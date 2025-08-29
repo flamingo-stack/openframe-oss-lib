@@ -1,41 +1,32 @@
 package com.openframe.document.tool;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
-import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 
 @Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
 @Document(collection = "tool_connections")
-@CompoundIndex(def = "{'machineId': 1, 'toolType': 1}", unique = true)
+@CompoundIndexes({
+        @CompoundIndex(name = "machine_tool_idx", def = "{'machineId': 1, 'toolType': 1}", unique = true),
+        @CompoundIndex(name = "tool_id_type_idx", def = "{'agentToolId': 1, 'toolType': 1}", unique = true) // Note this change
+})
 public class ToolConnection {
     @Id
     private String id;
 
-    @Indexed
     private String machineId;
-
-    @Indexed
+    private ToolType toolType;
     private String agentToolId;
 
-    private ToolType toolType;
-
     private ConnectionStatus status;
+    private String metadata;   // JSON string for tool-specific data
 
-    @CreatedDate
-    private Instant createdAt;
+    private Instant connectedAt;
+    private Instant lastSyncAt;
+    private Instant disconnectedAt;
 
-    @LastModifiedDate
-    private Instant updatedAt;
 }
