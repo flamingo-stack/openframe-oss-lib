@@ -26,14 +26,4 @@ public interface BaseUserRepository<T, B, ID> {
      * @return {@code Boolean} ({@code boolean} for blocking, {@code Mono<Boolean>} for reactive)
      */
     B existsByEmail(String email);
-
-    /**
-     * Find a user by their reset token.
-     * Default implementation provided for reactive repositories.
-     * Blocking repositories should override this.
-     *
-     * @param resetToken The reset token to search for
-     * @return The user wrapped in T ({@code Optional<User>} for blocking, {@code Mono<User>} for reactive)
-     */
-    T findByResetToken(String resetToken);
 } 

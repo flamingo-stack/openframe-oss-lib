@@ -1,4 +1,4 @@
-package com.openframe.data.repository.user;
+package com.openframe.data.repository.auth;
 
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.user.UserStatus;

@@ -15,7 +15,4 @@ public interface ReactiveUserRepository extends ReactiveMongoRepository<User, St
 
     @Override
     Mono<Boolean> existsByEmail(String email);
-
-    @Override
-    Mono<User> findByResetToken(String resetToken);
 } 

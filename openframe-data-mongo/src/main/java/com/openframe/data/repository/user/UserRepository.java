@@ -14,8 +14,5 @@ public interface UserRepository extends MongoRepository<User, String>, BaseUserR
     Optional<User> findByEmail(String email);
 
     @Override
-    Optional<User> findByResetToken(String resetToken);
-
-    @Override
     Boolean existsByEmail(String email);
 } 
