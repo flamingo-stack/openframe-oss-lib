@@ -1,0 +1,44 @@
+package com.openframe.data.document.sso;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+import java.time.LocalDateTime;
+
+/**
+ * SSO per-tenant configuration that inherits base SSOConfig (provider/client credentials, enabled)
+ * and adds tenant-specific linkage and timestamps.
+ */
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Document(collection = "sso_per_tenant_configs")
+@CompoundIndex(def = "{'tenantId': 1, 'provider': 1}", unique = true)
+public class SSOPerTenantConfig extends SSOConfig {
+    /**
+     * Tenant ID this SSO configuration belongs to
+     */
+    @Indexed
+    private String tenantId;
+
+    @CreatedDate
+    private LocalDateTime createdAt;
+
+    @LastModifiedDate
+    private LocalDateTime updatedAt;
+
+    /**
+     * Check if this SSO configuration is active (enabled and has credentials)
+     */
+    public boolean isActive() {
+        return isEnabled()
+                && getClientId() != null && !getClientId().trim().isEmpty()
+                && getClientSecret() != null && !getClientSecret().trim().isEmpty();
+    }
+}
