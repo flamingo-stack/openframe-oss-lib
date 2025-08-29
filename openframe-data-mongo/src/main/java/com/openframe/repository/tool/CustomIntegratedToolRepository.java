@@ -1,7 +1,7 @@
 package com.openframe.repository.tool;
 
-import com.openframe.documents.tool.IntegratedTool;
-import com.openframe.documents.tool.filter.ToolQueryFilter;
+import com.openframe.document.tool.IntegratedTool;
+import com.openframe.document.tool.filter.ToolQueryFilter;
 import org.springframework.data.mongodb.core.query.Query;
 
 import java.util.List;

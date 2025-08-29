@@ -1,6 +1,6 @@
 package com.openframe.repository.agent;
 
-import com.openframe.documents.agent.AgentRegistrationSecret;
+import com.openframe.document.agent.AgentRegistrationSecret;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;

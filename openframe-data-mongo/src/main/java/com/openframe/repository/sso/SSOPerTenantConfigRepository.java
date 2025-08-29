@@ -1,6 +1,6 @@
 package com.openframe.repository.sso;
 
-import com.openframe.documents.sso.SSOPerTenantConfig;
+import com.openframe.document.sso.SSOPerTenantConfig;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 

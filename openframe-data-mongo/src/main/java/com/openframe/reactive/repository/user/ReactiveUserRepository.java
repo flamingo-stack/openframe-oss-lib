@@ -1,6 +1,6 @@
 package com.openframe.reactive.repository.user;
 
-import com.openframe.documents.user.User;
+import com.openframe.document.user.User;
 import com.openframe.repository.user.BaseUserRepository;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.data.mongodb.repository.ReactiveMongoRepository;

@@ -1,6 +1,6 @@
 package com.openframe.repository.auth;
 
-import com.openframe.documents.auth.Tenant;
+import com.openframe.document.auth.Tenant;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;

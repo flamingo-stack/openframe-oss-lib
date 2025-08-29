@@ -1,7 +1,7 @@
 package com.openframe.repository.device;
 
-import com.openframe.documents.device.Machine;
-import com.openframe.documents.device.filter.MachineQueryFilter;
+import com.openframe.document.device.Machine;
+import com.openframe.document.device.filter.MachineQueryFilter;
 import org.springframework.data.mongodb.core.query.Query;
 
 import java.util.List;

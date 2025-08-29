@@ -1,0 +1,8 @@
+package com.openframe.document.device;
+
+public enum ComplianceState {
+    COMPLIANT,
+    NON_COMPLIANT,
+    IN_REMEDIATION,
+    UNKNOWN
+} 

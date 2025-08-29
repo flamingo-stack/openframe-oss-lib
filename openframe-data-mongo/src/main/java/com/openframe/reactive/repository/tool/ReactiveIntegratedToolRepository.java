@@ -1,6 +1,6 @@
 package com.openframe.reactive.repository.tool;
 
-import com.openframe.documents.tool.IntegratedTool;
+import com.openframe.document.tool.IntegratedTool;
 import com.openframe.repository.tool.BaseIntegratedToolRepository;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.data.mongodb.repository.ReactiveMongoRepository;

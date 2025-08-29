@@ -1,6 +1,6 @@
 package com.openframe.repository.device;
 
-import com.openframe.documents.device.MachineTag;
+import com.openframe.document.device.MachineTag;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 

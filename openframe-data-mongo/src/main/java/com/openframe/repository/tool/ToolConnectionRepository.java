@@ -1,7 +1,7 @@
 package com.openframe.repository.tool;
 
-import com.openframe.documents.tool.ToolConnection;
-import com.openframe.documents.tool.ToolType;
+import com.openframe.document.tool.ToolConnection;
+import com.openframe.document.tool.ToolType;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 

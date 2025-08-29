@@ -1,6 +1,6 @@
 package com.openframe.repository.event;
 
-import com.openframe.documents.event.ExternalApplicationEvent;
+import com.openframe.document.event.ExternalApplicationEvent;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;

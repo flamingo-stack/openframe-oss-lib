@@ -1,6 +1,6 @@
 package com.openframe.repository.oauth;
 
-import com.openframe.documents.oauth.MongoRegisteredClient;
+import com.openframe.document.oauth.MongoRegisteredClient;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 

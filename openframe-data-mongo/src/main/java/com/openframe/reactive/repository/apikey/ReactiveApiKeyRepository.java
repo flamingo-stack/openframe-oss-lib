@@ -1,6 +1,6 @@
 package com.openframe.reactive.repository.apikey;
 
-import com.openframe.documents.apikey.ApiKey;
+import com.openframe.document.apikey.ApiKey;
 import com.openframe.repository.apikey.BaseApiKeyRepository;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.data.mongodb.repository.Query;

@@ -1,7 +1,7 @@
 package com.openframe.repository.user;
 
-import com.openframe.documents.auth.AuthUser;
-import com.openframe.documents.user.UserStatus;
+import com.openframe.document.auth.AuthUser;
+import com.openframe.document.user.UserStatus;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 

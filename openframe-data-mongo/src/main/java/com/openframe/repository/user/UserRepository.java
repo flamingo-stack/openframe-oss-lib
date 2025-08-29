@@ -1,6 +1,6 @@
 package com.openframe.repository.user;
 
-import com.openframe.documents.user.User;
+import com.openframe.document.user.User;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;

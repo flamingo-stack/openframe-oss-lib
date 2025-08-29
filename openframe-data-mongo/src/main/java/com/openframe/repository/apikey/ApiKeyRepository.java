@@ -1,7 +1,7 @@
 package com.openframe.repository.apikey;
 
-import com.openframe.documents.apikey.ApiKey;
-import com.openframe.exceptions.ApiKeyNotFoundException;
+import com.openframe.document.apikey.ApiKey;
+import com.openframe.exception.ApiKeyNotFoundException;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
