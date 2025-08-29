@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.openframe.oss</groupId>
         <artifactId>openframe-oss-lib</artifactId>
-        <version>1.0.0</version>
+        <version>${revision}</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 

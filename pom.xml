@@ -4,9 +4,18 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
+    <properties>
+        <revision>1.0.0</revision>
+        <maven.compiler.release>21</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <spring.boot.version>3.2.5</spring.boot.version>
+        <lombok.version>1.18.32</lombok.version>
+    </properties>
+
     <groupId>com.openframe.oss</groupId>
     <artifactId>openframe-oss-lib</artifactId>
-    <version>1.0.0</version>
+    <version>${revision}</version>
     <packaging>pom</packaging>
 
     <name>OpenFrame OSS Libraries</name>
@@ -30,14 +39,6 @@
         <developerConnection>scm:git:ssh://git@github.com/Flamingo-CX/openframe-oss-lib.git</developerConnection>
         <tag>HEAD</tag>
     </scm>
-
-    <properties>
-        <maven.compiler.release>21</maven.compiler.release>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <spring.boot.version>3.2.5</spring.boot.version>
-        <lombok.version>1.18.32</lombok.version>
-    </properties>
 
     <dependencyManagement>
         <dependencies>
