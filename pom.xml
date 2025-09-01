@@ -32,6 +32,7 @@
     <modules>
         <module>openframe-data-mongo</module>
         <module>openframe-notification-mail</module>
+        <module>openframe-data-kafka</module>
     </modules>
 
     <scm>
