@@ -14,7 +14,7 @@
     <packaging>jar</packaging>
 
     <name>OpenFrame Data Mongo</name>
-    <description>MongoDB documents and repositories extracted from OpenFrame Authorization Server for multi-tenant
+    <description>MongoDB documents and repositories
         platform.
     </description>
     <url>https://github.com/flamingo-stack/openframe-oss-lib</url>
