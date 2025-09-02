@@ -68,7 +68,7 @@ jobs:
       - name: Build / Deploy
         run: |
           if [[ "${GITHUB_REF}" == refs/heads/feature/* || "${GITHUB_REF}" == refs/heads/fix/* ]]; then
-            mvn -B -ntp -DskipTests -Drevision="${SNAPSHOT_VERSION}" deploy
+            mvn -B -ntp -DskipTests deploy
           elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             mvn -B -ntp -DskipTests deploy
           else
