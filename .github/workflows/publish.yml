@@ -31,7 +31,7 @@ jobs:
           cache: 'maven'
           server-id: github
           server-username: ${{ github.actor }}
-          server-password: ${{ secrets.GITHUB_TOKEN }}
+          server-password: ${{ secrets.GH_PACKAGES_TOKEN }}
           overwrite-settings: true
 
       - name: Read version from POM (${revision})
@@ -75,5 +75,5 @@ jobs:
             mvn -B -ntp -DskipTests install
           fi
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
