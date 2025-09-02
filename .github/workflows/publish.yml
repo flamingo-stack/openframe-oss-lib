@@ -32,6 +32,7 @@ jobs:
           server-id: github
           server-username: ${{ github.actor }}
           server-password: ${{ secrets.GITHUB_TOKEN }}
+          overwrite-settings: true
 
       - name: Read version from POM (${revision})
         id: read-version
@@ -72,6 +73,9 @@ jobs:
           else
             mvn -B -ntp -DskipTests install
           fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
 
       - name: Deploy on tags
         if: startsWith(github.ref, 'refs/tags/')
