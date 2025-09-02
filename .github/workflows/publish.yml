@@ -65,23 +65,21 @@ jobs:
             echo "Tag ${GITHUB_REF_NAME} != v${VERSION}"; exit 1;
           fi
 
-      - name: Build only (branches)
+      - name: Build & deploy on branches
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         run: |
           if [[ "${GITHUB_REF}" == refs/heads/feature/* || "${GITHUB_REF}" == refs/heads/fix/* ]]; then
-            mvn -B -ntp -DskipTests -Drevision="${SNAPSHOT_VERSION}" deploy
+            mvn -B -ntp -DskipTests -Drevision="${SNAPSHOT_VERSION}" deploy -pl :openframe-data-mongo -am
           else
-            mvn -B -ntp -DskipTests install
+            mvn -B -ntp -DskipTests install -pl :openframe-data-mongo -am
           fi
-        working-directory: .
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
 
       - name: Deploy on tags
         if: startsWith(github.ref, 'refs/tags/')
-        run: mvn -B -ntp -DskipTests deploy
-        working-directory: .
+        run: mvn -B -ntp -DskipTests deploy -pl :openframe-data-mongo -am
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
