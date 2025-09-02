@@ -29,10 +29,10 @@ public class Tenant {
     private String id;
 
     /**
-     * Unique tenant name (organization name)
-     * Used for display and identification
+     * Tenant name (organization name). Not unique.
+     * Used primarily for display and identification.
      */
-    @Indexed(unique = true)
+    @Indexed
     private String name;
 
     /**
