@@ -30,7 +30,7 @@ jobs:
           java-version: '21'
           cache: 'maven'
           server-id: github
-          server-username: ${{ github.actor }}
+          server-username: ${{ secrets.GH_PACKAGES_USERNAME }}
           server-password: ${{ secrets.GH_PACKAGES_TOKEN }}
           overwrite-settings: true
 
@@ -48,8 +48,8 @@ jobs:
       - name: Auto-tag main with v${VERSION}
         if: github.ref == 'refs/heads/main'
         run: |
-          git config user.name "${{ github.actor }}"
-          git config user.email "${{ github.actor }}@users.noreply.github.com"
+          git config user.name "${{ secrets.GH_PACKAGES_USERNAME }}"
+          git config user.email "${{ secrets.GH_PACKAGES_USERNAME }}@users.noreply.github.com"
           git fetch --tags
           if ! git rev-parse "v${VERSION}" >/dev/null 2>&1; then
             git tag -a "v${VERSION}" -m "Release v${VERSION}"
@@ -76,4 +76,4 @@ jobs:
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
-          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_ACTOR: ${{ secrets.GH_PACKAGES_USERNAME }}
