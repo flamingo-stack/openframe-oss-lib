@@ -103,5 +103,10 @@
             <name>GitHub Flamingo-CX Apache Maven Packages</name>
             <url>https://maven.pkg.github.com/Flamingo-CX/openframe-oss-lib</url>
         </repository>
+        <snapshotRepository>
+            <id>github</id>
+            <name>GitHub Flamingo-CX Apache Maven Packages (Snapshots)</name>
+            <url>https://maven.pkg.github.com/Flamingo-CX/openframe-oss-lib</url>
+        </snapshotRepository>
     </distributionManagement>
 </project>
