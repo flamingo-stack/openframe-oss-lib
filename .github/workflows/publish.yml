@@ -73,6 +73,7 @@ jobs:
           else
             mvn -B -ntp -DskipTests install
           fi
+        working-directory: .
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
@@ -80,6 +81,7 @@ jobs:
       - name: Deploy on tags
         if: startsWith(github.ref, 'refs/tags/')
         run: mvn -B -ntp -DskipTests deploy
+        working-directory: .
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
