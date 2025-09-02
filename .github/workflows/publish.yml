@@ -24,8 +24,8 @@ jobs:
           java-version: '21'
           cache: 'maven'
           server-id: github
-          server-username: GITHUB_ACTOR
-          server-password: GITHUB_TOKEN
+          server-username: ${{ github.actor }}
+          server-password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Deploy all modules
         run: mvn -B -ntp -DskipTests deploy
