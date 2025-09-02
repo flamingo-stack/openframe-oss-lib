@@ -16,7 +16,7 @@
                 </repository>
                 <repository>
                     <id>github</id>
-                    <url>https://maven.pkg.github.com/Flamingo-CX/openframe-oss-lib</url>
+                    <url>https://maven.pkg.github.com/flamingo-stack/openframe-oss-lib</url>
                     <snapshots>
                         <enabled>true</enabled>
                     </snapshots>
