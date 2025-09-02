@@ -27,7 +27,7 @@
     </modules>
 
     <scm>
-        <url>https://github.com/Flamingo-CX/openframe-oss-lib</url>
+        <url>https://github.com/flamingo-stack/openframe-oss-lib</url>
         <connection>scm:git:https://github.com/flamingo-stack/openframe-oss-lib.git</connection>
         <developerConnection>scm:git:ssh://git@github.com/flamingo-stack/openframe-oss-lib.git</developerConnection>
         <tag>HEAD</tag>

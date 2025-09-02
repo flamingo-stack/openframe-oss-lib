@@ -34,6 +34,11 @@ jobs:
           server-password: ${{ secrets.GH_PACKAGES_TOKEN }}
           overwrite-settings: true
 
+      - name: Configure Maven settings
+        run: |
+          mkdir -p ~/.m2
+          cp .mvn/settings.xml ~/.m2/settings.xml
+
       - name: Read version from POM (${revision})
         id: read-version
         run: |
@@ -68,7 +73,7 @@ jobs:
       - name: Build / Deploy
         run: |
           if [[ "${GITHUB_REF}" == refs/heads/feature/* || "${GITHUB_REF}" == refs/heads/fix/* ]]; then
-            mvn -B -ntp -DskipTests deploy
+            mvn -B -ntp -DskipTests -Drevision="${SNAPSHOT_VERSION}" deploy
           elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             mvn -B -ntp -DskipTests deploy
           else
