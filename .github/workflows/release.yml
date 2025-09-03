@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., x.y.z)'
+        description: 'Version to release OSS Libs (x.y.z)'
         required: true
         type: string
 
@@ -30,34 +30,47 @@ jobs:
           distribution: 'temurin'
           cache: maven
       
-      - name: Get Next Patch Version
-        id: auto-version
+      - name: Get Old Version
+        env:
+          MAVEN_REGISTRY: maven.pkg.github.com
+          REPOSITORY: ${{ github.repository }}
+          OSS_LIB_ARTIFACT: com/openframe/oss/openframe-oss-lib
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          URL="https://$MAVEN_REGISTRY/$REPOSITORY/$OSS_LIB_ARTIFACT/maven-metadata.xml"
+          OLD_VERSION=$(curl -sf -H "Authorization: token $GITHUB_TOKEN" "$URL" | \
+                        grep -oP '<version>\K[0-9]+\.[0-9]+\.[0-9]+' | sort -V | tail -1 || echo "1.0.0")
+          echo "OLD_VERSION=$OLD_VERSION" >> $GITHUB_ENV
+          echo "Found old version: $OLD_VERSION"
+      
+      - name: Increment Version
         if: github.event_name == 'push'
         run: |
-          # Fetch latest version from registry
-          URL="https://maven.pkg.github.com/flamingo-stack/openframe-oss-lib"
-          METADATA=$(curl -sf -H "Authorization: token ${{ github.token }}" \
-            "$URL/com/openframe/oss/openframe-data-mongo/maven-metadata.xml" 2>/dev/null || echo "")
-          
-          # Extract latest version or use default
-          if [ -n "$METADATA" ]; then
-            LATEST=$(echo "$METADATA" | grep -oP '<version>\K[0-9]+\.[0-9]+\.[0-9]+' | sort -V | tail -1)
-          fi
-          LATEST=${LATEST:-1.0.0}
-          
-          # Increment patch version
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$LATEST"
-          NEW_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
-          
+          IFS='.' read -r major minor patch <<< "${{ steps.latest-version.outputs.LATEST }}"
+          NEW_VERSION="$major.$minor.$((patch + 1))"
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
-          echo "📦 Auto Version: $NEW_VERSION (previous: $NEW_VERSION)"
+          echo "${{ env.OLD_VERSION }} → $NEW_VERSION"
       
-
       - name: Set Manual Version
         if: github.event_name == 'workflow_dispatch'
+        env:
+          NEW_VERSION: ${{ github.event.inputs.version }}
         run: |
-          echo "NEW_VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
-          echo "Manual Version: ${{ github.event.inputs.version }}"
+          IFS='.' read -r old_major old_minor old_patch <<< "${{ env.OLD_VERSION }}"
+          IFS='.' read -r new_major new_minor new_patch <<< "$NEW_VERSION"
+
+          if [ "$new_major" != "$old_major" ]; then
+            # Major bump: must be +1, minor/patch must be 0
+            [ "$new_major" -eq $((old_major + 1)) ] && [ "$new_minor" -eq 0 ] && [ "$new_patch" -eq 0 ] || exit 1
+          elif [ "$new_minor" != "$old_minor" ]; then
+            # Minor bump: must be +1, patch must be 0
+            [ "$new_minor" -eq $((old_minor + 1)) ] && [ "$new_patch" -eq 0 ] || exit 1
+          else
+            # Patch bump: must be greater
+            [ "$new_patch" -gt "$old_patch" ] || exit 1
+          fi
+          echo "New version validated: ${{ env.OLD_VERSION }} → $NEW_VERSION"
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
       
       - name: Build
         run: mvn clean install -am -Dcompress --batch-mode
