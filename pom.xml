@@ -24,7 +24,6 @@
 
     <modules>
         <module>openframe-data-mongo</module>
-        <module>openframe-test-lib</module>
     </modules>
 
     <scm>
