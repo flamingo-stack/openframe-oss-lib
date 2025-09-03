@@ -49,7 +49,7 @@ jobs:
           IFS='.' read -r MAJOR MINOR PATCH <<< "$LATEST"
           NEW_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
           
-          echo "LATEST=$LATEST" >> $GITHUB_ENV
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
           echo "📦 Auto Version: $NEW_VERSION (previous: $NEW_VERSION)"
       
 
