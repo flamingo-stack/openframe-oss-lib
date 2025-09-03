@@ -5,15 +5,14 @@ permissions:
   packages: write
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+  push:
     branches: [feature/ci_release]
+    if: github.event_name == 'push'
 
 jobs:
   release:
     name: Build & Release
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
     
     steps:
       - uses: actions/checkout@v4

@@ -1,0 +1,40 @@
+name: OpenFrame OSS Libs Test
+
+permissions:
+  contents: read
+  packages: read
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [feature/ci_release]
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+
+
+jobs:
+  test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    
+    permissions:
+      contents: read
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+      
+      - name: Build & Test
+        run: mvn clean verify
+      
+      - name: Test Summary
+        if: always()
+        run: |
+          echo "## ✅ Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "Build and tests completed for PR #${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
