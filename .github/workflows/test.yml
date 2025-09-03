@@ -23,41 +23,18 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: maven
+
+      - name: Build & Test
+        run: mvn clean install -am -Dcompress --batch-mode
       
-      - name: Validate Project
-        run: mvn validate
-      
-      - name: Compile Sources
-        run: mvn compile
-      
-      - name: Compile Test Sources  
-        run: mvn test-compile
-      
-      - name: Run Unit Tests
-        run: mvn test
-      
-      - name: Package JARs
-        run: mvn package -DskipTests
-      
-      - name: Verify & Integration Tests
-        run: mvn verify -DskipUnitTests
-      
-      - name: Check Code Quality
-        run: |
-          # Check for common issues
-          echo "Checking for TODO/FIXME comments..."
-          find . -name "*.java" -exec grep -l "TODO\|FIXME" {} \; || echo "No TODOs found"
-          
-          # Validate POM files
-          echo "Validating POM files..."
-          mvn help:effective-pom -q > /dev/null && echo "✅ POMs are valid"
-      
-      - name: Upload Test Results
-        if: always()
+      - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: test-artifacts
           path: |
-            **/target/surefire-reports/
-            **/target/failsafe-reports/
-          retention-days: 30
+            **/target/*.jar
+            !**/target/original-*.jar
+            !**/target/*-sources.jar
+            !**/target/*-javadoc.jar
+          retention-days: 1
+          if-no-files-found: warn
