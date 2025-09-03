@@ -15,7 +15,7 @@
 
     <name>OpenFrame Test Library</name>
     <description>Test library module for demonstrating Maven release workflow</description>
-    <url>https://github.com/Flamingo-CX/openframe-oss-lib</url>
+    <url>https://github.com/flamingo-stack/openframe-oss-lib</url>
 
     <licenses>
         <license>
@@ -29,14 +29,14 @@
         <developer>
             <name>OpenFrame Team</name>
             <organization>OpenFrame</organization>
-            <organizationUrl>https://github.com/Flamingo-CX</organizationUrl>
+            <organizationUrl>https://github.com/flamingo-stack</organizationUrl>
         </developer>
     </developers>
 
     <scm>
-        <url>https://github.com/Flamingo-CX/openframe-oss-lib</url>
-        <connection>scm:git:https://github.com/Flamingo-CX/openframe-oss-lib.git</connection>
-        <developerConnection>scm:git:ssh://git@github.com/Flamingo-CX/openframe-oss-lib.git</developerConnection>
+        <url>https://github.com/flamingo-stack/openframe-oss-lib</url>
+        <connection>scm:git:https://github.com/flamingo-stack/openframe-oss-lib.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/flamingo-stack/openframe-oss-lib.git</developerConnection>
         <tag>HEAD</tag>
     </scm>
 
