@@ -17,7 +17,7 @@
     <description>MongoDB documents and repositories extracted from OpenFrame Authorization Server for multi-tenant
         platform.
     </description>
-    <url>https://github.com/Flamingo-CX/openframe-oss-lib</url>
+    <url>https://github.com/flamingo-stack/openframe-oss-lib</url>
 
     <licenses>
         <license>
@@ -31,35 +31,17 @@
         <developer>
             <name>OpenFrame Team</name>
             <organization>OpenFrame</organization>
-            <organizationUrl>https://github.com/Flamingo-CX</organizationUrl>
+            <organizationUrl>https://github.com/flamingo-stack</organizationUrl>
         </developer>
     </developers>
 
     <scm>
-        <url>https://github.com/Flamingo-CX/openframe-oss-lib</url>
-        <connection>scm:git:https://github.com/Flamingo-CX/openframe-oss-lib.git</connection>
-        <developerConnection>scm:git:ssh://git@github.com/Flamingo-CX/openframe-oss-lib.git</developerConnection>
+        <url>https://github.com/flamingo-stack/openframe-oss-lib</url>
+        <connection>scm:git:https://github.com/flamingo-stack/openframe-oss-lib.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/flamingo-stack/openframe-oss-lib.git</developerConnection>
         <tag>HEAD</tag>
     </scm>
 
-    <properties>
-        <maven.compiler.release>21</maven.compiler.release>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <spring.boot.version>3.2.5</spring.boot.version>
-    </properties>
-
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-dependencies</artifactId>
-                <version>${spring.boot.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
 
     <dependencies>
         <dependency>
@@ -132,7 +114,7 @@
         <repository>
             <id>github</id>
             <name>GitHub OWNER Apache Maven Packages</name>
-            <url>https://maven.pkg.github.com/OWNER/REPOSITORY</url>
+            <url>https://maven.pkg.github.com/flamingo-stack/openframe-oss-lib</url>
         </repository>
     </distributionManagement>
 </project>

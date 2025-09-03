@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <properties>
-        <revision>1.0.0</revision>
+        <revision>999-SNAPSHOT</revision>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
@@ -20,16 +20,16 @@
 
     <name>OpenFrame OSS Libraries</name>
     <description>Parent POM for OpenFrame OSS shared libraries with unified versioning.</description>
-    <url>https://github.com/Flamingo-CX/openframe-oss-lib</url>
+    <url>https://github.com/flamingo-stack/openframe-oss-lib</url>
 
     <modules>
         <module>openframe-data-mongo</module>
     </modules>
 
     <scm>
-        <url>https://github.com/Flamingo-CX/openframe-oss-lib</url>
-        <connection>scm:git:https://github.com/Flamingo-CX/openframe-oss-lib.git</connection>
-        <developerConnection>scm:git:ssh://git@github.com/Flamingo-CX/openframe-oss-lib.git</developerConnection>
+        <url>https://github.com/flamingo-stack/openframe-oss-lib</url>
+        <connection>scm:git:https://github.com/flamingo-stack/openframe-oss-lib.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/flamingo-stack/openframe-oss-lib.git</developerConnection>
         <tag>HEAD</tag>
     </scm>
 
@@ -86,14 +86,15 @@
                     </execution>
                 </executions>
             </plugin>
+
         </plugins>
     </build>
 
     <distributionManagement>
         <repository>
             <id>github</id>
-            <name>GitHub Flamingo-CX Apache Maven Packages</name>
-            <url>https://maven.pkg.github.com/Flamingo-CX/openframe-oss-lib</url>
+            <name>GitHub flamingo-stack Apache Maven Packages</name>
+            <url>https://maven.pkg.github.com/flamingo-stack/openframe-oss-lib</url>
         </repository>
     </distributionManagement>
 </project>
