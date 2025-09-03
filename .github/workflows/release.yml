@@ -43,7 +43,7 @@ jobs:
           echo "OLD_VERSION=$OLD_VERSION" >> $GITHUB_ENV
           echo "Found old version: $OLD_VERSION"
       
-      - name: Increment Version
+      - name: Set Auto Version
         if: github.event_name == 'push'
         run: |
           IFS='.' read -r major minor patch <<< "${{ env.OLD_VERSION }}"
