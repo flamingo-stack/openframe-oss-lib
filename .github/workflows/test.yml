@@ -24,11 +24,40 @@ jobs:
           distribution: 'temurin'
           cache: maven
       
-      - name: Build & Test
-        run: mvn clean verify
+      - name: Validate Project
+        run: mvn validate
       
-      - name: Test Summary
-        if: always()
+      - name: Compile Sources
+        run: mvn compile
+      
+      - name: Compile Test Sources  
+        run: mvn test-compile
+      
+      - name: Run Unit Tests
+        run: mvn test
+      
+      - name: Package JARs
+        run: mvn package -DskipTests
+      
+      - name: Verify & Integration Tests
+        run: mvn verify -DskipUnitTests
+      
+      - name: Check Code Quality
         run: |
-          echo "## ✅ Test Results" >> $GITHUB_STEP_SUMMARY
-          echo "Build and tests completed for PR #${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
+          # Check for common issues
+          echo "Checking for TODO/FIXME comments..."
+          find . -name "*.java" -exec grep -l "TODO\|FIXME" {} \; || echo "No TODOs found"
+          
+          # Validate POM files
+          echo "Validating POM files..."
+          mvn help:effective-pom -q > /dev/null && echo "✅ POMs are valid"
+      
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            **/target/surefire-reports/
+            **/target/failsafe-reports/
+          retention-days: 30
