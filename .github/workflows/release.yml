@@ -7,12 +7,18 @@ permissions:
 on:
   push:
     branches: [feature/ci_release]
-    if: github.event_name == 'push'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., x.y.z)'
+        required: true
+        type: string
 
 jobs:
   release:
     name: Build & Release
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' or github.event_name == 'workflow_dispatch'
     
     steps:
       - uses: actions/checkout@v4
@@ -24,8 +30,9 @@ jobs:
           distribution: 'temurin'
           cache: maven
       
-      - name: Get Next Version
-        id: version
+      - name: Get Next Patch Version
+        id: auto-version
+        if: github.event_name == 'push'
         run: |
           # Fetch latest version from registry
           URL="https://maven.pkg.github.com/flamingo-stack/openframe-oss-lib"
@@ -42,17 +49,23 @@ jobs:
           IFS='.' read -r MAJOR MINOR PATCH <<< "$LATEST"
           NEW_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
           
-          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "📦 Version: $NEW_VERSION (previous: $LATEST)"
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+          echo "📦 Auto Version: $NEW_VERSION (previous: $LATEST)"
+      
+      - name: Set Manual Version
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          echo "NEW_VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+          echo "📦 Manual Version: ${{ github.event.inputs.version }}"
       
       - name: Build & Test
         run: mvn clean install -am -Dcompress --batch-mode
       
-      - name: Deploy ${{ steps.version.outputs.version }}
+      - name: Deploy ${{ env.NEW_VERSION }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          mvn versions:set -DnewVersion="${{ steps.version.outputs.version }}" -DgenerateBackupPoms=false
+          mvn versions:set -DnewVersion="${{ env.NEW_VERSION }}" -DgenerateBackupPoms=false
           mvn deploy -DskipTests -s .mvn/settings.xml
       
       - name: Deploy Latest
