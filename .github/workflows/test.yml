@@ -24,7 +24,7 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Build & Test
+      - name: Build
         run: mvn clean install -am -Dcompress --batch-mode
       
       - name: Upload Build Artifacts
