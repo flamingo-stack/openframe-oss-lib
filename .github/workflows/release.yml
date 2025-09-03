@@ -40,7 +40,7 @@ jobs:
           URL="https://$MAVEN_REGISTRY/$REPOSITORY/$OSS_LIB_ARTIFACT/maven-metadata.xml"
           OLD_VERSION=$(curl -sf -H "Authorization: token $GITHUB_TOKEN" "$URL" | \
                         grep -oP '<version>\K[0-9]+\.[0-9]+\.[0-9]+' | sort -V | tail -1)
-          OLD_VERSION=${OLD_VERSION:-1.0.0}
+          OLD_VERSION=${OLD_VERSION:-0.0.0}
           echo "OLD_VERSION=$OLD_VERSION" >> $GITHUB_ENV
           echo "Found old version: $OLD_VERSION"
       
