@@ -59,7 +59,7 @@ jobs:
           echo "NEW_VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
           echo "Manual Version: ${{ github.event.inputs.version }}"
       
-      - name: Build & Test
+      - name: Build
         run: mvn clean install -am -Dcompress --batch-mode
       
       - name: Deploy ${{ env.NEW_VERSION }}
@@ -67,11 +67,4 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           mvn versions:set -DnewVersion="${{ env.NEW_VERSION }}" -DgenerateBackupPoms=false
-          mvn deploy -DskipTests -s .mvn/settings.xml
-      
-      - name: Deploy Latest
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          mvn versions:set -DnewVersion="latest" -DgenerateBackupPoms=false
           mvn deploy -DskipTests -s .mvn/settings.xml
