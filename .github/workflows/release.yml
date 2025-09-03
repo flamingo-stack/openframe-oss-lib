@@ -53,7 +53,7 @@ jobs:
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
           echo "📦 Auto Version: $LATEST (previous: $LATEST)"
       
-      
+
       # - name: Set Manual Version
       #   if: github.event_name == 'workflow_dispatch'
       #   run: |
@@ -63,11 +63,11 @@ jobs:
       - name: Build & Test
         run: mvn clean install -am -Dcompress --batch-mode
       
-      - name: Deploy ${{ env.NEW_VERSION }}
+      - name: Deploy ${{ env.LATEST }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          mvn versions:set -DnewVersion="${{ env.NEW_VERSION }}" -DgenerateBackupPoms=false
+          mvn versions:set -DnewVersion="${{ env.LATEST }}" -DgenerateBackupPoms=false
           mvn deploy -DskipTests -s .mvn/settings.xml
       
       - name: Deploy Latest
