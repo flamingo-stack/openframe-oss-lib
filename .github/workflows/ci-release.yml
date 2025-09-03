@@ -41,7 +41,7 @@ jobs:
           
           # Increment patch version
           IFS='.' read -r MAJOR MINOR PATCH <<< "$LATEST"
-          NEW_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))-PR${{ github.event.pull_request.number }}-SNAPSHOT"
+          NEW_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
           
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "📦 Version: $NEW_VERSION (previous: $LATEST)"
