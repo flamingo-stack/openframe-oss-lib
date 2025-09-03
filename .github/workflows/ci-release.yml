@@ -58,7 +58,8 @@ jobs:
       - name: Deploy to GitHub Packages
         run: |
           echo "Deploying version ${{ steps.version.outputs.version }} to GitHub Packages..."
-          mvn -B deploy -DskipTests -s $GITHUB_WORKSPACE/settings.xml
+          # Deploy all modules in the correct order
+          mvn -B clean deploy -DskipTests -DaltDeploymentRepository=github::https://maven.pkg.github.com/flamingo-stack/openframe-oss-lib -s .mvn/settings.xml
         env:
           GITHUB_TOKEN: ${{ github.token }}
       
