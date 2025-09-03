@@ -6,7 +6,7 @@ permissions:
 
 on:
   push:
-    branches: [feature/ci_release]
+    branches: [main]
   workflow_dispatch:
     inputs:
       version:
@@ -67,7 +67,7 @@ jobs:
             [ "$new_minor" -eq $((old_minor + 1)) ] && [ "$new_patch" -eq 0 ] || exit 1
           else
             # Patch bump: must be greater
-            [ "$new_patch" -gt "$old_patch" ] || exit 1
+            [ "$new_patch" -eq $((old_patch + 1)) ] || exit 1
           fi
           echo "New version validated: ${{ env.OLD_VERSION }} → $NEW_VERSION"
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
