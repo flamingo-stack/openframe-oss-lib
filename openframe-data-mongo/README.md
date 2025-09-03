@@ -5,7 +5,7 @@ server for reuse.
 
 Contents:
 
-- `document/` domain documents (Mongo) used by multi-tenant auth
+- `document/` domain documents (Mongo) used by multi-tenant
 - `repository/` Spring Data repositories for the documents
 
 Scope:
@@ -16,4 +16,3 @@ Scope:
 Publishing:
 
 - Configured to publish to GitHub Packages via Actions on tag `v*.*.*`
-
