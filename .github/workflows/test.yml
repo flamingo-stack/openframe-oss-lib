@@ -2,7 +2,6 @@ name: OpenFrame OSS Libs Test
 
 permissions:
   contents: read
-  packages: read
 
 on:
   pull_request:
@@ -14,10 +13,6 @@ jobs:
   test:
     name: Build & Test
     runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false
-    
-    permissions:
-      contents: read
     
     steps:
       - uses: actions/checkout@v4
