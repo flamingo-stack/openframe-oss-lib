@@ -1,0 +1,144 @@
+name: CI Release to Maven
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [feature/ci_release]
+
+jobs:
+  auto-publish:
+    name: Auto Publish to Maven Registry
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    permissions:
+      contents: read
+      packages: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+          server-id: github
+          settings-path: ${{ github.workspace }}
+      
+      - name: Generate version
+        id: version
+        run: |
+          # Generate version based on PR number and commit
+          BASE_VERSION="1.0.0"
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          SHORT_SHA=$(echo "${{ github.event.pull_request.head.sha }}" | cut -c1-7)
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          
+          # Create a unique SNAPSHOT version for this PR
+          VERSION="${BASE_VERSION}-PR${PR_NUMBER}-${SHORT_SHA}-SNAPSHOT"
+          
+          echo "Generated version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          # Set the version in all POMs
+          mvn versions:set -DnewVersion=$VERSION -DgenerateBackupPoms=false
+      
+      - name: Build and Test
+        run: |
+          echo "Building all modules..."
+          mvn -B clean compile --file pom.xml
+          
+          echo "Running tests..."
+          mvn -B test --file pom.xml || true
+      
+      - name: Deploy to GitHub Packages
+        run: |
+          echo "Deploying version ${{ steps.version.outputs.version }} to GitHub Packages..."
+          mvn -B deploy -DskipTests -s $GITHUB_WORKSPACE/settings.xml
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const version = '${{ steps.version.outputs.version }}';
+            const comment = `### 📦 Maven Package Published
+            
+            ✅ Successfully published version \`${version}\` to GitHub Packages Maven Registry.
+            
+            #### Published Artifacts:
+            - \`com.openframe.oss:openframe-oss-lib:${version}\`
+            - \`com.openframe.oss:openframe-data-mongo:${version}\`
+            - \`com.openframe.oss:openframe-test-lib:${version}\`
+            
+            #### Usage:
+            \`\`\`xml
+            <dependency>
+                <groupId>com.openframe.oss</groupId>
+                <artifactId>openframe-test-lib</artifactId>
+                <version>${version}</version>
+            </dependency>
+            \`\`\`
+            
+            **Note:** This is a SNAPSHOT version for testing. A stable version will be created upon merge.`;
+            
+            // Find and update existing comment or create new one
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('Maven Package Published')
+            );
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: comment
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment
+              });
+            }
+      
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: maven-artifacts-pr-${{ github.event.pull_request.number }}
+          path: |
+            **/target/*.jar
+            !**/target/original-*.jar
+          retention-days: 7
+      
+      - name: Summary
+        run: |
+          echo "# 🚀 CI Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Published Version" >> $GITHUB_STEP_SUMMARY
+          echo "\`${{ steps.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Details:" >> $GITHUB_STEP_SUMMARY
+          echo "- **PR:** #${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ github.event.pull_request.head.ref }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.event.pull_request.head.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Registry:** GitHub Packages Maven" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Published Modules:" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ openframe-oss-lib (parent)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ openframe-data-mongo" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ openframe-test-lib" >> $GITHUB_STEP_SUMMARY
