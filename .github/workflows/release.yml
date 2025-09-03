@@ -46,7 +46,7 @@ jobs:
       - name: Increment Version
         if: github.event_name == 'push'
         run: |
-          IFS='.' read -r major minor patch <<< "${{ steps.latest-version.outputs.LATEST }}"
+          IFS='.' read -r major minor patch <<< "${{ env.OLD_VERSION }}"
           NEW_VERSION="$major.$minor.$((patch + 1))"
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
           echo "${{ env.OLD_VERSION }} → $NEW_VERSION"
