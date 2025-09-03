@@ -10,7 +10,6 @@ on:
     branches: [feature/ci_release]
     if: github.event_name == 'pull_request' && !github.event.pull_request.draft
 
-
 jobs:
   test:
     name: Build & Test
