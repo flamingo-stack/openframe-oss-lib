@@ -6,7 +6,7 @@ permissions:
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    branches: [feature/ci_release]
+    branches: [main]
 
 jobs:
   test:
