@@ -7,18 +7,19 @@ permissions:
 on:
   push:
     branches: [feature/ci_release]
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to release (e.g., x.y.z)'
-        required: true
-        type: string
+  # workflow_dispatch:
+  #   inputs:
+  #     version:
+  #       description: 'Version to release (e.g., x.y.z)'
+  #       required: true
+  #       type: string
 
 jobs:
   release:
     name: Build & Release
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' 
+    # || github.event_name == 'workflow_dispatch'
     
     steps:
       - uses: actions/checkout@v4
@@ -52,11 +53,11 @@ jobs:
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
           echo "📦 Auto Version: $NEW_VERSION (previous: $LATEST)"
       
-      - name: Set Manual Version
-        if: github.event_name == 'workflow_dispatch'
-        run: |
-          echo "NEW_VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
-          echo "📦 Manual Version: ${{ github.event.inputs.version }}"
+      # - name: Set Manual Version
+      #   if: github.event_name == 'workflow_dispatch'
+      #   run: |
+      #     echo "NEW_VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+      #     echo "📦 Manual Version: ${{ github.event.inputs.version }}"
       
       - name: Build & Test
         run: mvn clean install -am -Dcompress --batch-mode
