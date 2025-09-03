@@ -70,7 +70,7 @@ jobs:
             const version = '${{ steps.version.outputs.version }}';
             const comment = `### 📦 Maven Package Published
             
-            ✅ Successfully published version \`${version}\` to GitHub Packages Maven Registry.
+            Successfully published version \`${version}\` to GitHub Packages Maven Registry.
             
             #### Published Artifacts:
             - \`com.openframe.oss:openframe-oss-lib:${version}\`
