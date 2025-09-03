@@ -1,4 +1,4 @@
-name: OpenFrame OSS Libs Publish
+name: OpenFrame OSS Libs Release
 
 permissions:
   contents: read
@@ -10,8 +10,8 @@ on:
     branches: [feature/ci_release]
 
 jobs:
-  publish:
-    name: Build & Publish
+  release:
+    name: Build & Release
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' && !github.event.pull_request.draft
     
