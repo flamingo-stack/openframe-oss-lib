@@ -45,26 +45,19 @@ jobs:
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "📦 Version: $NEW_VERSION (previous: $LATEST)"
       
-      - name: Set Version
-        run: mvn versions:set -DnewVersion="${{ steps.version.outputs.version }}" -DgenerateBackupPoms=false
-      
       - name: Build & Test
-        run: mvn clean verify
+        run: mvn clean install -am -Dcompress --batch-mode
       
-      - name: Deploy
-        run: mvn deploy -DskipTests -s .mvn/settings.xml
+      - name: Deploy ${{ steps.version.outputs.version }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
-      
-      - name: Summary
-        if: always()
         run: |
-          cat >> $GITHUB_STEP_SUMMARY << EOF
-          ## 📦 CI Release: \`${{ steps.version.outputs.version }}\`
-          
-          **PR #${{ github.event.pull_request.number }}** • ${GITHUB_SHA:0:7}
-          
-          ### Published to GitHub Packages:
-          - com.openframe.oss:openframe-data-mongo
-          - com.openframe.oss:openframe-test-lib
-          EOF
+          mvn versions:set -DnewVersion="${{ steps.version.outputs.version }}" -DgenerateBackupPoms=false
+          mvn deploy -DskipTests -s .mvn/settings.xml
+      
+      - name: Deploy Latest
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          mvn versions:set -DnewVersion="latest" -DgenerateBackupPoms=false
+          mvn deploy -DskipTests -s .mvn/settings.xml
