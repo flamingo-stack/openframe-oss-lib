@@ -75,7 +75,14 @@ jobs:
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
       
       - name: Build
-        run: mvn clean install -am -Dcompress --batch-mode
+        run: |
+          mvn clean install \
+            -am \
+            -Dcompress \
+            --threads 2C \
+            --batch-mode \
+            --no-transfer-progress \
+            -Dmaven.javadoc.skip=true
       
       - name: Deploy ${{ env.NEW_VERSION }}
         env:
