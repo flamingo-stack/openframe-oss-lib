@@ -8,6 +8,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.*;
+import org.springframework.kafka.listener.ContainerProperties;
 
 /**
  * Autoconfiguration for shared Kafka cluster using spring.kafka.shared prefix.
@@ -24,7 +25,7 @@ public class SharedKafkaAutoConfiguration {
      */
     @Bean("sharedKafkaProducerFactory")
     public ProducerFactory<String, Object> sharedKafkaProducerFactory(SharedKafkaProperties properties) {
-        var producerProperties = properties.buildProducerProperties(null);
+        var producerProperties = properties.getKafka().buildProducerProperties(null);
         return new DefaultKafkaProducerFactory<>(producerProperties);
     }
 
@@ -38,7 +39,7 @@ public class SharedKafkaAutoConfiguration {
         var template = new KafkaTemplate<>(sharedKafkaProducerFactory);
         
         // Apply template settings from properties
-        var templateProperties = properties.getTemplate();
+        var templateProperties = properties.getKafka().getTemplate();
         if (templateProperties.getDefaultTopic() != null) {
             template.setDefaultTopic(templateProperties.getDefaultTopic());
         }
@@ -51,7 +52,7 @@ public class SharedKafkaAutoConfiguration {
      */
     @Bean("sharedKafkaConsumerFactory")
     public ConsumerFactory<Object, Object> sharedKafkaConsumerFactory(SharedKafkaProperties properties) {
-        var consumerProperties = properties.buildConsumerProperties(null);
+        var consumerProperties = properties.getKafka().buildConsumerProperties(null);
         return new DefaultKafkaConsumerFactory<>(consumerProperties);
     }
 
@@ -67,13 +68,20 @@ public class SharedKafkaAutoConfiguration {
         factory.setConsumerFactory(sharedKafkaConsumerFactory);
 
         // Apply listener settings from properties
-        var listenerProperties = properties.getListener();
+        var listenerProperties = properties.getKafka().getListener();
         
         if (listenerProperties.getConcurrency() != null) {
             factory.setConcurrency(listenerProperties.getConcurrency());
         }
         
-        factory.getContainerProperties().setAckMode(listenerProperties.getAckMode());
+        // Set ackMode with default fallback if not configured
+        var ackMode = listenerProperties.getAckMode();
+        if (ackMode != null) {
+            factory.getContainerProperties().setAckMode(ackMode);
+        } else {
+            // Default to BATCH ackMode if not specified
+            factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.RECORD);
+        }
         
         if (listenerProperties.getPollTimeout() != null) {
             factory.getContainerProperties().setPollTimeout(listenerProperties.getPollTimeout().toMillis());

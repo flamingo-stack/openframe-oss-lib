@@ -1,6 +1,5 @@
 package com.openframe.kafka.config;
 
-import com.openframe.kafka.producer.GenericKafkaProducer;
 import com.openframe.kafka.producer.KafkaProducer;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -8,38 +7,38 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
-import org.springframework.kafka.config.KafkaStreamsConfiguration;
 import org.springframework.kafka.core.*;
+import org.springframework.kafka.listener.ContainerProperties;
 
 /**
- * Auto-configuration for main/tenant Kafka cluster using standard spring.kafka prefix.
+ * Auto-configuration for main/OSS Kafka cluster using spring.oss-kafka prefix.
  * Creates all necessary beans for Kafka operations: Producer, Consumer, Admin, Streams.
  */
 @AutoConfiguration
-@EnableConfigurationProperties(TenantKafkaProperties.class)
-@ConditionalOnProperty(prefix = "spring.kafka", name = "enabled", havingValue = "true", matchIfMissing = true)
-public class TenantKafkaAutoConfiguration {
+@EnableConfigurationProperties(OssKafkaProperties.class)
+@ConditionalOnProperty(prefix = "spring.oss-kafka", name = "enabled", havingValue = "true", matchIfMissing = true)
+public class OssKafkaAutoConfiguration {
 
     /**
-     * ProducerFactory for tenant cluster
+     * ProducerFactory for OSS cluster
      */
-    @Bean("kafkaProducerFactory")
-    public ProducerFactory<String, Object> kafkaProducerFactory(TenantKafkaProperties properties) {
-        var producerProperties = properties.buildProducerProperties(null);
+    @Bean("ossKafkaProducerFactory")
+    public ProducerFactory<String, Object> kafkaProducerFactory(OssKafkaProperties properties) {
+        var producerProperties = properties.getKafka().buildProducerProperties(null);
         return new DefaultKafkaProducerFactory<>(producerProperties);
     }
 
     /**
-     * KafkaTemplate for tenant cluster
+     * KafkaTemplate for OSS cluster
      */
-    @Bean("kafkaTemplate")
-    public KafkaTemplate<String, Object> kafkaTemplate(
-            ProducerFactory<String, Object> kafkaProducerFactory,
-            TenantKafkaProperties properties) {
-        var template = new KafkaTemplate<>(kafkaProducerFactory);
+    @Bean("ossKafkaTemplate")
+    public KafkaTemplate<String, Object> ossKafkaTemplate(
+            ProducerFactory<String, Object> ossKafkaProducerFactory,
+            OssKafkaProperties properties) {
+        var template = new KafkaTemplate<>(ossKafkaProducerFactory);
         
         // Apply template settings from properties
-        var templateProperties = properties.getTemplate();
+        var templateProperties = properties.getKafka().getTemplate();
         if (templateProperties.getDefaultTopic() != null) {
             template.setDefaultTopic(templateProperties.getDefaultTopic());
         }
@@ -48,33 +47,40 @@ public class TenantKafkaAutoConfiguration {
     }
 
     /**
-     * ConsumerFactory for tenant cluster
+     * ConsumerFactory for OSS cluster
      */
-    @Bean("kafkaConsumerFactory")
-    public ConsumerFactory<Object, Object> kafkaConsumerFactory(TenantKafkaProperties properties) {
-        var consumerProperties = properties.buildConsumerProperties(null);
+    @Bean("ossKafkaConsumerFactory")
+    public ConsumerFactory<Object, Object> ossKafkaConsumerFactory(OssKafkaProperties properties) {
+        var consumerProperties = properties.getKafka().buildConsumerProperties(null);
         return new DefaultKafkaConsumerFactory<>(consumerProperties);
     }
 
     /**
-     * KafkaListenerContainerFactory for tenant cluster
+     * KafkaListenerContainerFactory for OSS cluster
      */
     @Bean("kafkaListenerContainerFactory")
     public ConcurrentKafkaListenerContainerFactory<Object, Object> kafkaListenerContainerFactory(
-            ConsumerFactory<Object, Object> kafkaConsumerFactory,
-            TenantKafkaProperties properties) {
+            ConsumerFactory<Object, Object> ossKafkaConsumerFactory,
+            OssKafkaProperties properties) {
         
         var factory = new ConcurrentKafkaListenerContainerFactory<Object, Object>();
-        factory.setConsumerFactory(kafkaConsumerFactory);
+        factory.setConsumerFactory(ossKafkaConsumerFactory);
 
         // Apply listener settings from properties
-        var listenerProperties = properties.getListener();
+        var listenerProperties = properties.getKafka().getListener();
         
         if (listenerProperties.getConcurrency() != null) {
             factory.setConcurrency(listenerProperties.getConcurrency());
         }
         
-        factory.getContainerProperties().setAckMode(listenerProperties.getAckMode());
+        // Set ackMode with default fallback if not configured
+        var ackMode = listenerProperties.getAckMode();
+        if (ackMode != null) {
+            factory.getContainerProperties().setAckMode(ackMode);
+        } else {
+            // Default to BATCH ackMode if not specified
+            factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.RECORD);
+        }
         
         if (listenerProperties.getPollTimeout() != null) {
             factory.getContainerProperties().setPollTimeout(listenerProperties.getPollTimeout().toMillis());
@@ -92,10 +98,10 @@ public class TenantKafkaAutoConfiguration {
     }
 
     /**
-     * GenericKafkaProducer for tenant cluster
+     * GenericKafkaProducer for OSS cluster
      */
-    @Bean("kafkaProducer")
-    public KafkaProducer kafkaProducer(@Qualifier("kafkaTemplate") KafkaTemplate<String, Object> kafkaTemplate) {
-        return new KafkaProducer(kafkaTemplate);
+    @Bean("ossKafkaProducer")
+    public KafkaProducer kafkaProducer(@Qualifier("ossKafkaTemplate") KafkaTemplate<String, Object> ossKafkaTemplate) {
+        return new KafkaProducer(ossKafkaTemplate);
     }
 }

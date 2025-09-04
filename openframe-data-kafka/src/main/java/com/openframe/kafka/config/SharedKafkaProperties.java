@@ -9,5 +9,18 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * Activated only when spring.kafka.shared.bootstrap-servers is configured.
  */
 @ConfigurationProperties(prefix = "spring.shared-kafka")
-public class SharedKafkaProperties extends KafkaProperties {
+public class SharedKafkaProperties {
+    private boolean enabled = true;
+
+    private final KafkaProperties kafka = new KafkaProperties();
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    public KafkaProperties getKafka() { return kafka; }
 }
