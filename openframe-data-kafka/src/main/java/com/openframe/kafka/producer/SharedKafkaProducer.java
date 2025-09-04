@@ -4,8 +4,8 @@ import org.springframework.kafka.core.KafkaTemplate;
 
 public class SharedKafkaProducer extends GenericKafkaProducer {
 
-    public SharedKafkaProducer(KafkaTemplate<String, Object> kafkaTemplate) {
-        super(kafkaTemplate);
+    public SharedKafkaProducer(KafkaTemplate<String, Object> sharedKafkaTemplate) {
+        super(sharedKafkaTemplate);
     }
 
 }

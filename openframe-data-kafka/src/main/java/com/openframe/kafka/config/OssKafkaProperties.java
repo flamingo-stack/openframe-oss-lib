@@ -4,18 +4,20 @@ import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Configuration properties for tenant Kafka cluster using standard spring.kafka prefix.
+ * Configuration properties for OSS Kafka cluster using spring.oss-kafka prefix.
  * Inherits all possible parameters from standard KafkaProperties.
  * This is the main/default Kafka cluster configuration.
  */
-@ConfigurationProperties(prefix = "spring.kafka")
-public class TenantKafkaProperties extends KafkaProperties {
+@ConfigurationProperties(prefix = "spring.oss-kafka")
+public class OssKafkaProperties {
     
     /**
-     * Enable tenant Kafka cluster configuration.
+     * Enable OSS Kafka cluster configuration.
      * Enabled by default.
      */
     private boolean enabled = true;
+
+    private final KafkaProperties kafka = new KafkaProperties();
 
     public boolean isEnabled() {
         return enabled;
@@ -24,4 +26,6 @@ public class TenantKafkaProperties extends KafkaProperties {
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
     }
+
+    public KafkaProperties getKafka() { return kafka; }
 }
