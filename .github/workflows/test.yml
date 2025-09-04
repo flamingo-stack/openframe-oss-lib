@@ -25,7 +25,6 @@ jobs:
           cache: maven
 
       - name: Build
-        run: mvn clean install -am -Dcompress --batch-mode
         run: |
           mvn clean install \
             -am \
