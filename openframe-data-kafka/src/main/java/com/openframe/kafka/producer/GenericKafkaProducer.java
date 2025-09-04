@@ -5,7 +5,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.messaging.MessageDeliveryException;
 
 @Slf4j
-public class GenericKafkaProducer {
+public abstract class GenericKafkaProducer {
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
