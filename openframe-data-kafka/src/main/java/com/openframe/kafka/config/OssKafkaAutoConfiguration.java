@@ -16,7 +16,7 @@ import org.springframework.kafka.listener.ContainerProperties;
  */
 @AutoConfiguration
 @EnableConfigurationProperties(OssKafkaProperties.class)
-@ConditionalOnProperty(prefix = "spring.oss-kafka", name = "enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(prefix = "spring.oss-tenant", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class OssKafkaAutoConfiguration {
 
     /**
