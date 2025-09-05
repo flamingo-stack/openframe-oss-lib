@@ -8,7 +8,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * Inherits all possible parameters from standard KafkaProperties.
  * Activated only when spring.kafka.shared.bootstrap-servers is configured.
  */
-@ConfigurationProperties(prefix = "spring.shared-kafka")
+@ConfigurationProperties(prefix = "spring.shared-cluster")
 public class SharedKafkaProperties {
     private boolean enabled = true;
 
