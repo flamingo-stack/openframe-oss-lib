@@ -2,6 +2,7 @@ package com.openframe.data.document.sso;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
@@ -16,6 +17,7 @@ import java.time.LocalDateTime;
  * and adds tenant-specific linkage and timestamps.
  */
 @Data
+@EqualsAndHashCode(callSuper = true)
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "sso_per_tenant_configs")
@@ -32,13 +34,4 @@ public class SSOPerTenantConfig extends SSOConfig {
 
     @LastModifiedDate
     private LocalDateTime updatedAt;
-
-    /**
-     * Check if this SSO configuration is active (enabled and has credentials)
-     */
-    public boolean isActive() {
-        return isEnabled()
-                && getClientId() != null && !getClientId().trim().isEmpty()
-                && getClientSecret() != null && !getClientSecret().trim().isEmpty();
-    }
 }
