@@ -17,7 +17,7 @@ import org.springframework.kafka.listener.ContainerProperties;
  */
 @AutoConfiguration
 @EnableConfigurationProperties(SharedKafkaProperties.class)
-@ConditionalOnProperty(prefix = "spring.shared-kafka", name = "bootstrap-servers")
+@ConditionalOnProperty(prefix = "spring.shared-cluster", name = "bootstrap-servers")
 public class SharedKafkaAutoConfiguration {
 
     /**
