@@ -1,6 +1,9 @@
 package com.openframe.kafka.config;
 
-import com.openframe.kafka.producer.SharedKafkaProducer;
+import com.openframe.kafka.producer.OssTenantKafkaProducer;
+import com.openframe.kafka.producer.OssTenantMessageProducer;
+import com.openframe.kafka.producer.SaasKafkaProducer;
+import com.openframe.kafka.producer.SaasMessageProducer;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -11,32 +14,32 @@ import org.springframework.kafka.core.*;
 import org.springframework.kafka.listener.ContainerProperties;
 
 /**
- * Autoconfiguration for shared Kafka cluster using spring.kafka.shared prefix.
+ * Autoconfiguration for saas Kafka cluster using spring.kafka.saas prefix.
  * Creates all necessary beans for Kafka operations: Producer, Consumer, Admin, Streams.
- * Activated only when spring.kafka.shared.bootstrap-servers is configured.
+ * Activated only when spring.kafka.saas.bootstrap-servers is configured.
  */
 @AutoConfiguration
-@EnableConfigurationProperties(SharedKafkaProperties.class)
-@ConditionalOnProperty(prefix = "spring.shared-cluster", name = "bootstrap-servers")
-public class SharedKafkaAutoConfiguration {
+@EnableConfigurationProperties(SaasKafkaProperties.class)
+@ConditionalOnProperty(prefix = "spring.saas", name = "enabled", havingValue = "true")
+public class SaasKafkaAutoConfiguration {
 
     /**
-     * ProducerFactory for shared cluster
+     * ProducerFactory for saas cluster
      */
-    @Bean("sharedKafkaProducerFactory")
-    public ProducerFactory<String, Object> sharedKafkaProducerFactory(SharedKafkaProperties properties) {
+    @Bean("saasKafkaProducerFactory")
+    public ProducerFactory<String, Object> saasKafkaProducerFactory(SaasKafkaProperties properties) {
         var producerProperties = properties.getKafka().buildProducerProperties(null);
         return new DefaultKafkaProducerFactory<>(producerProperties);
     }
 
     /**
-     * KafkaTemplate for shared cluster
+     * KafkaTemplate for saas cluster
      */
-    @Bean("sharedKafkaTemplate")
-    public KafkaTemplate<String, Object> sharedKafkaTemplate(
-            ProducerFactory<String, Object> sharedKafkaProducerFactory,
-            SharedKafkaProperties properties) {
-        var template = new KafkaTemplate<>(sharedKafkaProducerFactory);
+    @Bean("saasKafkaTemplate")
+    public KafkaTemplate<String, Object> saasKafkaTemplate(
+            ProducerFactory<String, Object> saasKafkaProducerFactory,
+            SaasKafkaProperties properties) {
+        var template = new KafkaTemplate<>(saasKafkaProducerFactory);
         
         // Apply template settings from properties
         var templateProperties = properties.getKafka().getTemplate();
@@ -48,24 +51,24 @@ public class SharedKafkaAutoConfiguration {
     }
 
     /**
-     * ConsumerFactory for shared cluster
+     * ConsumerFactory for saas cluster
      */
-    @Bean("sharedKafkaConsumerFactory")
-    public ConsumerFactory<Object, Object> sharedKafkaConsumerFactory(SharedKafkaProperties properties) {
+    @Bean("saasKafkaConsumerFactory")
+    public ConsumerFactory<Object, Object> saasKafkaConsumerFactory(SaasKafkaProperties properties) {
         var consumerProperties = properties.getKafka().buildConsumerProperties(null);
         return new DefaultKafkaConsumerFactory<>(consumerProperties);
     }
 
     /**
-     * KafkaListenerContainerFactory for shared cluster
+     * KafkaListenerContainerFactory for saas cluster
      */
-    @Bean("sharedKafkaListenerContainerFactory")
-    public ConcurrentKafkaListenerContainerFactory<Object, Object> sharedKafkaListenerContainerFactory(
-            ConsumerFactory<Object, Object> sharedKafkaConsumerFactory,
-            SharedKafkaProperties properties) {
+    @Bean("saasKafkaListenerContainerFactory")
+    public ConcurrentKafkaListenerContainerFactory<Object, Object> saasKafkaListenerContainerFactory(
+            ConsumerFactory<Object, Object> saasKafkaConsumerFactory,
+            SaasKafkaProperties properties) {
         
         var factory = new ConcurrentKafkaListenerContainerFactory<Object, Object>();
-        factory.setConsumerFactory(sharedKafkaConsumerFactory);
+        factory.setConsumerFactory(saasKafkaConsumerFactory);
 
         // Apply listener settings from properties
         var listenerProperties = properties.getKafka().getListener();
@@ -99,10 +102,10 @@ public class SharedKafkaAutoConfiguration {
     }
 
     /**
-     * GenericKafkaProducer for shared cluster
+     * GenericKafkaProducer for saas cluster
      */
-    @Bean("sharedKafkaProducer")
-    public SharedKafkaProducer sharedKafkaProducer(@Qualifier("sharedKafkaTemplate") KafkaTemplate<String, Object> sharedKafkaTemplate) {
-        return new SharedKafkaProducer(sharedKafkaTemplate);
+    @Bean("saasMessageProducer")
+    public SaasMessageProducer saasMessageProducer(@Qualifier("saasKafkaTemplate") KafkaTemplate<String, Object> saasKafkaTemplate) {
+        return new SaasKafkaProducer(saasKafkaTemplate);
     }
 }
