@@ -8,8 +8,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * Inherits all possible parameters from standard KafkaProperties.
  * This is the main/default Kafka cluster configuration.
  */
-@ConfigurationProperties(prefix = "spring.oss-kafka")
-public class OssKafkaProperties {
+@ConfigurationProperties(prefix = "spring.oss-tenant")
+public class OssTenantKafkaProperties {
     
     /**
      * Enable OSS Kafka cluster configuration.
