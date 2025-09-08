@@ -1,7 +1,5 @@
 package com.openframe.kafka.config;
 
-import com.openframe.kafka.producer.OssTenantKafkaProducer;
-import com.openframe.kafka.producer.OssTenantMessageProducer;
 import com.openframe.kafka.producer.SaasKafkaProducer;
 import com.openframe.kafka.producer.SaasMessageProducer;
 import org.springframework.beans.factory.annotation.Qualifier;
