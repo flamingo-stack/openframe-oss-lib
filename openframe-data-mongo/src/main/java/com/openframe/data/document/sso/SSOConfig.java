@@ -13,14 +13,4 @@ public class SSOConfig {
     private String clientId;
     private String clientSecret;
     private boolean enabled;
-
-    /**
-     * Indicates whether this SSO configuration is active.
-     * A config is active when it's enabled and has non-empty client credentials.
-     */
-    public boolean isActive() {
-        return isEnabled()
-                && getClientId() != null && !getClientId().trim().isEmpty()
-                && getClientSecret() != null && !getClientSecret().trim().isEmpty();
-    }
 }
