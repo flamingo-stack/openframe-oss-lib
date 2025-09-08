@@ -4,6 +4,7 @@ import com.openframe.data.document.auth.Tenant;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -22,6 +23,10 @@ public interface TenantRepository extends MongoRepository<Tenant, String> {
      */
     boolean existsByDomain(String domain);
 
+
+    interface DomainView { String getDomain(); }
+
+    List<DomainView> findByDomainIn(List<String> domains);
     /**
      * Count total tenants
      */
