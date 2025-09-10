@@ -20,7 +20,7 @@ import java.time.Instant;
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper = true)
 @SuperBuilder
-@Document(collection = "users")
+@Document(collection = "auth_users")
 @CompoundIndex(def = "{'tenantId': 1, 'email': 1}", unique = true)
 public class AuthUser extends User {
 

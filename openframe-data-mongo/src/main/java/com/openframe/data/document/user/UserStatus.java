@@ -5,6 +5,5 @@ package com.openframe.data.document.user;
  */
 public enum UserStatus {
     ACTIVE,
-    DELETED,
-    REENBLED
+    DELETED
 }
