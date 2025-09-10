@@ -4,11 +4,11 @@ import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Configuration properties for shared Kafka cluster.
+ * Configuration properties for saas Kafka cluster.
  * Inherits all possible parameters from standard KafkaProperties.
- * Activated only when spring.kafka.shared.bootstrap-servers is configured.
+ * Activated only when spring.kafka.saas.bootstrap-servers is configured.
  */
-@ConfigurationProperties(prefix = "spring.shared-cluster")
+@ConfigurationProperties(prefix = "spring.saas")
 public class SaasKafkaProperties {
     private boolean enabled = true;
 

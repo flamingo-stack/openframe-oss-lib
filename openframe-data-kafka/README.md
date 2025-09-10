@@ -4,104 +4,107 @@ Library for working with Apache Kafka within the OpenFrame ecosystem.
 
 ## Features
 
-- Support for two Kafka clusters simultaneously (main/tenant and shared)
+- Support for two Kafka clusters simultaneously (OSS/Tenant and SaaS)
 - Auto-configuration with full support for all Spring Kafka parameters
 - Ready-to-use beans for Producer, Consumer, Admin, Streams for each cluster
+- Debezium message model support
 
 ## Configuration
 
-### Main/Tenant Kafka cluster (standard prefix)
+### OSS/Tenant Kafka cluster (primary cluster)
 
 ```yaml
 spring:
-  kafka:
+  oss-tenant:
     enabled: true  # enabled by default
-    bootstrap-servers: tenant-kafka:9092
-    client-id: tenant-client
-    producer:
-      acks: all
-      retries: 3
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-    consumer:
-      group-id: tenant-group
-      auto-offset-reset: latest
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-    listener:
-      ack-mode: record
-      concurrency: 3
-      poll-timeout: 3s
-    admin:
-      fail-fast: true
-    ssl:
-      enabled: false
-    properties:
-      # any additional Kafka properties
-      security.protocol: PLAINTEXT
+    kafka:
+      bootstrap-servers: tenant-kafka:9092
+      client-id: tenant-client
+      producer:
+        acks: all
+        retries: 3
+        key-serializer: org.apache.kafka.common.serialization.StringSerializer
+        value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      consumer:
+        group-id: tenant-group
+        auto-offset-reset: latest
+        key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+        value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      listener:
+        ack-mode: record
+        concurrency: 3
+        poll-timeout: 3s
+      admin:
+        fail-fast: true
+      ssl:
+        enabled: false
+      properties:
+        # any additional Kafka properties
+        security.protocol: PLAINTEXT
 ```
 
-### Shared Kafka cluster (activated only when configuration is present)
+### SaaS Kafka cluster (activated only when enabled)
 
 ```yaml
 spring:
-  shared-kafka:
-    # Presence of bootstrap-servers automatically activates shared cluster
-    bootstrap-servers: shared-kafka:9092
-    client-id: shared-client
-    producer:
-      acks: 1
-      batch-size: 16384
-    consumer:
-      group-id: shared-group
-      auto-offset-reset: earliest
-    listener:
-      ack-mode: batch
-      concurrency: 5
-    streams:
-      application-id: shared-streams-app
-      replication-factor: 3
+  saas:
+    enabled: true  # must be explicitly enabled
+    kafka:
+      bootstrap-servers: saas-kafka:9092
+      client-id: saas-client
+      producer:
+        acks: 1
+        batch-size: 16384
+      consumer:
+        group-id: saas-group
+        auto-offset-reset: earliest
+      listener:
+        ack-mode: batch
+        concurrency: 5
+      streams:
+        application-id: saas-streams-app
+        replication-factor: 3
 ```
 
 ## Usage
 
-### KafkaProducer for different clusters (recommended)
+### Message Producers for different clusters (recommended)
 
 ```java
 @Service
 public class KafkaService {
     
-    private final KafkaProducer tenantProducer;
-    private final SharedKafkaProducer sharedProducer;
+    private final OssTenantMessageProducer ossTenantProducer;
+    private final SaasMessageProducer saasProducer;
     
     public KafkaService(
-            @Qualifier("kafkaProducer") KafkaProducer tenantProducer,
-            @Qualifier("sharedKafkaProducer") @Autowired(required = false) SharedKafkaProducer sharedProducer) {
-        this.tenantProducer = tenantProducer;
-        this.sharedProducer = sharedProducer;
+            OssTenantMessageProducer ossTenantProducer,
+            @Autowired(required = false) SaasMessageProducer saasProducer) {
+        this.ossTenantProducer = ossTenantProducer;
+        this.saasProducer = saasProducer;
     }
     
-    // Send to tenant cluster
-    public void sendToTenant(String topic, Object message) {
-        tenantProducer.sendMessage(topic, message);
+    // Send to OSS/Tenant cluster
+    public void sendToOssTenant(String topic, Object message) {
+        ossTenantProducer.sendMessage(topic, message, null);
     }
     
-    // Send with key to tenant cluster
-    public void sendToTenant(String topic, String key, Object message) {
-        tenantProducer.sendMessage(topic, key, message);
+    // Send with key to OSS/Tenant cluster
+    public void sendToOssTenant(String topic, String key, Object message) {
+        ossTenantProducer.sendMessage(topic, message, key);
     }
     
-    // Send to shared cluster (if configured)
-    public void sendToShared(String topic, Object message) {
-        if (sharedProducer != null) {
-            sharedProducer.sendMessage(topic, message);
+    // Send to SaaS cluster (if configured)
+    public void sendToSaas(String topic, Object message) {
+        if (saasProducer != null) {
+            saasProducer.sendMessage(topic, message, null);
         }
     }
     
-    // Send with key to shared cluster (if configured)
-    public void sendToShared(String topic, String key, Object message) {
-        if (sharedProducer != null) {
-            sharedProducer.sendMessage(topic, key, message);
+    // Send with key to SaaS cluster (if configured)
+    public void sendToSaas(String topic, String key, Object message) {
+        if (saasProducer != null) {
+            saasProducer.sendMessage(topic, message, key);
         }
     }
 }
@@ -113,23 +116,21 @@ public class KafkaService {
 @Service
 public class AdvancedKafkaService {
     
-    // Tenant cluster
+    // OSS/Tenant cluster
     @Autowired
-    @Qualifier("kafkaTemplate")
-    private KafkaTemplate<String, Object> tenantTemplate;
+    private KafkaTemplate<String, Object> ossTenantKafkaTemplate;
     
-    // Shared cluster (optional)
+    // SaaS cluster (optional)
     @Autowired(required = false)
-    @Qualifier("sharedKafkaTemplate")
-    private KafkaTemplate<String, Object> sharedTemplate;
+    private KafkaTemplate<String, Object> saasKafkaTemplate;
     
-    public void sendToTenant(String topic, Object message) {
-        tenantTemplate.send(topic, message);
+    public void sendToOssTenant(String topic, Object message) {
+        ossTenantKafkaTemplate.send(topic, message);
     }
     
-    public void sendToShared(String topic, Object message) {
-        if (sharedTemplate != null) {
-            sharedTemplate.send(topic, message);
+    public void sendToSaas(String topic, Object message) {
+        if (saasKafkaTemplate != null) {
+            saasKafkaTemplate.send(topic, message);
         }
     }
 }
@@ -141,54 +142,55 @@ public class AdvancedKafkaService {
 @Component
 public class MessageListeners {
     
-    // Listener for main/tenant cluster (standard)
+    // Listener for OSS/Tenant cluster (primary)
     @KafkaListener(
-        topics = "tenant-topic",
-        containerFactory = "kafkaListenerContainerFactory"
+        topics = "oss-tenant-topic",
+        containerFactory = "ossTenantKafkaListenerContainerFactory"
     )
-    public void handleTenantMessage(String message) {
-        // process message from main/tenant cluster
+    public void handleOssTenantMessage(String message) {
+        // process message from OSS/Tenant cluster
     }
     
-    // Listener for shared cluster (if configured)
+    // Listener for SaaS cluster (if configured)
     @KafkaListener(
-        topics = "shared-topic", 
-        containerFactory = "sharedKafkaListenerContainerFactory"
+        topics = "saas-topic", 
+        containerFactory = "saasKafkaListenerContainerFactory"
     )
-    public void handleSharedMessage(String message) {
-        // process message from shared cluster
+    public void handleSaasMessage(String message) {
+        // process message from SaaS cluster
     }
 }
 ```
 
 ## Available Beans
 
-### Main/Tenant cluster (standard spring.kafka)
+### OSS/Tenant cluster (spring.oss-tenant)
 
-#### Producers:
-- `kafkaProducer` - KafkaProducer for tenant cluster (recommended)
-
-#### Low-level beans:
-- `kafkaProducerFactory` - ProducerFactory
-- `kafkaTemplate` - KafkaTemplate
-- `kafkaConsumerFactory` - ConsumerFactory  
-- `kafkaListenerContainerFactory` - ConcurrentKafkaListenerContainerFactory
-
-### Shared cluster (spring.shared-kafka, only when bootstrap-servers is present)
-
-#### Producers:
-- `sharedKafkaProducer` - SharedKafkaProducer for shared cluster (recommended)
+#### Message Producers:
+- `ossTenantMessageProducer` - OssTenantMessageProducer for OSS/Tenant cluster (recommended)
 
 #### Low-level beans:
-- `sharedKafkaProducerFactory` - ProducerFactory
-- `sharedKafkaTemplate` - KafkaTemplate
-- `sharedKafkaConsumerFactory` - ConsumerFactory
-- `sharedKafkaListenerContainerFactory` - ConcurrentKafkaListenerContainerFactory
+- `ossTenantKafkaProducerFactory` - ProducerFactory
+- `ossTenantKafkaTemplate` - KafkaTemplate
+- `ossTenantKafkaConsumerFactory` - ConsumerFactory  
+- `ossTenantKafkaListenerContainerFactory` - ConcurrentKafkaListenerContainerFactory
+
+### SaaS cluster (spring.saas, only when enabled)
+
+#### Message Producers:
+- `saasMessageProducer` - SaasMessageProducer for SaaS cluster (recommended)
+
+#### Low-level beans:
+- `saasKafkaProducerFactory` - ProducerFactory
+- `saasKafkaTemplate` - KafkaTemplate
+- `saasKafkaConsumerFactory` - ConsumerFactory
+- `saasKafkaListenerContainerFactory` - ConcurrentKafkaListenerContainerFactory
 
 ## Supported Parameters
 
-The library supports all parameters of standard `spring.kafka.*`, including:
+The library supports all parameters of standard `spring.kafka.*` under the `kafka` sub-property for each cluster:
 
+### OSS/Tenant cluster (spring.oss-tenant.kafka.*)
 - `bootstrap-servers` - broker addresses
 - `client-id` - client identifier
 - `producer.*` - producer settings (acks, retries, batch-size, etc.)
@@ -199,3 +201,23 @@ The library supports all parameters of standard `spring.kafka.*`, including:
 - `ssl.*` - SSL settings
 - `security.*` - security settings
 - `properties.*` - any additional Kafka properties
+
+### SaaS cluster (spring.saas.kafka.*)
+All the same parameters as OSS/Tenant cluster, configured under the `spring.saas.kafka.*` prefix.
+
+## Additional Features
+
+### Debezium Message Support
+The library includes built-in support for Debezium CDC messages with the `DebeziumMessage<T>` model class, providing structured access to:
+- `payload.before` - state before change
+- `payload.after` - state after change  
+- `payload.operation` - operation type (c/u/d/r)
+- `payload.source` - source metadata (database, table, timestamp, etc.)
+
+### Error Handling and Logging
+The `GenericKafkaProducer` provides comprehensive error handling with detailed logging for different failure scenarios:
+- Authorization errors
+- Record too large errors
+- Timeout errors
+- Retriable exceptions
+- Serialization failures

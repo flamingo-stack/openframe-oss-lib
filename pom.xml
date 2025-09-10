@@ -17,11 +17,11 @@
     <packaging>pom</packaging>
 
     <name>OpenFrame OSS Libraries</name>
-    <description>Parent POM for OpenFrame OSS shared libraries with unified versioning.</description>
+    <description>Parent POM for OpenFrame OSS saas libraries with unified versioning.</description>
     <url>https://github.com/flamingo-stack/openframe-oss-lib</url>
 
     <properties>
-        <revision>1.0.6</revision>
+        <revision>999-SNAPSHOT</revision>
         <java.version>21</java.version>
         <lombok.version>1.18.30</lombok.version>
         <spring-data-mongodb.version>4.2.0</spring-data-mongodb.version>
