@@ -20,8 +20,11 @@ import java.time.Instant;
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper = true)
 @SuperBuilder
-@Document(collection = "auth_users")
-@CompoundIndex(def = "{'tenantId': 1, 'email': 1}", unique = true)
+@CompoundIndex(
+        def = "{'tenantId': 1, 'email': 1}",
+        unique = true,
+        partialFilter = "{ 'tenantId': { $exists: true } }"
+)
 public class AuthUser extends User {
 
     @Indexed
