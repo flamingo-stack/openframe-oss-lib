@@ -27,9 +27,6 @@ public class AuthUser extends User {
     @Indexed
     private String tenantId;
 
-    @Indexed
-    private String tenantDomain;
-
     private String passwordHash;
 
     private boolean emailVerified = false;
