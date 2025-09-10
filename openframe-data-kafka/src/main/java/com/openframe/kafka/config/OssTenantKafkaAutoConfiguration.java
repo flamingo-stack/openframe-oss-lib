@@ -2,7 +2,6 @@ package com.openframe.kafka.config;
 
 import com.openframe.kafka.producer.OssTenantKafkaProducer;
 import com.openframe.kafka.producer.OssTenantMessageProducer;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -12,7 +11,7 @@ import org.springframework.kafka.core.*;
 import org.springframework.kafka.listener.ContainerProperties;
 
 /**
- * Auto-configuration for main/OSS Kafka cluster using spring.oss-kafka prefix.
+ * Auto-configuration for main/OSS Kafka cluster using spring.oss-tenant prefix.
  * Creates all necessary beans for Kafka operations: Producer, Consumer, Admin, Streams.
  */
 @AutoConfiguration
@@ -23,8 +22,8 @@ public class OssTenantKafkaAutoConfiguration {
     /**
      * ProducerFactory for OSS cluster
      */
-    @Bean("ossKafkaProducerFactory")
-    public ProducerFactory<String, Object> kafkaProducerFactory(OssTenantKafkaProperties properties) {
+    @Bean("ossTenantKafkaProducerFactory")
+    public ProducerFactory<String, Object> ossTenantKafkaProducerFactory(OssTenantKafkaProperties properties) {
         var producerProperties = properties.getKafka().buildProducerProperties(null);
         return new DefaultKafkaProducerFactory<>(producerProperties);
     }
@@ -32,11 +31,11 @@ public class OssTenantKafkaAutoConfiguration {
     /**
      * KafkaTemplate for OSS cluster
      */
-    @Bean("ossKafkaTemplate")
-    public KafkaTemplate<String, Object> ossKafkaTemplate(
-            ProducerFactory<String, Object> ossKafkaProducerFactory,
+    @Bean("ossTenantKafkaTemplate")
+    public KafkaTemplate<String, Object> ossTenantKafkaTemplate(
+            ProducerFactory<String, Object> ossTenantKafkaProducerFactory,
             OssTenantKafkaProperties properties) {
-        var template = new KafkaTemplate<>(ossKafkaProducerFactory);
+        var template = new KafkaTemplate<>(ossTenantKafkaProducerFactory);
         
         // Apply template settings from properties
         var templateProperties = properties.getKafka().getTemplate();
@@ -50,8 +49,8 @@ public class OssTenantKafkaAutoConfiguration {
     /**
      * ConsumerFactory for OSS cluster
      */
-    @Bean("ossKafkaConsumerFactory")
-    public ConsumerFactory<Object, Object> ossKafkaConsumerFactory(OssTenantKafkaProperties properties) {
+    @Bean("ossTenantKafkaConsumerFactory")
+    public ConsumerFactory<Object, Object> ossTenantKafkaConsumerFactory(OssTenantKafkaProperties properties) {
         var consumerProperties = properties.getKafka().buildConsumerProperties(null);
         return new DefaultKafkaConsumerFactory<>(consumerProperties);
     }
@@ -59,13 +58,13 @@ public class OssTenantKafkaAutoConfiguration {
     /**
      * KafkaListenerContainerFactory for OSS cluster
      */
-    @Bean("kafkaListenerContainerFactory")
-    public ConcurrentKafkaListenerContainerFactory<Object, Object> kafkaListenerContainerFactory(
-            ConsumerFactory<Object, Object> ossKafkaConsumerFactory,
+    @Bean("ossTenantKafkaListenerContainerFactory")
+    public ConcurrentKafkaListenerContainerFactory<Object, Object> ossTenantKafkaListenerContainerFactory(
+            ConsumerFactory<Object, Object> ossTenantKafkaConsumerFactory,
             OssTenantKafkaProperties properties) {
         
         var factory = new ConcurrentKafkaListenerContainerFactory<Object, Object>();
-        factory.setConsumerFactory(ossKafkaConsumerFactory);
+        factory.setConsumerFactory(ossTenantKafkaConsumerFactory);
 
         // Apply listener settings from properties
         var listenerProperties = properties.getKafka().getListener();
@@ -102,7 +101,7 @@ public class OssTenantKafkaAutoConfiguration {
      * kafka producer for OSS cluster
      */
     @Bean("ossTenantMessageProducer")
-    public OssTenantMessageProducer ossTenantMessageProducer(@Qualifier("ossKafkaTemplate") KafkaTemplate<String, Object> ossKafkaTemplate) {
-        return new OssTenantKafkaProducer(ossKafkaTemplate);
+    public OssTenantMessageProducer ossTenantMessageProducer(KafkaTemplate<String, Object> ossTenantKafkaTemplate) {
+        return new OssTenantKafkaProducer(ossTenantKafkaTemplate);
     }
 }

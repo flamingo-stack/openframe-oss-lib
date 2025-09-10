@@ -103,7 +103,7 @@ public class SaasKafkaAutoConfiguration {
      * GenericKafkaProducer for saas cluster
      */
     @Bean("saasMessageProducer")
-    public SaasMessageProducer saasMessageProducer(@Qualifier("saasKafkaTemplate") KafkaTemplate<String, Object> saasKafkaTemplate) {
+    public SaasMessageProducer saasMessageProducer(KafkaTemplate<String, Object> saasKafkaTemplate) {
         return new SaasKafkaProducer(saasKafkaTemplate);
     }
 }
