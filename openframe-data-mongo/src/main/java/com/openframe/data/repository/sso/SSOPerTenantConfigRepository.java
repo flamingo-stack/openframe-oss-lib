@@ -11,5 +11,7 @@ import java.util.Optional;
 public interface SSOPerTenantConfigRepository extends MongoRepository<SSOPerTenantConfig, String> {
     List<SSOPerTenantConfig> findByTenantIdAndEnabledTrue(String tenantId);
 
+    Optional<SSOPerTenantConfig> findByProvider(String provider);
+
     Optional<SSOPerTenantConfig> findFirstByTenantIdAndProviderAndEnabledTrue(String tenantId, String provider);
 }

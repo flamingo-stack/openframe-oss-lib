@@ -42,11 +42,6 @@ public class Tenant {
     @Indexed(unique = true)
     private String domain;
 
-    /**
-     * OpenFrame URL for this tenant
-     * Generated as https://{tenantName}.openframe.io
-     */
-    private String openFrameUrl;
 
     /**
      * Owner user ID (first registered user becomes owner)

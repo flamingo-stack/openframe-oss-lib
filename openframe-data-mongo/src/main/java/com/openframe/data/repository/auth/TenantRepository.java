@@ -23,10 +23,10 @@ public interface TenantRepository extends MongoRepository<Tenant, String> {
      */
     boolean existsByDomain(String domain);
 
-
     interface DomainView { String getDomain(); }
 
     List<DomainView> findByDomainIn(List<String> domains);
+
     /**
      * Count total tenants
      */

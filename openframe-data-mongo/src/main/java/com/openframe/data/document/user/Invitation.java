@@ -1,17 +1,18 @@
 package com.openframe.data.document.user;
 
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.experimental.SuperBuilder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,24 +20,25 @@ import java.util.List;
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "users")
-public class User {
+@Document(collection = "invitations")
+public class Invitation {
     @Id
     private String id;
+
     @Indexed
     private String email;
-    private String firstName;
-    private String lastName;
+
     @Builder.Default
     private List<UserRole> roles = new ArrayList<>();
 
-    @Indexed
+    private Instant expiresAt;
+
     @Builder.Default
-    private UserStatus status = UserStatus.ACTIVE;
+    private InvitationStatus status = InvitationStatus.PENDING;
 
     @CreatedDate
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @LastModifiedDate
-    private LocalDateTime updatedAt;
-} 
+    private Instant updatedAt;
+}
