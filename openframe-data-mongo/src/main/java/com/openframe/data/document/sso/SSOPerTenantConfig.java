@@ -8,7 +8,6 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.Indexed;
-import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
 
@@ -20,8 +19,11 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode(callSuper = true)
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "sso_per_tenant_configs")
-@CompoundIndex(def = "{'tenantId': 1, 'provider': 1}", unique = true)
+@CompoundIndex(
+        def = "{'tenantId': 1, 'email': 1}",
+        unique = true,
+        partialFilter = "{ 'tenantId': { $exists: true } }"
+)
 public class SSOPerTenantConfig extends SSOConfig {
     /**
      * Tenant ID this SSO configuration belongs to

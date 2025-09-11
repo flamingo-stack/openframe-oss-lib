@@ -1,7 +1,6 @@
 package com.openframe.data.document.user;
 
 
-import com.openframe.data.repository.user.InvitationStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

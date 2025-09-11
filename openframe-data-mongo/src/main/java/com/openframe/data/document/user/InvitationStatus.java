@@ -1,4 +1,4 @@
-package com.openframe.data.repository.user;
+package com.openframe.data.document.user;
 
 public enum InvitationStatus {
     PENDING,
