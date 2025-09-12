@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.openframe.oss</groupId>
+        <artifactId>openframe-oss-lib</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <artifactId>openframe-notification-mail</artifactId>
+    <packaging>jar</packaging>
+
+    <name>OpenFrame Notification Mail</name>
+    <description>Mail notification interfaces and providers (SMTP, HubSpot API) for OpenFrame.</description>
+    <url>https://github.com/flamingo-stack/openframe-oss-lib</url>
+
+    <developers>
+        <developer>
+            <name>OpenFrame Team</name>
+            <organization>OpenFrame</organization>
+            <organizationUrl>https://github.com/flamingo-stack</organizationUrl>
+        </developer>
+    </developers>
+
+    <scm>
+        <url>https://github.com/flamingo-stack/openframe-oss-lib</url>
+        <connection>scm:git:https://github.com/flamingo-stack/openframe-oss-lib.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/flamingo-stack/openframe-oss-lib.git</developerConnection>
+        <tag>HEAD</tag>
+    </scm>
+
+    <dependencies>
+        <!-- Spring Mail -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
+        <!-- Spring WebFlux for HubSpot WebClient -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+
+        <!-- Spring Context for annotations/config -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+        </dependency>
+
+        <!-- Lombok -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+    </dependencies>
+
+</project>
+
