@@ -1,0 +1,2 @@
+com.openframe.kafka.config.OssTenantKafkaAutoConfiguration
+com.openframe.kafka.config.SaasKafkaAutoConfiguration
