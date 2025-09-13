@@ -1,5 +1,6 @@
 package com.openframe.kafka.producer;
 
+import com.openframe.kafka.model.CommonMessage;
 import org.springframework.kafka.core.KafkaTemplate;
 
 public class OssTenantKafkaProducer extends GenericKafkaProducer implements OssTenantMessageProducer {
@@ -9,7 +10,7 @@ public class OssTenantKafkaProducer extends GenericKafkaProducer implements OssT
     }
 
     @Override
-    public <T> void sendMessage(String topic, T message, String key) {
+    public void sendMessage(String topic, CommonMessage message, String key) {
         sendMessage(topic, key, message);
     }
 }

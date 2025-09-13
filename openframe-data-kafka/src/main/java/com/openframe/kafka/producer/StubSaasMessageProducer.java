@@ -1,5 +1,6 @@
 package com.openframe.kafka.producer;
 
+import com.openframe.kafka.model.CommonMessage;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -11,7 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 public class StubSaasMessageProducer implements SaasMessageProducer {
 
     @Override
-    public <T> void sendMessage(String messageDestinationName, T message, String specificKey) {
+    public void sendMessage(String messageDestinationName, CommonMessage message, String specificKey) {
         log.debug("Stub SAAS message producer: ignoring message to topic '{}' with key '{}'", 
                  messageDestinationName, specificKey);
         // Empty implementation - does nothing

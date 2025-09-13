@@ -1,14 +1,20 @@
 package com.openframe.kafka.config;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.openframe.kafka.producer.OssTenantKafkaProducer;
 import com.openframe.kafka.producer.OssTenantMessageProducer;
+import com.openframe.kafka.producer.SaasMessageProducer;
+import com.openframe.kafka.producer.StubSaasMessageProducer;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.*;
 import org.springframework.kafka.listener.ContainerProperties;
+import org.springframework.kafka.support.serializer.JsonSerializer;
 
 /**
  * Auto-configuration for main/OSS Kafka cluster using spring.oss-tenant prefix.
@@ -24,6 +30,8 @@ public class OssTenantKafkaAutoConfiguration {
      */
     @Bean("ossTenantKafkaProducerFactory")
     public ProducerFactory<String, Object> ossTenantKafkaProducerFactory(OssTenantKafkaProperties properties) {
+        properties.getKafka().getProducer().setKeySerializer(StringSerializer.class);
+        properties.getKafka().getProducer().setValueSerializer(JsonSerializer.class);
         var producerProperties = properties.getKafka().buildProducerProperties(null);
         return new DefaultKafkaProducerFactory<>(producerProperties);
     }
@@ -103,5 +111,15 @@ public class OssTenantKafkaAutoConfiguration {
     @Bean("ossTenantMessageProducer")
     public OssTenantMessageProducer ossTenantMessageProducer(KafkaTemplate<String, Object> ossTenantKafkaTemplate) {
         return new OssTenantKafkaProducer(ossTenantKafkaTemplate);
+    }
+
+    /**
+     * Stub SaasMessageProducer for OSS version
+     * Only created if no other SaasMessageProducer bean exists
+     */
+    @Bean("saasMessageProducer")
+    @ConditionalOnMissingBean(SaasMessageProducer.class)
+    public SaasMessageProducer saasMessageProducer() {
+        return new StubSaasMessageProducer();
     }
 }

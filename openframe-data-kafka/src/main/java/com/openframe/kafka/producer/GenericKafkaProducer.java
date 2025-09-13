@@ -27,27 +27,7 @@ public abstract class GenericKafkaProducer {
         if (!StringUtils.hasText(topic)) {
             throw new MessageDeliveryException("Topic is null or blank");
         }
-
-        try {
-            kafkaTemplate.send(topic, message)
-                    .whenComplete((result, ex) -> {
-                        if (ex != null) {
-                            handleSendFailure(topic, null, message, ex);
-                        } else if (result != null && result.getRecordMetadata() != null) {
-                            var md = result.getRecordMetadata();
-                            logSendSuccess(md.topic(), null, md.partition(), md.offset());
-                        } else {
-                            log.info("Kafka PRODUCE success: topic={} (no record metadata)", topic);
-                        }
-                    });
-
-        } catch (SerializationException e) {
-            // Synchronous serialization failure
-            throw new MessageDeliveryException("Serialization failed for topic: %s, cause: %s".formatted(topic, e));
-        } catch (IllegalArgumentException e) {
-            // Invalid arguments (e.g., blank topic)
-            throw new MessageDeliveryException("Invalid arguments for topic: %s, cause: %s".formatted(topic, e));
-        }
+        sendMessage(topic, null, message);
     }
 
     /**
@@ -57,30 +37,25 @@ public abstract class GenericKafkaProducer {
         if (!StringUtils.hasText(topic)) {
             throw new MessageDeliveryException("Topic is null or blank");
         }
-        if (!StringUtils.hasText(key)) {
-            sendMessage(topic, message);
-        } else {
+        try {
+            kafkaTemplate.send(topic, key, message)
+                    .whenComplete((result, ex) -> {
+                        if (ex != null) {
+                            handleSendFailure(topic, key, message, ex);
+                        } else if (result != null && result.getRecordMetadata() != null) {
+                            var md = result.getRecordMetadata();
+                            logSendSuccess(md.topic(), key, md.partition(), md.offset());
+                        } else {
+                            log.info("Kafka PRODUCE success: topic={}, key={} (no record metadata)", topic, redact(key));
+                        }
+                    });
 
-            try {
-                kafkaTemplate.send(topic, key, message)
-                        .whenComplete((result, ex) -> {
-                            if (ex != null) {
-                                handleSendFailure(topic, key, message, ex);
-                            } else if (result != null && result.getRecordMetadata() != null) {
-                                var md = result.getRecordMetadata();
-                                logSendSuccess(md.topic(), key, md.partition(), md.offset());
-                            } else {
-                                log.info("Kafka PRODUCE success: topic={}, key={} (no record metadata)", topic, redact(key));
-                            }
-                        });
-
-            } catch (SerializationException e) {
-                throw new MessageDeliveryException("Serialization failed for topic: %s, key: %s, cause: %s"
-                        .formatted(topic, key, e));
-            } catch (IllegalArgumentException e) {
-                throw new MessageDeliveryException("Invalid arguments for topic: %s, key: %s, cause: %s"
-                        .formatted(topic, key, e));
-            }
+        } catch (SerializationException e) {
+            throw new MessageDeliveryException("Serialization failed for topic: %s, key: %s, cause: %s"
+                    .formatted(topic, key, e));
+        } catch (IllegalArgumentException e) {
+            throw new MessageDeliveryException("Invalid arguments for topic: %s, key: %s, cause: %s"
+                    .formatted(topic, key, e));
         }
     }
 
@@ -100,9 +75,8 @@ public abstract class GenericKafkaProducer {
                     log.error("Kafka PRODUCE record too large: topic={}, key={}, payloadSize={} | {}",
                             topic, redact(key), shortPayload.length(), rtle, rtle);
 
-            case TimeoutException te ->
-                    log.error("Kafka PRODUCE timeout: topic={}, key={}, payload~={} | {}",
-                            topic, redact(key), shortPayload, te, te);
+            case TimeoutException te -> log.error("Kafka PRODUCE timeout: topic={}, key={}, payload~={} | {}",
+                    topic, redact(key), shortPayload, te, te);
 
             case RetriableException re ->
                 // Producer will retry per configs; warn is enough for visibility.
@@ -110,9 +84,8 @@ public abstract class GenericKafkaProducer {
                             topic, redact(key), shortPayload, re, re);
 
             // Default branch for all other Throwables
-            default ->
-                    log.error("Kafka PRODUCE failure: topic={}, key={}, payload~={} | {}",
-                            topic, redact(key), shortPayload, ex, ex);
+            default -> log.error("Kafka PRODUCE failure: topic={}, key={}, payload~={} | {}",
+                    topic, redact(key), shortPayload, ex, ex);
         }
         // Do not rethrow here — caller is fire-and-forget.
     }
