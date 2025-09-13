@@ -78,7 +78,7 @@ public class OssTenantKafkaAutoConfiguration {
         if (ackMode != null) {
             factory.getContainerProperties().setAckMode(ackMode);
         } else {
-            // Default to BATCH ackMode if not specified
+            // Default to RECORD ackMode if not specified
             factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.RECORD);
         }
         

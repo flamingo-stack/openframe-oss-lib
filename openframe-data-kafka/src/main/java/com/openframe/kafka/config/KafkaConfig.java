@@ -1,7 +1,10 @@
 package com.openframe.kafka.config;
 
+import com.openframe.kafka.producer.SaasMessageProducer;
+import com.openframe.kafka.producer.StubSaasMessageProducer;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafka;
 
@@ -13,6 +16,13 @@ import org.springframework.kafka.annotation.EnableKafka;
 @EnableKafka
 @EnableAutoConfiguration(exclude = {KafkaAutoConfiguration.class})
 public class KafkaConfig {
-    // This class enables @KafkaListener annotations to work
-    // and automatically use the default "kafkaListenerContainerFactory" bean
+
+    /**
+     * Stub SaasMessageProducer for OSS version
+     */
+    @Bean("saasMessageProducer")
+    public SaasMessageProducer saasMessageProducer() {
+        return new StubSaasMessageProducer();
+    }
+
 }
