@@ -24,14 +24,20 @@ public class HubspotApiEmailService implements EmailService {
     @Value("${openframe.mail.from}")
     private String from;
 
-    @Value("${openframe.invitations.link-template}")
+    @Value("${openframe.invitations.link-template:}")
     private String linkTemplate;
+
+    @Value("${openframe.password-reset.link-template:}")
+    private String resetLinkTemplate;
 
     @Value("${openframe.mail.hubspot.access-token}")
     private String accessToken;
 
-    @Value("${openframe.mail.hubspot.invitation-email-id}")
+    @Value("${openframe.mail.hubspot.invitation-email-id:}")
     private String invitationEmailId;
+
+    @Value("${openframe.mail.hubspot.reset-email-id:}")
+    private String resetEmailId;
 
     @Value("${openframe.mail.hubspot.base-url}")
     private String baseUrl;
@@ -44,19 +50,28 @@ public class HubspotApiEmailService implements EmailService {
     @Override
     public void sendInvitationEmail(String toEmail, String invitationId) {
         String link = linkTemplate.replace("{id}", invitationId);
+        sendWithTemplate(invitationEmailId, toEmail, "You’re invited to join Flamingo Workspace", link, "Invitation");
+    }
 
+    @Override
+    public void sendPasswordResetEmail(String toEmail, String resetToken) {
+        String link = resetLinkTemplate.replace("{token}", resetToken);
+        sendWithTemplate(resetEmailId, toEmail, "Reset your OpenFrame password", link, "Password reset");
+    }
+
+    private void sendWithTemplate(String emailTemplateId, String toEmail, String subject, String link, String debugContext) {
         Map<String, Object> payload = Map.of(
-                "emailId", invitationEmailId,
+                "emailId", emailTemplateId,
                 "message", Map.of(
                         "to", toEmail,
                         "from", from,
-                        "subject", "You’re invited to join Flamingo Workspace"
+                        "subject", subject
                 ),
                 "customProperties", Map.of("link", link)
         );
 
         if (log.isDebugEnabled()) {
-            log.debug("[HubSpot API] Payload: {}", payload);
+            log.debug("[HubSpot API] {} Payload: {}", debugContext, payload);
         }
 
         webClient.post()
@@ -66,7 +81,7 @@ public class HubspotApiEmailService implements EmailService {
                 .bodyValue(payload)
                 .exchangeToMono(response -> {
                     if (response.statusCode().is2xxSuccessful()) {
-                        log.info("[HubSpot API] Invitation email sent to {}", toEmail);
+                        log.info("[HubSpot API] {} email sent to {}", debugContext, toEmail);
                         return response.releaseBody();
                     }
                     return response.bodyToMono(String.class)
@@ -76,12 +91,6 @@ public class HubspotApiEmailService implements EmailService {
                             )));
                 })
                 .block();
-    }
-
-    @Override
-    public void sendPasswordResetEmail(String toEmail, String resetToken) {
-        // Optional: configure another template id for reset if needed
-        log.info("[HubSpot API] sendPasswordResetEmail not implemented");
     }
 }
 
