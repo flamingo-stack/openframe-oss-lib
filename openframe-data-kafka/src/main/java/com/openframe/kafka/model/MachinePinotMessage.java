@@ -15,7 +15,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class MachinePinotMessage implements CommonMessage {
+public class MachinePinotMessage implements KafkaMessage {
 
     private String machineId;
     private String organizationId;

@@ -1,5 +1,5 @@
 package com.openframe.kafka.model;
 
-public interface CommonMessage {
+public interface KafkaMessage {
 
 }

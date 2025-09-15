@@ -17,14 +17,6 @@
     <description>Kafka abstractions and auto-configuration for the OpenFrame platform.</description>
     <url>https://github.com/flamingo-stack/openframe-oss-lib</url>
 
-    <licenses>
-        <license>
-            <name>MIT License</name>
-            <url>https://opensource.org/licenses/MIT</url>
-            <distribution>repo</distribution>
-        </license>
-    </licenses>
-
     <developers>
         <developer>
             <name>OpenFrame Team</name>

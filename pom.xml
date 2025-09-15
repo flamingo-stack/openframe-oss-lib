@@ -17,7 +17,7 @@
     <packaging>pom</packaging>
 
     <name>OpenFrame OSS Libraries</name>
-    <description>Parent POM for OpenFrame OSS saas libraries with unified versioning.</description>
+    <description>Parent POM for OpenFrame OSS shared libraries with unified versioning.</description>
     <url>https://github.com/flamingo-stack/openframe-oss-lib</url>
 
     <properties>

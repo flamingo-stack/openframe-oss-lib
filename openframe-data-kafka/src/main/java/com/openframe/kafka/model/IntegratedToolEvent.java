@@ -3,7 +3,7 @@ package com.openframe.kafka.model;
 import lombok.Data;
 
 @Data
-public class IntegratedToolEvent implements CommonMessage {
+public class IntegratedToolEvent implements KafkaMessage {
     private String toolEventId;
     private String userId;
     private String deviceId;

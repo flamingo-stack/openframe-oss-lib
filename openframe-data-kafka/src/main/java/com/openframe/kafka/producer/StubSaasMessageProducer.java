@@ -1,7 +1,6 @@
 package com.openframe.kafka.producer;
 
-import com.openframe.kafka.enumeration.MessageDestination;
-import com.openframe.kafka.model.CommonMessage;
+import com.openframe.kafka.model.KafkaMessage;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -13,17 +12,17 @@ import lombok.extern.slf4j.Slf4j;
 public class StubSaasMessageProducer implements SaasMessageProducer {
 
     @Override
-    public void sendFromTenantMessage(String messageDestinationName, CommonMessage message, String clusterId, String specificKey) {
+    public void sendFromTenantMessage(String messageDestinationName, KafkaMessage message, String clusterId, String specificKey) {
         debugLogMethod(messageDestinationName, specificKey);
     }
 
     @Override
-    public void sendToTenantMessage(String messageDestinationName, CommonMessage message, String clusterId, String specificKey) {
+    public void sendToTenantMessage(String messageDestinationName, KafkaMessage message, String clusterId, String specificKey) {
         debugLogMethod(messageDestinationName, specificKey);
     }
 
     @Override
-    public void sendSaasToSaasMessage(String messageDestinationName, CommonMessage message, String specificKey) {
+    public void sendSaasToSaasMessage(String messageDestinationName, KafkaMessage message, String specificKey) {
         debugLogMethod(messageDestinationName, specificKey);
     }
 
