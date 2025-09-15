@@ -4,6 +4,10 @@ import com.openframe.kafka.model.CommonMessage;
 
 public interface SaasMessageProducer {
 
-    void sendMessage(String messageDestinationName, CommonMessage message, String specificKey);
+    void sendFromTenantMessage(String messageDestinationName, CommonMessage message, String clusterId, String specificKey);
+
+    void sendToTenantMessage(String messageDestinationName, CommonMessage message, String clusterId, String specificKey);
+
+    void sendSaasToSaasMessage(String messageDestinationName, CommonMessage message, String specificKey);
 
 }
