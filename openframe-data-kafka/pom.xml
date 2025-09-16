@@ -10,11 +10,11 @@
         <version>${revision}</version>
     </parent>
 
-    <artifactId>openframe-data-mongo</artifactId>
+    <artifactId>openframe-data-kafka</artifactId>
     <packaging>jar</packaging>
 
-    <name>OpenFrame Data Mongo</name>
-    <description>MongoDB documents and repositories extracted from OpenFrame Authorization Server for multi-tenant platform.</description>
+    <name>OpenFrame Kafka</name>
+    <description>Kafka abstractions and auto-configuration for the OpenFrame platform.</description>
     <url>https://github.com/flamingo-stack/openframe-oss-lib</url>
 
     <developers>
@@ -33,24 +33,19 @@
     </scm>
 
     <dependencies>
-        <!-- Spring Data Mongo (blocking + reactive) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-mongodb</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-mongodb-reactive</artifactId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
         </dependency>
 
-        <!-- Spring Core/Web -->
         <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-web</artifactId>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
         </dependency>
+
         <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-context</artifactId>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-clients</artifactId>
         </dependency>
 
         <!-- Lombok (optional for compile) -->
@@ -60,11 +55,14 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- Bean Validation (optional, only if used) -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-validation</artifactId>
-            <optional>true</optional>
+            <artifactId>spring-boot-starter-json</artifactId>
         </dependency>
     </dependencies>
 
