@@ -65,29 +65,27 @@ public abstract class GenericKafkaProducer {
      */
     private void handleSendFailure(String topic, String key, Object payload, Throwable ex) {
         String shortPayload = abbreviate(String.valueOf(payload), MAX_PAYLOAD_LOG_LEN);
+        String originalPayload = String.valueOf(payload);
 
         switch (ex) {
             case TopicAuthorizationException tae ->
-                    log.error("Kafka PRODUCE authorization error: topic={}, key={}, payload~={} | {}",
-                            topic, redact(key), shortPayload, tae, tae);
+                    log.error("Kafka PRODUCE authorization error: topic={}, key={}, payload~={}",
+                            topic, redact(key), shortPayload, tae);
 
             case RecordTooLargeException rtle ->
-                    log.error("Kafka PRODUCE record too large: topic={}, key={}, payloadSize={} | {}",
-                            topic, redact(key), shortPayload.length(), rtle, rtle);
+                    log.error("Kafka PRODUCE record too large: topic={}, key={}, payloadSize={}",
+                            topic, redact(key), originalPayload.length(), rtle);
 
-            case TimeoutException te -> log.error("Kafka PRODUCE timeout: topic={}, key={}, payload~={} | {}",
-                    topic, redact(key), shortPayload, te, te);
+            case TimeoutException te -> log.error("Kafka PRODUCE timeout: topic={}, key={}, payload~={}",
+                    topic, redact(key), shortPayload, te);
 
             case RetriableException re ->
-                // Producer will retry per configs; warn is enough for visibility.
-                    log.warn("Kafka PRODUCE retriable failure: topic={}, key={}, payload~={} | {}",
-                            topic, redact(key), shortPayload, re, re);
+                    log.warn("Kafka PRODUCE retriable failure: topic={}, key={}, payload~={}",
+                            topic, redact(key), shortPayload, re);
 
-            // Default branch for all other Throwables
-            default -> log.error("Kafka PRODUCE failure: topic={}, key={}, payload~={} | {}",
-                    topic, redact(key), shortPayload, ex, ex);
+            default -> log.error("Kafka PRODUCE failure: topic={}, key={}, payload~={}",
+                    topic, redact(key), shortPayload, ex);
         }
-        // Do not rethrow here — caller is fire-and-forget.
     }
 
     /**
