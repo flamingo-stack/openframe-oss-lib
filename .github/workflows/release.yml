@@ -62,7 +62,6 @@ jobs:
         env:
           NEW_VERSION: ${{ github.event.inputs.version }}
         run: |
-          echo "Manually entered new version: $NEW_VERSION"
           OLD_BASE="${{ env.OLD_VERSION }}"
           [[ "$OLD_BASE" =~ ^([0-9]+\.[0-9]+\.[0-9]+) ]] && OLD_BASE="${BASH_REMATCH[1]}"
 
