@@ -14,6 +14,10 @@ on:
         required: true
         type: string
 
+env:
+  REGISTRY: "com.openframe.oss"
+  ORGANISATION: ${{ github.repository_owner }}
+  
 jobs:
   release:
     name: Build & Release
@@ -101,14 +105,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Get packages from pom modules
-          echo "openframe-oss-lib" > /tmp/modules
-          grep -oP '(?<=<module>)[^<]+' pom.xml >> /tmp/modules
-
-          cat /tmp/modules | while read MODULE; do
-            PKG="com.openframe.oss.openframe-${MODULE#openframe-}"
+          (echo "openframe-oss-lib"; grep -oP '(?<=<module>)[^<]+' pom.xml) | while read MODULE; do
+            PKG="${{ env.REGISTRY }}.${MODULE//\./%2E}"
             echo "Cleaning $PKG..."
-            gh api "/orgs/${{ github.repository_owner }}/packages/maven/${PKG//\./%2E}/versions" --paginate \
+            gh api "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions" --paginate \
               --jq '.[] | select(.name | test("-rc[0-9]+$")) | .id' 2>/dev/null | \
-              xargs -r -I {} gh api -X DELETE "/orgs/${{ github.repository_owner }}/packages/maven/${PKG//\./%2E}/versions/{}" 2>/dev/null || true
+              xargs -r -I {} gh api -X DELETE "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions/{}" 2>/dev/null || true
           done
