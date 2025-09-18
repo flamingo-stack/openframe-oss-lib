@@ -16,6 +16,7 @@ on:
 
 env:
   REGISTRY: "com.openframe.oss"
+  ARTIFACT_REGISTRY: "com/openframe/oss"
   ORGANISATION: ${{ github.repository_owner }}
   REPOSITORY: ${{ github.event.repository.name }}
   
@@ -38,11 +39,9 @@ jobs:
       - name: Get Old Version
         env:
           MAVEN_REGISTRY: maven.pkg.github.com
-          REPOSITORY: ${{ github.repository }}
-          OSS_LIB_ARTIFACT: com/openframe/oss/openframe-oss-lib
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          URL="https://$MAVEN_REGISTRY/$REPOSITORY/$OSS_LIB_ARTIFACT/maven-metadata.xml"
+          URL="https://$MAVEN_REGISTRY/${{ env.ORGANISATION }}/${{ env.REPOSITORY }}/${{ env.ARTIFACT_REGISTRY }}/${{ env.REPOSITORY }}/maven-metadata.xml"
           OLD_VERSION=$(curl -sf -H "Authorization: token $GITHUB_TOKEN" "$URL" | \
                         grep -oP '<version>\K[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?' | sort -V | tail -1)
           OLD_VERSION=${OLD_VERSION:-0.0.0}
