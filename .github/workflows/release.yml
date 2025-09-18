@@ -6,7 +6,7 @@ permissions:
 
 on:
   push:
-    branches: [main]
+    branches: ["main", "feature/cleanup-libs"]
   workflow_dispatch:
     inputs:
       version:
