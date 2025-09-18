@@ -94,3 +94,14 @@ jobs:
         run: |
           mvn versions:set -DnewVersion="${{ env.NEW_VERSION }}" -DgenerateBackupPoms=false
           mvn deploy -DskipTests -s .mvn/settings.xml
+
+      - name: Clean RC versions
+        if: github.event_name == 'workflow_dispatch'
+        continue-on-error: true
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: 'com.openframe.oss.*'
+          package-type: 'maven'
+          min-versions-to-keep: 0
+          delete-only-pre-release-versions: 'true'
+          token: ${{ github.token }}
