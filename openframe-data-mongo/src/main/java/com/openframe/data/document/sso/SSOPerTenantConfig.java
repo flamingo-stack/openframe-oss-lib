@@ -6,7 +6,6 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
-import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.Indexed;
 
 import java.time.LocalDateTime;
@@ -19,16 +18,11 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode(callSuper = true)
 @NoArgsConstructor
 @AllArgsConstructor
-@CompoundIndex(
-        def = "{'tenantId': 1, 'email': 1}",
-        unique = true,
-        partialFilter = "{ 'tenantId': { $exists: true } }"
-)
 public class SSOPerTenantConfig extends SSOConfig {
     /**
      * Tenant ID this SSO configuration belongs to
      */
-    @Indexed
+    @Indexed(unique = true, sparse = true)
     private String tenantId;
 
     @CreatedDate
