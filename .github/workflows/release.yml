@@ -101,11 +101,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh api "/repos/${{ github.repository }}/packages?package_type=maven" --paginate \
-            --jq '.[].name | select(startswith("com.openframe.oss"))' | \
-          while read PKG; do
+          # Get packages from pom modules
+          echo "openframe-oss-lib" > /tmp/modules
+          grep -oP '(?<=<module>)[^<]+' pom.xml >> /tmp/modules
+
+          cat /tmp/modules | while read MODULE; do
+            PKG="com.openframe.oss.openframe-${MODULE#openframe-}"
             echo "Cleaning $PKG..."
-            gh api "/repos/${{ github.repository }}/packages/maven/${PKG//\./%2E}/versions" --paginate \
-              --jq '.[] | select(.name | test("-rc[0-9]+$")) | .id' | \
-              xargs -r -I {} gh api -X DELETE "/repos/${{ github.repository }}/packages/maven/${PKG//\./%2E}/versions/{}" || true
+            gh api "/orgs/${{ github.repository_owner }}/packages/maven/${PKG//\./%2E}/versions" --paginate \
+              --jq '.[] | select(.name | test("-rc[0-9]+$")) | .id' 2>/dev/null | \
+              xargs -r -I {} gh api -X DELETE "/orgs/${{ github.repository_owner }}/packages/maven/${PKG//\./%2E}/versions/{}" 2>/dev/null || true
           done
