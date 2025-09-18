@@ -16,9 +16,9 @@ public class SmtpEmailService implements EmailService {
 
     private final JavaMailSender mailSender;
 
-    @Value("${openframe.invitations.link-template}")
+    @Value("${openframe.invitations.link-template:}")
     private String linkTemplate;
-    @Value("${openframe.password-reset.link-template}")
+    @Value("${openframe.password-reset.link-template:}")
     private String resetLinkTemplate;
 
     @Override

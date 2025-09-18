@@ -14,6 +14,12 @@ on:
         required: true
         type: string
 
+env:
+  REGISTRY: "com.openframe.oss"
+  ARTIFACT_REGISTRY: "com/openframe/oss"
+  ORGANISATION: ${{ github.repository_owner }}
+  REPOSITORY: ${{ github.event.repository.name }}
+  
 jobs:
   release:
     name: Build & Release
@@ -33,13 +39,11 @@ jobs:
       - name: Get Old Version
         env:
           MAVEN_REGISTRY: maven.pkg.github.com
-          REPOSITORY: ${{ github.repository }}
-          OSS_LIB_ARTIFACT: com/openframe/oss/openframe-oss-lib
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          URL="https://$MAVEN_REGISTRY/$REPOSITORY/$OSS_LIB_ARTIFACT/maven-metadata.xml"
+          URL="https://$MAVEN_REGISTRY/${{ env.ORGANISATION }}/${{ env.REPOSITORY }}/${{ env.ARTIFACT_REGISTRY }}/${{ env.REPOSITORY }}/maven-metadata.xml"
           OLD_VERSION=$(curl -sf -H "Authorization: token $GITHUB_TOKEN" "$URL" | \
-                        grep -oP '<version>\K[0-9]+\.[0-9]+\.[0-9]+' | sort -V | tail -1)
+                        grep -oP '<version>\K[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?' | sort -V | tail -1)
           OLD_VERSION=${OLD_VERSION:-0.0.0}
           echo "OLD_VERSION=$OLD_VERSION" >> $GITHUB_ENV
           echo "Found old version: $OLD_VERSION"
@@ -47,8 +51,13 @@ jobs:
       - name: Set Auto Version
         if: github.event_name == 'push'
         run: |
-          IFS='.' read -r major minor patch <<< "${{ env.OLD_VERSION }}"
-          NEW_VERSION="$major.$minor.$((patch + 1))"
+          # Check if version has rc suffix
+          if [[ "${{ env.OLD_VERSION }}" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-rc([0-9]+)$ ]]; then
+            RC="${BASH_REMATCH[2]}"
+            NEW_VERSION="${BASH_REMATCH[1]}-rc$((RC + 1))"
+          else
+            NEW_VERSION="${{ env.OLD_VERSION }}-rc1"
+          fi
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
           echo "${{ env.OLD_VERSION }} → $NEW_VERSION"
       
@@ -57,19 +66,18 @@ jobs:
         env:
           NEW_VERSION: ${{ github.event.inputs.version }}
         run: |
-          echo "Manually entered new version: $NEW_VERSION"
-          IFS='.' read -r old_major old_minor old_patch <<< "${{ env.OLD_VERSION }}"
+          OLD_BASE="${{ env.OLD_VERSION }}"
+          [[ "$OLD_BASE" =~ ^([0-9]+\.[0-9]+\.[0-9]+) ]] && OLD_BASE="${BASH_REMATCH[1]}"
+
+          IFS='.' read -r old_major old_minor old_patch <<< "$OLD_BASE"
           IFS='.' read -r new_major new_minor new_patch <<< "$NEW_VERSION"
 
-          if [ "$new_major" != "$old_major" ]; then
-            # Major bump: must be +1, minor/patch must be 0
-            [ "$new_major" -eq $((old_major + 1)) ] && [ "$new_minor" -eq 0 ] && [ "$new_patch" -eq 0 ] || exit 1
-          elif [ "$new_minor" != "$old_minor" ]; then
-            # Minor bump: must be +1, patch must be 0
-            [ "$new_minor" -eq $((old_minor + 1)) ] && [ "$new_patch" -eq 0 ] || exit 1
-          else
-            # Patch bump: must be greater
-            [ "$new_patch" -eq $((old_patch + 1)) ] || exit 1
+          # Validate version bump rules in one expression
+          if ! ([ "$new_major" -eq $((old_major + 1)) ] && [ "$new_minor" -eq 0 ] && [ "$new_patch" -eq 0 ]) &&
+             ! ([ "$new_major" -eq "$old_major" ] && [ "$new_minor" -eq $((old_minor + 1)) ] && [ "$new_patch" -eq 0 ]) &&
+             ! ([ "$new_major" -eq "$old_major" ] && [ "$new_minor" -eq "$old_minor" ] && [ "$new_patch" -eq $((old_patch + 1)) ]); then
+            echo "Invalid version bump: ${{ env.OLD_VERSION }} → $NEW_VERSION"
+            exit 1
           fi
           echo "New version validated: ${{ env.OLD_VERSION }} → $NEW_VERSION"
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
@@ -90,3 +98,17 @@ jobs:
         run: |
           mvn versions:set -DnewVersion="${{ env.NEW_VERSION }}" -DgenerateBackupPoms=false
           mvn deploy -DskipTests -s .mvn/settings.xml
+
+      - name: Clean RC versions
+        if: github.event_name == 'workflow_dispatch'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          (echo "${{ env.REPOSITORY }}"; grep -oP '(?<=<module>)[^<]+' pom.xml) | while read MODULE; do
+            PKG="${{ env.REGISTRY }}.${MODULE//\./%2E}"
+            echo "Cleaning $PKG..."
+            gh api "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions" --paginate \
+              --jq '.[] | select(.name | test("-rc[0-9]+$")) | .id' 2>/dev/null | \
+              xargs -r -I {} gh api -X DELETE "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions/{}" 2>/dev/null || true
+          done
