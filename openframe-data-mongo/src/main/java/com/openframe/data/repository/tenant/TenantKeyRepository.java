@@ -1,6 +1,6 @@
-package com.openframe.data.repository.auth;
+package com.openframe.data.repository.tenant;
 
-import com.openframe.data.document.auth.TenantKey;
+import com.openframe.data.document.tenant.TenantKey;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 

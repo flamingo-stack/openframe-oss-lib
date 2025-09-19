@@ -1,4 +1,4 @@
-package com.openframe.data.document.auth;
+package com.openframe.data.document.tenant;
 
 /**
  * Status values for tenants in the authorization server.

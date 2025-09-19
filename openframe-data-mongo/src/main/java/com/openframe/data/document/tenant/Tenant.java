@@ -1,4 +1,4 @@
-package com.openframe.data.document.auth;
+package com.openframe.data.document.tenant;
 
 import lombok.*;
 import lombok.experimental.SuperBuilder;
