@@ -30,6 +30,7 @@
     </properties>
 
     <modules>
+        <module>openframe-core</module>
         <module>openframe-data-mongo</module>
         <module>openframe-notification-mail</module>
         <module>openframe-data-kafka</module>
