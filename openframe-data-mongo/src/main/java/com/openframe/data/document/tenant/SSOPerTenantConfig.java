@@ -1,5 +1,6 @@
-package com.openframe.data.document.sso;
+package com.openframe.data.document.tenant;
 
+import com.openframe.data.document.sso.SSOConfig;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
