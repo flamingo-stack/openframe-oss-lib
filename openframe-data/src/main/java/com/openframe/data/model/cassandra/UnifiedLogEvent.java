@@ -34,9 +34,13 @@ public class UnifiedLogEvent {
     @Column("message")
     private String message;
 
-    /** Tool-specific or event-specific details (flexible, key-value pairs). */
+    /** Tool-specific or event-specific details as long text (JSON or plain text). */
+    @Column("debezium_message")
+    private String debeziumMessage;
+
+    /** Tool-specific or event-specific details (flexible, JSON). */
     @Column("details")
-    private Map<String, String> details;
+    private String details;
 
     @PrimaryKeyClass
     @Data
