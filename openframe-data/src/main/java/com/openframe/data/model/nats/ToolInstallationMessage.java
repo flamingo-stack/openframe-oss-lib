@@ -11,9 +11,11 @@ public class ToolInstallationMessage {
 
     private String toolAgentId;
     private String toolId;
+    private String toolType;
     private String version;
     private List<String> installationCommandArgs;
     private List<String> runCommandArgs;
+    private List<String> toolAgentIdCommandArgs;
     private List<Asset> assets;
 
     @Getter
