@@ -11,6 +11,8 @@ import java.util.Optional;
 @Repository
 public interface ToolConnectionRepository extends MongoRepository<ToolConnection, String> {
     List<ToolConnection> findByMachineId(String machineId);
+    
+    List<ToolConnection> findByMachineIdIn(List<String> machineIds);
 
     Optional<ToolConnection> findByAgentToolId(String agentToolId);
 
