@@ -24,11 +24,6 @@ import java.util.Optional;
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class IntegratedToolService {
     private final IntegratedToolRepository toolRepository;
-    private final RestTemplate restTemplate = new RestTemplate();
-
-    @Value("${debezium.connector.create}")
-    private String debeziumUrl;
-
     public List<IntegratedTool> getAllTools() {
         return toolRepository.findAll();
     }
@@ -42,25 +37,7 @@ public class IntegratedToolService {
     }
 
     public IntegratedTool saveTool(IntegratedTool tool) {
-        if (tool.getDebeziumConnector() != null) {
-            createDebeziumConnector(tool.getDebeziumConnector());
-        }
         return toolRepository.save(tool);
-    }
-
-    private void createDebeziumConnector(Object debeziumConnector) {
-        log.info("Add debezium connector");
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        HttpEntity<Object> requestEntity = new HttpEntity<>(debeziumConnector, headers);
-
-        try {
-            ResponseEntity<String> response = restTemplate.postForEntity(debeziumUrl, requestEntity, String.class);
-            log.info("Added debezium connector. Response: {}", response.getStatusCode());
-        } catch (Exception e) {
-            log.error("Failed to add debezium connector", e);
-        }
-
     }
 }
 
