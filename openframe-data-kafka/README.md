@@ -4,7 +4,7 @@ Library for working with Apache Kafka within the OpenFrame ecosystem.
 
 ## Features
 
-- Support for two Kafka clusters simultaneously (OSS/Tenant and SaaS)
+- Support Kafka cluster
 - Auto-configuration with full support for all Spring Kafka parameters
 - Ready-to-use beans for Producer, Consumer, Admin, Streams for each cluster
 - Debezium message model support
@@ -43,29 +43,6 @@ spring:
         security.protocol: PLAINTEXT
 ```
 
-### SaaS Kafka cluster (activated only when enabled)
-
-```yaml
-spring:
-  saas:
-    enabled: true  # must be explicitly enabled
-    kafka:
-      bootstrap-servers: saas-kafka:9092
-      client-id: saas-client
-      producer:
-        acks: 1
-        batch-size: 16384
-      consumer:
-        group-id: saas-group
-        auto-offset-reset: earliest
-      listener:
-        ack-mode: batch
-        concurrency: 5
-      streams:
-        application-id: saas-streams-app
-        replication-factor: 3
-```
-
 ## Usage
 
 ### Message Producers for different clusters (recommended)
@@ -75,13 +52,10 @@ spring:
 public class KafkaService {
     
     private final OssTenantMessageProducer ossTenantProducer;
-    private final SaasMessageProducer saasProducer;
     
     public KafkaService(
-            OssTenantMessageProducer ossTenantProducer,
-            @Autowired(required = false) SaasMessageProducer saasProducer) {
+            OssTenantMessageProducer ossTenantProducer) {
         this.ossTenantProducer = ossTenantProducer;
-        this.saasProducer = saasProducer;
     }
     
     // Send to OSS/Tenant cluster
@@ -94,19 +68,6 @@ public class KafkaService {
         ossTenantProducer.sendMessage(topic, message, key);
     }
     
-    // Send to SaaS cluster (if configured)
-    public void sendToSaas(String topic, Object message) {
-        if (saasProducer != null) {
-            saasProducer.sendMessage(topic, message, null);
-        }
-    }
-    
-    // Send with key to SaaS cluster (if configured)
-    public void sendToSaas(String topic, String key, Object message) {
-        if (saasProducer != null) {
-            saasProducer.sendMessage(topic, message, key);
-        }
-    }
 }
 ```
 
@@ -120,19 +81,10 @@ public class AdvancedKafkaService {
     @Autowired
     private KafkaTemplate<String, Object> ossTenantKafkaTemplate;
     
-    // SaaS cluster (optional)
-    @Autowired(required = false)
-    private KafkaTemplate<String, Object> saasKafkaTemplate;
-    
     public void sendToOssTenant(String topic, Object message) {
         ossTenantKafkaTemplate.send(topic, message);
     }
     
-    public void sendToSaas(String topic, Object message) {
-        if (saasKafkaTemplate != null) {
-            saasKafkaTemplate.send(topic, message);
-        }
-    }
 }
 ```
 
@@ -150,15 +102,6 @@ public class MessageListeners {
     public void handleOssTenantMessage(String message) {
         // process message from OSS/Tenant cluster
     }
-    
-    // Listener for SaaS cluster (if configured)
-    @KafkaListener(
-        topics = "saas-topic", 
-        containerFactory = "saasKafkaListenerContainerFactory"
-    )
-    public void handleSaasMessage(String message) {
-        // process message from SaaS cluster
-    }
 }
 ```
 
@@ -175,17 +118,6 @@ public class MessageListeners {
 - `ossTenantKafkaConsumerFactory` - ConsumerFactory  
 - `ossTenantKafkaListenerContainerFactory` - ConcurrentKafkaListenerContainerFactory
 
-### SaaS cluster (spring.saas, only when enabled)
-
-#### Message Producers:
-- `saasMessageProducer` - SaasMessageProducer for SaaS cluster (recommended)
-
-#### Low-level beans:
-- `saasKafkaProducerFactory` - ProducerFactory
-- `saasKafkaTemplate` - KafkaTemplate
-- `saasKafkaConsumerFactory` - ConsumerFactory
-- `saasKafkaListenerContainerFactory` - ConcurrentKafkaListenerContainerFactory
-
 ## Supported Parameters
 
 The library supports all parameters of standard `spring.kafka.*` under the `kafka` sub-property for each cluster:
@@ -201,9 +133,6 @@ The library supports all parameters of standard `spring.kafka.*` under the `kafk
 - `ssl.*` - SSL settings
 - `security.*` - security settings
 - `properties.*` - any additional Kafka properties
-
-### SaaS cluster (spring.saas.kafka.*)
-All the same parameters as OSS/Tenant cluster, configured under the `spring.saas.kafka.*` prefix.
 
 ## Additional Features
 

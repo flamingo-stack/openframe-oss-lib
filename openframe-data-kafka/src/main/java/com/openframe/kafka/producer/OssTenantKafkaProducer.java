@@ -3,7 +3,7 @@ package com.openframe.kafka.producer;
 import com.openframe.kafka.model.KafkaMessage;
 import org.springframework.kafka.core.KafkaTemplate;
 
-public class OssTenantKafkaProducer extends GenericKafkaProducer implements OssTenantMessageProducer {
+public class OssTenantKafkaProducer extends GenericKafkaProducer implements MessageProducer {
 
     public OssTenantKafkaProducer(KafkaTemplate<String, Object> ossTenantKafkaTemplate) {
         super(ossTenantKafkaTemplate);
