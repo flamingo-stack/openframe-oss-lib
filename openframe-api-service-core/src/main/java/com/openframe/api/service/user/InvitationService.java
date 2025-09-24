@@ -22,11 +22,6 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class InvitationService {
 
-    @Value("${openframe.saas.kafka.topics.outbound.user-events}")
-    private String topicOutboundUserEvents;
-    @Value("${openframe.cluster-id:default-cluster-id}")
-    private String clusterId;
-
     private final InvitationRepository invitationRepository;
     private final InvitationMapper invitationMapper;
     private final EmailService emailService;
