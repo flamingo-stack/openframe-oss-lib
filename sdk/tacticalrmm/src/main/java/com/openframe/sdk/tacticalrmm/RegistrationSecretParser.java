@@ -23,7 +23,7 @@ public class RegistrationSecretParser {
 
         // Case-insensitive search for --auth followed by a value (optionally quoted)
         // Captures non-space token excluding surrounding quotes if present
-        Pattern pattern = java.util.regex.Pattern.compile(
+        Pattern pattern = Pattern.compile(
                 "(?i)--auth\\s+([\"']?)([^\"'\s]+)\\1");
         java.util.regex.Matcher matcher = pattern.matcher(command);
         if (matcher.find()) {
