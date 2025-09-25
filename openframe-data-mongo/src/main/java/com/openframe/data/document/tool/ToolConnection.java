@@ -29,6 +29,4 @@ public class ToolConnection {
     private Instant lastSyncAt;
     private Instant disconnectedAt;
 
-    private String testFieldUpdate2;
-
 }
