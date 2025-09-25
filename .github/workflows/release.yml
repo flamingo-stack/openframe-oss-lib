@@ -36,7 +36,7 @@ jobs:
           distribution: 'temurin'
           cache: maven
       
-      - name: Get Old Version
+      - name: Get Previous Version
         env:
           MAVEN_REGISTRY: maven.pkg.github.com
           GITHUB_TOKEN: ${{ github.token }}
@@ -48,7 +48,7 @@ jobs:
           echo "OLD_VERSION=$OLD_VERSION" >> $GITHUB_ENV
           echo "Found old version: $OLD_VERSION"
       
-      - name: Set SNAPSHOT Version
+      - name: Set Snapshot Version
         if: github.event_name == 'push'
         run: |
           echo "NEW_VERSION=${{ env.OLD_VERSION }}-SNAPSHOT" >> $GITHUB_ENV
