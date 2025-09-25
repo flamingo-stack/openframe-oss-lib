@@ -1,9 +1,11 @@
 package com.openframe.api.service.user;
 
 import com.openframe.api.dto.user.UserPageResponse;
+import com.openframe.api.exception.UserSelfDeleteNotAllowedException;
 import com.openframe.api.mapper.UserMapper;
 import com.openframe.api.service.processor.UserProcessor;
 import com.openframe.data.document.user.User;
+import com.openframe.data.document.user.UserStatus;
 import com.openframe.data.repository.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -27,6 +29,10 @@ public class UserService {
         return userRepository.findByEmail(email);
     }
 
+    public boolean existsActiveUserByEmail(String email) {
+        return userRepository.existsByEmailAndStatus(email, UserStatus.ACTIVE);
+    }
+
     public UserPageResponse listUsers(int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
         Page<User> p = userRepository.findAll(pageable);
@@ -40,9 +46,13 @@ public class UserService {
                 .build();
     }
 
-    public void softDeleteUser(String id) {
+    public void softDeleteUser(String id, String requesterUserId) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + id));
+
+        if (requesterUserId.equals(user.getId())) {
+            throw new UserSelfDeleteNotAllowedException("User cannot delete self");
+        }
 
         if (user.getStatus() != DELETED) {
             user.setStatus(DELETED);

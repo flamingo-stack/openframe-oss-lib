@@ -61,12 +61,18 @@ public class GlobalExceptionHandler {
         return new ErrorResponse("USER_NOT_FOUND", ex.getMessage());
     }
 
-
     @ExceptionHandler(IllegalStateException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleIllegalState(IllegalStateException ex) {
         log.warn("Conflict: {}", ex.getMessage());
         return new ErrorResponse("CONFLICT", ex.getMessage());
+    }
+
+    @ExceptionHandler(UserSelfDeleteNotAllowedException.class)
+    @ResponseStatus(CONFLICT)
+    public ErrorResponse handleUserSelfDelete(UserSelfDeleteNotAllowedException ex) {
+        log.warn("Conflict: {}", ex.getMessage());
+        return new ErrorResponse("USER_SELF_DELETE_NOT_ALLOWED", ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
