@@ -102,6 +102,6 @@ jobs:
             PKG="${{ env.REGISTRY }}.${MODULE//\./%2E}"
             echo "Cleaning $PKG..."
             gh api "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions" --paginate \
-              --jq '.[] | select(.name | test("-rc[0-9]+$")) | .id' 2>/dev/null | \
-              xargs -r -I {} gh api -X DELETE "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions/{}" 2>/dev/null || true
+              --jq '[.[] | select(.name | test("SNAPSHOT"))] | sort_by(.created_at) | reverse | .[1:] | .[].id' |
+              xargs -r -n1 -I{} gh api -X DELETE "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions/{}"
           done
