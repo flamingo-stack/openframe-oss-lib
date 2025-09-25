@@ -34,10 +34,9 @@ public class InvitationService {
     private final InvitationProcessor invitationProcessor;
 
     public InvitationResponse createInvitation(CreateInvitationRequest request) {
-        userService.getUserByEmail(request.getEmail())
-                .ifPresent(u -> {
-                    throw new IllegalStateException("User with email " + u.getEmail() + " already exists in tenant");
-                });
+        if (userService.existsActiveUserByEmail(request.getEmail())) {
+            throw new IllegalStateException("User with email " + request.getEmail() + " already exists in tenant");
+        }
 
         Invitation saved = invitationRepository.save(invitationMapper.toEntity(request));
 

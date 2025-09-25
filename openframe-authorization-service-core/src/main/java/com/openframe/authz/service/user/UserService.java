@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
 
+import static com.openframe.data.document.user.UserStatus.ACTIVE;
 import static java.util.UUID.randomUUID;
 
 /**
@@ -27,11 +28,11 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
 
     public Optional<AuthUser> findActiveByEmail(String email) {
-        return userRepository.findByEmailAndStatus(email, UserStatus.ACTIVE);
+        return userRepository.findByEmailAndStatus(email, ACTIVE);
     }
 
     public Optional<AuthUser> findActiveByEmailAndTenant(String email, String tenantId) {
-        return userRepository.findByEmailAndTenantIdAndStatus(email, tenantId, UserStatus.ACTIVE);
+        return userRepository.findByEmailAndTenantIdAndStatus(email, tenantId, ACTIVE);
     }
 
     public boolean existsByEmailAndTenant(String email, String tenantId) {
@@ -39,32 +40,58 @@ public class UserService {
     }
 
     /**
-     * Register a new user
+     * Register a new user or reactivate an existing DELETED user within the same tenant.
+     * Throws conflict if an ACTIVE user already exists in this tenant.
      */
     public AuthUser registerUser(String tenantId, String email, String firstName, String lastName, String password, List<UserRole> roles) {
-        if (existsByEmailAndTenant(email, tenantId)) {
-            throw new IllegalArgumentException("User with this email already exists in this tenant");
-        }
+        var existing = userRepository.findByEmailAndTenantId(email, tenantId);
+        return existing
+                .map(u -> {
+                    if (u.getStatus() == ACTIVE) {
+                        throw new IllegalArgumentException("User with this email already exists in this tenant");
+                    }
+                    return reactivateUser(u, firstName, lastName, password, roles);
+                })
+                .orElseGet(() -> createUser(tenantId, email, firstName, lastName, password, roles));
+    }
 
+    public void deactivateUser(AuthUser user) {
+        user.setStatus(UserStatus.DELETED);
+        userRepository.save(user);
+    }
+
+    public AuthUser reactivateUser(AuthUser user,
+                                   String firstName,
+                                   String lastName,
+                                   String rawPassword,
+                                   List<UserRole> roles) {
+        user.setFirstName(firstName);
+        user.setLastName(lastName);
+        user.setPasswordHash(passwordEncoder.encode(rawPassword));
+        user.setRoles(roles);
+        user.setStatus(ACTIVE);
+        return userRepository.save(user);
+    }
+
+    private AuthUser createUser(String tenantId,
+                                String email,
+                                String firstName,
+                                String lastName,
+                                String rawPassword,
+                                List<UserRole> roles) {
         AuthUser user = AuthUser.builder()
                 .id(randomUUID().toString())
                 .tenantId(tenantId)
                 .email(email)
                 .firstName(firstName)
                 .lastName(lastName)
-                .passwordHash(passwordEncoder.encode(password))
-                .status(UserStatus.ACTIVE)
+                .passwordHash(passwordEncoder.encode(rawPassword))
+                .status(ACTIVE)
                 .emailVerified(false)
                 .roles(roles)
                 .loginProvider("LOCAL")
                 .build();
-
         return userRepository.save(user);
-    }
-
-    public void deactivateUser(AuthUser user) {
-        user.setStatus(UserStatus.DELETED);
-        userRepository.save(user);
     }
 
     public void updatePassword(String userId, String rawPassword) {

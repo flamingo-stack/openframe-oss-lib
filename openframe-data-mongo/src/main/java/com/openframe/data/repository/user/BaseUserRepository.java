@@ -1,5 +1,7 @@
 package com.openframe.data.repository.user;
 
+import com.openframe.data.document.user.UserStatus;
+
 /**
  * Base interface defining common user repository operations.
  * This interface is technology-agnostic and can be implemented by both reactive and non-reactive repositories.
@@ -26,4 +28,13 @@ public interface BaseUserRepository<T, B, ID> {
      * @return {@code Boolean} ({@code boolean} for blocking, {@code Mono<Boolean>} for reactive)
      */
     B existsByEmail(String email);
+
+    /**
+     * Check if a user exists with the given email and status.
+     *
+     * @param email  The email to check
+     * @param status The {@link UserStatus} to match (e.g., ACTIVE)
+     * @return {@code Boolean} ({@code boolean} for blocking, {@code Mono<Boolean>} for reactive)
+     */
+    B existsByEmailAndStatus(String email, UserStatus status);
 } 
