@@ -51,13 +51,15 @@ jobs:
       - name: Set Auto Version
         if: github.event_name == 'push'
         run: |
-          # Check if version has rc suffix
-          if [[ "${{ env.OLD_VERSION }}" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-rc([0-9]+)$ ]]; then
-            RC="${BASH_REMATCH[2]}"
-            NEW_VERSION="${BASH_REMATCH[1]}-rc$((RC + 1))"
-          else
-            NEW_VERSION="${{ env.OLD_VERSION }}-rc1"
-          fi
+          # # Check if version has rc suffix
+          # if [[ "${{ env.OLD_VERSION }}" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-rc([0-9]+)$ ]]; then
+          #   RC="${BASH_REMATCH[2]}"
+          #   NEW_VERSION="${BASH_REMATCH[1]}-rc$((RC + 1))"
+          # else
+          #   NEW_VERSION="${{ env.OLD_VERSION }}-rc1"
+          # fi
+          NEW_VERSION="${{ env.OLD_VERSION }}-SNAPSHOT"
+
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
           echo "${{ env.OLD_VERSION }} → $NEW_VERSION"
       
