@@ -43,27 +43,18 @@ jobs:
         run: |
           URL="https://$MAVEN_REGISTRY/${{ env.ORGANISATION }}/${{ env.REPOSITORY }}/${{ env.ARTIFACT_REGISTRY }}/${{ env.REPOSITORY }}/maven-metadata.xml"
           OLD_VERSION=$(curl -sf -H "Authorization: token $GITHUB_TOKEN" "$URL" | \
-                        grep -oP '<version>\K[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?' | sort -V | tail -1)
+                        grep -oP '<version>\K[0-9]+\.[0-9]+\.[0-9]+' | sort -V | tail -1)
           OLD_VERSION=${OLD_VERSION:-0.0.0}
           echo "OLD_VERSION=$OLD_VERSION" >> $GITHUB_ENV
           echo "Found old version: $OLD_VERSION"
       
-      - name: Set Auto Version
+      - name: Set SNAPSHOT Version
         if: github.event_name == 'push'
         run: |
-          # # Check if version has rc suffix
-          # if [[ "${{ env.OLD_VERSION }}" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-rc([0-9]+)$ ]]; then
-          #   RC="${BASH_REMATCH[2]}"
-          #   NEW_VERSION="${BASH_REMATCH[1]}-rc$((RC + 1))"
-          # else
-          #   NEW_VERSION="${{ env.OLD_VERSION }}-rc1"
-          # fi
-          NEW_VERSION="${{ env.OLD_VERSION }}-SNAPSHOT"
-
-          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
-          echo "${{ env.OLD_VERSION }} → $NEW_VERSION"
+          echo "NEW_VERSION=${{ env.OLD_VERSION }}-SNAPSHOT" >> $GITHUB_ENV
+          echo "${{ env.OLD_VERSION }} → ${{ env.OLD_VERSION }}-SNAPSHOT"
       
-      - name: Set Manual Version
+      - name: Set Release Version
         if: github.event_name == 'workflow_dispatch'
         env:
           NEW_VERSION: ${{ github.event.inputs.version }}
