@@ -92,7 +92,7 @@ jobs:
           mvn versions:set -DnewVersion="${{ env.NEW_VERSION }}" -DgenerateBackupPoms=false
           mvn deploy -DskipTests -s .mvn/settings.xml
 
-      - name: Clean RC versions
+      - name: Clean SNAPSHOT versions
         if: github.event_name == 'workflow_dispatch'
         continue-on-error: true
         env:
@@ -102,6 +102,6 @@ jobs:
             PKG="${{ env.REGISTRY }}.${MODULE//\./%2E}"
             echo "Cleaning $PKG..."
             gh api "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions" --paginate \
-              --jq '[.[] | select(.name | test("SNAPSHOT"))] | sort_by(.created_at) | reverse | .[1:] | .[].id' |
+              --jq '[.[] | select(.name | test("SNAPSHOT"))] | sort_by(.created_at) | reverse | .[3:] | .[].id' |
               xargs -r -n1 -I{} gh api -X DELETE "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions/{}"
           done
