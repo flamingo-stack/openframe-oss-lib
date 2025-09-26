@@ -170,7 +170,7 @@ public class OAuthBffController {
 
     private void addClearAuthCookies(HttpHeaders headers) {
         ResponseCookie clearedAccess = ResponseCookie.from(ACCESS_TOKEN, "").path("/").maxAge(0).build();
-        ResponseCookie clearedRefresh = ResponseCookie.from(REFRESH_TOKEN, "").path("/oauth/refresh").maxAge(0).build();
+        ResponseCookie clearedRefresh = ResponseCookie.from(REFRESH_TOKEN, "").path("/oauth").maxAge(0).build();
         headers.add(SET_COOKIE, clearedAccess.toString());
         headers.add(SET_COOKIE, clearedRefresh.toString());
     }

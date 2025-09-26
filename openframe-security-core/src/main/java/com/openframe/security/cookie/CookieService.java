@@ -46,7 +46,6 @@ public class CookieService {
      * Створює ResponseCookie для refresh token з налаштуваннями з CookieService
      */
     public ResponseCookie createRefreshTokenCookie(String refreshToken) {
-        // Make refresh cookie available to all OAuth endpoints (e.g., /oauth/refresh, /oauth/logout)
         return createCookie(REFRESH_TOKEN_COOKIE, refreshToken, "/oauth", refreshTokenExpirationSeconds);
     }
 
