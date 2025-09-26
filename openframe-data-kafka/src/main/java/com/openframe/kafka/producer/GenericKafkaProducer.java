@@ -1,67 +1,90 @@
 package com.openframe.kafka.producer;
 
+import com.openframe.kafka.exception.NonRetryableKafkaException;
+import com.openframe.kafka.exception.TransientKafkaSendException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.common.errors.*;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.messaging.MessageDeliveryException;
+import org.springframework.kafka.support.SendResult;
 import org.springframework.util.StringUtils;
 
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 @Slf4j
 public abstract class GenericKafkaProducer {
 
-    // Avoid logging huge payloads
     private static final int MAX_PAYLOAD_LOG_LEN = 500;
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
-    public GenericKafkaProducer(KafkaTemplate<String, Object> kafkaTemplate) {
+    protected GenericKafkaProducer(KafkaTemplate<String, Object> kafkaTemplate) {
         this.kafkaTemplate = Objects.requireNonNull(kafkaTemplate, "KafkaTemplate must not be null");
     }
 
     /**
-     * Send without key. Non-blocking (callbacks attached to the future).
+     * Async send: returns future (fire-and-forget friendly).
+     * Note: exceptions are handled by the future itself; this callback only logs.
      */
-    protected void sendMessage(String topic, Object message) {
-        if (!StringUtils.hasText(topic)) {
-            throw new MessageDeliveryException("Topic is null or blank");
-        }
-        sendMessage(topic, null, message);
+    public CompletableFuture<SendResult<String, Object>> sendAsync(
+            String topic, String key, Object payload
+    ) {
+        validateTopic(topic);
+
+        var future = (key == null)
+                ? kafkaTemplate.send(topic, payload)
+                : kafkaTemplate.send(topic, key, payload);
+
+        future.whenComplete((res, ex) -> {
+            if (ex != null) {
+                // LOG ONLY. Do not throw here – it won't change the future's state.
+                handleSendFailure(topic, key, payload, ex);
+            } else if (res != null && res.getRecordMetadata() != null) {
+                var md = res.getRecordMetadata();
+                logSendSuccess(md.topic(), key, md.partition(), md.offset());
+            } else {
+                log.info("Kafka PRODUCE success: topic={}, key={} (no record metadata)", topic, redact(key));
+            }
+        });
+
+        return future;
     }
 
     /**
-     * Send with key. Non-blocking (callbacks attached to the future).
+     * Sync send: blocking variant for controlled retries (Spring Retry) and SLA.
+     * Classifies fatal vs transient and throws dedicated runtime exceptions that carry the original cause.
      */
-    protected void sendMessage(String topic, String key, Object message) {
-        if (!StringUtils.hasText(topic)) {
-            throw new MessageDeliveryException("Topic is null or blank");
-        }
+    public void sendAndAwait(String topic, String key, Object payload) {
         try {
-            kafkaTemplate.send(topic, key, message)
-                    .whenComplete((result, ex) -> {
-                        if (ex != null) {
-                            handleSendFailure(topic, key, message, ex);
-                        } else if (result != null && result.getRecordMetadata() != null) {
-                            var md = result.getRecordMetadata();
-                            logSendSuccess(md.topic(), key, md.partition(), md.offset());
-                        } else {
-                            log.info("Kafka PRODUCE success: topic={}, key={} (no record metadata)", topic, redact(key));
-                        }
-                    });
+            sendAsync(topic, key, payload).join(); // throws CompletionException on failure
+        } catch (CompletionException ce) {
+            Throwable cause = ce.getCause();
 
-        } catch (SerializationException e) {
-            throw new MessageDeliveryException("Serialization failed for topic: %s, key: %s, cause: %s"
-                    .formatted(topic, key, e));
-        } catch (IllegalArgumentException e) {
-            throw new MessageDeliveryException("Invalid arguments for topic: %s, key: %s, cause: %s"
-                    .formatted(topic, key, e));
+            // Non-retryable (fail fast)
+            if (cause instanceof RecordTooLargeException
+                    || cause instanceof AuthorizationException
+                    || cause instanceof SerializationException
+                    || cause instanceof InvalidTopicException
+                    || cause instanceof UnknownTopicOrPartitionException) {
+                throw new NonRetryableKafkaException(
+                        "fatal kafka error: topic=%s key=%s".formatted(topic, key), cause);
+            }
+
+            // Retryable (transient)
+            throw new TransientKafkaSendException(
+                    "transient kafka error: topic=%s key=%s".formatted(topic, key), cause);
+        }
+    }
+
+    private void validateTopic(String topic) {
+        if (!StringUtils.hasText(topic)) {
+            throw new NonRetryableKafkaException("Topic is null or blank", null);
         }
     }
 
     /**
-     * Handle async send failure with proper logging and types.
-     * Uses Java 21 pattern-matching switch for clarity.
+     * Async callback logging (do not throw here).
      */
     private void handleSendFailure(String topic, String key, Object payload, Throwable ex) {
         String shortPayload = abbreviate(String.valueOf(payload), MAX_PAYLOAD_LOG_LEN);
@@ -76,21 +99,20 @@ public abstract class GenericKafkaProducer {
                     log.error("Kafka PRODUCE record too large: topic={}, key={}, payloadSize={}",
                             topic, redact(key), originalPayload.length(), rtle);
 
-            case TimeoutException te -> log.error("Kafka PRODUCE timeout: topic={}, key={}, payload~={}",
-                    topic, redact(key), shortPayload, te);
+            case TimeoutException te ->
+                    log.error("Kafka PRODUCE timeout: topic={}, key={}, payload~={}",
+                            topic, redact(key), shortPayload, te);
 
             case RetriableException re ->
                     log.warn("Kafka PRODUCE retriable failure: topic={}, key={}, payload~={}",
                             topic, redact(key), shortPayload, re);
 
-            default -> log.error("Kafka PRODUCE failure: topic={}, key={}, payload~={}",
-                    topic, redact(key), shortPayload, ex);
+            default ->
+                    log.error("Kafka PRODUCE failure: topic={}, key={}, payload~={}",
+                            topic, redact(key), shortPayload, ex);
         }
     }
 
-    /**
-     * Log async success with minimal useful metadata.
-     */
     private void logSendSuccess(String topic, String key, int partition, long offset) {
         log.info("Kafka PRODUCE success: topic={}, key={}, partition={}, offset={}",
                 topic, redact(key), partition, offset);
