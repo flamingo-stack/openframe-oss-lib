@@ -1,4 +1,4 @@
-package com.openframe.data.repository.mongo;
+package com.openframe.data.repository.toolagent;
 
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
 import com.openframe.data.document.toolagent.ToolAgentStatus;

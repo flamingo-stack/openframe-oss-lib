@@ -2,7 +2,7 @@ package com.openframe.data.service;
 
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
 import com.openframe.data.document.toolagent.ToolAgentStatus;
-import com.openframe.data.repository.mongo.IntegratedToolAgentRepository;
+import com.openframe.data.repository.toolagent.IntegratedToolAgentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
