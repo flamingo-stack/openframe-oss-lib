@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -26,5 +27,9 @@ public class IntegratedToolAgentService {
 
     public List<IntegratedToolAgent> getAllEnabled() {
         return agentRepository.findByStatus(ToolAgentStatus.ENABLED);
+    }
+
+    public Optional<IntegratedToolAgent> findById(String id) {
+        return agentRepository.findById(id);
     }
 } 
