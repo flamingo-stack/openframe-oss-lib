@@ -4,6 +4,7 @@ public enum ToolUrlType {
     DASHBOARD,
     API,
     WS,
+    NATS,
     DATABASE,
     CACHE,
     BROKER,
