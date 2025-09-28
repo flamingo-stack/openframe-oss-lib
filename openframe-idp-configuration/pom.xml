@@ -10,45 +10,34 @@
         <version>${revision}</version>
     </parent>
 
-    <artifactId>openframe-api-lib</artifactId>
+    <artifactId>openframe-idp-configuration</artifactId>
     <packaging>jar</packaging>
-    <name>OpenFrame API Library</name>
-    <description>Shared API library for OpenFrame platform</description>
+    <name>OpenFrame IDP Configuration</name>
+    <description>Bootstrap and configuration utilities for Identity Provider (RegisteredClient initialization).</description>
 
     <dependencies>
-
         <dependency>
             <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-data-mongo</artifactId>
         </dependency>
-
-        <!-- OpenFrame Dependencies -->
-        <dependency>
-            <groupId>com.openframe.oss</groupId>
-            <artifactId>openframe-data</artifactId>
-        </dependency>
-
-        <!-- Spring Framework -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter</artifactId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
         </dependency>
-
-        <!-- Validation -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-validation</artifactId>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
         </dependency>
-
-        <!-- Data -->
         <dependency>
-            <groupId>org.springframework.data</groupId>
-            <artifactId>spring-data-commons</artifactId>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
         </dependency>
-
         <dependency>
-            <groupId>com.openframe.oss</groupId>
-            <artifactId>openframe-data-kafka</artifactId>
+            <groupId>net.javacrumbs.shedlock</groupId>
+            <artifactId>shedlock-spring</artifactId>
+            <version>5.10.2</version>
         </dependency>
     </dependencies>
 </project>
+
+
