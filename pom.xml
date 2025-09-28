@@ -48,7 +48,16 @@
         <module>sdk/fleetmdm</module>
         <module>sdk/tacticalrmm</module>
         <module>openframe-security-oauth</module>
+        <module>openframe-idp-configuration</module>
     </modules>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+    </dependencies>
 
     <dependencyManagement>
         <dependencies>
