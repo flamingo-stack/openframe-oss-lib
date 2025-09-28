@@ -57,6 +57,16 @@ public class AuthPrincipal {
     private final String tenantDomain;
 
     /**
+     * Machine ID from 'machine_id' claim (AGENT tokens only)
+     */
+    private final String machineId;
+
+    /**
+     * Actor type based on roles: ADMIN or AGENT
+     */
+    private final ActorType actorType;
+
+    /**
      * Creates AuthPrincipal from JWT token
      */
     public static AuthPrincipal fromJwt(Jwt jwt) {
@@ -91,6 +101,12 @@ public class AuthPrincipal {
             email = sub;
         }
 
+        // AGENT token specific fields
+        String machineId = jwt.getClaimAsString("machine_id");
+        
+        // Determine actor type based on roles
+        ActorType actorType = determineActorType(roles);
+
         return AuthPrincipal.builder()
                 .id(id)
                 .email(email)
@@ -100,6 +116,8 @@ public class AuthPrincipal {
                 .scopes(scopes)
                 .tenantId(tenantId)
                 .tenantDomain(tenantDomain)
+                .machineId(machineId)
+                .actorType(actorType)
                 .build();
     }
 
@@ -109,6 +127,18 @@ public class AuthPrincipal {
 
     private static String getLastNameFromJwt(Jwt jwt) {
         return jwt.getClaimAsString("lastName");
+    }
+
+    /**
+     * Determines actor type based on roles.
+     * Gateway validates that roles exist and are valid before requests reach services.
+     * ADMIN type = human user, AGENT type = machine/service account.
+     */
+    private static ActorType determineActorType(List<String> roles) {
+        if (roles.contains("AGENT")) {
+            return ActorType.AGENT;
+        }
+        return ActorType.ADMIN;
     }
 
     /**
