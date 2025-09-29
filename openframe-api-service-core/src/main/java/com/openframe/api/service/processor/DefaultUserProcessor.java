@@ -15,11 +15,6 @@ import org.springframework.stereotype.Component;
 public class DefaultUserProcessor implements UserProcessor {
 
     @Override
-    public void postProcessUserRetrieved(User user) {
-        log.debug("User retrieved: {}", user.getId());
-    }
-
-    @Override
     public void postProcessUserDeleted(User user) {
         log.debug("User deleted: {}", user.getId());
     }
