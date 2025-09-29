@@ -10,15 +10,6 @@ import com.openframe.data.document.user.User;
 public interface UserProcessor {
 
     /**
-     * Process after a user has been retrieved.
-     *
-     * @param user The retrieved user
-     */
-    default void postProcessUserRetrieved(User user) {
-        // Default no-op implementation
-    }
-
-    /**
      * Process after a user has been soft deleted.
      *
      * @param user The soft deleted user with DELETED status

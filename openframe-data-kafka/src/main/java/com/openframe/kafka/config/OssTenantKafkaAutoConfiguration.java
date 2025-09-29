@@ -20,7 +20,7 @@ import org.springframework.kafka.support.serializer.JsonSerializer;
  */
 @AutoConfiguration
 @EnableConfigurationProperties(OssTenantKafkaProperties.class)
-@ConditionalOnProperty(prefix = "spring.oss-tenant", name = "enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(prefix = "spring.oss-tenant.kafka", name = "enabled", havingValue = "true")
 public class OssTenantKafkaAutoConfiguration {
 
     /**

@@ -107,7 +107,7 @@ public class MessageListeners {
 
 ## Available Beans
 
-### OSS/Tenant cluster (spring.oss-tenant)
+### OSS/Tenant cluster (spring.oss-tenant.kafka)
 
 #### Message Producers:
 - `ossTenantMessageProducer` - OssTenantMessageProducer for OSS/Tenant cluster (recommended)
