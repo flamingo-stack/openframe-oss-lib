@@ -32,7 +32,7 @@ public class OAuthBffController {
 
     private final OAuthBffService oauthBffService;
     private final OAuthDevTicketStore devTicketStore;
-    private final com.openframe.security.cookie.CookieService cookieService;
+    private final CookieService cookieService;
 
     @GetMapping("/login")
     public Mono<ResponseEntity<Void>> login(@RequestParam String tenantId,
@@ -50,7 +50,7 @@ public class OAuthBffController {
                                                WebSession session,
                                                ServerHttpRequest request) {
         boolean includeDevTicket = isLocalHost(request);
-        return oauthBffService.handleCallback(code, state, session)
+        return oauthBffService.handleCallback(code, state, session, request)
                 .map(result -> buildFoundWithCookies(
                         computeTargetWithOptionalDevTicket(
                                 safeRedirect(result.redirectTo()),

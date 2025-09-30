@@ -2,6 +2,7 @@ package com.openframe.security.oauth.service;
 
 import com.openframe.security.oauth.dto.OAuthCallbackResult;
 import com.openframe.security.oauth.dto.TokenResponse;
+import com.openframe.security.oauth.headers.ForwardedHeadersContributor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,6 +33,7 @@ import static org.springframework.util.StringUtils.hasText;
 public class OAuthBffService {
 
     private final WebClient.Builder webClientBuilder;
+    private final ForwardedHeadersContributor headersContributor;
 
     @Value("${openframe.auth.server.url}")
     private String authServerUrl;
@@ -72,17 +74,18 @@ public class OAuthBffService {
 
     public Mono<OAuthCallbackResult> handleCallback(String code,
                                                     String state,
-                                                    WebSession session) {
+                                                    WebSession session,
+                                                    ServerHttpRequest request) {
         OAuthSessionData sessionData = validateAndExtractSessionData(session, state);
         if (sessionData == null) {
             return Mono.error(new IllegalStateException("invalid_state"));
         }
-        return exchangeCodeForTokens(sessionData, code)
+        return exchangeCodeForTokens(sessionData, code, request)
                 .map(tokens -> new OAuthCallbackResult(sessionData.tenantId(), sessionData.redirectTo(), tokens));
     }
 
-    public Mono<TokenResponse> refreshTokensPublic(String tenantId, String refreshToken) {
-        return refreshTokens(tenantId, refreshToken);
+    public Mono<TokenResponse> refreshTokensPublic(String tenantId, String refreshToken, ServerHttpRequest request) {
+        return refreshTokens(tenantId, refreshToken, request);
     }
 
     public Mono<Void> logout(WebSession session) {
@@ -126,7 +129,7 @@ public class OAuthBffService {
         return new OAuthSessionData(codeVerifier, tenantId, isAbsoluteUrl(redirectTo) ? redirectTo : null);
     }
 
-    private Mono<TokenResponse> exchangeCodeForTokens(OAuthSessionData sessionData, String code) {
+    private Mono<TokenResponse> exchangeCodeForTokens(OAuthSessionData sessionData, String code, ServerHttpRequest request) {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("grant_type", "authorization_code");
         form.add("code", code);
@@ -136,7 +139,10 @@ public class OAuthBffService {
         return webClientBuilder.build()
                 .post()
                 .uri(String.format("%s/%s/oauth2/token", authServerUrl, sessionData.tenantId()))
-                .header(com.openframe.core.constants.HttpHeaders.AUTHORIZATION, basicAuth(clientId, clientSecret))
+                .headers(h -> {
+                    h.add(com.openframe.core.constants.HttpHeaders.AUTHORIZATION, basicAuth(clientId, clientSecret));
+                    headersContributor.contribute(h, request);
+                })
                 .header(ACCEPT, "application/json")
                 .body(BodyInserters.fromFormData(form))
                 .retrieve()
@@ -147,7 +153,7 @@ public class OAuthBffService {
                 .bodyToMono(TokenResponse.class);
     }
 
-    private Mono<TokenResponse> refreshTokens(String tenantId, String refreshToken) {
+    private Mono<TokenResponse> refreshTokens(String tenantId, String refreshToken, ServerHttpRequest request) {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("grant_type", "refresh_token");
         form.add("refresh_token", refreshToken);
@@ -155,7 +161,10 @@ public class OAuthBffService {
         return webClientBuilder.build()
                 .post()
                 .uri(String.format("%s/%s/oauth2/token", authServerUrl, tenantId))
-                .header(com.openframe.core.constants.HttpHeaders.AUTHORIZATION, basicAuth(clientId, clientSecret))
+                .headers(h -> {
+                    h.add(com.openframe.core.constants.HttpHeaders.AUTHORIZATION, basicAuth(clientId, clientSecret));
+                    headersContributor.contribute(h, request);
+                })
                 .header(ACCEPT, "application/json")
                 .body(BodyInserters.fromFormData(form))
                 .retrieve()
