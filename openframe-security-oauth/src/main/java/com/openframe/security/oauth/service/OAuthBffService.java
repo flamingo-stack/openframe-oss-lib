@@ -17,6 +17,7 @@ import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.WebSession;
 import reactor.core.publisher.Mono;
+import com.openframe.security.oauth.service.redirect.RedirectTargetResolver;
 
 import java.util.Base64;
 
@@ -33,6 +34,7 @@ import static org.springframework.util.StringUtils.hasText;
 public class OAuthBffService {
 
     private final WebClient.Builder webClientBuilder;
+    private final RedirectTargetResolver redirectTargetResolver;
     private final ForwardedHeadersContributor headersContributor;
 
     @Value("${openframe.auth.server.url}")
@@ -81,7 +83,10 @@ public class OAuthBffService {
             return Mono.error(new IllegalStateException("invalid_state"));
         }
         return exchangeCodeForTokens(sessionData, code, request)
-                .map(tokens -> new OAuthCallbackResult(sessionData.tenantId(), sessionData.redirectTo(), tokens));
+                .flatMap(tokens -> redirectTargetResolver
+                        .resolve(sessionData.tenantId(), sessionData.redirectTo(), session, request)
+                        .map(target -> new OAuthCallbackResult(sessionData.tenantId(), target, tokens))
+                );
     }
 
     public Mono<TokenResponse> refreshTokensPublic(String tenantId, String refreshToken, ServerHttpRequest request) {
