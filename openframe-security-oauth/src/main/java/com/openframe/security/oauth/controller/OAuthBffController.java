@@ -77,7 +77,7 @@ public class OAuthBffController {
             return Mono.just(ResponseEntity.status(401).build());
         }
         boolean includeDevHeaders = isLocalHost(request);
-        return oauthBffService.refreshTokensPublic(tenantId, token)
+        return oauthBffService.refreshTokensPublic(tenantId, token, request)
                 .map(tokens -> buildNoContentWithCookies(tokens, includeDevHeaders));
     }
 
