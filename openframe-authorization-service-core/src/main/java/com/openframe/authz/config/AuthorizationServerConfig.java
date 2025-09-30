@@ -16,7 +16,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
@@ -54,27 +53,19 @@ import static com.openframe.authz.config.tenant.TenantContext.getTenantId;
  */
 @Configuration
 @EnableWebSecurity
-@EnableConfigurationProperties(AuthzProps.class)
 @Slf4j
 public class AuthorizationServerConfig {
 
     @Bean
     @Order(1)
     public SecurityFilterChain authorizationServerSecurityFilterChain(
-            HttpSecurity http, AuthzProps props) throws Exception {
+            HttpSecurity http) throws Exception {
 
         var as = new OAuth2AuthorizationServerConfigurer();
-        AuthorizationServerSettings.Builder settingsBuilder = AuthorizationServerSettings
+        AuthorizationServerSettings settings = AuthorizationServerSettings
                 .builder()
-                .multipleIssuersAllowed(true);
-
-        String issuer = props.issuer();
-        if (issuer != null && !issuer.isBlank()) {
-            settingsBuilder.issuer(issuer.trim());
-            log.info("Authorization Server issuer set to: {}", issuer);
-        }
-
-        AuthorizationServerSettings settings = settingsBuilder.build();
+                .multipleIssuersAllowed(true)
+                .build();
 
         http.with(as, config -> {
             config.oidc(Customizer.withDefaults());
