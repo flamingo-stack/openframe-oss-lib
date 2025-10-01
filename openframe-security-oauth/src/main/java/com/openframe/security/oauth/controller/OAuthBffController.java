@@ -1,5 +1,6 @@
 package com.openframe.security.oauth.controller;
 
+import com.openframe.security.cookie.CookieService;
 import com.openframe.security.oauth.dto.TokenResponse;
 import com.openframe.security.oauth.service.OAuthBffService;
 import com.openframe.security.oauth.service.OAuthDevTicketStore;
@@ -32,7 +33,7 @@ public class OAuthBffController {
 
     private final OAuthBffService oauthBffService;
     private final OAuthDevTicketStore devTicketStore;
-    private final com.openframe.security.cookie.CookieService cookieService;
+    private final CookieService cookieService;
 
     @GetMapping("/login")
     public Mono<ResponseEntity<Void>> login(@RequestParam String tenantId,
@@ -50,7 +51,7 @@ public class OAuthBffController {
                                                WebSession session,
                                                ServerHttpRequest request) {
         boolean includeDevTicket = isLocalHost(request);
-        return oauthBffService.handleCallback(code, state, session)
+        return oauthBffService.handleCallback(code, state, session, request)
                 .map(result -> buildFoundWithCookies(
                         computeTargetWithOptionalDevTicket(
                                 safeRedirect(result.redirectTo()),
@@ -77,7 +78,7 @@ public class OAuthBffController {
             return Mono.just(ResponseEntity.status(401).build());
         }
         boolean includeDevHeaders = isLocalHost(request);
-        return oauthBffService.refreshTokensPublic(tenantId, token)
+        return oauthBffService.refreshTokensPublic(tenantId, token, request)
                 .map(tokens -> buildNoContentWithCookies(tokens, includeDevHeaders));
     }
 
