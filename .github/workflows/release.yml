@@ -68,9 +68,9 @@ jobs:
           echo "${{ env.OLD_VERSION }} → $NEW_VERSION"
       
       - name: Set Manual Version
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'
         env:
-          NEW_VERSION: ${{ github.event.inputs.version }}
+          NEW_VERSION: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || inputs.version }}
         run: |
           OLD_BASE="${{ env.OLD_VERSION }}"
           [[ "$OLD_BASE" =~ ^([0-9]+\.[0-9]+\.[0-9]+) ]] && OLD_BASE="${BASH_REMATCH[1]}"
