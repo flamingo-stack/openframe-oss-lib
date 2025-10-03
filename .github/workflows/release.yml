@@ -13,6 +13,8 @@ on:
         description: 'Version to release OSS Libs (x.y.z)'
         required: true
         type: string
+  repository_dispatch:
+    types: [trigger-build]
 
 env:
   REGISTRY: "com.openframe.oss"
