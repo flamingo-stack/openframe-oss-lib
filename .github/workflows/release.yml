@@ -13,8 +13,15 @@ on:
         description: 'Version to release OSS Libs (x.y.z)'
         required: true
         type: string
-  repository_dispatch:
-    types: [trigger-build]
+  workflow_call:
+    inputs:
+      tag:
+        description: "Tag to release OSS Libs (x.y.z)"
+        required: true
+        type: string
+    secrets:
+      GITHUB_TOKEN:
+        required: true
 
 env:
   REGISTRY: "com.openframe.oss"
