@@ -1,17 +1,21 @@
 package com.openframe.sdk.tacticalrmm;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.sdk.tacticalrmm.exception.TacticalRmmApiException;
 import com.openframe.sdk.tacticalrmm.exception.TacticalRmmException;
 import com.openframe.sdk.tacticalrmm.model.AgentInfo;
+import com.openframe.sdk.tacticalrmm.model.AgentListItem;
 import com.openframe.sdk.tacticalrmm.model.AgentRegistrationSecretRequest;
 import com.openframe.sdk.tacticalrmm.model.CommandResult;
+import com.openframe.sdk.tacticalrmm.model.ScriptListItem;
 
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.List;
 
 public class TacticalRmmClient {
 
@@ -211,6 +215,97 @@ public class TacticalRmmClient {
             throw e;
         } catch (Exception e) {
             throw new TacticalRmmException("Failed to get agent info for: " + agentId, e);
+        }
+    }
+
+    /**
+     * Get all agents with minimal information (detail=false)
+     * @param tacticalServerUrl The Tactical RMM server URL
+     * @param apiKey The API key for authentication
+     * @return List of AgentListItem containing basic agent information
+     */
+    public List<AgentListItem> getAllAgents(String tacticalServerUrl, String apiKey) {
+        // Validate parameters
+        if (tacticalServerUrl == null || tacticalServerUrl.trim().isEmpty()) {
+            throw new IllegalArgumentException("Tactical server URL cannot be null or empty");
+        }
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            throw new IllegalArgumentException("API key cannot be null or empty");
+        }
+
+        try {
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(tacticalServerUrl + "/agents/?detail=false"))
+                    .GET()
+                    .header("Content-Type", "application/json")
+                    .header("Accept", "application/json")
+                    .header("X-API-KEY", apiKey)
+                    .timeout(Duration.ofSeconds(30))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 401) {
+                throw new TacticalRmmApiException("Authentication failed. Please check your API key.", response.statusCode(), response.body());
+            } else if (response.statusCode() != 200) {
+                throw new TacticalRmmApiException("Failed to get agents list", response.statusCode(), response.body());
+            }
+
+            TypeReference<List<AgentListItem>> typeRef =
+                    new TypeReference<>() {
+                    };
+            return objectMapper.readValue(response.body(), typeRef);
+        } catch (TacticalRmmApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new TacticalRmmException("Failed to get agents list", e);
+        }
+    }
+
+    /**
+     * Get script information by script ID
+     * @param tacticalServerUrl The Tactical RMM server URL
+     * @param apiKey The API key for authentication
+     * @param scriptId The ID of the script to get info for
+     * @return ScriptListItem containing basic script information
+     */
+    public ScriptListItem getScript(String tacticalServerUrl, String apiKey, String scriptId) {
+        // Validate parameters
+        if (tacticalServerUrl == null || tacticalServerUrl.trim().isEmpty()) {
+            throw new IllegalArgumentException("Tactical server URL cannot be null or empty");
+        }
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            throw new IllegalArgumentException("API key cannot be null or empty");
+        }
+        if (scriptId == null || scriptId.trim().isEmpty()) {
+            throw new IllegalArgumentException("Script ID cannot be null or empty");
+        }
+
+        try {
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(tacticalServerUrl + "/scripts/" + scriptId + "/"))
+                    .GET()
+                    .header("Content-Type", "application/json")
+                    .header("Accept", "application/json")
+                    .header("X-API-KEY", apiKey)
+                    .timeout(Duration.ofSeconds(10))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 401) {
+                throw new TacticalRmmApiException("Authentication failed. Please check your API key.", response.statusCode(), response.body());
+            } else if (response.statusCode() == 404) {
+                throw new TacticalRmmApiException("Script not found with ID: " + scriptId, response.statusCode(), response.body());
+            } else if (response.statusCode() != 200) {
+                throw new TacticalRmmApiException("Failed to get script info", response.statusCode(), response.body());
+            }
+
+            return objectMapper.readValue(response.body(), ScriptListItem.class);
+        } catch (TacticalRmmApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new TacticalRmmException("Failed to get script info for: " + scriptId, e);
         }
     }
 
