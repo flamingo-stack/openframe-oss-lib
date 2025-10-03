@@ -75,8 +75,8 @@ public class AgentListItem {
                 "id=" + id +
                 ", agentId='" + agentId + '\'' +
                 ", hostname='" + hostname + '\'' +
-                ", site=" + site +
-                ", client=" + client +
+                ", site='" + site + '\'' +
+                ", client='" + client + '\'' +
                 '}';
     }
 }
