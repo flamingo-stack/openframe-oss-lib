@@ -25,6 +25,7 @@ public class ToolInstallationMessage {
         private String localFilename;
         private AssetSource source;
         private String path;
+        private boolean executable;
     }
 
     public enum AssetSource {
