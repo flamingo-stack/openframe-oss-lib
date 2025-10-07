@@ -157,19 +157,18 @@ jobs:
     needs: release
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
     steps:
       - name: Trigger tenant workflow
-        uses: actions/github-script@v7
+        uses: convictional/trigger-workflow-and-wait@v1.6.1
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            await github.rest.actions.createWorkflowDispatch({
-              owner: 'flamingo-stack',
-              repo: 'openframe-oss-tenant',
-              workflow_id: 'build.yml',
-              ref: 'ami/ci',
-              inputs: {
-                version: '${{ needs.release.outputs.version }}'
-              }
-            });
+          owner: flamingo-stack
+          repo: openframe-oss-tenant
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          workflow_file_name: build.yml
+          ref: ami/ci
+          wait_workflow: false
+          client_payload: '{"version": "${{ needs.release.outputs.version }}"}'
   
