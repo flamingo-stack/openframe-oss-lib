@@ -17,4 +17,11 @@ public interface MachineRepository extends MongoRepository<Machine, String>, Cus
     List<Machine> findByTypeAndHostnameContainingIgnoreCase(DeviceType deviceType, String hostname);
     
     List<Machine> findByType(DeviceType deviceType);
+    
+    /**
+     * Check if any machines exist with the given organizationId
+     * @param organizationId organization identifier
+     * @return true if at least one machine exists with this organizationId
+     */
+    boolean existsByOrganizationId(String organizationId);
 } 

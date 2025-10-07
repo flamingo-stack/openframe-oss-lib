@@ -1,0 +1,37 @@
+extend type Query {
+    # Get all organizations with optional filtering
+    organizations(filter: OrganizationFilterInput, search: String): OrganizationList!
+    
+    # Get single organization by ID
+    organization(id: String!): Organization
+    
+    # Get organization by organizationId
+    organizationByOrganizationId(organizationId: String!): Organization
+}
+
+type Organization {
+    id: ID!
+    name: String!
+    organizationId: String!  # Generated as UUID on creation
+    category: String
+    numberOfEmployees: Int
+    websiteUrl: String
+    monthlyRevenue: Float
+    contractStartDate: Date
+    contractEndDate: Date
+    createdAt: Instant
+    updatedAt: Instant
+    deleted: Boolean
+    deletedAt: Instant
+}
+
+input OrganizationFilterInput {
+    category: String
+    minEmployees: Int
+    maxEmployees: Int
+    hasActiveContract: Boolean
+}
+
+type OrganizationList {
+    organizations: [Organization!]!
+}

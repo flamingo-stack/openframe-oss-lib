@@ -70,5 +70,18 @@ public class DeviceDataFetcher {
         Machine machine = dfe.getSource();
         return dataLoader.load(machine.getMachineId());
     }
+
+    @DgsData(parentType = "Machine")
+    public CompletableFuture<String> organizationName(DgsDataFetchingEnvironment dfe) {
+        DataLoader<String, String> dataLoader = dfe.getDataLoader("organizationNameDataLoader");
+        Machine machine = dfe.getSource();
+        String organizationId = machine.getOrganizationId();
+
+        if (organizationId == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        
+        return dataLoader.load(organizationId);
+    }
 }
 

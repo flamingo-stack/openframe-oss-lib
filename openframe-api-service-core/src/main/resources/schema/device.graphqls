@@ -21,6 +21,7 @@ type DeviceFilters {
 
 type DeviceFilterOption {
     value: String!
+    label: String!
     count: Int!
 }
 
@@ -48,6 +49,7 @@ type Machine {
     status: DeviceStatus
     lastSeen: Instant
     organizationId: String
+    organizationName: String
     hostname: String
     displayName: String
     serialNumber: String
