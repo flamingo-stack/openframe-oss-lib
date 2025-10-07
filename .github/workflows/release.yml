@@ -1,3 +1,7 @@
+# when the lib is updtaed it will trigger the tenant with the patched version
+# which will update the pom.xml on root and auto commit to main
+# will rebuild the d0ockler images multistages
+
 name: OpenFrame OSS Libs Release
 
 permissions:
@@ -8,12 +12,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to release OSS Libs (x.y.z)'
-        required: true
-        type: string
-  workflow_call:
     inputs:
       version:
         description: 'Version to release OSS Libs (x.y.z)'
@@ -31,7 +29,6 @@ jobs:
     name: Build & Release
     runs-on: ubuntu-latest
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    
     steps:
       - uses: actions/checkout@v4
       
@@ -66,6 +63,7 @@ jobs:
           fi
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
           echo "${{ env.OLD_VERSION }} → $NEW_VERSION"
+          echo "version=${{ env.NEW_VERSION }}" >> $GITHUB_OUTPUT
       
       - name: Set Manual Version
         if: github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'
@@ -87,6 +85,7 @@ jobs:
           fi
           echo "New version validated: ${{ env.OLD_VERSION }} → $NEW_VERSION"
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+          echo "version=${{ env.NEW_VERSION }}" >> $GITHUB_OUTPUT
       
       - name: Build
         run: |
@@ -118,3 +117,46 @@ jobs:
               --jq '.[] | select(.name | test("-rc[0-9]+$")) | .id' 2>/dev/null | \
               xargs -r -I {} gh api -X DELETE "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions/{}" 2>/dev/null || true
           done
+
+  update-version:
+    name: Update Dependencies
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_call'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Update pom.xml versions
+        run: |
+          VERSION="${{ inputs.version }}"
+          echo "Updating to version: $VERSION"
+
+          # Find and update all openframe-oss-lib dependency versions
+          find . -name "pom.xml" -type f -exec sed -i \
+            "s|<groupId>com\.openframe\.oss</groupId>\s*<artifactId>openframe-[^<]*</artifactId>\s*<version>[0-9\.]*\(-rc[0-9]*\)\?</version>|<groupId>com.openframe.oss</groupId><artifactId>\1</artifactId><version>$VERSION</version>|g" {} \;
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pom.xml
+          git commit -m "chore: bump openframe-oss-lib to ${{ inputs.version }}" || echo "No changes to commit"
+          git push || echo "Nothing to push"
+
+  trigger-build:
+    name: Trigger Tenant Build
+    needs: release
+    if: github.event_name == 'workflow_dispatch'
+    uses: flamingo-stack/openframe-oss-tenant/.github/workflows/build.yml@ami/ci
+    with:
+      version: ${{ needs.release.outputs.version }}
+    secrets: inherit
