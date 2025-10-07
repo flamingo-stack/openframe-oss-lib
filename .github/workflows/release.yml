@@ -160,11 +160,7 @@ jobs:
     name: Trigger Tenant Build
     needs: release
     if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
     uses: flamingo-stack/openframe-oss-tenant/.github/workflows/build.yml@ami/ci
     secrets: inherit
     with:
       version: ${{ needs.release.outputs.version }}
-    permissions:
-      actions: write
-      contents: read
