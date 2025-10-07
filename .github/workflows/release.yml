@@ -166,12 +166,7 @@ jobs:
       contents: read
     steps:
       - name: Trigger tenant workflow
-        uses: convictional/trigger-workflow-and-wait@v1.6.1
+        uses: flamingo-stack/openframe-oss-tenant/.github/workflows/build.yml@ami/ci
+        secrets: inherit
         with:
-          owner: flamingo-stack
-          repo: openframe-oss-tenant
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          workflow_file_name: build.yml
-          ref: ami/ci
-          wait_workflow: false
-          client_payload: '{"version": "${{ needs.release.outputs.version }}"}'
+          version: ${{ needs.release.outputs.version }}
