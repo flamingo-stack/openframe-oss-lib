@@ -156,6 +156,13 @@ jobs:
     name: Trigger Tenant Build
     needs: release
     if: github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+      packages: write
+      actions: write
+      pull-requests: write
+      attestations: write
+      id-token: write
     uses: flamingo-stack/openframe-oss-tenant/.github/workflows/build.yml@ami/ci
     with:
       version: ${{ needs.release.outputs.version }}
