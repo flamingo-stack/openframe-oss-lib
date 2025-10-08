@@ -11,5 +11,6 @@ public class ToolAgentAsset {
     private String localFilename;
     private ToolAgentAssetSource source;
     private String path;
+    private boolean executable;
     
 }
