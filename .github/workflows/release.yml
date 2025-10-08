@@ -5,7 +5,7 @@
 name: OpenFrame OSS Libs Release
 
 permissions:
-  contents: read
+  contents: write
   packages: write
   actions: write
   pull-requests: write
@@ -118,7 +118,6 @@ jobs:
               --jq '[.[] | select(.name | test("SNAPSHOT"))] | sort_by(.created_at) | reverse | .[3:] | .[].id' |
               xargs -r -n1 -I{} gh api -X DELETE "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions/{}"
           done
-
 
   trigger-build:
     name: Trigger Tenant Build
