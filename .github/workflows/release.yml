@@ -135,4 +135,4 @@ jobs:
     uses: flamingo-stack/openframe-oss-tenant/.github/workflows/build.yml@ami/ci
     secrets: inherit
     with:
-      version: ${{ steps.release-version.outputs.version || steps.snapshot-version.outputs.version }}
+      version: ${{ needs.release.outputs.version }}
