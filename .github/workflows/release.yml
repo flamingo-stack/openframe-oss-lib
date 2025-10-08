@@ -21,6 +21,11 @@ on:
         description: 'Version to release OSS Libs (x.y.z)'
         required: true
         type: string
+      isSnapshot:
+        description: 'Is this a snapshot release?'
+        required: false
+        default: 'false'
+        type: boolean
 
 env:
   REGISTRY: "com.openframe.oss"
@@ -67,7 +72,7 @@ jobs:
       
       - name: Set Release Version
         id: release-version
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' && inputs.isSnapshot == 'false'
         env:
           NEW_VERSION: ${{ inputs.version }}
         run: |
