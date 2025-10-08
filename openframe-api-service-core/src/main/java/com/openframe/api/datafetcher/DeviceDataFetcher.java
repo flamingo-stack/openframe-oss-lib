@@ -8,6 +8,7 @@ import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.api.service.DeviceFilterService;
 import com.openframe.api.service.DeviceService;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.tool.Tag;
 import com.openframe.data.document.tool.ToolConnection;
 import jakarta.validation.Valid;
@@ -69,6 +70,19 @@ public class DeviceDataFetcher {
         DataLoader<String, List<ToolConnection>> dataLoader = dfe.getDataLoader("toolConnectionDataLoader");
         Machine machine = dfe.getSource();
         return dataLoader.load(machine.getMachineId());
+    }
+
+    @DgsData(parentType = "Machine")
+    public CompletableFuture<Organization> organization(DgsDataFetchingEnvironment dfe) {
+        DataLoader<String, Organization> dataLoader = dfe.getDataLoader("organizationDataLoader");
+        Machine machine = dfe.getSource();
+        String organizationId = machine.getOrganizationId();
+        
+        if (organizationId == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        
+        return dataLoader.load(organizationId);
     }
 }
 

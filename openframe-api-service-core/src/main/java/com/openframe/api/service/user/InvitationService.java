@@ -11,7 +11,6 @@ import com.openframe.data.repository.user.InvitationRepository;
 import com.openframe.notification.mail.service.EmailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -22,11 +21,6 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class InvitationService {
 
-    @Value("${openframe.saas.kafka.topics.outbound.user-events}")
-    private String topicOutboundUserEvents;
-    @Value("${openframe.cluster-id:default-cluster-id}")
-    private String clusterId;
-
     private final InvitationRepository invitationRepository;
     private final InvitationMapper invitationMapper;
     private final EmailService emailService;
@@ -34,10 +28,9 @@ public class InvitationService {
     private final InvitationProcessor invitationProcessor;
 
     public InvitationResponse createInvitation(CreateInvitationRequest request) {
-        userService.getUserByEmail(request.getEmail())
-                .ifPresent(u -> {
-                    throw new IllegalStateException("User with email " + u.getEmail() + " already exists in tenant");
-                });
+        if (userService.existsActiveUserByEmail(request.getEmail())) {
+            throw new IllegalStateException("User with email " + request.getEmail() + " already exists in tenant");
+        }
 
         Invitation saved = invitationRepository.save(invitationMapper.toEntity(request));
 

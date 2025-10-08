@@ -23,7 +23,9 @@ import java.util.Optional;
 @ConditionalOnProperty(name = "openframe.integration.tool.enabled", havingValue = "true")
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class IntegratedToolService {
+
     private final IntegratedToolRepository toolRepository;
+
     public List<IntegratedTool> getAllTools() {
         return toolRepository.findAll();
     }

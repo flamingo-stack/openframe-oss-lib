@@ -1,13 +1,10 @@
 package com.openframe.kafka.config;
 
 import com.openframe.kafka.producer.OssTenantKafkaProducer;
-import com.openframe.kafka.producer.OssTenantMessageProducer;
-import com.openframe.kafka.producer.SaasMessageProducer;
-import com.openframe.kafka.producer.StubSaasMessageProducer;
+import com.openframe.kafka.producer.MessageProducer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -23,13 +20,13 @@ import org.springframework.kafka.support.serializer.JsonSerializer;
  */
 @AutoConfiguration
 @EnableConfigurationProperties(OssTenantKafkaProperties.class)
+@ConditionalOnProperty(prefix = "spring.oss-tenant.kafka", name = "enabled", havingValue = "true")
 public class OssTenantKafkaAutoConfiguration {
 
     /**
      * ProducerFactory for OSS cluster
      */
     @Bean("ossTenantKafkaProducerFactory")
-    @ConditionalOnProperty(prefix = "spring.oss-tenant", name = "enabled", havingValue = "true", matchIfMissing = true)
     public ProducerFactory<String, Object> ossTenantKafkaProducerFactory(OssTenantKafkaProperties properties) {
         properties.getKafka().getProducer().setKeySerializer(StringSerializer.class);
         properties.getKafka().getProducer().setValueSerializer(JsonSerializer.class);
@@ -41,7 +38,6 @@ public class OssTenantKafkaAutoConfiguration {
      * KafkaTemplate for OSS cluster
      */
     @Bean("ossTenantKafkaTemplate")
-    @ConditionalOnProperty(prefix = "spring.oss-tenant", name = "enabled", havingValue = "true", matchIfMissing = true)
     public KafkaTemplate<String, Object> ossTenantKafkaTemplate(
             ProducerFactory<String, Object> ossTenantKafkaProducerFactory,
             OssTenantKafkaProperties properties) {
@@ -60,7 +56,6 @@ public class OssTenantKafkaAutoConfiguration {
      * ConsumerFactory for OSS cluster
      */
     @Bean("ossTenantKafkaConsumerFactory")
-    @ConditionalOnProperty(prefix = "spring.oss-tenant", name = "enabled", havingValue = "true", matchIfMissing = true)
     public ConsumerFactory<Object, Object> ossTenantKafkaConsumerFactory(OssTenantKafkaProperties properties) {
         properties.getKafka().getConsumer().setKeyDeserializer(StringDeserializer.class);
         properties.getKafka().getConsumer().setValueDeserializer(JsonDeserializer.class);
@@ -72,7 +67,6 @@ public class OssTenantKafkaAutoConfiguration {
      * KafkaListenerContainerFactory for OSS cluster
      */
     @Bean("ossTenantKafkaListenerContainerFactory")
-    @ConditionalOnProperty(prefix = "spring.oss-tenant", name = "enabled", havingValue = "true", matchIfMissing = true)
     public ConcurrentKafkaListenerContainerFactory<Object, Object> ossTenantKafkaListenerContainerFactory(
             ConsumerFactory<Object, Object> ossTenantKafkaConsumerFactory,
             OssTenantKafkaProperties properties) {
@@ -114,20 +108,8 @@ public class OssTenantKafkaAutoConfiguration {
     /**
      * kafka producer for OSS cluster
      */
-    @Bean("ossTenantMessageProducer")
-    @ConditionalOnProperty(prefix = "spring.oss-tenant", name = "enabled", havingValue = "true", matchIfMissing = true)
-    public OssTenantMessageProducer ossTenantMessageProducer(KafkaTemplate<String, Object> ossTenantKafkaTemplate) {
+    @Bean("ossTenantKafkaProducer")
+    public MessageProducer ossTenantKafkaProducer(KafkaTemplate<String, Object> ossTenantKafkaTemplate) {
         return new OssTenantKafkaProducer(ossTenantKafkaTemplate);
-    }
-
-    /**
-     * Default SaasMessageProducer implementation.
-     * Always available regardless of spring.oss-tenant.enabled setting.
-     * Only created if no other SaasMessageProducer bean exists (e.g., from SAAS module).
-     */
-    @Bean("saasMessageProducer")
-    @ConditionalOnMissingBean(SaasMessageProducer.class)
-    public SaasMessageProducer saasMessageProducer() {
-        return new StubSaasMessageProducer();
     }
 }

@@ -46,7 +46,7 @@ public class CookieService {
      * Створює ResponseCookie для refresh token з налаштуваннями з CookieService
      */
     public ResponseCookie createRefreshTokenCookie(String refreshToken) {
-        return createCookie(REFRESH_TOKEN_COOKIE, refreshToken, "/oauth/refresh", refreshTokenExpirationSeconds);
+        return createCookie(REFRESH_TOKEN_COOKIE, refreshToken, "/oauth", refreshTokenExpirationSeconds);
     }
 
     public ResponseCookie createCookie(String name, String value, String path, int age) {
