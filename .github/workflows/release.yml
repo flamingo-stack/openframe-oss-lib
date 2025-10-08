@@ -127,9 +127,11 @@ jobs:
           done
 
   update-version:
-    name: Update Dependencies
+    name: Update lib version in pmm.xml
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_call'
+    if: |
+      (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') || 
+      (github.event_name == 'push' && contains(needs.changes.outputs[matrix.name], 'true'))
     steps:
       - name: Checkout
         uses: actions/checkout@v4
