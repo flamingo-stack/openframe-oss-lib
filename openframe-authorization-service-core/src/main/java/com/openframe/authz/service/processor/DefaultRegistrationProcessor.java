@@ -1,5 +1,6 @@
 package com.openframe.authz.service.processor;
 
+import com.openframe.authz.dto.TenantRegistrationRequest;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.tenant.Tenant;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +18,7 @@ import org.springframework.stereotype.Component;
 public class DefaultRegistrationProcessor implements RegistrationProcessor {
 
     @Override
-    public void preProcessTenantRegistration() {
+    public void preProcessTenantRegistration(TenantRegistrationRequest request) {
         // Default no-op implementation
         log.debug("Default pre-processing tenant registration");
     }
