@@ -16,6 +16,8 @@ type Organization {
     category: String
     numberOfEmployees: Int
     websiteUrl: String
+    notes: String
+    contactInformation: ContactInformation
     monthlyRevenue: Float
     contractStartDate: Date
     contractEndDate: Date
@@ -23,6 +25,29 @@ type Organization {
     updatedAt: Instant
     deleted: Boolean
     deletedAt: Instant
+}
+
+type ContactInformation {
+    contacts: [ContactPerson!]!
+    physicalAddress: Address
+    mailingAddress: Address
+    mailingAddressSameAsPhysical: Boolean
+}
+
+type ContactPerson {
+    contactName: String
+    title: String
+    phone: String
+    email: String
+}
+
+type Address {
+    street1: String
+    street2: String
+    city: String
+    state: String
+    postalCode: String
+    country: String
 }
 
 input OrganizationFilterInput {

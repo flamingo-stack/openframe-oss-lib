@@ -10,7 +10,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplicat
 import org.springframework.stereotype.Service;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Service for managing Organization entities.
@@ -21,6 +20,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class OrganizationService {
+
+    /**
+     * Name of the default organization created for each tenant.
+     * This organization is used as fallback for machines without specific organization.
+     */
+    public static final String DEFAULT_ORGANIZATION_NAME = "Default";
 
     private final OrganizationRepository organizationRepository;
     private final MachineRepository machineRepository;
@@ -44,6 +49,17 @@ public class OrganizationService {
     public Optional<Organization> getOrganizationByOrganizationId(String organizationId) {
         log.debug("Fetching organization by organizationId: {}", organizationId);
         return organizationRepository.findByOrganizationId(organizationId)
+                .filter(org -> !org.isDeleted());
+    }
+
+    /**
+     * Get organization by name (excluding soft deleted)
+     * @param name organization name
+     * @return Optional containing the organization if found and not deleted
+     */
+    public Optional<Organization> getOrganizationByName(String name) {
+        log.debug("Fetching organization by name: {}", name);
+        return organizationRepository.findByName(name)
                 .filter(org -> !org.isDeleted());
     }
 
@@ -101,46 +117,5 @@ public class OrganizationService {
         log.info("Successfully soft deleted organization with ID: {}", id);
     }
 
-    /**
-     * Batch load organization names for multiple organizationIds (for DataLoader).
-     * Performs a single efficient MongoDB query with index lookup.
-     * Returns organization names in the same order as the input organizationIds.
-     * Returns null for organizationIds that don't exist.
-     * 
-     * Performance: MongoDB index scan on organizationId: 1-5ms for typical loads
-     * 
-     * @param organizationIds list of organization identifiers
-     * @return list of organization names (or null) in the same order as input
-     */
-    public List<String> getOrganizationNamesForOrganizationIds(List<String> organizationIds) {
-        log.debug("Batch loading organization names for {} organizationIds", organizationIds.size());
-
-        if (organizationIds.isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        // Filter out nulls and collect to Set (ensures uniqueness)
-        var nonNullIds = organizationIds.stream()
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-
-        if (nonNullIds.isEmpty()) {
-            return organizationIds.stream()
-                    .map(id -> (String) null)
-                    .collect(Collectors.toList());
-        }
-
-        // Batch query with Set (more efficient than List for IN queries)
-        List<Organization> organizations = organizationRepository.findByOrganizationIdIn(nonNullIds);
-        Map<String, String> namesByOrgId = organizations.stream()
-                .collect(Collectors.toMap(
-                        Organization::getOrganizationId,
-                        Organization::getName
-                ));
-
-        return organizationIds.stream()
-                .map(orgId -> orgId == null ? null : namesByOrgId.get(orgId))
-                .collect(Collectors.toList());
-    }
 }
 

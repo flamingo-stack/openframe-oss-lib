@@ -60,6 +60,16 @@ public class Organization {
     private String websiteUrl;
 
     /**
+     * Notes or additional information about the organization
+     */
+    private String notes;
+
+    /**
+     * Contact information including contacts and addresses
+     */
+    private ContactInformation contactInformation;
+
+    /**
      * Monthly revenue in the organization's currency
      */
     private BigDecimal monthlyRevenue;

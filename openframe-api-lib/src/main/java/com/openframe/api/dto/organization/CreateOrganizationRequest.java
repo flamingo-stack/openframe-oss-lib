@@ -1,5 +1,6 @@
 package com.openframe.api.dto.organization;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.PositiveOrZero;
 import lombok.Builder;
@@ -24,6 +25,11 @@ public record CreateOrganizationRequest(
         Integer numberOfEmployees,
 
         String websiteUrl,
+
+        String notes,
+
+        @Valid
+        ContactInformationDto contactInformation,
 
         @PositiveOrZero(message = "Monthly revenue must be zero or positive")
         BigDecimal monthlyRevenue,

@@ -1,9 +1,10 @@
 package com.openframe.api.controller;
 
 import com.openframe.api.dto.organization.CreateOrganizationRequest;
+import com.openframe.api.dto.organization.OrganizationResponse;
 import com.openframe.api.dto.organization.UpdateOrganizationRequest;
+import com.openframe.api.mapper.OrganizationMapper;
 import com.openframe.api.service.OrganizationCommandService;
-import com.openframe.data.document.organization.Organization;
 import com.openframe.data.exception.OrganizationHasMachinesException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,19 +24,21 @@ import org.springframework.web.server.ResponseStatusException;
 public class OrganizationController {
 
     private final OrganizationCommandService organizationCommandService;
+    private final OrganizationMapper organizationMapper;
 
     /**
      * POST /organizations
      * Create a new organization.
      * 
      * @param request create organization request
-     * @return created organization
+     * @return created organization response
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Organization createOrganization(@Valid @RequestBody CreateOrganizationRequest request) {
+    public OrganizationResponse createOrganization(@Valid @RequestBody CreateOrganizationRequest request) {
         log.info("Internal API: Creating new organization: {}", request.name());
-        return organizationCommandService.createOrganization(request);
+        var created = organizationCommandService.createOrganization(request);
+        return organizationMapper.toResponse(created);
     }
 
     /**
@@ -44,18 +47,19 @@ public class OrganizationController {
      * 
      * @param id organization ID
      * @param request update organization request
-     * @return updated organization
+     * @return updated organization response
      */
     @PutMapping("/{id}")
     @ResponseStatus(HttpStatus.OK)
-    public Organization updateOrganization(
+    public OrganizationResponse updateOrganization(
             @PathVariable String id,
             @Valid @RequestBody UpdateOrganizationRequest request) {
 
         log.info("Internal API: Updating organization: {}", id);
 
         try {
-            return organizationCommandService.updateOrganization(id, request);
+            var updated = organizationCommandService.updateOrganization(id, request);
+            return organizationMapper.toResponse(updated);
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
         }

@@ -25,6 +25,13 @@ public interface OrganizationRepository extends MongoRepository<Organization, St
     Optional<Organization> findByOrganizationId(String organizationId);
 
     /**
+     * Find organization by name
+     * @param name organization name
+     * @return Optional containing the organization if found
+     */
+    Optional<Organization> findByName(String name);
+
+    /**
      * Find organizations by organizationIds (for batch loading)
      * @param organizationIds collection of organization identifiers (can be Set or List)
      * @return list of organizations

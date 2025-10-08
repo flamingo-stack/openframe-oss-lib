@@ -2,7 +2,7 @@ package com.openframe.api.service;
 
 import com.openframe.api.dto.organization.CreateOrganizationRequest;
 import com.openframe.api.dto.organization.UpdateOrganizationRequest;
-import com.openframe.api.mapper.OrganizationRequestMapper;
+import com.openframe.api.mapper.OrganizationMapper;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.service.OrganizationService;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +21,7 @@ import org.springframework.stereotype.Service;
 public class OrganizationCommandService {
 
     private final OrganizationService organizationService;
-    private final OrganizationRequestMapper requestMapper;
+    private final OrganizationMapper organizationMapper;
 
     /**
      * Create a new organization from DTO.
@@ -32,7 +32,7 @@ public class OrganizationCommandService {
     public Organization createOrganization(CreateOrganizationRequest request) {
         log.debug("Creating organization from request: {}", request.name());
         
-        Organization organization = requestMapper.toEntity(request);
+        Organization organization = organizationMapper.toEntity(request);
         return organizationService.createOrganization(organization);
     }
 
@@ -52,7 +52,7 @@ public class OrganizationCommandService {
                 .orElseThrow(() -> new IllegalArgumentException("Organization not found with id: " + id));
         
         // Update with request data (only non-null fields)
-        Organization toUpdate = requestMapper.updateEntity(existing, request);
+        Organization toUpdate = organizationMapper.updateEntity(existing, request);
         return organizationService.updateOrganization(toUpdate);
     }
 
