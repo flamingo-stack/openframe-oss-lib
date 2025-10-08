@@ -24,7 +24,7 @@ public class TenantRegistrationService {
 
     public Tenant registerTenant(TenantRegistrationRequest request) {
 
-        registrationProcessor.preProcessTenantRegistration();
+        registrationProcessor.preProcessTenantRegistration(request);
 
         String tenantDomain = request.getTenantDomain();
 
