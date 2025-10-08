@@ -67,8 +67,10 @@ jobs:
         id: snapshot-version
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         run: |
-          echo "NEW_VERSION=${{ env.OLD_VERSION }}-SNAPSHOT" >> $GITHUB_ENV
-          echo "${{ env.OLD_VERSION }} → ${{ env.OLD_VERSION }}-SNAPSHOT"
+          VERSION="${{ env.OLD_VERSION }}-SNAPSHOT"
+          echo "NEW_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "${{ env.OLD_VERSION }} → $VERSION"
       
       - name: Set Release Version
         id: release-version
@@ -93,7 +95,7 @@ jobs:
           fi
           echo "New version validated: ${{ env.OLD_VERSION }} → $NEW_VERSION"
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
-          echo "version=${{ env.NEW_VERSION }}" >> $GITHUB_OUTPUT
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
       - name: Build
         run: |
@@ -133,4 +135,4 @@ jobs:
     uses: flamingo-stack/openframe-oss-tenant/.github/workflows/build.yml@ami/ci
     secrets: inherit
     with:
-      version: ${{ needs.release.outputs.version }}
+      version: ${{ steps.release-version.outputs.version || steps.snapshot-version.outputs.version }}
