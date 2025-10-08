@@ -18,6 +18,7 @@ public class IntegratedToolAgent {
     private List<String> installationCommandArgs;
     private List<String> runCommandArgs;
     private List<String> agentToolIdCommandArgs;
+    private List<String> uninstallationCommandArgs;
     private ToolAgentStatus status;
     
 }
