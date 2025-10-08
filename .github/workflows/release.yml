@@ -75,7 +75,9 @@ jobs:
           [[ "$OLD_BASE" =~ ^([0-9]+\.[0-9]+\.[0-9]+) ]] && OLD_BASE="${BASH_REMATCH[1]}"
 
           IFS='.' read -r old_major old_minor old_patch <<< "$OLD_BASE"
-          IFS='.' read -r new_major new_minor new_patch <<< "$NEW_VERSION"
+          NEW_BASE="$NEW_VERSION"
+          [[ "$NEW_BASE" =~ ^([0-9]+\.[0-9]+\.[0-9]+) ]] && NEW_BASE="${BASH_REMATCH[1]}"
+          IFS='.' read -r new_major new_minor new_patch <<< "$NEW_BASE"
 
           # Validate version bump rules in one expression
           if ! ([ "$new_major" -eq $((old_major + 1)) ] && [ "$new_minor" -eq 0 ] && [ "$new_patch" -eq 0 ]) &&
