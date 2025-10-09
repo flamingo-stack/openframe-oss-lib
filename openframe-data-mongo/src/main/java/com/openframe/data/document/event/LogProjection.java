@@ -20,6 +20,9 @@ public class LogProjection {
     public String severity;
     public String userId;
     public String deviceId;
+    public String hostname;
+    public String organizationId;
+    public String organizationName;
     public String summary;
     public Instant eventTimestamp;
 }

@@ -1,6 +1,8 @@
 package com.openframe.data.service;
 
 import com.openframe.data.document.tool.ToolConnection;
+import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.repository.organization.OrganizationRepository;
 import com.openframe.data.repository.tool.ToolConnectionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,12 +22,16 @@ class MachineIdCacheServiceTest {
 
     @Mock
     private ToolConnectionRepository toolConnectionRepository;
+    @Mock
+    private MachineRepository machineRepository;
+    @Mock
+    private OrganizationRepository organizationRepository;
 
     private MachineIdCacheService machineIdCacheService;
 
     @BeforeEach
     void setUp() {
-        machineIdCacheService = new MachineIdCacheService(toolConnectionRepository);
+        machineIdCacheService = new MachineIdCacheService(toolConnectionRepository, machineRepository, organizationRepository);
     }
 
     @Test

@@ -29,56 +29,56 @@ public class LogService {
 
     public LogQueryResult queryLogs(LogFilterOptions filter, CursorPaginationCriteria paginationCriteria, String search) {
         CursorPaginationCriteria normalizedCriteria = paginationCriteria.normalize();
-        
-        log.debug("Querying logs with filter: {}, pagination: {}, search: {}", 
-                 filter, normalizedCriteria, search);
-        
+
+        log.debug("Querying logs with filter: {}, pagination: {}, search: {}",
+                filter, normalizedCriteria, search);
+
         LocalDate startDate = filter.getStartDate();
         LocalDate endDate = filter.getEndDate();
         List<String> toolTypes = filter.getToolTypes();
         List<String> eventTypes = filter.getEventTypes();
         List<String> severities = filter.getSeverities();
         List<LogProjection> logs;
-        
+
         String cursor = normalizedCriteria.getCursor();
         int limit = normalizedCriteria.getLimit();
-        
+
         if (search != null && !search.trim().isEmpty()) {
             log.debug("Using search functionality with term: {}", search);
             logs = pinotLogRepository.searchLogs(
-                startDate, endDate,
-                toolTypes, eventTypes, severities,
-                search, cursor, limit);
+                    startDate, endDate,
+                    toolTypes, eventTypes, severities,
+                    search, cursor, limit);
         } else {
             log.debug("Using exact field filtering");
             logs = pinotLogRepository.findLogs(
-                startDate, endDate,
-                toolTypes, eventTypes, severities,
-                cursor, limit);
+                    startDate, endDate,
+                    toolTypes, eventTypes, severities,
+                    cursor, limit);
         }
-        
+
         log.debug("Retrieved {} logs from Pinot", logs != null ? logs.size() : 0);
-        
+
         LogQueryResult result = buildLogQueryResult(logs, cursor, limit);
-        
+
         log.debug("Successfully built result with {} events", result.getEvents().size());
         return result;
     }
 
-    public Optional<LogDetails> findLogDetails(String ingestDay, String toolType, String eventType, 
-                                            Instant timestamp, String toolEventId) {
+    public Optional<LogDetails> findLogDetails(String ingestDay, String toolType, String eventType,
+                                               Instant timestamp, String toolEventId) {
         log.debug("Finding log details for ingestDay: {}, toolType: {}, eventType: {}, timestamp: {}, toolEventId: {}",
-                 ingestDay, toolType, eventType, timestamp, toolEventId);
-        
+                ingestDay, toolType, eventType, timestamp, toolEventId);
+
         UnifiedLogEvent.UnifiedLogEventKey key = new UnifiedLogEvent.UnifiedLogEventKey();
         key.setIngestDay(ingestDay);
         key.setToolType(toolType);
         key.setEventType(eventType);
         key.setEventTimestamp(timestamp);
         key.setToolEventId(toolEventId);
-        
+
         Optional<UnifiedLogEvent> logEvent = unifiedLogEventRepository.findById(key);
-        
+
         if (logEvent.isPresent()) {
             LogDetails details = mapToLogDetails(logEvent.get());
             log.debug("Successfully retrieved audit details");
@@ -96,26 +96,25 @@ public class LogService {
         List<String> toolTypes = filters.getToolTypes();
         List<String> eventTypes = filters.getEventTypes();
         List<String> severities = filters.getSeverities();
-        
+
         List<String> toolTypeOptions = pinotLogRepository.getToolTypeOptions(
-            startDate, endDate, 
-            toolTypes, eventTypes, severities);
-        
+                startDate, endDate,
+                toolTypes, eventTypes, severities);
+
         List<String> eventTypeOptions = pinotLogRepository.getEventTypeOptions(
-            startDate, endDate, 
-            toolTypes, eventTypes, severities);
-        
+                startDate, endDate,
+                toolTypes, eventTypes, severities);
+
         List<String> severityOptions = pinotLogRepository.getSeverityOptions(
-            startDate, endDate, 
-            toolTypes, eventTypes, severities);
+                startDate, endDate,
+                toolTypes, eventTypes, severities);
 
         return LogFilters.builder()
-            .toolTypes(toolTypeOptions)
-            .eventTypes(eventTypeOptions)
-            .severities(severityOptions)
-            .build();
+                .toolTypes(toolTypeOptions)
+                .eventTypes(eventTypeOptions)
+                .severities(severityOptions)
+                .build();
     }
-
 
 
     private LogQueryResult buildLogQueryResult(List<LogProjection> logs, String cursor, int limit) {
@@ -123,22 +122,22 @@ public class LogService {
             logs = new ArrayList<>();
         }
         List<LogEvent> events = logs.stream()
-            .map(this::mapToLogEvent)
-            .collect(Collectors.toList());
+                .map(this::mapToLogEvent)
+                .collect(Collectors.toList());
 
         CursorPageInfo pageInfo = CursorPageInfo.builder()
-            .hasNextPage(logs.size() == limit)
-            .hasPreviousPage(cursor != null)
-            .startCursor(events.isEmpty() ? null : createLogCursor(events.getFirst()))
-            .endCursor(events.isEmpty() ? null : createLogCursor(events.getLast()))
-            .build();
+                .hasNextPage(logs.size() == limit)
+                .hasPreviousPage(cursor != null)
+                .startCursor(events.isEmpty() ? null : createLogCursor(events.getFirst()))
+                .endCursor(events.isEmpty() ? null : createLogCursor(events.getLast()))
+                .build();
 
         return LogQueryResult.builder()
-            .events(events)
-            .pageInfo(pageInfo)
-            .build();
+                .events(events)
+                .pageInfo(pageInfo)
+                .build();
     }
-    
+
     private String createLogCursor(LogEvent logEvent) {
         if (logEvent == null || logEvent.getTimestamp() == null) {
             return null;
@@ -148,16 +147,19 @@ public class LogService {
 
     private LogEvent mapToLogEvent(LogProjection log) {
         return LogEvent.builder()
-            .toolEventId(log.toolEventId)
-            .ingestDay(log.ingestDay)
-            .timestamp(log.eventTimestamp)
-            .toolType(log.toolType)
-            .eventType(log.eventType)
-            .severity(log.severity)
-            .summary(log.summary)
-            .userId(log.userId)
-            .deviceId(log.deviceId)
-            .build();
+                .toolEventId(log.toolEventId)
+                .ingestDay(log.ingestDay)
+                .timestamp(log.eventTimestamp)
+                .toolType(log.toolType)
+                .eventType(log.eventType)
+                .severity(log.severity)
+                .summary(log.summary)
+                .userId(log.userId)
+                .deviceId(log.deviceId)
+                .hostname(log.hostname)
+                .organizationId(log.organizationId)
+                .organizationName(log.organizationName)
+                .build();
     }
 
     private LogDetails mapToLogDetails(UnifiedLogEvent logEvent) {
@@ -172,6 +174,9 @@ public class LogService {
                 .details(logEvent.getDetails())
                 .userId(logEvent.getUserId())
                 .deviceId(logEvent.getDeviceId())
+                .hostname(logEvent.getHostname())
+                .organizationId(logEvent.getOrganizationId())
+                .organizationName(logEvent.getOrganizationName())
                 .summary(logEvent.getMessage())
                 .build();
     }
