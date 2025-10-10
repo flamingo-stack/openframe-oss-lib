@@ -37,7 +37,7 @@ public class PinotClientLogRepository implements PinotLogRepository {
     public List<LogProjection> findLogs(LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes,
                                         List<String> severities, String cursor, int limit) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable)
-            .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "summary", "eventTimestamp")
+            .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "organizationId", "organizationName", "summary", "eventTimestamp")
             .whereDateRange("eventTimestamp", startDate, endDate)
             .whereIn("toolType", toolTypes)
             .whereIn("eventType", eventTypes)
@@ -53,7 +53,7 @@ public class PinotClientLogRepository implements PinotLogRepository {
     public List<LogProjection> searchLogs(LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes, 
                                     List<String> severities, String searchTerm, String cursor, int limit) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable)
-            .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "summary", "eventTimestamp")
+            .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "organizationId", "organizationName", "summary", "eventTimestamp")
             .whereDateRange("eventTimestamp", startDate, endDate)
             .whereIn("toolType", toolTypes)
             .whereIn("eventType", eventTypes)
@@ -131,6 +131,9 @@ public class PinotClientLogRepository implements PinotLogRepository {
                 projection.severity = resultSet.getString(rowIndex, columnIndexMap.get("severity"));
                 projection.userId = resultSet.getString(rowIndex, columnIndexMap.get("userId"));
                 projection.deviceId = resultSet.getString(rowIndex, columnIndexMap.get("deviceId"));
+                projection.hostname = resultSet.getString(rowIndex, columnIndexMap.get("hostname"));
+                projection.organizationId = resultSet.getString(rowIndex, columnIndexMap.get("organizationId"));
+                projection.organizationName = resultSet.getString(rowIndex, columnIndexMap.get("organizationName"));
                 projection.summary = resultSet.getString(rowIndex, columnIndexMap.get("summary"));
                 projection.eventTimestamp = Instant.ofEpochMilli(resultSet.getLong(rowIndex, columnIndexMap.get("eventTimestamp")));
                 return projection;

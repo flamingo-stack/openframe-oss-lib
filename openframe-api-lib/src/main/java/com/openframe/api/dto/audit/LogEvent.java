@@ -19,6 +19,9 @@ public class LogEvent {
     private String severity;
     private String userId;
     private String deviceId;
+    private String hostname;
+    private String organizationId;
+    private String organizationName;
     private String summary;
     private Instant timestamp;
 } 
