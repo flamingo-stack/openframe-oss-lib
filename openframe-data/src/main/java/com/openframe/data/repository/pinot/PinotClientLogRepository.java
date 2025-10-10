@@ -131,6 +131,9 @@ public class PinotClientLogRepository implements PinotLogRepository {
                 projection.severity = resultSet.getString(rowIndex, columnIndexMap.get("severity"));
                 projection.userId = resultSet.getString(rowIndex, columnIndexMap.get("userId"));
                 projection.deviceId = resultSet.getString(rowIndex, columnIndexMap.get("deviceId"));
+                projection.hostname = resultSet.getString(rowIndex, columnIndexMap.get("hostname"));
+                projection.organizationId = resultSet.getString(rowIndex, columnIndexMap.get("organizationId"));
+                projection.organizationName = resultSet.getString(rowIndex, columnIndexMap.get("organizationName"));
                 projection.summary = resultSet.getString(rowIndex, columnIndexMap.get("summary"));
                 projection.eventTimestamp = Instant.ofEpochMilli(resultSet.getLong(rowIndex, columnIndexMap.get("eventTimestamp")));
                 return projection;
