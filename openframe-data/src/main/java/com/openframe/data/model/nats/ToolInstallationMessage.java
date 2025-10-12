@@ -1,5 +1,6 @@
 package com.openframe.data.model.nats;
 
+import com.openframe.data.document.toolagent.FileType;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -13,6 +14,8 @@ public class ToolInstallationMessage {
     private String toolId;
     private String toolType;
     private String version;
+    private FileType fileType;
+    private boolean requireGui;
     private List<String> installationCommandArgs;
     private List<String> runCommandArgs;
     private List<String> toolAgentIdCommandArgs;
