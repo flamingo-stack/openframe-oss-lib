@@ -8,16 +8,19 @@ import com.openframe.data.model.redis.CachedMachineInfo;
 import com.openframe.data.model.redis.CachedOrganizationInfo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 /**
  * Service for machine and organization cache operations using Spring Cache abstraction
  * Uses lightweight DTOs to avoid serialization issues and reduce cache size
+ * Only enabled when MongoDB repositories are available (servlet-based applications)
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@ConditionalOnBean({ToolConnectionRepository.class, MachineRepository.class, OrganizationRepository.class})
 public class MachineIdCacheService {
 
     private final ToolConnectionRepository toolConnectionRepository;
