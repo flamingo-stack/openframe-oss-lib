@@ -62,7 +62,7 @@ public class TenantRegistrationService {
         // Create default organization for the tenant
         createDefaultOrganization(savedTenant);
 
-        registrationProcessor.postProcessTenantRegistration(savedTenant, user);
+        registrationProcessor.postProcessTenantRegistration(savedTenant, user, request);
 
         return savedTenant;
     }

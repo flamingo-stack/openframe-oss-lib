@@ -1,5 +1,6 @@
 package com.openframe.authz.service.processor;
 
+import com.openframe.authz.dto.InvitationRegistrationRequest;
 import com.openframe.authz.dto.TenantRegistrationRequest;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.tenant.Tenant;
@@ -24,14 +25,14 @@ public class DefaultRegistrationProcessor implements RegistrationProcessor {
     }
 
     @Override
-    public void postProcessTenantRegistration(Tenant tenant, AuthUser user) {
+    public void postProcessTenantRegistration(Tenant tenant, AuthUser user, TenantRegistrationRequest request) {
         // Default no-op implementation
         log.debug("Default post-processing tenant registration for tenant: {} and user: {}",
                 tenant.getId(), user.getId());
     }
 
     @Override
-    public void postProcessInvitationRegistration(AuthUser user, String invitationId) {
+    public void postProcessInvitationRegistration(AuthUser user, String invitationId, InvitationRegistrationRequest request) {
         // Default no-op implementation
         log.debug("Default post-processing invitation registration for user: {} with invitation: {}",
                 user.getId(), invitationId);

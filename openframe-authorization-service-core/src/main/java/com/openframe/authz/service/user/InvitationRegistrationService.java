@@ -68,7 +68,7 @@ public class InvitationRegistrationService {
         invitation.setStatus(ACCEPTED);
         invitationRepository.save(invitation);
 
-        registrationProcessor.postProcessInvitationRegistration(user, invitation.getId());
+        registrationProcessor.postProcessInvitationRegistration(user, invitation.getId(), request);
 
         return user;
     }
