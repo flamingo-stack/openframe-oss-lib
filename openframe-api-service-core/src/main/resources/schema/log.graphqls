@@ -50,6 +50,9 @@ type LogEvent {
     severity: String!
     userId: String
     deviceId: String
+    hostname: String
+    organizationId: String
+    organizationName: String
     summary: String
     timestamp: Instant!
 }
@@ -63,8 +66,11 @@ type LogDetails {
     severity: String!
     userId: String
     deviceId: String
+    hostname: String
+    organizationId: String
+    organizationName: String
     message: String
     timestamp: Instant!
-    # Details as JSON string (converted from Map<String, String>)
+    # Details as JSON string
     details: String
 } 

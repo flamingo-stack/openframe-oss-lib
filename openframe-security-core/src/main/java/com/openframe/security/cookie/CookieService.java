@@ -4,11 +4,16 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpCookie;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.server.ServerWebExchange;
+
+import static com.openframe.security.oauth.SecurityConstants.ACCESS_TOKEN;
+import static com.openframe.security.oauth.SecurityConstants.REFRESH_TOKEN;
+import static org.springframework.http.HttpHeaders.SET_COOKIE;
 
 /**
  * Service for managing HTTP cookies used for authentication tokens.
@@ -38,18 +43,39 @@ public class CookieService {
     private String cookieSameSite;
 
 
-    public ResponseCookie createAccessTokenCookie(String accessToken) {
+    public void addAuthCookies(HttpHeaders headers, String accessToken, String refreshToken) {
+        ResponseCookie access = createAccessTokenCookie(accessToken);
+        ResponseCookie refresh = createRefreshTokenCookie(refreshToken);
+        headers.add(SET_COOKIE, access.toString());
+        headers.add(SET_COOKIE, refresh.toString());
+    }
+
+    public void addClearAuthCookies(HttpHeaders headers) {
+        ResponseCookie clearedAccess = ResponseCookie.from(ACCESS_TOKEN, "")
+                .path("/")
+                .domain(domain)
+                .maxAge(0)
+                .build();
+
+        ResponseCookie clearedRefresh = ResponseCookie.from(REFRESH_TOKEN, "")
+                .path("/oauth")
+                .domain(domain)
+                .maxAge(0)
+                .build();
+
+        headers.add(SET_COOKIE, clearedAccess.toString());
+        headers.add(SET_COOKIE, clearedRefresh.toString());
+    }
+
+    private ResponseCookie createAccessTokenCookie(String accessToken) {
         return createCookie(ACCESS_TOKEN_COOKIE, accessToken, "/", accessTokenExpirationSeconds);
     }
 
-    /**
-     * Створює ResponseCookie для refresh token з налаштуваннями з CookieService
-     */
-    public ResponseCookie createRefreshTokenCookie(String refreshToken) {
+    private ResponseCookie createRefreshTokenCookie(String refreshToken) {
         return createCookie(REFRESH_TOKEN_COOKIE, refreshToken, "/oauth", refreshTokenExpirationSeconds);
     }
 
-    public ResponseCookie createCookie(String name, String value, String path, int age) {
+    private ResponseCookie createCookie(String name, String value, String path, int age) {
         return ResponseCookie.from(name, value)
                 .httpOnly(true)
                 .secure(cookieSecure)

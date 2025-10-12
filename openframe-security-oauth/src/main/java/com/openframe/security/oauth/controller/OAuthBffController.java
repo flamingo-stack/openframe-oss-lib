@@ -8,7 +8,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.web.bind.annotation.*;
@@ -20,7 +19,6 @@ import java.nio.charset.StandardCharsets;
 
 import static com.openframe.security.oauth.SecurityConstants.*;
 import static org.springframework.http.HttpHeaders.LOCATION;
-import static org.springframework.http.HttpHeaders.SET_COOKIE;
 import static org.springframework.http.HttpStatus.FOUND;
 import static org.springframework.util.StringUtils.hasText;
 
@@ -41,8 +39,9 @@ public class OAuthBffController {
                                             @RequestParam(value = "provider", required = false) String provider,
                                             WebSession session,
                                             ServerHttpRequest request) {
+        session.getAttributes().clear();
         return oauthBffService.buildAuthorizeRedirect(tenantId, redirectTo, provider, session, request)
-                .map(url -> ResponseEntity.<Void>status(FOUND).header(LOCATION, url).build());
+                .map(url -> ResponseEntity.status(FOUND).header(LOCATION, url).build());
     }
 
     @GetMapping("/callback")
@@ -88,7 +87,7 @@ public class OAuthBffController {
                                              ServerHttpRequest request,
                                              WebSession session) {
         HttpHeaders headers = new HttpHeaders();
-        addClearAuthCookies(headers);
+        cookieService.addClearAuthCookies(headers);
         String refreshToken = hasText(refreshCookie) ? refreshCookie : request.getHeaders().getFirst(REFRESH_TOKEN_HEADER);
         return oauthBffService.logout(session)
                 .then(oauthBffService.revokeRefreshToken(tenantId, refreshToken))
@@ -135,13 +134,6 @@ public class OAuthBffController {
         return baseTarget + (baseTarget.contains("?") ? "&" : "?") + "devTicket=" + ticket;
     }
 
-    private void addAuthCookies(HttpHeaders headers, TokenResponse tokens) {
-        ResponseCookie access = cookieService.createAccessTokenCookie(tokens.access_token());
-        ResponseCookie refresh = cookieService.createRefreshTokenCookie(tokens.refresh_token());
-        headers.add(SET_COOKIE, access.toString());
-        headers.add(SET_COOKIE, refresh.toString());
-    }
-
     private ResponseEntity<Void> buildFound(String target) {
         HttpHeaders headers = new HttpHeaders();
         headers.add(LOCATION, target);
@@ -151,13 +143,13 @@ public class OAuthBffController {
     private ResponseEntity<Void> buildFoundWithCookies(String target, TokenResponse tokens) {
         HttpHeaders headers = new HttpHeaders();
         headers.add(LOCATION, target);
-        addAuthCookies(headers, tokens);
+        cookieService.addAuthCookies(headers, tokens.access_token(), tokens.refresh_token());
         return ResponseEntity.status(FOUND).headers(headers).build();
     }
 
     private ResponseEntity<Void> buildNoContentWithCookies(TokenResponse tokens, boolean includeDevHeaders) {
         HttpHeaders headers = new HttpHeaders();
-        addAuthCookies(headers, tokens);
+        cookieService.addAuthCookies(headers, tokens.access_token(), tokens.refresh_token());
         if (includeDevHeaders) {
             addDevHeaders(headers, tokens);
         }
@@ -167,13 +159,6 @@ public class OAuthBffController {
     private void addDevHeaders(HttpHeaders headers, TokenResponse tokens) {
         if (hasText(tokens.access_token())) headers.add(ACCESS_TOKEN_HEADER, tokens.access_token());
         if (hasText(tokens.refresh_token())) headers.add(REFRESH_TOKEN_HEADER, tokens.refresh_token());
-    }
-
-    private void addClearAuthCookies(HttpHeaders headers) {
-        ResponseCookie clearedAccess = ResponseCookie.from(ACCESS_TOKEN, "").path("/").maxAge(0).build();
-        ResponseCookie clearedRefresh = ResponseCookie.from(REFRESH_TOKEN, "").path("/oauth").maxAge(0).build();
-        headers.add(SET_COOKIE, clearedAccess.toString());
-        headers.add(SET_COOKIE, clearedRefresh.toString());
     }
 
     private String buildErrorRedirectTarget(WebSession session, String state, ServerHttpRequest request, String msg) {
