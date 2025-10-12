@@ -11,8 +11,7 @@ import java.time.Instant;
 @Data
 @Document(collection = "tool_connections")
 @CompoundIndexes({
-        @CompoundIndex(name = "machine_tool_idx", def = "{'machineId': 1, 'toolType': 1}", unique = true),
-        @CompoundIndex(name = "tool_id_type_idx", def = "{'agentToolId': 1, 'toolType': 1}", unique = true) // Note this change
+        @CompoundIndex(name = "machine_tool_idx", def = "{'machineId': 1, 'toolType': 1}", unique = true)
 })
 public class ToolConnection {
     @Id
