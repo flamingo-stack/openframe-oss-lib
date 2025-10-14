@@ -25,10 +25,8 @@ import java.util.List;
  */
 public class FleetMdmClient {
 
-    private static final String GET_HOST_URL = "/api/v1/fleet/hosts/";
-    private static final String SEARCH_HOSTS_URL = "/api/v1/fleet/hosts";
+    private static final String HOSTS_URL = "/api/v1/fleet/hosts";
     private static final String GET_ENROLL_SECRET_URL = "/api/latest/fleet/spec/enroll_secret";
-    private static final String RUN_QUERY_URL = "/api/v1/fleet/hosts/identifier/";
 
     private final String baseUrl;
     private final String apiToken;
@@ -66,7 +64,7 @@ public class FleetMdmClient {
      */
     public Host getHostById(long id) throws IOException, InterruptedException {
         HttpRequest request = addHeaders(HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + GET_HOST_URL + id)))
+                .uri(URI.create(baseUrl + HOSTS_URL + "/" + id)))
                 .GET()
                 .timeout(Duration.ofSeconds(30))
                 .build();
@@ -153,7 +151,7 @@ public class FleetMdmClient {
      * Build the search URL with query parameters
      */
     private String buildSearchUrl(HostSearchRequest searchRequest) {
-        StringBuilder urlBuilder = new StringBuilder(baseUrl + SEARCH_HOSTS_URL);
+        StringBuilder urlBuilder = new StringBuilder(baseUrl + HOSTS_URL);
         List<String> params = new ArrayList<>();
 
         if (searchRequest.getQuery() != null && !searchRequest.getQuery().trim().isEmpty()) {
@@ -193,52 +191,6 @@ public class FleetMdmClient {
      * @throws FleetMdmApiException if the API returns an error
      */
     public QueryResult runQuery(long hostId, String query) throws IOException, InterruptedException {
-        // Use numeric ID as identifier
-        return runQueryByIdentifier(String.valueOf(hostId), query);
-    }
-    
-    /**
-     * Run an osquery SQL-like query on a specific host using its UUID
-     * @param uuid The UUID of the host to query
-     * @param query The osquery SQL statement to execute
-     * @return QueryResult containing the query results or error information
-     * @throws IOException if an I/O exception occurs
-     * @throws InterruptedException if the request is interrupted
-     * @throws FleetMdmApiException if the API returns an error
-     */
-    public QueryResult runQueryByUuid(String uuid, String query) throws IOException, InterruptedException {
-        if (uuid == null || uuid.trim().isEmpty()) {
-            throw new IllegalArgumentException("UUID cannot be null or empty");
-        }
-        return runQueryByIdentifier(uuid, query);
-    }
-    
-    /**
-     * Run an osquery SQL-like query on a specific host using its hostname
-     * @param hostname The hostname of the host to query
-     * @param query The osquery SQL statement to execute
-     * @return QueryResult containing the query results or error information
-     * @throws IOException if an I/O exception occurs
-     * @throws InterruptedException if the request is interrupted
-     * @throws FleetMdmApiException if the API returns an error
-     */
-    public QueryResult runQueryByHostname(String hostname, String query) throws IOException, InterruptedException {
-        if (hostname == null || hostname.trim().isEmpty()) {
-            throw new IllegalArgumentException("Hostname cannot be null or empty");
-        }
-        return runQueryByIdentifier(hostname, query);
-    }
-    
-    /**
-     * Internal method to run an osquery SQL-like query on a specific host using any identifier
-     * @param identifier The identifier (ID, UUID, or hostname) of the host to query
-     * @param query The osquery SQL statement to execute
-     * @return QueryResult containing the query results or error information
-     * @throws IOException if an I/O exception occurs
-     * @throws InterruptedException if the request is interrupted
-     * @throws FleetMdmApiException if the API returns an error
-     */
-    private QueryResult runQueryByIdentifier(String identifier, String query) throws IOException, InterruptedException {
         if (query == null || query.trim().isEmpty()) {
             throw new IllegalArgumentException("Query cannot be null or empty");
         }
@@ -250,10 +202,10 @@ public class FleetMdmClient {
             );
 
             HttpRequest request = addHeaders(HttpRequest.newBuilder()
-                    .uri(URI.create(baseUrl + RUN_QUERY_URL + identifier + "/query"))
+                    .uri(URI.create(baseUrl + HOSTS_URL + "/" + hostId + "/query"))
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                     .header("Content-Type", "application/json"))
-                    .timeout(Duration.ofSeconds(60)) // Longer timeout for queries
+                    .timeout(Duration.ofSeconds(90)) // Increased timeout for legitimate multi-query cases
                     .build();
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -261,14 +213,12 @@ public class FleetMdmClient {
             if (response.statusCode() == 401) {
                 throw new FleetMdmApiException("Authentication failed. Please check your API token.", response.statusCode(), response.body());
             } else if (response.statusCode() == 404) {
-                throw new FleetMdmApiException("Host not found with identifier: " + identifier, response.statusCode(), response.body());
+                throw new FleetMdmApiException("Host not found with ID: " + hostId, response.statusCode(), response.body());
             } else if (response.statusCode() != 200) {
                 throw new FleetMdmApiException("Failed to execute query", response.statusCode(), response.body());
             }
 
             QueryResult result = MAPPER.readValue(response.body(), QueryResult.class);
-            // Note: We can't set hostId here as it might be a UUID or hostname
-            // The API response should contain the actual host_id
             if (result.getQuery() == null) {
                 result.setQuery(query);
             }
@@ -276,7 +226,7 @@ public class FleetMdmClient {
         } catch (FleetMdmApiException e) {
             throw e;
         } catch (Exception e) {
-            throw new FleetMdmException("Failed to execute query on host: " + identifier, e);
+            throw new FleetMdmException("Failed to execute query on host: " + hostId, e);
         }
     }
 

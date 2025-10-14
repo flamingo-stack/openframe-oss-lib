@@ -78,7 +78,8 @@ public class TacticalRmmClient {
             String agentId,
             String shell,
             String command,
-            int timeout
+            int timeout,
+            boolean runAsUser
     ) {
         // Validate parameters
         if (tacticalServerUrl == null || tacticalServerUrl.trim().isEmpty()) {
@@ -99,16 +100,13 @@ public class TacticalRmmClient {
         if (command == null || command.trim().isEmpty()) {
             throw new IllegalArgumentException("Command cannot be null or empty");
         }
-        if (timeout <= 0) {
-            timeout = 30; // Default timeout
-        }
 
         try {
-            // Create request body
             var requestBodyNode = objectMapper.createObjectNode();
             requestBodyNode.put("shell", shell);
             requestBodyNode.put("cmd", command);
             requestBodyNode.put("timeout", timeout);
+            requestBodyNode.put("run_as_user", runAsUser);
             String requestBody = objectMapper.writeValueAsString(requestBodyNode);
 
             HttpRequest httpRequest = HttpRequest.newBuilder()
@@ -117,7 +115,7 @@ public class TacticalRmmClient {
                     .header("Content-Type", "application/json")
                     .header("Accept", "application/json")
                     .header("X-API-KEY", apiKey)
-                    .timeout(Duration.ofSeconds(timeout + 10)) // Add buffer to HTTP timeout
+                    .timeout(Duration.ofSeconds(timeout + 15)) // Add buffer to HTTP timeout
                     .build();
 
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
@@ -130,20 +128,13 @@ public class TacticalRmmClient {
                 throw new TacticalRmmApiException("Failed to execute command", response.statusCode(), response.body());
             }
 
-            CommandResult result = objectMapper.readValue(response.body(), CommandResult.class);
-            // Set fields that might not be in response
-            if (result.getAgentId() == null) {
-                result.setAgentId(agentId);
-            }
-            if (result.getShell() == null) {
-                result.setShell(shell);
-            }
-            if (result.getCommand() == null) {
-                result.setCommand(command);
-            }
-            if (result.getTimeout() == null) {
-                result.setTimeout(timeout);
-            }
+            CommandResult result = new CommandResult();
+            String stdout = objectMapper.readValue(response.body(), String.class);
+            result.setStdout(stdout);
+            result.setAgentId(agentId);
+            result.setShell(shell);
+            result.setCommand(command);
+            result.setTimeout(timeout);
             return result;
         } catch (TacticalRmmApiException e) {
             throw e;
@@ -168,7 +159,7 @@ public class TacticalRmmClient {
             String shell,
             String command
     ) {
-        return runCommand(tacticalServerUrl, apiKey, agentId, shell, command, 30);
+        return runCommand(tacticalServerUrl, apiKey, agentId, shell, command, 30, false);
     }
 
     /**
