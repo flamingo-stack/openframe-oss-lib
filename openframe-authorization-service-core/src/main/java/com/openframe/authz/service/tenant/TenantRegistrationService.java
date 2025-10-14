@@ -4,7 +4,6 @@ import com.openframe.authz.dto.TenantRegistrationRequest;
 import com.openframe.authz.service.processor.RegistrationProcessor;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.data.document.auth.AuthUser;
-import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.tenant.Tenant;
 import com.openframe.data.service.OrganizationService;
 import lombok.RequiredArgsConstructor;
@@ -12,10 +11,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.UUID;
 
 import static com.openframe.data.document.user.UserRole.OWNER;
-import static com.openframe.data.service.OrganizationService.DEFAULT_ORGANIZATION_NAME;
 
 @Slf4j
 @Service
@@ -60,35 +57,10 @@ public class TenantRegistrationService {
         Tenant savedTenant = tenantService.save(tenant);
 
         // Create default organization for the tenant
-        createDefaultOrganization(savedTenant);
+        organizationService.createDefaultOrganization();
 
         registrationProcessor.postProcessTenantRegistration(savedTenant, user, request);
 
         return savedTenant;
-    }
-
-    /**
-     * Create a default organization for a newly registered tenant.
-     * This organization will be used for machines that don't have a specific organization assigned.
-     * 
-     * The default organization has:
-     * - name: {@link OrganizationService#DEFAULT_ORGANIZATION_NAME}
-     * - category: "General"
-     * - auto-generated organizationId (UUID)
-     */
-    private void createDefaultOrganization(Tenant tenant) {
-        log.info("Creating default organization for tenant: {}", tenant.getId());
-
-        Organization defaultOrg = Organization.builder()
-                .name(DEFAULT_ORGANIZATION_NAME)
-                .organizationId(UUID.randomUUID().toString())
-                .category("General")
-                .deleted(false)
-                .build();
-
-        Organization created = organizationService.createOrganization(defaultOrg);
-        
-        log.info("Created default organization '{}' with organizationId: {} for tenant: {}", 
-                created.getName(), created.getOrganizationId(), tenant.getId());
     }
 }
