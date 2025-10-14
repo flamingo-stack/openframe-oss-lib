@@ -1,6 +1,7 @@
 package com.openframe.api.service.user;
 
 import com.openframe.api.dto.user.UserPageResponse;
+import com.openframe.api.exception.OperationNotAllowedException;
 import com.openframe.api.exception.UserSelfDeleteNotAllowedException;
 import com.openframe.api.mapper.UserMapper;
 import com.openframe.api.service.processor.UserProcessor;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Optional;
 
+import static com.openframe.data.document.user.UserRole.OWNER;
 import static com.openframe.data.document.user.UserStatus.DELETED;
 
 @Service
@@ -52,6 +54,10 @@ public class UserService {
 
         if (requesterUserId.equals(user.getId())) {
             throw new UserSelfDeleteNotAllowedException("User cannot delete self");
+        }
+
+        if (user.getRoles().contains(OWNER)) {
+            throw new OperationNotAllowedException("Owner accounts can’t be deleted");
         }
 
         if (user.getStatus() != DELETED) {
