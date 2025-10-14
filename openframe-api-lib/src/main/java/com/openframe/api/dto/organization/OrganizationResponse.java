@@ -31,6 +31,7 @@ public class OrganizationResponse {
     private LocalDate contractEndDate;
     private Instant createdAt;
     private Instant updatedAt;
+    private Boolean isDefault;
     private Boolean deleted;
     private Instant deletedAt;
 }

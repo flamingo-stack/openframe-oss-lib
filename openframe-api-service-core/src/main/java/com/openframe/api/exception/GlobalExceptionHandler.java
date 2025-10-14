@@ -75,6 +75,13 @@ public class GlobalExceptionHandler {
         return new ErrorResponse("USER_SELF_DELETE_NOT_ALLOWED", ex.getMessage());
     }
 
+    @ExceptionHandler(OperationNotAllowedException.class)
+    @ResponseStatus(FORBIDDEN)
+    public ErrorResponse handleUserSelfDelete(OperationNotAllowedException ex) {
+        log.warn("Conflict: {}", ex.getMessage());
+        return new ErrorResponse("OPERATION_NOT_ALLOWED", ex.getMessage());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(BAD_REQUEST)
     public ErrorResponse handleValidationException(MethodArgumentNotValidException ex) {

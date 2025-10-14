@@ -1,6 +1,7 @@
 package com.openframe.data.document.organization;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -43,6 +44,14 @@ public class Organization {
     @NotBlank
     @Indexed(unique = true)
     private String organizationId;
+
+    /**
+     * Flag indicating if this is the default organization for the tenant
+     */
+    @NotNull
+    @Indexed
+    @Builder.Default
+    private Boolean isDefault = false;
 
     /**
      * Business category or industry
