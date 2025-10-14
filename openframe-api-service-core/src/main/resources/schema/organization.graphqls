@@ -23,6 +23,7 @@ type Organization {
     contractEndDate: Date
     createdAt: Instant
     updatedAt: Instant
+    isDefault: Boolean!
     deleted: Boolean
     deletedAt: Instant
 }
