@@ -34,6 +34,7 @@ public class OrganizationMapper {
                 .monthlyRevenue(request.monthlyRevenue())
                 .contractStartDate(request.contractStartDate())
                 .contractEndDate(request.contractEndDate())
+                .isDefault(false)
                 .deleted(false)
                 .build();
     }
@@ -110,6 +111,7 @@ public class OrganizationMapper {
                 .contractEndDate(organization.getContractEndDate())
                 .createdAt(organization.getCreatedAt())
                 .updatedAt(organization.getUpdatedAt())
+                .isDefault(organization.getIsDefault())
                 .deleted(organization.getDeleted())
                 .deletedAt(organization.getDeletedAt())
                 .build();
