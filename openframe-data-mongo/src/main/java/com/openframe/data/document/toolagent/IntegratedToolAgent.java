@@ -14,11 +14,14 @@ public class IntegratedToolAgent {
     private String id;
     private String toolId;
     private String version;
+    private SessionType sessionType;
     private List<ToolAgentAsset> assets;
+
     private List<String> installationCommandArgs;
     private List<String> runCommandArgs;
     private List<String> agentToolIdCommandArgs;
     private List<String> uninstallationCommandArgs;
+
     private ToolAgentStatus status;
     
 }
