@@ -1,6 +1,5 @@
 package com.openframe.data.model.nats;
 
-import com.openframe.data.document.toolagent.FileType;
 import com.openframe.data.document.toolagent.SessionType;
 import lombok.Getter;
 import lombok.Setter;
