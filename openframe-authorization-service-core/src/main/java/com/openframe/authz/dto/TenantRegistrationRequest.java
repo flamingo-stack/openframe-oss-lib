@@ -39,4 +39,6 @@ public class TenantRegistrationRequest extends CoreUserRequest {
      */
     @TenantDomain
     private String tenantDomain;
+
+    private String accessCode;
 }

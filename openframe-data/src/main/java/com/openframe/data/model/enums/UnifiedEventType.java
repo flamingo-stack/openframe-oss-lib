@@ -94,6 +94,69 @@ public enum UnifiedEventType {
     USER_SESSION_ENDED(Severity.INFO, "User session ended"),
     SESSION_COUNT_UPDATED(Severity.INFO, "Session count updated"),
 
+    // Configuration and settings events
+    CONFIGURATION_UPDATED(Severity.INFO, "Configuration updated"),
+    CONFIGURATION_CREATED(Severity.INFO, "Configuration created"),
+    CONFIGURATION_DELETED(Severity.INFO, "Configuration deleted"),
+
+    // Profile management events
+    PROFILE_CREATED(Severity.INFO, "Profile created"),
+    PROFILE_UPDATED(Severity.INFO, "Profile updated"),
+    PROFILE_DELETED(Severity.INFO, "Profile deleted"),
+    PROFILE_APPLIED(Severity.INFO, "Profile applied"),
+
+    // Pack management events
+    PACK_CREATED(Severity.INFO, "Pack created"),
+    PACK_UPDATED(Severity.INFO, "Pack updated"),
+    PACK_DELETED(Severity.INFO, "Pack deleted"),
+    PACK_APPLIED(Severity.INFO, "Pack applied"),
+
+    // Query events
+    QUERY_CREATED(Severity.INFO, "Query created"),
+    QUERY_UPDATED(Severity.INFO, "Query updated"),
+    QUERY_DELETED(Severity.INFO, "Query deleted"),
+    QUERY_EXECUTED(Severity.INFO, "Query executed"),
+
+    // Software management events
+    SOFTWARE_INSTALLED(Severity.INFO, "Software installed"),
+    SOFTWARE_UNINSTALLED(Severity.INFO, "Software uninstalled"),
+    SOFTWARE_CREATED(Severity.INFO, "Software created"),
+    SOFTWARE_UPDATED(Severity.INFO, "Software updated"),
+    SOFTWARE_DELETED(Severity.INFO, "Software deleted"),
+    SOFTWARE_INSTALLATION_CANCELED(Severity.INFO, "Software installation canceled"),
+
+    // Disk encryption events
+    DISK_ENCRYPTION_ENABLED(Severity.INFO, "Disk encryption enabled"),
+    DISK_ENCRYPTION_DISABLED(Severity.INFO, "Disk encryption disabled"),
+    DISK_ENCRYPTION_KEY_READ(Severity.WARNING, "Disk encryption key read"),
+    DISK_ENCRYPTION_KEY_ESCROWED(Severity.INFO, "Disk encryption key escrowed"),
+
+    // MDM events
+    MDM_ENROLLED(Severity.INFO, "Device enrolled to MDM"),
+    MDM_UNENROLLED(Severity.INFO, "Device unenrolled from MDM"),
+    MDM_ENABLED(Severity.INFO, "MDM enabled"),
+    MDM_DISABLED(Severity.INFO, "MDM disabled"),
+
+    // Automation events
+    AUTOMATION_ENABLED(Severity.INFO, "Automation enabled"),
+    AUTOMATION_DISABLED(Severity.INFO, "Automation disabled"),
+    AUTOMATION_UPDATED(Severity.INFO, "Automation updated"),
+
+    // Host security events
+    HOST_LOCKED(Severity.WARNING, "Host locked"),
+    HOST_UNLOCKED(Severity.INFO, "Host unlocked"),
+    HOST_WIPED(Severity.CRITICAL, "Host wiped"),
+
+    // Batch operations
+    BATCH_OPERATION_STARTED(Severity.INFO, "Batch operation started"),
+    BATCH_OPERATION_COMPLETED(Severity.INFO, "Batch operation completed"),
+    BATCH_OPERATION_CANCELED(Severity.INFO, "Batch operation canceled"),
+
+    // Integration events
+    INTEGRATION_ADDED(Severity.INFO, "Integration added"),
+    INTEGRATION_UPDATED(Severity.INFO, "Integration updated"),
+    INTEGRATION_DELETED(Severity.INFO, "Integration deleted"),
+
     // Unknown events
     UNKNOWN(Severity.WARNING, "Unknown event");
 

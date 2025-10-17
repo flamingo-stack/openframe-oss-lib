@@ -1,5 +1,6 @@
 package com.openframe.authz.service.processor;
 
+import com.openframe.authz.dto.InvitationRegistrationRequest;
 import com.openframe.authz.dto.TenantRegistrationRequest;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.tenant.Tenant;
@@ -24,8 +25,9 @@ public interface RegistrationProcessor {
      *
      * @param tenant The registered tenant
      * @param user   The created user
+     * @param request The original registration request
      */
-    default void postProcessTenantRegistration(Tenant tenant, AuthUser user) {
+    default void postProcessTenantRegistration(Tenant tenant, AuthUser user, TenantRegistrationRequest request) {
         // Default no-op implementation
     }
 
@@ -35,8 +37,9 @@ public interface RegistrationProcessor {
      *
      * @param user         The created user
      * @param invitationId The invitation identifier used for registration
+     * @param request      The original invitation registration request
      */
-    default void postProcessInvitationRegistration(AuthUser user, String invitationId) {
+    default void postProcessInvitationRegistration(AuthUser user, String invitationId, InvitationRegistrationRequest request) {
         // Default no-op implementation
     }
 }

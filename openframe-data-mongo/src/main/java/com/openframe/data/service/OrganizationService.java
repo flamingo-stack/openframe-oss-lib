@@ -64,6 +64,16 @@ public class OrganizationService {
     }
 
     /**
+     * Get the default organization (excluding soft deleted)
+     * @return Optional containing the default organization if found and not deleted
+     */
+    public Optional<Organization> getDefaultOrganization() {
+        log.debug("Fetching default organization");
+        return organizationRepository.findByIsDefaultTrue()
+                .filter(org -> !org.isDeleted());
+    }
+
+    /**
      * Create a new organization
      * @param organization organization to create
      * @return saved organization
@@ -102,6 +112,12 @@ public class OrganizationService {
             log.warn("Organization {} is already deleted", id);
             throw new IllegalArgumentException("Organization is already deleted: " + id);
         }
+
+        // Check if already deleted
+        if (organization.getIsDefault()) {
+            log.warn("The default organization {} cannot be deleted", id);
+            throw new IllegalArgumentException("The default organization {} cannot be deleted: " + id);
+        }
         
         // Check if any machines are associated with this organization
         if (machineRepository.existsByOrganizationId(organization.getOrganizationId())) {
@@ -115,6 +131,32 @@ public class OrganizationService {
         organizationRepository.save(organization);
         
         log.info("Successfully soft deleted organization with ID: {}", id);
+    }
+
+    /**
+     * Create a default organization for a newly registered tenant.
+     * This organization will be used for machines that don't have a specific organization assigned.
+     *
+     * The default organization has:
+     * - name: {@link OrganizationService#DEFAULT_ORGANIZATION_NAME}
+     * - category: "General"
+     * - auto-generated organizationId (UUID)
+     */
+    public void createDefaultOrganization() {
+        log.info("Creating default organization");
+
+        Organization defaultOrg = Organization.builder()
+                .name(DEFAULT_ORGANIZATION_NAME)
+                .organizationId(UUID.randomUUID().toString())
+                .isDefault(true)
+                .category("General")
+                .deleted(false)
+                .build();
+
+        Organization created = createOrganization(defaultOrg);
+
+        log.info("Created default organization '{}' with organizationId: {}",
+                created.getName(), created.getOrganizationId());
     }
 
 }
