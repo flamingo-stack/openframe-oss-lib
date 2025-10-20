@@ -16,8 +16,6 @@ public class IntegratedToolAgent {
     private String version;
     private SessionType sessionType;
 
-    private String githubPath;
-
     private List<ToolAgentAsset> assets;
 
     private List<String> installationCommandArgs;

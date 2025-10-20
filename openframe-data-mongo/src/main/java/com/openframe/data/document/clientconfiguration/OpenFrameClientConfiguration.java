@@ -16,6 +16,5 @@ public class OpenFrameClientConfiguration {
     @Id
     private String id;
     private String version;
-    private String githubPath;
 
 }
