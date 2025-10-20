@@ -27,4 +27,8 @@ public class LogFilterInput {
     private List<String> toolTypes;
 
     private List<String> severities;
+
+    private List<String> organizationIds;
+
+    private String deviceId;
 }
