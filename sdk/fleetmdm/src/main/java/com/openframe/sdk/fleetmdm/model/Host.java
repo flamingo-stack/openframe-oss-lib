@@ -281,12 +281,6 @@ public class Host {
     public Double getGigsTotalDiskSpace() { return gigsTotalDiskSpace; }
     public void setGigsTotalDiskSpace(Double gigsTotalDiskSpace) { this.gigsTotalDiskSpace = gigsTotalDiskSpace; }
 
-    public HostIssues getIssues() { return issues; }
-    public void setIssues(HostIssues issues) { this.issues = issues; }
-
-    public HostMdm getMdm() { return mdm; }
-    public void setMdm(HostMdm mdm) { this.mdm = mdm; }
-
     public String getRefetchCriticalQueriesUntil() { return refetchCriticalQueriesUntil; }
     public void setRefetchCriticalQueriesUntil(String refetchCriticalQueriesUntil) { this.refetchCriticalQueriesUntil = refetchCriticalQueriesUntil; }
 
