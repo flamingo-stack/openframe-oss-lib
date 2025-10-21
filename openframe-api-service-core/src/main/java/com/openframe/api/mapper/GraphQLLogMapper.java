@@ -22,6 +22,8 @@ public class GraphQLLogMapper {
                 .eventTypes(input.getEventTypes())
                 .toolTypes(input.getToolTypes())
                 .severities(input.getSeverities())
+                .organizationIds(input.getOrganizationIds())
+                .deviceId(input.getDeviceId())
                 .build();
     }
 

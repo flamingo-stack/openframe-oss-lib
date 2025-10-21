@@ -1,9 +1,11 @@
 package com.openframe.api.service;
 
 import com.openframe.api.dto.audit.*;
+import com.openframe.api.dto.audit.OrganizationFilterOption;
 import com.openframe.api.dto.shared.CursorPageInfo;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
-import com.openframe.data.document.event.LogProjection;
+import com.openframe.data.model.pinot.LogProjection;
+import com.openframe.data.model.pinot.OrganizationOption;
 import com.openframe.data.model.cassandra.UnifiedLogEvent;
 import com.openframe.data.repository.cassandra.UnifiedLogEventRepository;
 import com.openframe.data.repository.pinot.PinotLogRepository;
@@ -43,17 +45,22 @@ public class LogService {
         String cursor = normalizedCriteria.getCursor();
         int limit = normalizedCriteria.getLimit();
 
+        List<String> organizationIds = filter.getOrganizationIds();
+        String deviceId = filter.getDeviceId();
+
         if (search != null && !search.trim().isEmpty()) {
             log.debug("Using search functionality with term: {}", search);
             logs = pinotLogRepository.searchLogs(
                     startDate, endDate,
                     toolTypes, eventTypes, severities,
+                    organizationIds, deviceId,
                     search, cursor, limit);
         } else {
             log.debug("Using exact field filtering");
             logs = pinotLogRepository.findLogs(
                     startDate, endDate,
                     toolTypes, eventTypes, severities,
+                    organizationIds, deviceId,
                     cursor, limit);
         }
 
@@ -96,23 +103,36 @@ public class LogService {
         List<String> toolTypes = filters.getToolTypes();
         List<String> eventTypes = filters.getEventTypes();
         List<String> severities = filters.getSeverities();
+        List<String> organizationIds = filters.getOrganizationIds();
 
         List<String> toolTypeOptions = pinotLogRepository.getToolTypeOptions(
                 startDate, endDate,
-                toolTypes, eventTypes, severities);
+                toolTypes, eventTypes, severities, organizationIds);
 
         List<String> eventTypeOptions = pinotLogRepository.getEventTypeOptions(
                 startDate, endDate,
-                toolTypes, eventTypes, severities);
+                toolTypes, eventTypes, severities, organizationIds);
 
         List<String> severityOptions = pinotLogRepository.getSeverityOptions(
                 startDate, endDate,
+                toolTypes, eventTypes, severities, organizationIds);
+
+        List<OrganizationOption> dataOptions = pinotLogRepository.getOrganizationOptions(
+                startDate, endDate,
                 toolTypes, eventTypes, severities);
+
+        List<OrganizationFilterOption> organizationOptions = dataOptions.stream()
+                .map(opt -> OrganizationFilterOption.builder()
+                        .id(opt.getId())
+                        .name(opt.getName())
+                        .build())
+                .collect(Collectors.toList());
 
         return LogFilters.builder()
                 .toolTypes(toolTypeOptions)
                 .eventTypes(eventTypeOptions)
                 .severities(severityOptions)
+                .organizations(organizationOptions)
                 .build();
     }
 
