@@ -1,4 +1,4 @@
-package com.openframe.data.document.event;
+package com.openframe.data.model.pinot;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -26,4 +26,3 @@ public class LogProjection {
     public String summary;
     public Instant eventTimestamp;
 }
-

@@ -388,8 +388,6 @@ public class PinotQueryBuilder {
             
             relevanceConditions.add(TEXT_MATCH_FUNCTION + "(userId, '" + escapeSqlValue(processedSearchTerm) + "')");
             
-            relevanceConditions.add(TEXT_MATCH_FUNCTION + "(deviceId, '" + escapeSqlValue(processedSearchTerm) + "')");
-            
             String relevanceCondition = "(" + String.join(SQL_OR, relevanceConditions) + ")";
             whereConditions.add(relevanceCondition);
         }

@@ -1,6 +1,7 @@
 package com.openframe.data.repository.pinot;
 
-import com.openframe.data.document.event.LogProjection;
+import com.openframe.data.model.pinot.LogProjection;
+import com.openframe.data.model.pinot.OrganizationOption;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
@@ -15,6 +16,8 @@ public interface PinotLogRepository {
             List<String> toolTypes,
             List<String> eventTypes,
             List<String> severities,
+            List<String> organizationIds,
+            String deviceId,
             String cursor,
             int limit
     );
@@ -25,6 +28,8 @@ public interface PinotLogRepository {
             List<String> toolTypes,
             List<String> eventTypes,
             List<String> severities,
+            List<String> organizationIds,
+            String deviceId,
             String searchTerm,
             String cursor,
             int limit
@@ -35,7 +40,8 @@ public interface PinotLogRepository {
             LocalDate endDate,
             List<String> toolTypes,
             List<String> eventTypes,
-            List<String> severities
+            List<String> severities,
+            List<String> organizationIds
     );
 
     List<String> getEventTypeOptions(
@@ -43,7 +49,8 @@ public interface PinotLogRepository {
             LocalDate endDate,
             List<String> toolTypes,
             List<String> eventTypes,
-            List<String> severities
+            List<String> severities,
+            List<String> organizationIds
     );
 
     List<String> getSeverityOptions(
@@ -51,10 +58,20 @@ public interface PinotLogRepository {
             LocalDate endDate,
             List<String> toolTypes,
             List<String> eventTypes,
-            List<String> severities
+            List<String> severities,
+            List<String> organizationIds
     );
 
     List<String> getAvailableDateRanges(
+            List<String> toolTypes,
+            List<String> eventTypes,
+            List<String> severities,
+            List<String> organizationIds
+    );
+
+    List<OrganizationOption> getOrganizationOptions(
+            LocalDate startDate,
+            LocalDate endDate,
             List<String> toolTypes,
             List<String> eventTypes,
             List<String> severities
