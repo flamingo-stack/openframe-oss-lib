@@ -295,4 +295,60 @@ public class Host {
 
     public String getDisplayName() { return displayName; }
     public void setDisplayName(String displayName) { this.displayName = displayName; }
+
+    @Override
+    public String toString() {
+        return "Host{" +
+                "id=" + id +
+                ", hostname='" + hostname + '\'' +
+                ", uuid='" + uuid + '\'' +
+                ", platform='" + platform + '\'' +
+                ", createdAt='" + createdAt + '\'' +
+                ", updatedAt='" + updatedAt + '\'' +
+                ", softwareUpdatedAt='" + softwareUpdatedAt + '\'' +
+                ", detailUpdatedAt='" + detailUpdatedAt + '\'' +
+                ", labelUpdatedAt='" + labelUpdatedAt + '\'' +
+                ", policyUpdatedAt='" + policyUpdatedAt + '\'' +
+                ", lastEnrolledAt='" + lastEnrolledAt + '\'' +
+                ", seenTime='" + seenTime + '\'' +
+                ", refetchRequested=" + refetchRequested +
+                ", osqueryVersion='" + osqueryVersion + '\'' +
+                ", orbitVersion='" + orbitVersion + '\'' +
+                ", fleetDesktopVersion='" + fleetDesktopVersion + '\'' +
+                ", scriptsEnabled=" + scriptsEnabled +
+                ", osVersion='" + osVersion + '\'' +
+                ", build='" + build + '\'' +
+                ", platformLike='" + platformLike + '\'' +
+                ", codeName='" + codeName + '\'' +
+                ", uptime=" + uptime +
+                ", memory=" + memory +
+                ", cpuType='" + cpuType + '\'' +
+                ", cpuSubtype='" + cpuSubtype + '\'' +
+                ", cpuBrand='" + cpuBrand + '\'' +
+                ", cpuPhysicalCores=" + cpuPhysicalCores +
+                ", cpuLogicalCores=" + cpuLogicalCores +
+                ", hardwareVendor='" + hardwareVendor + '\'' +
+                ", hardwareModel='" + hardwareModel + '\'' +
+                ", hardwareVersion='" + hardwareVersion + '\'' +
+                ", hardwareSerial='" + hardwareSerial + '\'' +
+                ", computerName='" + computerName + '\'' +
+                ", publicIp='" + publicIp + '\'' +
+                ", primaryIp='" + primaryIp + '\'' +
+                ", primaryMac='" + primaryMac + '\'' +
+                ", distributedInterval=" + distributedInterval +
+                ", configTlsRefresh=" + configTlsRefresh +
+                ", loggerTlsPeriod=" + loggerTlsPeriod +
+                ", teamId=" + teamId +
+                ", packStats=" + packStats +
+                ", teamName='" + teamName + '\'' +
+                ", gigsDiskSpaceAvailable=" + gigsDiskSpaceAvailable +
+                ", percentDiskSpaceAvailable=" + percentDiskSpaceAvailable +
+                ", gigsTotalDiskSpace=" + gigsTotalDiskSpace +
+                ", refetchCriticalQueriesUntil='" + refetchCriticalQueriesUntil + '\'' +
+                ", lastRestartedAt='" + lastRestartedAt + '\'' +
+                ", status='" + status + '\'' +
+                ", displayText='" + displayText + '\'' +
+                ", displayName='" + displayName + '\'' +
+                '}';
+    }
 }
