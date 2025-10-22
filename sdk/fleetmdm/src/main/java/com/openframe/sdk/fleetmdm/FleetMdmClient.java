@@ -8,6 +8,7 @@ import com.openframe.sdk.fleetmdm.model.Host;
 import com.openframe.sdk.fleetmdm.model.HostSearchRequest;
 import com.openframe.sdk.fleetmdm.model.HostSearchResponse;
 import com.openframe.sdk.fleetmdm.model.QueryResult;
+import com.openframe.sdk.fleetmdm.model.Query;
 
 import java.io.IOException;
 import java.net.URI;
@@ -26,6 +27,7 @@ import java.util.List;
 public class FleetMdmClient {
 
     private static final String HOSTS_URL = "/api/v1/fleet/hosts";
+    private static final String QUERIES_URL = "/api/v1/fleet/queries";
     private static final String GET_ENROLL_SECRET_URL = "/api/latest/fleet/spec/enroll_secret";
 
     private final String baseUrl;
@@ -260,6 +262,35 @@ public class FleetMdmClient {
         } catch (Exception e) {
             throw new FleetMdmException("Failed to process get enroll secret request", e);
         }
+    }
+
+    /**
+     * Get a single query by ID from Fleet MDM
+     * 
+     * @param id Query ID
+     * @return Query object or null if not found
+     * @throws IOException if an I/O exception occurs
+     * @throws InterruptedException if the request is interrupted
+     * @throws FleetMdmApiException if the API returns an error
+     */
+    public Query getQueryById(long id) throws IOException, InterruptedException {
+        HttpRequest request = addHeaders(HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + QUERIES_URL + "/" + id)))
+                .GET()
+                .timeout(Duration.ofSeconds(30))
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        
+        if (response.statusCode() == 401) {
+            throw new FleetMdmApiException("Authentication failed. Please check your API token.", response.statusCode(), response.body());
+        } else if (response.statusCode() == 404) {
+            return null; // Query not found
+        } else if (response.statusCode() != 200) {
+            throw new FleetMdmApiException("Failed to fetch query", response.statusCode(), response.body());
+        }
+
+        return MAPPER.treeToValue(MAPPER.readTree(response.body()).path("query"), Query.class);
     }
 
     private HttpRequest.Builder addHeaders(HttpRequest.Builder builder) {
