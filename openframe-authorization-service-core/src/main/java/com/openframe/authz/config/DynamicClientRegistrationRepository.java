@@ -13,6 +13,7 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import static com.openframe.authz.config.GoogleSSOProperties.GOOGLE;
+import static com.openframe.authz.config.OfficeSSOProperties.OFFICE;
 
 @Component
 @RequiredArgsConstructor
@@ -25,7 +26,7 @@ public class DynamicClientRegistrationRepository implements ClientRegistrationRe
 
     @Override
     public ClientRegistration findByRegistrationId(String registrationId) {
-        if (!GOOGLE.equalsIgnoreCase(registrationId)) {
+        if (!GOOGLE.equalsIgnoreCase(registrationId) && !OFFICE.equalsIgnoreCase(registrationId)) {
             return null;
         }
         String tenantId = resolveTenantIdFromSession();
@@ -34,7 +35,12 @@ public class DynamicClientRegistrationRepository implements ClientRegistrationRe
             return null;
         }
         try {
-            return dynamic.loadGoogleClient(tenantId);
+            if (GOOGLE.equalsIgnoreCase(registrationId)) {
+                return dynamic.loadGoogleClient(tenantId);
+            } else if (OFFICE.equalsIgnoreCase(registrationId)) {
+                return dynamic.loadOfficeClient(tenantId);
+            }
+            return null;
         } catch (IllegalArgumentException ex) {
             log.warn("No active Google SSO config for tenant {}: {}", tenantId, ex.getMessage());
             return null;

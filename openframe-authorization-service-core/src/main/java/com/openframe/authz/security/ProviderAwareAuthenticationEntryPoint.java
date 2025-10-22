@@ -23,8 +23,12 @@ public class ProviderAwareAuthenticationEntryPoint implements AuthenticationEntr
         }
 
         String target = "/login";
-        if (provider != null && provider.equalsIgnoreCase("google")) {
-            target = "/oauth2/authorization/google";
+        if (provider != null) {
+            if (provider.equalsIgnoreCase("google")) {
+                target = "/oauth2/authorization/google";
+            } else if (provider.equalsIgnoreCase("office")) {
+                target = "/oauth2/authorization/office";
+            }
         }
 
         response.sendRedirect(request.getContextPath() + target);

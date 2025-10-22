@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static com.openframe.authz.config.GoogleSSOProperties.GOOGLE;
+import static com.openframe.authz.config.OfficeSSOProperties.OFFICE;
 
 @Slf4j
 @Service
@@ -42,6 +43,10 @@ public class SSOConfigService {
 
     public Optional<SSOPerTenantConfig> getGoogleConfig(String tenantId) {
         return getSSOConfig(localTenant ? null : tenantId, GOOGLE);
+    }
+
+    public Optional<SSOPerTenantConfig> getOfficeConfig(String tenantId) {
+        return getSSOConfig(localTenant ? null : tenantId, OFFICE);
     }
 
     /**
