@@ -40,5 +40,5 @@ public class IntegratedTool {
     private Integer connectionTimeout;
     private Integer readTimeout;
     private String[] allowedEndpoints;
-    private Object debeziumConnector;
+    private Object[] debeziumConnectors;
 }
