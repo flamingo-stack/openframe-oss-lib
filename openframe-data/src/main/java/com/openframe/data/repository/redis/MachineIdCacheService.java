@@ -38,8 +38,8 @@ public class MachineIdCacheService {
     public CachedMachineInfo getMachine(String agentId) {
         log.debug("Fetching machine info for agent: {}", agentId);
         try {
-            // First get the machineId from ToolConnection
-            return toolConnectionRepository.findByAgentToolId(agentId)
+            // Get the most recent machineId from ToolConnection
+            return toolConnectionRepository.findFirstByAgentToolIdOrderByConnectedAtDesc(agentId)
                 .map(ToolConnection::getMachineId)
                 .flatMap(machineRepository::findByMachineId)
                 .map(machine -> new CachedMachineInfo(

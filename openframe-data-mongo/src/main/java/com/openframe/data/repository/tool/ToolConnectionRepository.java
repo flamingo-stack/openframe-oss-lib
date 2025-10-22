@@ -14,7 +14,11 @@ public interface ToolConnectionRepository extends MongoRepository<ToolConnection
     
     List<ToolConnection> findByMachineIdIn(List<String> machineIds);
 
-    Optional<ToolConnection> findByAgentToolId(String agentToolId);
+    /**
+     * Find the most recent ToolConnection by agentToolId
+     * Sorted by connectedAt in descending order to get the latest record
+     */
+    Optional<ToolConnection> findFirstByAgentToolIdOrderByConnectedAtDesc(String agentToolId);
 
     Optional<ToolConnection> findByMachineIdAndToolType(String machineId, ToolType toolType);
 }
