@@ -12,9 +12,6 @@ import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
-import static com.openframe.authz.config.GoogleSSOProperties.GOOGLE;
-import static com.openframe.authz.config.OfficeSSOProperties.OFFICE;
-
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -26,23 +23,15 @@ public class DynamicClientRegistrationRepository implements ClientRegistrationRe
 
     @Override
     public ClientRegistration findByRegistrationId(String registrationId) {
-        if (!GOOGLE.equalsIgnoreCase(registrationId) && !OFFICE.equalsIgnoreCase(registrationId)) {
-            return null;
-        }
         String tenantId = resolveTenantIdFromSession();
         if (tenantId == null) {
             log.debug("Skipping dynamic client load: tenantId not found in session");
             return null;
         }
         try {
-            if (GOOGLE.equalsIgnoreCase(registrationId)) {
-                return dynamic.loadGoogleClient(tenantId);
-            } else if (OFFICE.equalsIgnoreCase(registrationId)) {
-                return dynamic.loadOfficeClient(tenantId);
-            }
-            return null;
+            return dynamic.loadClient(registrationId, tenantId);
         } catch (IllegalArgumentException ex) {
-            log.warn("No active Google SSO config for tenant {}: {}", tenantId, ex.getMessage());
+            log.warn("Dynamic client resolution failed for provider '{}' and tenant {}: {}", registrationId, tenantId, ex.getMessage());
             return null;
         }
     }
