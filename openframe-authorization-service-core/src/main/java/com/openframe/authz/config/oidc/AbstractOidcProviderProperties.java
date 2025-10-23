@@ -1,17 +1,11 @@
-package com.openframe.authz.config;
+package com.openframe.authz.config.oidc;
 
 import lombok.Data;
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 @Data
-@Component
-@ConfigurationProperties(prefix = "openframe.sso.google")
-public class GoogleSSOProperties {
-
-    public static final String GOOGLE = "google";
+public abstract class AbstractOidcProviderProperties {
 
     private String registrationRedirectUri;
     private String loginRedirectUri;

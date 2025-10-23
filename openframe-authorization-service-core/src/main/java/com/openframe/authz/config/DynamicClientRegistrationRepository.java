@@ -1,5 +1,6 @@
 package com.openframe.authz.config;
 
+import com.openframe.authz.config.tenant.TenantContext;
 import com.openframe.authz.service.auth.DynamicClientRegistrationService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -23,7 +24,7 @@ public class DynamicClientRegistrationRepository implements ClientRegistrationRe
 
     @Override
     public ClientRegistration findByRegistrationId(String registrationId) {
-        String tenantId = resolveTenantIdFromSession();
+        String tenantId = resolveTenantId();
         if (tenantId == null) {
             log.debug("Skipping dynamic client load: tenantId not found in session");
             return null;
@@ -36,7 +37,11 @@ public class DynamicClientRegistrationRepository implements ClientRegistrationRe
         }
     }
 
-    private String resolveTenantIdFromSession() {
+    private String resolveTenantId() {
+        String fromContext = TenantContext.getTenantId();
+        if (fromContext != null && !fromContext.isBlank()) {
+            return fromContext;
+        }
         RequestAttributes ra = RequestContextHolder.getRequestAttributes();
         if (!(ra instanceof ServletRequestAttributes sra)) {
             return null;
