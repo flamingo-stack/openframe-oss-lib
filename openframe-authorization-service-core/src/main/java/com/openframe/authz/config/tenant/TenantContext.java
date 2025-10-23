@@ -1,7 +1,6 @@
 package com.openframe.authz.config.tenant;
 
-public final class
-TenantContext {
+public final class TenantContext {
     private static final ThreadLocal<String> CURRENT_TENANT = new ThreadLocal<>();
 
     private TenantContext() {

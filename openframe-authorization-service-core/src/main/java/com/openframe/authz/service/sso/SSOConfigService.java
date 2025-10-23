@@ -12,7 +12,8 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Optional;
 
-import static com.openframe.authz.config.GoogleSSOProperties.GOOGLE;
+import static com.openframe.authz.config.oidc.GoogleSSOProperties.GOOGLE;
+import static com.openframe.authz.config.oidc.OfficeSSOProperties.OFFICE;
 
 @Slf4j
 @Service
@@ -38,10 +39,6 @@ public class SSOConfigService {
      */
     public List<SSOPerTenantConfig> getActiveForTenant(String tenantId) {
         return ssoPerTenantConfigRepository.findByTenantIdAndEnabledTrue(tenantId);
-    }
-
-    public Optional<SSOPerTenantConfig> getGoogleConfig(String tenantId) {
-        return getSSOConfig(localTenant ? null : tenantId, GOOGLE);
     }
 
     /**
