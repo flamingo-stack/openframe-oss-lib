@@ -44,7 +44,8 @@ public class UserService {
      * Throws conflict if an ACTIVE user already exists in this tenant.
      */
     public AuthUser registerUser(String tenantId, String email, String firstName, String lastName, String password, List<UserRole> roles) {
-        var existing = userRepository.findByEmailAndTenantId(email, tenantId);
+        String normalized = email.trim().toLowerCase(java.util.Locale.ROOT);
+        var existing = userRepository.findByEmailAndTenantId(normalized, tenantId);
         return existing
                 .map(u -> {
                     if (u.getStatus() == ACTIVE) {

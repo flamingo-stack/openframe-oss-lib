@@ -15,6 +15,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 @Data
 @SuperBuilder
@@ -41,4 +42,8 @@ public class Invitation {
 
     @LastModifiedDate
     private Instant updatedAt;
+
+    public void setEmail(String email) {
+        this.email = email == null ? null : email.trim().toLowerCase(Locale.ROOT);
+    }
 }
