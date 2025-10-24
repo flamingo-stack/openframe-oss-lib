@@ -163,7 +163,7 @@ public class AuthorizationServerConfig {
     public UserDetailsService userDetailsService(UserService userService) {
         return username -> {
             String tenantId = getTenantId();
-            AuthUser user = userService.findActiveByEmailAndTenant(username, tenantId)
+            AuthUser user = userService.findActiveByEmailAndTenant(username.toLowerCase(Locale.ROOT), tenantId)
                     .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
 
             return User.builder()
