@@ -28,7 +28,7 @@ public class TenantRegistrationService {
 
         registrationProcessor.preProcessTenantRegistration(request);
 
-        String tenantDomain = request.getTenantDomain();
+        String tenantDomain = request.getTenantDomain().toLowerCase();
 
         if (tenantService.existByDomain(tenantDomain)) {
             throw new IllegalArgumentException("Registration is closed for this organization");
@@ -56,7 +56,6 @@ public class TenantRegistrationService {
 
         Tenant savedTenant = tenantService.save(tenant);
 
-        // Create default organization for the tenant
         organizationService.createDefaultOrganization();
 
         registrationProcessor.postProcessTenantRegistration(savedTenant, user, request);
