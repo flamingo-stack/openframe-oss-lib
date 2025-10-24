@@ -9,6 +9,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Locale;
+
 import static org.springframework.http.HttpStatus.OK;
 
 /**
@@ -33,6 +35,6 @@ public class TenantDiscoveryController {
             @RequestParam @Email @NotBlank String email) {
 
         log.debug("Tenant discovery request for email: {}", email);
-        return tenantDiscoveryService.discoverTenantForEmail(email);
+        return tenantDiscoveryService.discoverTenantForEmail(email.toLowerCase(Locale.ROOT));
     }
 }

@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Locale;
 
 import static com.openframe.data.document.user.UserRole.OWNER;
 
@@ -28,13 +29,14 @@ public class TenantRegistrationService {
 
         registrationProcessor.preProcessTenantRegistration(request);
 
-        String tenantDomain = request.getTenantDomain().toLowerCase();
+        String tenantDomain = request.getTenantDomain().toLowerCase(Locale.ROOT);
+        String userEmail = request.getEmail().toLowerCase(Locale.ROOT);
 
         if (tenantService.existByDomain(tenantDomain)) {
             throw new IllegalArgumentException("Registration is closed for this organization");
         }
 
-        boolean hasActiveUser = userService.findActiveByEmail(request.getEmail())
+        boolean hasActiveUser = userService.findActiveByEmail(userEmail)
                 .isPresent();
 
         if (hasActiveUser) {
@@ -45,7 +47,7 @@ public class TenantRegistrationService {
 
         AuthUser user = userService.registerUser(
                 tenant.getId(),
-                request.getEmail(),
+                userEmail,
                 request.getFirstName(),
                 request.getLastName(),
                 request.getPassword(),

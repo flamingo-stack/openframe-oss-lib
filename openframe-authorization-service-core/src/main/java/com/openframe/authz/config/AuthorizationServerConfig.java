@@ -44,6 +44,7 @@ import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import org.springframework.web.filter.ForwardedHeaderFilter;
 
 import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Set;
 
 import static com.openframe.authz.config.tenant.TenantContext.getTenantId;
@@ -133,7 +134,7 @@ public class AuthorizationServerConfig {
             Authentication authentication = context.getPrincipal();
             String tenantId = getTenantId();
 
-            String username = authentication != null ? authentication.getName() : null;
+            String username = authentication != null ? authentication.getName().toLowerCase(Locale.ROOT) : null;
 
             AuthUser user = userService
                     .findActiveByEmailAndTenant(username, tenantId)
