@@ -15,7 +15,7 @@ public class ForceToolInstallationController {
 
     @PostMapping("force-install")
     public ForceToolInstallationResponse forceToolInstallation(@RequestBody ForceToolInstallationRequest toolInstallationRequest) {
-        return toolInstallationService.process(toolInstallationRequest);
+        return toolInstallationService.install(toolInstallationRequest);
     }
 
 }

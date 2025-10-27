@@ -10,7 +10,6 @@ import com.openframe.data.service.IntegratedToolAgentService;
 import com.openframe.data.service.ToolInstallationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.parameters.P;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -27,7 +26,7 @@ public class ForceToolInstallationService {
     private final ToolInstallationService toolInstallationService;
     private final MachineRepository machineRepository;
 
-    public ForceToolInstallationResponse process(ForceToolInstallationRequest toolInstallationRequest) {
+    public ForceToolInstallationResponse install(ForceToolInstallationRequest toolInstallationRequest) {
         String toolAgentId = toolInstallationRequest.getToolAgentId();
         List<String> machineIds = toolInstallationRequest.getMachineIds();
 
