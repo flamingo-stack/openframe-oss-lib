@@ -4,6 +4,7 @@ import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -13,6 +14,7 @@ import static org.apache.zookeeper.common.StringUtils.isEmpty;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@ConditionalOnProperty("spring.cloud.stream.enabled")
 public class ToolInstallationService {
 
     private final IntegratedToolService integratedToolService;
