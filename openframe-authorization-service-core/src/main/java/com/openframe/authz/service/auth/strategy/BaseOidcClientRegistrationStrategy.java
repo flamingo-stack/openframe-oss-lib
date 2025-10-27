@@ -26,6 +26,17 @@ public abstract class BaseOidcClientRegistrationStrategy implements ClientRegist
                 .orElseThrow(() -> new IllegalArgumentException("No active SSO config for provider '" + provider + "' and tenant " + tenantId));
 
         AbstractOidcProviderProperties p = props();
+        String msTenantId = cfg.getMsTenantId();
+
+        String authorizationUrl = p.getAuthorizationUrl();
+        String tokenUrl = p.getTokenUrl();
+        String jwkSetUri = p.getJwkSetUri();
+
+        if (msTenantId != null && !msTenantId.isBlank()) {
+            authorizationUrl = authorizationUrl.replace("{msTenantId}", msTenantId);
+            tokenUrl = tokenUrl.replace("{msTenantId}", msTenantId);
+            jwkSetUri = jwkSetUri.replace("{msTenantId}", msTenantId);
+        }
         return ClientRegistration.withRegistrationId(provider)
                 .clientId(cfg.getClientId())
                 .clientSecret(ssoConfigService.getDecryptedClientSecret(cfg))
@@ -33,11 +44,11 @@ public abstract class BaseOidcClientRegistrationStrategy implements ClientRegist
                 .authorizationGrantType(AUTHORIZATION_CODE)
                 .redirectUri(p.getLoginRedirectUri())
                 .scope(p.getScopes())
-                .authorizationUri(p.getAuthorizationUrl())
-                .tokenUri(p.getTokenUrl())
+                .authorizationUri(authorizationUrl)
+                .tokenUri(tokenUrl)
                 .userInfoUri(p.getUserInfoUrl())
                 .userNameAttributeName(IdTokenClaimNames.SUB)
-                .jwkSetUri(p.getJwkSetUri())
+                .jwkSetUri(jwkSetUri)
                 .clientName(capitalize(provider) + " (" + tenantId + ")")
                 .build();
     }

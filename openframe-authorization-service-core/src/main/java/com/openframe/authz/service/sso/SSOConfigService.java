@@ -30,7 +30,7 @@ public class SSOConfigService {
      * Get ACTIVE SSO configuration by tenant and provider.
      */
     public Optional<SSOPerTenantConfig> getSSOConfig(String tenantId, String provider) {
-        return ssoPerTenantConfigRepository.findFirstByTenantIdAndProviderAndEnabledTrue(tenantId, provider);
+        return ssoPerTenantConfigRepository.findFirstByTenantIdAndProviderAndEnabledTrue(localTenant? null : tenantId, provider);
     }
 
     /**
