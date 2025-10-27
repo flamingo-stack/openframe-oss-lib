@@ -7,6 +7,7 @@ import com.openframe.data.document.toolagent.ToolAgentAssetSource;
 import com.openframe.data.model.nats.ToolInstallationMessage;
 import com.openframe.data.repository.nats.NatsMessagePublisher;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -18,6 +19,7 @@ import static java.lang.String.format;
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty("spring.cloud.stream.enabled")
+@Slf4j
 public class ToolInstallationNatsPublisher {
 
     private final static String TOPIC_NAME_TEMPLATE = "machine.%s.tool-installation";
