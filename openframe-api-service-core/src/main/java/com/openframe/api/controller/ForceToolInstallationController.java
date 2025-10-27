@@ -4,19 +4,16 @@ import com.openframe.api.dto.toolinstallation.ForceToolInstallationRequest;
 import com.openframe.api.dto.toolinstallation.ForceToolInstallationResponse;
 import com.openframe.api.service.ForceToolInstallationService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("tool-installation")
+@RequestMapping("tool-agent")
 @RequiredArgsConstructor
-public class AgentToolInstallationController {
+public class ForceToolInstallationController {
 
     private final ForceToolInstallationService toolInstallationService;
 
-    @PostMapping
+    @PostMapping("force-install")
     public ForceToolInstallationResponse forceToolInstallation(@RequestBody ForceToolInstallationRequest toolInstallationRequest) {
         return toolInstallationService.process(toolInstallationRequest);
     }
