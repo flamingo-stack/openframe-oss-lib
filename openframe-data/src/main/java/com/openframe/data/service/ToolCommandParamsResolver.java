@@ -3,12 +3,14 @@ package com.openframe.data.service;
 import com.openframe.data.service.secretretriver.ToolAgentRegistrationSecretRetriever;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "openframe.integration.tool.enabled", havingValue = "true")
 public class ToolCommandParamsResolver {
 
     private static final String REGISTRATION_SECRET_PLACEHOLDER = "${server.registrationSecret}";

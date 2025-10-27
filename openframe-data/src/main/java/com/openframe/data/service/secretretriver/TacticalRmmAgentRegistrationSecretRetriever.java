@@ -9,10 +9,12 @@ import com.openframe.sdk.tacticalrmm.TacticalRmmClient;
 import com.openframe.sdk.tacticalrmm.model.AgentRegistrationSecretRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "openframe.integration.tool.enabled", havingValue = "true")
 @Slf4j
 public class TacticalRmmAgentRegistrationSecretRetriever implements ToolAgentRegistrationSecretRetriever{
 
