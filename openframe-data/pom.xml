@@ -83,5 +83,13 @@
             <artifactId>mockito-junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>fleetmdm</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>tacticalrmm</artifactId>
+        </dependency>
     </dependencies>
 </project>
