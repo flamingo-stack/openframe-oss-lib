@@ -17,6 +17,22 @@ public abstract class AbstractOidcProviderProperties {
     private String jwkSetUri;
 
     private List<String> scopes;
+
+    public String effectiveAuthorizationUrl(String msTenantId) {
+        return getAuthorizationUrl();
+    }
+
+    public String effectiveTokenUrl(String msTenantId) {
+        return getTokenUrl();
+    }
+
+    public String effectiveJwkSetUri(String msTenantId) {
+        return getJwkSetUri();
+    }
+
+    public String effectiveIssuerUri(String msTenantId) {
+        return getIssuerUri();
+    }
 }
 
 

@@ -25,28 +25,22 @@ public abstract class BaseOidcClientRegistrationStrategy implements ClientRegist
         SSOConfig cfg = ssoConfigService.getSSOConfig(tenantId, provider)
                 .orElseThrow(() -> new IllegalArgumentException("No active SSO config for provider '" + provider + "' and tenant " + tenantId));
 
-        AbstractOidcProviderProperties p = props();
+        AbstractOidcProviderProperties props = props();
         String msTenantId = cfg.getMsTenantId();
 
-        String authorizationUrl = p.getAuthorizationUrl();
-        String tokenUrl = p.getTokenUrl();
-        String jwkSetUri = p.getJwkSetUri();
-
-        if (msTenantId != null && !msTenantId.isBlank()) {
-            authorizationUrl = authorizationUrl.replace("{msTenantId}", msTenantId);
-            tokenUrl = tokenUrl.replace("{msTenantId}", msTenantId);
-            jwkSetUri = jwkSetUri.replace("{msTenantId}", msTenantId);
-        }
+        String authorizationUrl = props.effectiveAuthorizationUrl(msTenantId);
+        String tokenUrl = props.effectiveTokenUrl(msTenantId);
+        String jwkSetUri = props.effectiveJwkSetUri(msTenantId);
         return ClientRegistration.withRegistrationId(provider)
                 .clientId(cfg.getClientId())
                 .clientSecret(ssoConfigService.getDecryptedClientSecret(cfg))
                 .clientAuthenticationMethod(CLIENT_SECRET_BASIC)
                 .authorizationGrantType(AUTHORIZATION_CODE)
-                .redirectUri(p.getLoginRedirectUri())
-                .scope(p.getScopes())
+                .redirectUri(props.getLoginRedirectUri())
+                .scope(props.getScopes())
                 .authorizationUri(authorizationUrl)
                 .tokenUri(tokenUrl)
-                .userInfoUri(p.getUserInfoUrl())
+                .userInfoUri(props.getUserInfoUrl())
                 .userNameAttributeName(IdTokenClaimNames.SUB)
                 .jwkSetUri(jwkSetUri)
                 .clientName(capitalize(provider) + " (" + tenantId + ")")
