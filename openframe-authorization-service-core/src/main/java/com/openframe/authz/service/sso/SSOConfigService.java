@@ -13,7 +13,6 @@ import java.util.List;
 import java.util.Optional;
 
 import static com.openframe.authz.config.oidc.GoogleSSOProperties.GOOGLE;
-import static com.openframe.authz.config.oidc.OfficeSSOProperties.OFFICE;
 
 @Slf4j
 @Service

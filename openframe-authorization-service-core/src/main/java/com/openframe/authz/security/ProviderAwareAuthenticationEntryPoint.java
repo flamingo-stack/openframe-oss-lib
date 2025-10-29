@@ -1,7 +1,5 @@
 package com.openframe.authz.security;
 
-import com.openframe.authz.config.oidc.GoogleSSOProperties;
-import com.openframe.authz.config.oidc.OfficeSSOProperties;
 import com.openframe.authz.config.tenant.TenantContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -12,7 +10,7 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import java.io.IOException;
 
 import static com.openframe.authz.config.oidc.GoogleSSOProperties.GOOGLE;
-import static com.openframe.authz.config.oidc.OfficeSSOProperties.OFFICE;
+import static com.openframe.authz.config.oidc.MicrosoftSSOProperties.MICROSOFT;
 import static java.util.Locale.ROOT;
 
 public class ProviderAwareAuthenticationEntryPoint implements AuthenticationEntryPoint {
@@ -32,7 +30,7 @@ public class ProviderAwareAuthenticationEntryPoint implements AuthenticationEntr
         if (provider != null) {
             String p = provider.toLowerCase(ROOT);
             switch (p) {
-                case GOOGLE, OFFICE ->
+                case GOOGLE, MICROSOFT ->
                         target = "/oauth2/authorization/" + p;
                 default -> target = "/login";
             }

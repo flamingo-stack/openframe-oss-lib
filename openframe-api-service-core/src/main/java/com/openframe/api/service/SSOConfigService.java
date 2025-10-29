@@ -9,6 +9,7 @@ import com.openframe.api.service.processor.SSOConfigProcessor;
 import com.openframe.core.service.EncryptionService;
 import com.openframe.data.document.sso.SSOConfig;
 import com.openframe.data.repository.sso.SSOConfigRepository;
+import com.openframe.api.mapper.SSOConfigMapper;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +28,7 @@ public class SSOConfigService {
     private final EncryptionService encryptionService;
     private final SSOProperties ssoProperties;
     private final SSOConfigProcessor ssoConfigProcessor;
+    private final SSOConfigMapper ssoConfigMapper;
 
     /**
      * Get list of enabled SSO providers - used by login components
@@ -54,40 +56,28 @@ public class SSOConfigService {
      */
     public SSOConfigResponse getConfig(String provider) {
         return ssoConfigRepository.findByProvider(provider)
-                .map(config -> SSOConfigResponse.builder()
-                        .id(config.getId())
-                        .provider(config.getProvider())
-                        .clientId(config.getClientId())
-                        .clientSecret(encryptionService.decryptClientSecret(config.getClientSecret()))
-                        .enabled(config.isEnabled())
-                        .build())
+                .map(config -> ssoConfigMapper.toResponse(
+                        config,
+                        encryptionService.decryptClientSecret(config.getClientSecret())
+                ))
                 .orElse(SSOConfigResponse.builder()
                         .id(null)
                         .provider(provider)
                         .clientId(null)
                         .clientSecret(null)
+                        .msTenantId(null)
                         .enabled(false)
                         .build());
     }
 
     private SSOConfigResponse saveConfig(String provider, @Valid SSOConfigRequest request) {
-        SSOConfig config = new SSOConfig();
-        config.setProvider(provider);
-        config.setClientId(request.getClientId());
-        config.setClientSecret(encryptionService.encryptClientSecret(request.getClientSecret()));
-        config.setEnabled(true);
+        SSOConfig config = ssoConfigMapper.toEntity(provider, request, encryptionService);
 
         SSOConfig savedConfig = ssoConfigRepository.save(config);
         log.info("Successfully created SSO configuration for provider '{}'", provider);
 
         ssoConfigProcessor.postProcessConfigSaved(savedConfig);
-        return SSOConfigResponse.builder()
-                .id(savedConfig.getId())
-                .provider(savedConfig.getProvider())
-                .clientId(savedConfig.getClientId())
-                .clientSecret(request.getClientSecret())
-                .enabled(savedConfig.isEnabled())
-                .build();
+        return ssoConfigMapper.toResponse(savedConfig, request.getClientSecret());
     }
 
     public void deleteConfig(String provider) {
@@ -103,20 +93,13 @@ public class SSOConfigService {
     public SSOConfigResponse upsertConfig(String provider, @Valid SSOConfigRequest request) {
         return ssoConfigRepository.findByProvider(provider)
                 .map(existingConfig -> {
-                    existingConfig.setClientId(request.getClientId());
-                    existingConfig.setClientSecret(encryptionService.encryptClientSecret(request.getClientSecret()));
+                    ssoConfigMapper.updateEntity(existingConfig, request, encryptionService);
                     SSOConfig savedConfig = ssoConfigRepository.save(existingConfig);
                     log.info("Successfully updated SSO configuration for provider '{}'", provider);
 
                     ssoConfigProcessor.postProcessConfigSaved(savedConfig);
 
-                    return SSOConfigResponse.builder()
-                            .id(savedConfig.getId())
-                            .provider(savedConfig.getProvider())
-                            .clientId(savedConfig.getClientId())
-                            .clientSecret(request.getClientSecret())
-                            .enabled(savedConfig.isEnabled())
-                            .build();
+                    return ssoConfigMapper.toResponse(savedConfig, request.getClientSecret());
                 })
                 .orElseGet(() -> {
                     log.info("SSO configuration for provider '{}' not found. Creating new one.", provider);
