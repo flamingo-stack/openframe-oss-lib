@@ -1,5 +1,6 @@
 package com.openframe.authz.config;
 
+import com.openframe.authz.config.tenant.TenantContext;
 import com.openframe.authz.service.auth.DynamicClientRegistrationService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -12,8 +13,6 @@ import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
-import static com.openframe.authz.config.GoogleSSOProperties.GOOGLE;
-
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -25,23 +24,24 @@ public class DynamicClientRegistrationRepository implements ClientRegistrationRe
 
     @Override
     public ClientRegistration findByRegistrationId(String registrationId) {
-        if (!GOOGLE.equalsIgnoreCase(registrationId)) {
-            return null;
-        }
-        String tenantId = resolveTenantIdFromSession();
+        String tenantId = resolveTenantId();
         if (tenantId == null) {
             log.debug("Skipping dynamic client load: tenantId not found in session");
             return null;
         }
         try {
-            return dynamic.loadGoogleClient(tenantId);
+            return dynamic.loadClient(registrationId, tenantId);
         } catch (IllegalArgumentException ex) {
-            log.warn("No active Google SSO config for tenant {}: {}", tenantId, ex.getMessage());
+            log.warn("Dynamic client resolution failed for provider '{}' and tenant {}: {}", registrationId, tenantId, ex.getMessage());
             return null;
         }
     }
 
-    private String resolveTenantIdFromSession() {
+    private String resolveTenantId() {
+        String fromContext = TenantContext.getTenantId();
+        if (fromContext != null && !fromContext.isBlank()) {
+            return fromContext;
+        }
         RequestAttributes ra = RequestContextHolder.getRequestAttributes();
         if (!(ra instanceof ServletRequestAttributes sra)) {
             return null;

@@ -11,4 +11,6 @@ public class SSOConfigRequest {
 
     @NotBlank(message = "Client Secret cannot be empty")
     private String clientSecret;
+
+    private String msTenantId;
 } 
