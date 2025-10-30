@@ -1,7 +1,8 @@
+---
 name: OpenFrame OSS Libs Release
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 on:
@@ -19,23 +20,31 @@ env:
   ARTIFACT_REGISTRY: "com/openframe/oss"
   ORGANISATION: ${{ github.repository_owner }}
   REPOSITORY: ${{ github.event.repository.name }}
-  
+
 jobs:
   release:
     name: Build & Release
     runs-on: ubuntu-latest
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
       - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
           cache: maven
-      
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
       - name: Get Previous Version
         env:
           MAVEN_REGISTRY: maven.pkg.github.com
@@ -47,13 +56,14 @@ jobs:
           OLD_VERSION=${OLD_VERSION:-0.0.0}
           echo "OLD_VERSION=$OLD_VERSION" >> $GITHUB_ENV
           echo "Found old version: $OLD_VERSION"
-      
+
       - name: Set Snapshot Version
         if: github.event_name == 'push'
         run: |
           echo "NEW_VERSION=${{ env.OLD_VERSION }}-SNAPSHOT" >> $GITHUB_ENV
+          echo "SKIP_VERSION_COMMIT=true" >> $GITHUB_ENV
           echo "${{ env.OLD_VERSION }} → ${{ env.OLD_VERSION }}-SNAPSHOT"
-      
+
       - name: Set Release Version
         if: github.event_name == 'workflow_dispatch'
         env:
@@ -65,16 +75,31 @@ jobs:
           IFS='.' read -r old_major old_minor old_patch <<< "$OLD_BASE"
           IFS='.' read -r new_major new_minor new_patch <<< "$NEW_VERSION"
 
-          # Validate version bump rules in one expression
+          # Validate version bump rules
           if ! ([ "$new_major" -eq $((old_major + 1)) ] && [ "$new_minor" -eq 0 ] && [ "$new_patch" -eq 0 ]) &&
              ! ([ "$new_major" -eq "$old_major" ] && [ "$new_minor" -eq $((old_minor + 1)) ] && [ "$new_patch" -eq 0 ]) &&
              ! ([ "$new_major" -eq "$old_major" ] && [ "$new_minor" -eq "$old_minor" ] && [ "$new_patch" -eq $((old_patch + 1)) ]); then
             echo "Invalid version bump: ${{ env.OLD_VERSION }} → $NEW_VERSION"
             exit 1
           fi
+
+          # Calculate next snapshot version (bump patch)
+          NEXT_PATCH=$((new_patch + 1))
+          NEXT_SNAPSHOT_VERSION="${new_major}.${new_minor}.${NEXT_PATCH}-SNAPSHOT"
+
           echo "New version validated: ${{ env.OLD_VERSION }} → $NEW_VERSION"
+          echo "Next snapshot: $NEXT_SNAPSHOT_VERSION"
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
-      
+          echo "NEXT_SNAPSHOT_VERSION=$NEXT_SNAPSHOT_VERSION" >> $GITHUB_ENV
+          echo "SKIP_VERSION_COMMIT=false" >> $GITHUB_ENV
+
+      - name: Update to Release Version
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          mvn versions:set -DnewVersion="${{ env.NEW_VERSION }}" -DgenerateBackupPoms=false
+          git add pom.xml "**/pom.xml"
+          git commit -m "chore(release): bump version to ${{ env.NEW_VERSION }}"
+
       - name: Build
         run: |
           mvn clean install \
@@ -84,13 +109,30 @@ jobs:
             --batch-mode \
             --no-transfer-progress \
             -Dmaven.javadoc.skip=true
-      
+
       - name: Deploy ${{ env.NEW_VERSION }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          mvn versions:set -DnewVersion="${{ env.NEW_VERSION }}" -DgenerateBackupPoms=false
+          # For snapshot builds, set version before deploying
+          if [ "${{ github.event_name }}" == "push" ]; then
+            mvn versions:set -DnewVersion="${{ env.NEW_VERSION }}" -DgenerateBackupPoms=false
+          fi
           mvn deploy -DskipTests -s .mvn/settings.xml
+
+      - name: Create Git Tag
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git tag -a "v${{ env.NEW_VERSION }}" -m "Release version ${{ env.NEW_VERSION }}"
+          git push origin "v${{ env.NEW_VERSION }}"
+
+      - name: Bump to Next Snapshot Version
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          mvn versions:set -DnewVersion="${{ env.NEXT_SNAPSHOT_VERSION }}" -DgenerateBackupPoms=false
+          git add pom.xml "**/pom.xml"
+          git commit -m "chore(release): bump version to ${{ env.NEXT_SNAPSHOT_VERSION }}"
+          git push origin main
 
       - name: Clean SNAPSHOT versions
         if: github.event_name == 'workflow_dispatch'
@@ -105,3 +147,4 @@ jobs:
               --jq '[.[] | select(.name | test("SNAPSHOT"))] | sort_by(.created_at) | reverse | .[3:] | .[].id' |
               xargs -r -n1 -I{} gh api -X DELETE "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions/{}"
           done
+
