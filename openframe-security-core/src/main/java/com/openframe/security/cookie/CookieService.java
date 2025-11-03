@@ -26,6 +26,7 @@ public class CookieService {
 
     public static final String ACCESS_TOKEN_COOKIE = "access_token";
     public static final String REFRESH_TOKEN_COOKIE = "refresh_token";
+    public static final String JSESSIONID = "JSESSIONID";
 
     @Value("${security.oauth2.token.access.expiration-seconds}")
     private int accessTokenExpirationSeconds;
@@ -51,20 +52,13 @@ public class CookieService {
     }
 
     public void addClearAuthCookies(HttpHeaders headers) {
-        ResponseCookie clearedAccess = ResponseCookie.from(ACCESS_TOKEN, "")
-                .path("/")
-                .domain(domain)
-                .maxAge(0)
-                .build();
-
-        ResponseCookie clearedRefresh = ResponseCookie.from(REFRESH_TOKEN, "")
-                .path("/oauth")
-                .domain(domain)
-                .maxAge(0)
-                .build();
+        ResponseCookie clearedAccess = createClearedCookie(ACCESS_TOKEN, "/");
+        ResponseCookie clearedRefresh = createClearedCookie(REFRESH_TOKEN, "/oauth");
+        ResponseCookie clearedAuthSession = createClearedCookie(JSESSIONID, "/sas");
 
         headers.add(SET_COOKIE, clearedAccess.toString());
         headers.add(SET_COOKIE, clearedRefresh.toString());
+        headers.add(SET_COOKIE, clearedAuthSession.toString());
     }
 
     private ResponseCookie createAccessTokenCookie(String accessToken) {
@@ -84,6 +78,10 @@ public class CookieService {
                 .maxAge(age)
                 .domain(domain)
                 .build();
+    }
+
+    private ResponseCookie createClearedCookie(String name, String path) {
+        return createCookie(name, "", path, 0);
     }
 
     /**
