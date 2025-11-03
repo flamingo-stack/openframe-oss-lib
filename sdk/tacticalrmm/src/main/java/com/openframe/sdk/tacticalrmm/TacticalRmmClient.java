@@ -8,6 +8,7 @@ import com.openframe.sdk.tacticalrmm.model.AgentInfo;
 import com.openframe.sdk.tacticalrmm.model.AgentListItem;
 import com.openframe.sdk.tacticalrmm.model.AgentRegistrationSecretRequest;
 import com.openframe.sdk.tacticalrmm.model.CommandResult;
+import com.openframe.sdk.tacticalrmm.model.CreateScriptRequest;
 import com.openframe.sdk.tacticalrmm.model.ScriptListItem;
 
 import java.net.URI;
@@ -297,6 +298,122 @@ public class TacticalRmmClient {
             throw e;
         } catch (Exception e) {
             throw new TacticalRmmException("Failed to get script info for: " + scriptId, e);
+        }
+    }
+
+    /**
+     * Create a new script in Tactical RMM
+     * @param tacticalServerUrl The Tactical RMM server URL
+     * @param apiKey The API key for authentication
+     * @param request The script creation request containing all script details
+     * @return ScriptListItem containing the created script information
+     */
+    public ScriptListItem addScript(String tacticalServerUrl, String apiKey, CreateScriptRequest request) {
+        // Validate parameters
+        if (tacticalServerUrl == null || tacticalServerUrl.trim().isEmpty()) {
+            throw new IllegalArgumentException("Tactical server URL cannot be null or empty");
+        }
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            throw new IllegalArgumentException("API key cannot be null or empty");
+        }
+        if (request == null) {
+            throw new IllegalArgumentException("Script request cannot be null");
+        }
+        if (request.getName() == null || request.getName().trim().isEmpty()) {
+            throw new IllegalArgumentException("Script name cannot be null or empty");
+        }
+        if (request.getShell() == null || request.getShell().trim().isEmpty()) {
+            throw new IllegalArgumentException("Script shell cannot be null or empty");
+        }
+
+        try {
+            String requestBody = objectMapper.writeValueAsString(request);
+
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(tacticalServerUrl + "/scripts/"))
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .header("Content-Type", "application/json")
+                    .header("Accept", "application/json")
+                    .header("X-API-KEY", apiKey)
+                    .timeout(Duration.ofSeconds(30))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 401) {
+                throw new TacticalRmmApiException("Authentication failed. Please check your API key.", response.statusCode(), response.body());
+            } else if (response.statusCode() == 400) {
+                throw new TacticalRmmApiException("Invalid script data: " + response.body(), response.statusCode(), response.body());
+            } else if (response.statusCode() != 200 && response.statusCode() != 201) {
+                throw new TacticalRmmApiException("Failed to create script", response.statusCode(), response.body());
+            }
+
+            return objectMapper.readValue(response.body(), ScriptListItem.class);
+        } catch (TacticalRmmApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new TacticalRmmException("Failed to create script: " + request.getName(), e);
+        }
+    }
+
+    /**
+     * Update an existing script in Tactical RMM
+     * @param tacticalServerUrl The Tactical RMM server URL
+     * @param apiKey The API key for authentication
+     * @param scriptId The ID of the script to update
+     * @param request The script update request containing all script details
+     * @return ScriptListItem containing the updated script information
+     */
+    public ScriptListItem updateScript(String tacticalServerUrl, String apiKey, String scriptId, CreateScriptRequest request) {
+        // Validate parameters
+        if (tacticalServerUrl == null || tacticalServerUrl.trim().isEmpty()) {
+            throw new IllegalArgumentException("Tactical server URL cannot be null or empty");
+        }
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            throw new IllegalArgumentException("API key cannot be null or empty");
+        }
+        if (scriptId == null || scriptId.trim().isEmpty()) {
+            throw new IllegalArgumentException("Script ID cannot be null or empty");
+        }
+        if (request == null) {
+            throw new IllegalArgumentException("Script request cannot be null");
+        }
+        if (request.getName() == null || request.getName().trim().isEmpty()) {
+            throw new IllegalArgumentException("Script name cannot be null or empty");
+        }
+        if (request.getShell() == null || request.getShell().trim().isEmpty()) {
+            throw new IllegalArgumentException("Script shell cannot be null or empty");
+        }
+
+        try {
+            String requestBody = objectMapper.writeValueAsString(request);
+
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(tacticalServerUrl + "/scripts/" + scriptId + "/"))
+                    .PUT(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .header("Content-Type", "application/json")
+                    .header("Accept", "application/json")
+                    .header("X-API-KEY", apiKey)
+                    .timeout(Duration.ofSeconds(30))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 401) {
+                throw new TacticalRmmApiException("Authentication failed. Please check your API key.", response.statusCode(), response.body());
+            } else if (response.statusCode() == 404) {
+                throw new TacticalRmmApiException("Script not found with ID: " + scriptId, response.statusCode(), response.body());
+            } else if (response.statusCode() == 400) {
+                throw new TacticalRmmApiException("Invalid script data: " + response.body(), response.statusCode(), response.body());
+            } else if (response.statusCode() != 200 && response.statusCode() != 201) {
+                throw new TacticalRmmApiException("Failed to update script", response.statusCode(), response.body());
+            }
+
+            return objectMapper.readValue(response.body(), ScriptListItem.class);
+        } catch (TacticalRmmApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new TacticalRmmException("Failed to update script: " + scriptId, e);
         }
     }
 
