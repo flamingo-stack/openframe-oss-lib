@@ -1,0 +1,30 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "fileMatch": ["(^|/)pom\\.xml$"],
+      "matchStrings": [
+        "<properties>\\s*<revision>(?<currentValue>.*?)<\\/revision>"
+      ],
+      "depNameTemplate": "flamingo-stack/openframe-oss-lib",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    }
+  ],
+  "packageRules": [
+    {
+      "matchManagers": ["custom.regex"],
+      "matchDepNames": ["flamingo-stack/openframe-oss-lib"],
+      "groupName": "Project version",
+      "commitMessagePrefix": "chore: "
+    },
+    {
+      "matchPackagePrefixes": ["com.openframe.oss:"],
+      "enabled": false
+    }
+  ]
+}
