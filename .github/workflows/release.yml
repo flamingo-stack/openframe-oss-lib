@@ -6,7 +6,7 @@ permissions:
 
 on:
   push:
-    branches: [main]
+    branches: [feature/renovate]
   workflow_dispatch:
     inputs:
       version:
