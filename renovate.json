@@ -18,18 +18,20 @@
       "enabled": false
     },
     {
-      "description": "Enable updates for openframe-oss-lib parent version",
+      "description": "Enable updates for openframe-oss-lib parent version with automerge",
       "matchPackageNames": ["com.openframe.oss:openframe-oss-lib"],
+      "enabled": true,
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "description": "Only enable regex manager for revision tracking",
+      "matchManagers": ["regex"],
       "enabled": true
     },
     {
-      "description": "Only enable Maven and GitHub Actions managers",
-      "matchManagers": ["maven", "github-actions", "regex"],
-      "enabled": true
-    },
-    {
-      "description": "Disable all other managers",
-      "excludeManagers": ["maven", "github-actions", "regex"],
+      "description": "Disable all other managers including Maven and GitHub Actions",
+      "excludeManagers": ["regex"],
       "enabled": false
     }
   ],
