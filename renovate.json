@@ -25,6 +25,11 @@
       "ignoreUnstable": true
     },
     {
+      "matchPackagePatterns": ["^com\\.openframe\\.oss:.*"],
+      "enabled": false,
+      "description": "Ignore internal monorepo packages"
+    },
+    {
       "matchManagers": ["maven"],
       "enabled": false
     },
