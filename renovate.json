@@ -3,6 +3,12 @@
   "extends": [
     "config:recommended"
   ],
+  "hostRules": [
+    {
+      "hostType": "maven",
+      "matchHost": "maven.pkg.github.com"
+    }
+  ],
   "packageRules": [
     {
       "description": "Ignore all internal com.openframe.oss packages except openframe-oss-lib (this repo publishes them)",
@@ -18,13 +24,24 @@
     },
     {
       "description": "Only enable Maven and GitHub Actions managers",
-      "matchManagers": ["maven", "github-actions"],
+      "matchManagers": ["maven", "github-actions", "regex"],
       "enabled": true
     },
     {
       "description": "Disable all other managers",
-      "excludeManagers": ["maven", "github-actions"],
+      "excludeManagers": ["maven", "github-actions", "regex"],
       "enabled": false
+    }
+  ],
+  "regexManagers": [
+    {
+      "fileMatch": ["^pom\\.xml$"],
+      "matchStrings": [
+        "<revision>(?<currentValue>.*?)</revision>"
+      ],
+      "depNameTemplate": "com.openframe.oss:openframe-oss-lib",
+      "datasourceTemplate": "maven",
+      "registryUrlsTemplate": "https://maven.pkg.github.com/flamingo-stack/openframe-oss-lib"
     }
   ]
 }
