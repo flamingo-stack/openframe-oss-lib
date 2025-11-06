@@ -7,6 +7,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Locale;
+
 import static org.springframework.http.HttpStatus.ACCEPTED;
 import static org.springframework.http.HttpStatus.NO_CONTENT;
 import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
@@ -21,7 +23,7 @@ public class PasswordResetController {
     @PostMapping(path = "/request", consumes = APPLICATION_JSON_VALUE)
     @ResponseStatus(ACCEPTED)
     public void requestReset(@Valid @RequestBody ResetRequest request) {
-        passwordResetService.createResetToken(request.getEmail());
+        passwordResetService.createResetToken(request.getEmail().toLowerCase(Locale.ROOT));
     }
 
     @PostMapping(path = "/confirm", consumes = APPLICATION_JSON_VALUE)

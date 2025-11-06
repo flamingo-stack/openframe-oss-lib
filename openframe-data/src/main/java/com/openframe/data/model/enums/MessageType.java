@@ -14,6 +14,8 @@ public enum MessageType {
     TACTICAL_RMM_AGENT_HISTORY_EVENT(IntegratedToolType.TACTICAL, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
             List.of(Destination.CASSANDRA, Destination.KAFKA), EventHandlerType.COMMON_TYPE),
     FLEET_MDM_EVENT(IntegratedToolType.FLEET, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
+            List.of(Destination.CASSANDRA, Destination.KAFKA), EventHandlerType.COMMON_TYPE),
+    FLEET_MDM_QUERY_RESULT_EVENT(IntegratedToolType.FLEET, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
             List.of(Destination.CASSANDRA, Destination.KAFKA), EventHandlerType.COMMON_TYPE);
 
     private final IntegratedToolType integratedToolType;

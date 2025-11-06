@@ -1,6 +1,7 @@
 package com.openframe.data.repository.pinot;
 
-import com.openframe.data.document.event.LogProjection;
+import com.openframe.data.model.pinot.LogProjection;
+import com.openframe.data.model.pinot.OrganizationOption;
 import com.openframe.data.repository.pinot.exception.PinotQueryException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pinot.client.Connection;
@@ -35,13 +36,15 @@ public class PinotClientLogRepository implements PinotLogRepository {
 
     @Override
     public List<LogProjection> findLogs(LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes,
-                                        List<String> severities, String cursor, int limit) {
+                                        List<String> severities, List<String> organizationIds, String deviceId, String cursor, int limit) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable)
-            .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "summary", "eventTimestamp")
+            .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "organizationId", "organizationName", "summary", "eventTimestamp")
             .whereDateRange("eventTimestamp", startDate, endDate)
             .whereIn("toolType", toolTypes)
             .whereIn("eventType", eventTypes)
             .whereIn("severity", severities)
+            .whereIn("organizationId", organizationIds)
+            .whereEquals("deviceId", deviceId)
             .whereCursor(cursor)
             .orderByTimestampDesc()
             .limit(limit);
@@ -51,13 +54,15 @@ public class PinotClientLogRepository implements PinotLogRepository {
 
     @Override
     public List<LogProjection> searchLogs(LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes, 
-                                    List<String> severities, String searchTerm, String cursor, int limit) {
+                                    List<String> severities, List<String> organizationIds, String deviceId, String searchTerm, String cursor, int limit) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable)
-            .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "summary", "eventTimestamp")
+            .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "organizationId", "organizationName", "summary", "eventTimestamp")
             .whereDateRange("eventTimestamp", startDate, endDate)
             .whereIn("toolType", toolTypes)
             .whereIn("eventType", eventTypes)
             .whereIn("severity", severities)
+            .whereIn("organizationId", organizationIds)
+            .whereEquals("deviceId", deviceId)
             .whereRelevanceLogSearch(searchTerm)
             .whereCursor(cursor)
             .orderByTimestampDesc()
@@ -67,55 +72,93 @@ public class PinotClientLogRepository implements PinotLogRepository {
     }
 
     @Override
-    public List<String> getEventTypeOptions(LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes, List<String> severities) {
+    public List<String> getEventTypeOptions(LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes, List<String> severities, List<String> organizationIds) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable)
             .select("eventType")
             .distinct()
             .whereDateRange("eventTimestamp", startDate, endDate)
             .whereIn("toolType", toolTypes)
             .whereIn("severity", severities)
+            .whereIn("organizationId", organizationIds)
             .orderBy("eventType");
 
         return queryPinotForFilterOptions(queryBuilder.build());
     }
 
     @Override
-    public List<String> getSeverityOptions(LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes, List<String> severities) {
+    public List<String> getSeverityOptions(LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes, List<String> severities, List<String> organizationIds) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable)
             .select("severity")
             .distinct()
             .whereDateRange("eventTimestamp", startDate, endDate)
             .whereIn("toolType", toolTypes)
             .whereIn("eventType", eventTypes)
+            .whereIn("organizationId", organizationIds)
             .orderBy("severity");
 
         return queryPinotForFilterOptions(queryBuilder.build());
     }
 
     @Override
-    public List<String> getToolTypeOptions(LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes, List<String> severities) {
+    public List<String> getToolTypeOptions(LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes, List<String> severities, List<String> organizationIds) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable)
             .select("toolType")
             .distinct()
             .whereDateRange("eventTimestamp", startDate, endDate)
             .whereIn("eventType", eventTypes)
             .whereIn("severity", severities)
+            .whereIn("organizationId", organizationIds)
             .orderBy("toolType");
 
         return queryPinotForFilterOptions(queryBuilder.build());
     }
 
     @Override
-    public List<String> getAvailableDateRanges(List<String> toolTypes, List<String> eventTypes, List<String> severities) {
+    public List<String> getAvailableDateRanges(List<String> toolTypes, List<String> eventTypes, List<String> severities, List<String> organizationIds) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable)
             .select("ingestDay")
             .distinct()
             .whereIn("toolType", toolTypes)
             .whereIn("eventType", eventTypes)
             .whereIn("severity", severities)
+            .whereIn("organizationId", organizationIds)
             .orderBy("ingestDay");
 
         return queryPinotForFilterOptions(queryBuilder.build());
+    }
+
+    @Override
+    public List<OrganizationOption> getOrganizationOptions(LocalDate startDate, LocalDate endDate, 
+                                                               List<String> toolTypes, List<String> eventTypes, List<String> severities) {
+        PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable)
+            .select("organizationId", "organizationName")
+            .distinct()
+            .whereDateRange("eventTimestamp", startDate, endDate)
+            .whereIn("toolType", toolTypes)
+            .whereIn("eventType", eventTypes)
+            .whereIn("severity", severities)
+            .orderBy("organizationName");
+
+        return queryPinotForOrganizationOptions(queryBuilder.build());
+    }
+
+    private List<OrganizationOption> queryPinotForOrganizationOptions(String query) {
+        return executeQuery(query, resultSet -> rowIndex -> {
+            String organizationId = resultSet.getString(rowIndex, 0); // organizationId
+            String organizationName = resultSet.getString(rowIndex, 1); // organizationName
+            
+            // Skip null or empty organizations
+            if (organizationId == null || organizationId.trim().isEmpty()) {
+                return null;
+            }
+            
+            return OrganizationOption.builder()
+                .id(organizationId)
+                .name(organizationName != null ? organizationName : organizationId)
+                .build();
+        }).stream()
+        .filter(Objects::nonNull)
+        .collect(Collectors.toList());
     }
 
     private List<LogProjection> executeLogQuery(String query) {
@@ -131,6 +174,9 @@ public class PinotClientLogRepository implements PinotLogRepository {
                 projection.severity = resultSet.getString(rowIndex, columnIndexMap.get("severity"));
                 projection.userId = resultSet.getString(rowIndex, columnIndexMap.get("userId"));
                 projection.deviceId = resultSet.getString(rowIndex, columnIndexMap.get("deviceId"));
+                projection.hostname = resultSet.getString(rowIndex, columnIndexMap.get("hostname"));
+                projection.organizationId = resultSet.getString(rowIndex, columnIndexMap.get("organizationId"));
+                projection.organizationName = resultSet.getString(rowIndex, columnIndexMap.get("organizationName"));
                 projection.summary = resultSet.getString(rowIndex, columnIndexMap.get("summary"));
                 projection.eventTimestamp = Instant.ofEpochMilli(resultSet.getLong(rowIndex, columnIndexMap.get("eventTimestamp")));
                 return projection;

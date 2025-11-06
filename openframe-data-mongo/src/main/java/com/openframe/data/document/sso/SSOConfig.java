@@ -13,4 +13,8 @@ public class SSOConfig {
     private String clientId;
     private String clientSecret;
     private boolean enabled;
+    /**
+     * Microsoft Entra tenant ID for Office 365 OIDC (optional for common endpoints).
+     */
+    private String msTenantId;
 }

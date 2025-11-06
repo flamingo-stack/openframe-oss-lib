@@ -22,6 +22,12 @@ type LogFilters {
     toolTypes: [String!]!
     eventTypes: [String!]!
     severities: [String!]!
+    organizations: [OrganizationFilterOption!]!
+}
+
+type OrganizationFilterOption {
+    id: String!    # organizationId (for filtering)
+    name: String!  # organizationName (for display)
 }
 
 input LogFilterInput {
@@ -30,6 +36,8 @@ input LogFilterInput {
     eventTypes: [String!]  # Multiselect (not array)
     toolTypes: [String!]   # Multiselect (not array)
     severities: [String!]  # Multiselect (not array)
+    organizationIds: [String!]  # Organization filter (multiselect)
+    deviceId: String       # Single device filter (exact matching)
 }
 
 type LogConnection {
@@ -50,6 +58,9 @@ type LogEvent {
     severity: String!
     userId: String
     deviceId: String
+    hostname: String
+    organizationId: String
+    organizationName: String
     summary: String
     timestamp: Instant!
 }
@@ -63,8 +74,11 @@ type LogDetails {
     severity: String!
     userId: String
     deviceId: String
+    hostname: String
+    organizationId: String
+    organizationName: String
     message: String
     timestamp: Instant!
-    # Details as JSON string (converted from Map<String, String>)
+    # Details as JSON string
     details: String
 } 

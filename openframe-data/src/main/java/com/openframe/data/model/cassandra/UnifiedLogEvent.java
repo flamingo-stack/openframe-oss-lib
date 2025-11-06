@@ -26,6 +26,18 @@ public class UnifiedLogEvent {
     @Column("device_id")
     private String deviceId;
 
+    /** Hostname of the device/machine. */
+    @Column("hostname")
+    private String hostname;
+
+    /** Organization ID associated with the event. */
+    @Column("organization_id")
+    private String organizationId;
+
+    /** Organization name associated with the event. */
+    @Column("organization_name")
+    private String organizationName;
+
     /** Severity level (info, warning, error, etc.). */
     @Column("severity")
     private String severity;

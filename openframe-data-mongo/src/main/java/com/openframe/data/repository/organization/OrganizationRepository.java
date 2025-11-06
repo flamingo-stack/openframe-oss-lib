@@ -32,6 +32,12 @@ public interface OrganizationRepository extends MongoRepository<Organization, St
     Optional<Organization> findByName(String name);
 
     /**
+     * Find the default organization (where isDefault = true)
+     * @return Optional containing the default organization if found
+     */
+    Optional<Organization> findByIsDefaultTrue();
+
+    /**
      * Find organizations by organizationIds (for batch loading)
      * @param organizationIds collection of organization identifiers (can be Set or List)
      * @return list of organizations

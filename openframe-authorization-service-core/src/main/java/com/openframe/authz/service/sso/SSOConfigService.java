@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Optional;
 
-import static com.openframe.authz.config.GoogleSSOProperties.GOOGLE;
+import static com.openframe.authz.config.oidc.GoogleSSOProperties.GOOGLE;
 
 @Slf4j
 @Service
@@ -29,7 +29,7 @@ public class SSOConfigService {
      * Get ACTIVE SSO configuration by tenant and provider.
      */
     public Optional<SSOPerTenantConfig> getSSOConfig(String tenantId, String provider) {
-        return ssoPerTenantConfigRepository.findFirstByTenantIdAndProviderAndEnabledTrue(tenantId, provider);
+        return ssoPerTenantConfigRepository.findFirstByTenantIdAndProviderAndEnabledTrue(localTenant? null : tenantId, provider);
     }
 
     /**
@@ -38,10 +38,6 @@ public class SSOConfigService {
      */
     public List<SSOPerTenantConfig> getActiveForTenant(String tenantId) {
         return ssoPerTenantConfigRepository.findByTenantIdAndEnabledTrue(tenantId);
-    }
-
-    public Optional<SSOPerTenantConfig> getGoogleConfig(String tenantId) {
-        return getSSOConfig(localTenant ? null : tenantId, GOOGLE);
     }
 
     /**

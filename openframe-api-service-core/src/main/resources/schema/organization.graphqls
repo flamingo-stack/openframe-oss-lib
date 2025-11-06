@@ -23,8 +23,17 @@ type Organization {
     contractEndDate: Date
     createdAt: Instant
     updatedAt: Instant
+    isDefault: Boolean!
     deleted: Boolean
     deletedAt: Instant
+    
+    # Logo for the organization
+    image: OrganizationImage
+}
+
+type OrganizationImage {
+    # URL to access the logo image
+    imageUrl: String!
 }
 
 type ContactInformation {

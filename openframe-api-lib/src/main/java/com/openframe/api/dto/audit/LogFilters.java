@@ -15,4 +15,5 @@ public class LogFilters {
     private List<String> toolTypes;
     private List<String> eventTypes;
     private List<String> severities;
+    private List<OrganizationFilterOption> organizations;
 } 

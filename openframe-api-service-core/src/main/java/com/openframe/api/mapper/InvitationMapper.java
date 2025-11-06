@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 
 import static com.openframe.data.document.user.InvitationStatus.PENDING;
 import static com.openframe.data.document.user.UserRole.ADMIN;
@@ -28,7 +29,7 @@ public class InvitationMapper {
 
         return Invitation.builder()
                 .id(randomUUID().toString())
-                .email(request.getEmail())
+                .email(request.getEmail().toLowerCase(Locale.ROOT))
                 .roles(request.getRoles() != null ? request.getRoles().stream().map(r -> UserRole.valueOf(r.name())).toList() : List.of(ADMIN))
                 .createdAt(createdAt)
                 .expiresAt(createdAt.plus(ttl))

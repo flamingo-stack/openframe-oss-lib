@@ -3,6 +3,7 @@ package com.openframe.authz.service.user;
 import com.openframe.authz.dto.InvitationRegistrationRequest;
 import com.openframe.authz.exception.UserActiveInAnotherTenantException;
 import com.openframe.authz.service.processor.RegistrationProcessor;
+import com.openframe.authz.service.processor.UserDeactivationProcessor;
 import com.openframe.data.document.auth.AuthInvitation;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.repository.auth.AuthInvitationRepository;
@@ -27,6 +28,7 @@ public class InvitationRegistrationService {
     private final AuthInvitationRepository invitationRepository;
     private final TenantRepository tenantRepository;
     private final RegistrationProcessor registrationProcessor;
+    private final UserDeactivationProcessor userDeactivationProcessor;
 
     @Value("${openframe.tenancy.local-tenant:false}")
     private boolean localTenant;
@@ -46,6 +48,7 @@ public class InvitationRegistrationService {
         if (existing.isPresent()) {
             if (TRUE.equals(request.getSwitchTenant())) {
                 userService.deactivateUser(existing.get());
+                userDeactivationProcessor.postProcessDeactivation(existing.get());
             } else {
                 throw new UserActiveInAnotherTenantException(invitation.getEmail());
             }
@@ -68,7 +71,7 @@ public class InvitationRegistrationService {
         invitation.setStatus(ACCEPTED);
         invitationRepository.save(invitation);
 
-        registrationProcessor.postProcessInvitationRegistration(user, invitation.getId());
+        registrationProcessor.postProcessInvitationRegistration(user, invitation.getId(), request);
 
         return user;
     }
