@@ -10,17 +10,19 @@
       "matchStrings": [
         "<properties>\\s*<revision>(?<currentValue>.*?)<\\/revision>"
       ],
-      "depNameTemplate": "flamingo-stack/openframe-oss-lib",
-      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "com.openframe.oss:openframe-oss-lib",
+      "datasourceTemplate": "maven",
+      "registryUrlsTemplate": "https://maven.pkg.github.com/flamingo-stack/openframe-oss-lib",
       "versioningTemplate": "semver"
     }
   ],
   "packageRules": [
     {
       "matchManagers": ["custom.regex"],
-      "matchDepNames": ["flamingo-stack/openframe-oss-lib"],
+      "matchDepNames": ["com.openframe.oss:openframe-oss-lib"],
       "groupName": "Project version",
-      "commitMessagePrefix": "chore: "
+      "commitMessagePrefix": "chore: ",
+      "ignoreUnstable": true
     },
     {
       "matchManagers": ["maven"],
