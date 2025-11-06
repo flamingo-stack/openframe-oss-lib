@@ -1,14 +1,23 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", ":automergeAll"],
-  
-  "enabledManagers": ["regex"],
 
-  "maven": { "enabled": false },
-  "gradle": { "enabled": false },
-  "github-actions": { "enabled": false },
-  "dockerfile": { "enabled": false },
-  "npm": { "enabled": false },
+  "extends": [
+    "config:recommended",
+    ":automergeAll",
+    "local:disableAllManagersExceptRegex"
+  ],
+
+  "customPresets": {
+    "disableAllManagersExceptRegex": {
+      "description": "Disables all managers except regex",
+      "enabledManagers": ["regex"],
+      "maven": { "enabled": false },
+      "gradle": { "enabled": false },
+      "github-actions": { "enabled": false },
+      "dockerfile": { "enabled": false },
+      "npm": { "enabled": false }
+    }
+  },
 
   "regexManagers": [
     {
@@ -27,13 +36,6 @@
       "matchPackageNames": ["com.openframe.oss:openframe-oss-lib"],
       "automerge": true,
       "automergeType": "pr"
-    }
-  ],
-
-  "hostRules": [
-    {
-      "hostType": "maven",
-      "matchHost": "maven.pkg.github.com"
     }
   ]
 }
