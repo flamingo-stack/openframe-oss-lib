@@ -4,6 +4,9 @@
 
   "enabledManagers": ["regex"],
 
+  "automerge": true,
+  "automergeType": "pr",
+
   "regexManagers": [
     {
       "fileMatch": ["^pom\\.xml$"],
