@@ -22,7 +22,7 @@ openframe-client (service) → openframe-client-core (lib) → openframe-core, o
 ### Controllers
 - **AgentAuthController**: Handles agent authentication
 - **AgentController**: Manages agent operations
-- **ToolAgentFileController**: Handles file operations for tool agents
+- **ToolAgentFileController**: Serves agent installer files from resources
 
 ### Services
 - **AgentAuthService**: Authentication logic for agents
@@ -100,6 +100,16 @@ mvn clean install
 mvn test
 ```
 
+## Agent Installer Files
+
+The library includes pre-built agent installers in `src/main/resources/`:
+- **Tactical RMM**: `tacticalrmm-agent`, `tacticalrmm-agent.exe`
+- **Fleet MDM**: `fleetmdm-agent`, `fleetmdm-agent.exe`, `osqueryd`, `osqueryd.exe`
+- **MeshCentral**: `meshcentral-agent`, `meshcentral-agent.exe`, `meshcentral-core-module`
+- **OpenFrame Chat**: `openframe-chat.exe`
+
+These files are served by `ToolAgentFileController` via `/tool-agent/{assetId}?os={platform}` endpoint.
+
 ## Design Patterns
 
 This module follows OpenFrame architectural patterns:
@@ -108,6 +118,7 @@ This module follows OpenFrame architectural patterns:
 - **DTO Pattern**: Data transfer between layers
 - **Event-Driven Architecture**: Kafka-based messaging
 - **AOP Pattern**: Cross-cutting concerns with aspects
+- **Processor Pattern**: Extensibility hooks for customization
 
 ## References
 

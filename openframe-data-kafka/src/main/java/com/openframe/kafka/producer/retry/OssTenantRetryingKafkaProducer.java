@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 @ConditionalOnProperty(prefix = "spring.oss-tenant.kafka", name = "enabled", havingValue = "true")
 public class OssTenantRetryingKafkaProducer extends BaseRetryingKafkaProducer {
 
-    public OssTenantRetryingKafkaProducer(MessageProducer producer, KafkaRecoveryHandler recoveryHandler) {
-        super(producer, recoveryHandler);
+    public OssTenantRetryingKafkaProducer(MessageProducer ossTenantKafkaProducer, KafkaRecoveryHandler recoveryHandler) {
+        super(ossTenantKafkaProducer, recoveryHandler);
     }
 }
