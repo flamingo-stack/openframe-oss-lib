@@ -98,10 +98,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          (echo "${{ env.REPOSITORY }}"; grep -oP '(?<=<module>)[^<]+' pom.xml) | while read MODULE; do
-            PKG="${{ env.REGISTRY }}.${MODULE//\./%2E}"
+          # Get artifactId for main project
+          MAIN_ARTIFACT=$(grep -oP '(?<=<artifactId>)[^<]+' pom.xml | head -1)
+          echo "$MAIN_ARTIFACT"
+
+          # Get artifactId from each module's pom.xml
+          grep -oP '(?<=<module>)[^<]+' pom.xml | while read MODULE_PATH; do
+            grep -oP '(?<=<artifactId>)[^<]+' "$MODULE_PATH/pom.xml" | head -1
+          done | while read ARTIFACT; do
+            PKG="${{ env.REGISTRY }}.${ARTIFACT//\./%2E}"
             echo "Cleaning $PKG..."
             gh api "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions" --paginate \
               --jq '[.[] | select(.name | test("SNAPSHOT"))] | sort_by(.created_at) | reverse | .[3:] | .[].id' |
-              xargs -r -n1 -I{} gh api -X DELETE "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions/{}"
+              xargs -r -I{} gh api -X DELETE "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions/{}"
           done
