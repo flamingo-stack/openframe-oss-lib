@@ -5,9 +5,16 @@
   ],
   "packageRules": [
     {
-      "description": "Ignore all internal com.openframe.oss packages (this repo publishes them)",
-      "matchPackagePatterns": ["^com\\.openframe\\.oss:"],
+      "description": "Ignore all internal com.openframe.oss packages except openframe-oss-lib (this repo publishes them)",
+      "matchPackagePatterns": [
+        "^com\\.openframe\\.oss:(?!openframe-oss-lib$)"
+      ],
       "enabled": false
+    },
+    {
+      "description": "Enable updates for openframe-oss-lib parent version",
+      "matchPackageNames": ["com.openframe.oss:openframe-oss-lib"],
+      "enabled": true
     },
     {
       "description": "Only enable Maven and GitHub Actions managers",
