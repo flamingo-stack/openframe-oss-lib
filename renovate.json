@@ -2,48 +2,21 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
-  ], 
-  "customManagers": [
-    {
-      "customType": "regex",
-      "fileMatch": ["(^|/)pom\\.xml$"],
-      "matchStrings": [
-        "<properties>\\s*<revision>(?<currentValue>.*?)<\\/revision>"
-      ],
-      "depNameTemplate": "com.openframe.oss:openframe-oss-lib",
-      "datasourceTemplate": "maven",
-      "registryUrlsTemplate": "https://maven.pkg.github.com/flamingo-stack/openframe-oss-lib",
-      "versioningTemplate": "semver"
-    }
   ],
   "packageRules": [
     {
-      "matchManagers": ["custom.regex"],
-      "matchDepNames": ["com.openframe.oss:openframe-oss-lib"],
-      "groupName": "Project version",
-      "commitMessagePrefix": "chore: ",
-      "ignoreUnstable": true
-    },
-    {
-      "matchPackagePatterns": ["^com\\.openframe\\.oss:.*"],
-      "enabled": false,
-      "description": "Ignore internal monorepo packages"
-    },
-    {
-      "matchManagers": ["maven"],
+      "description": "Ignore all internal com.openframe.oss packages (this repo publishes them)",
+      "matchPackagePatterns": ["^com\\.openframe\\.oss:"],
       "enabled": false
     },
     {
-      "matchManagers": ["npm"],
-      "enabled": false
+      "description": "Only enable Maven and GitHub Actions managers",
+      "matchManagers": ["maven", "github-actions"],
+      "enabled": true
     },
     {
-      "matchManagers": ["docker"],
-      "enabled": false
-    },
-    {
-      "matchPackagePrefixes": ["*"],
-      "excludeDepNames": ["flamingo-stack/openframe-oss-lib"],
+      "description": "Disable all other managers",
+      "excludeManagers": ["maven", "github-actions"],
       "enabled": false
     }
   ]
