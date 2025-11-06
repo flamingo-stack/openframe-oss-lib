@@ -23,7 +23,20 @@
       "commitMessagePrefix": "chore: "
     },
     {
-      "matchPackagePrefixes": ["com.openframe.oss:"],
+      "matchManagers": ["maven"],
+      "enabled": false
+    },
+    {
+      "matchManagers": ["npm"],
+      "enabled": false
+    },
+    {
+      "matchManagers": ["docker"],
+      "enabled": false
+    },
+    {
+      "matchPackagePrefixes": ["*"],
+      "excludeDepNames": ["flamingo-stack/openframe-oss-lib"],
       "enabled": false
     }
   ]
