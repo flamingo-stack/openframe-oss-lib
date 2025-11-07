@@ -9,6 +9,10 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 
 import java.io.IOException;
 
+import static com.openframe.authz.config.oidc.GoogleSSOProperties.GOOGLE;
+import static com.openframe.authz.config.oidc.MicrosoftSSOProperties.MICROSOFT;
+import static java.util.Locale.ROOT;
+
 public class ProviderAwareAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
     @Override
@@ -23,8 +27,13 @@ public class ProviderAwareAuthenticationEntryPoint implements AuthenticationEntr
         }
 
         String target = "/login";
-        if (provider != null && provider.equalsIgnoreCase("google")) {
-            target = "/oauth2/authorization/google";
+        if (provider != null) {
+            String p = provider.toLowerCase(ROOT);
+            switch (p) {
+                case GOOGLE, MICROSOFT ->
+                        target = "/oauth2/authorization/" + p;
+                default -> target = "/login";
+            }
         }
 
         response.sendRedirect(request.getContextPath() + target);

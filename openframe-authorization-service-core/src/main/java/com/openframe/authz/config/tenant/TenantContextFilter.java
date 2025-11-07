@@ -7,9 +7,11 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Set;
 
 import static org.springframework.core.Ordered.HIGHEST_PRECEDENCE;
 
@@ -19,6 +21,10 @@ import static org.springframework.core.Ordered.HIGHEST_PRECEDENCE;
 public class TenantContextFilter extends OncePerRequestFilter {
 
     public static final String TENANT_ID = "TENANT_ID";
+
+    private static final Set<String> EXCLUDED_CONTEXTS = Set.of("login", "sso", "sas", "public", ".well-known");
+
+    private final AntPathMatcher antMatcher = new AntPathMatcher();
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -32,7 +38,8 @@ public class TenantContextFilter extends OncePerRequestFilter {
                 if (parts.length >= 3) {
                     String maybeTenant = parts[1];
                     String rest = "/" + parts[2];
-                    if (!maybeTenant.isBlank() && (rest.startsWith("/oauth2/")
+                    if (!maybeTenant.isBlank() && !EXCLUDED_CONTEXTS.contains(maybeTenant)
+                            && (rest.startsWith("/oauth2/")
                             || rest.startsWith("/.well-known/")
                             || rest.startsWith("/connect/")
                             || rest.equals("/login")
