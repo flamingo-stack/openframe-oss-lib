@@ -11,7 +11,7 @@
       "matchStrings": ["<revision>(?<currentValue>.*?)</revision>"],
       "depNameTemplate": "com.openframe.oss:openframe-oss-lib",
       "datasourceTemplate": "maven",
-      "lookupNameTemplate": "maven.pkg.github.com/flamingo-stack/openframe-oss-lib"
+      "registryUrls": ["https://maven.pkg.github.com/flamingo-stack/openframe-oss-lib"]
     }
   ],
 
@@ -25,7 +25,7 @@
       "automergeType": "pr"
     },
     {
-      "description": "Disable all other packages",
+      "description": "Disable all other dependencies",
       "packagePatterns": ["*"],
       "enabled": false
     }
