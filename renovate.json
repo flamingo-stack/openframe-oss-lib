@@ -17,16 +17,17 @@
 
   "packageRules": [
     {
-      "packagePatterns": ["*"],
-      "enabled": false
-    },
-    {
       "description": "Enable automerge for openframe-oss-lib revision updates",
       "matchManagers": ["regex"],
       "matchPackageNames": ["com.openframe.oss:openframe-oss-lib"],
       "enabled": true,
       "automerge": true,
       "automergeType": "pr"
+    },
+    {
+      "description": "Disable all other packages",
+      "packagePatterns": ["*"],
+      "enabled": false
     }
   ],
 
