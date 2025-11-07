@@ -1,10 +1,9 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:base"],
   "automerge": true,
   "automergeType": "pr",
-
-  "enabledManagers": ["regex"],
-
+  "github-actions": { "enabled": false },
   "regexManagers": [
     {
       "fileMatch": ["^pom\\.xml$"],
@@ -14,17 +13,18 @@
       "registryUrls": ["https://maven.pkg.github.com/flamingo-stack/openframe-oss-lib"]
     }
   ],
-
   "packageRules": [
     {
       "packagePatterns": ["*"],
       "enabled": false
     },
     {
-      "description": "automerge only the revision update",
+      "description": "Enable automerge for openframe-oss-lib revision updates",
       "matchManagers": ["regex"],
       "matchPackageNames": ["com.openframe.oss:openframe-oss-lib"],
       "enabled": true,
+      "automerge": true,
+      "automergeType": "pr"
     }
   ]
 }
