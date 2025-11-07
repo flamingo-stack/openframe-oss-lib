@@ -2,6 +2,8 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:base"],
 
+  "github-actions": { "enabled": false },
+
   "regexManagers": [
     {
       "fileMatch": ["^pom\\.xml$"],
@@ -18,7 +20,7 @@
       "enabled": false
     },
     {
-      "description": "Only enable openframe-oss-lib regex manager",
+      "description": "Enable revision updates for openframe-oss-lib only",
       "matchManagers": ["regex"],
       "matchPackageNames": ["com.openframe.oss:openframe-oss-lib"],
       "enabled": true,
