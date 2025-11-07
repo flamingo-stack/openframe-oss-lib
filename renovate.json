@@ -3,6 +3,9 @@
 
   "extends": [],
 
+  "automerge": true,
+  "automergeType": "pr",
+  
   "enabledManagers": ["regex"],
 
   "regexManagers": [
