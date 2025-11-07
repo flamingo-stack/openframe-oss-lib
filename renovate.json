@@ -4,15 +4,17 @@
   "automerge": true,
   "automergeType": "pr",
   "github-actions": { "enabled": false },
+
   "regexManagers": [
     {
       "fileMatch": ["^pom\\.xml$"],
       "matchStrings": ["<revision>(?<currentValue>.*?)</revision>"],
       "depNameTemplate": "com.openframe.oss:openframe-oss-lib",
       "datasourceTemplate": "maven",
-      "registryUrls": ["https://maven.pkg.github.com/flamingo-stack/openframe-oss-lib"]
+      "registryUrlsTemplate": "https://maven.pkg.github.com/flamingo-stack/openframe-oss-lib"
     }
   ],
+
   "packageRules": [
     {
       "packagePatterns": ["*"],
