@@ -1,23 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-
-  "extends": [
-    "config:recommended",
-    ":automergeAll",
-    "local:disableAllManagersExceptRegex"
-  ],
-
-  "customPresets": {
-    "disableAllManagersExceptRegex": {
-      "description": "Disables all managers except regex",
-      "enabledManagers": ["regex"],
-      "maven": { "enabled": false },
-      "gradle": { "enabled": false },
-      "github-actions": { "enabled": false },
-      "dockerfile": { "enabled": false },
-      "npm": { "enabled": false }
-    }
-  },
+  "extends": ["config:base"],
 
   "regexManagers": [
     {
@@ -25,15 +8,20 @@
       "matchStrings": ["<revision>(?<currentValue>.*?)</revision>"],
       "depNameTemplate": "com.openframe.oss:openframe-oss-lib",
       "datasourceTemplate": "maven",
-      "registryUrls": ["https://maven.pkg.github.com/flamingo-stack/openframe-oss-lib"],
-      "prCreation": "immediate"
+      "registryUrls": ["https://maven.pkg.github.com/flamingo-stack/openframe-oss-lib"]
     }
   ],
 
   "packageRules": [
     {
+      "packagePatterns": ["*"],
+      "enabled": false
+    },
+    {
+      "description": "Only enable openframe-oss-lib regex manager",
       "matchManagers": ["regex"],
       "matchPackageNames": ["com.openframe.oss:openframe-oss-lib"],
+      "enabled": true,
       "automerge": true,
       "automergeType": "pr"
     }
