@@ -1,9 +1,9 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:base"],
   "automerge": true,
   "automergeType": "pr",
-  "github-actions": { "enabled": false },
+  "enabledManagers": ["regex"],
+  "baseBranches": ["main"],
 
   "regexManagers": [
     {
@@ -26,6 +26,13 @@
       "enabled": true,
       "automerge": true,
       "automergeType": "pr"
+    }
+  ],
+
+  "hostRules": [
+    {
+      "hostType": "maven",
+      "matchHost": "maven.pkg.github.com"
     }
   ]
 }
