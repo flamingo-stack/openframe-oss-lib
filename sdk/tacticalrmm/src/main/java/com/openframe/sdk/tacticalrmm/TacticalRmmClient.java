@@ -350,9 +350,8 @@ public class TacticalRmmClient {
      * @param tacticalServerUrl The Tactical RMM server URL
      * @param apiKey The API key for authentication
      * @param request The script creation request containing all script details
-     * @return ScriptListItem containing the created script information
      */
-    public ScriptListItem addScript(String tacticalServerUrl, String apiKey, CreateScriptRequest request) {
+    public void addScript(String tacticalServerUrl, String apiKey, CreateScriptRequest request) {
         // Validate parameters
         if (tacticalServerUrl == null || tacticalServerUrl.trim().isEmpty()) {
             throw new IllegalArgumentException("Tactical server URL cannot be null or empty");
@@ -391,8 +390,6 @@ public class TacticalRmmClient {
             } else if (response.statusCode() != 200 && response.statusCode() != 201) {
                 throw new TacticalRmmApiException("Failed to create script", response.statusCode(), response.body());
             }
-
-            return objectMapper.readValue(response.body(), ScriptListItem.class);
         } catch (TacticalRmmApiException e) {
             throw e;
         } catch (Exception e) {
@@ -406,9 +403,8 @@ public class TacticalRmmClient {
      * @param apiKey The API key for authentication
      * @param scriptId The ID of the script to update
      * @param request The script update request containing all script details
-     * @return ScriptListItem containing the updated script information
      */
-    public ScriptListItem updateScript(String tacticalServerUrl, String apiKey, String scriptId, CreateScriptRequest request) {
+    public void updateScript(String tacticalServerUrl, String apiKey, String scriptId, CreateScriptRequest request) {
         // Validate parameters
         if (tacticalServerUrl == null || tacticalServerUrl.trim().isEmpty()) {
             throw new IllegalArgumentException("Tactical server URL cannot be null or empty");
@@ -452,8 +448,6 @@ public class TacticalRmmClient {
             } else if (response.statusCode() != 200 && response.statusCode() != 201) {
                 throw new TacticalRmmApiException("Failed to update script", response.statusCode(), response.body());
             }
-
-            return objectMapper.readValue(response.body(), ScriptListItem.class);
         } catch (TacticalRmmApiException e) {
             throw e;
         } catch (Exception e) {
