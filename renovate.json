@@ -11,7 +11,7 @@
       "matchStrings": ["<revision>(?<currentValue>.*?)</revision>"],
       "depNameTemplate": "com.openframe.oss:openframe-oss-lib",
       "datasourceTemplate": "maven",
-      "lookupNameTemplate": "https://maven.pkg.github.com/flamingo-stack/openframe-oss-lib"
+      "lookupNameTemplate": "maven.pkg.github.com/flamingo-stack/openframe-oss-lib"
     }
   ],
 
