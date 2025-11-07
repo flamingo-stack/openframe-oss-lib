@@ -13,6 +13,7 @@ public class IntegratedToolAgent {
     @Id
     private String id;
     private String toolId;
+    private List<String> downloadLinks;
     private String version;
     private SessionType sessionType;
 
