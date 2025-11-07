@@ -255,6 +255,50 @@ public class TacticalRmmClient {
     }
 
     /**
+     * Get all scripts
+     * @param tacticalServerUrl The Tactical RMM server URL
+     * @param apiKey The API key for authentication
+     * @return List of ScriptListItem containing script information
+     */
+    public List<ScriptListItem> getAllScripts(String tacticalServerUrl, String apiKey) {
+        // Validate parameters
+        if (tacticalServerUrl == null || tacticalServerUrl.trim().isEmpty()) {
+            throw new IllegalArgumentException("Tactical server URL cannot be null or empty");
+        }
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            throw new IllegalArgumentException("API key cannot be null or empty");
+        }
+
+        try {
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(tacticalServerUrl + "/scripts/"))
+                    .GET()
+                    .header("Content-Type", "application/json")
+                    .header("Accept", "application/json")
+                    .header("X-API-KEY", apiKey)
+                    .timeout(Duration.ofSeconds(30))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 401) {
+                throw new TacticalRmmApiException("Authentication failed. Please check your API key.", response.statusCode(), response.body());
+            } else if (response.statusCode() != 200) {
+                throw new TacticalRmmApiException("Failed to get scripts list", response.statusCode(), response.body());
+            }
+
+            TypeReference<List<ScriptListItem>> typeRef =
+                    new TypeReference<>() {
+                    };
+            return objectMapper.readValue(response.body(), typeRef);
+        } catch (TacticalRmmApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new TacticalRmmException("Failed to get scripts list", e);
+        }
+    }
+
+    /**
      * Get script information by script ID
      * @param tacticalServerUrl The Tactical RMM server URL
      * @param apiKey The API key for authentication
