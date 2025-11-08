@@ -1,5 +1,6 @@
 package com.openframe.data.service;
 
+import com.openframe.data.document.clientconfiguration.DownloadConfiguration;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
 import com.openframe.data.document.toolagent.ToolAgentAsset;
@@ -47,7 +48,11 @@ public class ToolInstallationNatsPublisher {
 
         message.setVersion(toolAgent.getVersion());
         message.setSessionType(toolAgent.getSessionType());
-        message.setDownloadConfigurations(downloadConfigurationMapper.map(toolAgent.getDownloadConfigurations()));
+
+        List<DownloadConfiguration> downloadConfigurations = toolAgent.getDownloadConfigurations();
+        String version = toolAgent.getVersion();
+        message.setDownloadConfigurations(downloadConfigurationMapper.map(downloadConfigurations, version));
+
         message.setAssets(mapAssets(toolAgent.getAssets()));
         message.setInstallationCommandArgs(toolAgent.getInstallationCommandArgs());
         message.setUninstallationCommandArgs(toolAgent.getUninstallationCommandArgs());
@@ -55,7 +60,7 @@ public class ToolInstallationNatsPublisher {
         message.setToolAgentIdCommandArgs(toolAgent.getAgentToolIdCommandArgs());
         return message;
     }
-
+    
     private List<ToolInstallationMessage.Asset> mapAssets(List<ToolAgentAsset> assets) {
         if (assets == null) {
             return null;
