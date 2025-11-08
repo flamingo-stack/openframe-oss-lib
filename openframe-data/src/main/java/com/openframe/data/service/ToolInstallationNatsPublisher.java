@@ -60,7 +60,7 @@ public class ToolInstallationNatsPublisher {
         message.setToolAgentIdCommandArgs(toolAgent.getAgentToolIdCommandArgs());
         return message;
     }
-    
+
     private List<ToolInstallationMessage.Asset> mapAssets(List<ToolAgentAsset> assets) {
         if (assets == null) {
             return null;
