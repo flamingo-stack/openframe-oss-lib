@@ -48,11 +48,7 @@ public class ToolInstallationNatsPublisher {
 
         message.setVersion(toolAgent.getVersion());
         message.setSessionType(toolAgent.getSessionType());
-
-        List<DownloadConfiguration> downloadConfigurations = toolAgent.getDownloadConfigurations();
-        String version = toolAgent.getVersion();
-        message.setDownloadConfigurations(downloadConfigurationMapper.map(downloadConfigurations, version));
-
+        message.setDownloadConfigurations(downloadConfigurationMapper.map(toolAgent.getDownloadConfigurations(), toolAgent.getVersion()));
         message.setAssets(mapAssets(toolAgent.getAssets()));
         message.setInstallationCommandArgs(toolAgent.getInstallationCommandArgs());
         message.setUninstallationCommandArgs(toolAgent.getUninstallationCommandArgs());
