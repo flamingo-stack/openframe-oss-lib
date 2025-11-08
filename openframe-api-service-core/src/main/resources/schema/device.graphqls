@@ -127,3 +127,12 @@ enum ConnectionStatus {
     DISCONNECTED
     ERROR
 }
+
+type InstalledAgent {
+    id: ID!
+    machineId: String!
+    agentType: String!
+    version: String!
+    createdAt: String
+    updatedAt: String
+}
