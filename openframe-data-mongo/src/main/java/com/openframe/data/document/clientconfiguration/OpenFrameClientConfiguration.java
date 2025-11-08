@@ -15,6 +15,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class OpenFrameClientConfiguration {
+
     @Id
     private String id;
     private String version;
