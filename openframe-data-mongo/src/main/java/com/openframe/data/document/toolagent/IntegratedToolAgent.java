@@ -1,6 +1,6 @@
 package com.openframe.data.document.toolagent;
 
-import com.openframe.data.document.clientconfiguration.DownloadLinkData;
+import com.openframe.data.document.clientconfiguration.DownloadConfiguration;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -17,8 +17,7 @@ public class IntegratedToolAgent {
     private String version;
     private SessionType sessionType;
 
-    private DownloadLinkData downloadLinkData;
-
+    private DownloadConfiguration downloadConfiguration;
     private List<ToolAgentAsset> assets;
 
     private List<String> installationCommandArgs;

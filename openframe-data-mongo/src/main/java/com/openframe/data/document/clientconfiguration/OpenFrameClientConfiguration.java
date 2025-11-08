@@ -16,6 +16,6 @@ public class OpenFrameClientConfiguration {
     @Id
     private String id;
     private String version;
-    private DownloadLinkData downloadLinkData;
+    private DownloadConfiguration downloadConfiguration;
 
 }
