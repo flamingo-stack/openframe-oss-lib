@@ -11,4 +11,6 @@ public interface InstalledAgentRepository extends MongoRepository<InstalledAgent
 
     Optional<InstalledAgent> findByMachineId(String machineId);
 
+    Optional<InstalledAgent> findByMachineIdAndAgentType(String machineId, String agentType);
+
 }
