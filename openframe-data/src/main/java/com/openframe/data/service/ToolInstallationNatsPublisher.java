@@ -45,6 +45,7 @@ public class ToolInstallationNatsPublisher {
 
         message.setVersion(toolAgent.getVersion());
         message.setSessionType(toolAgent.getSessionType());
+        message.setDownloadConfigurations(mapDownloadConfigurations(toolAgent.getDownloadConfigurations()));
         message.setAssets(mapAssets(toolAgent.getAssets()));
         message.setInstallationCommandArgs(toolAgent.getInstallationCommandArgs());
         message.setUninstallationCommandArgs(toolAgent.getUninstallationCommandArgs());
@@ -80,6 +81,27 @@ public class ToolInstallationNatsPublisher {
             case ARTIFACTORY -> ToolInstallationMessage.AssetSource.ARTIFACTORY;
             case TOOL_API -> ToolInstallationMessage.AssetSource.TOOL_API;
         };
+    }
+
+    private List<com.openframe.data.model.nats.DownloadConfiguration> mapDownloadConfigurations(
+            List<com.openframe.data.document.clientconfiguration.DownloadConfiguration> downloadConfigurations) {
+        if (downloadConfigurations == null) {
+            return null;
+        }
+        return downloadConfigurations.stream()
+                .map(this::mapDownloadConfiguration)
+                .collect(Collectors.toList());
+    }
+
+    private com.openframe.data.model.nats.DownloadConfiguration mapDownloadConfiguration(
+            com.openframe.data.document.clientconfiguration.DownloadConfiguration downloadConfiguration) {
+        com.openframe.data.model.nats.DownloadConfiguration messageDownloadConfig = 
+                new com.openframe.data.model.nats.DownloadConfiguration();
+        messageDownloadConfig.setOs(downloadConfiguration.getOs());
+        messageDownloadConfig.setLinkTemplate(downloadConfiguration.getLinkTemplate());
+        messageDownloadConfig.setFileName(downloadConfiguration.getFileName());
+        messageDownloadConfig.setAgentFileName(downloadConfiguration.getAgentFileName());
+        return messageDownloadConfig;
     }
 
 }
