@@ -1,9 +1,9 @@
-package com.openframe.api.dto.toolinstallation;
+package com.openframe.api.dto.force.response;
 
 import lombok.Data;
 
 @Data
-public class ForceToolAgentResponseItem {
+public class ForceToolAgentInstallationResponseItem {
 
     private String machineId;
     private String toolAgentId;
