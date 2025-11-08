@@ -4,7 +4,9 @@ import com.openframe.api.dto.force.response.ForceAgentStatus;
 import com.openframe.api.dto.force.response.ForceToolAgentUpdateResponseItem;
 import com.openframe.api.dto.update.ForceToolAgentUpdateRequest;
 import com.openframe.api.dto.update.ForceToolAgentUpdateResponse;
+import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
+import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.toolagent.IntegratedToolAgentRepository;
 import com.openframe.data.service.ToolAgentUpdateUpdatePublisher;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +25,7 @@ public class ForceToolAgentUpdateService {
 
     private final IntegratedToolAgentRepository toolAgentRepository;
     private final ToolAgentUpdateUpdatePublisher toolAgentUpdateUpdatePublisher;
+    private final MachineRepository machineRepository;
 
     public ForceToolAgentUpdateResponse process(ForceToolAgentUpdateRequest request) {
         String toolAgentId = request.getToolAgentId();
@@ -32,6 +35,26 @@ public class ForceToolAgentUpdateService {
         validateMachineIds(machineIds);
 
         log.info("Process force tool agent {} update request for machines {}", toolAgentId, machineIds);
+
+        List<ForceToolAgentUpdateResponseItem> responseItems = processMachines(machineIds, toolAgentId);
+
+        ForceToolAgentUpdateResponse response = new ForceToolAgentUpdateResponse();
+        response.setItems(responseItems);
+
+        return response;
+    }
+
+    public ForceToolAgentUpdateResponse processAll(String toolAgentId) {
+        validateToolAgentId(toolAgentId);
+
+        log.info("Process force tool agent {} update request for all machines", toolAgentId);
+
+        List<Machine> allMachines = machineRepository.findAll();
+        List<String> machineIds = allMachines.stream()
+                .map(Machine::getMachineId)
+                .toList();
+
+        log.info("Found {} machines to process", machineIds.size());
 
         List<ForceToolAgentUpdateResponseItem> responseItems = processMachines(machineIds, toolAgentId);
 
@@ -80,6 +103,5 @@ public class ForceToolAgentUpdateService {
 
         return responseItem;
     }
-
 }
 

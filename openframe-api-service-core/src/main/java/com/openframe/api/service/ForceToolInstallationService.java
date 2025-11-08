@@ -4,6 +4,7 @@ import com.openframe.api.dto.force.request.ForceToolInstallationRequest;
 import com.openframe.api.dto.force.response.ForceToolAgentInstallationResponse;
 import com.openframe.api.dto.force.response.ForceToolAgentInstallationResponseItem;
 import com.openframe.api.dto.force.response.ForceAgentStatus;
+import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.service.IntegratedToolAgentService;
@@ -34,6 +35,26 @@ public class ForceToolInstallationService {
         validateMachineIds(machineIds);
 
         log.info("Process force tool {} installation request for machines {}", toolAgentId, machineIds);
+
+        List<ForceToolAgentInstallationResponseItem> responseItems = processMachines(machineIds, toolAgentId);
+
+        ForceToolAgentInstallationResponse response = new ForceToolAgentInstallationResponse();
+        response.setItems(responseItems);
+
+        return response;
+    }
+
+    public ForceToolAgentInstallationResponse processAll(String toolAgentId) {
+        validateToolAgentId(toolAgentId);
+
+        log.info("Process force tool {} installation request for all machines", toolAgentId);
+
+        List<Machine> allMachines = machineRepository.findAll();
+        List<String> machineIds = allMachines.stream()
+                .map(Machine::getMachineId)
+                .toList();
+
+        log.info("Found {} machines to process", machineIds.size());
 
         List<ForceToolAgentInstallationResponseItem> responseItems = processMachines(machineIds, toolAgentId);
 
@@ -83,5 +104,4 @@ public class ForceToolInstallationService {
 
         return responseItem;
     }
-
 }

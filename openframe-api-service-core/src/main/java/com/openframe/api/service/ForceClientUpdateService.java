@@ -5,7 +5,9 @@ import com.openframe.api.dto.force.response.ForceClientUpdateResponseItem;
 import com.openframe.api.dto.force.response.ForceAgentStatus;
 import com.openframe.api.dto.update.ForceClientUpdateRequest;
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
+import com.openframe.data.document.device.Machine;
 import com.openframe.data.repository.clientconfiguration.OpenFrameClientConfigurationRepository;
+import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.service.OpenFrameClientUpdatePublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +24,7 @@ public class ForceClientUpdateService {
 
     private final OpenFrameClientConfigurationRepository clientConfigurationRepository;
     private final OpenFrameClientUpdatePublisher clientUpdateService;
+    private final MachineRepository machineRepository;
 
     public ForceClientUpdateResponse process(ForceClientUpdateRequest request) {
         List<String> machineIds = request.getMachineId();
@@ -29,6 +32,24 @@ public class ForceClientUpdateService {
         validateMachineIds(machineIds);
 
         log.info("Process force client update request for machines {}", machineIds);
+
+        List<ForceClientUpdateResponseItem> responseItems = processMachines(machineIds);
+
+        ForceClientUpdateResponse response = new ForceClientUpdateResponse();
+        response.setItems(responseItems);
+
+        return response;
+    }
+
+    public ForceClientUpdateResponse processAll() {
+        log.info("Process force client update request for all machines");
+
+        List<Machine> allMachines = machineRepository.findAll();
+        List<String> machineIds = allMachines.stream()
+                .map(Machine::getMachineId)
+                .toList();
+
+        log.info("Found {} machines to process", machineIds.size());
 
         List<ForceClientUpdateResponseItem> responseItems = processMachines(machineIds);
 
