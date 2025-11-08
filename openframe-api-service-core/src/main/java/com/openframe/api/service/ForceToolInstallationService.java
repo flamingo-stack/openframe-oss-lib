@@ -26,9 +26,9 @@ public class ForceToolInstallationService {
     private final ToolInstallationService toolInstallationService;
     private final MachineRepository machineRepository;
 
-    public ForceToolAgentInstallationResponse install(ForceToolInstallationRequest toolInstallationRequest) {
-        String toolAgentId = toolInstallationRequest.getToolAgentId();
-        List<String> machineIds = toolInstallationRequest.getMachineIds();
+    public ForceToolAgentInstallationResponse process(ForceToolInstallationRequest request) {
+        String toolAgentId = request.getToolAgentId();
+        List<String> machineIds = request.getMachineIds();
 
         validateToolAgentId(toolAgentId);
         validateMachineIds(machineIds);
