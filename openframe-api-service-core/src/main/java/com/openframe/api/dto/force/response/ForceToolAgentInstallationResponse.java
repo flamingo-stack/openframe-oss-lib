@@ -7,6 +7,6 @@ import java.util.List;
 @Data
 public class ForceToolAgentInstallationResponse {
 
-    private List<ForceToolAgentUpdateResponseItem> items;
+    private List<ForceToolAgentInstallationResponseItem> items;
 
 }
