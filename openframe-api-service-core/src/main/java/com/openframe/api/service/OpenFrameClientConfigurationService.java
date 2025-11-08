@@ -14,7 +14,7 @@ public class OpenFrameClientConfigurationService {
 
     private final OpenFrameClientConfigurationRepository clientConfigurationRepository;
 
-    public ClientConfigurationResponse getClientConfiguration() {
+    public ClientConfigurationResponse get() {
         OpenFrameClientConfiguration configuration = clientConfigurationRepository
                 .findFirstByOrderByCreatedAtDesc()
                 .orElseThrow(() -> new IllegalStateException("Client configuration not found"));
