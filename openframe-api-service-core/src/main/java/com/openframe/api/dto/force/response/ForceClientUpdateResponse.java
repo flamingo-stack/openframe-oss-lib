@@ -7,6 +7,6 @@ import java.util.List;
 @Data
 public class ForceClientUpdateResponse {
 
-    private List<ForceToolAgentUpdateResponseItem> items;
+    private List<ForceClientUpdateResponseItem> items;
 
 }
