@@ -1,4 +1,4 @@
-package com.openframe.api.dto.toolinstallation;
+package com.openframe.api.dto.force.request;
 
 import lombok.Data;
 
