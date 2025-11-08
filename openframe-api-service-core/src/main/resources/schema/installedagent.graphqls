@@ -1,0 +1,27 @@
+# Installed Agent GraphQL Schema
+# This schema defines the API for querying installed agents on devices
+
+extend type Query {
+    # Get all installed agents with optional filtering
+    installedAgents(filter: InstalledAgentFilterInput, search: String): InstalledAgentList!
+}
+
+type InstalledAgent {
+    id: ID!
+    machineId: String!
+    agentType: String!
+    version: String!
+    createdAt: String
+    updatedAt: String
+}
+
+input InstalledAgentFilterInput {
+    machineId: String
+    agentType: String
+}
+
+# Simple list type for installed agents query
+type InstalledAgentList {
+    agents: [InstalledAgent!]!
+}
+

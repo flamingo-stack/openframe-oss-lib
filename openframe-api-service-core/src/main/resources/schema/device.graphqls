@@ -64,6 +64,7 @@ type Machine {
     updatedAt: Instant
     tags: [Tag]
     toolConnections: [ToolConnection]
+    installedAgents: [InstalledAgent]
 }
 
 type Tag {
