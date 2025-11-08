@@ -3,10 +3,10 @@ package com.openframe.api.dto.toolinstallation;
 import lombok.Data;
 
 @Data
-public class ForceToolInstallationResponseItem {
+public class ForceToolAgentResponseItem {
 
     private String machineId;
     private String toolAgentId;
-    private ForceToolInstallationStatus status;
+    private ForceAgentStatus status;
 
 }
