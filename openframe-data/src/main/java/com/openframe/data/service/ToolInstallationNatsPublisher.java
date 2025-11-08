@@ -4,6 +4,7 @@ import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
 import com.openframe.data.document.toolagent.ToolAgentAsset;
 import com.openframe.data.document.toolagent.ToolAgentAssetSource;
+import com.openframe.data.mapper.DownloadConfigurationMapper;
 import com.openframe.data.model.nats.ToolInstallationMessage;
 import com.openframe.data.repository.nats.NatsMessagePublisher;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ public class ToolInstallationNatsPublisher {
     private final static String TOPIC_NAME_TEMPLATE = "machine.%s.tool-installation";
 
     private final NatsMessagePublisher natsMessagePublisher;
+    private final DownloadConfigurationMapper downloadConfigurationMapper;
 
     public void publish(String machineId, IntegratedToolAgent toolAgent, IntegratedTool tool) {
         String topicName = buildTopicName(machineId);
@@ -45,7 +47,7 @@ public class ToolInstallationNatsPublisher {
 
         message.setVersion(toolAgent.getVersion());
         message.setSessionType(toolAgent.getSessionType());
-        message.setDownloadConfigurations(mapDownloadConfigurations(toolAgent.getDownloadConfigurations()));
+        message.setDownloadConfigurations(downloadConfigurationMapper.map(toolAgent.getDownloadConfigurations()));
         message.setAssets(mapAssets(toolAgent.getAssets()));
         message.setInstallationCommandArgs(toolAgent.getInstallationCommandArgs());
         message.setUninstallationCommandArgs(toolAgent.getUninstallationCommandArgs());
@@ -81,27 +83,6 @@ public class ToolInstallationNatsPublisher {
             case ARTIFACTORY -> ToolInstallationMessage.AssetSource.ARTIFACTORY;
             case TOOL_API -> ToolInstallationMessage.AssetSource.TOOL_API;
         };
-    }
-
-    private List<com.openframe.data.model.nats.DownloadConfiguration> mapDownloadConfigurations(
-            List<com.openframe.data.document.clientconfiguration.DownloadConfiguration> downloadConfigurations) {
-        if (downloadConfigurations == null) {
-            return null;
-        }
-        return downloadConfigurations.stream()
-                .map(this::mapDownloadConfiguration)
-                .collect(Collectors.toList());
-    }
-
-    private com.openframe.data.model.nats.DownloadConfiguration mapDownloadConfiguration(
-            com.openframe.data.document.clientconfiguration.DownloadConfiguration downloadConfiguration) {
-        com.openframe.data.model.nats.DownloadConfiguration messageDownloadConfig = 
-                new com.openframe.data.model.nats.DownloadConfiguration();
-        messageDownloadConfig.setOs(downloadConfiguration.getOs());
-        messageDownloadConfig.setLinkTemplate(downloadConfiguration.getLinkTemplate());
-        messageDownloadConfig.setFileName(downloadConfiguration.getFileName());
-        messageDownloadConfig.setAgentFileName(downloadConfiguration.getAgentFileName());
-        return messageDownloadConfig;
     }
 
 }
