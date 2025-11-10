@@ -1,9 +1,10 @@
 package com.openframe.api.service;
 
-import com.openframe.api.dto.toolinstallation.ForceToolInstallationRequest;
-import com.openframe.api.dto.toolinstallation.ForceToolInstallationResponse;
-import com.openframe.api.dto.toolinstallation.ForceToolInstallationResponseItem;
-import com.openframe.api.dto.toolinstallation.ForceToolInstallationStatus;
+import com.openframe.api.dto.force.request.ForceToolInstallationRequest;
+import com.openframe.api.dto.force.response.ForceToolAgentInstallationResponse;
+import com.openframe.api.dto.force.response.ForceToolAgentInstallationResponseItem;
+import com.openframe.api.dto.force.response.ForceAgentStatus;
+import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.service.IntegratedToolAgentService;
@@ -26,24 +27,44 @@ public class ForceToolInstallationService {
     private final ToolInstallationService toolInstallationService;
     private final MachineRepository machineRepository;
 
-    public ForceToolInstallationResponse install(ForceToolInstallationRequest toolInstallationRequest) {
-        String toolAgentId = toolInstallationRequest.getToolAgentId();
-        List<String> machineIds = toolInstallationRequest.getMachineIds();
+    public ForceToolAgentInstallationResponse process(ForceToolInstallationRequest request) {
+        String toolAgentId = request.getToolAgentId();
+        List<String> machineIds = request.getMachineIds();
 
         validateToolAgentId(toolAgentId);
         validateMachineIds(machineIds);
 
         log.info("Process force tool {} installation request for machines {}", toolAgentId, machineIds);
 
-        List<ForceToolInstallationResponseItem> responseItems = processMachines(machineIds, toolAgentId);
+        List<ForceToolAgentInstallationResponseItem> responseItems = processMachines(machineIds, toolAgentId);
 
-        ForceToolInstallationResponse response = new ForceToolInstallationResponse();
+        ForceToolAgentInstallationResponse response = new ForceToolAgentInstallationResponse();
         response.setItems(responseItems);
 
         return response;
     }
 
-    private List<ForceToolInstallationResponseItem> processMachines(List<String> machineIds, String toolAgentId) {
+    public ForceToolAgentInstallationResponse processAll(String toolAgentId) {
+        validateToolAgentId(toolAgentId);
+
+        log.info("Process force tool {} installation request for all machines", toolAgentId);
+
+        List<Machine> allMachines = machineRepository.findAll();
+        List<String> machineIds = allMachines.stream()
+                .map(Machine::getMachineId)
+                .toList();
+
+        log.info("Found {} machines to process", machineIds.size());
+
+        List<ForceToolAgentInstallationResponseItem> responseItems = processMachines(machineIds, toolAgentId);
+
+        ForceToolAgentInstallationResponse response = new ForceToolAgentInstallationResponse();
+        response.setItems(responseItems);
+
+        return response;
+    }
+
+    private List<ForceToolAgentInstallationResponseItem> processMachines(List<String> machineIds, String toolAgentId) {
         return machineIds.stream()
                 .map(machineId -> processMachine(machineId, toolAgentId))
                 .toList();
@@ -61,27 +82,26 @@ public class ForceToolInstallationService {
         }
     }
 
-    private ForceToolInstallationResponseItem processMachine(String machineId, String toolAgentId) {
+    private ForceToolAgentInstallationResponseItem processMachine(String machineId, String toolAgentId) {
         try {
             IntegratedToolAgent toolAgent = integratedToolAgentService.findById(toolAgentId)
                     .orElseThrow(() -> new IllegalStateException("Not found tool agent configuration for " + toolAgentId));
             toolInstallationService.process(machineId, toolAgent);
 
-            return buildResponseItem(machineId, toolAgentId, ForceToolInstallationStatus.PROCESSED);
+            return buildResponseItem(machineId, toolAgentId, ForceAgentStatus.PROCESSED);
         } catch (Exception e) {
             log.error("Failed to process force tool {} installation message for machine {}", toolAgentId, machineId, e);
-            return buildResponseItem(machineId, toolAgentId, ForceToolInstallationStatus.FAILED);
+            return buildResponseItem(machineId, toolAgentId, ForceAgentStatus.FAILED);
         }
     }
 
 
-    private ForceToolInstallationResponseItem buildResponseItem(String machineId, String toolAgentId, ForceToolInstallationStatus status) {
-        ForceToolInstallationResponseItem responseItem = new ForceToolInstallationResponseItem();
+    private ForceToolAgentInstallationResponseItem buildResponseItem(String machineId, String toolAgentId, ForceAgentStatus status) {
+        ForceToolAgentInstallationResponseItem responseItem = new ForceToolAgentInstallationResponseItem();
         responseItem.setMachineId(machineId);
         responseItem.setToolAgentId(toolAgentId);
         responseItem.setStatus(status);
 
         return responseItem;
     }
-
 }

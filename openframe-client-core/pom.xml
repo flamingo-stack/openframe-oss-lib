@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.openframe.oss</groupId>
+        <artifactId>openframe-oss-lib</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <artifactId>openframe-client-core</artifactId>
+    <name>OpenFrame Client Service Core</name>
+    <description>Shared core for OpenFrame Client Service (without application and properties)</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-data-mongo</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-data</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-data-kafka</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-security-core</artifactId>
+        </dependency>
+        <!-- OpenFrame SDKs -->
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>tacticalrmm</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>fleetmdm</artifactId>
+        </dependency>
+        <!-- Spring Boot starters -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-mongodb</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+        </dependency>
+
+        <!-- Test Dependencies -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>
+

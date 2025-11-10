@@ -1,9 +1,11 @@
 package com.openframe.data.service;
 
+import com.openframe.data.document.clientconfiguration.DownloadConfiguration;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
 import com.openframe.data.document.toolagent.ToolAgentAsset;
 import com.openframe.data.document.toolagent.ToolAgentAssetSource;
+import com.openframe.data.mapper.DownloadConfigurationMapper;
 import com.openframe.data.model.nats.ToolInstallationMessage;
 import com.openframe.data.repository.nats.NatsMessagePublisher;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,7 @@ public class ToolInstallationNatsPublisher {
     private final static String TOPIC_NAME_TEMPLATE = "machine.%s.tool-installation";
 
     private final NatsMessagePublisher natsMessagePublisher;
+    private final DownloadConfigurationMapper downloadConfigurationMapper;
 
     public void publish(String machineId, IntegratedToolAgent toolAgent, IntegratedTool tool) {
         String topicName = buildTopicName(machineId);
@@ -45,6 +48,7 @@ public class ToolInstallationNatsPublisher {
 
         message.setVersion(toolAgent.getVersion());
         message.setSessionType(toolAgent.getSessionType());
+        message.setDownloadConfigurations(downloadConfigurationMapper.map(toolAgent.getDownloadConfigurations(), toolAgent.getVersion()));
         message.setAssets(mapAssets(toolAgent.getAssets()));
         message.setInstallationCommandArgs(toolAgent.getInstallationCommandArgs());
         message.setUninstallationCommandArgs(toolAgent.getUninstallationCommandArgs());

@@ -15,6 +15,7 @@ public class ToolInstallationMessage {
     private String toolType;
     private String version;
     private SessionType sessionType;
+    private List<DownloadConfiguration> downloadConfigurations;
     private List<Asset> assets;
 
     private List<String> installationCommandArgs;
