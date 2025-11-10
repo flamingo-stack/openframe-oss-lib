@@ -22,6 +22,7 @@ public class ToolInstallationMessage {
     private List<String> runCommandArgs;
     private List<String> toolAgentIdCommandArgs;
     private List<String> uninstallationCommandArgs;
+    private boolean reinstall = false;
 
     @Getter
     @Setter

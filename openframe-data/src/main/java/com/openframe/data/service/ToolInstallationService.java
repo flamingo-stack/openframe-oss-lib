@@ -22,6 +22,10 @@ public class ToolInstallationService {
     private final ToolInstallationNatsPublisher toolInstallationNatsPublisher;
 
     public void process(String machineId, IntegratedToolAgent toolAgent) {
+        process(machineId, toolAgent, false);
+    }
+
+    public void process(String machineId, IntegratedToolAgent toolAgent, boolean reinstall) {
         String toolId = toolAgent.getToolId();
         try {
             IntegratedTool tool = getIntegratedToolData(toolId);
@@ -36,7 +40,7 @@ public class ToolInstallationService {
             List<String> runCommandArgs = toolAgent.getRunCommandArgs();
             toolAgent.setRunCommandArgs(toolCommandParamsResolver.process(toolId, runCommandArgs));
 
-            toolInstallationNatsPublisher.publish(machineId, toolAgent, tool);
+            toolInstallationNatsPublisher.publish(machineId, toolAgent, tool, reinstall);
             log.info("Published {} agent installation message for machine {}", toolId, machineId);
         } catch (Exception e) {
             // TODO: add fallback mechanism
