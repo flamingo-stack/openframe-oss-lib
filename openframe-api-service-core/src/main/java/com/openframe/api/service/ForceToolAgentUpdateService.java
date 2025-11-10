@@ -1,14 +1,14 @@
 package com.openframe.api.service;
 
-import com.openframe.api.dto.force.request.ForceToolInstallationRequest;
-import com.openframe.api.dto.force.response.ForceToolAgentInstallationResponse;
-import com.openframe.api.dto.force.response.ForceToolAgentInstallationResponseItem;
 import com.openframe.api.dto.force.response.ForceAgentStatus;
+import com.openframe.api.dto.force.response.ForceToolAgentUpdateResponseItem;
+import com.openframe.api.dto.update.ForceToolAgentUpdateRequest;
+import com.openframe.api.dto.update.ForceToolAgentUpdateResponse;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
 import com.openframe.data.repository.device.MachineRepository;
-import com.openframe.data.service.IntegratedToolAgentService;
-import com.openframe.data.service.ToolInstallationService;
+import com.openframe.data.repository.toolagent.IntegratedToolAgentRepository;
+import com.openframe.data.service.ToolAgentUpdateUpdatePublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,33 +21,33 @@ import static org.apache.zookeeper.common.StringUtils.isBlank;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class ForceToolInstallationService {
+public class ForceToolAgentUpdateService {
 
-    private final IntegratedToolAgentService integratedToolAgentService;
-    private final ToolInstallationService toolInstallationService;
+    private final IntegratedToolAgentRepository toolAgentRepository;
+    private final ToolAgentUpdateUpdatePublisher toolAgentUpdateUpdatePublisher;
     private final MachineRepository machineRepository;
 
-    public ForceToolAgentInstallationResponse process(ForceToolInstallationRequest request) {
+    public ForceToolAgentUpdateResponse process(ForceToolAgentUpdateRequest request) {
         String toolAgentId = request.getToolAgentId();
         List<String> machineIds = request.getMachineIds();
 
         validateToolAgentId(toolAgentId);
         validateMachineIds(machineIds);
 
-        log.info("Process force tool {} installation request for machines {}", toolAgentId, machineIds);
+        log.info("Process force tool agent {} update request for machines {}", toolAgentId, machineIds);
 
-        List<ForceToolAgentInstallationResponseItem> responseItems = processMachines(machineIds, toolAgentId);
+        List<ForceToolAgentUpdateResponseItem> responseItems = processMachines(machineIds, toolAgentId);
 
-        ForceToolAgentInstallationResponse response = new ForceToolAgentInstallationResponse();
+        ForceToolAgentUpdateResponse response = new ForceToolAgentUpdateResponse();
         response.setItems(responseItems);
 
         return response;
     }
 
-    public ForceToolAgentInstallationResponse processAll(String toolAgentId) {
+    public ForceToolAgentUpdateResponse processAll(String toolAgentId) {
         validateToolAgentId(toolAgentId);
 
-        log.info("Process force tool {} installation request for all machines", toolAgentId);
+        log.info("Process force tool agent {} update request for all machines", toolAgentId);
 
         List<Machine> allMachines = machineRepository.findAll();
         List<String> machineIds = allMachines.stream()
@@ -56,15 +56,15 @@ public class ForceToolInstallationService {
 
         log.info("Found {} machines to process", machineIds.size());
 
-        List<ForceToolAgentInstallationResponseItem> responseItems = processMachines(machineIds, toolAgentId);
+        List<ForceToolAgentUpdateResponseItem> responseItems = processMachines(machineIds, toolAgentId);
 
-        ForceToolAgentInstallationResponse response = new ForceToolAgentInstallationResponse();
+        ForceToolAgentUpdateResponse response = new ForceToolAgentUpdateResponse();
         response.setItems(responseItems);
 
         return response;
     }
 
-    private List<ForceToolAgentInstallationResponseItem> processMachines(List<String> machineIds, String toolAgentId) {
+    private List<ForceToolAgentUpdateResponseItem> processMachines(List<String> machineIds, String toolAgentId) {
         return machineIds.stream()
                 .map(machineId -> processMachine(machineId, toolAgentId))
                 .toList();
@@ -82,22 +82,21 @@ public class ForceToolInstallationService {
         }
     }
 
-    private ForceToolAgentInstallationResponseItem processMachine(String machineId, String toolAgentId) {
+    private ForceToolAgentUpdateResponseItem processMachine(String machineId, String toolAgentId) {
         try {
-            IntegratedToolAgent toolAgent = integratedToolAgentService.findById(toolAgentId)
+            IntegratedToolAgent toolAgent = toolAgentRepository.findById(toolAgentId)
                     .orElseThrow(() -> new IllegalStateException("Not found tool agent configuration for " + toolAgentId));
-            toolInstallationService.process(machineId, toolAgent);
+            toolAgentUpdateUpdatePublisher.publish(toolAgent);
 
             return buildResponseItem(machineId, toolAgentId, ForceAgentStatus.PROCESSED);
         } catch (Exception e) {
-            log.error("Failed to process force tool {} installation message for machine {}", toolAgentId, machineId, e);
+            log.error("Failed to process force tool agent {} update message for machine {}", toolAgentId, machineId, e);
             return buildResponseItem(machineId, toolAgentId, ForceAgentStatus.FAILED);
         }
     }
 
-
-    private ForceToolAgentInstallationResponseItem buildResponseItem(String machineId, String toolAgentId, ForceAgentStatus status) {
-        ForceToolAgentInstallationResponseItem responseItem = new ForceToolAgentInstallationResponseItem();
+    private ForceToolAgentUpdateResponseItem buildResponseItem(String machineId, String toolAgentId, ForceAgentStatus status) {
+        ForceToolAgentUpdateResponseItem responseItem = new ForceToolAgentUpdateResponseItem();
         responseItem.setMachineId(machineId);
         responseItem.setToolAgentId(toolAgentId);
         responseItem.setStatus(status);
@@ -105,3 +104,4 @@ public class ForceToolInstallationService {
         return responseItem;
     }
 }
+

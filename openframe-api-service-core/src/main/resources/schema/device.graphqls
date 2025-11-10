@@ -64,6 +64,7 @@ type Machine {
     updatedAt: Instant
     tags: [Tag]
     toolConnections: [ToolConnection]
+    installedAgents: [InstalledAgent]
 }
 
 type Tag {
@@ -125,4 +126,13 @@ enum ConnectionStatus {
     CONNECTED
     DISCONNECTED
     ERROR
+}
+
+type InstalledAgent {
+    id: ID!
+    machineId: String!
+    agentType: String!
+    version: String!
+    createdAt: String
+    updatedAt: String
 }
