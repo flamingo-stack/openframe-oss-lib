@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class OpenFrameClientConfigurationService {
+public class OpenFrameClientConfigurationQueryService {
 
     private final OpenFrameClientConfigurationRepository clientConfigurationRepository;
 
