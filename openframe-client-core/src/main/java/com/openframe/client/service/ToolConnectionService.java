@@ -67,9 +67,10 @@ public class ToolConnectionService {
         } else {
             // Connection is already CONNECTED
             String currentAgentToolId = toolConnection.getAgentToolId();
-            if (!agentId.equals(currentAgentToolId)) {
+            String transformedAgentToolId = toolAgentIdTransformerService.transform(toolType, agentId, lastAttempt);
+            if (!transformedAgentToolId.equals(currentAgentToolId)) {
                 // If agentToolId is different, update it
-                toolConnection.setAgentToolId(agentId);
+                toolConnection.setAgentToolId(toolAgentIdTransformerService.transform(toolType, agentId, lastAttempt));
                 toolConnection.setLastSyncAt(Instant.now());
                 toolConnectionRepository.save(toolConnection);
                 log.info("Updated agentToolId for existing connected tool connection: machineId={} tool={} oldAgentToolId={} newAgentToolId={}", 
