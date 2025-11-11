@@ -42,7 +42,8 @@ public class ToolConnectionService {
                                 toolConnection,
                                 openframeAgentId,
                                 toolType,
-                                agentToolId
+                                agentToolId,
+                                lastAttempt
                         ),
                         () -> addNewToolConnection(openframeAgentId, toolType, agentToolId, lastAttempt)
                 );
@@ -52,11 +53,12 @@ public class ToolConnectionService {
             ToolConnection toolConnection,
             String openframeAgentId,
             ToolType toolType,
-            String agentId
+            String agentId,
+            boolean lastAttempt
     ) {
         if (toolConnection.getStatus() == ConnectionStatus.DISCONNECTED) {
             toolConnection.setStatus(ConnectionStatus.CONNECTED);
-            toolConnection.setAgentToolId(agentId);
+            toolConnection.setAgentToolId(toolAgentIdTransformerService.transform(toolType, agentId, lastAttempt));
             toolConnection.setConnectedAt(Instant.now());
             toolConnection.setDisconnectedAt(null);
             toolConnectionRepository.save(toolConnection);
