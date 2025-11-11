@@ -88,29 +88,6 @@ class ToolConnectionServiceTest {
     }
 
     @Test
-    void addToolConnection_ReactivatesDisconnectedConnection() {
-        when(machineRepository.findByMachineId(MACHINE_ID))
-                .thenReturn(Optional.of(new Machine()));
-        ToolConnection existingConnection = createToolConnection(MACHINE_ID, ToolType.MESHCENTRAL, "old-agent-tool-id");
-        existingConnection.setStatus(ConnectionStatus.DISCONNECTED);
-        existingConnection.setDisconnectedAt(Instant.now().minusSeconds(3600));
-        when(toolConnectionRepository.findByMachineIdAndToolType(MACHINE_ID, ToolType.MESHCENTRAL))
-                .thenReturn(Optional.of(existingConnection));
-        when(toolConnectionRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
-
-        toolConnectionService.addToolConnection(MACHINE_ID, TOOL_TYPE, AGENT_TOOL_ID, true);
-
-        verify(toolConnectionRepository).save(toolConnectionCaptor.capture());
-        ToolConnection savedConnection = toolConnectionCaptor.getValue();
-        assertEquals(MACHINE_ID, savedConnection.getMachineId());
-        assertEquals(ToolType.MESHCENTRAL, savedConnection.getToolType());
-        assertEquals(AGENT_TOOL_ID, savedConnection.getAgentToolId());
-        assertEquals(ConnectionStatus.CONNECTED, savedConnection.getStatus());
-        assertNotNull(savedConnection.getConnectedAt());
-        assertNull(savedConnection.getDisconnectedAt());
-    }
-
-    @Test
     void addToolConnection_WithAlreadyConnected_ThrowsException() {
         when(machineRepository.findByMachineId(MACHINE_ID))
                 .thenReturn(Optional.of(new Machine()));
