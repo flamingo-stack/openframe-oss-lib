@@ -63,8 +63,20 @@ public class ToolConnectionService {
 
             log.info("Updated existing tool connection with machineId {} tool {} agentToolId {}", openframeAgentId, toolType, agentId);
         } else {
-            ConnectionStatus toolConnectionStatus = toolConnection.getStatus();
-            log.warn("Tools agent already connected with machineId {} tool {} agentToolId {} status {}", openframeAgentId, toolType, agentId, toolConnectionStatus);
+            // Connection is already CONNECTED
+            String currentAgentToolId = toolConnection.getAgentToolId();
+            if (!agentId.equals(currentAgentToolId)) {
+                // If agentToolId is different, update it
+                toolConnection.setAgentToolId(agentId);
+                toolConnection.setLastSyncAt(Instant.now());
+                toolConnectionRepository.save(toolConnection);
+                log.info("Updated agentToolId for existing connected tool connection: machineId={} tool={} oldAgentToolId={} newAgentToolId={}", 
+                        openframeAgentId, toolType, currentAgentToolId, agentId);
+            } else {
+                // Same ID and already connected - no action needed
+                log.info("Tool connection already exists with same agentToolId: machineId={} tool={} agentToolId={}", 
+                        openframeAgentId, toolType, agentId);
+            }
         }
     }
 

@@ -45,9 +45,13 @@ public class ForceToolInstallationService {
     }
 
     public ForceToolAgentInstallationResponse processAll(String toolAgentId) {
+        return processAll(toolAgentId, false);
+    }
+
+    public ForceToolAgentInstallationResponse processAll(String toolAgentId, boolean reinstall) {
         validateToolAgentId(toolAgentId);
 
-        log.info("Process force tool {} installation request for all machines", toolAgentId);
+        log.info("Process force tool {} {} request for all machines", toolAgentId, reinstall ? "reinstallation" : "installation");
 
         List<Machine> allMachines = machineRepository.findAll();
         List<String> machineIds = allMachines.stream()
@@ -56,7 +60,7 @@ public class ForceToolInstallationService {
 
         log.info("Found {} machines to process", machineIds.size());
 
-        List<ForceToolAgentInstallationResponseItem> responseItems = processMachines(machineIds, toolAgentId);
+        List<ForceToolAgentInstallationResponseItem> responseItems = processMachines(machineIds, toolAgentId, reinstall);
 
         ForceToolAgentInstallationResponse response = new ForceToolAgentInstallationResponse();
         response.setItems(responseItems);
@@ -64,9 +68,34 @@ public class ForceToolInstallationService {
         return response;
     }
 
+    public ForceToolAgentInstallationResponse processReinstall(ForceToolInstallationRequest request) {
+        String toolAgentId = request.getToolAgentId();
+        List<String> machineIds = request.getMachineIds();
+
+        validateToolAgentId(toolAgentId);
+        validateMachineIds(machineIds);
+
+        log.info("Process force tool {} reinstallation request for machines {}", toolAgentId, machineIds);
+
+        List<ForceToolAgentInstallationResponseItem> responseItems = processMachines(machineIds, toolAgentId, true);
+
+        ForceToolAgentInstallationResponse response = new ForceToolAgentInstallationResponse();
+        response.setItems(responseItems);
+
+        return response;
+    }
+
+    public ForceToolAgentInstallationResponse processReinstallAll(String toolAgentId) {
+        return processAll(toolAgentId, true);
+    }
+
     private List<ForceToolAgentInstallationResponseItem> processMachines(List<String> machineIds, String toolAgentId) {
+        return processMachines(machineIds, toolAgentId, false);
+    }
+
+    private List<ForceToolAgentInstallationResponseItem> processMachines(List<String> machineIds, String toolAgentId, boolean reinstall) {
         return machineIds.stream()
-                .map(machineId -> processMachine(machineId, toolAgentId))
+                .map(machineId -> processMachine(machineId, toolAgentId, reinstall))
                 .toList();
     }
 
@@ -83,10 +112,14 @@ public class ForceToolInstallationService {
     }
 
     private ForceToolAgentInstallationResponseItem processMachine(String machineId, String toolAgentId) {
+        return processMachine(machineId, toolAgentId, false);
+    }
+
+    private ForceToolAgentInstallationResponseItem processMachine(String machineId, String toolAgentId, boolean reinstall) {
         try {
             IntegratedToolAgent toolAgent = integratedToolAgentService.findById(toolAgentId)
                     .orElseThrow(() -> new IllegalStateException("Not found tool agent configuration for " + toolAgentId));
-            toolInstallationService.process(machineId, toolAgent);
+            toolInstallationService.process(machineId, toolAgent, reinstall);
 
             return buildResponseItem(machineId, toolAgentId, ForceAgentStatus.PROCESSED);
         } catch (Exception e) {

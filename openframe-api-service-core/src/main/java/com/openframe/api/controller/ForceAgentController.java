@@ -2,6 +2,7 @@ package com.openframe.api.controller;
 
 import com.openframe.api.dto.force.request.ForceToolInstallationAllRequest;
 import com.openframe.api.dto.force.request.ForceToolInstallationRequest;
+import com.openframe.api.dto.force.request.ForceToolReinstallationRequest;
 import com.openframe.api.dto.force.response.ForceClientUpdateResponse;
 import com.openframe.api.dto.force.response.ForceToolAgentInstallationResponse;
 import com.openframe.api.dto.update.ForceClientUpdateRequest;
@@ -51,6 +52,19 @@ public class ForceAgentController {
     @PostMapping("tool-agent/update/all")
     public ForceToolAgentUpdateResponse forceToolAgentUpdateAll(@RequestBody ForceToolAgentUpdateAllRequest request) {
         return toolAgentUpdateService.processAll(request.getToolAgentId());
+    }
+
+    @PostMapping("tool-agent/reinstall")
+    public ForceToolAgentInstallationResponse forceToolReinstallation(@RequestBody ForceToolReinstallationRequest request) {
+        ForceToolInstallationRequest installRequest = new ForceToolInstallationRequest();
+        installRequest.setToolAgentId(request.getToolAgentId());
+        installRequest.setMachineIds(request.getMachineIds());
+        return toolInstallationService.processReinstall(installRequest);
+    }
+
+    @PostMapping("tool-agent/reinstall/all")
+    public ForceToolAgentInstallationResponse forceToolReinstallationAll(@RequestBody ForceToolInstallationAllRequest request) {
+        return toolInstallationService.processReinstallAll(request.getToolAgentId());
     }
 
 }

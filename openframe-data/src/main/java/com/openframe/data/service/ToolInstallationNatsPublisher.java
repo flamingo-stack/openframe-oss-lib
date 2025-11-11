@@ -30,8 +30,12 @@ public class ToolInstallationNatsPublisher {
     private final DownloadConfigurationMapper downloadConfigurationMapper;
 
     public void publish(String machineId, IntegratedToolAgent toolAgent, IntegratedTool tool) {
+        publish(machineId, toolAgent, tool, false);
+    }
+
+    public void publish(String machineId, IntegratedToolAgent toolAgent, IntegratedTool tool, boolean reinstall) {
         String topicName = buildTopicName(machineId);
-        ToolInstallationMessage message = buildMessage(toolAgent, tool);
+        ToolInstallationMessage message = buildMessage(toolAgent, tool, reinstall);
         natsMessagePublisher.publish(topicName, message);
     }
 
@@ -40,6 +44,10 @@ public class ToolInstallationNatsPublisher {
     }
 
     private ToolInstallationMessage buildMessage(IntegratedToolAgent toolAgent, IntegratedTool tool) {
+        return buildMessage(toolAgent, tool, false);
+    }
+
+    private ToolInstallationMessage buildMessage(IntegratedToolAgent toolAgent, IntegratedTool tool, boolean reinstall) {
         ToolInstallationMessage message = new ToolInstallationMessage();
         message.setToolAgentId(toolAgent.getId());
         // TODO: need refactoring
@@ -54,6 +62,7 @@ public class ToolInstallationNatsPublisher {
         message.setUninstallationCommandArgs(toolAgent.getUninstallationCommandArgs());
         message.setRunCommandArgs(toolAgent.getRunCommandArgs());
         message.setToolAgentIdCommandArgs(toolAgent.getAgentToolIdCommandArgs());
+        message.setReinstall(reinstall);
         return message;
     }
 
