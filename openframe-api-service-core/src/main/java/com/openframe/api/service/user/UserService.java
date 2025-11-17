@@ -38,7 +38,7 @@ public class UserService {
     public UserPageResponse listUsers(int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
         Page<User> p = userRepository.findAll(pageable);
-        return UserPageResponse.builder()
+        UserPageResponse response = UserPageResponse.builder()
                 .items(p.getContent().stream().map(userMapper::toResponse).toList())
                 .page(p.getNumber())
                 .size(p.getSize())
@@ -46,6 +46,8 @@ public class UserService {
                 .totalPages(p.getTotalPages())
                 .hasNext(p.hasNext())
                 .build();
+        userProcessor.postProcessUserGet(response);
+        return response;
     }
 
     public void softDeleteUser(String id, String requesterUserId) {

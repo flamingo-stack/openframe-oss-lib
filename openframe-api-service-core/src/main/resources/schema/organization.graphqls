@@ -33,7 +33,8 @@ type Organization {
 
 type OrganizationImage {
     # URL to access the logo image
-    imageUrl: String!
+    imageUrl: String!,
+    hash: String
 }
 
 type ContactInformation {

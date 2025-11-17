@@ -1,5 +1,6 @@
 package com.openframe.api.dto.user;
 
+import com.openframe.api.dto.image.ImageDto;
 import lombok.Builder;
 import lombok.Data;
 
@@ -15,6 +16,7 @@ public class UserResponse {
     private String lastName;
     private List<String> roles;
     private String status;
+    private ImageDto image;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
