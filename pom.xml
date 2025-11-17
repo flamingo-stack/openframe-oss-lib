@@ -32,6 +32,7 @@
         <jsonwebtoken.version>0.11.5</jsonwebtoken.version>
         <spring-authorization-server.version>1.3.1</spring-authorization-server.version>
         <netflix.dgs.version>9.0.3</netflix.dgs.version>
+        <grpc.version>1.58.0</grpc.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     </properties>
@@ -52,6 +53,9 @@
         <module>openframe-security-oauth</module>
         <module>openframe-idp-configuration</module>
         <module>openframe-config-core</module>
+        <module>openframe-external-api-service-core</module>
+        <module>openframe-stream-service-core</module>
+        <module>openframe-gateway-service-core</module>
     </modules>
 
     <dependencies>
@@ -108,7 +112,17 @@
             </dependency>
             <dependency>
                 <groupId>com.openframe.oss</groupId>
+                <artifactId>openframe-security-oauth</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openframe.oss</groupId>
                 <artifactId>openframe-client-core</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openframe.oss</groupId>
+                <artifactId>openframe-idp-configuration</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
@@ -146,6 +160,11 @@
                 <groupId>io.jsonwebtoken</groupId>
                 <artifactId>jjwt-jackson</artifactId>
                 <version>${jsonwebtoken.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.grpc</groupId>
+                <artifactId>grpc-netty</artifactId>
+                <version>${grpc.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
