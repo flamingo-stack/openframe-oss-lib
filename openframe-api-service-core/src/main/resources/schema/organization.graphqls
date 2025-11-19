@@ -34,7 +34,8 @@ type Organization {
 type OrganizationImage {
     # URL to access the logo image
     imageUrl: String!,
-    hash: String
+    hash: String,
+    sourceType: String!
 }
 
 type ContactInformation {
