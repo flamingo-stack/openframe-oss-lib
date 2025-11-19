@@ -30,6 +30,7 @@ public class AddAuthorizationHeaderFilter implements WebFilter {
 
     private final CookieService cookieService;
     private static final String CHAT_ENDPOINT_PATH = "/chat";
+    private static final String INTERNAL_AUTH_PROBE = "/internal/authz/probe";
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
@@ -68,6 +69,7 @@ public class AddAuthorizationHeaderFilter implements WebFilter {
                 || path.startsWith(WS_TOOLS_PREFIX + "/")
                 || path.startsWith(NATS_WS_ENDPOINT_PATH)
                 || path.startsWith(CHAT_ENDPOINT_PATH + "/")
+                || path.startsWith(INTERNAL_AUTH_PROBE)
                 || clientPrivate;
     }
 
