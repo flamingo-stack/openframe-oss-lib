@@ -1,5 +1,6 @@
 package com.openframe.api.service.processor;
 
+import com.openframe.api.dto.user.UserPageResponse;
 import com.openframe.data.document.user.User;
 
 /**
@@ -14,7 +15,7 @@ public interface UserProcessor {
      *
      * @param user The soft deleted user with DELETED status
      */
-    default void postProcessUserDeleted(User user) {
-        // Default no-op implementation
-    }
+    void postProcessUserDeleted(User user);
+
+    void postProcessUserGet(UserPageResponse response);
 }

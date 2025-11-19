@@ -1,5 +1,6 @@
 package com.openframe.api.service.processor;
 
+import com.openframe.api.dto.user.UserPageResponse;
 import com.openframe.data.document.user.User;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -17,5 +18,10 @@ public class DefaultUserProcessor implements UserProcessor {
     @Override
     public void postProcessUserDeleted(User user) {
         log.debug("User deleted: {}", user.getId());
+    }
+
+    @Override
+    public void postProcessUserGet(UserPageResponse response) {
+        log.debug("Users fetched. Count: {}", response.getItems().size());
     }
 }
