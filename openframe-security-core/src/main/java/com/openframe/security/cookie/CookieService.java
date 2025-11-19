@@ -61,6 +61,12 @@ public class CookieService {
         headers.add(SET_COOKIE, clearedAuthSession.toString());
     }
 
+    public void addClearSasCookies(HttpHeaders headers) {
+        ResponseCookie clearedAuthSession = createClearedCookie(JSESSIONID, "/sas");
+        headers.add(SET_COOKIE, clearedAuthSession.toString());
+    }
+
+
     private ResponseCookie createAccessTokenCookie(String accessToken) {
         return createCookie(ACCESS_TOKEN_COOKIE, accessToken, "/", accessTokenExpirationSeconds);
     }
