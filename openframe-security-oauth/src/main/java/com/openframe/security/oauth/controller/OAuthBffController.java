@@ -40,8 +40,10 @@ public class OAuthBffController {
                                             WebSession session,
                                             ServerHttpRequest request) {
         session.getAttributes().clear();
+        HttpHeaders headers = new HttpHeaders();
+        cookieService.addClearSasCookies(headers);
         return oauthBffService.buildAuthorizeRedirect(tenantId, redirectTo, provider, session, request)
-                .map(url -> ResponseEntity.status(FOUND).header(LOCATION, url).build());
+                .map(url -> ResponseEntity.status(FOUND).header(LOCATION, url).headers(headers).build());
     }
 
     @GetMapping("/callback")
