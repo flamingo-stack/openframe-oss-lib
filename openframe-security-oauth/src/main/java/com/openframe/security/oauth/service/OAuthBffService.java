@@ -58,7 +58,6 @@ public class OAuthBffService {
     public Mono<AuthorizeData> buildAuthorizeRedirect(String tenantId,
                                                       String redirectTo,
                                                       String provider,
-                                                      WebSession session,
                                                       ServerHttpRequest request) {
         String codeVerifier = generateCodeVerifier();
         String codeChallenge = generateCodeChallenge(codeVerifier);
@@ -217,6 +216,32 @@ public class OAuthBffService {
     }
 
     public record AuthorizeData(String authorizeUrl, String state, String codeVerifier, String tenantId, String redirectToAbs) {}
+
+    public String buildStateJwt(AuthorizeData data, int ttlSeconds) {
+        var claims = org.springframework.security.oauth2.jwt.JwtClaimsSet.builder()
+                .subject("oauth_state")
+                .claim("s", data.state())
+                .claim("cv", data.codeVerifier())
+                .claim("tid", data.tenantId())
+                .claim("rt", data.redirectToAbs())
+                .issuedAt(java.time.Instant.now())
+                .expiresAt(java.time.Instant.now().plusSeconds(ttlSeconds))
+                .build();
+        return jwtService.generateToken(claims);
+    }
+
+    public String tryGetRedirectFromStateCookie(String state, ServerHttpRequest request) {
+        String cookieName = "of_oauth_" + state;
+        var cookie = request.getCookies().getFirst(cookieName);
+        if (cookie == null) return null;
+        try {
+            var jwt = jwtService.decodeToken(cookie.getValue());
+            Object rt = jwt.getClaims().get("rt");
+            return rt != null ? rt.toString() : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
 }
 
 

@@ -1,7 +1,6 @@
 package com.openframe.security.oauth.controller;
 
 import com.openframe.security.cookie.CookieService;
-import com.openframe.security.jwt.JwtService;
 import com.openframe.security.oauth.dto.TokenResponse;
 import com.openframe.security.oauth.service.OAuthBffService;
 import com.openframe.security.oauth.service.OAuthDevTicketStore;
@@ -12,7 +11,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.server.reactive.ServerHttpRequest;
-import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.WebSession;
 import reactor.core.publisher.Mono;
@@ -35,7 +33,6 @@ public class OAuthBffController {
     private final OAuthBffService oauthBffService;
     private final OAuthDevTicketStore devTicketStore;
     private final CookieService cookieService;
-    private final JwtService jwtService;
 
     @Value("${openframe.gateway.oauth.state-cookie-ttl-seconds:180}")
     private int stateCookieTtlSeconds;
@@ -49,18 +46,9 @@ public class OAuthBffController {
         session.getAttributes().clear();
         HttpHeaders headers = new HttpHeaders();
         cookieService.addClearSasCookies(headers);
-        return oauthBffService.buildAuthorizeRedirect(tenantId, redirectTo, provider, session, request)
+        return oauthBffService.buildAuthorizeRedirect(tenantId, redirectTo, provider, request)
                 .map(data -> {
-                    var claims = JwtClaimsSet.builder()
-                            .subject("oauth_state")
-                            .claim("s", data.state())
-                            .claim("cv", data.codeVerifier())
-                            .claim("tid", data.tenantId())
-                            .claim("rt", data.redirectToAbs())
-                            .issuedAt(java.time.Instant.now())
-                            .expiresAt(java.time.Instant.now().plusSeconds(stateCookieTtlSeconds))
-                            .build();
-                    String token = jwtService.generateToken(claims);
+                    String token = oauthBffService.buildStateJwt(data, stateCookieTtlSeconds);
                     cookieService.addOAuthStateCookie(headers, data.state(), token, stateCookieTtlSeconds);
                     return ResponseEntity.status(FOUND).header(LOCATION, data.authorizeUrl()).headers(headers).build();
                 });
@@ -86,7 +74,7 @@ public class OAuthBffController {
                     String msg = URLEncoder.encode(
                             e.getMessage() != null ? e.getMessage() : "token_exchange_failed",
                             StandardCharsets.UTF_8);
-                    String target = buildErrorRedirectTarget(session, state, request, msg);
+                    String target = buildErrorRedirectTarget(state, request, msg);
                     return Mono.just(buildFound(target, state));
                 });
     }
@@ -192,8 +180,8 @@ public class OAuthBffController {
         if (hasText(tokens.refresh_token())) headers.add(REFRESH_TOKEN_HEADER, tokens.refresh_token());
     }
 
-    private String buildErrorRedirectTarget(WebSession session, String state, ServerHttpRequest request, String msg) {
-        String originalRedirectTo = tryGetRedirectFromStateCookie(state, request);
+    private String buildErrorRedirectTarget(String state, ServerHttpRequest request, String msg) {
+        String originalRedirectTo = oauthBffService.tryGetRedirectFromStateCookie(state, request);
         String base;
         if (isAbsoluteUrl(originalRedirectTo)) {
             base = originalRedirectTo;
@@ -204,18 +192,5 @@ public class OAuthBffController {
         return base.contains("?")
                 ? base + "&error=oauth_failed&message=" + msg
                 : base + "?error=oauth_failed&message=" + msg;
-    }
-
-    private String tryGetRedirectFromStateCookie(String state, ServerHttpRequest request) {
-        String cookieName = "of_oauth_" + state;
-        var cookie = request.getCookies().getFirst(cookieName);
-        if (cookie == null) return null;
-        try {
-            var jwt = jwtService.decodeToken(cookie.getValue());
-            Object rt = jwt.getClaims().get("rt");
-            return rt != null ? rt.toString() : null;
-        } catch (Exception e) {
-            return null;
-        }
     }
 }
