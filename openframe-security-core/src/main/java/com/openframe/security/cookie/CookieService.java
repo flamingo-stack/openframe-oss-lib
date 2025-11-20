@@ -56,15 +56,19 @@ public class CookieService {
         ResponseCookie clearedAccess = createClearedCookie(ACCESS_TOKEN, "/");
         ResponseCookie clearedRefresh = createClearedCookie(REFRESH_TOKEN, "/oauth");
         ResponseCookie clearedAuthSession = createClearedCookie(JSESSIONID, "/sas");
+        ResponseCookie clearedAuthSessionHostOnly = createClearedCookieHostOnly(JSESSIONID, "/sas");
 
         headers.add(SET_COOKIE, clearedAccess.toString());
         headers.add(SET_COOKIE, clearedRefresh.toString());
         headers.add(SET_COOKIE, clearedAuthSession.toString());
+        headers.add(SET_COOKIE, clearedAuthSessionHostOnly.toString());
     }
 
     public void addClearSasCookies(HttpHeaders headers) {
         ResponseCookie clearedAuthSession = createClearedCookie(JSESSIONID, "/sas");
+        ResponseCookie clearedAuthSessionHostOnly = createClearedCookieHostOnly(JSESSIONID, "/sas");
         headers.add(SET_COOKIE, clearedAuthSession.toString());
+        headers.add(SET_COOKIE, clearedAuthSessionHostOnly.toString());
     }
 
     /**
@@ -103,18 +107,26 @@ public class CookieService {
     }
 
     private ResponseCookie createCookie(String name, String value, String path, int age) {
+        return createCookie(name, value, path, age, true);
+    }
+
+    private ResponseCookie createCookie(String name, String value, String path, int age, boolean includeDomain) {
         return ResponseCookie.from(name, value)
                 .httpOnly(true)
                 .secure(cookieSecure)
                 .sameSite(cookieSameSite)
                 .path(path)
                 .maxAge(age)
-                .domain(domain)
+                .domain(includeDomain ? domain : null)
                 .build();
     }
 
     private ResponseCookie createClearedCookie(String name, String path) {
         return createCookie(name, "", path, 0);
+    }
+
+    private ResponseCookie createClearedCookieHostOnly(String name, String path) {
+        return createCookie(name, "", path, 0, false);
     }
 
     /**
