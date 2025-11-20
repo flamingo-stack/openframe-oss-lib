@@ -6,6 +6,7 @@ import com.openframe.security.oauth.service.OAuthBffService;
 import com.openframe.security.oauth.service.OAuthDevTicketStore;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -33,6 +34,9 @@ public class OAuthBffController {
     private final OAuthDevTicketStore devTicketStore;
     private final CookieService cookieService;
 
+    @Value("${openframe.gateway.oauth.state-cookie-ttl-seconds:180}")
+    private int stateCookieTtlSeconds;
+
     @GetMapping("/login")
     public Mono<ResponseEntity<Void>> login(@RequestParam String tenantId,
                                             @RequestParam(value = "redirectTo", required = false) String redirectTo,
@@ -42,8 +46,12 @@ public class OAuthBffController {
         session.getAttributes().clear();
         HttpHeaders headers = new HttpHeaders();
         cookieService.addClearSasCookies(headers);
-        return oauthBffService.buildAuthorizeRedirect(tenantId, redirectTo, provider, session, request)
-                .map(url -> ResponseEntity.status(FOUND).header(LOCATION, url).headers(headers).build());
+        return oauthBffService.buildAuthorizeRedirect(tenantId, redirectTo, provider, request)
+                .map(data -> {
+                    String token = oauthBffService.buildStateJwt(data, stateCookieTtlSeconds);
+                    cookieService.addOAuthStateCookie(headers, data.state(), token, stateCookieTtlSeconds);
+                    return ResponseEntity.status(FOUND).header(LOCATION, data.authorizeUrl()).headers(headers).build();
+                });
     }
 
     @GetMapping("/callback")
@@ -53,20 +61,21 @@ public class OAuthBffController {
                                                ServerHttpRequest request) {
         boolean includeDevTicket = isLocalHost(request);
         return oauthBffService.handleCallback(code, state, session, request)
-                .map(result -> buildFoundWithCookies(
-                        computeTargetWithOptionalDevTicket(
-                                safeRedirect(result.redirectTo()),
-                                includeDevTicket,
-                                result.tokens()
-                        ),
+                .flatMap(result -> computeTargetWithOptionalDevTicketReactive(
+                        safeRedirect(result.redirectTo()),
+                        includeDevTicket,
                         result.tokens()
-                ))
+                ).map(target -> buildFoundWithCookiesAndClearState(
+                        target,
+                        result.tokens(),
+                        state
+                )))
                 .onErrorResume(e -> {
                     String msg = URLEncoder.encode(
                             e.getMessage() != null ? e.getMessage() : "token_exchange_failed",
                             StandardCharsets.UTF_8);
-                    String target = buildErrorRedirectTarget(session, state, request, msg);
-                    return Mono.just(buildFound(target));
+                    String target = buildErrorRedirectTarget(state, request, msg);
+                    return Mono.just(buildFound(target, state));
                 });
     }
 
@@ -97,18 +106,18 @@ public class OAuthBffController {
     }
 
     @GetMapping("/dev-exchange")
-    public ResponseEntity<Void> devExchange(@RequestParam("ticket") String ticket,
+    public Mono<ResponseEntity<Object>> devExchange(@RequestParam("ticket") String ticket,
                                             ServerHttpRequest request) {
         if (!isLocalHost(request)) {
-            return ResponseEntity.status(404).build();
+            return Mono.just(ResponseEntity.status(404).build());
         }
-        TokenResponse tokens = devTicketStore.consumeTicket(ticket);
-        if (tokens == null) {
-            return ResponseEntity.status(404).build();
-        }
-        HttpHeaders headers = new HttpHeaders();
-        addDevHeaders(headers, tokens);
-        return ResponseEntity.noContent().headers(headers).build();
+        return devTicketStore.consumeTicket(ticket)
+                .map(tokens -> {
+                    HttpHeaders headers = new HttpHeaders();
+                    addDevHeaders(headers, tokens);
+                    return ResponseEntity.noContent().headers(headers).build();
+                })
+                .switchIfEmpty(Mono.just(ResponseEntity.status(404).build()));
     }
 
     private boolean isLocalHost(ServerHttpRequest request) {
@@ -128,24 +137,32 @@ public class OAuthBffController {
         return (redirectTo != null && !redirectTo.isBlank()) ? redirectTo : "/";
     }
 
-    private String computeTargetWithOptionalDevTicket(String baseTarget, boolean includeDevTicket, TokenResponse tokens) {
+    private Mono<String> computeTargetWithOptionalDevTicketReactive(String baseTarget, boolean includeDevTicket, TokenResponse tokens) {
         if (!includeDevTicket) {
-            return baseTarget;
+            return Mono.just(baseTarget);
         }
-        String ticket = devTicketStore.createTicket(tokens);
-        return baseTarget + (baseTarget.contains("?") ? "&" : "?") + "devTicket=" + ticket;
+        return devTicketStore.createTicket(tokens)
+                .map(ticket -> baseTarget + (baseTarget.contains("?") ? "&" : "?") + "devTicket=" + ticket);
     }
 
     private ResponseEntity<Void> buildFound(String target) {
+        return buildFound(target, null);
+    }
+
+    private ResponseEntity<Void> buildFound(String target, String stateToClear) {
         HttpHeaders headers = new HttpHeaders();
         headers.add(LOCATION, target);
+        if (hasText(stateToClear)) {
+            cookieService.addClearOAuthStateCookie(headers, stateToClear);
+        }
         return ResponseEntity.status(FOUND).headers(headers).build();
     }
 
-    private ResponseEntity<Void> buildFoundWithCookies(String target, TokenResponse tokens) {
+    private ResponseEntity<Void> buildFoundWithCookiesAndClearState(String target, TokenResponse tokens, String state) {
         HttpHeaders headers = new HttpHeaders();
         headers.add(LOCATION, target);
         cookieService.addAuthCookies(headers, tokens.access_token(), tokens.refresh_token());
+        cookieService.addClearOAuthStateCookie(headers, state);
         return ResponseEntity.status(FOUND).headers(headers).build();
     }
 
@@ -163,8 +180,8 @@ public class OAuthBffController {
         if (hasText(tokens.refresh_token())) headers.add(REFRESH_TOKEN_HEADER, tokens.refresh_token());
     }
 
-    private String buildErrorRedirectTarget(WebSession session, String state, ServerHttpRequest request, String msg) {
-        String originalRedirectTo = (String) session.getAttributes().get("oauth:redirect_to:" + state);
+    private String buildErrorRedirectTarget(String state, ServerHttpRequest request, String msg) {
+        String originalRedirectTo = oauthBffService.tryGetRedirectFromStateCookie(state, request);
         String base;
         if (isAbsoluteUrl(originalRedirectTo)) {
             base = originalRedirectTo;

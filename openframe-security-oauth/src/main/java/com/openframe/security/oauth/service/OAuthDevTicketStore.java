@@ -1,6 +1,7 @@
 package com.openframe.security.oauth.service;
 
 import com.openframe.security.oauth.dto.TokenResponse;
+import reactor.core.publisher.Mono;
 
 /**
  * Store for development-only OAuth exchange tickets used to pass tokens back on localhost.
@@ -11,12 +12,12 @@ public interface OAuthDevTicketStore {
     /**
      * Creates a single-use ticket associated with the provided tokens and returns the ticket id.
      */
-    String createTicket(TokenResponse tokens);
+    Mono<String> createTicket(TokenResponse tokens);
 
     /**
      * Consumes (retrieves and removes) the tokens for the given ticket id. Returns null if not found.
      */
-    TokenResponse consumeTicket(String ticketId);
+    Mono<TokenResponse> consumeTicket(String ticketId);
 }
 
 

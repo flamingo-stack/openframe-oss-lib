@@ -27,6 +27,7 @@ public class CookieService {
     public static final String ACCESS_TOKEN_COOKIE = "access_token";
     public static final String REFRESH_TOKEN_COOKIE = "refresh_token";
     public static final String JSESSIONID = "JSESSIONID";
+    private static final String OAUTH_STATE_COOKIE_PREFIX = "of_oauth_";
 
     @Value("${security.oauth2.token.access.expiration-seconds}")
     private int accessTokenExpirationSeconds;
@@ -55,15 +56,45 @@ public class CookieService {
         ResponseCookie clearedAccess = createClearedCookie(ACCESS_TOKEN, "/");
         ResponseCookie clearedRefresh = createClearedCookie(REFRESH_TOKEN, "/oauth");
         ResponseCookie clearedAuthSession = createClearedCookie(JSESSIONID, "/sas");
+        ResponseCookie clearedAuthSessionHostOnly = createClearedCookieHostOnly(JSESSIONID, "/sas");
 
         headers.add(SET_COOKIE, clearedAccess.toString());
         headers.add(SET_COOKIE, clearedRefresh.toString());
         headers.add(SET_COOKIE, clearedAuthSession.toString());
+        headers.add(SET_COOKIE, clearedAuthSessionHostOnly.toString());
     }
 
     public void addClearSasCookies(HttpHeaders headers) {
         ResponseCookie clearedAuthSession = createClearedCookie(JSESSIONID, "/sas");
+        ResponseCookie clearedAuthSessionHostOnly = createClearedCookieHostOnly(JSESSIONID, "/sas");
         headers.add(SET_COOKIE, clearedAuthSession.toString());
+        headers.add(SET_COOKIE, clearedAuthSessionHostOnly.toString());
+    }
+
+    /**
+     * Adds a short-lived signed OAuth state cookie bound to the specific state value.
+     * Cookie name format: of_oauth_{state}, Path=/oauth
+     */
+    public void addOAuthStateCookie(HttpHeaders headers, String state, String jwtValue, int ttlSeconds) {
+        String name = OAUTH_STATE_COOKIE_PREFIX + state;
+        ResponseCookie cookie = ResponseCookie.from(name, jwtValue)
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .sameSite(cookieSameSite)
+                .path("/oauth")
+                .maxAge(ttlSeconds)
+                .domain(domain)
+                .build();
+        headers.add(SET_COOKIE, cookie.toString());
+    }
+
+    /**
+     * Clears the OAuth state cookie for given state.
+     */
+    public void addClearOAuthStateCookie(HttpHeaders headers, String state) {
+        String name = OAUTH_STATE_COOKIE_PREFIX + state;
+        ResponseCookie cleared = createClearedCookie(name, "/oauth");
+        headers.add(SET_COOKIE, cleared.toString());
     }
 
 
@@ -76,18 +107,26 @@ public class CookieService {
     }
 
     private ResponseCookie createCookie(String name, String value, String path, int age) {
+        return createCookie(name, value, path, age, true);
+    }
+
+    private ResponseCookie createCookie(String name, String value, String path, int age, boolean includeDomain) {
         return ResponseCookie.from(name, value)
                 .httpOnly(true)
                 .secure(cookieSecure)
                 .sameSite(cookieSameSite)
                 .path(path)
                 .maxAge(age)
-                .domain(domain)
+                .domain(includeDomain ? domain : null)
                 .build();
     }
 
     private ResponseCookie createClearedCookie(String name, String path) {
         return createCookie(name, "", path, 0);
+    }
+
+    private ResponseCookie createClearedCookieHostOnly(String name, String path) {
+        return createCookie(name, "", path, 0, false);
     }
 
     /**
