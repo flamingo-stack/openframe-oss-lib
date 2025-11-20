@@ -27,6 +27,7 @@ public class CookieService {
     public static final String ACCESS_TOKEN_COOKIE = "access_token";
     public static final String REFRESH_TOKEN_COOKIE = "refresh_token";
     public static final String JSESSIONID = "JSESSIONID";
+    private static final String OAUTH_STATE_COOKIE_PREFIX = "of_oauth_";
 
     @Value("${security.oauth2.token.access.expiration-seconds}")
     private int accessTokenExpirationSeconds;
@@ -64,6 +65,32 @@ public class CookieService {
     public void addClearSasCookies(HttpHeaders headers) {
         ResponseCookie clearedAuthSession = createClearedCookie(JSESSIONID, "/sas");
         headers.add(SET_COOKIE, clearedAuthSession.toString());
+    }
+
+    /**
+     * Adds a short-lived signed OAuth state cookie bound to the specific state value.
+     * Cookie name format: of_oauth_{state}, Path=/oauth
+     */
+    public void addOAuthStateCookie(HttpHeaders headers, String state, String jwtValue, int ttlSeconds) {
+        String name = OAUTH_STATE_COOKIE_PREFIX + state;
+        ResponseCookie cookie = ResponseCookie.from(name, jwtValue)
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .sameSite(cookieSameSite)
+                .path("/oauth")
+                .maxAge(ttlSeconds)
+                .domain(domain)
+                .build();
+        headers.add(SET_COOKIE, cookie.toString());
+    }
+
+    /**
+     * Clears the OAuth state cookie for given state.
+     */
+    public void addClearOAuthStateCookie(HttpHeaders headers, String state) {
+        String name = OAUTH_STATE_COOKIE_PREFIX + state;
+        ResponseCookie cleared = createClearedCookie(name, "/oauth");
+        headers.add(SET_COOKIE, cleared.toString());
     }
 
 

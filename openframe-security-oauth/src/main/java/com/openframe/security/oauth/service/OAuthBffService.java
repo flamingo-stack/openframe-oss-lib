@@ -1,5 +1,6 @@
 package com.openframe.security.oauth.service;
 
+import com.openframe.security.jwt.JwtService;
 import com.openframe.security.oauth.dto.OAuthCallbackResult;
 import com.openframe.security.oauth.dto.TokenResponse;
 import com.openframe.security.oauth.headers.ForwardedHeadersContributor;
@@ -20,6 +21,7 @@ import reactor.core.publisher.Mono;
 import com.openframe.security.oauth.service.redirect.RedirectTargetResolver;
 
 import java.util.Base64;
+import java.util.Optional;
 
 import static com.openframe.core.constants.HttpHeaders.ACCEPT;
 import static com.openframe.security.pkce.PKCEUtils.*;
@@ -36,6 +38,7 @@ public class OAuthBffService {
     private final WebClient.Builder webClientBuilder;
     private final RedirectTargetResolver redirectTargetResolver;
     private final ForwardedHeadersContributor headersContributor;
+    private final JwtService jwtService;
 
     @Value("${openframe.auth.server.url}")
     private String authServerUrl;
@@ -52,36 +55,29 @@ public class OAuthBffService {
     @Value("${openframe.gateway.oauth.redirect-uri}")
     private String redirectUri;
 
-    public Mono<String> buildAuthorizeRedirect(String tenantId,
-                                               String redirectTo,
-                                               String provider,
-                                               WebSession session,
-                                               ServerHttpRequest request) {
+    public Mono<AuthorizeData> buildAuthorizeRedirect(String tenantId,
+                                                      String redirectTo,
+                                                      String provider,
+                                                      WebSession session,
+                                                      ServerHttpRequest request) {
         String codeVerifier = generateCodeVerifier();
         String codeChallenge = generateCodeChallenge(codeVerifier);
         String state = generateState();
 
-        session.getAttributes().put("oauth:state", state);
-        session.getAttributes().put("oauth:code_verifier:" + state, codeVerifier);
-        session.getAttributes().put("oauth:tenant_id:" + state, tenantId);
-
         String effectiveRedirect = resolveRedirectTarget(redirectTo, request);
-        if (isAbsoluteUrl(effectiveRedirect)) {
-            session.getAttributes().put("oauth:redirect_to:" + state, effectiveRedirect);
-        }
+        String absoluteRedirect = isAbsoluteUrl(effectiveRedirect) ? effectiveRedirect : null;
 
         String authorizeUrl = buildAuthorizeUrl(tenantId, codeChallenge, state, provider);
-        return Mono.just(authorizeUrl);
+        return Mono.just(new AuthorizeData(authorizeUrl, state, codeVerifier, tenantId, absoluteRedirect));
     }
 
     public Mono<OAuthCallbackResult> handleCallback(String code,
                                                     String state,
                                                     WebSession session,
                                                     ServerHttpRequest request) {
-        OAuthSessionData sessionData = validateAndExtractSessionData(session, state);
-        if (sessionData == null) {
-            return Mono.error(new IllegalStateException("invalid_state"));
-        }
+        OAuthSessionData sessionData = validateAndExtractCookieData(state, request)
+                .orElse(null);
+        if (sessionData == null) return Mono.error(new IllegalStateException("invalid_state"));
         return exchangeCodeForTokens(sessionData, code, request)
                 .flatMap(tokens -> redirectTargetResolver
                         .resolve(sessionData.tenantId(), sessionData.redirectTo(), session, request)
@@ -112,26 +108,23 @@ public class OAuthBffService {
         return base;
     }
 
-    private OAuthSessionData validateAndExtractSessionData(WebSession session, String state) {
-        String expectedState = (String) session.getAttributes().get("oauth:state");
-        if (expectedState == null || !expectedState.equals(state)) {
-            return null;
+    private Optional<OAuthSessionData> validateAndExtractCookieData(String state, ServerHttpRequest request) {
+        String cookieName = "of_oauth_" + state;
+        var cookie = request.getCookies().getFirst(cookieName);
+        if (cookie == null) return Optional.empty();
+        try {
+            var jwt = jwtService.decodeToken(cookie.getValue());
+            String tokenState = (String) jwt.getClaims().get("s");
+            if (tokenState == null || !tokenState.equals(state)) return Optional.empty();
+            String codeVerifier = (String) jwt.getClaims().get("cv");
+            String tenantId = (String) jwt.getClaims().get("tid");
+            String redirectTo = (String) jwt.getClaims().get("rt");
+            if (codeVerifier == null || tenantId == null) return Optional.empty();
+            return Optional.of(new OAuthSessionData(codeVerifier, tenantId, isAbsoluteUrl(redirectTo) ? redirectTo : null));
+        } catch (Exception e) {
+            log.warn("Failed to decode OAuth state cookie: {}", e.getMessage());
+            return Optional.empty();
         }
-
-        String codeVerifier = (String) session.getAttributes().get("oauth:code_verifier:" + state);
-        String tenantId = (String) session.getAttributes().get("oauth:tenant_id:" + state);
-        String redirectTo = (String) session.getAttributes().get("oauth:redirect_to:" + state);
-
-        if (codeVerifier == null || tenantId == null) {
-            return null;
-        }
-
-        session.getAttributes().remove("oauth:state");
-        session.getAttributes().remove("oauth:code_verifier:" + state);
-        session.getAttributes().remove("oauth:tenant_id:" + state);
-        session.getAttributes().remove("oauth:redirect_to:" + state);
-
-        return new OAuthSessionData(codeVerifier, tenantId, isAbsoluteUrl(redirectTo) ? redirectTo : null);
     }
 
     private Mono<TokenResponse> exchangeCodeForTokens(OAuthSessionData sessionData, String code, ServerHttpRequest request) {
@@ -222,6 +215,8 @@ public class OAuthBffService {
                 .bodyToMono(Void.class)
                 .onErrorResume(e -> Mono.empty());
     }
+
+    public record AuthorizeData(String authorizeUrl, String state, String codeVerifier, String tenantId, String redirectToAbs) {}
 }
 
 

@@ -3,6 +3,7 @@ package com.openframe.security.oauth.service;
 import com.openframe.security.oauth.dto.TokenResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
 
 import java.util.Map;
 import java.util.UUID;
@@ -15,15 +16,15 @@ public class InMemoryOAuthDevTicketStore implements OAuthDevTicketStore {
     private final Map<String, TokenResponse> store = new ConcurrentHashMap<>();
 
     @Override
-    public String createTicket(TokenResponse tokens) {
+    public Mono<String> createTicket(TokenResponse tokens) {
         String id = UUID.randomUUID().toString();
         store.put(id, tokens);
-        return id;
+        return Mono.just(id);
     }
 
     @Override
-    public TokenResponse consumeTicket(String ticketId) {
-        return store.remove(ticketId);
+    public Mono<TokenResponse> consumeTicket(String ticketId) {
+        return Mono.justOrEmpty(store.remove(ticketId));
     }
 }
 
