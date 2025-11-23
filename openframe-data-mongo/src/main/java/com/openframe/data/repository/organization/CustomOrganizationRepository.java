@@ -7,17 +7,26 @@ import org.springframework.data.mongodb.core.query.Query;
 import java.util.List;
 
 /**
- * Custom repository interface for organization queries with filtering.
+ * Custom repository interface for organization queries with filtering and pagination.
  */
 public interface CustomOrganizationRepository {
-    
+
     /**
      * Build MongoDB query with filters and search.
      */
     Query buildOrganizationQuery(OrganizationQueryFilter filter, String search);
-    
+
     /**
      * Find organizations with filters and search applied at database level.
      */
     List<Organization> findOrganizationsWithFilters(OrganizationQueryFilter filter, String search);
+
+    /**
+     * Find organizations with cursor-based pagination.
+     * @param query MongoDB query with filters applied
+     * @param cursor Starting cursor for pagination (organization ID)
+     * @param limit Maximum number of organizations to return
+     * @return List of organizations
+     */
+    List<Organization> findOrganizationsWithCursor(Query query, String cursor, int limit);
 }

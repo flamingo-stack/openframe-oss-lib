@@ -1,10 +1,14 @@
 extend type Query {
-    # Get all organizations with optional filtering
-    organizations(filter: OrganizationFilterInput, search: String): OrganizationList!
-    
+    # Get all organizations with optional filtering and pagination
+    organizations(
+        filter: OrganizationFilterInput
+        pagination: CursorPaginationInput
+        search: String
+    ): OrganizationConnection!
+
     # Get single organization by ID
     organization(id: String!): Organization
-    
+
     # Get organization by organizationId
     organizationByOrganizationId(organizationId: String!): Organization
 }
@@ -68,6 +72,18 @@ input OrganizationFilterInput {
     hasActiveContract: Boolean
 }
 
+type OrganizationConnection {
+    edges: [OrganizationEdge!]!
+    pageInfo: CursorPageInfo!
+    filteredCount: Int!
+}
+
+type OrganizationEdge {
+    node: Organization!
+    cursor: String!
+}
+
+# Deprecated: Use OrganizationConnection instead
 type OrganizationList {
     organizations: [Organization!]!
 }

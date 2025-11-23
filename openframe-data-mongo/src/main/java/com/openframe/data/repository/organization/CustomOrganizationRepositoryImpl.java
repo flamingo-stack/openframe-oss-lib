@@ -4,6 +4,8 @@ import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.organization.filter.OrganizationQueryFilter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.bson.types.ObjectId;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -77,14 +79,38 @@ public class CustomOrganizationRepositoryImpl implements CustomOrganizationRepos
     @Override
     public List<Organization> findOrganizationsWithFilters(OrganizationQueryFilter filter, String search) {
         Query query = buildOrganizationQuery(filter, search);
-        
+
         // Always exclude soft deleted organizations
         query.addCriteria(new Criteria().orOperator(
                 Criteria.where("deleted").is(false),
                 Criteria.where("deleted").exists(false)
         ));
-        
+
         log.debug("Executing MongoDB query: {}", query);
+        return mongoTemplate.find(query, Organization.class);
+    }
+
+    @Override
+    public List<Organization> findOrganizationsWithCursor(Query query, String cursor, int limit) {
+        // Always exclude soft deleted organizations
+        query.addCriteria(new Criteria().orOperator(
+                Criteria.where("deleted").is(false),
+                Criteria.where("deleted").exists(false)
+        ));
+
+        if (cursor != null && !cursor.trim().isEmpty()) {
+            try {
+                ObjectId cursorId = new ObjectId(cursor);
+                query.addCriteria(Criteria.where("_id").lt(cursorId));
+            } catch (IllegalArgumentException ex) {
+                log.warn("Invalid ObjectId cursor format: {}", cursor);
+            }
+        }
+
+        query.limit(limit);
+        query.with(Sort.by(Sort.Direction.DESC, "_id"));
+
+        log.debug("Executing MongoDB query with cursor pagination: {}", query);
         return mongoTemplate.find(query, Organization.class);
     }
 }
