@@ -14,6 +14,11 @@ public class SSOConfig {
     private String clientSecret;
     private boolean enabled;
     /**
+     * If true, users authenticated via this SSO provider may be auto-provisioned in the system.
+     * If false, only pre-existing users are allowed to sign in via this provider.
+     */
+    private boolean autoProvisionUsers;
+    /**
      * Microsoft Entra tenant ID for Office 365 OIDC (optional for common endpoints).
      */
     private String msTenantId;

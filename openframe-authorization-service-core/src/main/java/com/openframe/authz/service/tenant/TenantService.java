@@ -4,16 +4,14 @@ import com.openframe.data.document.tenant.Tenant;
 import com.openframe.data.document.tenant.TenantPlan;
 import com.openframe.data.document.tenant.TenantStatus;
 import com.openframe.data.repository.tenant.TenantRepository;
-import com.openframe.data.repository.tenant.TenantRepository.DomainView;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
+
+import static java.time.LocalDateTime.now;
 
 /**
  * Service for managing tenants in multi-tenant architecture
@@ -40,6 +38,7 @@ public class TenantService {
                 .id(Tenant.generateTenantId())
                 .name(tenantName)
                 .domain(domain)
+                .createdAt(now())
                 .status(TenantStatus.ACTIVE)
                 .plan(TenantPlan.FREE)
                 .build();
