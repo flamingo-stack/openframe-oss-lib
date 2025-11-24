@@ -1,8 +1,8 @@
 package com.openframe.api.service;
 
+import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.organization.OrganizationFilterOptions;
 import com.openframe.api.dto.organization.OrganizationList;
-import com.openframe.api.dto.organization.OrganizationQueryResult;
 import com.openframe.api.dto.shared.CursorPageInfo;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.data.document.organization.Organization;
@@ -46,7 +46,7 @@ public class OrganizationQueryService {
      * Query organizations with optional filtering, pagination, and search.
      * Filtering happens at MongoDB level for better performance.
      */
-    public OrganizationQueryResult queryOrganizations(
+    public CountedGenericQueryResult<Organization> queryOrganizations(
             OrganizationFilterOptions filterOptions,
             CursorPaginationCriteria paginationCriteria,
             String search) {
@@ -63,8 +63,8 @@ public class OrganizationQueryService {
 
         CursorPageInfo pageInfo = buildPageInfo(pageItems, hasNextPage, normalizedPagination.hasCursor());
 
-        return OrganizationQueryResult.builder()
-                .organizations(pageItems)
+        return CountedGenericQueryResult.<Organization>builder()
+                .items(pageItems)
                 .pageInfo(pageInfo)
                 .filteredCount(pageItems.size())
                 .build();

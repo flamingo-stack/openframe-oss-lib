@@ -68,6 +68,7 @@ public class CustomOrganizationRepositoryImpl implements CustomOrganizationRepos
         if (search != null && !search.trim().isEmpty()) {
             Criteria searchCriteria = new Criteria().orOperator(
                     Criteria.where("name").regex(search, "i"),
+                    Criteria.where("organizationId").regex(search, "i"),
                     Criteria.where("category").regex(search, "i")
             );
             query.addCriteria(searchCriteria);

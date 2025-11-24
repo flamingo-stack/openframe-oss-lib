@@ -1,5 +1,6 @@
 package com.openframe.api.service;
 
+import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.audit.*;
 import com.openframe.api.dto.audit.OrganizationFilterOption;
 import com.openframe.api.dto.shared.CursorPageInfo;
@@ -29,7 +30,7 @@ public class LogService {
     private final UnifiedLogEventRepository unifiedLogEventRepository;
 
 
-    public LogQueryResult queryLogs(LogFilterOptions filter, CursorPaginationCriteria paginationCriteria, String search) {
+    public GenericQueryResult<LogEvent> queryLogs(LogFilterOptions filter, CursorPaginationCriteria paginationCriteria, String search) {
         CursorPaginationCriteria normalizedCriteria = paginationCriteria.normalize();
 
         log.debug("Querying logs with filter: {}, pagination: {}, search: {}",
@@ -66,9 +67,9 @@ public class LogService {
 
         log.debug("Retrieved {} logs from Pinot", logs != null ? logs.size() : 0);
 
-        LogQueryResult result = buildLogQueryResult(logs, cursor, limit);
+        GenericQueryResult<LogEvent> result = buildLogQueryResult(logs, cursor, limit);
 
-        log.debug("Successfully built result with {} events", result.getEvents().size());
+        log.debug("Successfully built result with {} events", result.getItems().size());
         return result;
     }
 
@@ -137,7 +138,7 @@ public class LogService {
     }
 
 
-    private LogQueryResult buildLogQueryResult(List<LogProjection> logs, String cursor, int limit) {
+    private GenericQueryResult<LogEvent> buildLogQueryResult(List<LogProjection> logs, String cursor, int limit) {
         if (logs == null) {
             logs = new ArrayList<>();
         }
@@ -152,8 +153,8 @@ public class LogService {
                 .endCursor(events.isEmpty() ? null : createLogCursor(events.getLast()))
                 .build();
 
-        return LogQueryResult.builder()
-                .events(events)
+        return GenericQueryResult.<LogEvent>builder()
+                .items(events)
                 .pageInfo(pageInfo)
                 .build();
     }

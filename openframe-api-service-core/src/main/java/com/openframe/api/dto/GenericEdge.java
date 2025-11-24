@@ -1,4 +1,4 @@
-package com.openframe.api.dto.audit;
+package com.openframe.api.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class LogEdge {
-    private LogEvent node;
+public class GenericEdge<T> {
+    private T node;
     private String cursor;
 }

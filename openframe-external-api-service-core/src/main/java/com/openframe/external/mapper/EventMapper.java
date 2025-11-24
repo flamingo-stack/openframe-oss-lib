@@ -1,8 +1,8 @@
 package com.openframe.external.mapper;
 
+import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.event.EventFilterOptions;
 import com.openframe.api.dto.event.EventFilters;
-import com.openframe.api.dto.event.EventQueryResult;
 import com.openframe.data.document.event.Event;
 import com.openframe.external.dto.event.EventFilterCriteria;
 import com.openframe.external.dto.event.EventFilterResponse;
@@ -51,12 +51,12 @@ public class EventMapper extends BaseRestMapper {
                 .build();
     }
 
-    public EventsResponse toEventsResponse(EventQueryResult queryResult) {
+    public EventsResponse toEventsResponse(GenericQueryResult<Event> queryResult) {
         if (queryResult == null) {
             return null;
         }
 
-        List<EventResponse> eventResponses = toEventResponseList(queryResult.getEvents());
+        List<EventResponse> eventResponses = toEventResponseList(queryResult.getItems());
         
         return EventsResponse.builder()
                 .events(eventResponses)

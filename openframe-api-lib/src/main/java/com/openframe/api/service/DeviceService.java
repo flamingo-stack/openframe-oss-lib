@@ -1,7 +1,7 @@
 package com.openframe.api.service;
 
+import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.device.DeviceFilterOptions;
-import com.openframe.api.dto.device.DeviceQueryResult;
 import com.openframe.api.dto.shared.CursorPageInfo;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.data.document.device.Machine;
@@ -43,9 +43,9 @@ public class DeviceService {
         return result;
     }
 
-    public DeviceQueryResult queryDevices(DeviceFilterOptions filterOptions,
-                                          CursorPaginationCriteria paginationCriteria,
-                                          String search) {
+    public CountedGenericQueryResult<Machine> queryDevices(DeviceFilterOptions filterOptions,
+                                                  CursorPaginationCriteria paginationCriteria,
+                                                  String search) {
         log.debug("Querying devices with filter: {}, pagination: {}, search: {}",
                 filterOptions, paginationCriteria, search);
 
@@ -57,8 +57,8 @@ public class DeviceService {
         
         CursorPageInfo pageInfo = buildPageInfo(pageItems, hasNextPage, normalizedPagination.hasCursor());
 
-        return DeviceQueryResult.builder()
-                .devices(pageItems)
+        return CountedGenericQueryResult.<Machine>builder()
+                .items(pageItems)
                 .pageInfo(pageInfo)
                 .filteredCount(pageItems.size())
                 .build();
