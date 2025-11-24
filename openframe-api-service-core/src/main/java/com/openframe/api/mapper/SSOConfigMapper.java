@@ -18,6 +18,7 @@ public class SSOConfigMapper {
         config.setClientSecret(encryptionService.encryptClientSecret(request.getClientSecret()));
         config.setAutoProvisionUsers(TRUE.equals(request.getAutoProvisionUsers()));
         config.setMsTenantId(request.getMsTenantId());
+        config.setAllowedDomains(request.getAllowedDomains());
         config.setEnabled(true);
         return config;
     }
@@ -27,6 +28,7 @@ public class SSOConfigMapper {
         existing.setClientSecret(encryptionService.encryptClientSecret(request.getClientSecret()));
         existing.setAutoProvisionUsers(TRUE.equals(request.getAutoProvisionUsers()));
         existing.setMsTenantId(request.getMsTenantId());
+        existing.setAllowedDomains(request.getAllowedDomains());
     }
 
     public SSOConfigResponse toResponse(SSOConfig entity, String decryptedSecret) {
@@ -38,6 +40,7 @@ public class SSOConfigMapper {
                 .autoProvisionUsers(entity.isAutoProvisionUsers())
                 .msTenantId(entity.getMsTenantId())
                 .enabled(entity.isEnabled())
+                .allowedDomains(entity.getAllowedDomains())
                 .build();
     }
 }

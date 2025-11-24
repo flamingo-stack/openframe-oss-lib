@@ -3,6 +3,8 @@ package com.openframe.api.dto;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class SSOConfigRequest {
 
@@ -19,4 +21,9 @@ public class SSOConfigRequest {
     private Boolean autoProvisionUsers;
 
     private String msTenantId;
+
+    /**
+     * Whitelisted email domains for auto-provisioning.
+     */
+    private List<String> allowedDomains;
 } 

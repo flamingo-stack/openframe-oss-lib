@@ -26,6 +26,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static com.openframe.data.document.user.UserRole.ADMIN;
+import static java.util.Locale.ROOT;
 
 /**
  * Security Configuration for Default Requests
@@ -107,7 +108,10 @@ public class SecurityConfig {
                             }
                             String email = user.getEmail();
                             if (email != null && !email.isBlank()) {
-                                boolean exists = userService.findActiveByEmailAndTenant(email.toLowerCase(java.util.Locale.ROOT), tenantId).isPresent();
+                                if (!isEmailAllowedByDomains(cfg.getAllowedDomains(), email)) {
+                                    return;
+                                }
+                                boolean exists = userService.findActiveByEmailAndTenant(email.toLowerCase(ROOT), tenantId).isPresent();
                                 if (!exists) {
                                     String givenName = valueOrNull(user.getClaims().get("given_name"));
                                     String familyName = valueOrNull(user.getClaims().get("family_name"));
@@ -131,5 +135,16 @@ public class SecurityConfig {
 
     private static String valueOrNull(Object claim) {
         return claim instanceof String s && !s.isBlank() ? s : null;
+    }
+
+    private boolean isEmailAllowedByDomains(List<String> allowedDomains, String email) {
+        if (allowedDomains == null || allowedDomains.isEmpty()) {
+            return false;
+        }
+        String domain = email.substring(email.lastIndexOf('@') + 1)
+                .toLowerCase(ROOT);
+        return allowedDomains.stream()
+                .map(d -> d.toLowerCase(ROOT))
+                .anyMatch(domain::equals);
     }
 }

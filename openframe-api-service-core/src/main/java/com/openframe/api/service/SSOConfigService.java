@@ -129,6 +129,13 @@ public class SSOConfigService {
     private void validateAutoProvision(String provider, SSOConfigRequest request) {
         boolean isMicrosoft = MICROSOFT.equals(provider);
         boolean wantsAutoProvision = TRUE.equals(request.getAutoProvisionUsers());
+        if (wantsAutoProvision) {
+            var domains = request.getAllowedDomains();
+            boolean hasAtLeastOne = domains != null && domains.stream().anyMatch(d -> d != null && !d.isBlank());
+            if (!hasAtLeastOne) {
+                throw new IllegalArgumentException("allowedDomains must contain at least one domain when autoProvisionUsers is true.");
+            }
+        }
         if (isMicrosoft && wantsAutoProvision) {
             String msTenantId = request.getMsTenantId();
             if (msTenantId == null || msTenantId.isBlank()) {
