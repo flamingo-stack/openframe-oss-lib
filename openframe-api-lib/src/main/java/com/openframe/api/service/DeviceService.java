@@ -4,6 +4,8 @@ import com.openframe.api.dto.device.DeviceFilterOptions;
 import com.openframe.api.dto.device.DeviceQueryResult;
 import com.openframe.api.dto.shared.CursorPageInfo;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.exception.DeviceNotFoundException;
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.MachineTag;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
@@ -15,6 +17,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import java.time.Instant;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
@@ -127,5 +130,20 @@ public class DeviceService {
         queryFilter.setOrganizationIds(filter.getOrganizationIds());
         queryFilter.setTagNames(filter.getTagNames());
         return queryFilter;
+    }
+
+    public void softDeleteByMachineId(@NotBlank String machineId) {
+        log.info("Soft deleting device with machineId={}", machineId);
+        Machine machine = machineRepository.findByMachineId(machineId)
+                .orElseThrow(() -> new DeviceNotFoundException("Device not found: " + machineId));
+
+        if (machine.getStatus() != DeviceStatus.DELETED) {
+            machine.setStatus(DeviceStatus.DELETED);
+            machine.setUpdatedAt(Instant.now());
+            machineRepository.save(machine);
+            log.info("Device {} marked as DELETED", machineId);
+        } else {
+            log.warn("Device {} is already DELETED", machineId);
+        }
     }
 } 

@@ -121,7 +121,7 @@ class AgentRegistrationServiceTest {
         assertEquals("00:11:22:33:44:55", savedMachine.getMacAddress());
         assertEquals("test-os-uuid", savedMachine.getOsUuid());
         assertEquals("1.0.0", savedMachine.getAgentVersion());
-        assertEquals(DeviceStatus.ACTIVE, savedMachine.getStatus());
+        assertEquals(DeviceStatus.PENDING, savedMachine.getStatus());
         assertNotNull(savedMachine.getLastSeen());
     }
 

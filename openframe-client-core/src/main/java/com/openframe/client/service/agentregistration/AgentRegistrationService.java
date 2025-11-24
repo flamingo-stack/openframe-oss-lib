@@ -135,7 +135,7 @@ public class AgentRegistrationService {
         machine.setOsUuid(request.getOsUuid());
         machine.setAgentVersion(request.getAgentVersion());
         machine.setLastSeen(Instant.now());
-        machine.setStatus(DeviceStatus.ACTIVE);
+        machine.setStatus(DeviceStatus.PENDING);
         machine.setOrganizationId(organizationId);
         machine.setType(DeviceType.DESKTOP);
 

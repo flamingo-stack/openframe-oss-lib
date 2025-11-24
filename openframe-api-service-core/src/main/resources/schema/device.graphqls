@@ -78,12 +78,14 @@ type Tag {
 }
 
 enum DeviceStatus {
+    PENDING,
     ACTIVE
     INACTIVE
     MAINTENANCE
     DECOMMISSIONED,
     ONLINE, 
-    OFFLINE
+    OFFLINE,
+    DELETED
 }
 
 enum DeviceType {
