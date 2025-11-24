@@ -9,8 +9,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.LinkedHashSet;
+import java.util.Set;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @Slf4j
 @Service
@@ -65,6 +69,25 @@ public class SSOConfigService {
      */
     public List<SSOPerTenantConfig> getActiveForTenant(String tenantId) {
         return ssoPerTenantConfigRepository.findByTenantIdAndEnabledTrue(tenantId);
+    }
+
+    /**
+     * Get effective providers for tenant: union of active per-tenant providers and available defaults from properties.
+     */
+    public List<String> getEffectiveProvidersForTenant(String tenantId) {
+        Set<String> result = new LinkedHashSet<>();
+
+        for (SSOPerTenantConfig cfg : getActiveForTenant(tenantId)) {
+                result.add(cfg.getProvider().toLowerCase());
+        }
+
+        for (DefaultProviderConfig cfg : defaultProviderConfigs) {
+            if (isNotBlank(cfg.getDefaultClientId()) && isNotBlank(cfg.getDefaultClientSecret())) {
+                    result.add(cfg.providerId().toLowerCase());
+            }
+        }
+
+        return new ArrayList<>(result);
     }
 
     /**
