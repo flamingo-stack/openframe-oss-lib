@@ -28,5 +28,4 @@ public class SSOConfig {
      * Whitelisted email domains for auto-provisioning. If empty/null, any domain is allowed.
      */
     private List<String> allowedDomains;
-
 }
