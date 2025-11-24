@@ -12,5 +12,11 @@ public class SSOConfigRequest {
     @NotBlank(message = "Client Secret cannot be empty")
     private String clientSecret;
 
+    /**
+     * If true, users authenticated via this SSO provider may be auto-provisioned in the system.
+     * If false, only pre-existing users are allowed to sign in via this provider.
+     */
+    private Boolean autoProvisionUsers;
+
     private String msTenantId;
 } 

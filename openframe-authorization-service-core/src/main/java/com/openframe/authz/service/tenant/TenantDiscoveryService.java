@@ -3,7 +3,6 @@ package com.openframe.authz.service.tenant;
 import com.openframe.authz.dto.TenantDiscoveryResponse;
 import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.authz.service.user.UserService;
-import com.openframe.data.document.tenant.SSOPerTenantConfig;
 import com.openframe.data.document.tenant.Tenant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -66,12 +65,7 @@ public class TenantDiscoveryService {
      */
     private List<String> getAvailableAuthProviders(Tenant tenant) {
 
-        List<String> ssoProviders;
-        ssoProviders = ssoConfigService.getActiveForTenant(localTenant ? null : tenant.getId())
-                .stream()
-                .map(SSOPerTenantConfig::getProvider)
-                .map(String::toLowerCase)
-                .toList();
+        List<String> ssoProviders = ssoConfigService.getEffectiveProvidersForTenant(localTenant ? null : tenant.getId());
 
         List<String> providers = new ArrayList<>(ssoProviders);
         providers.add(DEFAULT_PROVIDER);

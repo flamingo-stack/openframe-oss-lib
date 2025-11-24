@@ -6,6 +6,8 @@ import com.openframe.core.service.EncryptionService;
 import com.openframe.data.document.sso.SSOConfig;
 import org.springframework.stereotype.Component;
 
+import static java.lang.Boolean.TRUE;
+
 @Component
 public class SSOConfigMapper {
 
@@ -14,6 +16,7 @@ public class SSOConfigMapper {
         config.setProvider(provider);
         config.setClientId(request.getClientId());
         config.setClientSecret(encryptionService.encryptClientSecret(request.getClientSecret()));
+        config.setAutoProvisionUsers(TRUE.equals(request.getAutoProvisionUsers()));
         config.setMsTenantId(request.getMsTenantId());
         config.setEnabled(true);
         return config;
@@ -22,6 +25,7 @@ public class SSOConfigMapper {
     public void updateEntity(SSOConfig existing, SSOConfigRequest request, EncryptionService encryptionService) {
         existing.setClientId(request.getClientId());
         existing.setClientSecret(encryptionService.encryptClientSecret(request.getClientSecret()));
+        existing.setAutoProvisionUsers(TRUE.equals(request.getAutoProvisionUsers()));
         existing.setMsTenantId(request.getMsTenantId());
     }
 
@@ -31,6 +35,7 @@ public class SSOConfigMapper {
                 .provider(entity.getProvider())
                 .clientId(entity.getClientId())
                 .clientSecret(decryptedSecret)
+                .autoProvisionUsers(entity.isAutoProvisionUsers())
                 .msTenantId(entity.getMsTenantId())
                 .enabled(entity.isEnabled())
                 .build();

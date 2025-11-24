@@ -1,4 +1,4 @@
-package com.openframe.data.сonfig;
+package com.openframe.data.config;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;

@@ -5,11 +5,11 @@ import com.openframe.api.dto.SSOConfigRequest;
 import com.openframe.api.dto.SSOConfigResponse;
 import com.openframe.api.dto.SSOConfigStatusResponse;
 import com.openframe.api.dto.SSOProviderInfo;
+import com.openframe.api.mapper.SSOConfigMapper;
 import com.openframe.api.service.processor.SSOConfigProcessor;
 import com.openframe.core.service.EncryptionService;
 import com.openframe.data.document.sso.SSOConfig;
 import com.openframe.data.repository.sso.SSOConfigRepository;
-import com.openframe.api.mapper.SSOConfigMapper;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +18,8 @@ import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
 import java.util.stream.Collectors;
+
+import static java.lang.Boolean.TRUE;
 
 @Slf4j
 @Service
@@ -29,6 +31,8 @@ public class SSOConfigService {
     private final SSOProperties ssoProperties;
     private final SSOConfigProcessor ssoConfigProcessor;
     private final SSOConfigMapper ssoConfigMapper;
+
+    private static final String MICROSOFT = "microsoft";
 
     /**
      * Get list of enabled SSO providers - used by login components
@@ -66,11 +70,13 @@ public class SSOConfigService {
                         .clientId(null)
                         .clientSecret(null)
                         .msTenantId(null)
+                        .autoProvisionUsers(false)
                         .enabled(false)
                         .build());
     }
 
     private SSOConfigResponse saveConfig(String provider, @Valid SSOConfigRequest request) {
+        validateAutoProvision(provider, request);
         SSOConfig config = ssoConfigMapper.toEntity(provider, request, encryptionService);
 
         SSOConfig savedConfig = ssoConfigRepository.save(config);
@@ -93,6 +99,7 @@ public class SSOConfigService {
     public SSOConfigResponse upsertConfig(String provider, @Valid SSOConfigRequest request) {
         return ssoConfigRepository.findByProvider(provider)
                 .map(existingConfig -> {
+                    validateAutoProvision(provider, request);
                     ssoConfigMapper.updateEntity(existingConfig, request, encryptionService);
                     SSOConfig savedConfig = ssoConfigRepository.save(existingConfig);
                     log.info("Successfully updated SSO configuration for provider '{}'", provider);
@@ -117,5 +124,16 @@ public class SSOConfigService {
 
                     ssoConfigProcessor.postProcessConfigToggled(savedConfig);
                 });
+    }
+
+    private void validateAutoProvision(String provider, SSOConfigRequest request) {
+        boolean isMicrosoft = MICROSOFT.equals(provider);
+        boolean wantsAutoProvision = TRUE.equals(request.getAutoProvisionUsers());
+        if (isMicrosoft && wantsAutoProvision) {
+            String msTenantId = request.getMsTenantId();
+            if (msTenantId == null || msTenantId.isBlank()) {
+                throw new IllegalArgumentException("autoProvisionUsers can be true only for Microsoft single-tenant apps (msTenantId is required).");
+            }
+        }
     }
 } 
