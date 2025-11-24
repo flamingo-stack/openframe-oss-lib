@@ -3,6 +3,8 @@ package com.openframe.api.dto;
 import lombok.Builder;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 @Builder
 public class SSOConfigResponse {
@@ -13,4 +15,5 @@ public class SSOConfigResponse {
     private boolean autoProvisionUsers;
     private String msTenantId;
     private boolean enabled;
+    private List<String> allowedDomains;
 } 

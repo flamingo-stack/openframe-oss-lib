@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.Locale;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @Slf4j
@@ -88,6 +89,21 @@ public class SSOConfigService {
         }
 
         return new ArrayList<>(result);
+    }
+
+    /**
+     * Find enabled, auto-provisioning SSO config by email domain (lowercased).
+     */
+    public Optional<SSOPerTenantConfig> findAutoProvisionByDomain(String domain) {
+        if (domain == null || domain.isBlank()) {
+            return Optional.empty();
+        }
+        String d = domain.toLowerCase(Locale.ROOT);
+        List<SSOPerTenantConfig> matches = ssoPerTenantConfigRepository.findByAllowedDomainsIn(List.of(d));
+        return matches.stream()
+                .filter(SSOPerTenantConfig::isEnabled)
+                .filter(SSOPerTenantConfig::isAutoProvisionUsers)
+                .findFirst();
     }
 
     /**

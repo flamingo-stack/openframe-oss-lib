@@ -13,6 +13,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static java.util.Locale.ROOT;
+
 /**
  * Service for tenant discovery based on user email
  * Helps users find which tenants they have access to
@@ -54,10 +56,23 @@ public class TenantDiscoveryService {
                                 .hasExistingAccounts(false)
                                 .build())
                 )
-                .orElseGet(() -> TenantDiscoveryResponse.builder()
-                        .email(email)
-                        .hasExistingAccounts(false)
-                        .build());
+                .orElseGet(() -> {
+                    // Fallback: no existing user. Try domain-based discovery via allowedDomains + autoProvision flag.
+                    int at = email.lastIndexOf('@');
+                    String domain = email.substring(at + 1).toLowerCase(ROOT);
+                    return ssoConfigService.findAutoProvisionByDomain(domain)
+                            .flatMap(cfg -> localTenant ? tenantService.findFirst() : tenantService.findById(cfg.getTenantId()).filter(Tenant::isActive))
+                            .map(tenant -> TenantDiscoveryResponse.builder()
+                                    .email(email)
+                                    .hasExistingAccounts(true)
+                                    .tenantId(tenant.getId())
+                                    .authProviders(getAvailableAuthProviders(tenant))
+                                    .build())
+                            .orElseGet(() -> TenantDiscoveryResponse.builder()
+                                    .email(email)
+                                    .hasExistingAccounts(false)
+                                    .build());
+                });
     }
 
     /**

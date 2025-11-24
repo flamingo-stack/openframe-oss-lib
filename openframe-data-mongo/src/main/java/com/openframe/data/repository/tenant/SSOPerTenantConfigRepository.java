@@ -14,4 +14,9 @@ public interface SSOPerTenantConfigRepository extends MongoRepository<SSOPerTena
     Optional<SSOPerTenantConfig> findByProvider(String provider);
 
     Optional<SSOPerTenantConfig> findFirstByTenantIdAndProviderAndEnabledTrue(String tenantId, String provider);
+
+    /**
+     * Find per-tenant SSO configs that contain any of the given allowed domains.
+     */
+    List<SSOPerTenantConfig> findByAllowedDomainsIn(List<String> domains);
 }

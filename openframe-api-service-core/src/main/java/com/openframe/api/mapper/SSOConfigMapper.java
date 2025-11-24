@@ -7,6 +7,9 @@ import com.openframe.data.document.sso.SSOConfig;
 import org.springframework.stereotype.Component;
 
 import static java.lang.Boolean.TRUE;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Component
 public class SSOConfigMapper {
@@ -18,6 +21,7 @@ public class SSOConfigMapper {
         config.setClientSecret(encryptionService.encryptClientSecret(request.getClientSecret()));
         config.setAutoProvisionUsers(TRUE.equals(request.getAutoProvisionUsers()));
         config.setMsTenantId(request.getMsTenantId());
+        config.setAllowedDomains(normalizeDomains(request.getAllowedDomains()));
         config.setEnabled(true);
         return config;
     }
@@ -27,6 +31,7 @@ public class SSOConfigMapper {
         existing.setClientSecret(encryptionService.encryptClientSecret(request.getClientSecret()));
         existing.setAutoProvisionUsers(TRUE.equals(request.getAutoProvisionUsers()));
         existing.setMsTenantId(request.getMsTenantId());
+        existing.setAllowedDomains(normalizeDomains(request.getAllowedDomains()));
     }
 
     public SSOConfigResponse toResponse(SSOConfig entity, String decryptedSecret) {
@@ -38,7 +43,19 @@ public class SSOConfigMapper {
                 .autoProvisionUsers(entity.isAutoProvisionUsers())
                 .msTenantId(entity.getMsTenantId())
                 .enabled(entity.isEnabled())
+                .allowedDomains(entity.getAllowedDomains())
                 .build();
+    }
+
+    private List<String> normalizeDomains(List<String> domains) {
+        if (domains == null) return List.of();
+        return domains.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .map(s -> s.toLowerCase(java.util.Locale.ROOT))
+                .distinct()
+                .collect(Collectors.toList());
     }
 }
 
