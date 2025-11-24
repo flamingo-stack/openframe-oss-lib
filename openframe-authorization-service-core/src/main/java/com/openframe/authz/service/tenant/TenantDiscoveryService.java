@@ -61,7 +61,7 @@ public class TenantDiscoveryService {
                     int at = email.lastIndexOf('@');
                     String domain = email.substring(at + 1).toLowerCase(ROOT);
                     return ssoConfigService.findAutoProvisionByDomain(domain)
-                            .flatMap(cfg -> tenantService.findById(cfg.getTenantId()).filter(Tenant::isActive))
+                            .flatMap(cfg -> localTenant ? tenantService.findFirst() : tenantService.findById(cfg.getTenantId()).filter(Tenant::isActive))
                             .map(tenant -> TenantDiscoveryResponse.builder()
                                     .email(email)
                                     .hasExistingAccounts(true)
