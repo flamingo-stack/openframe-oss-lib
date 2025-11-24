@@ -22,8 +22,8 @@ public abstract class BaseOidcClientRegistrationStrategy implements ClientRegist
     @Override
     public ClientRegistration buildClient(String tenantId) {
         String provider = providerId();
-        SSOConfig cfg = ssoConfigService.getSSOConfig(tenantId, provider)
-                .orElseThrow(() -> new IllegalArgumentException("No active SSO config for provider '" + provider + "' and tenant " + tenantId));
+        SSOConfig cfg = ssoConfigService.getEffectiveSSOConfig(tenantId, provider)
+                .orElseThrow(() -> new IllegalArgumentException("No active SSO config for provider '" + provider + "' (tenant-specific or default) and tenant " + tenantId));
 
         AbstractOidcProviderProperties props = props();
         String msTenantId = cfg.getMsTenantId();
