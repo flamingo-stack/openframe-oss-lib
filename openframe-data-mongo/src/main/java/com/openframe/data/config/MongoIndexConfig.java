@@ -1,4 +1,4 @@
-package com.openframe.data.сonfig;
+package com.openframe.data.config;
 
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;

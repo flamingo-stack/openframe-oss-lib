@@ -10,6 +10,7 @@ public class SSOConfigResponse {
     private String provider;
     private String clientId;
     private String clientSecret;
+    private boolean autoProvisionUsers;
     private String msTenantId;
     private boolean enabled;
 } 

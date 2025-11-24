@@ -1,5 +1,9 @@
 package com.openframe.authz.config;
 
+import com.openframe.authz.config.tenant.TenantContext;
+import com.openframe.authz.service.sso.SSOConfigService;
+import com.openframe.authz.service.user.UserService;
+import com.openframe.data.document.tenant.SSOPerTenantConfig;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -17,7 +21,11 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.SecurityFilterChain;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import java.util.UUID;
+
+import static com.openframe.data.document.user.UserRole.ADMIN;
 
 /**
  * Security Configuration for Default Requests
@@ -62,10 +70,13 @@ public class SecurityConfig {
     }
 
     @Bean
-    public OAuth2UserService<OidcUserRequest, OidcUser> oidcUserService() {
+    public OAuth2UserService<OidcUserRequest, OidcUser> oidcUserService(SSOConfigService ssoConfigService,
+                                                                         UserService userService) {
         OidcUserService delegate = new OidcUserService();
         return userRequest -> {
             OidcUser user = delegate.loadUser(userRequest);
+
+            autoProvisionIfNeeded(userRequest, user, ssoConfigService, userService);
 
             Set<GrantedAuthority> authorities = new HashSet<>(user.getAuthorities());
 
@@ -77,5 +88,48 @@ public class SecurityConfig {
 
             return new DefaultOidcUser(authorities, userRequest.getIdToken(), userInfo, nameKey);
         };
+    }
+
+    private void autoProvisionIfNeeded(OidcUserRequest userRequest,
+                                       OidcUser user,
+                                       SSOConfigService ssoConfigService,
+                                       UserService userService) {
+        // Auto-provision user if provider is configured with autoProvisionUsers=true
+        try {
+            String tenantId = TenantContext.getTenantId();
+            String provider = userRequest.getClientRegistration().getRegistrationId();
+            if (tenantId != null && provider != null) {
+                ssoConfigService.getSSOConfig(tenantId, provider)
+                        .filter(SSOPerTenantConfig::isEnabled)
+                        .ifPresent(cfg -> {
+                            if (!cfg.isAutoProvisionUsers()) {
+                                return;
+                            }
+                            String email = user.getEmail();
+                            if (email != null && !email.isBlank()) {
+                                boolean exists = userService.findActiveByEmailAndTenant(email.toLowerCase(java.util.Locale.ROOT), tenantId).isPresent();
+                                if (!exists) {
+                                    String givenName = valueOrNull(user.getClaims().get("given_name"));
+                                    String familyName = valueOrNull(user.getClaims().get("family_name"));
+                                    String password = UUID.randomUUID().toString();
+                                    userService.registerUser(
+                                            tenantId,
+                                            email,
+                                            givenName,
+                                            familyName,
+                                            password,
+                                            List.of(ADMIN)
+                                    );
+                                }
+                            }
+                        });
+            }
+        } catch (Exception ignored) {
+            // Do not block login flow if provisioning has a non-critical issue
+        }
+    }
+
+    private static String valueOrNull(Object claim) {
+        return claim instanceof String s && !s.isBlank() ? s : null;
     }
 }

@@ -10,6 +10,10 @@ public abstract class AbstractOidcProviderProperties {
     private String registrationRedirectUri;
     private String loginRedirectUri;
 
+    // Optional defaults to allow global fallback when tenant-specific config is absent
+    private String defaultClientId;
+    private String defaultClientSecret;
+
     private String authorizationUrl;
     private String tokenUrl;
     private String userInfoUrl;
