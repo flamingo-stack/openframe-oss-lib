@@ -48,6 +48,7 @@
         <module>openframe-authorization-service-core</module>
         <module>openframe-client-core</module>
         <module>openframe-api-service-core</module>
+        <module>openframe-management-service-core</module>
         <module>sdk/fleetmdm</module>
         <module>sdk/tacticalrmm</module>
         <module>openframe-security-oauth</module>
@@ -118,6 +119,11 @@
             <dependency>
                 <groupId>com.openframe.oss</groupId>
                 <artifactId>openframe-client-core</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openframe.oss</groupId>
+                <artifactId>openframe-management-service-core</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
