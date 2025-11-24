@@ -56,7 +56,7 @@ public class OrganizationQueryService {
 
         CursorPaginationCriteria normalizedPagination = paginationCriteria.normalize();
         OrganizationQueryFilter queryFilter = buildQueryFilter(filterOptions);
-        Query query = organizationRepository.buildOrganizationQuery(queryFilter, search);
+        Query query = organizationRepository.buildOrganizationQuery(queryFilter, search, normalizedPagination.getCursor());
 
         List<Organization> pageItems = fetchPageItems(query, normalizedPagination);
         boolean hasNextPage = pageItems.size() == normalizedPagination.getLimit();
@@ -71,8 +71,9 @@ public class OrganizationQueryService {
     }
 
     private List<Organization> fetchPageItems(@NotNull Query query, CursorPaginationCriteria criteria) {
+        // Cursor is already included in the query, so we pass null here
         List<Organization> organizations = organizationRepository.findOrganizationsWithCursor(
-            query, criteria.getCursor(), criteria.getLimit() + 1);
+            query, null, criteria.getLimit() + 1);
         return organizations.size() > criteria.getLimit()
             ? organizations.subList(0, criteria.getLimit())
             : organizations;

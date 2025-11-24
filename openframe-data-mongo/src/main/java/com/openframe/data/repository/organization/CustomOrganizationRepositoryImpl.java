@@ -12,9 +12,8 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
-import java.util.stream.Collectors;
 
 /**
  * Custom repository implementation for organization queries with MongoDB filtering.
@@ -29,33 +28,47 @@ public class CustomOrganizationRepositoryImpl implements CustomOrganizationRepos
 
     @Override
     public Query buildOrganizationQuery(OrganizationQueryFilter filter, String search) {
+        return buildOrganizationQuery(filter, search, null);
+    }
+    
+    @Override
+    public Query buildOrganizationQuery(OrganizationQueryFilter filter, String search, String cursor) {
         Query query = new Query();
+        
+        // Collect all criteria to combine them with $and
+        List<Criteria> criteriaList = new ArrayList<>();
+
+        // Always exclude soft deleted organizations
+        criteriaList.add(new Criteria().orOperator(
+                Criteria.where("deleted").is(false),
+                Criteria.where("deleted").exists(false)
+        ));
 
         if (filter != null) {
             // Category filter
             if (filter.getCategory() != null) {
-                query.addCriteria(Criteria.where("category").regex("^" + filter.getCategory() + "$", "i"));
+                criteriaList.add(Criteria.where("category").regex("^" + filter.getCategory() + "$", "i"));
             }
 
             // Employee range filters
             if (filter.getMinEmployees() != null) {
-                query.addCriteria(Criteria.where("numberOfEmployees").gte(filter.getMinEmployees()));
+                criteriaList.add(Criteria.where("numberOfEmployees").gte(filter.getMinEmployees()));
             }
 
             if (filter.getMaxEmployees() != null) {
-                query.addCriteria(Criteria.where("numberOfEmployees").lte(filter.getMaxEmployees()));
+                criteriaList.add(Criteria.where("numberOfEmployees").lte(filter.getMaxEmployees()));
             }
 
             // Active contract filter
             if (filter.getHasActiveContract() != null && filter.getHasActiveContract()) {
                 LocalDate now = LocalDate.now();
-                query.addCriteria(new Criteria().andOperator(
+                criteriaList.add(new Criteria().andOperator(
                         Criteria.where("contractStartDate").ne(null).lte(now),
                         Criteria.where("contractEndDate").ne(null).gte(now)
                 ));
             } else if (filter.getHasActiveContract() != null && !filter.getHasActiveContract()) {
                 LocalDate now = LocalDate.now();
-                query.addCriteria(new Criteria().orOperator(
+                criteriaList.add(new Criteria().orOperator(
                         Criteria.where("contractStartDate").is(null),
                         Criteria.where("contractEndDate").is(null),
                         Criteria.where("contractStartDate").gt(now),
@@ -64,14 +77,30 @@ public class CustomOrganizationRepositoryImpl implements CustomOrganizationRepos
             }
         }
 
-        // Search filter (name or category)
+        // Search filter (name, organizationId or category)
         if (search != null && !search.trim().isEmpty()) {
-            Criteria searchCriteria = new Criteria().orOperator(
+            criteriaList.add(new Criteria().orOperator(
                     Criteria.where("name").regex(search, "i"),
                     Criteria.where("organizationId").regex(search, "i"),
                     Criteria.where("category").regex(search, "i")
-            );
-            query.addCriteria(searchCriteria);
+            ));
+        }
+        
+        // Cursor filter for pagination
+        if (cursor != null && !cursor.trim().isEmpty()) {
+            try {
+                ObjectId cursorId = new ObjectId(cursor);
+                criteriaList.add(Criteria.where("_id").lt(cursorId));
+            } catch (IllegalArgumentException ex) {
+                log.warn("Invalid ObjectId cursor format: {}", cursor);
+            }
+        }
+
+        // Combine all criteria with $and in a single addCriteria call
+        if (!criteriaList.isEmpty()) {
+            query.addCriteria(new Criteria().andOperator(
+                    criteriaList.toArray(new Criteria[0])
+            ));
         }
 
         return query;
@@ -81,33 +110,15 @@ public class CustomOrganizationRepositoryImpl implements CustomOrganizationRepos
     public List<Organization> findOrganizationsWithFilters(OrganizationQueryFilter filter, String search) {
         Query query = buildOrganizationQuery(filter, search);
 
-        // Always exclude soft deleted organizations
-        query.addCriteria(new Criteria().orOperator(
-                Criteria.where("deleted").is(false),
-                Criteria.where("deleted").exists(false)
-        ));
-
         log.debug("Executing MongoDB query: {}", query);
         return mongoTemplate.find(query, Organization.class);
     }
 
     @Override
     public List<Organization> findOrganizationsWithCursor(Query query, String cursor, int limit) {
-        // Always exclude soft deleted organizations
-        query.addCriteria(new Criteria().orOperator(
-                Criteria.where("deleted").is(false),
-                Criteria.where("deleted").exists(false)
-        ));
-
-        if (cursor != null && !cursor.trim().isEmpty()) {
-            try {
-                ObjectId cursorId = new ObjectId(cursor);
-                query.addCriteria(Criteria.where("_id").lt(cursorId));
-            } catch (IllegalArgumentException ex) {
-                log.warn("Invalid ObjectId cursor format: {}", cursor);
-            }
-        }
-
+        // Note: The cursor is already included in the query via buildOrganizationQuery(filter, search, cursor)
+        // This method just adds limit and sorting
+        
         query.limit(limit);
         query.with(Sort.by(Sort.Direction.DESC, "_id"));
 
