@@ -1,5 +1,6 @@
 package com.openframe.external.controller;
 
+import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.service.DeviceFilterService;
 import com.openframe.api.service.DeviceService;
 import com.openframe.api.service.TagService;
@@ -13,7 +14,6 @@ import com.openframe.external.dto.device.DeviceFilterResponse;
 import com.openframe.external.dto.device.DeviceResponse;
 import com.openframe.external.dto.device.DevicesResponse;
 import com.openframe.external.dto.shared.PaginationCriteria;
-import com.openframe.external.exception.DeviceNotFoundException;
 import com.openframe.external.mapper.DeviceMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static org.springframework.http.HttpStatus.NO_CONTENT;
 import static org.springframework.http.HttpStatus.OK;
 
 @RestController
@@ -205,5 +206,29 @@ public class DeviceController {
         var filters = deviceFilterService.getDeviceFilters(
                 deviceMapper.toDeviceFilterOptions(filterCriteria)).join();
         return deviceMapper.toDeviceFilterResponse(filters);
+    }
+
+    @Operation(
+            summary = "Delete device by machine ID",
+            description = "Soft delete device by setting its status to DELETED"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Device deleted"),
+            @ApiResponse(responseCode = "404", description = "Device not found",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Unauthorized - invalid or missing API key",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "500", description = "Internal server error",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    @DeleteMapping("/{machineId}")
+    @ResponseStatus(NO_CONTENT)
+    public void deleteDevice(
+            @Parameter(description = "Machine ID of the device")
+            @PathVariable String machineId,
+            @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
+        log.info("Deleting device by ID: {} - userId: {}, apiKeyId: {}", machineId, userId, apiKeyId);
+        deviceService.softDeleteByMachineId(machineId);
     }
 } 

@@ -61,6 +61,13 @@ public class GlobalExceptionHandler {
         return new ErrorResponse("USER_NOT_FOUND", ex.getMessage());
     }
 
+    @ExceptionHandler(DeviceNotFoundException.class)
+    @ResponseStatus(NOT_FOUND)
+    public ErrorResponse handleDeviceNotFound(DeviceNotFoundException ex) {
+        log.warn("Device not found: {}", ex.getMessage());
+        return new ErrorResponse("DEVICE_NOT_FOUND", ex.getMessage());
+    }
+
     @ExceptionHandler(IllegalStateException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleIllegalState(IllegalStateException ex) {

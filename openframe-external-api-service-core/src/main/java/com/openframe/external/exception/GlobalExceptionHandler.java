@@ -2,11 +2,11 @@ package com.openframe.external.exception;
 
 import com.openframe.core.dto.ErrorResponse;
 import com.openframe.data.repository.pinot.exception.PinotQueryException;
+import com.openframe.api.exception.DeviceNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
