@@ -85,7 +85,8 @@ enum DeviceStatus {
     DECOMMISSIONED,
     ONLINE, 
     OFFLINE,
-    DELETED
+    DELETED,
+    ARCHIVED
 }
 
 enum DeviceType {

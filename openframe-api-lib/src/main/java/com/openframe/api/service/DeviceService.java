@@ -28,6 +28,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static java.time.Instant.now;
+
 @Service
 @Slf4j
 @Validated
@@ -139,11 +141,24 @@ public class DeviceService {
 
         if (machine.getStatus() != DeviceStatus.DELETED) {
             machine.setStatus(DeviceStatus.DELETED);
-            machine.setUpdatedAt(Instant.now());
             machineRepository.save(machine);
             log.info("Device {} marked as DELETED", machineId);
         } else {
             log.warn("Device {} is already DELETED", machineId);
         }
+    }
+
+    public void updateStatusByMachineId(@NotBlank String machineId, @NotNull DeviceStatus status) {
+        log.info("Updating device status. machineId={}, newStatus={}", machineId, status);
+        Machine machine = machineRepository.findByMachineId(machineId)
+                .orElseThrow(() -> new DeviceNotFoundException("Device not found: " + machineId));
+        if (machine.getStatus() == status) {
+            log.info("Device {} already has status {}", machineId, status);
+            return;
+        }
+        machine.setStatus(status);
+        machine.setUpdatedAt(now());
+        machineRepository.save(machine);
+        log.info("Device {} status updated to {}", machineId, status);
     }
 } 

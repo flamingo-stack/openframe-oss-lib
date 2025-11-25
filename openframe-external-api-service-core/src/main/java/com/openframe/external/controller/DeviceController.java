@@ -13,6 +13,7 @@ import com.openframe.external.dto.device.DeviceFilterCriteria;
 import com.openframe.external.dto.device.DeviceFilterResponse;
 import com.openframe.external.dto.device.DeviceResponse;
 import com.openframe.external.dto.device.DevicesResponse;
+import com.openframe.external.dto.device.UpdateDeviceStatusRequest;
 import com.openframe.external.dto.shared.PaginationCriteria;
 import com.openframe.external.mapper.DeviceMapper;
 import io.swagger.v3.oas.annotations.Operation;
@@ -209,26 +210,29 @@ public class DeviceController {
     }
 
     @Operation(
-            summary = "Delete device by machine ID",
-            description = "Soft delete device by setting its status to DELETED"
+            summary = "Update device status by machine ID",
+            description = "Set device status to DELETED or ARCHIVED"
     )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "204", description = "Device deleted"),
-            @ApiResponse(responseCode = "404", description = "Device not found",
+            @ApiResponse(responseCode = "204", description = "Device status updated"),
+            @ApiResponse(responseCode = "400", description = "Invalid status value",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
             @ApiResponse(responseCode = "401", description = "Unauthorized - invalid or missing API key",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "Device not found",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
             @ApiResponse(responseCode = "500", description = "Internal server error",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
-    @DeleteMapping("/{machineId}")
+    @PatchMapping("/{machineId}")
     @ResponseStatus(NO_CONTENT)
-    public void deleteDevice(
+    public void updateDeviceStatus(
             @Parameter(description = "Machine ID of the device")
             @PathVariable String machineId,
+            @RequestBody UpdateDeviceStatusRequest request,
             @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
             @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
-        log.info("Deleting device by ID: {} - userId: {}, apiKeyId: {}", machineId, userId, apiKeyId);
-        deviceService.softDeleteByMachineId(machineId);
+        log.info("Updating device {} status to {} - userId: {}, apiKeyId: {}", machineId, request.status(), userId, apiKeyId);
+        deviceService.updateStatusByMachineId(machineId, request.status());
     }
 } 
