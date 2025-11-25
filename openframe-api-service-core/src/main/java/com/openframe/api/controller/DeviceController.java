@@ -1,6 +1,7 @@
 package com.openframe.api.controller;
 
 import com.openframe.api.service.DeviceService;
+import com.openframe.api.dto.device.UpdateDeviceStatusRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -14,10 +15,11 @@ public class DeviceController {
 
     private final DeviceService deviceService;
 
-    @DeleteMapping("/{machineId}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteDevice(@PathVariable String machineId) {
-        log.info("Internal API: Delete device {}", machineId);
-        deviceService.softDeleteByMachineId(machineId);
-    }
+	@PatchMapping("/{machineId}")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	public void updateDeviceStatus(@PathVariable String machineId,
+	                               @RequestBody UpdateDeviceStatusRequest request) {
+		log.info("Internal API: Update device status {} -> {}", machineId, request.status());
+		deviceService.updateStatusByMachineId(machineId, request.status());
+	}
 }

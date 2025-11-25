@@ -8,5 +8,6 @@ public enum DeviceStatus {
     DECOMMISSIONED,
     ONLINE,
     OFFLINE,
-    DELETED
+    DELETED,
+    ARCHIVED
 } 
