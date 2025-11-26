@@ -1,4 +1,4 @@
-package com.openframe.client.service;
+package com.openframe.data.service;
 
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.MachineTag;
@@ -57,4 +57,5 @@ public interface MachineTagEventService {
      * @param tags the collection of tag entities that were saved
      */
     void processTagSaveAll(Iterable<Tag> tags);
-} 
+}
+

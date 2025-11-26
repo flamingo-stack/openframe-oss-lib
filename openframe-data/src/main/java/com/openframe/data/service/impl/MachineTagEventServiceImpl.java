@@ -1,17 +1,18 @@
-package com.openframe.client.service.impl;
+package com.openframe.data.service.impl;
 
-import com.openframe.client.service.MachineTagEventService;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.MachineTag;
 import com.openframe.data.document.tool.Tag;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.device.MachineTagRepository;
 import com.openframe.data.repository.tool.TagRepository;
+import com.openframe.data.service.MachineTagEventService;
 import com.openframe.kafka.model.MachinePinotMessage;
 import com.openframe.kafka.producer.retry.OssTenantRetryingKafkaProducer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.util.HashSet;
@@ -25,6 +26,7 @@ import java.util.Set;
 @Service
 @Slf4j
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "openframe.device.aspect.enabled", havingValue = "true", matchIfMissing = true)
 public class MachineTagEventServiceImpl implements MachineTagEventService {
 
     private final MachineRepository machineRepository;
@@ -228,4 +230,5 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
                         .toList())
                 .build();
     }
-} 
+}
+
