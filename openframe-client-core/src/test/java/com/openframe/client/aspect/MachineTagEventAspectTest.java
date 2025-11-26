@@ -1,9 +1,10 @@
 package com.openframe.client.aspect;
 
-import com.openframe.client.service.MachineTagEventService;
+import com.openframe.data.aspect.MachineTagEventAspect;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.MachineTag;
 import com.openframe.data.document.tool.Tag;
+import com.openframe.data.service.MachineTagEventService;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

@@ -1,9 +1,9 @@
-package com.openframe.client.aspect;
+package com.openframe.data.aspect;
 
-import com.openframe.client.service.MachineTagEventService;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.MachineTag;
 import com.openframe.data.document.tool.Tag;
+import com.openframe.data.service.MachineTagEventService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.JoinPoint;
@@ -11,6 +11,7 @@ import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.AfterReturning;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
@@ -23,6 +24,7 @@ import java.util.Map;
 @Aspect
 @Component
 @Slf4j
+@ConditionalOnProperty(name = "openframe.device.aspect.enabled", havingValue = "true", matchIfMissing = true)
 @RequiredArgsConstructor
 public class MachineTagEventAspect {
 
@@ -154,4 +156,5 @@ public class MachineTagEventAspect {
             throw e;
         }
     }
-} 
+}
+
