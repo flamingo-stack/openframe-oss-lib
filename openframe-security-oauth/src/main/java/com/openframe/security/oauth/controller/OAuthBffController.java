@@ -41,9 +41,7 @@ public class OAuthBffController {
     public Mono<ResponseEntity<Void>> login(@RequestParam String tenantId,
                                             @RequestParam(value = "redirectTo", required = false) String redirectTo,
                                             @RequestParam(value = "provider", required = false) String provider,
-                                            WebSession session,
                                             ServerHttpRequest request) {
-        session.getAttributes().clear();
         HttpHeaders headers = new HttpHeaders();
         cookieService.addClearSasCookies(headers);
         return oauthBffService.buildAuthorizeRedirect(tenantId, redirectTo, provider, request)
@@ -57,10 +55,9 @@ public class OAuthBffController {
     @GetMapping("/callback")
     public Mono<ResponseEntity<Void>> callback(@RequestParam String code,
                                                @RequestParam String state,
-                                               WebSession session,
                                                ServerHttpRequest request) {
         boolean includeDevTicket = isLocalHost(request);
-        return oauthBffService.handleCallback(code, state, session, request)
+        return oauthBffService.handleCallback(code, state, request)
                 .flatMap(result -> computeTargetWithOptionalDevTicketReactive(
                         safeRedirect(result.redirectTo()),
                         includeDevTicket,
@@ -100,8 +97,7 @@ public class OAuthBffController {
         HttpHeaders headers = new HttpHeaders();
         cookieService.addClearAuthCookies(headers);
         String refreshToken = hasText(refreshCookie) ? refreshCookie : request.getHeaders().getFirst(REFRESH_TOKEN_HEADER);
-        return oauthBffService.logout(session)
-                .then(oauthBffService.revokeRefreshToken(tenantId, refreshToken))
+        return oauthBffService.revokeRefreshToken(tenantId, refreshToken)
                 .then(Mono.just(ResponseEntity.noContent().headers(headers).build()));
     }
 
@@ -143,10 +139,6 @@ public class OAuthBffController {
         }
         return devTicketStore.createTicket(tokens)
                 .map(ticket -> baseTarget + (baseTarget.contains("?") ? "&" : "?") + "devTicket=" + ticket);
-    }
-
-    private ResponseEntity<Void> buildFound(String target) {
-        return buildFound(target, null);
     }
 
     private ResponseEntity<Void> buildFound(String target, String stateToClear) {
