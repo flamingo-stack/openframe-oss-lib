@@ -4,7 +4,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
-import org.springframework.web.server.WebSession;
 import reactor.core.publisher.Mono;
 
 import static org.springframework.http.HttpHeaders.REFERER;
@@ -13,7 +12,7 @@ import static org.springframework.http.HttpHeaders.REFERER;
 @ConditionalOnMissingBean(value = RedirectTargetResolver.class, ignored = DefaultRedirectTargetResolver.class)
 public class DefaultRedirectTargetResolver implements RedirectTargetResolver {
     @Override
-    public Mono<String> resolve(String tenantId, String requestedRedirectTo, WebSession session, ServerHttpRequest request) {
+    public Mono<String> resolve(String tenantId, String requestedRedirectTo, ServerHttpRequest request) {
         String target = requestedRedirectTo;
         if (!StringUtils.hasText(target)) {
             String referer = request.getHeaders().getFirst(REFERER);

@@ -72,24 +72,19 @@ public class OAuthBffService {
 
     public Mono<OAuthCallbackResult> handleCallback(String code,
                                                     String state,
-                                                    WebSession session,
                                                     ServerHttpRequest request) {
         OAuthSessionData sessionData = validateAndExtractCookieData(state, request)
                 .orElse(null);
         if (sessionData == null) return Mono.error(new IllegalStateException("invalid_state"));
         return exchangeCodeForTokens(sessionData, code, request)
                 .flatMap(tokens -> redirectTargetResolver
-                        .resolve(sessionData.tenantId(), sessionData.redirectTo(), session, request)
+                        .resolve(sessionData.tenantId(), sessionData.redirectTo(), request)
                         .map(target -> new OAuthCallbackResult(sessionData.tenantId(), target, tokens))
                 );
     }
 
     public Mono<TokenResponse> refreshTokensPublic(String tenantId, String refreshToken, ServerHttpRequest request) {
         return refreshTokens(tenantId, refreshToken, request);
-    }
-
-    public Mono<Void> logout(WebSession session) {
-        return session.invalidate();
     }
 
     private String buildAuthorizeUrl(String tenantId, String codeChallenge, String state, String provider) {
