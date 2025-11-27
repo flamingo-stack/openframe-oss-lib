@@ -73,6 +73,11 @@ public class IntegratedToolAgentInitializer {
         String existingVersion = existingAgent.getVersion();
         String newVersion = newAgent.getVersion();
 
+        if (newAgent.isReleaseVersion()) {
+           log.info("Skip update for release version {} {}", toolAgentId, existingVersion);
+           return;
+        }
+
         if (!existingVersion.equals(newVersion)) {
             log.info("Detected version update for {} from {} to {}", toolAgentId, existingVersion, newVersion);
             toolAgentUpdatePublisher.publish(newAgent);

@@ -21,7 +21,6 @@ public class OpenFrameClientConfiguration {
 
     @Id
     private String id;
-    private String version;
     private List<DownloadConfiguration> downloadConfiguration;
     
     @CreatedDate
