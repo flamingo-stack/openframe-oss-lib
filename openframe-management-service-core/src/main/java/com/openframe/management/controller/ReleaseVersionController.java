@@ -2,7 +2,6 @@ package com.openframe.management.controller;
 
 import com.openframe.management.dto.ReleaseVersionRequest;
 import com.openframe.management.service.ReleaseVersionService;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
