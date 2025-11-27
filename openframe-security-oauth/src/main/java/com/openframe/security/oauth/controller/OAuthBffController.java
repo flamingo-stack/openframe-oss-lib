@@ -36,6 +36,8 @@ public class OAuthBffController {
 
     @Value("${openframe.gateway.oauth.state-cookie-ttl-seconds:180}")
     private int stateCookieTtlSeconds;
+    @Value("${openframe.gateway.oauth.dev-ticket-enabled:true}")
+    private boolean devTicketEnabled;
 
     @GetMapping("/login")
     public Mono<ResponseEntity<Void>> login(@RequestParam String tenantId,
@@ -56,11 +58,10 @@ public class OAuthBffController {
     public Mono<ResponseEntity<Void>> callback(@RequestParam String code,
                                                @RequestParam String state,
                                                ServerHttpRequest request) {
-        boolean includeDevTicket = isLocalHost(request);
         return oauthBffService.handleCallback(code, state, request)
                 .flatMap(result -> computeTargetWithOptionalDevTicketReactive(
                         safeRedirect(result.redirectTo()),
-                        includeDevTicket,
+                        devTicketEnabled,
                         result.tokens()
                 ).map(target -> buildFoundWithCookiesAndClearState(
                         target,
@@ -84,9 +85,8 @@ public class OAuthBffController {
         if (!hasText(token)) {
             return Mono.just(ResponseEntity.status(401).build());
         }
-        boolean includeDevHeaders = isLocalHost(request);
         return oauthBffService.refreshTokensPublic(tenantId, token, request)
-                .map(tokens -> buildNoContentWithCookies(tokens, includeDevHeaders));
+                .map(tokens -> buildNoContentWithCookies(tokens, devTicketEnabled));
     }
 
     @GetMapping("/logout")
@@ -104,7 +104,7 @@ public class OAuthBffController {
     @GetMapping("/dev-exchange")
     public Mono<ResponseEntity<Object>> devExchange(@RequestParam("ticket") String ticket,
                                             ServerHttpRequest request) {
-        if (!isLocalHost(request)) {
+        if (!devTicketEnabled) {
             return Mono.just(ResponseEntity.status(404).build());
         }
         return devTicketStore.consumeTicket(ticket)
@@ -114,13 +114,6 @@ public class OAuthBffController {
                     return ResponseEntity.noContent().headers(headers).build();
                 })
                 .switchIfEmpty(Mono.just(ResponseEntity.status(404).build()));
-    }
-
-    private boolean isLocalHost(ServerHttpRequest request) {
-        String host = request.getURI().getHost();
-        if (hasText(host) && "localhost".equalsIgnoreCase(host)) return true;
-        String hostHeader = request.getHeaders().getFirst(HttpHeaders.HOST);
-        return hasText(hostHeader) && hostHeader.toLowerCase().startsWith("localhost");
     }
 
     private static boolean isAbsoluteUrl(String url) {
