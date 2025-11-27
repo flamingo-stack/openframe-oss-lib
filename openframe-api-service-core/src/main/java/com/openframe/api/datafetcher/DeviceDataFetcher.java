@@ -1,6 +1,9 @@
 package com.openframe.api.datafetcher;
 
 import com.netflix.graphql.dgs.*;
+import com.openframe.api.dto.CountedGenericConnection;
+import com.openframe.api.dto.CountedGenericQueryResult;
+import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.device.*;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.CursorPaginationInput;
@@ -41,7 +44,7 @@ public class DeviceDataFetcher {
     }
 
     @DgsQuery
-    public DeviceConnection devices(
+    public CountedGenericConnection<GenericEdge<Machine>> devices(
             @InputArgument @Valid DeviceFilterInput filter,
             @InputArgument @Valid CursorPaginationInput pagination,
             @InputArgument String search) {
@@ -49,7 +52,7 @@ public class DeviceDataFetcher {
         log.debug("Fetching devices with filter: {}, pagination: {}, search: {}", filter, pagination, search);
         DeviceFilterOptions filterOptions = mapper.toDeviceFilterOptions(filter);
         CursorPaginationCriteria paginationCriteria = mapper.toCursorPaginationCriteria(pagination);
-        DeviceQueryResult result = deviceService.queryDevices(filterOptions, paginationCriteria, search);
+        CountedGenericQueryResult<Machine> result = deviceService.queryDevices(filterOptions, paginationCriteria, search);
         return mapper.toDeviceConnection(result);
     }
 

@@ -1,5 +1,8 @@
 package com.openframe.api.mapper;
 
+import com.openframe.api.dto.GenericConnection;
+import com.openframe.api.dto.GenericEdge;
+import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.audit.*;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.CursorPaginationInput;
@@ -38,15 +41,15 @@ public class GraphQLLogMapper {
                 .build();
     }
 
-    public LogConnection toLogConnection(LogQueryResult result) {
-        List<LogEdge> edges = result.getEvents().stream()
-                .map(logEvent -> LogEdge.builder()
+    public GenericConnection<GenericEdge<LogEvent>> toLogConnection(GenericQueryResult<LogEvent> result) {
+        List<GenericEdge<LogEvent>> edges = result.getItems().stream()
+                .map(logEvent -> GenericEdge.<LogEvent>builder()
                         .node(logEvent)
                         .cursor(createLogCursor(logEvent))
                         .build())
                 .collect(Collectors.toList());
 
-        return LogConnection.builder()
+        return GenericConnection.<GenericEdge<LogEvent>>builder()
                 .edges(edges)
                 .pageInfo(result.getPageInfo())
                 .build();

@@ -1,19 +1,18 @@
-package com.openframe.api.dto.audit;
+package com.openframe.api.dto;
 
 import com.openframe.api.dto.shared.CursorPageInfo;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
 
 import java.util.List;
 
 
 @Data
-@Builder
+@SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-public class LogQueryResult {
-    private List<LogEvent> events;
-    private CursorPageInfo pageInfo;
+public class CountedGenericConnection<T extends GenericEdge> extends GenericConnection<T> {
+    private int filteredCount;
 }
