@@ -1,4 +1,4 @@
-package com.openframe.data.document.cluster;
+package com.openframe.data.document.version;
 
 import lombok.Data;
 import org.springframework.data.annotation.CreatedDate;
@@ -10,29 +10,29 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.Instant;
 
 /**
- * Cluster registration document representing cluster image tag version information.
+ * Release version document representing application version information.
  */
 @Data
-@Document(collection = "cluster_registrations")
-public class ClusterRegistration {
+@Document(collection = "release_versions")
+public class ReleaseVersion {
 
     @Id
     private String id;
 
     /**
-     * Image tag version string (e.g., "4.2.0", "1.0.0-beta")
+     * Version string (e.g., "4.2.0", "1.0.0-beta")
      */
     @Indexed
-    private String imageTagVersion;
+    private String version;
 
     /**
-     * Timestamp when this cluster registration was created
+     * Timestamp when this version was created
      */
     @CreatedDate
     private Instant createdAt;
 
     /**
-     * Timestamp when this cluster registration was last updated
+     * Timestamp when this version was last updated
      */
     @LastModifiedDate
     private Instant updatedAt;
