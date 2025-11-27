@@ -1,5 +1,6 @@
 package com.openframe.external.mapper;
 
+import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.device.*;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.tool.Tag;
@@ -39,8 +40,8 @@ public class DeviceMapper extends BaseRestMapper {
                 .build();
     }
 
-    public DevicesResponse toDevicesResponse(DeviceQueryResult queryResult) {
-        List<DeviceResponse> deviceResponses = queryResult.getDevices().stream()
+    public DevicesResponse toDevicesResponse(CountedGenericQueryResult<Machine> queryResult) {
+        List<DeviceResponse> deviceResponses = queryResult.getItems().stream()
                 .map(machine -> toDeviceResponse(machine, List.of()))
                 .collect(Collectors.toList());
         
@@ -51,8 +52,8 @@ public class DeviceMapper extends BaseRestMapper {
                 .build();
     }
 
-    public DevicesResponse toDevicesResponseWithTags(DeviceQueryResult queryResult, List<List<Tag>> tagsPerMachine) {
-        List<Machine> devices = queryResult.getDevices();
+    public DevicesResponse toDevicesResponseWithTags(CountedGenericQueryResult<Machine> queryResult, List<List<Tag>> tagsPerMachine) {
+        List<Machine> devices = queryResult.getItems();
         
         List<DeviceResponse> deviceResponses = java.util.stream.IntStream.range(0, devices.size())
                 .mapToObj(i -> {

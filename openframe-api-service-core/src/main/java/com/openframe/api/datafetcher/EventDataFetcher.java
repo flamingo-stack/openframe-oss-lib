@@ -4,6 +4,9 @@ import com.netflix.graphql.dgs.DgsComponent;
 import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
+import com.openframe.api.dto.GenericConnection;
+import com.openframe.api.dto.GenericEdge;
+import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.event.*;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.CursorPaginationInput;
@@ -29,7 +32,7 @@ public class EventDataFetcher {
     private final GraphQLEventMapper eventMapper;
 
     @DgsQuery
-    public EventConnection events(
+    public GenericConnection<GenericEdge<Event>> events(
             @InputArgument @Valid EventFilterInput filter,
             @InputArgument @Valid CursorPaginationInput pagination,
             @InputArgument String search) {
@@ -40,8 +43,8 @@ public class EventDataFetcher {
         EventFilterOptions filterOptions = eventMapper.toEventFilterOptions(filter);
         CursorPaginationCriteria paginationCriteria = eventMapper.toCursorPaginationCriteria(pagination);
 
-        EventQueryResult result = eventService.queryEvents(filterOptions, paginationCriteria, search);
-        EventConnection connection = eventMapper.toEventConnection(result);
+        GenericQueryResult<Event> result = eventService.queryEvents(filterOptions, paginationCriteria, search);
+        GenericConnection<GenericEdge<Event>> connection = eventMapper.toEventConnection(result);
 
         log.debug("Successfully fetched {} events with cursor-based pagination",
                 connection.getEdges().size());

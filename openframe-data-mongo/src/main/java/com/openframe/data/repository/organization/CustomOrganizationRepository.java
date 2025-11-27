@@ -17,6 +17,15 @@ public interface CustomOrganizationRepository {
     Query buildOrganizationQuery(OrganizationQueryFilter filter, String search);
 
     /**
+     * Build MongoDB query with filters, search, and cursor for pagination.
+     * @param filter Query filter criteria
+     * @param search Search string
+     * @param cursor Starting cursor for pagination (organization ID)
+     * @return MongoDB query object
+     */
+    Query buildOrganizationQuery(OrganizationQueryFilter filter, String search, String cursor);
+
+    /**
      * Find organizations with filters and search applied at database level.
      */
     List<Organization> findOrganizationsWithFilters(OrganizationQueryFilter filter, String search);

@@ -3,11 +3,11 @@ package com.openframe.api.datafetcher;
 import com.netflix.graphql.dgs.DgsComponent;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
-import com.openframe.api.dto.organization.OrganizationConnection;
+import com.openframe.api.dto.CountedGenericConnection;
+import com.openframe.api.dto.CountedGenericQueryResult;
+import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.organization.OrganizationFilterInput;
 import com.openframe.api.dto.organization.OrganizationFilterOptions;
-import com.openframe.api.dto.organization.OrganizationList;
-import com.openframe.api.dto.organization.OrganizationQueryResult;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.CursorPaginationInput;
 import com.openframe.api.mapper.GraphQLOrganizationMapper;
@@ -34,7 +34,7 @@ public class OrganizationDataFetcher {
     private final GraphQLOrganizationMapper mapper;
 
     @DgsQuery
-    public OrganizationConnection organizations(
+    public CountedGenericConnection<GenericEdge<Organization>> organizations(
             @InputArgument @Valid OrganizationFilterInput filter,
             @InputArgument @Valid CursorPaginationInput pagination,
             @InputArgument String search) {
@@ -43,7 +43,7 @@ public class OrganizationDataFetcher {
 
         OrganizationFilterOptions filterOptions = mapper.toFilterOptions(filter);
         CursorPaginationCriteria paginationCriteria = mapper.toCursorPaginationCriteria(pagination);
-        OrganizationQueryResult result = organizationQueryService.queryOrganizations(filterOptions, paginationCriteria, search);
+        CountedGenericQueryResult<Organization> result = organizationQueryService.queryOrganizations(filterOptions, paginationCriteria, search);
         return mapper.toOrganizationConnection(result);
     }
 

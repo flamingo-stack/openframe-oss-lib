@@ -1,19 +1,18 @@
-package com.openframe.api.dto.device;
+package com.openframe.api.dto;
 
 import com.openframe.api.dto.shared.CursorPageInfo;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
 
 import java.util.List;
 
 @Data
-@Builder
+@SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-public class DeviceConnection {
-    private List<DeviceEdge> edges;
+public class GenericQueryResult<T> {
+    private List<T> items;
     private CursorPageInfo pageInfo;
-    private int filteredCount;
 }

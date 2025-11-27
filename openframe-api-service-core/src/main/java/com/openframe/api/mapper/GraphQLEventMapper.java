@@ -1,8 +1,12 @@
 package com.openframe.api.mapper;
 
+import com.openframe.api.dto.GenericConnection;
+import com.openframe.api.dto.GenericEdge;
+import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.event.*;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.CursorPaginationInput;
+import com.openframe.data.document.event.Event;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -35,22 +39,22 @@ public class GraphQLEventMapper {
                 .build();
     }
 
-    public EventConnection toEventConnection(EventQueryResult result) {
+    public GenericConnection<GenericEdge<Event>> toEventConnection(GenericQueryResult<Event> result) {
         if (result == null) {
-            return EventConnection.builder()
+            return GenericConnection.<GenericEdge<Event>>builder()
                     .edges(List.of())
                     .pageInfo(null)
                     .build();
         }
 
-        List<EventEdge> edges = result.getEvents().stream()
-                .map(event -> EventEdge.builder()
+        List<GenericEdge<Event>> edges = result.getItems().stream()
+                .map(event -> GenericEdge.<Event>builder()
                         .node(event)
                         .cursor(event.getId())
                         .build())
                 .collect(Collectors.toList());
 
-        return EventConnection.builder()
+        return GenericConnection.<GenericEdge<Event>>builder()
                 .edges(edges)
                 .pageInfo(result.getPageInfo())
                 .build();

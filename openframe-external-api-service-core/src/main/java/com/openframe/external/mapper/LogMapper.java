@@ -1,11 +1,10 @@
 package com.openframe.external.mapper;
 
-import com.openframe.api.dto.audit.LogQueryResult;
+import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.audit.LogEvent;
 import com.openframe.api.dto.audit.LogFilters;
 import com.openframe.api.dto.audit.LogDetails;
 import com.openframe.api.dto.audit.LogFilterOptions;
-import com.openframe.api.dto.audit.OrganizationFilterOption;
 import com.openframe.external.dto.audit.LogResponse;
 import com.openframe.external.dto.audit.LogsResponse;
 import com.openframe.external.dto.audit.LogFilterResponse;
@@ -40,7 +39,7 @@ public class LogMapper extends BaseRestMapper {
     }
 
 
-    public LogsResponse toLogsResponse(LogQueryResult result) {
+    public LogsResponse toLogsResponse(GenericQueryResult<LogEvent> result) {
         if (result == null) {
             return LogsResponse.builder()
                     .logs(List.of())
@@ -48,7 +47,7 @@ public class LogMapper extends BaseRestMapper {
                     .build();
         }
 
-        List<LogResponse> logs = result.getEvents().stream()
+        List<LogResponse> logs = result.getItems().stream()
                 .map(this::toLogResponse)
                 .collect(Collectors.toList());
 

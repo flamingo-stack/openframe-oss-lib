@@ -1,8 +1,12 @@
 package com.openframe.api.mapper;
 
+import com.openframe.api.dto.CountedGenericConnection;
+import com.openframe.api.dto.CountedGenericQueryResult;
+import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.device.*;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.CursorPaginationInput;
+import com.openframe.data.document.device.Machine;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -36,14 +40,14 @@ public class GraphQLDeviceMapper {
                 .build();
     }
 
-    public DeviceConnection toDeviceConnection(DeviceQueryResult result) {
-        List<DeviceEdge> edges = result.getDevices().stream()
-                .map(machine -> DeviceEdge.builder()
+    public CountedGenericConnection<GenericEdge<Machine>> toDeviceConnection(CountedGenericQueryResult<Machine> result) {
+        List<GenericEdge<Machine>> edges = result.getItems().stream()
+                .map(machine -> GenericEdge.<Machine>builder()
                         .node(machine)
                         .cursor(machine.getMachineId())
                         .build())
                 .collect(Collectors.toList());
-        return DeviceConnection.builder()
+        return CountedGenericConnection.<GenericEdge<Machine>>builder()
                 .edges(edges)
                 .pageInfo(result.getPageInfo())
                 .filteredCount(result.getFilteredCount())

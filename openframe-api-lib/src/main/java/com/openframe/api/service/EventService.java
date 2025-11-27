@@ -1,8 +1,8 @@
 package com.openframe.api.service;
 
+import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.event.EventFilterOptions;
 import com.openframe.api.dto.event.EventFilters;
-import com.openframe.api.dto.event.EventQueryResult;
 import com.openframe.api.dto.shared.CursorPageInfo;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.data.document.event.Event;
@@ -25,9 +25,9 @@ public class EventService {
     
     private final EventRepository eventRepository;
 
-    public EventQueryResult queryEvents(EventFilterOptions filterOptions,
-                                     CursorPaginationCriteria paginationCriteria,
-                                     String search) {
+    public GenericQueryResult<Event> queryEvents(EventFilterOptions filterOptions,
+                                          CursorPaginationCriteria paginationCriteria,
+                                          String search) {
         log.debug("Querying events with filter: {}, pagination: {}, search: {}",
                 filterOptions, paginationCriteria, search);
 
@@ -40,8 +40,8 @@ public class EventService {
         
         CursorPageInfo pageInfo = buildPageInfo(pageItems, hasNextPage, normalizedPagination.hasCursor());
         
-        return EventQueryResult.builder()
-                .events(pageItems)
+        return GenericQueryResult.<Event>builder()
+                .items(pageItems)
                 .pageInfo(pageInfo)
                 .build();
     }

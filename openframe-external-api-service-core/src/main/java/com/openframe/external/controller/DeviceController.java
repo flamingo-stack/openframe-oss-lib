@@ -116,7 +116,7 @@ public class DeviceController {
                 search);
 
         if (includeTags) {
-            List<String> machineIds = result.getDevices().stream()
+            List<String> machineIds = result.getItems().stream()
                     .map(Machine::getId)
                     .collect(Collectors.toList());
             try {

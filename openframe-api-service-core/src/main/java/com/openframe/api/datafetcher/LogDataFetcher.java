@@ -3,6 +3,8 @@ package com.openframe.api.datafetcher;
 import com.netflix.graphql.dgs.DgsComponent;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
+import com.openframe.api.dto.GenericConnection;
+import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.audit.*;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.CursorPaginationInput;
@@ -35,7 +37,7 @@ public class LogDataFetcher {
     }
 
     @DgsQuery
-    public LogConnection logs(
+    public GenericConnection<GenericEdge<LogEvent>> logs(
             @InputArgument @Valid LogFilterInput filter,
             @InputArgument @Valid CursorPaginationInput pagination,
             @InputArgument String search) {
@@ -47,7 +49,7 @@ public class LogDataFetcher {
         CursorPaginationCriteria paginationCriteria = logMapper.toCursorPaginationCriteria(pagination);
 
         var result = logService.queryLogs(filterOptions, paginationCriteria, search);
-        LogConnection connection = logMapper.toLogConnection(result);
+        GenericConnection<GenericEdge<LogEvent>> connection = logMapper.toLogConnection(result);
         log.debug("Successfully fetched {} logs with cursor-based pagination",
                 connection.getEdges().size());
 
