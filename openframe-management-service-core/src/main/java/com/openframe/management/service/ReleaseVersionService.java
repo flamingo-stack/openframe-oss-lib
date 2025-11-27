@@ -17,8 +17,10 @@ public class ReleaseVersionService {
         log.info("Processing release version: {}", releaseVersion);
 
         releaseVersionRepository.findFirstByOrderByCreatedAtAsc()
-                .map(existing -> updateExistingReleaseVersion(existing, releaseVersion))
-                .orElseGet(() -> createNewReleaseVersion(releaseVersion));
+                .ifPresentOrElse(
+                        existing -> updateExistingReleaseVersion(existing, releaseVersion),
+                    () -> createNewReleaseVersion(releaseVersion)
+        );
     }
 
     private ReleaseVersion updateExistingReleaseVersion(ReleaseVersion existing, String releaseVersion) {
@@ -27,7 +29,7 @@ public class ReleaseVersionService {
         
         ReleaseVersion saved = releaseVersionRepository.save(existing);
         log.info("Successfully updated release version: {} with id: {}", saved.getVersion(), saved.getId());
-        
+
         return saved;
     }
 

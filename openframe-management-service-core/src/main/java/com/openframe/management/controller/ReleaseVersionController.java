@@ -1,5 +1,6 @@
 package com.openframe.management.controller;
 
+import com.openframe.management.dto.ReleaseVersionRequest;
 import com.openframe.management.service.ReleaseVersionService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -13,11 +14,6 @@ import org.springframework.web.bind.annotation.*;
 public class ReleaseVersionController {
 
     private final ReleaseVersionService releaseVersionService;
-
-    @Data
-    public static class ReleaseVersionRequest {
-        private String imageTagVersion;
-    }
 
     @PostMapping
     public void updateReleaseVersion(@RequestBody ReleaseVersionRequest request) {
