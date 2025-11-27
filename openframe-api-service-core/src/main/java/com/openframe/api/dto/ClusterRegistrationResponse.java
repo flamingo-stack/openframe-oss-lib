@@ -2,9 +2,9 @@ package com.openframe.api.dto;
 
 import java.time.Instant;
 
-public record ReleaseVersionResponse(
+public record ClusterRegistrationResponse(
         String id,
-        String releaseVersion,
+        String imageTagVersion,
         Instant createdAt,
         Instant updatedAt
 ) {
