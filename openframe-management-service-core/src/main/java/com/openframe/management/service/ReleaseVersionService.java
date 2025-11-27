@@ -13,10 +13,10 @@ public class ReleaseVersionService {
 
     private final ReleaseVersionRepository releaseVersionRepository;
 
-    public ReleaseVersion processReleaseVersion(String releaseVersion) {
+    public void process(String releaseVersion) {
         log.info("Processing release version: {}", releaseVersion);
-        
-        return releaseVersionRepository.findFirstByOrderByCreatedAtAsc()
+
+        releaseVersionRepository.findFirstByOrderByCreatedAtAsc()
                 .map(existing -> updateExistingReleaseVersion(existing, releaseVersion))
                 .orElseGet(() -> createNewReleaseVersion(releaseVersion));
     }
