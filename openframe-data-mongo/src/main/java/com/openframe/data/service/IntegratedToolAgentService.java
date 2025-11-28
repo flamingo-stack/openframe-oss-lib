@@ -32,4 +32,17 @@ public class IntegratedToolAgentService {
     public Optional<IntegratedToolAgent> findById(String id) {
         return agentRepository.findById(id);
     }
+
+    public List<IntegratedToolAgent> findByReleaseVersionTrue() {
+        return agentRepository.findByReleaseVersionTrue();
+    }
+
+    public void updateVersionForReleaseAgents(String version) {
+        List<IntegratedToolAgent> releaseAgents = findByReleaseVersionTrue();
+        releaseAgents.forEach(agent -> {
+            agent.setVersion(version);
+            save(agent);
+        });
+        log.info("Updated version to {} for {} release agents", version, releaseAgents.size());
+    }
 } 

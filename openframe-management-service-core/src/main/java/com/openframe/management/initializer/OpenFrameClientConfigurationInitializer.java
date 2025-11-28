@@ -3,10 +3,8 @@ package com.openframe.management.initializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
 import com.openframe.data.service.OpenFrameClientConfigurationService;
-import com.openframe.data.service.OpenFrameClientUpdatePublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
@@ -21,12 +19,8 @@ public class OpenFrameClientConfigurationInitializer {
     private static final String DEFAULT_ID = "default";
     private static final String CONFIG_FILE = "agent-configurations/client-configuration.json";
 
-    @Value("${openframe.client.update.feature.enabled:false}")
-    private boolean clientUpdateFeatureEnabled;
-
     private final ObjectMapper objectMapper;
     private final OpenFrameClientConfigurationService clientConfigurationService;
-    private final OpenFrameClientUpdatePublisher clientUpdateService;
 
     @PostConstruct
     public void init() throws IOException {
@@ -52,28 +46,14 @@ public class OpenFrameClientConfigurationInitializer {
             OpenFrameClientConfiguration newConfiguration
     ) {
         log.info("Default OpenFrame client configuration already exists");
+        
+        // Preserve existing version to prevent overriding
+        String existingVersion = existingConfiguration.getVersion();
+        newConfiguration.setVersion(existingVersion);
+        log.info("Preserving existing version: {}", existingVersion);
+        
         clientConfigurationService.save(newConfiguration);
         log.info("Updated existing OpenFrame client configuration");
-
-        processVersionUpdate(existingConfiguration, newConfiguration);
-    }
-
-    private void processVersionUpdate(
-            OpenFrameClientConfiguration existingConfiguration,
-            OpenFrameClientConfiguration newConfiguration
-    ) {
-        String existingVersion = existingConfiguration.getVersion();
-        String newVersion = newConfiguration.getVersion();
-        // TODO: integrate with version env variable
-        if (!existingVersion.equals(newVersion)) {
-            log.info("Detected version update from {} to {}", existingVersion, newVersion);
-            if (!clientUpdateFeatureEnabled) {
-                log.info("Client update publishing is disabled, skipping publish");
-                return;
-            }
-            clientUpdateService.publish(newConfiguration);
-            log.info("Processed version update");
-        }
     }
 
     private void processNewConfiguration(OpenFrameClientConfiguration newConfiguration) {

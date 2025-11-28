@@ -56,6 +56,14 @@ public class IntegratedToolAgentInitializer {
 
     private void processExistingAgent(IntegratedToolAgent existingAgent, IntegratedToolAgent newAgent, String filePath) {
         log.info("Agent configuration {} already exists, updating", newAgent.getId());
+        
+        // Preserve version for release agents to prevent overriding
+        if (existingAgent.isReleaseVersion()) {
+            String existingVersion = existingAgent.getVersion();
+            newAgent.setVersion(existingVersion);
+            log.info("Preserving version {} for release agent {}", existingVersion, newAgent.getId());
+        }
+        
         integratedToolAgentService.save(newAgent);
         log.info("Updated agent configuration: {} from {}", newAgent.getId(), filePath);
         
