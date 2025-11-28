@@ -6,6 +6,7 @@ import com.openframe.data.model.nats.ToolAgentUpdateMessage;
 import com.openframe.data.repository.nats.NatsMessagePublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -19,10 +20,18 @@ public class ToolAgentUpdateUpdatePublisher {
 
     private final static String TOPIC_NAME_TEMPLATE = "machine.all.tool.%s.update";
 
+    @Value("${openframe.tool-agent.update.feature.enabled:false}")
+    private boolean toolAgentUpdateFeatureEnabled;
+
     private final NatsMessagePublisher natsMessagePublisher;
     private final DownloadConfigurationMapper downloadConfigurationMapper;
 
     public void publish(IntegratedToolAgent toolAgent) {
+        if (!toolAgentUpdateFeatureEnabled) {
+            log.info("Tool agent update publishing is disabled, skipping publish for tool: {} version: {}", toolAgent.getId(), toolAgent.getVersion());
+            return;
+        }
+        
         String topicName = buildTopicName(toolAgent);
         ToolAgentUpdateMessage message = buildMessage(toolAgent);
         natsMessagePublisher.publish(topicName, message);

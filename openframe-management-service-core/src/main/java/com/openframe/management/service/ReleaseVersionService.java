@@ -10,7 +10,6 @@ import com.openframe.data.service.OpenFrameClientUpdatePublisher;
 import com.openframe.data.service.ToolAgentUpdateUpdatePublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -21,12 +20,6 @@ import java.util.List;
 public class ReleaseVersionService {
 
     private static final String DEFAULT_CLIENT_CONFIG_ID = "default";
-
-    @Value("${openframe.client.update.feature.enabled:false}")
-    private boolean clientUpdateFeatureEnabled;
-
-    @Value("${openframe.tool-agent.update.feature.enabled:false}")
-    private boolean toolAgentUpdateFeatureEnabled;
 
     private final ReleaseVersionRepository releaseVersionRepository;
     private final OpenFrameClientConfigurationService openFrameClientConfigurationService;
@@ -78,12 +71,7 @@ public class ReleaseVersionService {
                             OpenFrameClientConfiguration updatedConfig = openFrameClientConfigurationService.save(config);
                             log.info("Updated OpenFrameClientConfiguration from version {} to {}", oldVersion, version);
                             
-                            if (clientUpdateFeatureEnabled) {
-                                openFrameClientUpdatePublisher.publish(updatedConfig);
-                                log.info("Published client update message for version: {}", version);
-                            } else {
-                                log.info("Client update publishing is disabled, skipping publish");
-                            }
+                            openFrameClientUpdatePublisher.publish(updatedConfig);
                         },
                         () -> log.warn("OpenFrameClientConfiguration with id '{}' not found, skipping update", DEFAULT_CLIENT_CONFIG_ID)
                 );
@@ -101,12 +89,7 @@ public class ReleaseVersionService {
             IntegratedToolAgent updatedAgent = integratedToolAgentService.save(agent);
             log.info("Updated agent {} from version {} to {}", agent.getId(), oldVersion, version);
             
-            if (toolAgentUpdateFeatureEnabled) {
-                toolAgentUpdatePublisher.publish(updatedAgent);
-                log.info("Published tool agent update message for agent: {}", agent.getId());
-            } else {
-                log.info("Tool agent update publishing is disabled, skipping publish for agent: {}", agent.getId());
-            }
+            toolAgentUpdatePublisher.publish(updatedAgent);
         });
         
         log.info("Successfully updated {} release agents", releaseAgents.size());
