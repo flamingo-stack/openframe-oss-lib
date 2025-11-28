@@ -6,6 +6,7 @@ import com.openframe.data.service.IntegratedToolAgentService;
 import com.openframe.data.service.ToolAgentUpdateUpdatePublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
@@ -17,6 +18,9 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 public class IntegratedToolAgentInitializer {
+
+    @Value("${openframe.tool-agent.update.feature.enabled:false}")
+    private boolean toolAgentUpdateFeatureEnabled;
 
     private final ObjectMapper objectMapper;
     private final IntegratedToolAgentService integratedToolAgentService;
@@ -88,8 +92,13 @@ public class IntegratedToolAgentInitializer {
 
         if (!existingVersion.equals(newVersion)) {
             log.info("Detected version update for {} from {} to {}", toolAgentId, existingVersion, newVersion);
-            toolAgentUpdatePublisher.publish(newAgent);
-            log.info("Processed version update for {}", newAgent.getId());
+            
+            if (toolAgentUpdateFeatureEnabled) {
+                toolAgentUpdatePublisher.publish(newAgent);
+                log.info("Processed version update for {}", newAgent.getId());
+            } else {
+                log.info("Tool agent update publishing is disabled, skipping publish for {}", newAgent.getId());
+            }
         }
     }
 
