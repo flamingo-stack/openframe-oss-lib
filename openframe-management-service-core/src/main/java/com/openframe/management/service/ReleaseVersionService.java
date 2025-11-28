@@ -35,20 +35,25 @@ public class ReleaseVersionService {
                         existing -> updateExistingReleaseVersion(existing, releaseVersion),
                     () -> createNewReleaseVersion(releaseVersion)
         );
-
-        // Update OpenFrameClientConfiguration and publish
-        updateClientConfiguration(releaseVersion);
-
-        // Update IntegratedToolAgents where releaseVersion is true and publish
-        updateReleaseAgents(releaseVersion);
     }
 
     private void updateExistingReleaseVersion(ReleaseVersion existing, String releaseVersion) {
-        log.info("Updating existing release version from {} to {}", existing.getVersion(), releaseVersion);
+        String currentVersion = existing.getVersion();
+        
+        if (currentVersion.equals(releaseVersion)) {
+            log.info("Release version {} is already up to date, skipping update", releaseVersion);
+            return;
+        }
+        
+        log.info("Updating existing release version from {} to {}", currentVersion, releaseVersion);
         existing.setVersion(releaseVersion);
 
         ReleaseVersion saved = releaseVersionRepository.save(existing);
         log.info("Successfully updated release version: {} with id: {}", saved.getVersion(), saved.getId());
+        
+        // Update configurations and publish only when version changed
+        updateClientConfiguration(releaseVersion);
+        updateReleaseAgents(releaseVersion);
     }
 
     private void createNewReleaseVersion(String releaseVersion) {
@@ -58,6 +63,10 @@ public class ReleaseVersionService {
         
         ReleaseVersion saved = releaseVersionRepository.save(newReleaseVersion);
         log.info("Successfully created release version: {} with id: {}", saved.getVersion(), saved.getId());
+        
+        // Update configurations and publish for new version
+        updateClientConfiguration(releaseVersion);
+        updateReleaseAgents(releaseVersion);
     }
 
     private void updateClientConfiguration(String version) {
