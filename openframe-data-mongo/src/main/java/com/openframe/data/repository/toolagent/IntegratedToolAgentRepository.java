@@ -12,4 +12,6 @@ public interface IntegratedToolAgentRepository extends MongoRepository<Integrate
 
     List<IntegratedToolAgent> findByStatus(ToolAgentStatus status);
 
+    List<IntegratedToolAgent> findByReleaseVersionTrue();
+
 } 

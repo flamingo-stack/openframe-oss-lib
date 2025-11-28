@@ -14,7 +14,10 @@ public class IntegratedToolAgent {
     @Id
     private String id;
     private String toolId;
+
+    private boolean releaseVersion;
     private String version;
+
     private SessionType sessionType;
 
     private List<DownloadConfiguration> downloadConfigurations;

@@ -6,6 +6,7 @@ import com.openframe.data.model.nats.OpenFrameClientUpdateMessage;
 import com.openframe.data.repository.nats.NatsMessagePublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -17,10 +18,18 @@ public class OpenFrameClientUpdatePublisher {
 
     private final static String TOPIC_NAME = "machine.all.client-update";
 
+    @Value("${openframe.client.update.feature.enabled:false}")
+    private boolean clientUpdateFeatureEnabled;
+
     private final NatsMessagePublisher natsMessagePublisher;
     private final DownloadConfigurationMapper downloadConfigurationMapper;
 
     public void publish(OpenFrameClientConfiguration configuration) {
+        if (!clientUpdateFeatureEnabled) {
+            log.info("Client update publishing is disabled, skipping publish for version: {}", configuration.getVersion());
+            return;
+        }
+        
         OpenFrameClientUpdateMessage message = buildMessage(configuration);
         natsMessagePublisher.publish(TOPIC_NAME, message);
         log.info("Published client update message for all machines with version: {}", configuration.getVersion());
