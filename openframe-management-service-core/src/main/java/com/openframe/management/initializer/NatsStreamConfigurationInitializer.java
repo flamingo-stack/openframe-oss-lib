@@ -36,7 +36,7 @@ public class NatsStreamConfigurationInitializer {
             // tool agent update stream
             StreamConfiguration.builder()
                     .name("TOOL_UPDATE")
-                    .subjects(List.of("machine.*.tool-update"))
+                    .subjects(List.of("machine.*.tool.*.update"))
                     .storageType(StorageType.File)
                     .retentionPolicy(RetentionPolicy.Limits)
                     .build(),
