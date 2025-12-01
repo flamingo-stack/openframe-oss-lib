@@ -6,11 +6,11 @@ import com.openframe.data.service.IntegratedToolAgentService;
 import com.openframe.data.service.ToolAgentUpdateUpdatePublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
-import java.util.Arrays;
 import java.util.List;
 
 @Component
@@ -22,18 +22,16 @@ public class IntegratedToolAgentInitializer {
     private final IntegratedToolAgentService integratedToolAgentService;
     private final ToolAgentUpdateUpdatePublisher toolAgentUpdatePublisher;
 
-    private static final List<String> AGENT_CONFIGURATION_FILE_PATHS = Arrays.asList(
-            "agent-configurations/fleetmdm-agent.json",
-            "agent-configurations/tacticalrmm-agent.json", 
-            "agent-configurations/meshcentral-agent.json",
-            "agent-configurations/openframe-chat-agent.json"
-    );
+    @Value("${openframe.management.agent-configurations}")
+    private List<String> agentConfigurationPaths;
 
     @PostConstruct
     public void initializeToolAgents() {
         log.info("Initializing IntegratedToolAgent configurations from resources...");
+        log.info("Loading {} agent configuration(s) from configuration: {}", 
+                agentConfigurationPaths.size(), agentConfigurationPaths);
         
-        AGENT_CONFIGURATION_FILE_PATHS
+        agentConfigurationPaths
                 .forEach(this::processAgentConfiguration);
         
         log.info("IntegratedToolAgent configurations initialized successfully");
@@ -42,6 +40,11 @@ public class IntegratedToolAgentInitializer {
     private void processAgentConfiguration(String agentConfigurationFilePath) {
         try {
             ClassPathResource resource = new ClassPathResource(agentConfigurationFilePath);
+            if (!resource.exists()) {
+                log.warn("Agent configuration file not found: {}, skipping", agentConfigurationFilePath);
+                return;
+            }
+            
             IntegratedToolAgent agent = objectMapper.readValue(resource.getInputStream(), IntegratedToolAgent.class);
             
             integratedToolAgentService.findById(agent.getId())
@@ -50,7 +53,7 @@ public class IntegratedToolAgentInitializer {
                     () -> processNewAgent(agent, agentConfigurationFilePath)
                 );
         } catch (Exception e) {
-            log.error("Failed to load agent configuration from {}: {}", agentConfigurationFilePath, e.getMessage());
+            log.error("Failed to load agent configuration from {}: {}", agentConfigurationFilePath, e.getMessage(), e);
         }
     }
 
