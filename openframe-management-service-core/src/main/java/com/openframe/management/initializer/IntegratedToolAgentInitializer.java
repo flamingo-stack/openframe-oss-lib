@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
 import com.openframe.data.service.IntegratedToolAgentService;
 import com.openframe.data.service.ToolAgentUpdateUpdatePublisher;
-import com.openframe.management.config.ManagementProperties;
+import com.openframe.management.config.AgentConfigurationProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
@@ -21,11 +21,11 @@ public class IntegratedToolAgentInitializer {
     private final ObjectMapper objectMapper;
     private final IntegratedToolAgentService integratedToolAgentService;
     private final ToolAgentUpdateUpdatePublisher toolAgentUpdatePublisher;
-    private final ManagementProperties managementProperties;
+    private final AgentConfigurationProperties agentConfigurationProperties;
 
     @PostConstruct
     public void initializeToolAgents() {
-        List<String> agentConfigurationPaths = managementProperties.getAgentConfigurations();
+        List<String> agentConfigurationPaths = agentConfigurationProperties.getAgentConfigurations();
         log.info("Initializing IntegratedToolAgent configurations from resources...");
         log.info("Loading {} agent configuration(s) from configuration: {}", 
                 agentConfigurationPaths.size(), agentConfigurationPaths);
