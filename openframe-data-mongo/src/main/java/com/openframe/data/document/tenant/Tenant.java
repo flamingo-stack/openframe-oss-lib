@@ -37,6 +37,10 @@ public class Tenant extends CoreTenant{
     @Builder.Default
     private TenantPlan plan = TenantPlan.FREE;
 
+    private BillingPlan billingPlan;
+
+    private String timezoneId;
+
     private String hubspotContactId;
 
     private String hubspotTenantId;
