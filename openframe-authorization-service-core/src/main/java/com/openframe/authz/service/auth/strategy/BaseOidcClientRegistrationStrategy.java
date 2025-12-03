@@ -29,8 +29,6 @@ public abstract class BaseOidcClientRegistrationStrategy implements ClientRegist
         String msTenantId = cfg.getMsTenantId();
 
         String authorizationUrl = props.effectiveAuthorizationUrl(msTenantId);
-        String tokenUrl = props.effectiveTokenUrl(msTenantId);
-        String jwkSetUri = props.effectiveJwkSetUri(msTenantId);
         return ClientRegistration.withRegistrationId(provider)
                 .clientId(cfg.getClientId())
                 .clientSecret(ssoConfigService.getDecryptedClientSecret(cfg))
@@ -39,10 +37,10 @@ public abstract class BaseOidcClientRegistrationStrategy implements ClientRegist
                 .redirectUri(props.getLoginRedirectUri())
                 .scope(props.getScopes())
                 .authorizationUri(authorizationUrl)
-                .tokenUri(tokenUrl)
+                .tokenUri(props.effectiveTokenUrl(msTenantId))
                 .userInfoUri(props.getUserInfoUrl())
                 .userNameAttributeName(IdTokenClaimNames.SUB)
-                .jwkSetUri(jwkSetUri)
+                .jwkSetUri(props.effectiveJwkSetUri(msTenantId))
                 .clientName(capitalize(provider) + " (" + tenantId + ")")
                 .build();
     }
