@@ -1,7 +1,5 @@
 package com.openframe.api.service;
 
-import com.openframe.api.support.client.InternalDomainValidationHttpClient;
-import com.openframe.api.support.dto.DomainExistsRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -12,7 +10,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class DomainValidationService {
 
-    private final InternalDomainValidationHttpClient domainValidationHttpClient;
+    private final DomainExistenceValidator domainExistenceValidator;
 
     private static final Set<String> GENERIC_PUBLIC_DOMAINS = Set.of(
             "gmail.com",
@@ -36,7 +34,7 @@ public class DomainValidationService {
         if (domains.isEmpty()) {
             return;
         }
-        boolean anyExists = domainValidationHttpClient.exists(new DomainExistsRequest(domains)).isExists();
+        boolean anyExists = domainExistenceValidator.anyExists(domains);
         if (anyExists) {
             throw new IllegalArgumentException("One or more domains already exist in the system");
         }
