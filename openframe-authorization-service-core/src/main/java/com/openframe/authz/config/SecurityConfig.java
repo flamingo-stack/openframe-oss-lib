@@ -2,6 +2,7 @@ package com.openframe.authz.config;
 
 import com.openframe.authz.config.tenant.TenantContext;
 import com.openframe.authz.service.sso.SSOConfigService;
+import com.openframe.authz.service.policy.GlobalDomainPolicyLookup;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.data.document.tenant.SSOPerTenantConfig;
 import org.springframework.context.annotation.Bean;
@@ -95,12 +96,13 @@ public class SecurityConfig {
 
     @Bean
     public OAuth2UserService<OidcUserRequest, OidcUser> oidcUserService(SSOConfigService ssoConfigService,
-                                                                         UserService userService) {
+                                                                         UserService userService,
+                                                                         GlobalDomainPolicyLookup globalDomainPolicyLookup) {
         OidcUserService delegate = new OidcUserService();
         return userRequest -> {
             OidcUser user = delegate.loadUser(userRequest);
 
-            autoProvisionIfNeeded(userRequest, user, ssoConfigService, userService);
+            autoProvisionIfNeeded(userRequest, user, ssoConfigService, userService, globalDomainPolicyLookup);
 
             Set<GrantedAuthority> authorities = new HashSet<>(user.getAuthorities());
 
@@ -147,43 +149,59 @@ public class SecurityConfig {
     private void autoProvisionIfNeeded(OidcUserRequest userRequest,
                                        OidcUser user,
                                        SSOConfigService ssoConfigService,
-                                       UserService userService) {
-        // Auto-provision user if provider is configured with autoProvisionUsers=true
+                                       UserService userService,
+                                       GlobalDomainPolicyLookup globalDomainPolicyLookup) {
         try {
             String tenantId = TenantContext.getTenantId();
             String provider = userRequest.getClientRegistration().getRegistrationId();
-            if (tenantId != null && provider != null) {
-                ssoConfigService.getSSOConfig(tenantId, provider)
-                        .filter(SSOPerTenantConfig::isEnabled)
-                        .ifPresent(cfg -> {
-                            if (!cfg.isAutoProvisionUsers()) {
-                                return;
-                            }
-                                String email = resolvePreferredEmail(user);
-                            if (email != null && !email.isBlank()) {
-                                if (!isEmailAllowedByDomains(cfg.getAllowedDomains(), email)) {
-                                    return;
-                                }
-                                boolean exists = userService.findActiveByEmailAndTenant(email.toLowerCase(ROOT), tenantId).isPresent();
-                                if (!exists) {
-                                    String givenName = valueOrNull(user.getClaims().get("given_name"));
-                                    String familyName = valueOrNull(user.getClaims().get("family_name"));
-                                    String password = UUID.randomUUID().toString();
-                                    userService.registerUser(
-                                            tenantId,
-                                            email,
-                                            givenName,
-                                            familyName,
-                                            password,
-                                            List.of(ADMIN)
-                                    );
-                                }
-                            }
-                        });
+            if (tenantId == null || provider == null) {
+                return;
+            }
+            String email = resolvePreferredEmail(user);
+            if (email == null || email.isBlank()) {
+                return;
+            }
+
+            var config = ssoConfigService.getSSOConfig(tenantId, provider)
+                    .filter(SSOPerTenantConfig::isEnabled);
+
+            // If enabled custom provider exists → use only it and ignore global policy
+            if (config.isPresent()) {
+                SSOPerTenantConfig cfg = config.get();
+                if (!cfg.isAutoProvisionUsers()) {
+                    return;
+                }
+                if (!isEmailAllowedByDomains(cfg.getAllowedDomains(), email)) {
+                    return;
+                }
+                boolean exists = userService.findActiveByEmailAndTenant(email.toLowerCase(ROOT), tenantId).isPresent();
+                if (exists) {
+                    return;
+                }
+                registerUser(userService, tenantId, email, user);
+                return;
+            }
+
+            // No enabled per-tenant provider → fallback to global policy (autoAllow + domain match for current tenant)
+            String domain = email.substring(email.lastIndexOf('@') + 1).toLowerCase(ROOT);
+            boolean exists = userService.findActiveByEmailAndTenant(email.toLowerCase(ROOT), tenantId).isPresent();
+            if (exists) {
+                return;
+            }
+            var mapped = globalDomainPolicyLookup.findTenantIdByDomainIfAutoAllowed(domain);
+            if (mapped.isPresent() && tenantId.equals(mapped.get())) {
+                registerUser(userService, tenantId, email, user);
             }
         } catch (Exception ignored) {
             // Do not block login flow if provisioning has a non-critical issue
         }
+    }
+
+    private void registerUser(UserService userService, String tenantId, String email, OidcUser user) {
+        String givenName = valueOrNull(user.getClaims().get("given_name"));
+        String familyName = valueOrNull(user.getClaims().get("family_name"));
+        String password = UUID.randomUUID().toString();
+        userService.registerUser(tenantId, email, givenName, familyName, password, List.of(ADMIN));
     }
 
     /**
