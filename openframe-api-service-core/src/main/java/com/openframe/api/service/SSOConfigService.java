@@ -31,6 +31,7 @@ public class SSOConfigService {
     private final SSOProperties ssoProperties;
     private final SSOConfigProcessor ssoConfigProcessor;
     private final SSOConfigMapper ssoConfigMapper;
+    private final DomainValidationService domainValidationService;
 
     private static final String MICROSOFT = "microsoft";
 
@@ -129,18 +130,35 @@ public class SSOConfigService {
     private void validateAutoProvision(String provider, SSOConfigRequest request) {
         boolean isMicrosoft = MICROSOFT.equals(provider);
         boolean wantsAutoProvision = TRUE.equals(request.getAutoProvisionUsers());
+
+        List<String> normalized = normalizeDomains(request.getAllowedDomains());
+        domainValidationService.validateGenericPublicDomain(normalized);
+        domainValidationService.validateExists(normalized);
+
+        request.setAllowedDomains(normalized);
+
         if (wantsAutoProvision) {
-            var domains = request.getAllowedDomains();
-            boolean hasAtLeastOne = domains != null && domains.stream().anyMatch(d -> d != null && !d.isBlank());
-            if (!hasAtLeastOne) {
+            if (normalized.isEmpty()) {
                 throw new IllegalArgumentException("allowedDomains must contain at least one domain when autoProvisionUsers is true.");
             }
         }
+
         if (isMicrosoft && wantsAutoProvision) {
             String msTenantId = request.getMsTenantId();
             if (msTenantId == null || msTenantId.isBlank()) {
                 throw new IllegalArgumentException("autoProvisionUsers can be true only for Microsoft single-tenant apps (msTenantId is required).");
             }
         }
+    }
+
+    private List<String> normalizeDomains(List<String> domains) {
+        if (domains == null) return List.of();
+        return domains.stream()
+                .filter(java.util.Objects::nonNull)
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .map(s -> s.toLowerCase(java.util.Locale.ROOT))
+                .distinct()
+                .collect(java.util.stream.Collectors.toList());
     }
 } 
