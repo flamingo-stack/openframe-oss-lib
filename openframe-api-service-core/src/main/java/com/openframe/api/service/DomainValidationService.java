@@ -112,4 +112,8 @@ public class DomainValidationService {
             throw new IllegalArgumentException("Generic domains not allowed: " + found);
         }
     }
+
+    public boolean isGenericPublicDomain(String domain) {
+        return GENERIC_PUBLIC_DOMAINS.contains(domain);
+    }
 }

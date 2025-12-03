@@ -1,6 +1,7 @@
 package com.openframe.authz.service.tenant;
 
 import com.openframe.authz.dto.TenantDiscoveryResponse;
+import com.openframe.authz.service.policy.GlobalDomainPolicyLookup;
 import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.data.document.tenant.Tenant;
@@ -28,6 +29,7 @@ public class TenantDiscoveryService {
     private final UserService userService;
     private final TenantService tenantService;
     private final SSOConfigService ssoConfigService;
+    private final GlobalDomainPolicyLookup globalDomainPolicyLookup;
 
     @Value("${openframe.tenancy.local-tenant:false}")
     private boolean localTenant;
@@ -68,10 +70,21 @@ public class TenantDiscoveryService {
                                     .tenantId(tenant.getId())
                                     .authProviders(getAvailableAuthProviders(tenant))
                                     .build())
-                            .orElseGet(() -> TenantDiscoveryResponse.builder()
-                                    .email(email)
-                                    .hasExistingAccounts(false)
-                                    .build());
+                            .orElseGet(() -> {
+                                // Fallback 2: check global domain policy (shared) for autoAllow + domain match
+                                return globalDomainPolicyLookup.findTenantIdByDomainIfAutoAllowed(domain)
+                                        .flatMap(tid -> localTenant ? tenantService.findFirst() : tenantService.findById(tid).filter(Tenant::isActive))
+                                        .map(tenant -> TenantDiscoveryResponse.builder()
+                                                .email(email)
+                                                .hasExistingAccounts(true)
+                                                .tenantId(tenant.getId())
+                                                .authProviders(getAvailableAuthProviders(tenant))
+                                                .build())
+                                        .orElseGet(() -> TenantDiscoveryResponse.builder()
+                                                .email(email)
+                                                .hasExistingAccounts(false)
+                                                .build());
+                            });
                 });
     }
 
