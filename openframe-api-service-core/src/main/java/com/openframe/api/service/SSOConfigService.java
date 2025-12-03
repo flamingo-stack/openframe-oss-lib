@@ -133,13 +133,14 @@ public class SSOConfigService {
 
         List<String> normalized = normalizeDomains(request.getAllowedDomains());
         domainValidationService.validateGenericPublicDomain(normalized);
+        domainValidationService.validateExists(normalized);
+
         request.setAllowedDomains(normalized);
 
         if (wantsAutoProvision) {
             if (normalized.isEmpty()) {
                 throw new IllegalArgumentException("allowedDomains must contain at least one domain when autoProvisionUsers is true.");
             }
-            //TODO call domainValidationService.validateExists
         }
 
         if (isMicrosoft && wantsAutoProvision) {

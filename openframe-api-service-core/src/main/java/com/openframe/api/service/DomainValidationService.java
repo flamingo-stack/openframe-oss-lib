@@ -1,6 +1,7 @@
 package com.openframe.api.service;
 
-import com.openframe.data.repository.tenant.SSOPerTenantConfigRepository;
+import com.openframe.api.support.client.InternalDomainValidationHttpClient;
+import com.openframe.api.support.dto.DomainExistsRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -11,7 +12,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class DomainValidationService {
 
-    private final SSOPerTenantConfigRepository ssoPerTenantConfigRepository;
+    private final InternalDomainValidationHttpClient domainValidationHttpClient;
 
     private static final Set<String> GENERIC_PUBLIC_DOMAINS = Set.of(
             "gmail.com",
@@ -32,11 +33,19 @@ public class DomainValidationService {
     );
 
     public void validateExists(List<String> domains) {
-        //TODO call to internal api
-       //TODO  throw IllegalArgumentException in case of exist true
+        if (domains.isEmpty()) {
+            return;
+        }
+        boolean anyExists = domainValidationHttpClient.exists(new DomainExistsRequest(domains)).isExists();
+        if (anyExists) {
+            throw new IllegalArgumentException("One or more domains already exist in the system");
+        }
     }
 
     public void validateGenericPublicDomain(List<String> domains) {
+        if (domains.isEmpty()) {
+            return;
+        }
         List<String> found = domains.stream()
                 .filter(GENERIC_PUBLIC_DOMAINS::contains)
                 .toList();
@@ -46,5 +55,3 @@ public class DomainValidationService {
         }
     }
 }
-
-
