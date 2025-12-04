@@ -37,4 +37,10 @@ public class DefaultRegistrationProcessor implements RegistrationProcessor {
         log.debug("Default post-processing invitation registration for user: {} with invitation: {}",
                 user.getId(), invitationId);
     }
+
+    @Override
+    public void postProcessAutoProvision(AuthUser user) {
+        // Default no-op implementation
+        log.debug("Default post-processing auto-provision for user: {}", user.getId());
+    }
 }

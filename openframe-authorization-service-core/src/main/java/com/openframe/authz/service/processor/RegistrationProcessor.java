@@ -42,4 +42,14 @@ public interface RegistrationProcessor {
     default void postProcessInvitationRegistration(AuthUser user, String invitationId, InvitationRegistrationRequest request) {
         // Default no-op implementation
     }
+
+    /**
+     * Post-process hook for auto-provisioned registrations (SSO first-login).
+     * Called after a user has been automatically provisioned without an invitation.
+     *
+     * @param user The created user
+     */
+    default void postProcessAutoProvision(AuthUser user) {
+        // Default no-op implementation
+    }
 }

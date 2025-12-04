@@ -10,9 +10,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 import static com.openframe.data.document.user.UserStatus.ACTIVE;
+import static com.openframe.data.document.user.UserStatus.DELETED;
 import static java.time.LocalDateTime.now;
 import static java.util.UUID.randomUUID;
 
@@ -45,7 +47,7 @@ public class UserService {
      * Throws conflict if an ACTIVE user already exists in this tenant.
      */
     public AuthUser registerUser(String tenantId, String email, String firstName, String lastName, String password, List<UserRole> roles) {
-        String normalized = email.trim().toLowerCase(java.util.Locale.ROOT);
+        String normalized = email.trim().toLowerCase(Locale.ROOT);
         var existing = userRepository.findByEmailAndTenantId(normalized, tenantId);
         return existing
                 .map(u -> {
@@ -58,7 +60,7 @@ public class UserService {
     }
 
     public void deactivateUser(AuthUser user) {
-        user.setStatus(UserStatus.DELETED);
+        user.setStatus(DELETED);
         userRepository.save(user);
     }
 
