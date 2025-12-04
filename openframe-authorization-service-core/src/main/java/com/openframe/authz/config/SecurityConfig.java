@@ -1,37 +1,35 @@
 package com.openframe.authz.config;
 
 import com.openframe.authz.config.tenant.TenantContext;
-import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.authz.service.policy.GlobalDomainPolicyLookup;
+import com.openframe.authz.service.processor.RegistrationProcessor;
+import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.authz.service.user.UserService;
+import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.tenant.SSOPerTenantConfig;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.ObjectPostProcessor;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.oauth2.client.oidc.authentication.OidcAuthorizationCodeAuthenticationProvider;
+import org.springframework.security.oauth2.client.oidc.authentication.OidcIdTokenValidator;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
-import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
-import org.springframework.security.oauth2.client.oidc.authentication.OidcAuthorizationCodeAuthenticationProvider;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
+import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.jwt.JwtDecoderFactory;
-import org.springframework.security.oauth2.jwt.JwtDecoders;
-import org.springframework.security.oauth2.jwt.JwtValidators;
-import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
-import org.springframework.security.config.annotation.ObjectPostProcessor;
-import org.springframework.security.oauth2.client.oidc.authentication.OidcIdTokenValidator;
 import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.web.SecurityFilterChain;
 
 import java.util.HashSet;
@@ -96,13 +94,14 @@ public class SecurityConfig {
 
     @Bean
     public OAuth2UserService<OidcUserRequest, OidcUser> oidcUserService(SSOConfigService ssoConfigService,
-                                                                         UserService userService,
-                                                                         GlobalDomainPolicyLookup globalDomainPolicyLookup) {
+                                                                        UserService userService,
+                                                                        GlobalDomainPolicyLookup globalDomainPolicyLookup,
+                                                                        RegistrationProcessor registrationProcessor) {
         OidcUserService delegate = new OidcUserService();
         return userRequest -> {
             OidcUser user = delegate.loadUser(userRequest);
 
-            autoProvisionIfNeeded(userRequest, user, ssoConfigService, userService, globalDomainPolicyLookup);
+            autoProvisionIfNeeded(userRequest, user, ssoConfigService, userService, globalDomainPolicyLookup, registrationProcessor);
 
             Set<GrantedAuthority> authorities = new HashSet<>(user.getAuthorities());
 
@@ -150,7 +149,8 @@ public class SecurityConfig {
                                        OidcUser user,
                                        SSOConfigService ssoConfigService,
                                        UserService userService,
-                                       GlobalDomainPolicyLookup globalDomainPolicyLookup) {
+                                       GlobalDomainPolicyLookup globalDomainPolicyLookup,
+                                       RegistrationProcessor registrationProcessor) {
         try {
             String tenantId = TenantContext.getTenantId();
             String provider = userRequest.getClientRegistration().getRegistrationId();
@@ -162,46 +162,45 @@ public class SecurityConfig {
                 return;
             }
 
-            var config = ssoConfigService.getSSOConfig(tenantId, provider)
-                    .filter(SSOPerTenantConfig::isEnabled);
+            String normalizedEmail = email.toLowerCase(ROOT);
 
-            // If enabled custom provider exists → use only it and ignore global policy
-            if (config.isPresent()) {
-                SSOPerTenantConfig cfg = config.get();
-                if (!cfg.isAutoProvisionUsers()) {
-                    return;
-                }
-                if (!isEmailAllowedByDomains(cfg.getAllowedDomains(), email)) {
-                    return;
-                }
-                boolean exists = userService.findActiveByEmailAndTenant(email.toLowerCase(ROOT), tenantId).isPresent();
-                if (exists) {
-                    return;
-                }
-                registerUser(userService, tenantId, email, user);
-                return;
-            }
-
-            // No enabled per-tenant provider → fallback to global policy (autoAllow + domain match for current tenant)
-            String domain = email.substring(email.lastIndexOf('@') + 1).toLowerCase(ROOT);
-            boolean exists = userService.findActiveByEmailAndTenant(email.toLowerCase(ROOT), tenantId).isPresent();
-            if (exists) {
-                return;
-            }
-            var mapped = globalDomainPolicyLookup.findTenantIdByDomainIfAutoAllowed(domain);
-            if (mapped.isPresent() && tenantId.equals(mapped.get())) {
-                registerUser(userService, tenantId, email, user);
-            }
+            ssoConfigService
+                    .getSSOConfig(tenantId, provider)
+                    .filter(SSOPerTenantConfig::isEnabled)
+                    .ifPresentOrElse(cfg -> {
+                        if (!cfg.isAutoProvisionUsers()) {
+                            return;
+                        }
+                        if (isEmailAllowedByDomains(cfg.getAllowedDomains(), email)) {
+                            if (userService.findActiveByEmailAndTenant(normalizedEmail, tenantId).isEmpty()) {
+                                AuthUser created = registerUser(userService, tenantId, email, user);
+                                registrationProcessor.postProcessAutoProvision(created);
+                            }
+                        }
+                    }, () -> {
+                        String domain = email.substring(email.lastIndexOf('@') + 1).toLowerCase(ROOT);
+                        if (userService
+                                .findActiveByEmailAndTenant(normalizedEmail, tenantId)
+                                .isEmpty()) {
+                            globalDomainPolicyLookup.findTenantIdByDomainIfAutoAllowed(domain)
+                                    .ifPresent(mappedTenantId -> {
+                                        if (tenantId.equals(mappedTenantId)) {
+                                            AuthUser created = registerUser(userService, tenantId, email, user);
+                                            registrationProcessor.postProcessAutoProvision(created);
+                                        }
+                                    });
+                        }
+                    });
         } catch (Exception ignored) {
             // Do not block login flow if provisioning has a non-critical issue
         }
     }
 
-    private void registerUser(UserService userService, String tenantId, String email, OidcUser user) {
+    private AuthUser registerUser(UserService userService, String tenantId, String email, OidcUser user) {
         String givenName = valueOrNull(user.getClaims().get("given_name"));
         String familyName = valueOrNull(user.getClaims().get("family_name"));
         String password = UUID.randomUUID().toString();
-        userService.registerUser(tenantId, email, givenName, familyName, password, List.of(ADMIN));
+        return userService.registerUser(tenantId, email, givenName, familyName, password, List.of(ADMIN));
     }
 
     /**
