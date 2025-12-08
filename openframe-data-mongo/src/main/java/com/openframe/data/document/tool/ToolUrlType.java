@@ -13,5 +13,6 @@ public enum ToolUrlType {
     SERVER,
     METRICS,
     LOGS,
-    INTERNAL
+    INTERNAL,
+    MINION
 } 
