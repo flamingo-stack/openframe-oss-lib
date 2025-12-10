@@ -57,7 +57,10 @@ public class SecurityConfig {
     @Bean
     @Order(2)
     public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http,
-                                                          OAuth2UserService<OidcUserRequest, OidcUser> oidcUserService) throws Exception {
+                                                          OAuth2UserService<OidcUserRequest, OidcUser> oidcUserService,
+                                                          com.openframe.authz.security.SsoTenantRegistrationSuccessHandler ssoSuccessHandler,
+                                                          org.springframework.security.oauth2.client.registration.ClientRegistrationRepository clientRegistrationRepository,
+                                                          com.openframe.security.jwt.JwtService jwtService) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(AbstractHttpConfigurer::disable)
@@ -80,7 +83,11 @@ public class SecurityConfig {
                 .formLogin(form -> form.loginPage("/login").permitAll())
                 .oauth2Login(o -> o
                         .loginPage("/login")
+                        .authorizationEndpoint(a -> a.authorizationRequestResolver(
+                                new com.openframe.authz.security.SsoAuthorizationRequestResolver(clientRegistrationRepository, jwtService)
+                        ))
                         .userInfoEndpoint(u -> u.oidcUserService(oidcUserService))
+                        .successHandler(ssoSuccessHandler)
                         .withObjectPostProcessor(new ObjectPostProcessor<OidcAuthorizationCodeAuthenticationProvider>() {
                             @Override
                             public <O extends OidcAuthorizationCodeAuthenticationProvider> O postProcess(O provider) {
