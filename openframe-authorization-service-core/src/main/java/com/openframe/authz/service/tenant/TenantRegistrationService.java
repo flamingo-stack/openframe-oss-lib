@@ -11,9 +11,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Locale;
 
 import static com.openframe.data.document.user.UserRole.OWNER;
+import static java.util.Locale.ROOT;
 
 @Slf4j
 @Service
@@ -29,8 +29,8 @@ public class TenantRegistrationService {
 
         registrationProcessor.preProcessTenantRegistration(request);
 
-        String tenantDomain = request.getTenantDomain().toLowerCase(Locale.ROOT);
-        String userEmail = request.getEmail().toLowerCase(Locale.ROOT);
+        String tenantDomain = request.getTenantDomain().toLowerCase(ROOT);
+        String userEmail = request.getEmail().toLowerCase(ROOT);
 
         if (tenantService.existByDomain(tenantDomain)) {
             throw new IllegalArgumentException("Registration is closed for this organization");

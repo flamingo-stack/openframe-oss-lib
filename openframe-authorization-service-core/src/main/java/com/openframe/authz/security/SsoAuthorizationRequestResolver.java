@@ -1,7 +1,5 @@
 package com.openframe.authz.security;
 
-import com.openframe.authz.controller.TenantSsoRegistrationController;
-import com.openframe.security.jwt.JwtService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -10,8 +8,10 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.util.StringUtils;
+
+import java.util.Optional;
+
+import static com.openframe.authz.security.SsoRegistrationConstants.COOKIE_SSO_REG;
 
 /**
  * Custom resolver that reads our pre-generated state from a signed cookie
@@ -22,12 +22,12 @@ import org.springframework.util.StringUtils;
 public class SsoAuthorizationRequestResolver implements OAuth2AuthorizationRequestResolver {
 
     private final DefaultOAuth2AuthorizationRequestResolver delegate;
-    private final JwtService jwtService;
+    private final SsoCookieCodec ssoCookieCodec;
 
     public SsoAuthorizationRequestResolver(ClientRegistrationRepository repo,
-                                           JwtService jwtService) {
+                                           SsoCookieCodec ssoCookieCodec) {
         this.delegate = new DefaultOAuth2AuthorizationRequestResolver(repo, "/oauth2/authorization");
-        this.jwtService = jwtService;
+        this.ssoCookieCodec = ssoCookieCodec;
     }
 
     @Override
@@ -45,31 +45,26 @@ public class SsoAuthorizationRequestResolver implements OAuth2AuthorizationReque
     private OAuth2AuthorizationRequest maybeInjectStateFromCookie(HttpServletRequest request,
                                                                   OAuth2AuthorizationRequest req) {
         if (req == null) return null;
-        try {
-            Cookie c = findCookie(request, TenantSsoRegistrationController.COOKIE_SSO_REG);
-            if (c == null || !StringUtils.hasText(c.getValue())) {
-                return req;
-            }
-            Jwt jwt = jwtService.decodeToken(c.getValue());
-            Object s = jwt.getClaims().get("s");
-            String state = s instanceof String str ? str : null;
-            if (!StringUtils.hasText(state)) {
-                return req;
-            }
-            return OAuth2AuthorizationRequest.from(req).state(state).build();
-        } catch (Exception e) {
-            log.warn("Failed to inject state from cookie: {}", e.getMessage());
-            return req;
-        }
+        Optional<String> state = extractStateFromCookie(request);
+        return state.map(s -> OAuth2AuthorizationRequest.from(req).state(s).build()).orElse(req);
     }
 
-    private static Cookie findCookie(HttpServletRequest request, String name) {
-        Cookie[] cookies = request.getCookies();
-        if (cookies == null) return null;
-        for (Cookie c : cookies) {
-            if (name.equals(c.getName())) return c;
+    private Optional<String> extractStateFromCookie(HttpServletRequest request) {
+        try {
+            Cookie[] cookies = request.getCookies();
+            if (cookies == null) return Optional.empty();
+            for (Cookie c : cookies) {
+                if (COOKIE_SSO_REG.equals(c.getName())) {
+                    String token = c.getValue();
+                    if (token == null || token.isBlank()) return Optional.empty();
+                    return ssoCookieCodec.decode(token).map(SsoCookiePayload::s).filter(sv -> !sv.isBlank());
+                }
+            }
+            return Optional.empty();
+        } catch (Exception e) {
+            log.warn("Failed to inject state from cookie: {}", e.getMessage());
+            return Optional.empty();
         }
-        return null;
     }
 }
 
