@@ -21,6 +21,7 @@ enum ToolUrlType {
     LOGS
     INTERNAL
     NATS
+    MINION
 }
 
 enum APIKeyType {
