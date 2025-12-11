@@ -8,13 +8,13 @@ import com.openframe.authz.service.sso.SsoTenantRegistrationService;
 import com.openframe.authz.service.user.InvitationRegistrationService;
 import com.openframe.data.document.auth.AuthUser;
 import jakarta.servlet.http.Cookie;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
+import static com.openframe.authz.web.Redirects.seeOther;
 import static org.springframework.http.HttpStatus.OK;
 
 @RestController
@@ -31,9 +31,8 @@ public class InvitationRegistrationController {
         return invitationRegistrationService.registerByInvitation(request);
     }
 
-    @PostMapping(path = "/accept/sso", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public void acceptViaSso(@Valid @RequestBody SsoInvitationAcceptRequest request,
-                             HttpServletRequest httpRequest,
+    @GetMapping(path = "/accept/sso")
+    public void acceptViaSso(@Valid @ModelAttribute SsoInvitationAcceptRequest request,
                              HttpServletResponse httpResponse) throws Exception {
         // start SSO accept flow and set short-lived HMAC cookie
         SsoTenantRegistrationService.SsoAuthorizeData init = ssoInvitationService.startAccept(request);
@@ -43,8 +42,8 @@ public class InvitationRegistrationController {
         cookie.setPath("/");
         cookie.setMaxAge(init.cookieTtlSeconds());
         httpResponse.addCookie(cookie);
-        // redirect to authorization endpoint (already includes ?tenant=...)
-        httpResponse.sendRedirect(httpRequest.getContextPath() + init.redirectPath());
+
+        seeOther(httpResponse, init.redirectPath());
     }
 }
 

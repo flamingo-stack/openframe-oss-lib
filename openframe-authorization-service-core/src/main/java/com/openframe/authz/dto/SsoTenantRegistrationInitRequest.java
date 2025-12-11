@@ -1,6 +1,7 @@
 package com.openframe.authz.dto;
 
 import com.openframe.core.validation.TenantDomain;
+import com.openframe.core.validation.ValidEmail;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import lombok.AllArgsConstructor;
@@ -14,6 +15,12 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class SsoTenantRegistrationInitRequest {
+
+    @ValidEmail
+    @NotBlank(message = "Email is required")
+    private String email;
+
+    private String accessCode;
 
     @NotBlank(message = "Organization name is required")
     @Pattern(
