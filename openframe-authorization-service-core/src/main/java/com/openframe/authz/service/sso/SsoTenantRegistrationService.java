@@ -23,7 +23,6 @@ public class SsoTenantRegistrationService {
     private final SsoCookieCodec ssoCookieCodec;
     private final RegistrationValidationService validationService;
     private final SsoProviderValidator ssoProviderValidator;
-    private final SSOConfigService ssoConfigService;
     private final RegistrationProcessor registrationProcessor;
 
     public SsoAuthorizeData startRegistration(SsoTenantRegistrationInitRequest request) {
@@ -72,6 +71,7 @@ public class SsoTenantRegistrationService {
                 request.getTenantDomain(),
                 provider,
                 request.getRedirectTo(),
+                request.getAccessCode(),
                 issuedAt,
                 issuedAt + COOKIE_TTL_SECONDS
         );
