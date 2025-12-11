@@ -60,6 +60,7 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
 
         TenantRegistrationRequest reg = TenantRegistrationRequest.builder()
                 .email(email)
+                .accessCode(payload.accessCode())
                 .firstName(givenName != null ? givenName : "")
                 .lastName(familyName != null ? familyName : "")
                 .password(UUID.randomUUID().toString())
