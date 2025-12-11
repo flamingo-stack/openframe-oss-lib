@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
 
 import static com.openframe.authz.security.SsoRegistrationConstants.COOKIE_SSO_REG;
+import static com.openframe.authz.web.Redirects.seeOther;
 import static org.springframework.http.HttpStatus.OK;
 
 @RestController
@@ -35,8 +36,8 @@ public class TenantRegistrationController {
         return registrationService.registerTenant(request);
     }
 
-    @PostMapping(path = "/register/sso", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public void startSsoRegistration(@Valid @RequestBody SsoTenantRegistrationInitRequest request,
+    @GetMapping(path = "/register/sso")
+    public void startSsoRegistration(@Valid @ModelAttribute SsoTenantRegistrationInitRequest request,
                                      HttpServletRequest httpRequest,
                                      HttpServletResponse httpResponse) throws IOException {
         clearAuthenticationState(httpRequest, httpResponse);
@@ -44,8 +45,8 @@ public class TenantRegistrationController {
         SsoAuthorizeData ssoAuthorizeData = ssoRegistrationService.startRegistration(request);
         httpResponse.addCookie(buildSsoRegistrationCookie(ssoAuthorizeData.cookieValue(), ssoAuthorizeData.cookieTtlSeconds()));
 
-        // Redirect to Spring Security's oauth2 authorization endpoint under onboarding tenant context
-        httpResponse.sendRedirect(httpRequest.getContextPath() + ssoAuthorizeData.redirectPath());
+        // Redirect to Spring Security's oauth2 authorization endpoint under onboarding tenant context via Location header
+        seeOther(httpResponse, ssoAuthorizeData.redirectPath());
     }
 
     private Cookie buildSsoRegistrationCookie(String value, int ttlSeconds) {
