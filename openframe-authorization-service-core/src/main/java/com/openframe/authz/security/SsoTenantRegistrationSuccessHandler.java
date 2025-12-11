@@ -1,6 +1,5 @@
 package com.openframe.authz.security;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.authz.dto.TenantRegistrationRequest;
 import com.openframe.authz.service.tenant.TenantRegistrationService;
 import jakarta.servlet.ServletException;
@@ -16,11 +15,13 @@ import org.springframework.security.web.authentication.SavedRequestAwareAuthenti
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.net.URLEncoder;
 import java.util.Locale;
 import java.util.UUID;
 
 import static com.openframe.authz.util.OidcUserUtils.resolveEmail;
 import static com.openframe.authz.util.OidcUserUtils.stringClaim;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * On successful OIDC login, if SSO tenant registration was initiated,
@@ -55,7 +56,7 @@ public class SsoTenantRegistrationSuccessHandler extends SavedRequestAwareAuthen
     private void finalizeSsoTenantRegistrationAndRespond(HttpServletRequest request,
                                                          HttpServletResponse response,
                                                          Authentication authentication,
-                                                         Cookie regCookie) throws IOException {
+                                                         Cookie regCookie) {
 
         OidcUser oidcUser = requireOidcUser(authentication);
         validateStateOrThrow(request);
@@ -76,7 +77,7 @@ public class SsoTenantRegistrationSuccessHandler extends SavedRequestAwareAuthen
 
         clearRegistrationCookie(response);
         clearAuthenticationSession(request);
-        // Final redirect if provided
+
         String target = buildFinalRedirect(payload.redirectTo(), tenant.getId());
         if (target == null) {
             target = "/";
@@ -172,7 +173,7 @@ public class SsoTenantRegistrationSuccessHandler extends SavedRequestAwareAuthen
     private String buildFinalRedirect(String redirectTo, String tenantId) {
         if (redirectTo == null || redirectTo.isBlank()) return null;
         String sep = redirectTo.contains("?") ? "&" : "?";
-        return redirectTo + sep + "tenantId=" + java.net.URLEncoder.encode(tenantId, java.nio.charset.StandardCharsets.UTF_8);
+        return redirectTo + sep + "tenantId=" + URLEncoder.encode(tenantId, UTF_8);
     }
 
     private Cookie getRegCookie(HttpServletRequest request) {
