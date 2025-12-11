@@ -70,10 +70,15 @@ public class CookieService {
         // Also clear potential SSO registration cookie used during tenant registration
         ResponseCookie clearedSsoRegistration = createClearedCookie("of_sso_reg", "/");
         ResponseCookie clearedSsoRegistrationHostOnly = createClearedCookieHostOnly("of_sso_reg", "/");
+        // Also clear potential SSO invitation cookie used during invitation acceptance
+        ResponseCookie clearedSsoInvite = createClearedCookie("of_sso_invite", "/");
+        ResponseCookie clearedSsoInviteHostOnly = createClearedCookieHostOnly("of_sso_invite", "/");
         headers.add(SET_COOKIE, clearedAuthSession.toString());
         headers.add(SET_COOKIE, clearedAuthSessionHostOnly.toString());
         headers.add(SET_COOKIE, clearedSsoRegistration.toString());
         headers.add(SET_COOKIE, clearedSsoRegistrationHostOnly.toString());
+        headers.add(SET_COOKIE, clearedSsoInvite.toString());
+        headers.add(SET_COOKIE, clearedSsoInviteHostOnly.toString());
     }
 
     /**
