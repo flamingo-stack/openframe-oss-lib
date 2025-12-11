@@ -82,7 +82,8 @@ public class SecurityConfig {
                                 "/tenant/**",
                                 "/management/v1/**",
                                 "/.well-known/**",
-                                "/error"
+                                "/error",
+                                "/sso/providers/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
