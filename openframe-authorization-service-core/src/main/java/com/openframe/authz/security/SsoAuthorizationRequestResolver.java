@@ -11,8 +11,6 @@ import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequ
 
 import java.util.Optional;
 
-import static com.openframe.authz.security.SsoRegistrationConstants.COOKIE_SSO_REG;
-
 /**
  * Custom resolver that reads our pre-generated state from a signed cookie
  * and injects it into the outgoing authorization request to Google/Microsoft.
@@ -50,21 +48,21 @@ public class SsoAuthorizationRequestResolver implements OAuth2AuthorizationReque
     }
 
     private Optional<String> extractStateFromCookie(HttpServletRequest request) {
-        try {
-            Cookie[] cookies = request.getCookies();
-            if (cookies == null) return Optional.empty();
-            for (Cookie c : cookies) {
-                if (COOKIE_SSO_REG.equals(c.getName())) {
-                    String token = c.getValue();
-                    if (token == null || token.isBlank()) return Optional.empty();
-                    return ssoCookieCodec.decode(token).map(SsoCookiePayload::s).filter(sv -> !sv.isBlank());
-                }
+        Cookie[] cookies = request.getCookies();
+        if (cookies == null) return Optional.empty();
+        for (Cookie c : cookies) {
+            String name = c.getName();
+            String token = c.getValue();
+            if (token == null || token.isBlank()) continue;
+            if (SsoRegistrationConstants.COOKIE_SSO_REG.equals(name)) {
+                var payload = ssoCookieCodec.decodeTenant(token);
+                if (payload.isPresent()) return Optional.ofNullable(payload.get().s());
+            } else if (SsoRegistrationConstants.COOKIE_SSO_INVITE.equals(name)) {
+                var payload = ssoCookieCodec.decodeInvite(token);
+                if (payload.isPresent()) return Optional.ofNullable(payload.get().s());
             }
-            return Optional.empty();
-        } catch (Exception e) {
-            log.warn("Failed to inject state from cookie: {}", e.getMessage());
-            return Optional.empty();
         }
+        return Optional.empty();
     }
 }
 

@@ -73,19 +73,28 @@ public class SSOConfigService {
      */
     public List<String> getEffectiveProvidersForTenant(String tenantId) {
         Set<String> result = new LinkedHashSet<>();
-
+        
         for (SSOPerTenantConfig cfg : getActiveForTenant(tenantId)) {
                 result.add(cfg.getProvider().toLowerCase());
         }
 
-        for (DefaultProviderConfig cfg : defaultProviderConfigs) {
-            if (isNotBlank(cfg.getDefaultClientId()) && isNotBlank(cfg.getDefaultClientSecret())) {
-                    result.add(cfg.providerId().toLowerCase());
-            }
-        }
+       result.addAll(getDefaultProviders());
 
         return new ArrayList<>(result);
     }
+
+    public List<String> getDefaultProviders() {
+        List<String> result = new ArrayList<>();
+
+        for (DefaultProviderConfig cfg : defaultProviderConfigs) {
+            if (isNotBlank(cfg.getDefaultClientId()) && isNotBlank(cfg.getDefaultClientSecret())) {
+                result.add(cfg.providerId().toLowerCase());
+            }
+        }
+
+        return result;
+    }
+
 
     /**
      * Find enabled, auto-provisioning SSO config by email domain (lowercased).

@@ -25,7 +25,7 @@ public class SsoCookieCodec {
     @Value("${openframe.sso.registration-cookie.secret:change-me-in-config}")
     private String hmacSecret;
 
-    public String encode(SsoCookiePayload payload) {
+    public String encode(Object payload) {
         try {
             byte[] json = objectMapper.writeValueAsBytes(payload);
             String body = B64.encodeToString(json);
@@ -36,7 +36,23 @@ public class SsoCookieCodec {
         }
     }
 
-    public Optional<SsoCookiePayload> decode(String token) {
+    public String encodeTenant(SsoTenantRegCookiePayload payload) {
+        return encode(payload);
+    }
+
+    public String encodeInvite(SsoInviteCookiePayload payload) {
+        return encode(payload);
+    }
+
+    public Optional<SsoTenantRegCookiePayload> decodeTenant(String token) {
+        return decode(token, SsoTenantRegCookiePayload.class);
+    }
+
+    public Optional<SsoInviteCookiePayload> decodeInvite(String token) {
+        return decode(token, SsoInviteCookiePayload.class);
+    }
+
+    public <T> Optional<T> decode(String token, Class<T> type) {
         try {
             if (token == null) {
                 return Optional.empty();
@@ -52,13 +68,24 @@ public class SsoCookieCodec {
                 return Optional.empty();
             }
             byte[] json = B64D.decode(body);
-            SsoCookiePayload payload = objectMapper.readValue(json, SsoCookiePayload.class);
-            if (payload.exp() > 0 && payload.exp() < Instant.now().getEpochSecond()) {
+            T payload = objectMapper.readValue(json, type);
+            long exp = extractExp(payload);
+            if (exp > 0 && exp < Instant.now().getEpochSecond()) {
                 return Optional.empty();
             }
             return Optional.of(payload);
         } catch (Exception e) {
             return Optional.empty();
+        }
+    }
+
+    private long extractExp(Object payload) {
+        try {
+            var m = payload.getClass().getMethod("exp");
+            Object v = m.invoke(payload);
+            return v instanceof Number n ? n.longValue() : 0L;
+        } catch (Exception ignored) {
+            return 0L;
         }
     }
 

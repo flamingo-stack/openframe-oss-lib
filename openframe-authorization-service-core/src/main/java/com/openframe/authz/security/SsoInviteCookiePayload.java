@@ -1,9 +1,9 @@
 package com.openframe.authz.security;
 
-public record SsoCookiePayload(
+public record SsoInviteCookiePayload(
         String s,
-        String tenantName,
-        String tenantDomain,
+        String invitationId,
+        Boolean switchTenant,
         String provider,
         String redirectTo,
         long iat,
