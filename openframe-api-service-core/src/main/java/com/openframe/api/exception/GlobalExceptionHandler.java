@@ -17,6 +17,8 @@ import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.ResponseEntity;
 
 import java.util.stream.Collectors;
 
@@ -144,6 +146,13 @@ public class GlobalExceptionHandler {
     public ErrorResponse handleAgentRegistrationSecretNotFoundException(AgentRegistrationSecretNotFoundException ex) {
         log.error("Agent registration secret entity not found: ", ex);
         return new ErrorResponse(ex.getErrorCode(), ex.getMessage());
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ErrorResponse> handleResponseStatusException(ResponseStatusException ex) {
+        log.warn("Response status exception: {} - {}", ex.getStatusCode(), ex.getReason());
+        ErrorResponse errorResponse = new ErrorResponse("error", ex.getReason());
+        return ResponseEntity.status(ex.getStatusCode()).body(errorResponse);
     }
 
     @ExceptionHandler(Exception.class)
