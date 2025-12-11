@@ -1,5 +1,6 @@
 package com.openframe.authz.service.tenant;
 
+import com.openframe.authz.service.validation.RegistrationValidationService;
 import com.openframe.data.document.tenant.Tenant;
 import com.openframe.data.document.tenant.TenantPlan;
 import com.openframe.data.document.tenant.TenantStatus;
@@ -23,6 +24,7 @@ import static java.time.LocalDateTime.now;
 public class TenantService {
 
     private final TenantRepository tenantRepository;
+    private final RegistrationValidationService registrationValidationService;
 
     /**
      * Create a new tenant
@@ -30,9 +32,7 @@ public class TenantService {
     public Tenant createTenant(String tenantName, String domain) {
         log.debug("Creating tenant: {} with domain: {}", tenantName, domain);
 
-        if (tenantRepository.existsByDomain(domain)) {
-            throw new IllegalArgumentException("Tenant domain already exists");
-        }
+        registrationValidationService.ensureTenantDomainAvailable(domain);
 
         Tenant tenant = Tenant.builder()
                 .id(Tenant.generateTenantId())

@@ -9,12 +9,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.LinkedHashSet;
-import java.util.Set;
-import java.util.Locale;
+import java.util.*;
+
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @Slf4j
@@ -33,7 +29,7 @@ public class SSOConfigService {
      * Get ACTIVE SSO configuration by tenant and provider.
      */
     public Optional<SSOPerTenantConfig> getSSOConfig(String tenantId, String provider) {
-        return ssoPerTenantConfigRepository.findFirstByTenantIdAndProviderAndEnabledTrue(localTenant? null : tenantId, provider);
+        return ssoPerTenantConfigRepository.findFirstByTenantIdAndProviderAndEnabledTrue(localTenant ? null : tenantId, provider);
     }
 
     /**
@@ -77,19 +73,28 @@ public class SSOConfigService {
      */
     public List<String> getEffectiveProvidersForTenant(String tenantId) {
         Set<String> result = new LinkedHashSet<>();
-
+        
         for (SSOPerTenantConfig cfg : getActiveForTenant(tenantId)) {
                 result.add(cfg.getProvider().toLowerCase());
         }
 
-        for (DefaultProviderConfig cfg : defaultProviderConfigs) {
-            if (isNotBlank(cfg.getDefaultClientId()) && isNotBlank(cfg.getDefaultClientSecret())) {
-                    result.add(cfg.providerId().toLowerCase());
-            }
-        }
+       result.addAll(getDefaultProviders());
 
         return new ArrayList<>(result);
     }
+
+    public List<String> getDefaultProviders() {
+        List<String> result = new ArrayList<>();
+
+        for (DefaultProviderConfig cfg : defaultProviderConfigs) {
+            if (isNotBlank(cfg.getDefaultClientId()) && isNotBlank(cfg.getDefaultClientSecret())) {
+                result.add(cfg.providerId().toLowerCase());
+            }
+        }
+
+        return result;
+    }
+
 
     /**
      * Find enabled, auto-provisioning SSO config by email domain (lowercased).

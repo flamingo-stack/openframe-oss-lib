@@ -1,6 +1,9 @@
 package com.openframe.authz.config;
 
 import com.openframe.authz.config.tenant.TenantContext;
+import com.openframe.authz.security.SsoAuthorizationRequestResolver;
+import com.openframe.authz.security.SsoCookieCodec;
+import com.openframe.authz.security.SsoTenantRegistrationSuccessHandler;
 import com.openframe.authz.service.policy.GlobalDomainPolicyLookup;
 import com.openframe.authz.service.processor.RegistrationProcessor;
 import com.openframe.authz.service.sso.SSOConfigService;
@@ -21,6 +24,7 @@ import org.springframework.security.oauth2.client.oidc.authentication.OidcIdToke
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2Error;
@@ -38,6 +42,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
+import static com.openframe.authz.util.OidcUserUtils.resolveEmail;
+import static com.openframe.authz.util.OidcUserUtils.stringClaim;
 import static com.openframe.data.document.user.UserRole.ADMIN;
 import static java.util.Locale.ROOT;
 
@@ -57,7 +63,10 @@ public class SecurityConfig {
     @Bean
     @Order(2)
     public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http,
-                                                          OAuth2UserService<OidcUserRequest, OidcUser> oidcUserService) throws Exception {
+                                                          OAuth2UserService<OidcUserRequest, OidcUser> oidcUserService,
+                                                          SsoTenantRegistrationSuccessHandler ssoSuccessHandler,
+                                                          ClientRegistrationRepository clientRegistrationRepository,
+                                                          SsoCookieCodec ssoCookieCodec) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(AbstractHttpConfigurer::disable)
@@ -80,7 +89,11 @@ public class SecurityConfig {
                 .formLogin(form -> form.loginPage("/login").permitAll())
                 .oauth2Login(o -> o
                         .loginPage("/login")
+                        .authorizationEndpoint(a -> a.authorizationRequestResolver(
+                                new SsoAuthorizationRequestResolver(clientRegistrationRepository, ssoCookieCodec)
+                        ))
                         .userInfoEndpoint(u -> u.oidcUserService(oidcUserService))
+                        .successHandler(ssoSuccessHandler)
                         .withObjectPostProcessor(new ObjectPostProcessor<OidcAuthorizationCodeAuthenticationProvider>() {
                             @Override
                             public <O extends OidcAuthorizationCodeAuthenticationProvider> O postProcess(O provider) {
@@ -157,7 +170,7 @@ public class SecurityConfig {
             if (tenantId == null || provider == null) {
                 return;
             }
-            String email = resolvePreferredEmail(user);
+            String email = resolveEmail(user);
             if (email == null || email.isBlank()) {
                 return;
             }
@@ -197,8 +210,8 @@ public class SecurityConfig {
     }
 
     private AuthUser registerUser(UserService userService, String tenantId, String email, OidcUser user) {
-        String givenName = valueOrNull(user.getClaims().get("given_name"));
-        String familyName = valueOrNull(user.getClaims().get("family_name"));
+        String givenName = stringClaim(user.getClaims().get("given_name"));
+        String familyName = stringClaim(user.getClaims().get("family_name"));
         String password = UUID.randomUUID().toString();
         return userService.registerUser(tenantId, email, givenName, familyName, password, List.of(ADMIN));
     }
@@ -227,32 +240,6 @@ public class SecurityConfig {
         return SUB;
     }
 
-    /**
-     * Resolve an email-like identifier from claims, falling back for AAD org accounts.
-     */
-    private String resolvePreferredEmail(OidcUser user) {
-        String email = user.getEmail();
-        if (email != null && !email.isBlank()) {
-            return email;
-        }
-        Object preferred = user.getClaims().get("preferred_username");
-        if (preferred instanceof String s && !s.isBlank()) {
-            return s;
-        }
-        Object upn = user.getClaims().get("upn");
-        if (upn instanceof String s2 && !s2.isBlank()) {
-            return s2;
-        }
-        Object uniq = user.getClaims().get("unique_name");
-        if (uniq instanceof String s3 && !s3.isBlank()) {
-            return s3;
-        }
-        return null;
-    }
-
-    private static String valueOrNull(Object claim) {
-        return claim instanceof String s && !s.isBlank() ? s : null;
-    }
 
     private boolean isEmailAllowedByDomains(List<String> allowedDomains, String email) {
         if (allowedDomains == null || allowedDomains.isEmpty()) {

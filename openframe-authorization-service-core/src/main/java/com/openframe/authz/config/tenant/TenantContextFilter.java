@@ -7,7 +7,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
-import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -23,8 +22,6 @@ public class TenantContextFilter extends OncePerRequestFilter {
     public static final String TENANT_ID = "TENANT_ID";
 
     private static final Set<String> EXCLUDED_CONTEXTS = Set.of("login", "sso", "sas", "public", ".well-known");
-
-    private final AntPathMatcher antMatcher = new AntPathMatcher();
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
