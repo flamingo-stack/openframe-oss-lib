@@ -34,37 +34,67 @@ public class InvitationRegistrationService {
 
     public AuthUser registerByInvitation(InvitationRegistrationRequest request) {
         AuthInvitation invitation = invitationValidator.loadAndEnsureAcceptable(request.getInvitationId());
+        String targetTenantId = resolveTargetTenantId(invitation);
 
         var existing = userService.findActiveByEmail(invitation.getEmail());
         if (existing.isPresent()) {
-            if (TRUE.equals(request.getSwitchTenant())) {
-                userService.deactivateUser(existing.get());
-                userDeactivationProcessor.postProcessDeactivation(existing.get());
-            } else {
-                throw new UserActiveInAnotherTenantException(invitation.getEmail());
+            AuthUser completed = handleExistingActiveUser(existing.get(), targetTenantId, invitation, request);
+            if (completed != null) {
+                return completed;
             }
         }
 
-        String tenantId = invitation.getTenantId();
-        if (localTenant) {
-            tenantId = tenantRepository.findAll().getFirst().getId();
-        }
+        AuthUser user = createUserForInvitation(targetTenantId, invitation, request);
+        acceptInvitation(invitation, user, request);
+        return user;
+    }
 
-        AuthUser user = userService.registerUser(
-                tenantId,
+    private String resolveTargetTenantId(AuthInvitation invitation) {
+        if (localTenant) {
+            return tenantRepository.findAll().getFirst().getId();
+        }
+        return invitation.getTenantId();
+    }
+
+    /**
+     * If user already belongs to target tenant: accept invitation and return existing user.
+     * If user belongs to another tenant:
+     *   - when switchTenant=true: deactivate and continue (return null to proceed with creation)
+     *   - otherwise: throw
+     */
+    private AuthUser handleExistingActiveUser(AuthUser current,
+                                              String targetTenantId,
+                                              AuthInvitation invitation,
+                                              InvitationRegistrationRequest request) {
+        if (targetTenantId.equals(current.getTenantId())) {
+            acceptInvitation(invitation, current, request);
+            return current;
+        }
+        if (TRUE.equals(request.getSwitchTenant())) {
+            userService.deactivateUser(current);
+            userDeactivationProcessor.postProcessDeactivation(current);
+            return null;
+        }
+        throw new UserActiveInAnotherTenantException(invitation.getEmail());
+    }
+
+    private AuthUser createUserForInvitation(String targetTenantId,
+                                             AuthInvitation invitation,
+                                             InvitationRegistrationRequest request) {
+        return userService.registerUser(
+                targetTenantId,
                 invitation.getEmail(),
                 request.getFirstName(),
                 request.getLastName(),
                 request.getPassword(),
                 invitation.getRoles()
         );
+    }
 
+    private void acceptInvitation(AuthInvitation invitation, AuthUser user, InvitationRegistrationRequest request) {
         invitation.setStatus(ACCEPTED);
         invitationRepository.save(invitation);
-
         registrationProcessor.postProcessInvitationRegistration(user, invitation.getId(), request);
-
-        return user;
     }
 }
 
