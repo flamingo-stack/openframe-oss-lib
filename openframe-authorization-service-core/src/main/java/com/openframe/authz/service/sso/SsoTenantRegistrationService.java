@@ -35,6 +35,7 @@ public class SsoTenantRegistrationService {
                 request.getTenantName(),
                 request.getTenantDomain(),
                 provider,
+                request.getRedirectTo(),
                 now,
                 now + COOKIE_TTL_SECONDS
         );

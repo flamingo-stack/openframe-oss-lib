@@ -40,13 +40,13 @@ public class SsoTenantRegistrationSuccessHandler extends SavedRequestAwareAuthen
                                         HttpServletResponse response,
                                         Authentication authentication) throws ServletException, IOException {
         // If this is NOT our SSO registration flow, continue default behavior
-        var regCookieOpt = CookieHelper.findCookie(request, SsoRegistrationConstants.COOKIE_SSO_REG);
-        if (regCookieOpt.isEmpty()) {
+        Cookie cookie = getRegCookie(request);
+        if (cookie == null) {
             super.onAuthenticationSuccess(request, response, authentication);
             return;
         }
         try {
-            finalizeSsoTenantRegistrationAndRespond(request, response, authentication, regCookieOpt.get());
+            finalizeSsoTenantRegistrationAndRespond(request, response, authentication, cookie);
         } catch (Exception e) {
             log.error("SSO tenant registration finalization failed: {}", e.getMessage(), e);
             response.sendError(HttpServletResponse.SC_BAD_REQUEST, "tenant_registration_failed");
@@ -77,7 +77,13 @@ public class SsoTenantRegistrationSuccessHandler extends SavedRequestAwareAuthen
 
         clearRegistrationCookie(response);
         clearAuthenticationSession(request);
-        writeTenantResponse(response, tenant);
+        // Final redirect if provided
+        String target = buildFinalRedirect(payload.redirectTo(), tenant.getId());
+        if (target == null) {
+            target = "/";
+        }
+        response.setStatus(HttpServletResponse.SC_FOUND);
+        response.setHeader("Location", target);
     }
 
     private OidcUser requireOidcUser(Authentication authentication) {
@@ -164,10 +170,20 @@ public class SsoTenantRegistrationSuccessHandler extends SavedRequestAwareAuthen
         }
     }
 
-    private void writeTenantResponse(HttpServletResponse response, Object tenant) throws IOException {
-        response.setStatus(HttpServletResponse.SC_OK);
-        response.setContentType("application/json");
-        objectMapper.writeValue(response.getWriter(), tenant);
+    private String buildFinalRedirect(String redirectTo, String tenantId) {
+        if (redirectTo == null || redirectTo.isBlank()) return null;
+        String sep = redirectTo.contains("?") ? "&" : "?";
+        return redirectTo + sep + "tenantId=" + java.net.URLEncoder.encode(tenantId, java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    private Cookie getRegCookie(HttpServletRequest request) {
+        Cookie[] cookies = request.getCookies();
+        if (cookies == null) return null;
+        for (Cookie c : cookies) {
+            if (SsoRegistrationConstants.COOKIE_SSO_REG.equals(c.getName())) return c;
+        }
+        return null;
     }
 }
+
 

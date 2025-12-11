@@ -5,6 +5,7 @@ public record SsoCookiePayload(
         String tenantName,
         String tenantDomain,
         String provider,
+        String redirectTo,
         long iat,
         long exp
 ) {
