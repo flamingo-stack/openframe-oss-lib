@@ -33,7 +33,6 @@ public class SsoTenantRegistrationSuccessHandler extends SavedRequestAwareAuthen
 
     private final TenantRegistrationService registrationService;
     private final SsoCookieCodec ssoCookieCodec;
-    private final ObjectMapper objectMapper;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request,

@@ -7,10 +7,10 @@ import com.openframe.authz.service.validation.RegistrationValidationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.UUID;
-
 import static com.openframe.authz.security.SsoRegistrationConstants.ONBOARDING_TENANT_ID;
+import static java.time.Instant.now;
 import static java.util.Locale.ROOT;
+import static java.util.UUID.randomUUID;
 
 @Service
 @RequiredArgsConstructor
@@ -28,8 +28,8 @@ public class SsoTenantRegistrationService {
 
         validationService.ensureTenantDomainAvailable(request.getTenantDomain());
 
-        String state = UUID.randomUUID().toString();
-        long now = java.time.Instant.now().getEpochSecond();
+        String state = randomUUID().toString();
+        long now = now().getEpochSecond();
         SsoCookiePayload payload = new SsoCookiePayload(
                 state,
                 request.getTenantName(),
