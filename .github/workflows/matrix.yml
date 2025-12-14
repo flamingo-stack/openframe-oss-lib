@@ -1,0 +1,32 @@
+name: Generate Matrix
+
+on:
+  workflow_call:
+    outputs:
+      node_matrix:
+        description: "Node packages matrix"
+        value: ${{ jobs.matrix.outputs.node_matrix }}
+
+
+jobs:
+  matrix:
+    name: Generate Matrix
+    runs-on: ubuntu-latest
+    outputs:
+      node_matrix: ${{ steps.matrix.outputs.node_matrix }}
+    steps:
+      - name: Define Matrix
+        id: matrix
+        run: |
+          node_matrix_json='[
+            {
+              "name": "ui-kit",
+              "path": "ui-kit"
+            }
+          ]'
+
+          {
+            echo 'node_matrix<<EOF'
+            echo "$node_matrix_json"
+            echo EOF
+          } >> $GITHUB_OUTPUT

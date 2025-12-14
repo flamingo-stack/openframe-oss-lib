@@ -5,8 +5,8 @@ on:
     outputs:
       java:
         value: ${{ jobs.changes.outputs.java }}
-      node_matrix:
-        value: ${{ jobs.changes.outputs.node_matrix }}
+      ui-kit:
+        value: ${{ jobs.changes.outputs.ui-kit }}
 
 
 jobs:
@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       java: ${{ steps.filter.outputs.java }}
-      node_matrix: ${{ steps.node_matrix.outputs.matrix }}
+      ui-kit: ${{ steps.filter.outputs.ui-kit }}
     steps:
       - uses: actions/checkout@v4
 
@@ -30,19 +30,3 @@ jobs:
               - '.mvn/**'
             ui-kit:
               - 'ui-kit/**'
-
-
-      - name: Build Node Matrix
-        id: node_matrix
-        env:
-          FILTER_OUTPUTS: ${{ toJson(steps.filter.outputs) }}
-        run: |
-          packages='{
-            "ui-kit":"ui-kit"
-          }'
-
-          matrix=$(echo "$packages" | jq -c --argjson outputs "$FILTER_OUTPUTS" '
-            to_entries | map(select($outputs[.key] == "true") | {name: .key, path: .value})
-          ')
-
-          echo "matrix=$matrix" >> $GITHUB_OUTPUT
