@@ -150,7 +150,7 @@ jobs:
         with:
           node-version: '22'
           registry-url: 'https://npm.pkg.github.com'
-          scope: '@flamingo-stack'
+          scope: '@${{ github.repository_owner }}'
 
       - name: Install Dependencies
         if: steps.should_run.outputs.run == 'true'
