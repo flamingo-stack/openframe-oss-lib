@@ -179,7 +179,7 @@ jobs:
         if: steps.should_run.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
         working-directory: ${{ matrix.path }}
         env:
-          GH_TOKEN: ${{ github.token }}
+          NODE_AUTH_TOKEN: ${{ github.token }}
         run: |
           PKG_NAME=$(jq -r '.name' package.json)
           OLD_VERSION=$(npm view "$PKG_NAME" version --registry=https://npm.pkg.github.com 2>/dev/null || echo "0.0.0")
