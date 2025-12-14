@@ -46,6 +46,7 @@ jobs:
       github.event_name == 'workflow_dispatch' || 
       github.event_name == 'push'
 
+
   release-java:
     name: Release Java
     runs-on: ubuntu-latest
@@ -174,10 +175,38 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: npm version "0.0.0-snapshot.$(date +%Y%m%d%H%M%S)" --no-git-tag-version
 
+      - name: Get Previous Version
+        if: steps.should_run.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
+        working-directory: ${{ matrix.path }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PKG_NAME=$(jq -r '.name' package.json)
+          OLD_VERSION=$(npm view "$PKG_NAME" version --registry=https://npm.pkg.github.com 2>/dev/null || echo "0.0.0")
+          OLD_VERSION=${OLD_VERSION:-0.0.0}
+          echo "OLD_VERSION=$OLD_VERSION" >> $GITHUB_ENV
+          echo "Found old version: $OLD_VERSION"
+
       - name: Set Release Version
         if: steps.should_run.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
         working-directory: ${{ matrix.path }}
-        run: npm version ${{ github.event.inputs.version }} --no-git-tag-version
+        env:
+          NEW_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          OLD_BASE="${{ env.OLD_VERSION }}"
+          [[ "$OLD_BASE" =~ ^([0-9]+\.[0-9]+\.[0-9]+) ]] && OLD_BASE="${BASH_REMATCH[1]}"
+
+          IFS='.' read -r old_major old_minor old_patch <<< "$OLD_BASE"
+          IFS='.' read -r new_major new_minor new_patch <<< "$NEW_VERSION"
+
+          if ! ([ "$new_major" -eq $((old_major + 1)) ] && [ "$new_minor" -eq 0 ] && [ "$new_patch" -eq 0 ]) &&
+             ! ([ "$new_major" -eq "$old_major" ] && [ "$new_minor" -eq $((old_minor + 1)) ] && [ "$new_patch" -eq 0 ]) &&
+             ! ([ "$new_major" -eq "$old_major" ] && [ "$new_minor" -eq "$old_minor" ] && [ "$new_patch" -eq $((old_patch + 1)) ]); then
+            echo "Invalid version bump: ${{ env.OLD_VERSION }} → $NEW_VERSION"
+            exit 1
+          fi
+          echo "New version validated: ${{ env.OLD_VERSION }} → $NEW_VERSION"
+          npm version "$NEW_VERSION" --no-git-tag-version
 
       - name: Publish to GitHub Packages
         if: steps.should_run.outputs.run == 'true'
