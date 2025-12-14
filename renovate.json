@@ -12,6 +12,12 @@
       "matchStrings": ["<revision>(?<currentValue>.*?)</revision>"],
       "depNameTemplate": "com.openframe.oss:openframe-oss-lib",
       "datasourceTemplate": "maven"
+    },
+    {
+      "fileMatch": ["^ui-kit/package\\.json$"],
+      "matchStrings": ["\"version\":\\s*\"(?<currentValue>.*?)\""],
+      "depNameTemplate": "@flamingo-stack/ui-kit",
+      "datasourceTemplate": "npm"
     }
   ],
 
@@ -29,6 +35,16 @@
       "automergeType": "pr",
       "platformAutomerge": true,
       "registryUrls": ["https://maven.pkg.github.com/flamingo-stack/openframe-oss-lib"]
+    },
+    {
+      "description": "Enable automerge for ui-kit version updates",
+      "matchManagers": ["regex"],
+      "matchPackageNames": ["@flamingo-stack/ui-kit"],
+      "enabled": true,
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": true,
+      "registryUrls": ["https://npm.pkg.github.com"]
     }
   ],
 
@@ -36,6 +52,10 @@
     {
       "hostType": "maven",
       "matchHost": "maven.pkg.github.com"
+    },
+    {
+      "hostType": "npm",
+      "matchHost": "npm.pkg.github.com"
     }
   ]
 }
