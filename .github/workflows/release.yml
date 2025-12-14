@@ -182,7 +182,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ github.token }}
         run: |
           PKG_NAME=$(jq -r '.name' package.json)
-          OLD_VERSION=$(npm view "$PKG_NAME" version --registry=https://npm.pkg.github.com 2>/dev/null || echo "0.0.0")
+          OLD_VERSION=$(npm view "$PKG_NAME" versions --registry=https://npm.pkg.github.com 2>/dev/null | grep -oE '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1 || echo "0.0.0")
           OLD_VERSION=${OLD_VERSION:-0.0.0}
           echo "OLD_VERSION=$OLD_VERSION" >> $GITHUB_ENV
           echo "Found old version: $OLD_VERSION"
