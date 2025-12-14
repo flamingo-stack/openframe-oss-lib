@@ -1,0 +1,47 @@
+name: Detect Changes
+
+on:
+  workflow_call:
+    outputs:
+      java:
+        value: ${{ jobs.changes.outputs.java }}
+      node_matrix:
+        value: ${{ jobs.changes.outputs.node_matrix }}
+
+
+jobs:
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      java: ${{ steps.filter.outputs.java }}
+      node_matrix: ${{ steps.node_matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            java:
+              - 'pom.xml'
+              - 'openframe-*/**'
+              - 'sdk/**'
+              - '.mvn/**'
+            ui-kit:
+              - 'ui-kit/**'
+
+      - name: Build Node Matrix
+        id: node_matrix
+        env:
+          FILTER_OUTPUTS: ${{ toJson(steps.filter.outputs) }}
+        run: |
+          packages='{
+            "ui-kit":"ui-kit"
+          }'
+
+          matrix=$(echo "$packages" | jq -c --argjson outputs "$FILTER_OUTPUTS" '
+            to_entries | map(select($outputs[.key] == "true") | {name: .key, path: .value})
+          ')
+
+          echo "matrix=$matrix" >> $GITHUB_OUTPUT
