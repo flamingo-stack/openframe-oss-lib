@@ -1,0 +1,28 @@
+/* Custom scrollbar styles for logs list */
+.logs-list-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.logs-list-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.logs-list-scrollbar::-webkit-scrollbar-thumb {
+  background: #4a4a4a;
+  border-radius: 3px;
+}
+
+.logs-list-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #5a5a5a;
+}
+
+/* Firefox scrollbar styles */
+.logs-list-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #4a4a4a transparent;
+}
+
+/* Smooth scrolling */
+.logs-list-scrollbar {
+  scroll-behavior: smooth;
+}

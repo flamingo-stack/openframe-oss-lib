@@ -1,0 +1,566 @@
+/* ODS Dynamic Theming System */
+
+/* Theme transition animations */
+.theme-transitioning {
+  transition: 
+    background-color var(--theme-transition-duration, 300ms) ease-out,
+    color var(--theme-transition-duration, 300ms) ease-out,
+    border-color var(--theme-transition-duration, 300ms) ease-out;
+}
+
+.theme-transitioning * {
+  transition: 
+    background-color var(--theme-transition-duration, 300ms) ease-out,
+    color var(--theme-transition-duration, 300ms) ease-out,
+    border-color var(--theme-transition-duration, 300ms) ease-out,
+    fill var(--theme-transition-duration, 300ms) ease-out,
+    stroke var(--theme-transition-duration, 300ms) ease-out;
+}
+
+/* Platform-specific theme classes */
+.theme-openmsp {
+  --theme-accent-rgb: 255, 192, 8;
+  --theme-personality: 'energetic';
+}
+
+.theme-admin-hub {
+  --theme-accent-rgb: 255, 107, 157;
+  --theme-personality: 'professional';
+}
+
+.theme-openframe {
+  --theme-accent-rgb: 0, 212, 170;
+  --theme-personality: 'technical';
+}
+
+.theme-flamingo {
+  --theme-accent-rgb: 255, 107, 157;
+  --theme-personality: 'creative';
+}
+
+/* High contrast accessibility mode */
+.high-contrast,
+.theme-high-contrast {
+  /* Enhanced contrast ratios */
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #e0e0e0;
+  --color-bg: #000000;
+  --color-bg-card: #1a1a1a;
+  --color-border-default: #ffffff;
+  
+  /* More pronounced focus indicators */
+  --color-focus-ring: #ffff00;
+  --focus-ring-width: 3px;
+  
+  /* High contrast status colors */
+  --color-success: #00ff00;
+  --color-error: #ff0000;
+  --color-warning: #ffff00;
+  --color-info: #00ffff;
+}
+
+.high-contrast * {
+  /* Ensure all elements respect high contrast */
+  outline-width: var(--focus-ring-width, 2px) !important;
+}
+
+.high-contrast button:focus-visible,
+.high-contrast a:focus-visible,
+.high-contrast input:focus-visible {
+  outline: var(--focus-ring-width, 3px) solid var(--color-focus-ring) !important;
+  outline-offset: 2px !important;
+}
+
+/* Dynamic theme variables based on context */
+.theme-dynamic {
+  /* Contextual color mixing */
+  --color-accent-subtle: color-mix(in srgb, var(--color-accent-primary) 60%, transparent);
+  --color-accent-strong: color-mix(in srgb, var(--color-accent-primary) 140%, #000000);
+  
+  /* Dynamic gradients */
+  --gradient-accent-primary: linear-gradient(135deg, var(--color-accent-primary) 0%, var(--color-accent-hover) 100%);
+  --gradient-accent-subtle: linear-gradient(135deg, var(--color-accent-subtle) 0%, transparent 100%);
+  
+  /* Adaptive shadows */
+  --shadow-accent: 0 4px 20px color-mix(in srgb, var(--color-accent-primary) 25%, transparent);
+  --shadow-accent-strong: 0 8px 32px color-mix(in srgb, var(--color-accent-primary) 40%, transparent);
+}
+
+/* Responsive theme adjustments */
+@media (max-width: 768px) {
+  .theme-dynamic {
+    /* Slightly more contrast on mobile for better readability */
+    --color-text-secondary: color-mix(in srgb, var(--color-text-secondary) 110%, var(--color-text-primary));
+    
+    /* Larger touch targets in dark mode */
+    --touch-target-min: 48px;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .theme-transitioning,
+  .theme-transitioning * {
+    transition: none !important;
+    animation: none !important;
+  }
+  
+  /* Still allow instant theme changes */
+  .theme-dynamic {
+    --theme-transition-duration: 0ms;
+  }
+}
+
+/* Theme-aware component utilities */
+.ods-adaptive-bg {
+  background: var(--color-bg-card);
+  transition: background-color var(--theme-transition-duration, 300ms) ease-out;
+}
+
+.ods-adaptive-text {
+  color: var(--color-text-primary);
+  transition: color var(--theme-transition-duration, 300ms) ease-out;
+}
+
+.ods-adaptive-border {
+  border-color: var(--color-border-default);
+  transition: border-color var(--theme-transition-duration, 300ms) ease-out;
+}
+
+/* Interactive state enhancements */
+.ods-interactive {
+  position: relative;
+  transition: all var(--theme-transition-duration, 300ms) ease-out;
+}
+
+.ods-interactive::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--gradient-accent-subtle);
+  opacity: 0;
+  transition: opacity var(--theme-transition-duration, 300ms) ease-out;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.ods-interactive:hover::before {
+  opacity: 0.1;
+}
+
+.ods-interactive:active::before {
+  opacity: 0.2;
+}
+
+/* Platform personality animations */
+.theme-openmsp .ods-accent-element {
+  /* Energetic bounce effect */
+  animation: energetic-pulse 2s ease-in-out infinite;
+}
+
+.theme-admin-hub .ods-accent-element {
+  /* Professional fade effect */
+  animation: professional-fade 3s ease-in-out infinite;
+}
+
+.theme-openframe .ods-accent-element {
+  /* Technical glow effect */
+  animation: technical-glow 2.5s ease-in-out infinite;
+}
+
+.theme-flamingo .ods-accent-element {
+  /* Creative wave effect */
+  animation: creative-wave 4s ease-in-out infinite;
+}
+
+@keyframes energetic-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+@keyframes professional-fade {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+
+@keyframes technical-glow {
+  0%, 100% { 
+    filter: drop-shadow(0 0 8px var(--color-accent-primary)); 
+  }
+  50% { 
+    filter: drop-shadow(0 0 16px var(--color-accent-primary)); 
+  }
+}
+
+@keyframes creative-wave {
+  0%, 100% { 
+    transform: translateY(0px); 
+  }
+  33% { 
+    transform: translateY(-2px); 
+  }
+  66% { 
+    transform: translateY(2px); 
+  }
+}
+
+/* Theme validation indicators */
+.theme-validation-pass {
+  position: relative;
+}
+
+.theme-validation-pass::after {
+  content: '✓';
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 16px;
+  height: 16px;
+  background: var(--color-success);
+  color: white;
+  border-radius: 50%;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.theme-validation-fail {
+  position: relative;
+  outline: 2px solid var(--color-error);
+  outline-offset: 2px;
+}
+
+.theme-validation-fail::after {
+  content: '!';
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 16px;
+  height: 16px;
+  background: var(--color-error);
+  color: white;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+/* Debug mode indicators */
+.theme-debug {
+  --debug-indicator-size: 4px;
+}
+
+.theme-debug .ods-accent {
+  position: relative;
+}
+
+.theme-debug .ods-accent::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--debug-indicator-size);
+  height: var(--debug-indicator-size);
+  background: #ff00ff;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+/* Dynamic loading states */
+.ods-loading-dynamic {
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-skeleton) 25%,
+    var(--color-bg-hover) 50%,
+    var(--color-bg-skeleton) 75%
+  );
+  background-size: 200% 100%;
+  animation: loading-shimmer 2s infinite;
+}
+
+@keyframes loading-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Platform-aware focus indicators */
+.theme-openmsp :focus-visible {
+  outline: 2px solid var(--ods-open-yellow-base);
+  outline-offset: 2px;
+}
+
+.theme-admin-hub :focus-visible {
+  outline: 2px solid var(--ods-flamingo-pink-base);
+  outline-offset: 2px;
+}
+
+.theme-openframe :focus-visible {
+  outline: 2px solid var(--ods-flamingo-cyan-base);
+  outline-offset: 2px;
+}
+
+.theme-flamingo :focus-visible {
+  outline: 2px solid var(--ods-flamingo-pink-base);
+  outline-offset: 2px;
+}
+
+/* Enhanced button interactions */
+.ods-interactive {
+  position: relative;
+  overflow: hidden;
+}
+
+.ods-interactive .animate {
+  transform: scale(4);
+  opacity: 0;
+  transition: transform 0.5s ease-out, opacity 0.5s ease-out;
+}
+
+.high-contrast-button {
+  border-width: 2px !important;
+  border-style: solid !important;
+}
+
+.high-contrast-button:focus {
+  outline: 3px solid var(--color-focus-ring) !important;
+  outline-offset: 3px !important;
+}
+
+.auto-contrast {
+  color: var(--optimal-text-color, inherit);
+}
+
+/* Platform switch button enhancements */
+.platform-switch-preview {
+  position: relative;
+}
+
+.platform-switch-preview::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--preview-color);
+  opacity: 0.8;
+}
+
+/* Platform-aware skeleton animations */
+.skeleton-wave {
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-base, var(--color-bg-skeleton)) 25%,
+    var(--skeleton-highlight, var(--color-bg-hover)) 50%,
+    var(--skeleton-base, var(--color-bg-skeleton)) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-wave-motion 2s infinite;
+}
+
+@keyframes skeleton-wave-motion {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Platform-specific skeleton styling */
+.skeleton-platform-openmsp {
+  --skeleton-accent: color-mix(in srgb, var(--ods-open-yellow-base) 8%, transparent);
+}
+
+.skeleton-platform-admin-hub {
+  --skeleton-accent: color-mix(in srgb, var(--ods-flamingo-pink-base) 8%, transparent);
+}
+
+.skeleton-platform-openframe {
+  --skeleton-accent: color-mix(in srgb, var(--ods-flamingo-cyan-base) 8%, transparent);
+}
+
+.skeleton-platform-flamingo {
+  --skeleton-accent: color-mix(in srgb, var(--ods-flamingo-pink-base) 8%, transparent);
+  /* Light theme adjustments */
+  --skeleton-base: color-mix(in srgb, var(--color-bg-skeleton) 20%, #f5f5f5);
+}
+
+/* Enhanced skeleton states */
+.skeleton-stage-0 {
+  /* Basic loading state */
+  opacity: 0.6;
+}
+
+.skeleton-stage-1 {
+  /* Detailed loading state */
+  opacity: 0.8;
+  background: var(--skeleton-highlight);
+}
+
+.skeleton-stage-2 {
+  /* Interactive loading state */
+  opacity: 1;
+  background: linear-gradient(
+    45deg,
+    var(--skeleton-base),
+    var(--skeleton-accent),
+    var(--skeleton-base)
+  );
+  background-size: 300% 300%;
+  animation: skeleton-interactive 3s ease-in-out infinite;
+}
+
+@keyframes skeleton-interactive {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* Platform skeleton container */
+.platform-skeleton {
+  position: relative;
+}
+
+.platform-skeleton::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: var(--skeleton-accent);
+  border-radius: inherit;
+  opacity: 0.1;
+  pointer-events: none;
+}
+
+/* Skeleton accessibility enhancements */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-wave,
+  .ods-loading-dynamic,
+  .skeleton-stage-2 {
+    animation: none !important;
+    background: var(--color-bg-skeleton) !important;
+  }
+}
+
+/* High contrast skeleton adjustments */
+.high-contrast .skeleton-wave,
+.high-contrast .ods-loading-dynamic {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--color-bg-skeleton) 0px,
+    var(--color-border-default) 2px,
+    var(--color-bg-skeleton) 4px
+  ) !important;
+  animation: none !important;
+}
+
+/* Interactive wrapper states */
+.interactive-wrapper {
+  position: relative;
+  overflow: hidden;
+  transition: all var(--theme-transition-duration, 200ms) ease-out;
+}
+
+.interactive-wrapper.state-hovered {
+  transform: translateY(-1px);
+}
+
+.interactive-wrapper.state-pressed {
+  transform: translateY(0px) scale(0.98);
+}
+
+.interactive-wrapper.state-focused {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.interactive-wrapper.state-disabled {
+  opacity: 0.6;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+.interactive-wrapper.state-loading {
+  cursor: progress;
+}
+
+.interactive-wrapper.state-active {
+  background-color: var(--color-accent-primary);
+  color: var(--color-text-on-accent);
+}
+
+/* Ripple animation */
+@keyframes ripple-expand {
+  0% {
+    transform: scale(0);
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(20);
+    opacity: 0;
+  }
+}
+
+/* Enhanced focus indicators for interactive elements */
+.interactive-wrapper:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-focus-ring) 20%, transparent);
+}
+
+/* High contrast enhancements for interactive elements */
+.high-contrast .interactive-wrapper {
+  border: 2px solid var(--color-border-default);
+}
+
+.high-contrast .interactive-wrapper.state-hovered {
+  border-color: var(--color-accent-primary);
+  background-color: color-mix(in srgb, var(--color-accent-primary) 10%, transparent);
+}
+
+.high-contrast .interactive-wrapper.state-focused {
+  outline: 3px solid var(--color-focus-ring) !important;
+  outline-offset: 3px !important;
+}
+
+/* Platform-specific interactive enhancements */
+.theme-openmsp .interactive-wrapper.state-hovered {
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--ods-open-yellow-base) 20%, transparent);
+}
+
+.theme-admin-hub .interactive-wrapper.state-hovered {
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--ods-flamingo-pink-base) 20%, transparent);
+}
+
+.theme-openframe .interactive-wrapper.state-hovered {
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--ods-flamingo-cyan-base) 20%, transparent);
+}
+
+.theme-flamingo .interactive-wrapper.state-hovered {
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--ods-flamingo-pink-base) 20%, transparent);
+}
+
+/* Reduced motion support for interactive elements */
+@media (prefers-reduced-motion: reduce) {
+  .interactive-wrapper {
+    transition: none !important;
+    transform: none !important;
+  }
+  
+  .interactive-wrapper.state-hovered,
+  .interactive-wrapper.state-pressed {
+    transform: none !important;
+  }
+  
+  @keyframes ripple-expand {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 0.1;
+    }
+  }
+}

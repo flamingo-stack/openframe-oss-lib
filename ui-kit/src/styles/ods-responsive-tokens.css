@@ -1,0 +1,241 @@
+/* Open Design System – Responsive Design Tokens */
+
+:root {
+  /* =================================================== */
+  /* DEVICE CONTEXT */
+  /* =================================================== */
+  
+  /* Device Type Identification */
+  --device-type: desktop;
+  --device-screen-width: 80rem; /* Default desktop width */
+  
+  /* =================================================== */
+  /* RESPONSIVE SPACING SYSTEM */
+  /* =================================================== */
+  
+  /* Desktop Spacing (Default) - 80rem and above */
+  --spacing-system-zero: 0rem;
+  --spacing-system-xxs: 0.25rem;   /* 4px */
+  --spacing-system-xs: 0.5rem;     /* 8px */
+  --spacing-system-xsf: 0.5rem;    /* 8px - variant */
+  --spacing-system-s: 0.75rem;     /* 12px */
+  --spacing-system-sf: 0.75rem;    /* 12px - variant */
+  --spacing-system-m: 1rem;        /* 16px */
+  --spacing-system-mf: 1rem;       /* 16px - variant */
+  --spacing-system-l: 1.5rem;      /* 24px */
+  --spacing-system-lf: 1.5rem;     /* 24px - variant */
+  --spacing-system-xl: 2.5rem;     /* 40px */
+  --spacing-system-xlf: 2.5rem;    /* 40px - variant */
+  --spacing-system-xxl: 5rem;      /* 80px */
+  
+  /* =================================================== */
+  /* RESPONSIVE TYPOGRAPHY SYSTEM */
+  /* =================================================== */
+  
+  /* Desktop Typography (Default) */
+  --font-size-h1-title: 3.5rem;           /* 56px */
+  --font-size-h2-sub-title: 2rem;         /* 32px */
+  --font-size-h3-body: 1.125rem;          /* 18px */
+  --font-size-h5-caption: 0.875rem;       /* 14px */
+  
+  --font-line-space-h1-main-title: 4rem;      /* 64px */
+  --font-line-space-h2-sub-title: 2.5rem;     /* 40px */
+  --font-line-space-h3-body: 1.5rem;          /* 24px */
+  --font-line-space-h5-caption: 1.25rem;      /* 20px */
+  
+  /* =================================================== */
+  /* RESPONSIVE ICON SYSTEM */
+  /* =================================================== */
+  
+  --icon-size-icon-size: 1.5rem;  /* 24px */
+}
+
+/* =================================================== */
+/* TABLET RESPONSIVE TOKENS - 50rem (800px) and below */
+/* =================================================== */
+
+@media (max-width: 50rem) {
+  :root {
+    /* Device Context */
+    --device-type: tablet;
+    --device-screen-width: 50rem;
+    
+    /* Tablet Spacing - slightly smaller than desktop */
+    --spacing-system-zero: 0rem;
+    --spacing-system-xxs: 0.25rem;   /* 4px - same */
+    --spacing-system-xs: 0.5rem;     /* 8px - same */
+    --spacing-system-xsf: 0.5rem;    /* 8px - same */
+    --spacing-system-s: 0.75rem;     /* 12px - same */
+    --spacing-system-sf: 0.75rem;    /* 12px - same */
+    --spacing-system-m: 1rem;        /* 16px - same */
+    --spacing-system-mf: 1rem;       /* 16px - same */
+    --spacing-system-l: 1.5rem;      /* 24px - same */
+    --spacing-system-lf: 1.5rem;     /* 24px - same */
+    --spacing-system-xl: 2.5rem;     /* 40px - same */
+    --spacing-system-xlf: 2.5rem;    /* 40px - same */
+    --spacing-system-xxl: 3rem;      /* 48px - reduced from 80px */
+    
+    /* Tablet Typography - slightly smaller */
+    --font-size-h1-title: 3rem;             /* 48px - from 56px */
+    --font-size-h2-sub-title: 2rem;         /* 32px - same */
+    --font-size-h3-body: 1.125rem;          /* 18px - same */
+    --font-size-h5-caption: 0.875rem;       /* 14px - same */
+    
+    --font-line-space-h1-main-title: 3.5rem;    /* 56px - from 64px */
+    --font-line-space-h2-sub-title: 2.5rem;     /* 40px - same */
+    --font-line-space-h3-body: 1.5rem;          /* 24px - same */
+    --font-line-space-h5-caption: 1.25rem;      /* 20px - same */
+    
+    /* Tablet Icons - same size */
+    --icon-size-icon-size: 1.5rem;  /* 24px */
+  }
+}
+
+/* =================================================== */
+/* MOBILE LARGE RESPONSIVE TOKENS - 26.875rem (430px) and below */
+/* =================================================== */
+
+@media (max-width: 26.875rem) {
+  :root {
+    /* Device Context */
+    --device-type: mobile;
+    --device-screen-width: 26.875rem;
+    
+    /* Mobile Large Spacing - significantly tighter */
+    --spacing-system-zero: 0rem;
+    --spacing-system-xxs: 0.25rem;   /* 4px - same */
+    --spacing-system-xs: 0.25rem;    /* 4px - reduced from 8px */
+    --spacing-system-xsf: 0.5rem;    /* 8px - reduced from 8px */
+    --spacing-system-s: 0.5rem;      /* 8px - reduced from 12px */
+    --spacing-system-sf: 0.75rem;    /* 12px - same */
+    --spacing-system-m: 0.75rem;     /* 12px - reduced from 16px */
+    --spacing-system-mf: 1rem;       /* 16px - same */
+    --spacing-system-l: 1rem;        /* 16px - reduced from 24px */
+    --spacing-system-lf: 1.5rem;     /* 24px - same */
+    --spacing-system-xl: 1.5rem;     /* 24px - reduced from 40px */
+    --spacing-system-xlf: 2.5rem;    /* 40px - same */
+    --spacing-system-xxl: 2.5rem;    /* 40px - reduced from 48px */
+    
+    /* Mobile Large Typography - smaller sizes */
+    --font-size-h1-title: 2.5rem;           /* 40px - from 48px */
+    --font-size-h2-sub-title: 1.5rem;       /* 24px - from 32px */
+    --font-size-h3-body: 0.875rem;          /* 14px - from 18px */
+    --font-size-h5-caption: 0.75rem;        /* 12px - from 14px */
+    
+    --font-line-space-h1-main-title: 2.5rem;    /* 40px - from 56px */
+    --font-line-space-h2-sub-title: 2rem;       /* 32px - from 40px */
+    --font-line-space-h3-body: 1.25rem;         /* 20px - from 24px */
+    --font-line-space-h5-caption: 1rem;         /* 16px - from 20px */
+    
+    /* Mobile Icons - smaller */
+    --icon-size-icon-size: 1rem;    /* 16px - from 24px */
+  }
+}
+
+/* =================================================== */
+/* MOBILE SMALL RESPONSIVE TOKENS - 23.4375rem (375px) and below */
+/* =================================================== */
+
+@media (max-width: 23.4375rem) {
+  :root {
+    /* Device Context */
+    --device-type: mobile-s;
+    --device-screen-width: 23.4375rem;
+    
+    /* Mobile Small Spacing - same as mobile large for now */
+    /* All spacing values remain the same as mobile large */
+    
+    /* Mobile Small Typography - same as mobile large */
+    /* All typography values remain the same as mobile large */
+    
+    /* Mobile Small Icons - same as mobile large */
+    --icon-size-icon-size: 1rem;    /* 16px */
+  }
+}
+
+/* =================================================== */
+/* SEMANTIC SPACING ALIASES */
+/* =================================================== */
+
+:root {
+  /* Map semantic names to responsive system */
+  --space-responsive-zero: var(--spacing-system-zero);
+  --space-responsive-xxs: var(--spacing-system-xxs);
+  --space-responsive-xs: var(--spacing-system-xs);
+  --space-responsive-s: var(--spacing-system-s);
+  --space-responsive-m: var(--spacing-system-m);
+  --space-responsive-l: var(--spacing-system-l);
+  --space-responsive-xl: var(--spacing-system-xl);
+  --space-responsive-xxl: var(--spacing-system-xxl);
+  
+  /* Component spacing that adapts */
+  --space-component-responsive-xs: var(--spacing-system-xs);
+  --space-component-responsive-sm: var(--spacing-system-s);
+  --space-component-responsive-md: var(--spacing-system-m);
+  --space-component-responsive-lg: var(--spacing-system-l);
+  --space-component-responsive-xl: var(--spacing-system-xl);
+  
+  /* Section spacing that adapts */
+  --space-section-responsive-xs: var(--spacing-system-m);
+  --space-section-responsive-sm: var(--spacing-system-l);
+  --space-section-responsive-md: var(--spacing-system-xl);
+  --space-section-responsive-lg: var(--spacing-system-xxl);
+}
+
+/* =================================================== */
+/* RESPONSIVE TYPOGRAPHY UTILITIES */
+/* =================================================== */
+
+:root {
+  /* Responsive heading utilities */
+  --font-responsive-h1: var(--font-weight-bold) var(--font-size-h1-title)/var(--font-line-space-h1-main-title) var(--font-family-heading);
+  --font-responsive-h2: var(--font-weight-semibold) var(--font-size-h2-sub-title)/var(--font-line-space-h2-sub-title) var(--font-family-heading);
+  --font-responsive-h3: var(--font-weight-medium) var(--font-size-h3-body)/var(--font-line-space-h3-body) var(--font-family-body);
+  --font-responsive-h5: var(--font-weight-medium) var(--font-size-h5-caption)/var(--font-line-space-h5-caption) var(--font-family-body);
+}
+
+/* =================================================== */
+/* INTEGRATION WITH EXISTING TOKENS */
+/* =================================================== */
+
+:root {
+  /* Create bridge tokens for existing system compatibility */
+  --space-responsive-component-xs: var(--space-component-responsive-xs);
+  --space-responsive-component-sm: var(--space-component-responsive-sm);
+  --space-responsive-component-md: var(--space-component-responsive-md);
+  --space-responsive-component-lg: var(--space-component-responsive-lg);
+  --space-responsive-component-xl: var(--space-component-responsive-xl);
+  
+  --space-responsive-section-xs: var(--space-section-responsive-xs);
+  --space-responsive-section-sm: var(--space-section-responsive-sm);
+  --space-responsive-section-md: var(--space-section-responsive-md);
+  --space-responsive-section-lg: var(--space-section-responsive-lg);
+}
+
+/* =================================================== */
+/* UTILITY CLASSES FOR RESPONSIVE SPACING */
+/* =================================================== */
+
+.responsive-spacing-debug {
+  /* Debug utility to show current device type */
+  --current-device: var(--device-type);
+}
+
+/* Platform-specific responsive adjustments */
+[data-app-type="admin-hub"] {
+  /* Admin interface might need tighter spacing */
+  --spacing-system-xxl: calc(var(--spacing-system-xxl) * 0.8);
+}
+
+[data-app-type="flamingo-teaser"] {
+  /* Landing page might need more generous spacing */
+  --spacing-system-xxl: calc(var(--spacing-system-xxl) * 1.2);
+}
+
+/* Reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    /* Responsive transitions should respect motion preferences */
+    --transition-responsive: none;
+  }
+}

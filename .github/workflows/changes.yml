@@ -1,0 +1,32 @@
+name: Generate Changes
+
+on:
+  workflow_call:
+    outputs:
+      java:
+        value: ${{ jobs.changes.outputs.java }}
+      ui-kit:
+        value: ${{ jobs.changes.outputs.ui-kit }}
+
+
+jobs:
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      java: ${{ steps.filter.outputs.java }}
+      ui-kit: ${{ steps.filter.outputs.ui-kit }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            java:
+              - 'pom.xml'
+              - 'openframe-*/**'
+              - 'sdk/**'
+              - '.mvn/**'
+            ui-kit:
+              - 'ui-kit/**'
