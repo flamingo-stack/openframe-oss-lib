@@ -6,7 +6,7 @@ permissions:
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/ui-kit-migration]
   workflow_dispatch:
     inputs:
       version:
