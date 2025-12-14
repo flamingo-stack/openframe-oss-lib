@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { Skeleton } from '@flamingo/ui-kit'
+import { Skeleton } from '../skeleton'
 
 interface FileManagerSkeletonProps {
   rows?: number

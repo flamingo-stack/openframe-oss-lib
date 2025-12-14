@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Badge } from "@flamingo/ui-kit/components/ui";
+import { Button, Badge } from "../ui";
 import { Check } from 'lucide-react';
 import React from 'react';
 
