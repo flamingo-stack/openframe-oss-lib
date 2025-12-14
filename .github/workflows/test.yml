@@ -11,7 +11,7 @@ on:
 
 jobs:
   changes:
-    name: Detect Changes
+    name: Changes
     uses: ./.github/workflows/changes.yml
     if: |
       github.event_name == 'pull_request' &&
@@ -19,7 +19,7 @@ jobs:
 
 
   test-java:
-    name: Build & Test Java
+    name: Test Java
     runs-on: ubuntu-latest
     needs: changes
     if: needs.changes.outputs.java == 'true'
@@ -58,7 +58,7 @@ jobs:
 
 
   test-node:
-    name: Build & Test Node (${{ matrix.name }})
+    name: Test Node (${{ matrix.name }})
     runs-on: ubuntu-latest
     needs: changes
     if: needs.changes.outputs.node_matrix != '[]'
