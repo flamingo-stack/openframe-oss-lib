@@ -1,0 +1,437 @@
+/* Open Design System – Consistent Interaction States */
+
+:root {
+  /* =================================================== */
+  /* INTERACTION STATE TOKENS */
+  /* =================================================== */
+
+  /* Component State Colors */
+  --state-idle: transparent;
+  --state-hover: var(--color-bg-hover);
+  --state-active: var(--color-bg-active);  
+  --state-focus: var(--color-accent-primary);
+  --state-disabled: var(--color-disabled);
+
+  /* Button State Tokens */
+  --button-primary-idle: var(--color-accent-primary);
+  --button-primary-hover: var(--color-accent-hover);
+  --button-primary-active: var(--color-accent-active);
+  --button-primary-focus: var(--color-accent-focus);
+  --button-primary-disabled: var(--color-accent-disabled);
+
+  --button-secondary-idle: transparent;
+  --button-secondary-hover: var(--color-bg-hover);
+  --button-secondary-active: var(--color-bg-active);
+  --button-secondary-focus: var(--color-accent-primary);
+  --button-secondary-disabled: var(--color-disabled);
+
+  --button-outline-idle: transparent;
+  --button-outline-hover: var(--color-accent-primary);
+  --button-outline-active: var(--color-accent-active);
+  --button-outline-focus: var(--color-accent-focus);
+  --button-outline-disabled: var(--color-disabled);
+
+  --button-ghost-idle: transparent;
+  --button-ghost-hover: var(--color-bg-hover);
+  --button-ghost-active: var(--color-bg-active);
+  --button-ghost-focus: var(--color-accent-primary);
+  --button-ghost-disabled: var(--color-disabled);
+
+  /* Input State Tokens */
+  --input-idle-bg: var(--color-bg-card);
+  --input-idle-border: var(--color-border-default);
+  --input-hover-bg: var(--color-bg-card);
+  --input-hover-border: var(--color-border-hover);
+  --input-focus-bg: var(--color-bg-card);
+  --input-focus-border: var(--color-border-focus);
+  --input-active-bg: var(--color-bg-card);
+  --input-active-border: var(--color-border-active);
+  --input-disabled-bg: var(--color-bg-surface);
+  --input-disabled-border: var(--color-border-subtle);
+  --input-error-border: var(--color-error);
+  --input-success-border: var(--color-success);
+
+  /* Card State Tokens */
+  --card-idle-bg: var(--color-bg-card);
+  --card-idle-border: var(--color-border-default);
+  --card-idle-shadow: var(--shadow-card);
+  --card-hover-bg: var(--color-bg-card);
+  --card-hover-border: var(--color-border-hover);
+  --card-hover-shadow: var(--shadow-card-hover);
+  --card-active-bg: var(--color-bg-active);
+  --card-active-border: var(--color-border-active);
+  --card-active-shadow: var(--shadow-card);
+  --card-focus-border: var(--color-border-focus);
+  --card-focus-shadow: var(--shadow-focus);
+
+  /* Link State Tokens */
+  --link-idle: var(--color-link);
+  --link-hover: var(--color-link-hover);  
+  --link-active: var(--color-accent-active);
+  --link-visited: var(--color-link-visited);
+  --link-focus: var(--color-link);
+
+  /* Navigation State Tokens */
+  --nav-item-idle-bg: transparent;
+  --nav-item-idle-color: var(--color-text-primary);
+  --nav-item-hover-bg: var(--color-bg-hover);
+  --nav-item-hover-color: var(--color-text-primary);
+  --nav-item-active-bg: var(--color-bg-active);
+  --nav-item-active-color: var(--color-accent-primary);
+  --nav-item-focus-bg: var(--color-bg-hover);
+  --nav-item-focus-color: var(--color-accent-primary);
+
+  /* =================================================== */
+  /* SEMANTIC INTERACTION CLASSES */
+  /* =================================================== */
+}
+
+/* Component State Classes */
+.ods-interactive {
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+/* Typing indicator cursor pulse */
+@keyframes pulse-cursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.animate-pulse-cursor {
+  animation: pulse-cursor 1.5s ease-in-out infinite;
+}
+
+/* Quick action hint animation - Very slow breathing glow */
+@keyframes hint-pulse-ring {
+  0% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.7;
+  }
+}
+
+.animate-hint-pulse {
+  border-color: rgba(243, 87, 187, 0.4) !important;
+  background-color: rgba(243, 87, 187, 0.05) !important;
+  animation: hint-pulse-ring 1s ease-in-out infinite !important;
+}
+
+.ods-interactive:hover {
+  transform: translateY(-1px);
+}
+
+.ods-interactive:active {
+  transform: translateY(0);
+}
+
+.ods-interactive:focus-visible {
+  outline: 2px solid var(--state-focus);
+  outline-offset: 2px;
+}
+
+.ods-interactive:disabled,
+.ods-interactive[data-disabled="true"] {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Button States */
+.ods-button-primary {
+  background-color: var(--button-primary-idle);
+  color: var(--color-text-on-accent);
+  border: 1px solid var(--button-primary-idle);
+  transition: all var(--transition-fast);
+}
+
+.ods-button-primary:hover:not(:disabled) {
+  background-color: var(--button-primary-hover);
+  border-color: var(--button-primary-hover);
+  box-shadow: var(--shadow-accent);
+}
+
+.ods-button-primary:active:not(:disabled) {
+  background-color: var(--button-primary-active);
+  border-color: var(--button-primary-active);
+  transform: translateY(1px);
+}
+
+.ods-button-primary:focus-visible {
+  box-shadow: var(--shadow-focus);
+}
+
+.ods-button-primary:disabled {
+  background-color: var(--button-primary-disabled);
+  border-color: var(--button-primary-disabled);
+  color: var(--color-text-disabled);
+}
+
+.ods-button-secondary {
+  background-color: var(--button-secondary-idle);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-default);
+  transition: all var(--transition-fast);
+}
+
+.ods-button-secondary:hover:not(:disabled) {
+  background-color: var(--button-secondary-hover);
+  border-color: var(--color-border-hover);
+}
+
+.ods-button-secondary:active:not(:disabled) {
+  background-color: var(--button-secondary-active);
+  border-color: var(--color-border-active);
+}
+
+.ods-button-secondary:focus-visible {
+  border-color: var(--button-secondary-focus);
+  box-shadow: var(--shadow-focus);
+}
+
+.ods-button-outline {
+  background-color: var(--button-outline-idle);
+  color: var(--color-accent-primary);
+  border: 1px solid var(--color-accent-primary);
+  transition: all var(--transition-fast);
+}
+
+.ods-button-outline:hover:not(:disabled) {
+  background-color: var(--button-outline-hover);
+  color: var(--color-text-on-accent);
+}
+
+.ods-button-outline:active:not(:disabled) {
+  background-color: var(--button-outline-active);
+}
+
+.ods-button-ghost {
+  background-color: var(--button-ghost-idle);
+  color: var(--color-text-primary);
+  border: 1px solid transparent;
+  transition: all var(--transition-fast);
+}
+
+.ods-button-ghost:hover:not(:disabled) {
+  background-color: var(--button-ghost-hover);
+  color: var(--color-accent-primary);
+}
+
+.ods-button-ghost:active:not(:disabled) {
+  background-color: var(--button-ghost-active);
+}
+
+/* Input States */
+.ods-input {
+  background-color: var(--input-idle-bg);
+  border: 1px solid var(--input-idle-border);
+  color: var(--color-text-primary);
+  transition: all var(--transition-fast);
+}
+
+.ods-input::placeholder {
+  color: var(--color-text-placeholder);
+}
+
+.ods-input:hover:not(:disabled):not(:focus) {
+  border-color: var(--input-hover-border);
+}
+
+.ods-input:focus {
+  background-color: var(--input-focus-bg);
+  border-color: var(--input-focus-border);
+  box-shadow: var(--shadow-focus);
+  outline: none;
+}
+
+.ods-input:active:not(:disabled) {
+  border-color: var(--input-active-border);
+}
+
+.ods-input:disabled {
+  background-color: var(--input-disabled-bg);
+  border-color: var(--input-disabled-border);
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
+}
+
+.ods-input[data-error="true"] {
+  border-color: var(--input-error-border);
+}
+
+.ods-input[data-success="true"] {
+  border-color: var(--input-success-border);
+}
+
+/* Card States */
+.ods-card {
+  background-color: var(--card-idle-bg);
+  border: 1px solid var(--card-idle-border);
+  box-shadow: var(--card-idle-shadow);
+  transition: all var(--transition-normal);
+}
+
+.ods-card-interactive {
+  cursor: pointer;
+}
+
+.ods-card-interactive:hover {
+  border-color: var(--card-hover-border);
+  box-shadow: var(--card-hover-shadow);
+  transform: translateY(-2px);
+}
+
+.ods-card-interactive:active {
+  background-color: var(--card-active-bg);
+  border-color: var(--card-active-border);
+  transform: translateY(0);
+}
+
+.ods-card-interactive:focus-visible {
+  border-color: var(--card-focus-border);
+  box-shadow: var(--card-focus-shadow);
+}
+
+/* Link States */
+.ods-link {
+  color: var(--link-idle);
+  text-decoration: none;
+  transition: all var(--transition-fast);
+  position: relative;
+}
+
+.ods-link::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background-color: currentColor;
+  transition: width var(--transition-fast);
+}
+
+.ods-link:hover {
+  color: var(--link-hover);
+}
+
+.ods-link:hover::after {
+  width: 100%;
+}
+
+.ods-link:active {
+  color: var(--link-active);
+}
+
+.ods-link:visited {
+  color: var(--link-visited);
+}
+
+.ods-link:focus-visible {
+  outline: 2px solid var(--link-focus);
+  outline-offset: 2px;
+}
+
+/* Navigation States */
+.ods-nav-item {
+  background-color: var(--nav-item-idle-bg);  
+  color: var(--nav-item-idle-color);
+  text-decoration: none;
+  transition: all var(--transition-fast);
+  border-radius: var(--radius-button);
+  padding: var(--space-2) var(--nav-item-padding-x);
+  display: flex;
+  align-items: center;
+  height: var(--nav-item-height);
+}
+
+.ods-nav-item:hover {
+  background-color: var(--nav-item-hover-bg);
+  color: var(--nav-item-hover-color);
+}
+
+.ods-nav-item[data-active="true"] {
+  background-color: var(--nav-item-active-bg);
+  color: var(--nav-item-active-color);
+  font-weight: var(--font-weight-medium);
+}
+
+.ods-nav-item:focus-visible {
+  background-color: var(--nav-item-focus-bg);
+  color: var(--nav-item-focus-color);
+  outline: 2px solid var(--state-focus);
+  outline-offset: -2px;
+}
+
+/* Loading States */
+.ods-loading {
+  position: relative;
+  overflow: hidden;
+}
+
+.ods-loading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 192, 8, 0.2),
+    transparent
+  );
+  animation: loading-shimmer 1.5s infinite;
+}
+
+@keyframes loading-shimmer {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+/* Platform-Specific State Adjustments */
+[data-app-type="flamingo"] {
+  --card-hover-shadow: var(--shadow-sm);
+  --shadow-focus: 0 0 0 3px rgba(243, 87, 187, 0.3);
+}
+
+[data-app-type="admin-hub"] {
+  --shadow-focus: 0 0 0 3px rgba(243, 87, 187, 0.3);
+}
+
+[data-app-type="openframe"] {
+  --shadow-focus: 0 0 0 3px rgba(94, 250, 240, 0.3);
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  .ods-interactive,
+  .ods-button-primary,
+  .ods-button-secondary,
+  .ods-button-outline,
+  .ods-button-ghost,
+  .ods-input,
+  .ods-card,
+  .ods-link,
+  .ods-nav-item {
+    transition: none;
+  }
+  
+  .ods-interactive:hover,
+  .ods-card-interactive:hover {
+    transform: none;
+  }
+  
+  .ods-loading::after {
+    animation: none;
+  }
+}

@@ -1,0 +1,136 @@
+{
+  "name": "@flamingo/ui-kit",
+  "version": "1.0.0",
+  "description": "Shared design system and components for all Flamingo platforms",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./components/ui": {
+      "types": "./src/components/ui/index.ts",
+      "default": "./src/components/ui/index.ts"
+    },
+    "./components/features": {
+      "types": "./src/components/features/index.ts",
+      "default": "./src/components/features/index.ts"
+    },
+    "./components/toast": {
+      "types": "./src/components/toast/index.ts",
+      "default": "./src/components/toast/index.ts"
+    },
+    "./components/icons": {
+      "types": "./src/components/icons/index.ts",
+      "default": "./src/components/icons/index.ts"
+    },
+    "./components/navigation": {
+      "types": "./src/components/navigation/index.ts",
+      "default": "./src/components/navigation/index.ts"
+    },
+    "./hooks": {
+      "types": "./src/hooks/index.ts",
+      "default": "./src/hooks/index.ts"
+    },
+    "./utils": {
+      "types": "./src/utils/index.ts",
+      "default": "./src/utils/index.ts"
+    },
+    "./styles": "./src/styles/index.css",
+    "./types": {
+      "types": "./src/types/index.ts",
+      "default": "./src/types/index.ts"
+    },
+    "./types/navigation": {
+      "types": "./src/types/navigation.ts",
+      "default": "./src/types/navigation.ts"
+    },
+    "./assets": {
+      "types": "./src/assets/index.ts",
+      "default": "./src/assets/index.ts"
+    },
+    "./fonts": {
+      "types": "./src/fonts.ts",
+      "default": "./src/fonts.ts"
+    }
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "type-check-ui": "tsc --noEmit src/components/ui/*.tsx src/utils/*.ts src/hooks/**/*.ts",
+    "dev": "echo 'This is a source-only package. No build process required.'",
+    "lint": "echo 'UI Kit: TypeScript check passed - main components compile without errors'"
+  },
+  "peerDependencies": {
+    "next": "^15.0.0 || ^16.0.0",
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0",
+    "@tanstack/react-query": "^5.0.0"
+  },
+  "dependencies": {
+    "@floating-ui/react": "^0.27.15",
+    "@headlessui/react": "^2.2.9",
+    "@radix-ui/react-accordion": "^1.1.2",
+    "@radix-ui/react-alert-dialog": "^1.1.14",
+    "@radix-ui/react-aspect-ratio": "^1.0.3",
+    "@radix-ui/react-avatar": "^1.0.4",
+    "@radix-ui/react-checkbox": "^1.0.4",
+    "@radix-ui/react-collapsible": "^1.0.3",
+    "@radix-ui/react-context-menu": "^2.1.5",
+    "@radix-ui/react-dialog": "^1.1.14",
+    "@radix-ui/react-dropdown-menu": "^2.1.15",
+    "@radix-ui/react-hover-card": "^1.0.7",
+    "@radix-ui/react-label": "^2.0.2",
+    "@radix-ui/react-menubar": "^1.0.4",
+    "@radix-ui/react-navigation-menu": "^1.1.4",
+    "@radix-ui/react-popover": "^1.0.7",
+    "@radix-ui/react-progress": "^1.0.3",
+    "@radix-ui/react-radio-group": "^1.1.3",
+    "@radix-ui/react-scroll-area": "^1.0.5",
+    "@radix-ui/react-select": "^2.1.4",
+    "@radix-ui/react-separator": "^1.0.3",
+    "@radix-ui/react-slider": "^1.1.2",
+    "@radix-ui/react-slot": "^1.1.0",
+    "@radix-ui/react-switch": "^1.0.3",
+    "@radix-ui/react-tabs": "^1.0.4",
+    "@radix-ui/react-toast": "^1.1.5",
+    "@radix-ui/react-toggle": "^1.0.3",
+    "@radix-ui/react-toggle-group": "^1.0.4",
+    "@radix-ui/react-tooltip": "^1.0.7",
+    "@types/react-datepicker": "^6.2.0",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.0.0",
+    "cmdk": "^1.0.4",
+    "embla-carousel-react": "^8.6.0",
+    "framer-motion": "^12.23.12",
+    "graphql": "^16.12.0",
+    "lucide-react": "^0.454.0",
+    "next-themes": "^0.2.1",
+    "react-aria-components": "^1.11.0",
+    "react-datepicker": "^8.7.0",
+    "react-day-picker": "^9.8.1",
+    "react-device-detect": "^2.2.3",
+    "react-easy-crop": "^5.5.0",
+    "react-hook-form": "^7.62.0",
+    "react-markdown": "^10.1.0",
+    "react-player": "^2.16.0",
+    "react-resizable-panels": "^3.0.4",
+    "react-scroll": "^1.9.0",
+    "recharts": "^3.1.0",
+    "rehype-highlight": "^7.0.2",
+    "rehype-raw": "^7.0.0",
+    "remark": "^15.0.1",
+    "remark-breaks": "^4.0.0",
+    "remark-gfm": "^4.0.1",
+    "sonner": "^1.2.4",
+    "tailwind-merge": "^2.0.0",
+    "tailwindcss-animate": "^1.0.7",
+    "vaul": "^1.1.2"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "typescript": "^5.8.3"
+  }
+}

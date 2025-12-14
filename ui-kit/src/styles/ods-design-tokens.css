@@ -1,0 +1,304 @@
+/* Open Design System – Complete Design Tokens */
+
+:root {
+  /* =================================================== */
+  /* SPACING TOKENS */
+  /* =================================================== */
+  
+  /* Base Spacing Scale (rem) */
+  --space-0: 0;
+  --space-px: 0.0625rem;   /* 1px */
+  --space-0-5: 0.125rem;   /* 2px */
+  --space-1: 0.25rem;      /* 4px */
+  --space-1-5: 0.375rem;   /* 6px */
+  --space-2: 0.5rem;       /* 8px */
+  --space-2-5: 0.625rem;   /* 10px */
+  --space-3: 0.75rem;      /* 12px */
+  --space-3-5: 0.875rem;   /* 14px */
+  --space-4: 1rem;         /* 16px */
+  --space-5: 1.25rem;      /* 20px */
+  --space-6: 1.5rem;       /* 24px */
+  --space-7: 1.75rem;      /* 28px */
+  --space-8: 2rem;         /* 32px */
+  --space-9: 2.25rem;      /* 36px */
+  --space-10: 2.5rem;      /* 40px */
+  --space-11: 2.75rem;     /* 44px */
+  --space-12: 3rem;        /* 48px */
+  --space-14: 3.5rem;      /* 56px */
+  --space-16: 4rem;        /* 64px */
+  --space-20: 5rem;        /* 80px */
+  --space-24: 6rem;        /* 96px */
+  --space-28: 7rem;        /* 112px */
+  --space-32: 8rem;        /* 128px */
+  --space-36: 9rem;        /* 144px */
+  --space-40: 10rem;       /* 160px */
+  --space-44: 11rem;       /* 176px */
+  --space-48: 12rem;       /* 192px */
+  --space-52: 13rem;       /* 208px */
+  --space-56: 14rem;       /* 224px */
+  --space-60: 15rem;       /* 240px */
+  --space-64: 16rem;       /* 256px */
+  --space-72: 18rem;       /* 288px */
+  --space-80: 20rem;       /* 320px */
+  --space-96: 24rem;       /* 384px */
+
+  /* Semantic Spacing */
+  --space-component-xs: var(--space-2);    /* 8px - tight components */
+  --space-component-sm: var(--space-3);    /* 12px - small components */
+  --space-component-md: var(--space-4);    /* 16px - default components */
+  --space-component-lg: var(--space-6);    /* 24px - large components */
+  --space-component-xl: var(--space-8);    /* 32px - extra large components */
+
+  --space-section-xs: var(--space-8);      /* 32px - tight sections */
+  --space-section-sm: var(--space-12);     /* 48px - small sections */
+  --space-section-md: var(--space-16);     /* 64px - default sections */
+  --space-section-lg: var(--space-20);     /* 80px - large sections */
+  --space-section-xl: var(--space-24);     /* 96px - extra large sections */
+
+  /* =================================================== */
+  /* TYPOGRAPHY TOKENS */
+  /* =================================================== */
+
+  /* Font Families */
+  --font-family-heading: "Azeret Mono", "SF Mono", Monaco, Inconsolata, "Roboto Mono", Consolas, "Courier New", monospace;
+  --font-family-body: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-family-mono: "SF Mono", Monaco, Inconsolata, "Roboto Mono", Consolas, "Courier New", monospace;
+
+  /* Font Sizes */
+  --font-size-xs: 0.75rem;     /* 12px */
+  --font-size-sm: 0.875rem;    /* 14px */
+  --font-size-base: 1rem;      /* 16px */
+  --font-size-lg: 1.125rem;    /* 18px */
+  --font-size-xl: 1.25rem;     /* 20px */
+  --font-size-2xl: 1.5rem;     /* 24px */
+  --font-size-3xl: 1.875rem;   /* 30px */
+  --font-size-4xl: 2.25rem;    /* 36px */
+  --font-size-5xl: 3rem;       /* 48px */
+  --font-size-6xl: 3.75rem;    /* 60px */
+  --font-size-7xl: 4.5rem;     /* 72px */
+  --font-size-8xl: 6rem;       /* 96px */
+  --font-size-9xl: 8rem;       /* 128px */
+
+  /* Line Heights */
+  --line-height-none: 1;
+  --line-height-tight: 1.25;
+  --line-height-snug: 1.375;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.625;
+  --line-height-loose: 2;
+
+  /* Font Weights */
+  --font-weight-thin: 100;
+  --font-weight-extralight: 200;
+  --font-weight-light: 300;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-extrabold: 800;
+  --font-weight-black: 900;
+
+  /* Letter Spacing */
+  --letter-spacing-tighter: -0.05em;
+  --letter-spacing-tight: -0.025em;
+  --letter-spacing-normal: 0;
+  --letter-spacing-wide: 0.025em;
+  --letter-spacing-wider: 0.05em;
+  --letter-spacing-widest: 0.1em;
+
+  /* Semantic Typography - Static Sizes */
+  --font-heading-1: var(--font-weight-bold) var(--font-size-4xl)/var(--line-height-tight) var(--font-family-heading);
+  --font-heading-2: var(--font-weight-semibold) var(--font-size-3xl)/var(--line-height-tight) var(--font-family-heading);
+  --font-heading-3: var(--font-weight-semibold) var(--font-size-2xl)/var(--line-height-snug) var(--font-family-heading);
+  --font-heading-4: var(--font-weight-medium) var(--font-size-xl)/var(--line-height-snug) var(--font-family-heading);
+  --font-heading-5: var(--font-weight-medium) var(--font-size-lg)/var(--line-height-normal) var(--font-family-heading);
+  --font-heading-6: var(--font-weight-medium) var(--font-size-base)/var(--line-height-normal) var(--font-family-heading);
+  
+  /* Responsive Typography - Adapts to screen size */
+  --font-heading-1-responsive: var(--font-responsive-h1);
+  --font-heading-2-responsive: var(--font-responsive-h2);
+  --font-heading-3-responsive: var(--font-responsive-h3);
+  --font-heading-5-responsive: var(--font-responsive-h5);
+
+  --font-body-large: var(--font-weight-normal) var(--font-size-lg)/var(--line-height-relaxed) var(--font-family-body);
+  --font-body-base: var(--font-weight-normal) var(--font-size-base)/var(--line-height-normal) var(--font-family-body);
+  --font-body-small: var(--font-weight-normal) var(--font-size-sm)/var(--line-height-normal) var(--font-family-body);
+  --font-body-xs: var(--font-weight-normal) var(--font-size-xs)/var(--line-height-normal) var(--font-family-body);
+
+  --font-caption: var(--font-weight-medium) var(--font-size-sm)/var(--line-height-normal) var(--font-family-body);
+  --font-label: var(--font-weight-medium) var(--font-size-sm)/var(--line-height-tight) var(--font-family-body);
+  --font-button: var(--font-weight-semibold) var(--font-size-base)/var(--line-height-none) var(--font-family-body);
+  --font-code: var(--font-weight-normal) var(--font-size-sm)/var(--line-height-normal) var(--font-family-mono);
+
+  /* =================================================== */
+  /* BORDER RADIUS TOKENS */
+  /* =================================================== */
+
+  --radius-none: 0;
+  --radius-sm: 0.125rem;    /* 2px */
+  --radius-base: 0.25rem;   /* 4px */
+  --radius-md: 0.375rem;    /* 6px */
+  --radius-lg: 0.5rem;      /* 8px */
+  --radius-xl: 0.75rem;     /* 12px */
+  --radius-2xl: 1rem;       /* 16px */
+  --radius-3xl: 1.5rem;     /* 24px */
+  --radius-full: 9999px;
+
+  /* Semantic Border Radius */
+  --radius-button: var(--radius-md);
+  --radius-card: var(--radius-lg);
+  --radius-input: var(--radius-md);
+  --radius-modal: var(--radius-xl);
+  --radius-badge: var(--radius-full);
+  --radius-avatar: var(--radius-full);
+
+  /* =================================================== */
+  /* SHADOW TOKENS */
+  /* =================================================== */
+
+  /* Base Shadows */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-base: 0 4px 6px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 20px 25px rgba(0, 0, 0, 0.1), 0 10px 10px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0 25px 50px rgba(0, 0, 0, 0.15), 0 12px 24px rgba(0, 0, 0, 0.08);
+  --shadow-2xl: 0 50px 100px rgba(0, 0, 0, 0.2);
+  --shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.06);
+
+  /* Dark Mode Shadows */
+  --shadow-dark-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-dark-sm: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-dark-base: 0 4px 6px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2);
+  --shadow-dark-md: 0 10px 15px rgba(0, 0, 0, 0.4), 0 4px 6px rgba(0, 0, 0, 0.2);
+  --shadow-dark-lg: 0 20px 25px rgba(0, 0, 0, 0.4), 0 10px 10px rgba(0, 0, 0, 0.2);
+  --shadow-dark-xl: 0 25px 50px rgba(0, 0, 0, 0.5), 0 12px 24px rgba(0, 0, 0, 0.3);
+  --shadow-dark-2xl: 0 50px 100px rgba(0, 0, 0, 0.6);
+
+  /* Semantic Shadows */
+  --shadow-card: var(--shadow-sm);
+  --shadow-card-hover: var(--shadow-md);
+  --shadow-modal: var(--shadow-xl);
+  --shadow-dropdown: var(--shadow-lg);
+  --shadow-tooltip: var(--shadow-base);
+  --shadow-focus: 0 0 0 3px rgba(255, 192, 8, 0.3);
+  
+  /* Accent Shadows */
+  --shadow-accent: 0 0 20px rgba(255, 192, 8, 0.2);
+  --shadow-accent-lg: 0 0 40px rgba(255, 192, 8, 0.3);
+
+  /* =================================================== */
+  /* ANIMATION TOKENS */
+  /* =================================================== */
+
+  /* Duration */
+  --duration-instant: 0ms;
+  --duration-fast: 150ms;
+  --duration-normal: 300ms;
+  --duration-slow: 500ms;
+  --duration-slower: 750ms;
+
+  /* Easing Functions */
+  --ease-linear: linear;
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --ease-elastic: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+
+  /* Semantic Animation */
+  --transition-fast: var(--duration-fast) var(--ease-out);
+  --transition-normal: var(--duration-normal) var(--ease-out);
+  --transition-slow: var(--duration-slow) var(--ease-out);
+  --transition-bounce: var(--duration-normal) var(--ease-bounce);
+  --transition-elastic: var(--duration-slow) var(--ease-elastic);
+
+  /* =================================================== */
+  /* Z-INDEX TOKENS */
+  /* =================================================== */
+
+  --z-base: 0;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-fixed: 300;
+  --z-modal-backdrop: 400;
+  --z-modal: 500;
+  --z-popover: 600;
+  --z-tooltip: 700;
+  --z-notification: 800;
+  --z-debug: 9999;
+
+  /* =================================================== */
+  /* COMPONENT-SPECIFIC TOKENS */
+  /* =================================================== */
+
+  /* Buttons */
+  --button-height-sm: var(--space-8);      /* 32px */
+  --button-height-md: var(--space-10);     /* 40px */
+  --button-height-lg: var(--space-12);     /* 48px */
+  --button-height-xl: var(--space-14);     /* 56px */
+
+  --button-padding-x-sm: var(--space-3);   /* 12px */
+  --button-padding-x-md: var(--space-4);   /* 16px */
+  --button-padding-x-lg: var(--space-6);   /* 24px */
+  --button-padding-x-xl: var(--space-8);   /* 32px */
+
+  /* Form Elements */
+  --input-height-sm: var(--space-8);       /* 32px */
+  --input-height-md: var(--space-10);      /* 40px */
+  --input-height-lg: var(--space-12);      /* 48px */
+
+  --input-padding-x: var(--space-3);       /* 12px */
+  --input-padding-y: var(--space-2);       /* 8px */
+
+  /* Cards */
+  --card-padding-sm: var(--space-4);       /* 16px */
+  --card-padding-md: var(--space-6);       /* 24px */
+  --card-padding-lg: var(--space-8);       /* 32px */
+
+  /* Navigation */
+  --nav-height: var(--space-16);           /* 64px */
+  --nav-item-height: var(--space-10);      /* 40px */
+  --nav-item-padding-x: var(--space-4);    /* 16px */
+
+  /* Modal */
+  --modal-width-sm: 24rem;                 /* 384px */
+  --modal-width-md: 32rem;                 /* 512px */
+  --modal-width-lg: 48rem;                 /* 768px */
+  --modal-width-xl: 64rem;                 /* 1024px */
+  --modal-width-2xl: 80rem;                /* 1280px */
+
+  /* =================================================== */
+  /* RESPONSIVE BREAKPOINTS */
+  /* =================================================== */
+
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 860px;    /* Custom for your 2-column layout */
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1550px;   /* Custom for your 3-column vendor grid */
+  --breakpoint-2xl: 1920px;  /* Your max-width */
+}
+
+/* Dark Mode Adjustments */
+.dark {
+  --shadow-card: var(--shadow-dark-sm);
+  --shadow-card-hover: var(--shadow-dark-md);
+  --shadow-modal: var(--shadow-dark-xl);
+  --shadow-dropdown: var(--shadow-dark-lg);
+  --shadow-tooltip: var(--shadow-dark-base);
+}
+
+/* Platform-Specific Token Overrides */
+[data-app-type="flamingo"] {
+  /* Light mode platform gets lighter shadows */
+  --shadow-card: var(--shadow-xs);
+  --shadow-card-hover: var(--shadow-sm);
+  --shadow-modal: var(--shadow-lg);
+}
+
+/* High Contrast Mode Adjustments */
+.theme-high-contrast {
+  --shadow-focus: 0 0 0 3px #00ff00;
+  --transition-normal: var(--duration-instant) var(--ease-linear);
+  --transition-fast: var(--duration-instant) var(--ease-linear);
+}
