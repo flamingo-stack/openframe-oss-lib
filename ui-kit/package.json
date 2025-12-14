@@ -1,72 +1,103 @@
 {
-  "name": "@flamingo/ui-kit",
-  "version": "1.0.0",
+  "name": "@flamingo-stack/ui-kit",
+  "version": "0.0.0-snapshot",
   "description": "Shared design system and components for all Flamingo platforms",
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "src/styles"
+  ],
   "exports": {
     ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.js"
     },
     "./components/ui": {
-      "types": "./src/components/ui/index.ts",
-      "default": "./src/components/ui/index.ts"
+      "types": "./dist/components/ui/index.d.ts",
+      "import": "./dist/components/ui/index.js",
+      "require": "./dist/components/ui/index.cjs",
+      "default": "./dist/components/ui/index.js"
     },
     "./components/features": {
-      "types": "./src/components/features/index.ts",
-      "default": "./src/components/features/index.ts"
+      "types": "./dist/components/features/index.d.ts",
+      "import": "./dist/components/features/index.js",
+      "require": "./dist/components/features/index.cjs",
+      "default": "./dist/components/features/index.js"
     },
     "./components/toast": {
-      "types": "./src/components/toast/index.ts",
-      "default": "./src/components/toast/index.ts"
+      "types": "./dist/components/toast/index.d.ts",
+      "import": "./dist/components/toast/index.js",
+      "require": "./dist/components/toast/index.cjs",
+      "default": "./dist/components/toast/index.js"
     },
     "./components/icons": {
-      "types": "./src/components/icons/index.ts",
-      "default": "./src/components/icons/index.ts"
+      "types": "./dist/components/icons/index.d.ts",
+      "import": "./dist/components/icons/index.js",
+      "require": "./dist/components/icons/index.cjs",
+      "default": "./dist/components/icons/index.js"
     },
     "./components/navigation": {
-      "types": "./src/components/navigation/index.ts",
-      "default": "./src/components/navigation/index.ts"
+      "types": "./dist/components/navigation/index.d.ts",
+      "import": "./dist/components/navigation/index.js",
+      "require": "./dist/components/navigation/index.cjs",
+      "default": "./dist/components/navigation/index.js"
     },
     "./hooks": {
-      "types": "./src/hooks/index.ts",
-      "default": "./src/hooks/index.ts"
+      "types": "./dist/hooks/index.d.ts",
+      "import": "./dist/hooks/index.js",
+      "require": "./dist/hooks/index.cjs",
+      "default": "./dist/hooks/index.js"
     },
     "./utils": {
-      "types": "./src/utils/index.ts",
-      "default": "./src/utils/index.ts"
+      "types": "./dist/utils/index.d.ts",
+      "import": "./dist/utils/index.js",
+      "require": "./dist/utils/index.cjs",
+      "default": "./dist/utils/index.js"
     },
     "./styles": "./src/styles/index.css",
     "./types": {
-      "types": "./src/types/index.ts",
-      "default": "./src/types/index.ts"
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/types/index.js",
+      "require": "./dist/types/index.cjs",
+      "default": "./dist/types/index.js"
     },
     "./types/navigation": {
-      "types": "./src/types/navigation.ts",
-      "default": "./src/types/navigation.ts"
+      "types": "./dist/types/navigation.d.ts",
+      "import": "./dist/types/navigation.js",
+      "require": "./dist/types/navigation.cjs",
+      "default": "./dist/types/navigation.js"
     },
     "./assets": {
-      "types": "./src/assets/index.ts",
-      "default": "./src/assets/index.ts"
+      "types": "./dist/assets/index.d.ts",
+      "import": "./dist/assets/index.js",
+      "require": "./dist/assets/index.cjs",
+      "default": "./dist/assets/index.js"
     },
     "./fonts": {
-      "types": "./src/fonts.ts",
-      "default": "./src/fonts.ts"
+      "types": "./dist/fonts.d.ts",
+      "import": "./dist/fonts.js",
+      "require": "./dist/fonts.cjs",
+      "default": "./dist/fonts.js"
     }
   },
   "scripts": {
     "type-check": "tsc --noEmit",
-    "type-check-ui": "tsc --noEmit src/components/ui/*.tsx src/utils/*.ts src/hooks/**/*.ts",
-    "dev": "echo 'This is a source-only package. No build process required.'",
-    "lint": "echo 'UI Kit: TypeScript check passed - main components compile without errors'"
+    "dev": "tsup --watch",
+    "build": "tsup",
+    "build:fast": "tsup --no-dts",
+    "clean": "rm -rf dist node_modules/.cache",
+    "prepack": "npm run build"
   },
   "peerDependencies": {
+    "@tanstack/react-query": "^5.0.0",
     "next": "^15.0.0 || ^16.0.0",
     "react": "^18.0.0 || ^19.0.0",
-    "react-dom": "^18.0.0 || ^19.0.0",
-    "@tanstack/react-query": "^5.0.0"
+    "react-dom": "^18.0.0 || ^19.0.0"
   },
   "dependencies": {
     "@floating-ui/react": "^0.27.15",
@@ -129,8 +160,18 @@
     "vaul": "^1.1.2"
   },
   "devDependencies": {
-    "@types/react": "^19.2.0",
-    "@types/react-dom": "^19.2.0",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
+    "tsup": "^8.5.1",
     "typescript": "^5.8.3"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/flamingo-stack/openframe-oss-lib.git"
   }
 }
