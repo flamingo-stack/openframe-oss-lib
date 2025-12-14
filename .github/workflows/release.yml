@@ -9,6 +9,13 @@ on:
     branches: [main, feature/ui-kit-migration]
   workflow_dispatch:
     inputs:
+      target:
+        description: 'What to release'
+        required: true
+        type: choice
+        options:
+          - java
+          - node
       version:
         description: 'Version to release OSS Libs (x.y.z)'
         required: true
@@ -44,8 +51,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: changes
     if: |
-      github.event_name == 'workflow_dispatch' || 
-      needs.changes.outputs.java == 'true'
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'java') ||
+      (github.event_name == 'push' && needs.changes.outputs.java == 'true')
 
     steps:
       - uses: actions/checkout@v4
@@ -139,7 +146,7 @@ jobs:
     steps:
       - name: Check if should run
         id: should_run
-        run: echo "run=${{ github.event_name == 'workflow_dispatch' || fromJSON(toJSON(needs.changes.outputs))[matrix.name] == 'true' }}" >> $GITHUB_OUTPUT
+        run: echo "run=${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'node') || (github.event_name == 'push' && fromJSON(toJSON(needs.changes.outputs))[matrix.name] == 'true') }}" >> $GITHUB_OUTPUT
 
       - uses: actions/checkout@v4
         if: steps.should_run.outputs.run == 'true'
