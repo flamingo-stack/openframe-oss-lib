@@ -170,11 +170,6 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: npm run build
 
-      - name: Set Snapshot Version
-        if: steps.should_run.outputs.run == 'true' && github.event_name == 'push'
-        working-directory: ${{ matrix.path }}
-        run: npm version "0.0.0-snapshot.$(date +%Y%m%d%H%M%S)" --no-git-tag-version
-
       - name: Get Previous Version
         if: steps.should_run.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
         working-directory: ${{ matrix.path }}
@@ -182,10 +177,15 @@ jobs:
           NODE_AUTH_TOKEN: ${{ github.token }}
         run: |
           PKG_NAME=$(jq -r '.name' package.json)
-          OLD_VERSION=$(npm view "$PKG_NAME" versions --registry=https://npm.pkg.github.com 2>/dev/null | grep -oE '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1 || echo "0.0.0")
+          OLD_VERSION=$(npm view "$PKG_NAME" versions --registry=https://npm.pkg.github.com 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | grep -v snapshot | sort -V | tail -1 || echo "0.0.0")
           OLD_VERSION=${OLD_VERSION:-0.0.0}
           echo "OLD_VERSION=$OLD_VERSION" >> $GITHUB_ENV
           echo "Found old version: $OLD_VERSION"
+
+      - name: Set Snapshot Version
+        if: steps.should_run.outputs.run == 'true' && github.event_name == 'push'
+        working-directory: ${{ matrix.path }}
+        run: npm version "${{ env.OLD_VERSION }}-snapshot.$(date +%Y%m%d%H%M%S)" --no-git-tag-version
 
       - name: Set Release Version
         if: steps.should_run.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
