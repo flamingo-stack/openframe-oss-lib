@@ -16,7 +16,7 @@ export default defineConfig({
     'types/navigation': 'src/types/navigation.ts',
     'assets/index': 'src/assets/index.ts',
     'fonts': 'src/fonts.ts',
-    'tailwind.config': 'src/tailwind.config.ts',
+    'tailwind.config': './tailwind.config.ts',
   },
   format: ['esm', 'cjs'],
   dts: true,
