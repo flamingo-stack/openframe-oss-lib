@@ -20,8 +20,8 @@ jobs:
         run: |
           node_matrix_json='[
             {
-              "name": "ui-kit",
-              "path": "ui-kit"
+              "name": "openframe-frontend-core",
+              "path": "openframe-frontend-core"
             }
           ]'
 
