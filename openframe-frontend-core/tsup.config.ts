@@ -3,7 +3,9 @@ import { defineConfig } from 'tsup'
 export default defineConfig({
   entry: {
     'index': 'src/index.ts',
+    'components/index': 'src/components/index.ts',
     'components/ui/index': 'src/components/ui/index.ts',
+    'components/ui/file-manager/index': 'src/components/ui/file-manager/index.ts',
     'components/features/index': 'src/components/features/index.ts',
     'components/toast/index': 'src/components/toast/index.ts',
     'components/icons/index': 'src/components/icons/index.ts',

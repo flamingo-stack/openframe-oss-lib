@@ -5,8 +5,8 @@ on:
     outputs:
       java:
         value: ${{ jobs.changes.outputs.java }}
-      ui-kit:
-        value: ${{ jobs.changes.outputs.ui-kit }}
+      openframe-frontend-core:
+        value: ${{ jobs.changes.outputs.openframe-frontend-core }}
 
 
 jobs:
@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       java: ${{ steps.filter.outputs.java }}
-      ui-kit: ${{ steps.filter.outputs.ui-kit }}
+      openframe-frontend-core: ${{ steps.filter.outputs.openframe-frontend-core }}
     steps:
       - uses: actions/checkout@v4
 
@@ -28,5 +28,5 @@ jobs:
               - 'openframe-*/**'
               - 'sdk/**'
               - '.mvn/**'
-            ui-kit:
-              - 'ui-kit/**'
+            openframe-frontend-core:
+              - 'openframe-frontend-core/**'
