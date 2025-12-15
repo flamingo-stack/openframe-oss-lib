@@ -26,6 +26,7 @@ jobs:
             java:
               - 'pom.xml'
               - 'openframe-*/**'
+              - '!openframe-frontend-core/**'
               - 'sdk/**'
               - '.mvn/**'
             openframe-frontend-core:
