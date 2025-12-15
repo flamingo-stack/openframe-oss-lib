@@ -17,11 +17,23 @@
       "require": "./dist/index.cjs",
       "default": "./dist/index.js"
     },
+    "./components": {
+      "types": "./dist/components/index.d.ts",
+      "import": "./dist/components/index.js",
+      "require": "./dist/components/index.cjs",
+      "default": "./dist/components/index.js"
+    },
     "./components/ui": {
       "types": "./dist/components/ui/index.d.ts",
       "import": "./dist/components/ui/index.js",
       "require": "./dist/components/ui/index.cjs",
       "default": "./dist/components/ui/index.js"
+    },
+    "./components/ui/file-manager": {
+      "types": "./dist/components/ui/file-manager/index.d.ts",
+      "import": "./dist/components/ui/file-manager/index.js",
+      "require": "./dist/components/ui/file-manager/index.cjs",
+      "default": "./dist/components/ui/file-manager/index.js"
     },
     "./components/features": {
       "types": "./dist/components/features/index.d.ts",
