@@ -171,7 +171,7 @@ jobs:
         run: npm run build
 
       - name: Get Previous Version
-        if: steps.should_run.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
+        if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
         env:
           NODE_AUTH_TOKEN: ${{ github.token }}
