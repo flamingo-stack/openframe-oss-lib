@@ -8,7 +8,8 @@
   "types": "./dist/index.d.ts",
   "files": [
     "dist",
-    "src/styles"
+    "src/styles",
+    "tailwind.config.ts"
   ],
   "exports": {
     ".": {
@@ -71,7 +72,12 @@
       "require": "./dist/utils/index.cjs",
       "default": "./dist/utils/index.js"
     },
-    "./styles": "./src/styles/index.css",
+    "./styles": {
+      "import": "./src/styles/index.css",
+      "require": "./src/styles/index.css",
+      "default": "./src/styles/index.css"
+    },
+    "./styles/*": "./src/styles/*",
     "./types": {
       "types": "./dist/types/index.d.ts",
       "import": "./dist/types/index.js",
@@ -95,6 +101,10 @@
       "import": "./dist/fonts.js",
       "require": "./dist/fonts.cjs",
       "default": "./dist/fonts.js"
+    },
+    "./tailwind.config.ts": {
+      "types": "./dist/tailwind.config.d.ts",
+      "default": "./tailwind.config.ts"
     }
   },
   "scripts": {
@@ -188,4 +198,3 @@
     "directory": "openframe-frontend-core"
   }
 }
-
