@@ -221,4 +221,4 @@ jobs:
         with:
           package-name: ${{ matrix.name }}
           package-type: npm
-          min-versions-to-keep: 10
+          min-versions-to-keep: 20
