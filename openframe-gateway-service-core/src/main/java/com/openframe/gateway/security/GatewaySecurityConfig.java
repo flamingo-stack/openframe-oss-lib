@@ -103,7 +103,7 @@ public class GatewaySecurityConfig {
                         .pathMatchers(TOOLS_PREFIX + "/agent/**").hasRole(AGENT)
                         .pathMatchers(WS_TOOLS_PREFIX + "/agent/**").hasRole(AGENT)
                         // Agent nats
-                        .pathMatchers(NATS_WS_ENDPOINT_PATH).hasRole("AGENT")
+                        .pathMatchers(NATS_WS_ENDPOINT_PATH).hasAnyRole(AGENT, ADMIN)
                         // Client service
                         .pathMatchers(CLIENTS_PREFIX + "/**").hasRole(AGENT)
                         // Api tools
