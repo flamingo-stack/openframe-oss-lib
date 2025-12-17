@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<included debug="true" scan="false">
+    <!-- Console Appender in logfmt -->
+    <appender name="ConsoleAppender" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <pattern>ts=%d{yyyy-MM-dd'T'HH:mm:ss.SSSX} level=%-5level service=${SPRING_APP_NAME} logger=%logger{36} thread=%thread msg="%replace(%msg){'\r?\n',' '}" stack="%replace(%ex){'\r?\n',' | '}"%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Rolling File Appender (Text Format - logfmt) -->
+    <appender name="RollingFileAppender" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/${SPRING_APP_NAME}.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/${SPRING_APP_NAME}.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <totalSizeCap>50MB</totalSizeCap>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <pattern>ts=%d{yyyy-MM-dd'T'HH:mm:ss.SSSX} level=%-5level service=${SPRING_APP_NAME} logger=%logger{36} thread=%thread msg="%replace(%msg){'\r?\n',' '}" stack="%replace(%ex){'\r?\n',' | '}"%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Keep JSON rolling appender as-is for optional local use -->
+    <appender name="JsonRollingFileAppender" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/${SPRING_APP_NAME}.json</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/${SPRING_APP_NAME}.%d{yyyy-MM-dd}.%i.json</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <totalSizeCap>50MB</totalSizeCap>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp />
+                <logLevel />
+                <threadName />
+                <loggerName />
+                <message />
+                <stackTrace />
+            </providers>
+        </encoder>
+    </appender>
+
+    <!-- Loki Appender (unchanged) -->
+    <appender name="LokiRemoteAppender" class="com.github.loki4j.logback.Loki4jAppender">
+        <http>
+            <url>${LOKI_ADDRESS}</url>
+        </http>
+        <format>
+            <message class="com.github.loki4j.logback.JsonLayout" />
+            <label>
+                <pattern>category=microservices,app=${SPRING_APP_NAME},host=${SPRING_CONTAINER_IP}</pattern>
+            </label>
+        </format>
+    </appender>
+
+    <!-- Add all appenders to root -->
+    <root level="info">
+        <appender-ref ref="ConsoleAppender" />
+        <appender-ref ref="RollingFileAppender" />
+        <appender-ref ref="JsonRollingFileAppender" />
+        <appender-ref ref="LokiRemoteAppender" />
+    </root>
+</included>
+
