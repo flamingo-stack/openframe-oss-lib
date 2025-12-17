@@ -15,3 +15,6 @@ export * from './state'
 
 // API hooks for product releases
 export * from './api/use-product-releases'
+
+// NATS hooks
+export * from './nats/use-nats-client'

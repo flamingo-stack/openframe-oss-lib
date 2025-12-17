@@ -1,3 +1,5 @@
+'use client'
+
 // Main export file for @flamingo/ui-kit
 export * from './components/ui'
 export * from './components/features'

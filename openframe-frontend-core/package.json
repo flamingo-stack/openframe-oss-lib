@@ -66,6 +66,12 @@
       "require": "./dist/hooks/index.cjs",
       "default": "./dist/hooks/index.js"
     },
+    "./nats": {
+      "types": "./dist/nats/index.d.ts",
+      "import": "./dist/nats/index.js",
+      "require": "./dist/nats/index.cjs",
+      "default": "./dist/nats/index.js"
+    },
     "./utils": {
       "types": "./dist/utils/index.d.ts",
       "import": "./dist/utils/index.js",
@@ -90,6 +96,12 @@
       "require": "./dist/types/navigation.cjs",
       "default": "./dist/types/navigation.js"
     },
+    "./types/announcement": {
+      "types": "./dist/types/announcement.d.ts",
+      "import": "./dist/types/announcement.js",
+      "require": "./dist/types/announcement.cjs",
+      "default": "./dist/types/announcement.js"
+    },
     "./assets": {
       "types": "./dist/assets/index.d.ts",
       "import": "./dist/assets/index.js",
@@ -113,7 +125,10 @@
     "build": "tsup",
     "build:fast": "tsup --no-dts",
     "clean": "rm -rf dist node_modules/.cache",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "yalc:watch": "nodemon --watch src --watch '*.json' --watch '*.ts' --watch '*.tsx' -e ts,tsx,json,css --exec 'npm run build && yalc push --changed'",
+    "yalc:push": "npm run build && yalc push",
+    "yalc:publish": "yalc publish"
   },
   "peerDependencies": {
     "@tanstack/react-query": "^5.0.0",
@@ -159,6 +174,7 @@
     "framer-motion": "^12.23.12",
     "graphql": "^16.12.0",
     "lucide-react": "^0.454.0",
+    "nats.ws": "^1.30.3",
     "next-themes": "^0.2.1",
     "react-aria-components": "^1.11.0",
     "react-datepicker": "^8.7.0",
@@ -185,6 +201,7 @@
     "@types/node": "^24.10.1",
     "@types/react": "^19.1.12",
     "@types/react-dom": "^19.1.9",
+    "nodemon": "^3.1.11",
     "tsup": "^8.5.1",
     "typescript": "^5.8.3"
   },
