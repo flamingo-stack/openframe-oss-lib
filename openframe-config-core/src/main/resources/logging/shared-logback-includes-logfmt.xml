@@ -3,7 +3,7 @@
     <!-- Console Appender in logfmt -->
     <appender name="ConsoleAppender" class="ch.qos.logback.core.ConsoleAppender">
         <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
-            <pattern>ts=%d{yyyy-MM-dd'T'HH:mm:ss.SSSX} lvl=%-5level service=${SPRING_APP_NAME} logger=%logger{36} thread=%thread msg="%replace(%msg){'\r?\n',' '}" stack="%replace(%ex){'\r?\n',' | '}"%n</pattern>
+            <pattern>ts=%d{yyyy-MM-dd'T'HH:mm:ss.SSSX} level=%-5level service=${SPRING_APP_NAME} logger=%logger{36} thread=%thread msg="%replace(%msg){'\r?\n',' '}" stack="%replace(%ex){'\r?\n',' | '}"%n</pattern>
         </encoder>
     </appender>
 
@@ -17,7 +17,7 @@
             <maxHistory>30</maxHistory>
         </rollingPolicy>
         <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
-            <pattern>ts=%d{yyyy-MM-dd'T'HH:mm:ss.SSSX} lvl=%-5level service=${SPRING_APP_NAME} logger=%logger{36} thread=%thread msg="%replace(%msg){'\r?\n',' '}" stack="%replace(%ex){'\r?\n',' | '}"%n</pattern>
+            <pattern>ts=%d{yyyy-MM-dd'T'HH:mm:ss.SSSX} level=%-5level service=${SPRING_APP_NAME} logger=%logger{36} thread=%thread msg="%replace(%msg){'\r?\n',' '}" stack="%replace(%ex){'\r?\n',' | '}"%n</pattern>
         </encoder>
     </appender>
 
