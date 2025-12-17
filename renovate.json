@@ -14,9 +14,9 @@
       "datasourceTemplate": "maven"
     },
     {
-      "fileMatch": ["^ui-kit/package\\.json$"],
+      "fileMatch": ["^openframe-frontend-core/package\\.json$"],
       "matchStrings": ["\"version\":\\s*\"(?<currentValue>.*?)\""],
-      "depNameTemplate": "@flamingo-stack/ui-kit",
+      "depNameTemplate": "@flamingo-stack/openframe-frontend-core",
       "datasourceTemplate": "npm"
     }
   ],
@@ -34,17 +34,21 @@
       "automerge": true,
       "automergeType": "pr",
       "platformAutomerge": true,
-      "registryUrls": ["https://maven.pkg.github.com/flamingo-stack/openframe-oss-lib"]
+      "registryUrls": ["https://maven.pkg.github.com/flamingo-stack/openframe-oss-lib"],
+      "schedule": ["at any time"],
+      "prCreation": "immediate"
     },
     {
-      "description": "Enable automerge for ui-kit version updates",
+      "description": "Enable automerge for openframe-frontend-core version updates",
       "matchManagers": ["regex"],
-      "matchPackageNames": ["@flamingo-stack/ui-kit"],
+      "matchPackageNames": ["@flamingo-stack/openframe-frontend-core"],
       "enabled": true,
       "automerge": true,
       "automergeType": "pr",
       "platformAutomerge": true,
-      "registryUrls": ["https://npm.pkg.github.com"]
+      "registryUrls": ["https://npm.pkg.github.com"],
+      "schedule": ["at any time"],
+      "prCreation": "immediate"
     }
   ],
 
