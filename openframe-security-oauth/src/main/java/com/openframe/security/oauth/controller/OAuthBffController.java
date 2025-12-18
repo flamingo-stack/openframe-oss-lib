@@ -12,7 +12,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.WebSession;
 import reactor.core.publisher.Mono;
 
 import java.net.URLEncoder;
@@ -109,8 +108,7 @@ public class OAuthBffController {
     @GetMapping("/logout")
     public Mono<ResponseEntity<Void>> logout(@RequestParam String tenantId,
                                              @CookieValue(name = REFRESH_TOKEN, required = false) String refreshCookie,
-                                             ServerHttpRequest request,
-                                             WebSession session) {
+                                             ServerHttpRequest request) {
         HttpHeaders headers = new HttpHeaders();
         cookieService.addClearAuthCookies(headers);
         String refreshToken = hasText(refreshCookie) ? refreshCookie : request.getHeaders().getFirst(REFRESH_TOKEN_HEADER);
@@ -119,8 +117,7 @@ public class OAuthBffController {
     }
 
     @GetMapping("/dev-exchange")
-    public Mono<ResponseEntity<Object>> devExchange(@RequestParam("ticket") String ticket,
-                                            ServerHttpRequest request) {
+    public Mono<ResponseEntity<Object>> devExchange(@RequestParam("ticket") String ticket) {
         if (!devTicketEnabled) {
             return Mono.just(ResponseEntity.status(404).build());
         }
