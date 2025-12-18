@@ -10,6 +10,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
+import com.openframe.management.dto.debezium.ConnectorStatus;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -69,6 +72,77 @@ public class DebeziumService {
 
     private String getDebeziumConnectorUrl(String name) {
         return "%s/%s".formatted(getDebeziumConnectorCreateUrl(), name);
+    }
+
+    /**
+     * List all registered connectors.
+     */
+    @SuppressWarnings("unchecked")
+    public List<String> listConnectors() {
+        try {
+            List<String> connectors = restTemplate.getForObject(getDebeziumConnectorCreateUrl(), List.class);
+            return connectors != null ? connectors : Collections.emptyList();
+        } catch (Exception e) {
+            log.error("Failed to list connectors", e);
+            return Collections.emptyList();
+        }
+    }
+
+    /**
+     * Get connector status including task states.
+     */
+    public ConnectorStatus getConnectorStatus(String connectorName) {
+        String url = getDebeziumConnectorUrl(connectorName) + "/status";
+        return restTemplate.getForObject(url, ConnectorStatus.class);
+    }
+
+    /**
+     * Restart a specific task of a connector.
+     */
+    public void restartTask(String connectorName, int taskId) {
+        String url = getDebeziumConnectorUrl(connectorName) + "/tasks/" + taskId + "/restart";
+        restTemplate.postForEntity(url, null, Void.class);
+        log.info("Restarted task {} for connector {}", taskId, connectorName);
+    }
+
+    /**
+     * Check all connectors and restart any failed tasks.
+     */
+    public void checkAndRestartFailedTasks() {
+        List<String> connectors = listConnectors();
+        if (connectors.isEmpty()) {
+            log.debug("No connectors found");
+            return;
+        }
+
+        for (String connector : connectors) {
+            checkConnectorAndRestartFailedTasks(connector);
+        }
+    }
+
+    /**
+     * Check a specific connector and restart failed tasks.
+     */
+    public void checkConnectorAndRestartFailedTasks(String connectorName) {
+        try {
+            ConnectorStatus status = getConnectorStatus(connectorName);
+            if (status == null || status.getTasks() == null) {
+                log.warn("Could not get status for connector {}", connectorName);
+                return;
+            }
+
+            for (ConnectorStatus.TaskStatus task : status.getTasks()) {
+                if ("FAILED".equals(task.getState())) {
+                    log.warn("Connector {} task {} is FAILED. Trace: {}",
+                            connectorName, task.getId(),
+                            task.getTrace() != null ? task.getTrace().split("\n")[0] : "N/A");
+
+                    restartTask(connectorName, task.getId());
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to check connector {}", connectorName, e);
+        }
     }
 
 }
