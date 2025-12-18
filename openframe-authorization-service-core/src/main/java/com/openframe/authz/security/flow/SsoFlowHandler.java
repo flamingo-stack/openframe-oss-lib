@@ -63,8 +63,7 @@ public interface SsoFlowHandler {
         return new String[]{givenName != null ? givenName : "", familyName != null ? familyName : ""};
     }
 
-    default void clearFlowCookieAndRedirect(HttpServletRequest request,
-                                            HttpServletResponse response,
+    default void clearFlowCookieAndRedirect(HttpServletResponse response,
                                             Cookie flowCookie,
                                             String tenantId,
                                             String redirectTo) {
@@ -72,6 +71,6 @@ public interface SsoFlowHandler {
         String path = "/oauth/continue?tenantId=" +
                 encode(tenantId, UTF_8);
         // TODO: Add redirectTo support for local debugging after the frontend removes this parameter in SaaS mode
-        found(request, response, path);
+        found(response, path);
     }
 }

@@ -51,7 +51,7 @@ public class InviteSsoHandler implements SsoFlowHandler {
         String targetTenantId = userCreated.getTenantId();
 
         // Clear SSO flow cookie but KEEP session to allow OAuth continue
-        clearFlowCookieAndRedirect(request, response, cookie, targetTenantId, payload.redirectTo());
+        clearFlowCookieAndRedirect(response, cookie, targetTenantId, payload.redirectTo());
     }
 
 }

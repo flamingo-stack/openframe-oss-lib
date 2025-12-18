@@ -1,6 +1,5 @@
 package com.openframe.authz.web;
 
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
@@ -13,15 +12,11 @@ public final class Redirects {
     }
 
     public static void seeOther(HttpServletResponse response, String relativePath) {
-        String absolute = buildAbsolute(relativePath);
-        response.setStatus(SC_SEE_OTHER);
-        response.setHeader(LOCATION, absolute);
+        redirect(response, SC_SEE_OTHER, relativePath);
     }
 
-    public static void found(HttpServletRequest request, HttpServletResponse response, String relativePath) {
-        String absolute = buildAbsolute(relativePath);
-        response.setStatus(SC_FOUND);
-        response.setHeader(LOCATION, absolute);
+    public static void found(HttpServletResponse response, String relativePath) {
+        redirect(response, SC_FOUND, relativePath);
     }
 
     private static String buildAbsolute(String relativePath) {
@@ -29,6 +24,12 @@ public final class Redirects {
                 .path(relativePath)
                 .build()
                 .toUriString();
+    }
+
+    private static void redirect(HttpServletResponse response, int status, String relativePath) {
+        String absolute = buildAbsolute(relativePath);
+        response.setStatus(status);
+        response.setHeader(LOCATION, absolute);
     }
 }
 

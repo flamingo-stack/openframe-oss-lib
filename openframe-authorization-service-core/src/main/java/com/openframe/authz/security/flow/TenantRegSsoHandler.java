@@ -58,7 +58,7 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
 
         var tenant = registrationService.registerTenant(reg);
 
-        clearFlowCookieAndRedirect(request, response, cookie, tenant.getId(), payload.redirectTo());
+        clearFlowCookieAndRedirect(response, cookie, tenant.getId(), payload.redirectTo());
     }
 
 }
