@@ -12,15 +12,11 @@ public final class Redirects {
     }
 
     public static void seeOther(HttpServletResponse response, String relativePath) {
-        String absolute = buildAbsolute(relativePath);
-        response.setStatus(SC_SEE_OTHER);
-        response.setHeader(LOCATION, absolute);
+        redirect(response, SC_SEE_OTHER, relativePath);
     }
 
     public static void found(HttpServletResponse response, String relativePath) {
-        String absolute = buildAbsolute(relativePath);
-        response.setStatus(SC_FOUND);
-        response.setHeader(LOCATION, absolute);
+        redirect(response, SC_FOUND, relativePath);
     }
 
     /**
@@ -43,5 +39,10 @@ public final class Redirects {
                 .build()
                 .toUriString();
     }
-}
 
+    private static void redirect(HttpServletResponse response, int status, String relativePath) {
+        String absolute = buildAbsolute(relativePath);
+        response.setStatus(status);
+        response.setHeader(LOCATION, absolute);
+    }
+}
