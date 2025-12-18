@@ -54,6 +54,23 @@ public class OAuthBffController {
                 });
     }
 
+    /**
+     * Initializes OAuth authorize redirect (PKCE/state) without clearing any cookies or session.
+     * Useful for "continue" flows after SSO finalization where we already have an authenticated principal.
+     */
+    @GetMapping("/continue")
+    public Mono<ResponseEntity<Void>> continueFlow(@RequestParam String tenantId,
+                                                   @RequestParam(value = "redirectTo", required = false) String redirectTo,
+                                                   ServerHttpRequest request) {
+        HttpHeaders headers = new HttpHeaders();
+        return oauthBffService.buildAuthorizeRedirect(tenantId, redirectTo, null, request)
+                .map(data -> {
+                    String token = oauthBffService.buildStateJwt(data, stateCookieTtlSeconds);
+                    cookieService.addOAuthStateCookie(headers, data.state(), token, stateCookieTtlSeconds);
+                    return ResponseEntity.status(FOUND).header(LOCATION, data.authorizeUrl()).headers(headers).build();
+                });
+    }
+
     @GetMapping("/callback")
     public Mono<ResponseEntity<Void>> callback(@RequestParam String code,
                                                @RequestParam String state,
