@@ -11,6 +11,7 @@ import java.io.IOException;
 
 import static com.openframe.authz.config.oidc.GoogleSSOProperties.GOOGLE;
 import static com.openframe.authz.config.oidc.MicrosoftSSOProperties.MICROSOFT;
+import static com.openframe.authz.config.tenant.TenantContextFilter.TENANT_ID;
 import static java.util.Locale.ROOT;
 
 public class ProviderAwareAuthenticationEntryPoint implements AuthenticationEntryPoint {
@@ -23,7 +24,7 @@ public class ProviderAwareAuthenticationEntryPoint implements AuthenticationEntr
         String tenantId = TenantContext.getTenantId();
         if (tenantId != null && !tenantId.isBlank()) {
             HttpSession session = request.getSession(true);
-            session.setAttribute("TENANT_ID", tenantId);
+            session.setAttribute(TENANT_ID, tenantId);
         }
 
         String target = "/login";

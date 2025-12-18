@@ -13,12 +13,12 @@ import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import static com.openframe.authz.config.tenant.TenantContextFilter.TENANT_ID;
+
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class DynamicClientRegistrationRepository implements ClientRegistrationRepository {
-
-    private static final String TENANT_ID = "TENANT_ID";
 
     private final DynamicClientRegistrationService dynamic;
 

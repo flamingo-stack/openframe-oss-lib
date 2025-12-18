@@ -8,12 +8,14 @@ import com.openframe.authz.service.sso.SsoTenantRegistrationService;
 import com.openframe.authz.service.user.InvitationRegistrationService;
 import com.openframe.data.document.auth.AuthUser;
 import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
+import static com.openframe.authz.web.AuthStateUtils.clearAuthState;
 import static com.openframe.authz.web.Redirects.seeOther;
 import static org.springframework.http.HttpStatus.OK;
 
@@ -33,7 +35,9 @@ public class InvitationRegistrationController {
 
     @GetMapping(path = "/accept/sso")
     public void acceptViaSso(@Valid @ModelAttribute SsoInvitationAcceptRequest request,
+                             HttpServletRequest httpRequest,
                              HttpServletResponse httpResponse) throws Exception {
+        clearAuthState(httpRequest, httpResponse);
         // start SSO accept flow and set short-lived HMAC cookie
         SsoTenantRegistrationService.SsoAuthorizeData init = ssoInvitationService.startAccept(request);
         Cookie cookie = new Cookie(SsoRegistrationConstants.COOKIE_SSO_INVITE, init.cookieValue());

@@ -9,7 +9,6 @@ import com.openframe.data.document.tenant.Tenant;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -18,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
 
 import static com.openframe.authz.security.SsoRegistrationConstants.COOKIE_SSO_REG;
+import static com.openframe.authz.web.AuthStateUtils.clearAuthState;
 import static com.openframe.authz.web.Redirects.seeOther;
 import static org.springframework.http.HttpStatus.OK;
 
@@ -40,7 +40,7 @@ public class TenantRegistrationController {
     public void startSsoRegistration(@Valid @ModelAttribute SsoTenantRegistrationInitRequest request,
                                      HttpServletRequest httpRequest,
                                      HttpServletResponse httpResponse) throws IOException {
-        clearAuthenticationState(httpRequest, httpResponse);
+        clearAuthState(httpRequest, httpResponse);
 
         SsoAuthorizeData ssoAuthorizeData = ssoRegistrationService.startRegistration(request);
         httpResponse.addCookie(buildSsoRegistrationCookie(ssoAuthorizeData.cookieValue(), ssoAuthorizeData.cookieTtlSeconds()));
@@ -58,35 +58,7 @@ public class TenantRegistrationController {
         return cookie;
     }
 
-    private void clearSessionCookie(HttpServletResponse response, String path) {
-        Cookie c = new Cookie("JSESSIONID", "");
-        c.setHttpOnly(true);
-        c.setSecure(true);
-        c.setPath(path);
-        c.setMaxAge(0);
-        response.addCookie(c);
-    }
 
-    /**
-     * Clears any existing HTTP session and related cookies to avoid leaking prior auth state
-     * into the SSO registration flow.
-     */
-    private void clearAuthenticationState(HttpServletRequest request, HttpServletResponse response) {
-        HttpSession existing = request.getSession(false);
-        if (existing != null) {
-            try {
-                existing.invalidate();
-            } catch (Exception ignored) {
-                // best-effort
-            }
-        }
-        // Proactively clear JSESSIONID cookie for root and current context path
-        clearSessionCookie(response, "/");
-        String ctx = request.getContextPath();
-        if (ctx != null && !ctx.isBlank()) {
-            clearSessionCookie(response, ctx);
-        }
-    }
 }
 
 
