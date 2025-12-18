@@ -36,7 +36,8 @@
       "platformAutomerge": true,
       "registryUrls": ["https://maven.pkg.github.com/flamingo-stack/openframe-oss-lib"],
       "schedule": ["at any time"],
-      "prCreation": "immediate"
+      "prCreation": "immediate",
+      "ignoreUnstable": true
     },
     {
       "description": "Enable automerge for openframe-frontend-core version updates",
@@ -48,7 +49,8 @@
       "platformAutomerge": true,
       "registryUrls": ["https://npm.pkg.github.com"],
       "schedule": ["at any time"],
-      "prCreation": "immediate"
+      "prCreation": "immediate",
+      "ignoreUnstable": true
     }
   ],
 
