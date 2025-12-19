@@ -5,11 +5,13 @@ import { cn } from "../../utils/cn"
 import { SquareAvatar } from "../ui/square-avatar"
 import { ChatTypingIndicator } from "./chat-typing-indicator"
 import { ToolExecutionDisplay, type ToolExecutionMessage } from "./tool-execution-display"
+import { ApprovalRequestMessage, type ApprovalRequestData } from "./approval-request-message"
 import { SimpleMarkdownRenderer } from "../ui/simple-markdown-renderer"
 
 export type MessageSegment =
   | { type: 'text'; text: string }
   | { type: 'tool_execution'; data: ToolExecutionMessage }
+  | { type: 'approval_request'; data: ApprovalRequestData; status?: 'pending' | 'approved' | 'rejected'; onApprove?: (requestId?: string) => void; onReject?: (requestId?: string) => void }
 
 export type MessageContent = string | MessageSegment[]
 
@@ -137,6 +139,16 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                       message={segment.data}
                       isExpanded={expandedTools.has(toolKey)}
                       onToggleExpand={() => toggleToolExpanded(toolKey)}
+                    />
+                  )
+                } else if (segment.type === 'approval_request') {
+                  return (
+                    <ApprovalRequestMessage
+                      key={index}
+                      data={segment.data}
+                      status={segment.status}
+                      onApprove={segment.onApprove}
+                      onReject={segment.onReject}
                     />
                   )
                 }

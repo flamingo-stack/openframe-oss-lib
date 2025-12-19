@@ -4,6 +4,7 @@ export * from './features'
 export * from './icons'
 export * from './navigation'
 export * from './platform'
+export * from './chat'
 
 // Individual component exports
 export * from './hero-image-uploader'
