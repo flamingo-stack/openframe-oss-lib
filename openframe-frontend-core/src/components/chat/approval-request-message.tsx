@@ -23,10 +23,7 @@ export interface ApprovalRequestMessageProps extends HTMLAttributes<HTMLDivEleme
 
 const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessageProps>(
   ({ className, data, onApprove, onReject, status = 'pending', ...props }, ref) => {
-    const [localStatus, setLocalStatus] = useState(status)
     const [isProcessing, setIsProcessing] = useState(false)
-    
-    const currentStatus = status || localStatus
     
     const handleApprove = async () => {
       setIsProcessing(true)
@@ -34,7 +31,6 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
         if (onApprove) {
           await onApprove(data.requestId)
         }
-        setLocalStatus('approved')
       } finally {
         setIsProcessing(false)
       }
@@ -46,13 +42,12 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
         if (onReject) {
           await onReject(data.requestId)
         }
-        setLocalStatus('rejected')
       } finally {
         setIsProcessing(false)
       }
     }
     
-    if (currentStatus !== 'pending') {
+    if (status !== 'pending') {
       return (
         <div
           ref={ref}
@@ -63,7 +58,7 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
           )}
           {...props}
         >
-          {currentStatus === 'approved' ? (
+          {status === 'approved' ? (
             <CheckCircle className="w-5 h-5 text-ods-success flex-shrink-0" />
           ) : (
             <XCircle className="w-5 h-5 text-ods-error flex-shrink-0" />
@@ -72,7 +67,7 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
             <p className={cn(
               "text-xs font-medium text-ods-text-secondary mb-2 uppercase tracking-wider"
             )}>
-              {currentStatus === 'approved' ? 'Approved' : 'Rejected'}
+              {status === 'approved' ? 'Approved' : 'Rejected'}
             </p>
             <p className="text-sm text-ods-text-secondary mt-1">
               <code className="font-mono">{data.command}</code>
