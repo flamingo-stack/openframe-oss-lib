@@ -19,6 +19,20 @@ public final class Redirects {
         redirect(response, SC_FOUND, relativePath);
     }
 
+    /**
+     * Issue 302 redirect building URL against server root (ignoring contextPath).
+     * Useful when you need to target a top-level path like "/oauth/...".
+     */
+    public static void foundAtRoot(HttpServletResponse response, String relativePath) {
+        String absolute = ServletUriComponentsBuilder.fromCurrentRequestUri()
+                .replacePath(relativePath)
+                .replaceQuery(null)
+                .build()
+                .toUriString();
+        response.setStatus(SC_FOUND);
+        response.setHeader(LOCATION, absolute);
+    }
+
     private static String buildAbsolute(String relativePath) {
         return ServletUriComponentsBuilder.fromCurrentContextPath()
                 .path(relativePath)
@@ -32,4 +46,3 @@ public final class Redirects {
         response.setHeader(LOCATION, absolute);
     }
 }
-

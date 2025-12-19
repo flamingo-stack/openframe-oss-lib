@@ -4,21 +4,21 @@ import com.openframe.security.jwt.JwtService;
 import com.openframe.security.oauth.dto.OAuthCallbackResult;
 import com.openframe.security.oauth.dto.TokenResponse;
 import com.openframe.security.oauth.headers.ForwardedHeadersContributor;
+import com.openframe.security.oauth.service.redirect.RedirectTargetResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.server.WebSession;
 import reactor.core.publisher.Mono;
-import com.openframe.security.oauth.service.redirect.RedirectTargetResolver;
 
 import java.util.Base64;
 import java.util.Optional;
@@ -26,6 +26,7 @@ import java.util.Optional;
 import static com.openframe.core.constants.HttpHeaders.ACCEPT;
 import static com.openframe.security.pkce.PKCEUtils.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.time.Instant.now;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.util.StringUtils.hasText;
 
@@ -213,15 +214,17 @@ public class OAuthBffService {
     public record AuthorizeData(String authorizeUrl, String state, String codeVerifier, String tenantId, String redirectToAbs) {}
 
     public String buildStateJwt(AuthorizeData data, int ttlSeconds) {
-        var claims = org.springframework.security.oauth2.jwt.JwtClaimsSet.builder()
+        var builder = JwtClaimsSet.builder()
                 .subject("oauth_state")
                 .claim("s", data.state())
                 .claim("cv", data.codeVerifier())
                 .claim("tid", data.tenantId())
-                .claim("rt", data.redirectToAbs())
-                .issuedAt(java.time.Instant.now())
-                .expiresAt(java.time.Instant.now().plusSeconds(ttlSeconds))
-                .build();
+                .issuedAt(now())
+                .expiresAt(now().plusSeconds(ttlSeconds));
+        if (data.redirectToAbs() != null) {
+            builder.claim("rt", data.redirectToAbs());
+        }
+        var claims = builder.build();
         return jwtService.generateToken(claims);
     }
 

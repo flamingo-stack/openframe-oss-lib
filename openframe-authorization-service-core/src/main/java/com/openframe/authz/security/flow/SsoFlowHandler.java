@@ -9,7 +9,7 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import static com.openframe.authz.util.OidcUserUtils.resolveEmail;
 import static com.openframe.authz.util.OidcUserUtils.stringClaim;
 import static com.openframe.authz.web.AuthStateUtils.clearCookie;
-import static com.openframe.authz.web.Redirects.found;
+import static com.openframe.authz.web.Redirects.foundAtRoot;
 import static java.net.URLEncoder.encode;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Locale.ROOT;
@@ -71,6 +71,6 @@ public interface SsoFlowHandler {
         String path = "/oauth/continue?tenantId=" +
                 encode(tenantId, UTF_8);
         // TODO: Add redirectTo support for local debugging after the frontend removes this parameter in SaaS mode
-        found(response, path);
+        foundAtRoot(response, path);
     }
 }
