@@ -1,0 +1,5 @@
+flowchart TD
+    A[LogEvent] -->|contains| B[LogFilters]
+    B -->|uses| C[OrganizationFilterOption]
+    D[DeviceFilters] -->|contains| E[DeviceFilterOptions]
+    E -->|uses| F[DeviceStatus, DeviceType]

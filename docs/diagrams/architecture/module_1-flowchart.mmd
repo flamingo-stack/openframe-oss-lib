@@ -1,0 +1,5 @@
+flowchart TD
+    LogDetails["LogDetails"] --> LogFilterOptions["LogFilterOptions"]
+    LogFilterOptions --> DeviceFilterOption["DeviceFilterOption"]
+    CountedGenericQueryResult --> GenericQueryResult
+    GenericQueryResult -->|extends| CountedGenericQueryResult
