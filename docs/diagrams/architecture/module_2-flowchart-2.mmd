@@ -1,0 +1,6 @@
+flowchart TD
+    Query["API Query"] -->|uses| DeviceFilters
+    Query -->|uses| LogFilterOptions
+    DeviceFilters -->|composed of| DeviceFilterOption
+    Query -->|returns| GenericQueryResult
+    Query -->|returns| CountedGenericQueryResult

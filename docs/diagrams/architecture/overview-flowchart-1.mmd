@@ -1,0 +1,28 @@
+flowchart TD
+    subgraph module_1["module_1: Audit & Device DTOs"]
+        LogEvent["LogEvent"]
+        LogDetails["LogDetails"]
+        LogFilters["LogFilters"]
+        OrganizationFilterOption["OrganizationFilterOption"]
+        DeviceFilterOptions["DeviceFilterOptions"]
+    end
+    subgraph module_2["module_2: Query Results & Filter Options"]
+        GenericQueryResult["GenericQueryResult<T>"]
+        CountedGenericQueryResult["CountedGenericQueryResult<T>"]
+        DeviceFilters["DeviceFilters"]
+        DeviceFilterOption["DeviceFilterOption"]
+        LogFilterOptions["LogFilterOptions"]
+    end
+
+    LogFilters -->|uses| OrganizationFilterOption
+    LogEvent -->|references| LogDetails
+    LogFilters -.->|used with| LogEvent
+    DeviceFilterOptions -.->|used in| LogEvent
+
+    DeviceFilters --> DeviceFilterOption
+    CountedGenericQueryResult -->|extends| GenericQueryResult
+    DeviceFilters -.->|relates to| DeviceFilterOptions
+
+    LogFilterOptions -.->|relates to| LogFilters
+
+    module_1 -.->|DTOs used by| module_2

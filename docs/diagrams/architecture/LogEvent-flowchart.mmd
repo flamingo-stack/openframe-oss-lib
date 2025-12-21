@@ -1,0 +1,4 @@
+flowchart TD
+    LogEvent["LogEvent"] -->|can be detailed by| LogDetails["LogDetails"]
+    LogEvent -->|filtered by| LogFilters["LogFilters"]
+    LogEvent -->|organization context| OrganizationFilterOption["OrganizationFilterOption"]

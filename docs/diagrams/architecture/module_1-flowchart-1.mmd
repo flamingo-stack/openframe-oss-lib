@@ -1,0 +1,14 @@
+flowchart TD
+    subgraph audit_dto["Audit DTOs"]
+        LogEvent["LogEvent"]
+        LogDetails["LogDetails"]
+        LogFilters["LogFilters"]
+        OrganizationFilterOption["OrganizationFilterOption"]
+    end
+    subgraph device_dto["Device DTOs"]
+        DeviceFilterOptions["DeviceFilterOptions"]
+    end
+    LogFilters -->|uses| OrganizationFilterOption
+    LogEvent -->|references| LogDetails
+    LogFilters -.->|used with| LogEvent
+    DeviceFilterOptions -.->|used in| LogEvent

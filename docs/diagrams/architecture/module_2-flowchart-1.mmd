@@ -1,0 +1,17 @@
+flowchart TD
+    subgraph core_dto["Core DTOs"]
+        GenericQueryResult["GenericQueryResult<T>"]
+        CountedGenericQueryResult["CountedGenericQueryResult<T>"]
+    end
+    subgraph device_filters["Device Filtering"]
+        DeviceFilters["DeviceFilters"]
+        DeviceFilterOption["DeviceFilterOption"]
+    end
+    subgraph audit_filters["Audit Log Filtering"]
+        LogFilterOptions["LogFilterOptions"]
+    end
+    
+    CountedGenericQueryResult -->|extends| GenericQueryResult
+    DeviceFilters --> DeviceFilterOption
+    core_dto --> DeviceFilters
+    core_dto --> LogFilterOptions

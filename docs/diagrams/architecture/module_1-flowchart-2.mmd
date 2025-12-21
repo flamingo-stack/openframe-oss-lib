@@ -1,0 +1,4 @@
+flowchart TD
+    LogFilters["LogFilters"] -->|contains| OrganizationFilterOption["OrganizationFilterOption"]
+    LogEvent["LogEvent"] -->|can be detailed by| LogDetails["LogDetails"]
+    DeviceFilterOptions["DeviceFilterOptions"] -.->|used for| device_filtering["Device Filtering"]
