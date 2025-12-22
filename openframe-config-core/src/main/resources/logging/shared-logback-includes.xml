@@ -43,24 +43,10 @@
         </encoder>
     </appender>
 
-    <!-- Loki Appender -->
-    <appender name="LokiRemoteAppender" class="com.github.loki4j.logback.Loki4jAppender">
-        <http>
-            <url>${LOKI_ADDRESS}</url>
-        </http>
-        <format>
-            <message class="com.github.loki4j.logback.JsonLayout" />
-            <label>
-                <pattern>category=microservices,app=${SPRING_APP_NAME},host=${SPRING_CONTAINER_IP}</pattern>
-            </label>
-        </format>
-    </appender>
-
     <!-- Add all appenders to root -->
     <root level="info">
         <appender-ref ref="ConsoleAppender" />
         <appender-ref ref="RollingFileAppender" />
         <appender-ref ref="JsonRollingFileAppender" />
-        <appender-ref ref="LokiRemoteAppender" />
     </root>
 </included>
