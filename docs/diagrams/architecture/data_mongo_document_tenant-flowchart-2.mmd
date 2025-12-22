@@ -1,0 +1,8 @@
+flowchart TD
+    User["User Login Request"] --> App["Application Layer"]
+    App --> Repo["TenantRepository"]
+    Repo --> Doc["SSOPerTenantConfig"]
+    Doc --> Repo
+    Repo --> App
+    App --> Auth["Authorization Service"]
+    Auth -->|"uses SSO config"| Doc

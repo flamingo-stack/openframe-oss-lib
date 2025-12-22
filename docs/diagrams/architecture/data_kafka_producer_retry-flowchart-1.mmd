@@ -1,0 +1,9 @@
+flowchart TD
+    ProducerApp["Producer Application"] -->|sends message| KafkaProducer["Kafka Producer"]
+    KafkaProducer -->|failure| KafkaRecoveryHandlerImpl["KafkaRecoveryHandlerImpl"]
+    KafkaRecoveryHandlerImpl -->|retry logic| KafkaProducer
+    KafkaRecoveryHandlerImpl -->|recovery callback| RecoveryCallback["Recovery Callback"]
+    KafkaProducer -->|success| KafkaBroker["Kafka Broker"]
+    KafkaProducer -.->|uses config| KafkaConfig["Kafka Config (OssKafkaConfig, etc.)"]
+    KafkaProducer -.->|uses model| KafkaMessageModel["Kafka Message Model"]
+    KafkaProducer -.->|uses headers| KafkaHeader["Kafka Header Enum"]

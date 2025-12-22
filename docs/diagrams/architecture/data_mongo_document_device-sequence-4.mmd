@@ -1,0 +1,17 @@
+sequenceDiagram
+    participant Monitoring as Monitoring System
+    participant API as API Layer
+    participant Controller as DeviceController
+    participant Service as DeviceService
+    participant Repo as DeviceRepository
+    participant DB as MongoDB
+    Monitoring->>API: POST /devices/{id}/alerts (alert data)
+    API->>Controller: handle alert
+    Controller->>Service: process alert
+    Service->>Repo: update device with alert
+    Repo->>DB: update Device Document
+    DB-->>Repo: confirmation
+    Repo-->>Service: updated device
+    Service-->>Controller: response
+    Controller-->>API: response
+    API-->>Monitoring: alert recorded

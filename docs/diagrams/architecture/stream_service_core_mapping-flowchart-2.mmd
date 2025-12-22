@@ -1,0 +1,5 @@
+graph TD
+    Deserializer["Deserializer"] -->|uses| EventTypeMapper["EventTypeMapper"]
+    Handler["Handler"] -->|uses| EventTypeMapper
+    EnrichmentService["EnrichmentService"] -->|uses| FleetActivityTypeMapping["FleetActivityTypeMapping"]
+    EventTypeMapper -->|references| SourceEventTypes["SourceEventTypes"]

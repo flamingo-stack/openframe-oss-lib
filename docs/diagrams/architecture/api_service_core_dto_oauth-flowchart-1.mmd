@@ -1,0 +1,6 @@
+flowchart TD
+    Client["Client Application"] -->|sends SocialAuthRequest| Controller["OAuth Controller\n(api_service_core_controller)"]
+    Controller -->|uses| OAuthDTOs["OAuth DTOs\n(api_service_core_dto_oauth)"]
+    Controller -->|calls| AuthService["Authentication Service\n(api_service_core_service)"]
+    AuthService -->|returns| OAuthDTOs
+    Controller -->|returns AuthorizationResponse/TokenResponse| Client

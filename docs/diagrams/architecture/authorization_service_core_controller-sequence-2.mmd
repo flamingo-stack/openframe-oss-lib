@@ -1,0 +1,15 @@
+sequenceDiagram
+    participant Client
+    participant TRC as TenantRegistrationController
+    participant SsoHandler as TenantRegSsoHandler
+    participant SsoService as authorization_service_core_service_sso
+    participant KeyService as TenantKeyService
+    participant Repo as MongoRegisteredClientRepository
+
+    Client->>TRC: POST /tenant/register (SsoTenantRegistrationInitRequest)
+    TRC->>SsoHandler: Initiate SSO registration
+    SsoHandler->>SsoService: Configure SSO provider
+    SsoService->>KeyService: Generate tenant keys
+    KeyService->>Repo: Store client registration
+    SsoHandler-->>TRC: SSO registration result
+    TRC-->>Client: TenantAvailabilityResponse

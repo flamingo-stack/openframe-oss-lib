@@ -1,0 +1,7 @@
+graph TD
+    A["Client Request"] --> B["OrganizationController"]
+    B --> C["OrganizationFilterOptions"]
+    B --> D["OrganizationDataFetcher"]
+    D --> E["OrganizationDataLoader"]
+    D --> F["OrganizationResponse"]
+    F --> G["API Response"]

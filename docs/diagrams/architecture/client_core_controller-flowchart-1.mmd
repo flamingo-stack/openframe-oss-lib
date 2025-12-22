@@ -1,0 +1,23 @@
+flowchart TD
+    AgentClient["Agent Client"] -->|API Requests| AgentAuthController["AgentAuthController"]
+    AgentClient -->|API Requests| AgentController["AgentController"]
+    AgentClient -->|API Requests| ToolAgentFileController["ToolAgentFileController"]
+
+    AgentAuthController -->|uses| DefaultAgentRegistrationProcessor["DefaultAgentRegistrationProcessor"]
+    AgentController -->|uses| DefaultAgentRegistrationProcessor
+    ToolAgentFileController -->|uses| ToolAgentFileService["ToolAgentFileService"]
+
+    DefaultAgentRegistrationProcessor -->|depends on| FleetMdmAgentIdTransformer["FleetMdmAgentIdTransformer"]
+    DefaultAgentRegistrationProcessor -->|depends on| MeshCentralAgentIdTransformer["MeshCentralAgentIdTransformer"]
+
+    AgentAuthController -->|validates| PasswordEncoderConfig["PasswordEncoderConfig"]
+
+    subgraph Related DTOs
+        AgentRegistrationRequest["AgentRegistrationRequest"]
+        CreateClientRequest["CreateClientRequest"]
+        MetricsMessage["MetricsMessage"]
+    end
+
+    AgentAuthController -->|accepts| AgentRegistrationRequest
+    AgentController -->|accepts| CreateClientRequest
+    AgentController -->|accepts| MetricsMessage

@@ -1,0 +1,12 @@
+sequenceDiagram
+    participant Client
+    participant GatewayApiKeyAuthenticationFilter as "ApiKeyAuthenticationFilter"
+    participant BaseApiKeyRepository
+    participant MongoDB
+
+    Client->>GatewayApiKeyAuthenticationFilter: Sends request with API key
+    GatewayApiKeyAuthenticationFilter->>BaseApiKeyRepository: Lookup API key
+    BaseApiKeyRepository->>MongoDB: Query API key document
+    MongoDB-->>BaseApiKeyRepository: Return API key data
+    BaseApiKeyRepository-->>GatewayApiKeyAuthenticationFilter: Return API key entity
+    GatewayApiKeyAuthenticationFilter-->>Client: Allow or deny access

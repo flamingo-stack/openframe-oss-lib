@@ -1,0 +1,13 @@
+sequenceDiagram
+    participant ClientApp as "OAuth2 Client Application"
+    participant AuthServer as "Authorization Server ([authorization_service_core_service_auth.md])"
+    participant MongoDoc as "MongoRegisteredClient / OAuthToken ([data_mongo_document_oauth.md])"
+    participant MongoRepo as "Repositories ([data_mongo_reactive_repository_oauth.md], [data_mongo_repository_oauth.md])"
+
+    ClientApp->>AuthServer: Register client / Request token
+    AuthServer->>MongoRepo: Save MongoRegisteredClient / OAuthToken
+    MongoRepo->>MongoDoc: Persist document in MongoDB
+    AuthServer-->>ClientApp: Return client credentials / token
+    AuthServer->>MongoRepo: Lookup/validate client or token
+    MongoRepo->>MongoDoc: Query document in MongoDB
+    MongoRepo-->>AuthServer: Return client/token data

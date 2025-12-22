@@ -1,0 +1,10 @@
+flowchart TD
+    Client["API Client"] -->|requests organizations| OrganizationController["OrganizationController"]
+    OrganizationController -->|fetches data| OrganizationDataFetcher["OrganizationDataFetcher"]
+    OrganizationDataFetcher -->|queries| OrganizationService["OrganizationService"]
+    OrganizationService -->|retrieves| OrganizationRepository["OrganizationRepository"]
+    OrganizationRepository -->|returns| OrganizationEntities["Organization Entities"]
+    OrganizationService -->|maps to DTOs| OrganizationResponse["OrganizationResponse"]
+    OrganizationController -->|returns| OrganizationsResponse["OrganizationsResponse"]
+    OrganizationsResponse -->|contains| OrganizationResponse
+    OrganizationsResponse -->|contains| PaginationCriteria["PaginationCriteria"]

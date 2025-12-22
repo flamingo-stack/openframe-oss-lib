@@ -1,0 +1,16 @@
+flowchart TD
+    Init["management_service_core_initializer"] --> ARSI["AgentRegistrationSecretInitializer"]
+    Init --> ITAI["IntegratedToolAgentInitializer"]
+    Init --> NSCI["NatsStreamConfigurationInitializer"]
+    Init --> OFCCI["OpenFrameClientConfigurationInitializer"]
+    Init --> TRSI["TacticalRmmScriptsInitializer"]
+
+    ARSI -->|uses| MSC_Config["management_service_core_config"]
+    ITAI -->|uses| MSC_Config
+    NSCI -->|uses| Stream_Config["stream_service_core_config"]
+    OFCCI -->|uses| MSC_Config
+    TRSI -->|uses| Scripts["management_service_core_model"]
+
+    ITAI -->|integrates| ITC["management_service_core_controller"]
+    ARSI -->|integrates| ARSC["api_service_core_controller"]
+    OFCCI -->|integrates| OFC["api_service_core_controller"]

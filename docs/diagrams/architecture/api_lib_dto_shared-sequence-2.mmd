@@ -1,0 +1,12 @@
+sequenceDiagram
+    participant Client
+    participant Controller
+    participant Service
+    participant Repository
+
+    Client->>Controller: Request with CursorPaginationInput
+    Controller->>Service: Passes pagination input
+    Service->>Repository: Queries with cursor and limit
+    Repository-->>Service: Returns paginated data
+    Service-->>Controller: Returns data + next cursor
+    Controller-->>Client: Responds with paginated results

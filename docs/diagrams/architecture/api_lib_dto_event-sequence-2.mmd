@@ -1,0 +1,15 @@
+sequenceDiagram
+    participant Client
+    participant Controller
+    participant Service
+    participant DataFetcher
+    participant DataModel
+
+    Client->>Controller: Request events with filters
+    Controller->>Service: Passes EventFilters DTO
+    Service->>DataFetcher: Applies EventFilters
+    DataFetcher->>DataModel: Queries CoreEvent with filters
+    DataModel-->>DataFetcher: Returns filtered events
+    DataFetcher-->>Service: Returns event data
+    Service-->>Controller: Returns response
+    Controller-->>Client: Returns filtered events

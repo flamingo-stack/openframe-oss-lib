@@ -1,0 +1,6 @@
+flowchart TD
+    Parent["Parent Component"] -->|fetches data| Hooks["frontend_core_hooks_ui"]
+    Hooks -->|provides data| Table["TableProps"]
+    Table -->|renders rows| TableRow["TableRowProps"]
+    Table -->|shows empty| EmptyState["TableEmptyStateProps"]
+    Table -->|shows loading| Skeleton["TableCardSkeletonProps"]

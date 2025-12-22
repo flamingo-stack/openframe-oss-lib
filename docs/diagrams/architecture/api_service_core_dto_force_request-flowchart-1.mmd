@@ -1,0 +1,8 @@
+flowchart TD
+    User["Admin User or System Process"] -->|initiates| Controller["ForceAgentController"]
+    Controller -->|receives| ForceRequestDTOs["Force Request DTOs\n(api_service_core_dto_force_request)"]
+    ForceRequestDTOs -->|passed to| ServiceLayer["Force Operation Service\n(e.g., OpenFrameClientVersionUpdateService)"]
+    ServiceLayer -->|executes| Agents["Client Agents / Tool Agents"]
+    ServiceLayer -->|returns| ForceResponseDTOs["Force Response DTOs\n(api_service_core_dto_force_response)"]
+    ForceResponseDTOs -->|sent to| Controller
+    Controller -->|responds to| User

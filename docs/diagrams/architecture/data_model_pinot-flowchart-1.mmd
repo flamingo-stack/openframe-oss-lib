@@ -1,0 +1,11 @@
+flowchart TD
+    PinotEventEntity["PinotEventEntity"] -->|used by| PinotClientDeviceRepository["PinotClientDeviceRepository\n[data_repository_pinot]"]
+    PinotEventEntity -->|used by| PinotClientLogRepository["PinotClientLogRepository\n[data_repository_pinot]"]
+    OrganizationOption["OrganizationOption"] -->|used by| PinotClientDeviceRepository
+    OrganizationOption -->|used by| PinotClientLogRepository
+    PinotClientDeviceRepository -->|returns| PinotEventEntity
+    PinotClientLogRepository -->|returns| PinotEventEntity
+    data_model_pinot["data_model_pinot"] --> PinotEventEntity
+    data_model_pinot --> OrganizationOption
+    PinotClientDeviceRepository -->|depends on| data_model_pinot
+    PinotClientLogRepository -->|depends on| data_model_pinot

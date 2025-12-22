@@ -1,0 +1,5 @@
+flowchart LR
+    K["Kafka Topic"] --> L["JsonKafkaListener"]
+    L --> M["Message Handler"]
+    M --> N["Enrichment Service"]
+    N --> O["Downstream Consumers"]

@@ -1,0 +1,8 @@
+flowchart TD
+    Controller["Controller Layer"] -->|invokes| Processor["authorization_service_core_service_processor"]
+    Processor -->|delegates| AuthService["authorization_service_core_service_auth (MongoAuthorizationService)"]
+    Processor -->|delegates| UserService["authorization_service_core_service_user (UserService)"]
+    Processor -->|uses| TenantContext["authorization_service_core_config_tenant (TenantContext)"]
+    Processor -->|enforces| Policy["authorization_service_core_service_policy"]
+    AuthService -->|persists| MongoRepo["authorization_service_core_repository (MongoRegisteredClientRepository)"]
+    UserService -->|persists| UserRepo["data_mongo_repository_user (BaseUserRepository)"]

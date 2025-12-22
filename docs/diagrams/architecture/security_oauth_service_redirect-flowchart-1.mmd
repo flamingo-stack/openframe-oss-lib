@@ -1,0 +1,6 @@
+flowchart TD
+    OAuthBffController["OAuthBffController"] -->|invokes| DefaultRedirectTargetResolver["DefaultRedirectTargetResolver"]
+    DefaultRedirectTargetResolver -->|uses| SecurityConstants["SecurityConstants"]
+    DefaultRedirectTargetResolver -->|may use| PKCEUtils["PKCEUtils"]
+    DefaultRedirectTargetResolver -->|may consult| InMemoryOAuthDevTicketStore["InMemoryOAuthDevTicketStore"]
+    DefaultRedirectTargetResolver -->|returns| Redirects["Redirects"]

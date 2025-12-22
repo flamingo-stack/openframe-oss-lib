@@ -1,0 +1,6 @@
+flowchart TD
+    A["External Systems"] -->|"registers agent"| B["sdk_tacticalrmm\n(RegistrationSecretParser)"]
+    B -->|"parses secret"| C["sdk_tacticalrmm_model\n(AgentInfo, AgentListItem)"]
+    C -->|"provides agent data"| D["api_service_core_controller\n(AgentRegistrationSecretController)"]
+    D -->|"manages agent lifecycle"| E["api_service_core_service\n(DefaultDomainExistenceValidator, SSOConfigService)"]
+    E -->|"persists/updates"| F["data_mongo_document_device\n(Device)"]

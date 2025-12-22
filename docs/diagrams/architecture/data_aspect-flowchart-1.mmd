@@ -1,0 +1,6 @@
+flowchart TD
+    ServiceImpl["MachineTagEventServiceImpl"] -->|invokes| Aspect["MachineTagEventAspect"]
+    Aspect -->|applies logic to| DeviceDoc["Device (MongoDB Document)"]
+    Aspect -->|applies logic to| TagDoc["Tag (MongoDB Document)"]
+    Aspect -->|triggers| PinotRepo["PinotClientDeviceRepository"]
+    Aspect -->|triggers| PinotLogRepo["PinotClientLogRepository"]

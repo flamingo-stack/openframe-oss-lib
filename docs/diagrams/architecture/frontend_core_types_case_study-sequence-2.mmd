@@ -1,0 +1,8 @@
+sequenceDiagram
+    participant UI as UI Component
+    participant Types as frontend_core_types_case_study
+    participant API as API Layer
+    UI->>Types: Use CaseStudyFilters to build query
+    UI->>API: Request case studies with filters
+    API-->>UI: Return CaseStudyListResponse
+    UI->>Types: Parse and display using CaseStudyListResponse

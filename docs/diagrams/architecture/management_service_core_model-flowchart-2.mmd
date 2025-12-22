@@ -1,0 +1,6 @@
+flowchart TD
+    User["Admin/User"] -->|triggers| API["Management API"]
+    API -->|calls| management_service_core_controller["Controller"]
+    management_service_core_controller -->|delegates| management_service_core_initializer["Initializer"]
+    management_service_core_initializer -->|loads| ScriptConfig["ScriptConfig"]
+    ScriptConfig -->|provides config to| ScriptExecutionService["Script Execution Service"]

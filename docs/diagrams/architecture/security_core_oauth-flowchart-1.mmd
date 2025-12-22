@@ -1,0 +1,23 @@
+flowchart TD
+    SecurityConstants["SecurityConstants"]
+    SecurityCoreOAuth["security_core_oauth"]
+    SecurityCoreJwt["security_core_jwt"]
+    SecurityCorePkce["security_core_pkce"]
+    SecurityOauthController["security_oauth_controller"]
+    SecurityOauthService["security_oauth_service"]
+    SecurityOauthServiceRedirect["security_oauth_service_redirect"]
+    AuthorizationServiceCoreConfig["authorization_service_core_config"]
+    AuthorizationServiceCoreSecurity["authorization_service_core_security"]
+    AuthorizationServiceCoreSecurityFlow["authorization_service_core_security_flow"]
+    GatewayServiceCoreSecurity["gateway_service_core_security"]
+
+    SecurityCoreOAuth --> SecurityConstants
+    SecurityCoreJwt --> SecurityCoreOAuth
+    SecurityCorePkce --> SecurityCoreOAuth
+    SecurityOauthController --> SecurityCoreOAuth
+    SecurityOauthService --> SecurityCoreOAuth
+    SecurityOauthServiceRedirect --> SecurityCoreOAuth
+    AuthorizationServiceCoreConfig --> SecurityCoreOAuth
+    AuthorizationServiceCoreSecurity --> SecurityCoreOAuth
+    AuthorizationServiceCoreSecurityFlow --> SecurityCoreOAuth
+    GatewayServiceCoreSecurity --> SecurityCoreOAuth

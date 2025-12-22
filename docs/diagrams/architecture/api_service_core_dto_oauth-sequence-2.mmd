@@ -1,0 +1,8 @@
+sequenceDiagram
+    participant Client as "Client App"
+    participant Controller as "OAuth Controller"
+    participant Service as "Auth Service"
+    Client->>Controller: POST /oauth/social (SocialAuthRequest)
+    Controller->>Service: Validate and process SocialAuthRequest
+    Service-->>Controller: TokenResponse / AuthorizationResponse
+    Controller-->>Client: TokenResponse / AuthorizationResponse

@@ -1,0 +1,18 @@
+sequenceDiagram
+    participant U as "User"
+    participant LC as "LoginController"
+    participant IH as "InviteSsoHandler"
+    participant TH as "TenantRegSsoHandler"
+    participant KS as "TenantKeyService"
+    participant AS as "MongoAuthorizationService"
+    participant TR as "TenantRepository"
+
+    U->>LC: Initiate SSO login/registration
+    LC->>IH: Delegate invitation acceptance (if invitation)
+    IH->>KS: Retrieve/generate keys
+    IH->>AS: Register SSO client
+    AS->>AS: Persist client
+    LC->>TH: Delegate tenant registration (if new tenant)
+    TH->>KS: Manage tenant keys
+    TH->>AS: Register tenant SSO client
+    TH->>TR: Persist tenant

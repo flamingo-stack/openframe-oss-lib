@@ -1,0 +1,6 @@
+flowchart TD
+    Agent["Agent (Client Device)"] -->|sends registration| AgentAuthController["AgentAuthController"]
+    AgentAuthController -->|parses| AgentRegistrationRequest["AgentRegistrationRequest DTO"]
+    AgentAuthController -->|delegates| DefaultAgentRegistrationProcessor["DefaultAgentRegistrationProcessor"]
+    DefaultAgentRegistrationProcessor -->|validates & processes| InstalledAgentService["InstalledAgentService"]
+    InstalledAgentService -->|persists agent| DataStore["Database / Data Store"]

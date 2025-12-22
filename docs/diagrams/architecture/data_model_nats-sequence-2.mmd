@@ -1,0 +1,7 @@
+sequenceDiagram
+    participant Producer as Producer Service
+    participant NATS as NATS Bus
+    participant Consumer as Consumer Service
+    Producer->>NATS: Publish InstalledAgentMessage
+    NATS->>Consumer: Deliver InstalledAgentMessage
+    Consumer->>Consumer: Deserialize and process InstalledAgentMessage

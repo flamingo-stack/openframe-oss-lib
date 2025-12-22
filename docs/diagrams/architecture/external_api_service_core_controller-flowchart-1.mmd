@@ -1,0 +1,43 @@
+flowchart TD
+    subgraph External API Service Core Controller
+        DeviceController
+        EventController
+        IntegrationController
+        LogController
+        OrganizationController
+        ToolController
+    end
+    subgraph Service Layer
+        RestProxyService
+    end
+    subgraph DTOs
+        AuditDTOs["Audit DTOs"]
+        DeviceDTOs["Device DTOs"]
+        EventDTOs["Event DTOs"]
+        OrganizationDTOs["Organization DTOs"]
+        ToolDTOs["Tool DTOs"]
+        SharedDTOs["Shared DTOs"]
+    end
+    subgraph Data Fetchers & Loaders
+        DataFetchers["DataFetchers/DataLoaders"]
+    end
+    subgraph Data Sources
+        MongoDB
+        Pinot
+        Kafka
+    end
+    DeviceController -->|uses| DeviceDTOs
+    DeviceController -->|calls| RestProxyService
+    EventController -->|uses| EventDTOs
+    EventController -->|calls| RestProxyService
+    IntegrationController -->|calls| RestProxyService
+    LogController -->|uses| AuditDTOs
+    LogController -->|calls| RestProxyService
+    OrganizationController -->|uses| OrganizationDTOs
+    OrganizationController -->|calls| RestProxyService
+    ToolController -->|uses| ToolDTOs
+    ToolController -->|calls| RestProxyService
+    RestProxyService -->|delegates| DataFetchers
+    DataFetchers -->|query| MongoDB
+    DataFetchers -->|query| Pinot
+    DataFetchers -->|consume| Kafka

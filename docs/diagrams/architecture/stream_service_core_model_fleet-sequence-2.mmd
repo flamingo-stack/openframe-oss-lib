@@ -1,0 +1,11 @@
+sequenceDiagram
+    participant Kafka as "Kafka Topic"
+    participant Listener as "JsonKafkaListener"
+    participant Deserializer as "FleetEventDeserializer"
+    participant Enrichment as "ActivityEnrichmentService"
+    participant Downstream as "Downstream Consumer"
+
+    Kafka->>Listener: New fleet event message
+    Listener->>Deserializer: Deserialize event
+    Deserializer->>Enrichment: Create ActivityMessage
+    Enrichment->>Downstream: Produce HostActivityMessage

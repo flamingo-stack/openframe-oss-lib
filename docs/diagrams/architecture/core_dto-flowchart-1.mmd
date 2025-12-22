@@ -1,0 +1,25 @@
+flowchart TD
+    PageResponse["PageResponse"]
+    api_service_core_dto["api_service_core_dto"]
+    api_service_core_dto_user["api_service_core_dto_user"]
+    api_service_core_dto_invitation["api_service_core_dto_invitation"]
+    api_service_core_dto_event["api_service_core_dto_event"]
+    api_service_core_dto_device["api_service_core_dto_device"]
+    api_service_core_dto_tool["api_service_core_dto_tool"]
+    external_api_service_core_dto_device["external_api_service_core_dto_device"]
+    external_api_service_core_dto_event["external_api_service_core_dto_event"]
+    external_api_service_core_dto_tool["external_api_service_core_dto_tool"]
+    external_api_service_core_dto_organization["external_api_service_core_dto_organization"]
+    frontend_core_hooks_ui["frontend_core_hooks_ui"]
+
+    PageResponse -->|used by| api_service_core_dto
+    PageResponse -->|used by| api_service_core_dto_user
+    PageResponse -->|used by| api_service_core_dto_invitation
+    PageResponse -->|used by| api_service_core_dto_event
+    PageResponse -->|used by| api_service_core_dto_device
+    PageResponse -->|used by| api_service_core_dto_tool
+    PageResponse -->|used by| external_api_service_core_dto_device
+    PageResponse -->|used by| external_api_service_core_dto_event
+    PageResponse -->|used by| external_api_service_core_dto_tool
+    PageResponse -->|used by| external_api_service_core_dto_organization
+    PageResponse -->|used by| frontend_core_hooks_ui

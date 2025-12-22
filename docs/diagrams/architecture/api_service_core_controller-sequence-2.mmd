@@ -1,0 +1,14 @@
+sequenceDiagram
+    participant Client
+    participant DeviceController
+    participant DeviceService
+    participant DeviceDataFetcher
+    participant DeviceRepository
+    Client->>DeviceController: POST /devices (register device)
+    DeviceController->>DeviceService: validate & process registration
+    DeviceService->>DeviceDataFetcher: fetch device data
+    DeviceDataFetcher->>DeviceRepository: query/insert device
+    DeviceRepository-->>DeviceDataFetcher: device data
+    DeviceDataFetcher-->>DeviceService: device data
+    DeviceService-->>DeviceController: registration result
+    DeviceController-->>Client: response (success/error)

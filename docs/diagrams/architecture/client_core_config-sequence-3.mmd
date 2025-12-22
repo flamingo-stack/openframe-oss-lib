@@ -1,0 +1,12 @@
+sequenceDiagram
+    participant User as "User/Agent"
+    participant Controller as "AgentAuthController"
+    participant Service as "ClientAuthService"
+    participant Config as "PasswordEncoderConfig"
+
+    User->>Controller: Submit credentials (username/password)
+    Controller->>Service: Pass credentials
+    Service->>Config: Use password encoder to verify password
+    Config-->>Service: PasswordEncoder instance
+    Service-->>Controller: Authentication result
+    Controller-->>User: Success/Failure response

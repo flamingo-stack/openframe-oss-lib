@@ -1,0 +1,9 @@
+flowchart TD
+    User["User"] -->|registers tenant| TenantRegistrationController["TenantRegistrationController"]
+    TenantRegistrationController -->|generates state| AuthStateUtils
+    TenantRegistrationController -->|redirects| Redirects
+    Redirects -->|sends| SSOProvider["SSO Provider"]
+    SSOProvider -->|callback| TenantRegistrationController
+    TenantRegistrationController -->|validates state| AuthStateUtils
+    TenantRegistrationController -->|final redirect| Redirects
+    TenantRegistrationController -->|creates tenant| TenantService["Tenant Service"]

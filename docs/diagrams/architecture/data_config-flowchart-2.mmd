@@ -1,0 +1,15 @@
+flowchart TD
+    subgraph Data Stores
+        cassandra["Cassandra"]
+        pinot["Pinot"]
+        redis["Redis"]
+    end
+    DataConfiguration["DataConfiguration"] --> cassandra
+    DataConfiguration --> pinot
+    DataConfiguration --> redis
+    DataConfiguration --> cache["Cache Layer"]
+    cache --> redis
+    DataConfiguration --> tool_sdk["Tool SDK Integration"]
+    tool_sdk -->|uses| cassandra
+    tool_sdk -->|uses| pinot
+    tool_sdk -->|uses| redis

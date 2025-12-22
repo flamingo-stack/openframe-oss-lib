@@ -1,0 +1,14 @@
+sequenceDiagram
+    participant User
+    participant ChatUI as "Chat UI"
+    participant SlackHook as "useSlackCommunity"
+    participant ApiLayer as "API Service"
+    participant SlackAPI as "Slack API"
+
+    User->>ChatUI: Types message
+    ChatUI->>SlackHook: sendMessage(SlackMessageSendRequest)
+    SlackHook->>ApiLayer: POST /slack/message (SlackMessageSendRequest)
+    ApiLayer->>SlackAPI: Forward request
+    SlackAPI-->>ApiLayer: SlackApiResponse
+    ApiLayer-->>SlackHook: SlackApiResponse
+    SlackHook-->>ChatUI: Update UI (message sent)

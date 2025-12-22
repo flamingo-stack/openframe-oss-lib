@@ -1,0 +1,5 @@
+flowchart TD
+    A["Kafka Topic"] -->|raw event| B["Deserializer (stream_service_core_deserializer)"]
+    B -->|typed event| C["Message Handler (stream_service_core_handler)"]
+    C -->|enriched event| D["Enrichment Service (stream_service_core_service)"]
+    D -->|processed event| E["Downstream Consumers"]

@@ -1,0 +1,6 @@
+graph TD
+    ProducerService["Kafka Producer Service"] -->|sends| MachinePinotMessage["MachinePinotMessage"]
+    MachinePinotMessage -->|serialized as| KafkaTopic["Kafka Topic"]
+    KafkaTopic -->|consumed by| ConsumerService["Kafka Consumer Service"]
+    ConsumerService -->|parses| MachinePinotMessage
+    ConsumerService -->|writes to| PinotEventEntity["PinotEventEntity (data_model_pinot)"]

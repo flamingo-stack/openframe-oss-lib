@@ -1,0 +1,14 @@
+sequenceDiagram
+    participant Client
+    participant Controller
+    participant Service
+    participant Repository
+    participant PageResponse
+
+    Client->>Controller: GET /api/users?page=1&pageSize=20
+    Controller->>Service: fetchUsers(page=1, pageSize=20)
+    Service->>Repository: queryUsers(page=1, pageSize=20)
+    Repository-->>Service: List<User>, totalCount
+    Service->>PageResponse: construct(List<User>, totalCount, page, pageSize)
+    PageResponse-->>Controller: PageResponse<User>
+    Controller-->>Client: JSON PageResponse<User>

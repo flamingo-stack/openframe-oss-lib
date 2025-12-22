@@ -1,0 +1,5 @@
+flowchart TD
+    Client["API Client"] -->|sends ReleaseVersionRequest| ReleaseVersionController["ReleaseVersionController"]
+    ReleaseVersionController -->|uses| ReleaseVersionRequest["ReleaseVersionRequest DTO"]
+    ReleaseVersionController -->|calls| OpenFrameClientVersionUpdateService["OpenFrameClientVersionUpdateService"]
+    OpenFrameClientVersionUpdateService -->|persists/updates| DataStore["Data Store"]

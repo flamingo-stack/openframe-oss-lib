@@ -1,0 +1,7 @@
+flowchart TD
+    Start["Start"] --> ValidateRequest["Validate Registration Request"]
+    ValidateRequest -->|valid| GenerateTenantKeys["Manage Tenant Keys"]
+    GenerateTenantKeys --> RegisterTenantClient["Register Tenant SSO Client"]
+    RegisterTenantClient --> PersistTenant["Persist Tenant"]
+    PersistTenant --> Success["Registration Complete"]
+    ValidateRequest -->|invalid| Error["Error Handling"]

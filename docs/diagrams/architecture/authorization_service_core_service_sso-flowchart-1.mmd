@@ -1,0 +1,8 @@
+graph TD
+    SsoDiscoveryController["SsoDiscoveryController"] -->|requests default config| GoogleDefaultProviderConfig["GoogleDefaultProviderConfig"]
+    SsoDiscoveryController -->|requests default config| MicrosoftDefaultProviderConfig["MicrosoftDefaultProviderConfig"]
+    SsoDiscoveryController -->|returns config| Client["Tenant Admin UI"]
+    SsoTenantRegistrationSuccessHandler["SsoTenantRegistrationSuccessHandler"] -->|uses| GoogleDefaultProviderConfig
+    SsoTenantRegistrationSuccessHandler -->|uses| MicrosoftDefaultProviderConfig
+    DefaultRegistrationProcessor["DefaultRegistrationProcessor"] -->|validates| GoogleDefaultProviderConfig
+    DefaultRegistrationProcessor -->|validates| MicrosoftDefaultProviderConfig

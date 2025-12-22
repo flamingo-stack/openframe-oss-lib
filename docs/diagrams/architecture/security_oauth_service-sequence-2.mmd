@@ -1,0 +1,13 @@
+sequenceDiagram
+    participant User as User
+    participant App as User Application
+    participant Controller as OAuthBffController
+    participant TicketStore as InMemoryOAuthDevTicketStore
+
+    User->>App: Initiate OAuth login
+    App->>Controller: OAuth request
+    Controller->>TicketStore: Store OAuth ticket
+    Controller-->>App: Redirect to OAuth provider
+    App->>Controller: Callback with code
+    Controller->>TicketStore: Retrieve OAuth ticket
+    Controller-->>App: Complete authentication

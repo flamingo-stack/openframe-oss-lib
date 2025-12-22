@@ -1,0 +1,8 @@
+sequenceDiagram
+    participant Client
+    participant AuthService as "Authorization Service"
+    participant PolicyLookup as "NoopGlobalDomainPolicyLookup"
+    Client->>AuthService: Request access
+    AuthService->>PolicyLookup: Lookup global domain policy
+    PolicyLookup-->>AuthService: Return (noop/default) policy
+    AuthService-->>Client: Grant/deny access based on policy

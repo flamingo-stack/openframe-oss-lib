@@ -1,0 +1,6 @@
+flowchart TD
+    User["User"] -->|creates| StackBuilderUI["Stack Builder UI"]
+    StackBuilderUI -->|uses types| StackTypes["frontend_core_types_stack"]
+    StackBuilderUI -->|sends AddVendorToStackRequest| API["Backend API"]
+    API -->|returns updated StackDetailResponse| StackBuilderUI
+    StackBuilderUI -->|renders| UI["Stack Detail Page"]
