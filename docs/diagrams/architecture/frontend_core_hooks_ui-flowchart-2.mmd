@@ -1,0 +1,5 @@
+flowchart LR
+    User["User Action"] --> UI["UI Component"]
+    UI -->|updates| PaginationConfig["Pagination Config<br/>(from frontend_core_hooks_ui)"]
+    PaginationConfig -->|triggers| DataFetch["Data Fetcher"]
+    DataFetch -->|returns| UI

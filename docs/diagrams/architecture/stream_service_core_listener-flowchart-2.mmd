@@ -1,0 +1,7 @@
+flowchart LR
+    A["Kafka Topic"] --> B["JsonKafkaListener"]
+    B --> C["Deserializer"]
+    C --> D["Event Type Mapper"]
+    D --> E["Message Handler"]
+    E --> F["Enrichment Service"]
+    F --> G["Downstream Consumers / Storage"]

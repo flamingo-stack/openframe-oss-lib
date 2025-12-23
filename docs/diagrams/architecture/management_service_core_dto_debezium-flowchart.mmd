@@ -1,0 +1,7 @@
+flowchart TD
+    DebeziumConnector["Debezium Connector"] -->|emits status| DebeziumMessageHandler["DebeziumMessageHandler"]
+    DebeziumMessageHandler -->|parses| DebeziumMessage["DebeziumMessage"]
+    DebeziumMessage -->|maps to| ConnectorStatus["ConnectorStatus DTO"]
+    ConnectorStatus -->|contains| TaskStatus["TaskStatus DTO"]
+    ConnectorStatus -->|used by| DebeziumHealthCheckScheduler["DebeziumHealthCheckScheduler"]
+    DebeziumHealthCheckScheduler -->|reports to| ManagementAPI["Management Service API"]

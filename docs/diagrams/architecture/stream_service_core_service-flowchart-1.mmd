@@ -1,0 +1,9 @@
+flowchart TD
+    A["Kafka Topic (Raw Events)"] -->|consumed by| B["JsonKafkaListener"]
+    B -->|deserializes| C["stream_service_core_deserializer"]
+    C -->|maps event types| D["stream_service_core_mapping"]
+    D -->|handles messages| E["stream_service_core_handler"]
+    E -->|enriches activity| F["ActivityEnrichmentService"]
+    E -->|enriches tool data| G["IntegratedToolDataEnrichmentService"]
+    F -->|outputs| H["Enriched Activity Stream"]
+    G -->|outputs| I["Enriched Tool Data Stream"]

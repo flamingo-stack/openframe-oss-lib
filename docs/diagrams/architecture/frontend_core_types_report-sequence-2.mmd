@@ -1,0 +1,11 @@
+sequenceDiagram
+    participant UI as "UI Component"
+    participant Hook as "Data Fetch Hook"
+    participant API as "API Service"
+    participant Types as "frontend_core_types_report"
+
+    UI->>Hook: Request margin report data
+    Hook->>API: Fetch margin report
+    API-->>Hook: Return data (typed as MarginReport)
+    Hook-->>UI: Provide MarginReport data
+    Note right of UI: Uses MarginReport type for rendering

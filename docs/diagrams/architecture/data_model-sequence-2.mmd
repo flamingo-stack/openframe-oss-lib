@@ -1,0 +1,15 @@
+sequenceDiagram
+    participant Client
+    participant API as "API Layer"
+    participant DataFetcher
+    participant MongoDoc as "Mongo Document"
+    participant StreamService
+
+    Client->>API: Submit new tool integration
+    API->>DataFetcher: Validate and process tool data
+    DataFetcher->>MongoDoc: Store IntegratedToolTypes & ToolCredentials
+    MongoDoc-->>DataFetcher: Confirm storage
+    DataFetcher-->>API: Respond with success
+    API-->>Client: Acknowledge integration
+    MongoDoc->>StreamService: Emit tool integration event
+    StreamService->>MongoDoc: Enrich/process event using models

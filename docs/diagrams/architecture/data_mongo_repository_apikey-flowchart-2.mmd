@@ -1,0 +1,4 @@
+flowchart TD
+    BaseApiKeyRepository -->|depends on| MongoConfig["MongoConfig"]
+    BaseApiKeyRepository -->|uses| AuthUser["AuthUser"]
+    MongoConfig -->|configures| MongoDB

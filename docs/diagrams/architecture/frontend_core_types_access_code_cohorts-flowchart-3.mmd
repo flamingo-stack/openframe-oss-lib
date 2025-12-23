@@ -1,0 +1,7 @@
+graph LR
+    UI["UI Components"] -->|display| CohortWithStats
+    UI -->|manage| AccessCode
+    UI -->|show| CohortMembership
+    API["API Layer"] -->|provides| AccessCodeCohort
+    API -->|validates| AccessCodeValidation
+    Auth["Auth Module"] -->|uses| AccessCodeValidation

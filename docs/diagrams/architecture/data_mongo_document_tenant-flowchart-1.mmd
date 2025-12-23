@@ -1,0 +1,6 @@
+graph TD
+    A["SSOPerTenantConfig (data_mongo_document_tenant)"] -->|"persisted in"| B["MongoDB"]
+    A -->|"used by"| C["TenantRepository (data_mongo_repository_tenant)"]
+    C -->|"queried by"| D["TenantContext (authorization_service_core_config_tenant)"]
+    D -->|"provides context to"| E["MongoAuthorizationService (authorization_service_core_service_auth)"]
+    E -->|"enables"| F["SSO Authentication Flows"]

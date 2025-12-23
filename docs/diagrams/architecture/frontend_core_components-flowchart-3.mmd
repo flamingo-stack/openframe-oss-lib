@@ -1,0 +1,4 @@
+flowchart TD
+    Dev["Developer"] -->|defines new prop type| Core["frontend_core_components"]
+    Core -->|exports type| UI["frontend_core_components_ui"]
+    UI -->|implements component| App["Application Page"]

@@ -1,0 +1,5 @@
+flowchart TD
+    OAuthTokenRepository["OAuthTokenRepository"] -->|uses| OAuthToken["OAuthToken (Document)"]
+    OAuthTokenRepository -->|persists to| MongoDB["MongoDB"]
+    AuthService["MongoAuthorizationService"] -->|calls| OAuthTokenRepository
+    ReactiveOAuthClientRepository["ReactiveOAuthClientRepository"] -->|complements| OAuthTokenRepository

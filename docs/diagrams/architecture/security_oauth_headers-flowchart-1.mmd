@@ -1,0 +1,5 @@
+flowchart TD
+    OAuthController["OAuth BFF Controller"] -->|uses| NoopForwardedHeadersContributor["NoopForwardedHeadersContributor"]
+    OAuthService["OAuth Service"] -->|may use| NoopForwardedHeadersContributor
+    SecurityConfig["Security Config"] -->|wires| NoopForwardedHeadersContributor
+    NoopForwardedHeadersContributor -.->|implements| HeaderContributorInterface["Header Contributor Interface"]

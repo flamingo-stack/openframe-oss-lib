@@ -1,0 +1,6 @@
+flowchart TD
+    ServiceLayer["Service Layer"] -->|uses| BaseIntegratedToolRepository["BaseIntegratedToolRepository"]
+    ServiceLayer -->|uses| CustomIntegratedToolRepositoryImpl["CustomIntegratedToolRepositoryImpl"]
+    BaseIntegratedToolRepository -->|manages| IntegratedToolAgent["IntegratedToolAgent (Entity)"]
+    CustomIntegratedToolRepositoryImpl -->|manages| IntegratedToolAgent
+    IntegratedToolAgent -->|has| Tag["Tag (Entity)"]

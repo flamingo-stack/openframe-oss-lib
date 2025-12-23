@@ -1,0 +1,5 @@
+flowchart TD
+    EventFilters["EventFilters"] -->|uses| EventFilterOptions["EventFilterOptions"]
+    EventFilters -->|includes| CursorPaginationInput["CursorPaginationInput (from api_lib_dto_shared)"]
+    EventFilters -->|used by| EventDataFetcher["EventDataFetcher (service layer)"]
+    EventDataFetcher -->|queries| CoreEvent["CoreEvent (data model)"]

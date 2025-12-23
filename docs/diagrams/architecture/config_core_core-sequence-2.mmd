@@ -1,0 +1,15 @@
+sequenceDiagram
+    participant User
+    participant LoggingConfigController
+    participant ConfigServerConfiguration
+    participant SecurityConfig
+    participant DataStorage
+
+    User->>LoggingConfigController: Request configuration data
+    LoggingConfigController->>SecurityConfig: Authenticate/Authorize request
+    SecurityConfig-->>LoggingConfigController: Access granted/denied
+    LoggingConfigController->>ConfigServerConfiguration: Retrieve configuration bean
+    ConfigServerConfiguration->>DataStorage: Fetch configuration values
+    DataStorage-->>ConfigServerConfiguration: Return configuration data
+    ConfigServerConfiguration-->>LoggingConfigController: Provide configuration data
+    LoggingConfigController-->>User: Respond with configuration data

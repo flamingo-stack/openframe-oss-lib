@@ -1,0 +1,12 @@
+sequenceDiagram
+    participant Client as API Client
+    participant Controller as InvitationController
+    participant Processor as DefaultInvitationProcessor
+    participant DB as Database
+    
+    Client->>Controller: POST /invitations (CreateInvitationRequest)
+    Controller->>Processor: createInvitation(CreateInvitationRequest)
+    Processor->>DB: Save invitation
+    DB-->>Processor: Invitation saved
+    Processor-->>Controller: InvitationResponse
+    Controller-->>Client: InvitationResponse

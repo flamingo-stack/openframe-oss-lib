@@ -1,0 +1,8 @@
+sequenceDiagram
+    participant Client
+    participant Controller as SsoDiscoveryController
+    participant Service as SsoHandler
+    Client->>Controller: POST /sso/invitation/accept (SsoInvitationAcceptRequest)
+    Controller->>Service: process SSO invitation
+    Service-->>Controller: TenantDiscoveryResponse
+    Controller-->>Client: TenantDiscoveryResponse

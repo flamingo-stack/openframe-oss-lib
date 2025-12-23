@@ -1,0 +1,15 @@
+sequenceDiagram
+    participant Client as API Client
+    participant Controller as OrganizationController
+    participant Fetcher as OrganizationDataFetcher
+    participant Service as OrganizationService
+    participant Repo as OrganizationRepository
+
+    Client->>Controller: GET /organizations
+    Controller->>Fetcher: fetchOrganizations(filter, pagination)
+    Fetcher->>Service: getOrganizations(filter, pagination)
+    Service->>Repo: queryOrganizations(filter, pagination)
+    Repo-->>Service: Organization Entities
+    Service-->>Fetcher: Organization Entities
+    Fetcher-->>Controller: OrganizationResponse[], PaginationCriteria
+    Controller-->>Client: OrganizationsResponse

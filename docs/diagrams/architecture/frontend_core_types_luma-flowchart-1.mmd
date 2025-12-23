@@ -1,0 +1,17 @@
+flowchart TD
+    LumaTypes["frontend_core_types_luma"]
+    UIComponents["frontend_core_components_ui"]
+    Features["frontend_core_components_features"]
+    Navigation["frontend_core_components_navigation"]
+    Shared["frontend_core_components_shared"]
+    MediaTypes["frontend_core_types_media"]
+    AuthTypes["frontend_core_types_auth"]
+    PlatformTypes["frontend_core_types_platform"]
+
+    LumaTypes -->|used by| UIComponents
+    LumaTypes -->|used by| Features
+    LumaTypes -->|used by| Navigation
+    LumaTypes -->|used by| Shared
+    LumaTypes -->|references| MediaTypes
+    LumaTypes -->|references| AuthTypes
+    LumaTypes -->|references| PlatformTypes

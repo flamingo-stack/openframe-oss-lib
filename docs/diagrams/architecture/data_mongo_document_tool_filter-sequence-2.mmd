@@ -1,0 +1,16 @@
+sequenceDiagram
+    participant Client
+    participant API as "API Layer"
+    participant DTO as "ToolFilterInput"
+    participant Filter as "ToolQueryFilter"
+    participant Repo as "Repository"
+    participant DB as "MongoDB"
+
+    Client->>API: Submit tool filter request
+    API->>DTO: Map request to ToolFilterInput
+    DTO->>Filter: Convert to ToolQueryFilter
+    Filter->>Repo: Provide filter criteria
+    Repo->>DB: Execute MongoDB query
+    DB-->>Repo: Return filtered tool documents
+    Repo-->>API: Return results
+    API-->>Client: Respond with filtered data

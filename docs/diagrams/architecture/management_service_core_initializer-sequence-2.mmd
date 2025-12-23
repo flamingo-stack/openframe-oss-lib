@@ -1,0 +1,10 @@
+sequenceDiagram
+    participant App as Management Service
+    participant ARSI as AgentRegistrationSecretInitializer
+    participant Config as management_service_core_config
+    participant SecretStore as Secret Storage
+
+    App->>ARSI: Initialize agent registration secrets
+    ARSI->>Config: Fetch configuration
+    ARSI->>SecretStore: Retrieve secrets
+    ARSI-->>App: Secrets ready

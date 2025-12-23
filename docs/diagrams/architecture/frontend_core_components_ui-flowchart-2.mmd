@@ -1,0 +1,6 @@
+flowchart TD
+    DATA["Data Source (API, Store)"] -->|fetches| HOOKS["frontend_core_hooks_ui"]
+    HOOKS -->|provides props| UI["frontend_core_components_ui"]
+    UI -->|renders| USER["User Interface"]
+    USER -->|triggers events| UI
+    UI -->|calls handlers| HOOKS

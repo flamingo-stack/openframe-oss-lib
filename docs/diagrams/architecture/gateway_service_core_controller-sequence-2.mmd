@@ -1,0 +1,23 @@
+sequenceDiagram
+    participant C as Client
+    participant G as gateway_service_core_controller
+    participant S as gateway_service_core_security
+    participant F as gateway_service_core_filter
+    participant I as IntegrationController
+    participant D as DownstreamService
+
+    C->>G: HTTP Request
+    G->>S: Authenticate/JWT Validation
+    S-->>G: Auth Result
+    G->>F: API Key/Request Filtering
+    F-->>G: Filter Result
+    alt Integration Endpoint
+        G->>I: Forward/Proxy Request
+        I->>D: Call Downstream Service
+        D-->>I: Response
+        I-->>G: Response
+    else Internal Probe
+        G->>InternalAuthProbeController: Probe Request
+        InternalAuthProbeController-->>G: Probe Result
+    end
+    G-->>C: HTTP Response

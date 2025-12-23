@@ -1,0 +1,8 @@
+flowchart TD
+    GatewayRequest["Gateway HTTP Request"] --> AuthFilter["ApiKeyAuthenticationFilter\n(gateway_service_core_filter)"]
+    AuthFilter --> SecurityConfig["GatewaySecurityConfig\n(gateway_service_core_security)"]
+    SecurityConfig --> IssuerUrlProvider["IssuerUrlProvider\n(gateway_service_core_security_tenant)"]
+    IssuerUrlProvider --> TenantContext["TenantContext\n(authorization_service_core_config_tenant)"]
+    IssuerUrlProvider --> TenantRepository["TenantRepository\n(data_mongo_repository_tenant)"]
+    SecurityConfig --> JwtAuthConfig["JwtAuthConfig\n(gateway_service_core_security)"]
+    JwtAuthConfig --> IssuerUrlProvider

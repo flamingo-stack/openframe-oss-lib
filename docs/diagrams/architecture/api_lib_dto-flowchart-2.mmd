@@ -1,0 +1,4 @@
+flowchart TD
+    Repository["Repository"] -->|fetches data| Service["Service Layer"]
+    Service -->|wraps in CountedGenericQueryResult| Controller["API Controller"]
+    Controller -->|returns DTO| Client["API Client"]

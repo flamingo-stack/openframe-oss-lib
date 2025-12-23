@@ -1,0 +1,13 @@
+sequenceDiagram
+    participant Client as Client Application
+    participant Controller as SSOConfigController
+    participant Service as SSOConfigService
+    participant OIDC_DTO as api_service_core_dto_oidc
+    participant OIDC_Provider as OIDC Provider
+
+    Client->>Controller: Request user info (with access token)
+    Controller->>Service: Validate and process request
+    Service->>OIDC_Provider: Call userinfo endpoint (using UserInfoRequest)
+    OIDC_Provider-->>Service: Return user info (UserInfo)
+    Service-->>Controller: Return user info DTO
+    Controller-->>Client: Respond with user info

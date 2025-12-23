@@ -1,0 +1,7 @@
+flowchart TD
+    A["frontend_core_types_category"] -->|defines types for| B["frontend_core_components_ui"]
+    A -->|defines types for| C["frontend_core_components_features"]
+    A -->|base types for| D["frontend_core_types_categories"]
+    D -->|extends/aggregates| A
+    A -->|used in| E["State Management"]
+    A -->|used in| F["API Data Transfer"]

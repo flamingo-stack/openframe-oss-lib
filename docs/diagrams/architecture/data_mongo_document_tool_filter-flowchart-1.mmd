@@ -1,0 +1,6 @@
+flowchart TD
+    API["API Layer"] -->|receives filter input| DTO["ToolFilterInput (api_service_core_dto_tool)"]
+    DTO -->|transforms to| ToolQueryFilter["ToolQueryFilter (data_mongo_document_tool_filter)"]
+    ToolQueryFilter -->|applies filter| Repo["CustomIntegratedToolRepositoryImpl (data_mongo_repository_tool)"]
+    Repo -->|queries| MongoDB["MongoDB Database"]
+    ToolQueryFilter -->|reused by| Service["Tool-related Services"]

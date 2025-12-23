@@ -1,0 +1,17 @@
+flowchart TD
+    ApiServiceCoreConfig["api_service_core_config"]
+    ApiServiceCoreController["api_service_core_controller"]
+    ApiServiceCoreDataFetcher["api_service_core_datafetcher"]
+    ApiServiceCoreService["api_lib_service"]
+    ApiServiceCoreDataloader["api_service_core_dataloader"]
+    ApiServiceCoreDto["api_service_core_dto"]
+    AuthorizationServiceCoreConfig["authorization_service_core_config"]
+    SecurityCoreConfig["security_core_config"]
+
+    ApiServiceCoreConfig -->|provides config| ApiServiceCoreController
+    ApiServiceCoreConfig -->|provides config| ApiServiceCoreDataFetcher
+    ApiServiceCoreConfig -->|provides config| ApiServiceCoreService
+    ApiServiceCoreConfig -->|provides config| ApiServiceCoreDataloader
+    ApiServiceCoreConfig -->|provides config| ApiServiceCoreDto
+    ApiServiceCoreConfig -->|integrates| AuthorizationServiceCoreConfig
+    ApiServiceCoreConfig -->|integrates| SecurityCoreConfig

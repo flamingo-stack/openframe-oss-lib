@@ -1,0 +1,7 @@
+flowchart TD
+    VendorWithLinks["VendorWithLinks"] -->|composes| DetailedVendorFeature["DetailedVendorFeature (frontend_core_types_vendor)"]
+    VendorWithLinks -->|used by| VendorProfileCard["VendorProfileCard (frontend_core_components)"]
+    VendorWithLinks -->|used by| StackDetailPage["StackDetailPage (frontend_core_types_stack)"]
+    VendorLinkInput["VendorLinkInput"] -->|input for| VendorLinkForm["VendorLinkForm (frontend_core_components)"]
+    LinkDisplayConfig["LinkDisplayConfig"] -->|configures| VendorLinkRenderer["VendorLinkRenderer (frontend_core_components_features)"]
+    VendorLinkFallback["VendorLinkFallback"] -->|fallback for| VendorLinkRenderer

@@ -1,0 +1,5 @@
+flowchart TD
+    A["OnboardingWalkthroughProps"] -->|"contains array of"| B["OnboardingStepCardProps"]
+    B -->|"used by"| C["Onboarding Step Card Component"]
+    A -->|"used by"| D["Onboarding Walkthrough Component"]
+    C -->|"rendered in"| D

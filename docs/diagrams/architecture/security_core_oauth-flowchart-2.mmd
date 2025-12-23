@@ -1,0 +1,7 @@
+flowchart TD
+    Client["Client Application"] -->|sends request with token| Gateway["GatewayServiceCoreSecurity"]
+    Gateway -->|extracts token using SecurityConstants| OauthController["security_oauth_controller"]
+    OauthController -->|validates token| OauthService["security_oauth_service"]
+    OauthService -->|uses SecurityConstants for validation| SecurityCoreOAuth["security_core_oauth"]
+    OauthService -->|returns result| OauthController
+    OauthController -->|responds| Client

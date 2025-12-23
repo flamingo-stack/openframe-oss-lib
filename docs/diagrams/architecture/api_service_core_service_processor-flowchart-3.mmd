@@ -1,0 +1,8 @@
+flowchart TD
+    A["User/Client Request"] --> B["SSOConfigController"]
+    B --> C["DefaultSSOConfigProcessor"]
+    C --> D["SSOConfigService"]
+    D --> E["SSOConfigRepository"]
+    D --> F["SSOConfig DTOs"]
+    C --> G["Validation/Transformation"]
+    G --> D

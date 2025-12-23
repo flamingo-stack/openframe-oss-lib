@@ -1,0 +1,7 @@
+sequenceDiagram
+    participant Scheduler as ApiKeyStatsSyncScheduler
+    participant Service as Service Layer
+    participant Repo as Data Repository
+    Scheduler->>Service: Trigger stats sync
+    Service->>Repo: Fetch/update API key stats
+    Service-->>Scheduler: Return status

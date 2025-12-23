@@ -1,0 +1,4 @@
+graph TD
+    BlogFilters["BlogFilters"] -->|applies to| GetBlogPostsOptions["GetBlogPostsOptions"]
+    GetBlogPostsOptions -->|fetches| BlogPagination["BlogPagination"]
+    BlogPagination -->|provides| UIComponent["Pagination UI"]

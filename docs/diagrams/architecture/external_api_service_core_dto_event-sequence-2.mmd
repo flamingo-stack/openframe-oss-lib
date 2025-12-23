@@ -1,0 +1,12 @@
+sequenceDiagram
+    participant Client
+    participant EventController
+    participant ServiceLayer
+    participant DTOs
+    Client->>EventController: Request events (with filters)
+    EventController->>DTOs: Map request to EventFilterCriteria
+    EventController->>ServiceLayer: Pass filter criteria
+    ServiceLayer->>DTOs: Use EventFilterCriteria, PaginationCriteria
+    ServiceLayer->>EventController: Return EventResponse(s)
+    EventController->>DTOs: Wrap in EventsResponse
+    EventController->>Client: Respond with EventsResponse

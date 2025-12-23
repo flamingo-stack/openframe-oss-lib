@@ -1,0 +1,14 @@
+sequenceDiagram
+    participant Controller
+    participant DataFetcher
+    participant DataLoader
+    participant Service
+    participant Repository
+    Controller->>DataFetcher: Request data (e.g., organization by ID)
+    DataFetcher->>DataLoader: Load data for multiple IDs
+    DataLoader->>Service: Batch fetch for IDs
+    Service->>Repository: Query database
+    Repository-->>Service: Return data
+    Service-->>DataLoader: Return batch results
+    DataLoader-->>DataFetcher: Return mapped results
+    DataFetcher-->>Controller: Return response

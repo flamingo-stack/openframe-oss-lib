@@ -1,0 +1,5 @@
+flowchart TD
+    PasswordEncoderConfig["PasswordEncoderConfig"] -->|provides| ClientAuthService["Client Authentication Service"]
+    PasswordEncoderConfig -->|provides| AgentRegistrationProcessor["Agent Registration Processor"]
+    ClientAuthService -->|used by| AgentAuthController["AgentAuthController"]
+    AgentRegistrationProcessor -->|used by| AgentController["AgentController"]

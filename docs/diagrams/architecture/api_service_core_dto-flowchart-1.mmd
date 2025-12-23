@@ -1,0 +1,7 @@
+flowchart TD
+    Controller["API Controllers"] -->|use| CoreDTO["api_service_core_dto"]
+    Service["API Services"] -->|populate| CoreDTO
+    DataLoader["Data Loaders"] -->|supply data| CoreDTO
+    DataFetcher["Data Fetchers"] -->|supply data| CoreDTO
+    CoreDTO -->|extends| SpecializedDTO["Specialized DTO Modules"]
+    CoreDTO -->|used by| Client["API Clients"]

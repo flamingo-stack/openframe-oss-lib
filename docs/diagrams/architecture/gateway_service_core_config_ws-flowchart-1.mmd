@@ -1,0 +1,5 @@
+graph TD
+    Client["External Client"] --> Gateway["Gateway Service"]
+    Gateway -->|WebSocket Upgrade| FilterChain["WebSocket Proxy Filters"]
+    FilterChain -->|Proxy| ToolAgent["Tool Agent"]
+    FilterChain -->|Proxy| ToolApi["Tool API"]

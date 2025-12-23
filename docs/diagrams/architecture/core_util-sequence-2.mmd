@@ -1,0 +1,12 @@
+sequenceDiagram
+    participant User as "User/External System"
+    participant Controller as "Controller (e.g., OrganizationController)"
+    participant Util as "core_util.SlugUtil"
+    participant DB as "Database"
+
+    User->>Controller: Submit resource creation request (e.g., organization name)
+    Controller->>Util: Call SlugUtil to generate slug from name
+    Util-->>Controller: Return generated slug
+    Controller->>DB: Store resource with generated slug
+    DB-->>Controller: Confirm storage
+    Controller-->>User: Return created resource with slug

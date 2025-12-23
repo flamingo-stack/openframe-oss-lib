@@ -1,0 +1,18 @@
+sequenceDiagram
+    participant Controller
+    participant Service
+    participant BaseRepo as BaseIntegratedToolRepository
+    participant CustomRepo as CustomIntegratedToolRepositoryImpl
+    participant MongoDB
+
+    Controller->>Service: Request tool data (CRUD/query)
+    Service->>BaseRepo: Standard query or update
+    BaseRepo->>MongoDB: Execute operation
+    MongoDB-->>BaseRepo: Return result
+    BaseRepo-->>Service: Return data
+    Service-->>Controller: Respond to client
+    Note over Service,CustomRepo: For advanced queries
+    Service->>CustomRepo: Custom query
+    CustomRepo->>MongoDB: Execute custom operation
+    MongoDB-->>CustomRepo: Return result
+    CustomRepo-->>Service: Return data

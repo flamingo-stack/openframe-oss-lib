@@ -1,0 +1,6 @@
+flowchart TD
+    Client["Client Application"] -->|API Request| IntegratedToolController["IntegratedToolController"]
+    IntegratedToolController -->|uses| SaveToolRequest["SaveToolRequest DTO"]
+    IntegratedToolController -->|delegates| IntegratedToolService["IntegratedTool Service Layer"]
+    IntegratedToolService -->|persists| ToolRepository["Tool Repository"]
+    IntegratedToolService -->|notifies| EventPublisher["Event Publisher"]

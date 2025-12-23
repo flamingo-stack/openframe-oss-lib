@@ -1,0 +1,5 @@
+flowchart TD
+    LogsDataSource["Logs Data Source"] -->|provides logs| LogsListComponent["Logs List Component"]
+    LogsListComponent -->|renders| LogRowComponent["Log Row Component"]
+    LogRowComponent -->|uses| ToolIconComponent["Tool Icon Component"]
+    LogRowComponent -->|uses| LogSeverityDotComponent["Log Severity Dot Component"]

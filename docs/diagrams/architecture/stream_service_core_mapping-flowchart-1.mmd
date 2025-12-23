@@ -1,0 +1,6 @@
+flowchart TD
+    A["Raw Event Sources"] --> B["Deserializers\n(stream_service_core_deserializer)"]
+    B --> C["Event Type Mapping\n(stream_service_core_mapping)"]
+    C --> D["Handlers\n(stream_service_core_handler)"]
+    D --> E["Enrichment Services\n(stream_service_core_service)"]
+    E --> F["Downstream Analytics/Storage"]

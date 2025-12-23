@@ -1,0 +1,6 @@
+graph TD
+    UseTMCGMembersResult -->|used as| TMCGMembersGridProps
+    UseTMCGMemberResult -->|used as| TMCGMemberCardProps
+    TMCGMembersResponse -->|shapes| UseTMCGMembersResult
+    TMCGMemberResponse -->|shapes| UseTMCGMemberResult
+    TMCGMemberCardProps -->|renders| TMCGSocialLinksProps

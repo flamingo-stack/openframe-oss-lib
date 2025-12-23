@@ -1,0 +1,14 @@
+sequenceDiagram
+    participant Agent as "Agent (Client Device)"
+    participant Controller as "AgentAuthController"
+    participant Processor as "DefaultAgentRegistrationProcessor"
+    participant Service as "InstalledAgentService"
+    participant DB as "Database"
+
+    Agent->>Controller: POST /register (AgentRegistrationRequest)
+    Controller->>Processor: Validate & process request
+    Processor->>Service: Register agent
+    Service->>DB: Persist agent data
+    Service-->>Processor: Registration result
+    Processor-->>Controller: Response (success/failure)
+    Controller-->>Agent: Registration response

@@ -1,0 +1,11 @@
+sequenceDiagram
+    participant Client as API Client
+    participant Controller as DeviceController
+    participant Service as DeviceService
+    participant DTOs as Device DTOs
+    Client->>Controller: GET /devices?filter=...
+    Controller->>DTOs: Parse DeviceFilterCriteria
+    Controller->>Service: Fetch devices with filters
+    Service-->>Controller: Device entities
+    Controller->>DTOs: Map entities to DeviceResponse/DevicesResponse
+    Controller-->>Client: Return DevicesResponse

@@ -1,0 +1,4 @@
+graph TD
+    A["Service A (Producer)"] -->|sends message with headers| B["Kafka Topic"]
+    B -->|consumed by| C["Service B (Consumer)"]
+    C -->|reads headers| D["KafkaHeader Enum"]

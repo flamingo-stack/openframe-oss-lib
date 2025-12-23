@@ -1,0 +1,6 @@
+flowchart TD
+    MongoRegisteredClient["MongoRegisteredClient"] -->|"persisted by"| ReactiveOAuthClientRepository["ReactiveOAuthClientRepository\n[data_mongo_reactive_repository_oauth]"]
+    MongoRegisteredClient -->|"persisted by"| MongoRegisteredClientRepository["MongoRegisteredClientRepository\n[data_mongo_repository_oauth]"]
+    OAuthToken["OAuthToken"] -->|"persisted by"| OAuthTokenRepository["OAuthTokenRepository\n[data_mongo_repository_oauth]"]
+    OAuthToken -->|"used by"| MongoAuthorizationService["MongoAuthorizationService\n[authorization_service_core_service_auth]"]
+    MongoRegisteredClient -->|"used by"| MongoAuthorizationService

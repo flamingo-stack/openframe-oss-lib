@@ -1,0 +1,6 @@
+graph TD
+    A["Agent Client"] --> B["AgentAuthController"]
+    B --> C["DefaultAgentRegistrationProcessor"]
+    C --> D["AgentIdTransformer(s)"]
+    C --> E["Device Service"]
+    C --> F["ClientConnectionListener"]

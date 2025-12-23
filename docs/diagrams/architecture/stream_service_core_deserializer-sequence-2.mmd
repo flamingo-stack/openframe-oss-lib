@@ -1,0 +1,10 @@
+sequenceDiagram
+    participant K as "Kafka Topic"
+    participant D as "Deserializer"
+    participant H as "Handler"
+    participant S as "Service"
+    participant C as "Consumer"
+    K->>D: Raw event message
+    D->>H: Typed event object
+    H->>S: Enriched event
+    S->>C: Processed event
