@@ -1,311 +1,240 @@
 # Development Documentation
 
-Welcome to the OpenFrame OSS Library development documentation. This section provides comprehensive guides for developers who want to contribute to, extend, or build applications with the OpenFrame platform.
+Welcome to the OpenFrame OSS Library development documentation. This section provides comprehensive guides for developers working with, extending, or contributing to the OpenFrame ecosystem.
 
-## Quick Navigation
+## 📋 Documentation Overview
 
-### Setup Guides
-- **[Environment Setup](setup/environment.md)** - Configure your development environment
-- **[Local Development](setup/local-development.md)** - Running and debugging locally
+### Setup & Environment
+Get your development environment properly configured for efficient OpenFrame development.
 
-### Architecture
-- **[Overview](architecture/overview.md)** - System architecture and design patterns
+- **[Environment Setup](setup/environment.md)** - IDE configuration, plugins, and tools
+- **[Local Development](setup/local-development.md)** - Running services locally, debugging, and hot reload
 
-### Testing
-- **[Testing Overview](testing/overview.md)** - Testing strategies and tools
+### Architecture & Design
+Understand how OpenFrame is structured and designed for scalability and maintainability.
+
+- **[Architecture Overview](architecture/overview.md)** - High-level system design and component relationships
+- **[Module Documentation](../reference/architecture/overview.md)** - Detailed module-by-module reference
+
+### Testing & Quality
+Learn testing strategies and maintain code quality across the codebase.
+
+- **[Testing Overview](testing/overview.md)** - Testing patterns, frameworks, and best practices
 
 ### Contributing
-- **[Guidelines](contributing/guidelines.md)** - How to contribute to the project
+Guidelines for contributing to the OpenFrame ecosystem.
 
-## Development Sections
+- **[Contributing Guidelines](contributing/guidelines.md)** - Code style, PR process, and development workflow
 
-### 🛠️ Setup and Configuration
+## 🚀 Quick Navigation
 
-Get your development environment ready:
+| I want to... | Go to... |
+|--------------|-----------|
+| Set up my IDE for OpenFrame development | [Environment Setup](setup/environment.md) |
+| Run OpenFrame services locally | [Local Development](setup/local-development.md) |
+| Understand the system architecture | [Architecture Overview](architecture/overview.md) |
+| Write tests for my code | [Testing Overview](testing/overview.md) |
+| Contribute to the project | [Contributing Guidelines](contributing/guidelines.md) |
+| Understand specific modules | [Reference Documentation](../reference/) |
 
-| Guide | Description | Estimated Time |
-|-------|-------------|----------------|
-| **[Environment Setup](setup/environment.md)** | IDE setup, tools, and configuration | 30 minutes |
-| **[Local Development](setup/local-development.md)** | Clone, build, and run locally | 15 minutes |
-
-### 🏗️ Architecture and Design
-
-Understand the system architecture:
-
-| Guide | Description | Level |
-|-------|-------------|-------|
-| **[Overview](architecture/overview.md)** | High-level architecture and components | Intermediate |
-
-### 🧪 Testing and Quality
-
-Ensure code quality and reliability:
-
-| Guide | Description | Focus |
-|-------|-------------|--------|
-| **[Testing Overview](testing/overview.md)** | Testing strategies and best practices | All Levels |
-
-### 🤝 Contributing
-
-Help improve OpenFrame:
-
-| Guide | Description | Audience |
-|-------|-------------|----------|
-| **[Guidelines](contributing/guidelines.md)** | Contribution process and standards | Contributors |
-
-## Development Workflow
+## 🏗️ OpenFrame Development Stack
 
 ```mermaid
-graph LR
-    subgraph "Development Process"
-        SETUP[Environment Setup]
-        CLONE[Clone & Build]
-        DEV[Local Development]
-        TEST[Testing]
-        CONTRIB[Contribute]
+graph TD
+    subgraph "Development Environment"
+        A[IntelliJ IDEA / VS Code]
+        B[Java 21 JDK]
+        C[Maven 3.6+]
+        D[Docker & Docker Compose]
     end
     
-    SETUP --> CLONE
-    CLONE --> DEV
-    DEV --> TEST
-    TEST --> CONTRIB
-    CONTRIB --> DEV
+    subgraph "Local Services"
+        E[MongoDB]
+        F[Redis] 
+        G[Apache Kafka]
+        H[NATS]
+    end
+    
+    subgraph "Testing Framework"
+        I[JUnit 5]
+        J[Spring Boot Test]
+        K[Testcontainers]
+        L[MockMVC]
+    end
+    
+    subgraph "Code Quality"
+        M[SpotBugs]
+        N[Checkstyle]
+        O[SonarQube]
+        P[Jacoco Coverage]
+    end
+    
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    D --> F
+    D --> G
+    D --> H
+    
+    C --> I
+    I --> J
+    J --> K
+    K --> L
+    
+    C --> M
+    M --> N
+    N --> O
+    O --> P
 ```
 
-## Key Development Areas
+## 🧩 Module Structure
 
-### Core Library Development
+OpenFrame follows a modular architecture with clear separation of concerns:
 
-Working on the foundational components:
+### Core Libraries
+- `openframe-core` - Shared utilities, validation, and common components
+- `openframe-security-core` - JWT, OAuth2, and authentication infrastructure
+- `openframe-data-mongo` - MongoDB models and repositories
 
-- **DTOs and Mappers** - Data transfer objects and conversions
-- **Service Interfaces** - Business logic contracts
-- **Data Models** - MongoDB document entities
-- **Configuration** - Spring configuration classes
-- **Utilities** - Shared utility functions
+### API Libraries  
+- `openframe-api-lib` - DTOs, service interfaces, and API contracts
+- `openframe-api-service-core` - Main API implementation
+- `openframe-external-api-service-core` - External-facing REST APIs
 
-### Service Development
+### Service Components
+- `openframe-client-core` - Agent management and client connectivity
+- `openframe-gateway-service-core` - API gateway and routing
+- `openframe-management-service-core` - Platform administration
+- `openframe-stream-service-core` - Event streaming and processing
 
-Building microservices using the library:
+### Integration SDKs
+- `sdk/fleetmdm` - FleetDM integration SDK
+- `sdk/tacticalrmm` - Tactical RMM integration SDK
 
-- **API Services** - RESTful web services
-- **Authorization Services** - Authentication and security
-- **Gateway Services** - API gateway and routing
-- **Management Services** - Administrative functions
-- **Stream Services** - Event processing and messaging
+## 🔧 Development Workflow
 
-### Integration Development
-
-Connecting external systems:
-
-- **RMM Tools** - Fleet MDM, Tactical RMM, MeshCentral
-- **Authentication Providers** - OAuth, OIDC, SAML
-- **Monitoring Systems** - Metrics and alerting
-- **Data Pipelines** - ETL and analytics
-
-## Technologies and Stack
-
-### Core Technologies
-
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| **Java** | 17+ | Primary language |
-| **Spring Boot** | 3.2+ | Application framework |
-| **Spring Data** | 3.2+ | Data access layer |
-| **MongoDB** | 7.0+ | Primary database |
-| **Redis** | 7.0+ | Caching layer |
-| **Kafka** | 3.6+ | Event streaming |
-
-### Development Tools
-
-| Tool | Purpose | Required |
-|------|---------|----------|
-| **Gradle** | Build system | ✅ Yes |
-| **Docker** | Containerization | 🔶 Recommended |
-| **IntelliJ IDEA** | IDE | 🔶 Recommended |
-| **Postman** | API testing | 🔶 Optional |
-
-### Testing Framework
-
-| Framework | Purpose | Coverage |
-|-----------|---------|----------|
-| **JUnit 5** | Unit testing | All components |
-| **Spring Boot Test** | Integration testing | Service layer |
-| **Testcontainers** | Database testing | Data layer |
-| **WireMock** | API mocking | External services |
-
-## Code Organization
-
-### Module Structure
-
-```text
-openframe-oss-lib/
-├── openframe-api-lib/              # Core API DTOs and interfaces
-│   └── src/main/java/com/openframe/api/
-├── openframe-data-mongo/           # MongoDB data models
-│   └── src/main/java/com/openframe/data/
-├── openframe-core/                 # Core utilities and common code
-│   └── src/main/java/com/openframe/core/
-├── openframe-security-core/        # Security components
-│   └── src/main/java/com/openframe/security/
-└── examples/                       # Example applications
-    └── device-management/
+### 1. Setup Phase
+```mermaid
+flowchart LR
+    A[Clone Repository] --> B[Configure IDE]
+    B --> C[Set Environment Variables]
+    C --> D[Start Local Services]
+    D --> E[Verify Installation]
 ```
 
-### Package Conventions
+### 2. Development Cycle
+```mermaid
+flowchart TD
+    A[Create Feature Branch] --> B[Write Code]
+    B --> C[Write Tests]
+    C --> D[Run Local Tests]
+    D --> E{Tests Pass?}
+    E -->|No| B
+    E -->|Yes| F[Run Integration Tests]
+    F --> G{All Tests Pass?}
+    G -->|No| C
+    G -->|Yes| H[Create Pull Request]
+    H --> I[Code Review]
+    I --> J[Merge to Main]
+```
 
-| Package | Purpose | Examples |
-|---------|---------|----------|
-| `dto` | Data transfer objects | `DeviceResponse`, `OrganizationRequest` |
-| `service` | Business logic interfaces | `DeviceService`, `OrganizationService` |
-| `repository` | Data access layer | `DeviceRepository`, `EventRepository` |
-| `config` | Configuration classes | `MongoConfig`, `SecurityConfig` |
-| `exception` | Custom exceptions | `DeviceNotFoundException` |
-| `util` | Utility functions | `SlugUtil`, `EncryptionService` |
+## 📊 Performance Considerations
 
-## Development Standards
+### Scalability Targets
+- **Throughput**: 10,000+ requests/second per service
+- **Latency**: <100ms for 95% of API calls
+- **Concurrent Users**: 10,000+ per tenant
+- **Data Volume**: Terabytes of device/event data
 
-### Code Quality
+### Optimization Areas
+- Database query optimization and indexing
+- Caching strategies (Redis, application-level)
+- Event streaming performance (Kafka partitioning)
+- Connection pooling and resource management
 
-- ✅ **Test Coverage** - Minimum 80% line coverage
-- ✅ **Documentation** - Javadoc for public APIs
-- ✅ **Static Analysis** - SpotBugs and PMD integration
-- ✅ **Code Style** - Google Java Style Guide
-- ✅ **Dependencies** - Keep dependencies up-to-date
+## 🛡️ Security Considerations
 
-### API Design
+### Authentication & Authorization
+- JWT-based stateless authentication
+- OAuth2/OIDC for external integrations  
+- Role-based access control (RBAC)
+- Multi-tenant data isolation
 
-- ✅ **RESTful Design** - Follow REST principles
-- ✅ **Consistent DTOs** - Standardized request/response objects
-- ✅ **Cursor Pagination** - Use cursor-based pagination
-- ✅ **Error Handling** - Standardized error responses
-- ✅ **Validation** - Input validation on all endpoints
+### Data Protection
+- Encryption at rest and in transit
+- Secure secrets management
+- Audit logging for compliance
+- Input validation and sanitization
 
-### Security
+## 🔍 Debugging & Troubleshooting
 
-- ✅ **Input Validation** - Validate all inputs
-- ✅ **SQL Injection** - Use parameterized queries
-- ✅ **Authentication** - JWT-based authentication
-- ✅ **Authorization** - Role-based access control
-- ✅ **Audit Logging** - Log security events
+### Common Development Issues
 
-## Performance Guidelines
-
-### Database Optimization
-
-- 🚀 **Indexes** - Proper indexing for query performance
-- 🚀 **Aggregation** - Use MongoDB aggregation pipelines
-- 🚀 **Connection Pooling** - Optimize database connections
-- 🚀 **Caching** - Redis for frequently accessed data
-
-### API Performance
-
-- 🚀 **Pagination** - Always paginate large result sets
-- 🚀 **Filtering** - Support server-side filtering
-- 🚀 **Compression** - Enable GZIP compression
-- 🚀 **Async Processing** - Use async for long-running operations
-
-## Debugging and Troubleshooting
-
-### Common Issues
-
-| Issue | Cause | Solution |
-|-------|-------|---------|
-| **Build Failures** | Dependency conflicts | `./gradlew clean build` |
-| **MongoDB Connection** | Service not running | `docker-compose up mongodb` |
-| **Port Conflicts** | Port already in use | Change port or kill process |
-| **Memory Issues** | Insufficient heap | Increase `JAVA_OPTS` |
+| Issue | Symptoms | Solution |
+|-------|----------|----------|
+| Maven build fails | Compilation errors, dependency conflicts | Check Java version, clear `.m2` cache |
+| Service won't start | Connection errors, port conflicts | Verify database connectivity, check ports |
+| Tests failing | Assertion errors, timeout issues | Check test data, verify test containers |
+| Hot reload not working | Changes not reflected | Restart development server, check IDE config |
 
 ### Debug Configuration
 
+The development setup includes comprehensive logging and debugging capabilities:
+
 ```yaml
-# application-debug.yml
+# application-dev.yml
 logging:
   level:
     com.openframe: DEBUG
-    org.springframework.data.mongodb: DEBUG
     org.springframework.security: DEBUG
+    org.mongodb.driver: DEBUG
+    
+spring:
+  profiles:
+    active: dev
     
 management:
   endpoints:
     web:
       exposure:
         include: "*"
+  endpoint:
+    health:
+      show-details: always
 ```
 
-### Useful Debug Commands
+## 🚀 Getting Started Checklist
 
-```bash
-# View running processes
-jps -v
+- [ ] Read the [Environment Setup](setup/environment.md) guide
+- [ ] Configure your IDE with recommended plugins
+- [ ] Set up local development services (MongoDB, Redis, etc.)
+- [ ] Run the test suite to verify everything works
+- [ ] Explore the [Architecture Overview](architecture/overview.md)
+- [ ] Try building a simple feature using the examples
+- [ ] Read the [Contributing Guidelines](contributing/guidelines.md)
 
-# MongoDB connection
-mongosh --eval "db.adminCommand('ping')"
+## 📚 Additional Resources
 
-# Redis connection  
-redis-cli ping
+### External Documentation
+- [Spring Boot Reference](https://docs.spring.io/spring-boot/docs/current/reference/html/)
+- [Spring Security Documentation](https://docs.spring.io/spring-security/reference/)
+- [MongoDB Java Driver](https://mongodb.github.io/mongo-java-driver/)
+- [Apache Kafka Documentation](https://kafka.apache.org/documentation/)
 
-# Check application logs
-tail -f logs/application.log
+### OpenFrame Resources
+- [API Reference Documentation](../reference/)
+- [Example Applications](https://github.com/flamingo-stack/openframe-examples)
+- [Community Forums](https://community.openframe.ai)
+- [Issue Tracker](https://github.com/flamingo-stack/openframe-oss-lib/issues)
 
-# View heap usage
-jmap -histo <pid>
-```
+## 💬 Community & Support
 
-## Resources and References
+- **GitHub Discussions**: For general questions and community support
+- **Issue Tracker**: For bug reports and feature requests  
+- **Discord/Slack**: Real-time developer chat and collaboration
+- **Monthly Dev Calls**: Regular community meetings and roadmap discussions
 
-### Documentation
+---
 
-- 📖 **[Spring Boot Reference](https://docs.spring.io/spring-boot/docs/current/reference/htmlsingle/)**
-- 📖 **[Spring Data MongoDB](https://docs.spring.io/spring-data/mongodb/docs/current/reference/html/)**
-- 📖 **[MongoDB Documentation](https://www.mongodb.com/docs/)**
-- 📖 **[Redis Documentation](https://redis.io/documentation)**
-
-### Tools and IDEs
-
-- 🛠️ **[IntelliJ IDEA](https://www.jetbrains.com/idea/)**
-- 🛠️ **[MongoDB Compass](https://www.mongodb.com/products/compass)**
-- 🛠️ **[Redis Desktop Manager](https://resp.app/)**
-- 🛠️ **[Postman](https://www.postman.com/)**
-
-### Community
-
-- 💬 **[GitHub Discussions](https://github.com/openframe/openframe-oss-lib/discussions)**
-- 🐛 **[GitHub Issues](https://github.com/openframe/openframe-oss-lib/issues)**
-- 📧 **[Mailing List](mailto:dev@openframe.io)**
-- 💡 **[Feature Requests](https://github.com/openframe/openframe-oss-lib/discussions/categories/ideas)**
-
-## Getting Help
-
-### For Development Issues
-
-1. **Check the documentation** - Most questions are answered here
-2. **Search existing issues** - Someone might have faced the same problem
-3. **Ask in discussions** - Community support and Q&A
-4. **Open an issue** - For bugs or feature requests
-
-### For Enterprise Support
-
-- 📧 **Email**: enterprise@openframe.io
-- 📞 **Phone**: Available for enterprise customers
-- 🎯 **Dedicated Support**: SLA-backed support available
-
-## What's Next?
-
-Choose your path based on your role:
-
-### New Developers
-1. **[Environment Setup](setup/environment.md)** - Get your tools ready
-2. **[Local Development](setup/local-development.md)** - Run the project locally
-3. **[Architecture Overview](architecture/overview.md)** - Understand the design
-
-### Contributors
-1. **[Contributing Guidelines](contributing/guidelines.md)** - Learn the process
-2. **[Testing Overview](testing/overview.md)** - Write good tests
-3. **[Architecture Overview](architecture/overview.md)** - Understand the codebase
-
-### Architects
-1. **[Architecture Overview](architecture/overview.md)** - System design deep dive
-2. **[Testing Overview](testing/overview.md)** - Quality and reliability
-3. **[Contributing Guidelines](contributing/guidelines.md)** - Best practices
-
-Ready to start developing? Let's build something amazing with OpenFrame! 🚀
+Ready to start developing with OpenFrame? Begin with the [Environment Setup](setup/environment.md) guide and join our growing community of developers building the future of open-source MSP platforms! 🚀

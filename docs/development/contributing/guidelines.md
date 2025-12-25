@@ -1,302 +1,418 @@
 # Contributing Guidelines
 
-Welcome to the OpenFrame OSS Library contributing guide! We're excited to have you contribute to making device management better for everyone. This guide covers everything you need to know about contributing to the project.
-
-## Table of Contents
-
-- [Code of Conduct](#code-of-conduct)
-- [Getting Started](#getting-started)
-- [Development Workflow](#development-workflow)
-- [Coding Standards](#coding-standards)
-- [Testing Requirements](#testing-requirements)
-- [Documentation Standards](#documentation-standards)
-- [Pull Request Process](#pull-request-process)
-- [Issue Guidelines](#issue-guidelines)
-- [Release Process](#release-process)
-
-## Code of Conduct
-
-### Our Commitment
-
-We are committed to providing a welcoming, inclusive environment for all contributors, regardless of background, experience level, gender, gender identity and expression, sexual orientation, disability, personal appearance, body size, race, ethnicity, age, religion, or nationality.
-
-### Expected Behavior
-
-- **Be Respectful** - Treat everyone with respect and courtesy
-- **Be Inclusive** - Welcome newcomers and help them succeed
-- **Be Collaborative** - Share knowledge and work together
-- **Be Professional** - Focus on constructive feedback and solutions
-- **Be Patient** - Everyone is learning and growing
-
-### Unacceptable Behavior
-
-- Harassment, discrimination, or hate speech
-- Personal attacks or inflammatory comments  
-- Trolling, spamming, or disruptive behavior
-- Sharing private information without consent
-- Any behavior that would be inappropriate in a professional setting
+Welcome to the OpenFrame OSS Library contributor community! This guide covers everything you need to know to make effective contributions, from code style to the review process.
 
 ## Getting Started
 
-### Prerequisites for Contributors
+### Before You Contribute
 
-Before contributing, ensure you have:
+1. **Read the Documentation** - Familiarize yourself with the [Architecture Overview](../architecture/overview.md)
+2. **Set Up Development Environment** - Follow the [Environment Setup](../setup/environment.md) guide
+3. **Understand the Testing Approach** - Review [Testing Overview](../testing/overview.md)
+4. **Check Existing Issues** - Look for [good first issues](https://github.com/flamingo-stack/openframe-oss-lib/labels/good%20first%20issue)
 
-1. ✅ **Development Environment** - Set up per [Environment Setup Guide](../setup/environment.md)
-2. ✅ **GitHub Account** - With 2FA enabled
-3. ✅ **Git Configuration** - Proper name and email
-4. ✅ **Code Editor** - With OpenFrame-specific configurations
+### Types of Contributions
 
-### First-Time Contributor Setup
+We welcome various types of contributions:
 
-```bash
-# 1. Fork the repository on GitHub
-# Click "Fork" button on https://github.com/openframe/openframe-oss-lib
-
-# 2. Clone your fork
-git clone https://github.com/YOUR_USERNAME/openframe-oss-lib.git
-cd openframe-oss-lib
-
-# 3. Add upstream remote
-git remote add upstream https://github.com/openframe/openframe-oss-lib.git
-
-# 4. Verify remotes
-git remote -v
-# origin    https://github.com/YOUR_USERNAME/openframe-oss-lib.git (fetch)
-# origin    https://github.com/YOUR_USERNAME/openframe-oss-lib.git (push)  
-# upstream  https://github.com/openframe/openframe-oss-lib.git (fetch)
-# upstream  https://github.com/openframe/openframe-oss-lib.git (push)
-
-# 5. Install dependencies and verify build
-./gradlew build
-```
-
-### Finding Issues to Work On
-
-Great first contributions:
-
-| Label | Description | Good For |
-|-------|-------------|----------|
-| `good first issue` | Well-scoped issues for new contributors | First-time contributors |
-| `help wanted` | Issues that need community help | All levels |
-| `bug` | Bug fixes needed | Developers familiar with codebase |
-| `enhancement` | Feature requests | Experienced contributors |
-| `documentation` | Documentation improvements | Technical writers |
-
-**Find issues:** [GitHub Issues](https://github.com/openframe/openframe-oss-lib/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+| Type | Description | Examples |
+|------|-------------|----------|
+| **🐛 Bug Fixes** | Fix existing issues or problems | Null pointer exceptions, logic errors, performance issues |
+| **✨ Features** | Add new functionality | New API endpoints, tool integrations, improvements |
+| **📚 Documentation** | Improve docs and examples | README updates, tutorial improvements, API documentation |
+| **🧪 Testing** | Add or improve tests | Unit tests, integration tests, test data |
+| **🔧 Refactoring** | Code improvements without changing behavior | Code cleanup, performance optimization, architecture improvements |
+| **🎨 UI/UX** | Frontend improvements | Better user experience, visual improvements |
 
 ## Development Workflow
 
-### Branch Strategy
+### 1. Fork and Clone
 
-We use **GitHub Flow** with feature branches:
+```bash
+# Fork the repository on GitHub, then clone your fork
+git clone https://github.com/YOUR-USERNAME/openframe-oss-lib.git
+cd openframe-oss-lib
+
+# Add upstream remote
+git remote add upstream https://github.com/flamingo-stack/openframe-oss-lib.git
+
+# Verify remotes
+git remote -v
+```
+
+### 2. Branch Strategy
+
+We use a Git Flow inspired branching strategy:
 
 ```mermaid
-graph LR
-    MAIN[main] --> FEATURE[feature/device-search-optimization]
-    FEATURE --> PR[Pull Request]
-    PR --> REVIEW[Code Review]
-    REVIEW --> MERGE[Merge to main]
-    MERGE --> MAIN
+gitgraph:
+    options:
+    {
+        "mainBranchName": "main",
+        "theme": "base"
+    }
+    commit
+    commit
+    branch develop
+    checkout develop
+    commit
+    commit
+    branch feature/new-feature
+    checkout feature/new-feature
+    commit
+    commit
+    checkout develop
+    merge feature/new-feature
+    commit
+    checkout main
+    merge develop
+    commit
 ```
 
-### Creating Feature Branches
+**Branch Types:**
+
+- `main` - Production-ready code
+- `develop` - Integration branch for features
+- `feature/feature-name` - New features
+- `bugfix/issue-description` - Bug fixes
+- `hotfix/critical-issue` - Emergency fixes for production
+
+**Create a feature branch:**
 
 ```bash
-# 1. Start from latest main
-git checkout main
-git pull upstream main
+# Update develop branch
+git checkout develop
+git pull upstream develop
 
-# 2. Create feature branch
-git checkout -b feature/your-feature-name
+# Create feature branch
+git checkout -b feature/add-device-tagging
 
-# Examples of good branch names:
-git checkout -b feature/device-search-optimization
-git checkout -b bugfix/pagination-cursor-encoding  
-git checkout -b docs/contributing-guidelines
-git checkout -b refactor/service-layer-cleanup
+# Or for bug fixes
+git checkout -b bugfix/fix-null-pointer-in-device-service
 ```
 
-### Branch Naming Convention
+### 3. Development Process
 
-| Type | Format | Example |
-|------|--------|---------|
-| **Features** | `feature/description` | `feature/device-health-monitoring` |
-| **Bug Fixes** | `bugfix/description` | `bugfix/device-status-update-error` |
-| **Documentation** | `docs/description` | `docs/api-documentation-update` |
-| **Refactoring** | `refactor/description` | `refactor/repository-layer-cleanup` |
-| **Testing** | `test/description` | `test/integration-test-coverage` |
-
-### Making Changes
-
-#### Development Process
-
-1. **Write Tests First** (TDD approach)
-   ```bash
-   # Create failing test
-   ./gradlew test --tests "DeviceServiceTest.shouldUpdateDeviceStatus"
-   ```
-
-2. **Implement Feature**
-   ```bash
-   # Make changes to make test pass
-   # Run tests continuously
-   ./gradlew --continuous test
-   ```
-
-3. **Verify All Tests Pass**
-   ```bash
-   # Run full test suite
-   ./gradlew clean build
-   ```
-
-4. **Update Documentation**
-   ```bash
-   # Update relevant documentation
-   # Add JavaDoc for public APIs
-   ```
-
-#### Commit Guidelines
-
-**Commit Message Format:**
-
-```text
-type(scope): short description
-
-Longer description explaining what changed and why.
-
-Fixes #123
-Closes #456
+```mermaid
+flowchart TD
+    A[Create Branch] --> B[Write Code]
+    B --> C[Write/Update Tests]
+    C --> D[Run Tests Locally]
+    D --> E{Tests Pass?}
+    E -->|No| B
+    E -->|Yes| F[Update Documentation]
+    F --> G[Commit Changes]
+    G --> H[Push to Fork]
+    H --> I[Create Pull Request]
+    I --> J[Code Review]
+    J --> K{Review Approved?}
+    K -->|Changes Needed| B
+    K -->|Approved| L[Merge to Develop]
 ```
 
-**Commit Types:**
+### 4. Making Changes
 
-| Type | Description | Example |
-|------|-------------|---------|
-| `feat` | New feature | `feat(device): add device health monitoring` |
-| `fix` | Bug fix | `fix(pagination): correct cursor encoding issue` |
-| `docs` | Documentation | `docs(api): add device search examples` |
-| `test` | Adding tests | `test(device): add integration tests for search` |
-| `refactor` | Code refactoring | `refactor(service): simplify device service layer` |
-| `perf` | Performance improvement | `perf(query): optimize device search query` |
-| `style` | Code style changes | `style(format): fix code formatting` |
+**Write clean, tested code:**
 
-**Good Commit Examples:**
-
-```bash
-git commit -m "feat(device): add device health monitoring
-
-- Add DeviceHealth entity and DTOs
-- Implement health check service
-- Add REST endpoints for health monitoring
-- Include comprehensive test coverage
-
-Closes #234"
-
-git commit -m "fix(pagination): correct cursor encoding for special characters
-
-The cursor encoding was failing when device IDs contained special
-characters like + or /. Updated to use URL-safe base64 encoding.
-
-Fixes #345"
+```java
+// ✅ Good: Clear, well-documented, tested
+@Service
+@Slf4j
+public class DeviceTaggingService {
+    
+    private final DeviceRepository deviceRepository;
+    private final EventPublisher eventPublisher;
+    
+    public DeviceTaggingService(DeviceRepository deviceRepository, 
+                               EventPublisher eventPublisher) {
+        this.deviceRepository = deviceRepository;
+        this.eventPublisher = eventPublisher;
+    }
+    
+    /**
+     * Adds tags to a device and publishes a tagging event.
+     * 
+     * @param deviceId The ID of the device to tag
+     * @param tags Set of tags to add (will be merged with existing tags)
+     * @return Updated device with new tags
+     * @throws DeviceNotFoundException if device doesn't exist
+     * @throws IllegalArgumentException if tags are invalid
+     */
+    @Transactional
+    public Device addTags(String deviceId, Set<String> tags) {
+        validateTags(tags);
+        
+        Device device = deviceRepository.findById(deviceId)
+            .orElseThrow(() -> new DeviceNotFoundException(deviceId));
+            
+        Set<String> existingTags = device.getTags();
+        Set<String> newTags = new HashSet<>(existingTags);
+        newTags.addAll(tags);
+        
+        device.setTags(newTags);
+        device.setUpdatedAt(Instant.now());
+        
+        Device savedDevice = deviceRepository.save(device);
+        
+        eventPublisher.publish(new DeviceTaggedEvent(deviceId, tags));
+        
+        log.info("Added {} tags to device {}: {}", tags.size(), deviceId, tags);
+        
+        return savedDevice;
+    }
+    
+    private void validateTags(Set<String> tags) {
+        if (tags == null || tags.isEmpty()) {
+            throw new IllegalArgumentException("Tags cannot be null or empty");
+        }
+        
+        tags.forEach(tag -> {
+            if (StringUtils.isBlank(tag)) {
+                throw new IllegalArgumentException("Tag cannot be blank");
+            }
+            if (tag.length() > 50) {
+                throw new IllegalArgumentException("Tag cannot exceed 50 characters");
+            }
+        });
+    }
+}
 ```
 
-### Keeping Your Branch Updated
+**Corresponding test:**
 
-```bash
-# Regularly sync with upstream
-git fetch upstream
-git checkout main
-git merge upstream/main
-git push origin main
-
-# Rebase your feature branch
-git checkout feature/your-feature-name
-git rebase main
-
-# Force push if needed (only on your branch!)
-git push --force-with-lease origin feature/your-feature-name
+```java
+@ExtendWith(MockitoExtension.class)
+class DeviceTaggingServiceTest {
+    
+    @Mock
+    private DeviceRepository deviceRepository;
+    
+    @Mock
+    private EventPublisher eventPublisher;
+    
+    @InjectMocks
+    private DeviceTaggingService deviceTaggingService;
+    
+    @Test
+    void shouldAddTagsToDevice() {
+        // Given
+        String deviceId = "device-123";
+        Set<String> existingTags = Set.of("production", "web-server");
+        Set<String> newTags = Set.of("nginx", "ssl-enabled");
+        
+        Device device = Device.builder()
+            .id(deviceId)
+            .tags(new HashSet<>(existingTags))
+            .build();
+            
+        Device expectedDevice = Device.builder()
+            .id(deviceId)
+            .tags(Set.of("production", "web-server", "nginx", "ssl-enabled"))
+            .updatedAt(any(Instant.class))
+            .build();
+        
+        when(deviceRepository.findById(deviceId)).thenReturn(Optional.of(device));
+        when(deviceRepository.save(any(Device.class))).thenReturn(expectedDevice);
+        
+        // When
+        Device result = deviceTaggingService.addTags(deviceId, newTags);
+        
+        // Then
+        assertThat(result.getTags())
+            .hasSize(4)
+            .containsAll(existingTags)
+            .containsAll(newTags);
+            
+        verify(eventPublisher).publish(any(DeviceTaggedEvent.class));
+        verify(deviceRepository).save(argThat(d -> 
+            d.getUpdatedAt() != null && 
+            d.getTags().containsAll(newTags)
+        ));
+    }
+    
+    @Test
+    void shouldThrowExceptionWhenDeviceNotFound() {
+        // Given
+        String deviceId = "nonexistent";
+        Set<String> tags = Set.of("test-tag");
+        
+        when(deviceRepository.findById(deviceId)).thenReturn(Optional.empty());
+        
+        // When & Then
+        assertThatThrownBy(() -> deviceTaggingService.addTags(deviceId, tags))
+            .isInstanceOf(DeviceNotFoundException.class)
+            .hasMessage("Device not found: " + deviceId);
+            
+        verify(deviceRepository, never()).save(any());
+        verify(eventPublisher, never()).publish(any());
+    }
+}
 ```
 
-## Coding Standards
+## Code Style and Standards
 
 ### Java Code Style
 
-We follow **Google Java Style** with OpenFrame-specific customizations.
+We follow Google Java Style Guide with some OpenFrame-specific conventions.
 
-#### Code Formatting
+#### Class and Method Structure
 
-**IntelliJ IDEA Setup:**
-```text
-Settings → Editor → Code Style → Java
-Import Scheme → Eclipse XML Profile → config/codestyle/openframe-java-style.xml
+```java
+// ✅ Good structure
+@Service
+@Slf4j
+public class OrganizationService {
+    
+    // Fields - dependency injection
+    private final OrganizationRepository repository;
+    private final EventPublisher eventPublisher;
+    private final ValidationService validationService;
+    
+    // Constructor
+    public OrganizationService(OrganizationRepository repository,
+                              EventPublisher eventPublisher,
+                              ValidationService validationService) {
+        this.repository = repository;
+        this.eventPublisher = eventPublisher;
+        this.validationService = validationService;
+    }
+    
+    // Public methods - business operations
+    public Organization create(CreateOrganizationRequest request) {
+        // Implementation
+    }
+    
+    public Optional<Organization> findById(String id) {
+        // Implementation  
+    }
+    
+    // Private methods - implementation details
+    private void validateRequest(CreateOrganizationRequest request) {
+        // Implementation
+    }
+}
 ```
 
-**Key Style Rules:**
+#### Naming Conventions
 
-| Rule | Example |
-|------|---------|
-| **Indentation** | 4 spaces, no tabs |
-| **Line Length** | 120 characters maximum |
-| **Braces** | Opening brace on same line |
-| **Imports** | No wildcard imports, organized groups |
-| **Naming** | camelCase for variables, PascalCase for classes |
+| Element | Convention | Example |
+|---------|------------|---------|
+| **Classes** | PascalCase | `OrganizationService`, `DeviceRepository` |
+| **Methods** | camelCase | `createOrganization()`, `findByDomain()` |
+| **Variables** | camelCase | `organizationId`, `deviceList` |
+| **Constants** | UPPER_SNAKE_CASE | `MAX_RETRY_ATTEMPTS`, `DEFAULT_TIMEOUT` |
+| **Packages** | lowercase.separated | `com.openframe.api.service` |
 
-#### Code Example
+#### Documentation Standards
+
+```java
+/**
+ * Service for managing MSP client organizations.
+ * 
+ * <p>This service handles the full lifecycle of organizations including:
+ * <ul>
+ *   <li>Registration and onboarding</li>
+ *   <li>Status management (active, suspended, etc.)</li>
+ *   <li>Multi-tenant data isolation</li>
+ *   <li>Integration with external billing systems</li>
+ * </ul>
+ * 
+ * <p>All operations are audited and events are published for external
+ * systems to react to changes.
+ * 
+ * @author OpenFrame Team
+ * @since 5.10.0
+ */
+@Service
+public class OrganizationService {
+    
+    /**
+     * Creates a new organization with the specified details.
+     * 
+     * <p>This method performs the following operations:
+     * <ol>
+     *   <li>Validates the request data</li>
+     *   <li>Checks domain uniqueness</li>
+     *   <li>Creates the organization entity</li>
+     *   <li>Publishes creation event</li>
+     * </ol>
+     * 
+     * @param request the organization creation request containing name, domain, and contact info
+     * @return the created organization with generated ID and timestamps
+     * @throws ValidationException if request data is invalid
+     * @throws DomainAlreadyExistsException if domain is already registered
+     * @throws ServiceException if creation fails due to system error
+     */
+    public Organization createOrganization(CreateOrganizationRequest request) {
+        // Implementation
+    }
+}
+```
+
+### Error Handling
+
+#### Exception Hierarchy
+
+```java
+// Base exception for all OpenFrame exceptions
+public abstract class OpenFrameException extends RuntimeException {
+    protected OpenFrameException(String message) {
+        super(message);
+    }
+    
+    protected OpenFrameException(String message, Throwable cause) {
+        super(message, cause);
+    }
+}
+
+// Domain-specific exceptions
+public class OrganizationException extends OpenFrameException {
+    public OrganizationException(String message) {
+        super(message);
+    }
+}
+
+public class DomainAlreadyExistsException extends OrganizationException {
+    public DomainAlreadyExistsException(String domain) {
+        super("Organization with domain '" + domain + "' already exists");
+    }
+}
+```
+
+#### Error Handling Patterns
 
 ```java
 @Service
-@Transactional
-@Slf4j
-public class DeviceServiceImpl implements DeviceService {
+public class OrganizationService {
     
-    private final DeviceRepository deviceRepository;
-    private final DeviceMapper deviceMapper;
-    private final EventService eventService;
-    
-    public DeviceServiceImpl(DeviceRepository deviceRepository,
-                           DeviceMapper deviceMapper,
-                           EventService eventService) {
-        this.deviceRepository = deviceRepository;
-        this.deviceMapper = deviceMapper;
-        this.eventService = eventService;
-    }
-    
-    @Override
-    public GenericQueryResult<DeviceResponse> searchDevices(DeviceFilterInput filter) {
-        log.debug("Searching devices with filter: {}", filter);
-        
-        // Validate input
-        validateSearchFilter(filter);
-        
-        // Convert to query filter
-        DeviceQueryFilter queryFilter = deviceMapper.toQueryFilter(filter);
-        
-        // Execute search
-        GenericQueryResult<Device> result = deviceRepository.findWithFilter(queryFilter);
-        
-        // Map to DTOs
-        List<DeviceResponse> responses = result.getItems().stream()
-            .map(deviceMapper::toResponseDTO)
-            .collect(Collectors.toList());
-        
-        // Log event
-        eventService.logDeviceSearch(filter, responses.size());
-        
-        return GenericQueryResult.<DeviceResponse>builder()
-            .items(responses)
-            .pageInfo(result.getPageInfo())
-            .build();
-    }
-    
-    private void validateSearchFilter(DeviceFilterInput filter) {
-        if (filter.getPagination() == null) {
-            throw new ValidationException("Pagination is required");
-        }
-        
-        if (filter.getPagination().getFirst() != null 
-            && filter.getPagination().getFirst() > 100) {
-            throw new ValidationException("Page size cannot exceed 100");
+    public Organization createOrganization(CreateOrganizationRequest request) {
+        try {
+            // Validate request
+            validationService.validate(request);
+            
+            // Check domain uniqueness
+            if (repository.existsByDomain(request.getDomain())) {
+                throw new DomainAlreadyExistsException(request.getDomain());
+            }
+            
+            // Create organization
+            Organization org = buildOrganization(request);
+            Organization saved = repository.save(org);
+            
+            // Publish event
+            eventPublisher.publish(new OrganizationCreatedEvent(saved));
+            
+            return saved;
+            
+        } catch (DataAccessException e) {
+            log.error("Database error while creating organization: {}", request.getDomain(), e);
+            throw new ServiceException("Failed to create organization", e);
+        } catch (ValidationException e) {
+            log.warn("Validation failed for organization creation: {}", e.getMessage());
+            throw e; // Re-throw validation exceptions as-is
+        } catch (Exception e) {
+            log.error("Unexpected error while creating organization: {}", request.getDomain(), e);
+            throw new ServiceException("Unexpected error during organization creation", e);
         }
     }
 }
@@ -304,646 +420,419 @@ public class DeviceServiceImpl implements DeviceService {
 
 ### API Design Standards
 
-#### REST Endpoint Design
-
-**URL Patterns:**
-```text
-✅ Good:
-POST /api/devices/search           # Search devices
-GET  /api/devices/{id}            # Get specific device
-PUT  /api/devices/{id}            # Update device
-DELETE /api/devices/{id}          # Delete device
-
-❌ Avoid:
-GET /api/searchDevices            # Non-RESTful
-POST /api/device/create           # Redundant 'create'
-GET /api/devices/get/{id}         # Redundant 'get'
-```
-
-**Request/Response DTOs:**
-```java
-// Request DTOs - Input validation
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class CreateDeviceRequest {
-    
-    @NotBlank(message = "Machine ID is required")
-    private String machineId;
-    
-    @NotBlank(message = "Serial number is required")  
-    @Size(max = 50, message = "Serial number cannot exceed 50 characters")
-    private String serialNumber;
-    
-    @NotNull(message = "Device type is required")
-    private DeviceType type;
-    
-    @Valid
-    private DeviceConfiguration configuration;
-}
-
-// Response DTOs - Clean data transfer
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class DeviceResponse {
-    
-    private String id;
-    private String machineId;
-    private String serialNumber;
-    private String model;
-    private String osVersion;
-    private DeviceType type;
-    private String status;
-    private Instant lastCheckin;
-    private Instant createdAt;
-    private Instant updatedAt;
-}
-```
-
-### Database Design Standards
-
-#### Entity Design
+#### REST Endpoints
 
 ```java
-@Document(collection = "devices")
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-@CompoundIndex(name = "org_status_idx", def = "{'organizationId': 1, 'status': 1}")
-@CompoundIndex(name = "org_type_checkin_idx", def = "{'organizationId': 1, 'type': 1, 'lastCheckin': -1}")
-public class Device {
+@RestController
+@RequestMapping("/api/v1/organizations")
+@Validated
+public class OrganizationController {
     
-    @Id
-    private String id;
-    
-    @Indexed
-    @NotNull
-    private String organizationId;  // Tenant isolation
-    
-    @Indexed
-    @NotNull
-    private String machineId;
-    
-    @Indexed(unique = true)
-    @NotBlank
-    private String serialNumber;
-    
-    @NotBlank
-    private String model;
-    
-    private String osVersion;
-    
-    @NotNull
-    private DeviceType type;
-    
-    @Indexed
-    private String status;
-    
-    private Instant lastCheckin;
-    
-    @Embedded
-    private DeviceConfiguration configuration;
-    
-    @Embedded
-    private DeviceHealth health;
-    
-    @CreatedDate
-    private Instant createdAt;
-    
-    @LastModifiedDate
-    private Instant updatedAt;
-}
-```
-
-#### Index Strategy
-
-```java
-// Compound indexes for common queries
-@CompoundIndex(def = "{'organizationId': 1, 'status': 1}")          // Filter by org + status
-@CompoundIndex(def = "{'organizationId': 1, 'type': 1}")            // Filter by org + type  
-@CompoundIndex(def = "{'organizationId': 1, 'lastCheckin': -1}")    // Sort by checkin time
-@CompoundIndex(def = "{'serialNumber': 1}", unique = true)          // Unique constraint
-```
-
-## Testing Requirements
-
-### Test Coverage Standards
-
-- **Minimum Coverage**: 80% line coverage
-- **Critical Path Coverage**: 100% for business logic
-- **Integration Tests**: All repository and service layers
-- **Unit Tests**: All public methods
-
-### Test Categories
-
-#### Unit Tests
-
-```java
-@ExtendWith(MockitoExtension.class)
-@DisplayName("Device Service Tests")
-class DeviceServiceImplTest {
-    
-    @Mock
-    private DeviceRepository deviceRepository;
-    
-    @Mock
-    private EventService eventService;
-    
-    @InjectMocks
-    private DeviceServiceImpl deviceService;
-    
-    @Test
-    @DisplayName("Should create device successfully")
-    void shouldCreateDeviceSuccessfully() {
-        // Given
-        CreateDeviceRequest request = CreateDeviceRequest.builder()
-            .machineId("machine-001")
-            .serialNumber("SN123456789")
-            .type(DeviceType.DESKTOP)
-            .build();
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public OrganizationResponse createOrganization(
+            @Valid @RequestBody CreateOrganizationRequest request,
+            @AuthenticationPrincipal AuthPrincipal principal) {
         
-        Device savedDevice = Device.builder()
-            .id("device-001")
-            .machineId("machine-001")
-            .serialNumber("SN123456789")
-            .type(DeviceType.DESKTOP)
-            .build();
+        Organization org = organizationService.createOrganization(request);
+        return mapper.toResponse(org);
+    }
+    
+    @GetMapping("/{id}")
+    public OrganizationResponse getOrganization(
+            @PathVariable @UUID String id,
+            @AuthenticationPrincipal AuthPrincipal principal) {
         
-        when(deviceRepository.save(any(Device.class))).thenReturn(savedDevice);
+        Organization org = organizationService.findById(id)
+            .orElseThrow(() -> new OrganizationNotFoundException(id));
+            
+        return mapper.toResponse(org);
+    }
+    
+    @GetMapping
+    public PageResponse<OrganizationResponse> getOrganizations(
+            @Valid OrganizationFilterRequest filter,
+            @Valid CursorPaginationInput pagination,
+            @AuthenticationPrincipal AuthPrincipal principal) {
         
-        // When
-        DeviceResponse response = deviceService.createDevice(request);
-        
-        // Then
-        assertThat(response.getId()).isEqualTo("device-001");
-        assertThat(response.getSerialNumber()).isEqualTo("SN123456789");
-        
-        verify(eventService).logDeviceCreated(any(Device.class));
+        Page<Organization> page = organizationService.findAll(filter, pagination);
+        return PageResponse.of(
+            page.getContent().stream()
+                .map(mapper::toResponse)
+                .collect(Collectors.toList()),
+            page.getCursor(),
+            page.hasNext()
+        );
     }
 }
 ```
 
-#### Integration Tests
+### Database Patterns
+
+#### Repository Implementation
 
 ```java
-@SpringBootTest
-@Testcontainers
-@ActiveProfiles("test")
-@DisplayName("Device Repository Integration Tests")
-class DeviceRepositoryIntegrationTest {
+@Repository
+public interface OrganizationRepository extends MongoRepository<Organization, String> {
     
-    @Container
-    static MongoDBContainer mongoDBContainer = new MongoDBContainer("mongo:7.0");
+    // Simple query methods
+    Optional<Organization> findByDomain(String domain);
+    
+    boolean existsByDomain(String domain);
+    
+    List<Organization> findByStatus(OrganizationStatus status);
+    
+    // Custom query methods
+    @Query("{ 'status': ?0, 'plan': ?1 }")
+    List<Organization> findByStatusAndPlan(OrganizationStatus status, TenantPlan plan);
+    
+    // Aggregation queries
+    @Aggregation(pipeline = {
+        "{ '$match': { 'createdAt': { '$gte': ?0 } } }",
+        "{ '$group': { '_id': '$status', 'count': { '$sum': 1 } } }"
+    })
+    List<StatusCount> countByStatusSince(Instant since);
+}
+
+// Custom repository for complex queries
+@Repository
+public class CustomOrganizationRepositoryImpl implements CustomOrganizationRepository {
     
     @Autowired
-    private DeviceRepository deviceRepository;
-    
-    @Test
-    @DisplayName("Should support cursor-based pagination")
-    void shouldSupportCursorBasedPagination() {
-        // Given - Create test devices
-        List<Device> devices = createTestDevices(20);
-        deviceRepository.saveAll(devices);
-        
-        // When - Get first page
-        CursorPaginationInput pagination = CursorPaginationInput.builder()
-            .first(5)
-            .build();
-        
-        GenericQueryResult<Device> firstPage = deviceRepository.findWithPagination(pagination);
-        
-        // Then
-        assertThat(firstPage.getItems()).hasSize(5);
-        assertThat(firstPage.getPageInfo().isHasNextPage()).isTrue();
-        
-        // When - Get second page
-        CursorPaginationInput nextPagination = CursorPaginationInput.builder()
-            .first(5)  
-            .after(firstPage.getPageInfo().getEndCursor())
-            .build();
-        
-        GenericQueryResult<Device> secondPage = deviceRepository.findWithPagination(nextPagination);
-        
-        // Then
-        assertThat(secondPage.getItems()).hasSize(5);
-        assertThat(secondPage.getPageInfo().isHasPreviousPage()).isTrue();
-    }
-}
-```
-
-### Test Data Management
-
-```java
-public class DeviceTestDataBuilder {
-    
-    public static Device.DeviceBuilder aDevice() {
-        return Device.builder()
-            .id(UUID.randomUUID().toString())
-            .organizationId("test-org-" + System.currentTimeMillis())
-            .machineId("machine-" + System.currentTimeMillis())
-            .serialNumber("SN" + System.currentTimeMillis())
-            .model("Test Device Model")
-            .osVersion("Test OS 1.0")
-            .type(DeviceType.DESKTOP)
-            .status("ACTIVE")
-            .lastCheckin(Instant.now())
-            .createdAt(Instant.now())
-            .updatedAt(Instant.now());
-    }
-    
-    public static Device activeDesktop() {
-        return aDevice()
-            .type(DeviceType.DESKTOP)
-            .status("ACTIVE")
-            .build();
-    }
-    
-    public static Device offlineLaptop() {
-        return aDevice()
-            .type(DeviceType.LAPTOP)
-            .status("OFFLINE")
-            .lastCheckin(Instant.now().minus(1, ChronoUnit.HOURS))
-            .build();
-    }
-}
-```
-
-## Documentation Standards
-
-### JavaDoc Requirements
-
-All public APIs must have comprehensive JavaDoc:
-
-```java
-/**
- * Service for managing device operations including creation, updates, and search functionality.
- * 
- * <p>This service provides a high-level interface for device management operations,
- * including validation, business logic, and integration with external systems.</p>
- * 
- * <h3>Usage Example:</h3>
- * <pre>{@code
- * DeviceFilterInput filter = DeviceFilterInput.builder()
- *     .types(List.of("DESKTOP", "LAPTOP"))
- *     .organizationId("org-123")
- *     .pagination(CursorPaginationInput.builder().first(20).build())
- *     .build();
- * 
- * GenericQueryResult<DeviceResponse> result = deviceService.searchDevices(filter);
- * }</pre>
- *
- * @author OpenFrame Team
- * @since 1.0.0
- * @see DeviceRepository
- * @see DeviceMapper
- */
-public interface DeviceService {
-    
-    /**
-     * Searches for devices based on the provided filter criteria.
-     *
-     * <p>This method supports filtering by device type, status, organization,
-     * and includes cursor-based pagination for efficient large dataset handling.</p>
-     *
-     * @param filter the search criteria including type filters, organization scope,
-     *               and pagination parameters
-     * @return a paginated result containing matching devices and pagination metadata
-     * @throws ValidationException if the filter criteria are invalid
-     * @throws TenantViolationException if attempting to access devices outside
-     *                                  the current tenant scope
-     * @since 1.0.0
-     */
-    GenericQueryResult<DeviceResponse> searchDevices(DeviceFilterInput filter);
-}
-```
-
-### Code Comments
-
-```java
-public class DeviceServiceImpl implements DeviceService {
+    private MongoTemplate mongoTemplate;
     
     @Override
-    public GenericQueryResult<DeviceResponse> searchDevices(DeviceFilterInput filter) {
-        // Validate input parameters to ensure data integrity
-        validateSearchFilter(filter);
+    public List<Organization> findWithFilters(OrganizationFilter filter) {
+        Criteria criteria = new Criteria();
         
-        // Convert API DTO to internal query format for repository layer
-        DeviceQueryFilter queryFilter = deviceMapper.toQueryFilter(filter);
+        if (StringUtils.hasText(filter.getName())) {
+            criteria.and("name").regex(filter.getName(), "i");
+        }
         
-        // Execute database query with tenant-scoped filtering
-        GenericQueryResult<Device> result = deviceRepository.findWithFilter(queryFilter);
+        if (filter.getStatus() != null) {
+            criteria.and("status").is(filter.getStatus());
+        }
         
-        // Transform internal entities to API response DTOs
-        List<DeviceResponse> responses = result.getItems().stream()
-            .map(deviceMapper::toResponseDTO)
-            .collect(Collectors.toList());
+        if (filter.getCreatedAfter() != null) {
+            criteria.and("createdAt").gte(filter.getCreatedAfter());
+        }
         
-        // Create audit trail for compliance and debugging
-        eventService.logDeviceSearch(filter, responses.size());
+        Query query = new Query(criteria);
         
-        // Return paginated result with metadata for client-side pagination
-        return GenericQueryResult.<DeviceResponse>builder()
-            .items(responses)
-            .pageInfo(result.getPageInfo())
-            .build();
+        if (filter.getSort() != null) {
+            query.with(Sort.by(Sort.Direction.fromString(filter.getSort().getDirection()), 
+                              filter.getSort().getProperty()));
+        }
+        
+        return mongoTemplate.find(query, Organization.class);
     }
 }
 ```
 
-### README and Documentation Updates
+## Commit Guidelines
 
-When adding new features, update relevant documentation:
+### Commit Message Format
 
-1. **API Documentation** - Update OpenAPI specs
-2. **README Files** - Update module-specific READMEs  
-3. **User Guides** - Update getting started guides
-4. **Examples** - Add usage examples
-5. **Migration Guides** - For breaking changes
+We follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
+
+```text
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+**Types:**
+- `feat:` - New feature
+- `fix:` - Bug fix
+- `docs:` - Documentation changes
+- `style:` - Code style changes (formatting, etc.)
+- `refactor:` - Code changes that neither fix bugs nor add features
+- `test:` - Adding or updating tests
+- `chore:` - Maintenance tasks, dependency updates
+
+**Examples:**
+
+```bash
+# Feature addition
+git commit -m "feat(api): add device tagging endpoint"
+
+# Bug fix
+git commit -m "fix(auth): resolve JWT token expiration issue"
+
+# Documentation
+git commit -m "docs(setup): update environment setup guide"
+
+# Breaking change
+git commit -m "feat(api)!: change organization API response format
+
+BREAKING CHANGE: Organization API now returns ISO 8601 dates instead of Unix timestamps"
+```
+
+### Commit Best Practices
+
+1. **Atomic Commits** - One logical change per commit
+2. **Clear Messages** - Explain what and why, not how
+3. **Reference Issues** - Include issue numbers when applicable
+
+```bash
+# Good commit messages
+git commit -m "feat(device): add support for IoT device types
+
+- Add DeviceType.IOT enum value
+- Update device registration validation
+- Add integration tests for IoT devices
+
+Closes #123"
+
+git commit -m "fix(security): prevent SQL injection in device search
+
+The previous implementation was vulnerable to SQL injection
+when using user-provided search terms. This fix uses
+parameterized queries and input validation.
+
+Fixes #456"
+```
 
 ## Pull Request Process
 
-### Before Submitting
-
-**Pre-submission Checklist:**
-
-- [ ] ✅ Code follows style guidelines
-- [ ] ✅ All tests pass locally
-- [ ] ✅ New tests added for new functionality
-- [ ] ✅ Documentation updated
-- [ ] ✅ No merge conflicts with main
-- [ ] ✅ Commit messages follow convention
-- [ ] ✅ Changes are focused and atomic
-
-### Creating Pull Request
+### 1. Before Creating PR
 
 ```bash
-# 1. Push your branch
-git push origin feature/your-feature-name
+# Ensure your branch is up to date
+git checkout develop
+git pull upstream develop
+git checkout feature/your-feature
+git rebase develop
 
-# 2. Create pull request on GitHub
-# Use the GitHub web interface or CLI:
-gh pr create --title "feat(device): add health monitoring" \
-             --body "Adds comprehensive device health monitoring with real-time status updates"
+# Run tests locally
+mvn clean test
+
+# Check code style
+mvn spotless:check
+
+# Run integration tests
+mvn verify
 ```
 
-### PR Template
+### 2. PR Title and Description
 
+**Title Format:**
+```text
+feat(scope): brief description of changes
+```
+
+**Description Template:**
 ```markdown
 ## Description
-Brief description of changes made.
+Brief description of what this PR does.
 
 ## Type of Change
-- [ ] 🐛 Bug fix (non-breaking change that fixes an issue)
-- [ ] ✨ New feature (non-breaking change that adds functionality)
-- [ ] 💥 Breaking change (fix or feature that would cause existing functionality to not work as expected)
-- [ ] 📚 Documentation update
+- [ ] Bug fix (non-breaking change which fixes an issue)
+- [ ] New feature (non-breaking change which adds functionality)  
+- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
+- [ ] Documentation update
+
+## Changes Made
+- List of specific changes
+- Another change
+- And another
 
 ## Testing
 - [ ] Unit tests pass
 - [ ] Integration tests pass
 - [ ] Manual testing completed
+- [ ] Added new tests for new functionality
 
-## Documentation
-- [ ] Code comments updated
-- [ ] JavaDoc updated for public APIs
-- [ ] User documentation updated
-- [ ] Examples added/updated
+## Screenshots (if applicable)
+<!-- Add screenshots for UI changes -->
 
 ## Checklist
-- [ ] My code follows the style guidelines
-- [ ] I have performed a self-review
+- [ ] My code follows the code style of this project
+- [ ] I have performed a self-review of my own code
 - [ ] I have commented my code, particularly in hard-to-understand areas
 - [ ] I have made corresponding changes to the documentation
 - [ ] My changes generate no new warnings
 - [ ] I have added tests that prove my fix is effective or that my feature works
+- [ ] New and existing unit tests pass locally with my changes
 
 ## Related Issues
-Fixes #123
-Closes #456
+Closes #123
 ```
 
-### Review Process
+### 3. Code Review Process
 
-#### For Contributors
-
-1. **Address Feedback** - Respond to all review comments
-2. **Make Changes** - Update code based on feedback
-3. **Request Re-review** - When ready for another review
-4. **Stay Engaged** - Respond promptly to reviewer questions
-
-#### For Reviewers
-
-**Review Checklist:**
-
-- [ ] ✅ Code quality and style
-- [ ] ✅ Test coverage and quality  
-- [ ] ✅ Documentation completeness
-- [ ] ✅ API design consistency
-- [ ] ✅ Performance considerations
-- [ ] ✅ Security implications
-
-**Review Feedback Examples:**
-
-```markdown
-# ✅ Good feedback - Specific and actionable
-"Consider using Optional.ofNullable() here to handle potential null values more elegantly. This would make the code more robust and follow our null-safety guidelines."
-
-# ✅ Good feedback - Explains reasoning  
-"This method is getting quite long. Consider extracting the validation logic into a separate private method for better readability and testability."
-
-# ❌ Avoid vague feedback
-"This looks wrong"
-
-# ❌ Avoid unconstructive criticism
-"This is terrible code"
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant PR as Pull Request
+    participant Rev as Reviewers
+    participant CI as CI/CD
+    participant Main as Main Branch
+    
+    Dev->>PR: Create Pull Request
+    PR->>CI: Trigger automated checks
+    CI-->>PR: Report test results
+    PR->>Rev: Request review
+    
+    loop Review Cycle
+        Rev->>PR: Review code
+        alt Approved
+            Rev-->>PR: Approve
+        else Changes needed
+            Rev-->>PR: Request changes
+            PR-->>Dev: Notification
+            Dev->>PR: Push updates
+            PR->>CI: Re-run checks
+        end
+    end
+    
+    Rev->>Main: Merge approved PR
+    Main->>CI: Trigger deployment
 ```
 
-## Issue Guidelines
+**Review Criteria:**
 
-### Creating Quality Issues
+1. **Functionality** - Does the code work as intended?
+2. **Quality** - Is the code clean, readable, and maintainable?
+3. **Tests** - Are there adequate tests covering the changes?
+4. **Documentation** - Is documentation updated appropriately?
+5. **Performance** - Are there any performance implications?
+6. **Security** - Are there any security concerns?
 
-#### Bug Reports
+### 4. Addressing Review Comments
 
-**Bug Report Template:**
+```bash
+# Make requested changes
+git add .
+git commit -m "fix: address review comments
 
-```markdown
-## Bug Description
-Clear description of the issue.
+- Fix null check in device validation
+- Add missing error handling
+- Update tests for edge cases"
 
-## Steps to Reproduce
-1. Step 1
-2. Step 2  
-3. Step 3
+# Push updates
+git push origin feature/your-feature
 
-## Expected Behavior
-What should happen.
-
-## Actual Behavior
-What actually happens.
-
-## Environment
-- OpenFrame Version: 1.2.0
-- Java Version: 17.0.7
-- OS: Ubuntu 22.04
-- Database: MongoDB 7.0
-
-## Additional Context
-Screenshots, logs, or other relevant information.
+# The PR will automatically update
 ```
-
-#### Feature Requests
-
-**Feature Request Template:**
-
-```markdown
-## Feature Description
-Clear description of the proposed feature.
-
-## Problem Statement
-What problem does this solve?
-
-## Proposed Solution
-How should this feature work?
-
-## Alternatives Considered
-Other solutions you've considered.
-
-## Additional Context
-Use cases, mockups, or other relevant information.
-```
-
-### Issue Labels
-
-| Label | Description | Usage |
-|-------|-------------|--------|
-| `bug` | Something isn't working | Bug reports |
-| `enhancement` | New feature or request | Feature requests |
-| `good first issue` | Good for newcomers | Beginner-friendly issues |
-| `help wanted` | Extra attention needed | Community help needed |
-| `question` | Further information requested | Q&A and support |
-| `documentation` | Documentation improvements | Doc updates |
-| `duplicate` | This issue already exists | Duplicate issues |
-| `wontfix` | This will not be worked on | Rejected issues |
 
 ## Release Process
 
-### Semantic Versioning
+### Version Management
 
-We follow [Semantic Versioning (SemVer)](https://semver.org/):
+We use [Semantic Versioning](https://semver.org/):
 
-```text
-MAJOR.MINOR.PATCH
-
-MAJOR: Breaking changes
-MINOR: New features (backward compatible)  
-PATCH: Bug fixes (backward compatible)
-
-Examples:
-1.0.0 → 1.0.1 (bug fix)
-1.0.1 → 1.1.0 (new feature)
-1.1.0 → 2.0.0 (breaking change)
-```
+- `MAJOR.MINOR.PATCH`
+- `MAJOR` - Breaking changes
+- `MINOR` - New features (backward compatible)
+- `PATCH` - Bug fixes (backward compatible)
 
 ### Release Workflow
 
 ```mermaid
-graph LR
-    DEV[Development] --> RC[Release Candidate]
-    RC --> TEST[Testing]
-    TEST --> RELEASE[Release]
-    RELEASE --> TAG[Git Tag]
-    TAG --> PUBLISH[Publish Artifacts]
-    PUBLISH --> ANNOUNCE[Announce]
+graph TD
+    A[Feature Development] --> B[Develop Branch]
+    B --> C[Release Branch]
+    C --> D[Testing & Bug Fixes]
+    D --> E[Main Branch]
+    E --> F[Tag Version]
+    F --> G[Deploy to Production]
+    
+    G --> H[Hotfix Needed?]
+    H -->|Yes| I[Hotfix Branch]
+    I --> J[Fix & Test]
+    J --> E
+    H -->|No| K[Continue Development]
+    K --> A
 ```
 
-### Release Checklist
+## Community Guidelines
 
-**Pre-Release:**
-- [ ] All tests passing
-- [ ] Documentation updated  
-- [ ] Changelog updated
-- [ ] Version numbers updated
-- [ ] Breaking changes documented
+### Code of Conduct
 
-**Release:**
-- [ ] Create release branch
-- [ ] Final testing
-- [ ] Create Git tag
-- [ ] Publish artifacts
-- [ ] Update documentation site
+- **Be Respectful** - Treat all contributors with respect
+- **Be Inclusive** - Welcome contributors from all backgrounds
+- **Be Collaborative** - Work together toward common goals
+- **Be Patient** - Help newcomers learn and grow
 
-**Post-Release:**
-- [ ] Announce release
-- [ ] Update examples
-- [ ] Plan next release
+### Communication
 
-## Getting Help
+- **Issues** - Use GitHub issues for bug reports and feature requests
+- **Discussions** - Use GitHub discussions for questions and ideas
+- **Discord/Slack** - Join our community chat for real-time discussions
 
-### Community Channels
+### Getting Help
 
-- 💬 **[GitHub Discussions](https://github.com/openframe/openframe-oss-lib/discussions)** - Q&A and general discussion
-- 🐛 **[GitHub Issues](https://github.com/openframe/openframe-oss-lib/issues)** - Bug reports and feature requests
-- 📧 **[Mailing List](mailto:dev@openframe.io)** - Developer discussions
-- 💡 **[Feature Requests](https://github.com/openframe/openframe-oss-lib/discussions/categories/ideas)** - Propose new features
-
-### Mentorship Program
-
-New contributors can request a mentor:
-
-1. **Comment on Issue** - "@openframe/mentors please assign a mentor"
-2. **Get Matched** - Mentor will reach out within 48 hours
-3. **One-on-One Support** - Regular check-ins and guidance
-4. **Gradual Independence** - Learn to contribute independently
-
-### Office Hours
-
-**Weekly Office Hours:**
-- **When**: Thursdays 2:00 PM UTC
-- **Where**: GitHub Discussions Live Chat
-- **Format**: Open Q&A and code reviews
-- **Who**: Core team and experienced contributors
+1. **Documentation First** - Check existing documentation
+2. **Search Issues** - Look for existing solutions
+3. **Ask Questions** - Don't hesitate to ask for help
+4. **Provide Context** - Include relevant details when asking for help
 
 ## Recognition
 
-### Contributor Recognition
+### Contributors
 
-We recognize contributions in multiple ways:
+We recognize contributors in multiple ways:
 
-- 🏆 **Hall of Fame** - Top contributors featured on website
-- 🎖️ **Badges** - GitHub profile badges for contributors  
-- 📰 **Blog Posts** - Feature contributor stories
-- 🎁 **Swag** - OpenFrame swag for regular contributors
-- 🎤 **Speaking Opportunities** - Conference speaking invitations
+- **GitHub Contributors** - Listed on repository
+- **Changelog Credits** - Mentioned in release notes
+- **Community Highlights** - Featured in community updates
+- **Maintainer Path** - Outstanding contributors may become maintainers
 
-### Types of Contributions
+### Contribution Types
 
-We value all types of contributions:
+All contributions are valued:
 
-| Contribution Type | Examples | Recognition |
-|-------------------|----------|-------------|
-| **Code** | Features, bug fixes, optimizations | Commit attribution, changelog |
-| **Documentation** | Guides, examples, API docs | Author bylines |
-| **Testing** | Test coverage, test automation | Quality champion badge |
-| **Design** | UI/UX, architecture | Design contributor badge |
-| **Community** | Mentoring, support, advocacy | Community leader badge |
+- Code contributions
+- Documentation improvements
+- Bug reports and testing
+- Community support and mentoring
+- Design and UX feedback
 
-## Thank You!
+## Quick Reference
 
-Contributing to open source is about more than just code - it's about building something amazing together. Every contribution, whether it's a bug fix, documentation improvement, or helping other contributors, makes OpenFrame better for everyone.
+### Essential Commands
 
-We're grateful for your time and effort, and we're here to help you succeed. Welcome to the OpenFrame community! 🚀
+```bash
+# Setup
+git clone https://github.com/YOUR-USERNAME/openframe-oss-lib.git
+cd openframe-oss-lib
+git remote add upstream https://github.com/flamingo-stack/openframe-oss-lib.git
+
+# Development
+git checkout develop
+git pull upstream develop
+git checkout -b feature/my-feature
+# Make changes...
+mvn clean test
+git add .
+git commit -m "feat: add my feature"
+git push origin feature/my-feature
+# Create PR on GitHub
+
+# Code Quality  
+mvn spotless:apply    # Fix formatting
+mvn spotless:check    # Check formatting
+mvn test              # Run tests
+mvn jacoco:report     # Generate coverage
+```
+
+### Resources
+
+- **Style Guide**: [Google Java Style Guide](https://google.github.io/styleguide/javaguide.html)
+- **Commit Format**: [Conventional Commits](https://www.conventionalcommits.org/)
+- **Testing**: [JUnit 5 User Guide](https://junit.org/junit5/docs/current/user-guide/)
+- **Spring Boot**: [Spring Boot Reference](https://docs.spring.io/spring-boot/docs/current/reference/html/)
 
 ---
 
-## Quick Links
+Thank you for contributing to OpenFrame OSS Library! Your contributions help build the future of open-source MSP platforms. 🚀
 
-- 📖 **[Development Setup](../setup/environment.md)** - Get your environment ready
-- 🧪 **[Testing Guide](../testing/overview.md)** - Write great tests
-- 🏗️ **[Architecture Guide](../architecture/overview.md)** - Understand the system
-- 🚀 **[Getting Started](../../getting-started/introduction.md)** - Start using OpenFrame
+**Questions?** Don't hesitate to reach out:
+- GitHub Discussions
+- Community Discord/Slack  
+- Email: contributors@openframe.ai
 
-**Questions?** Don't hesitate to ask in [GitHub Discussions](https://github.com/openframe/openframe-oss-lib/discussions) - we're here to help!
+Welcome to the team! 🎉

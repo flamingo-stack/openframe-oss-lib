@@ -14,7 +14,7 @@
 
 The foundational library for secure, scalable device and organization management platforms. OpenFrame OSS Library provides standardized data models, API DTOs, and service interfaces that power the entire OpenFrame ecosystem, enabling organizations to build robust, multi-tenant device management solutions.
 
-[![OpenFrame Product Walkthrough (Beta Access)](https://img.youtube.com/vi/awc-yAnkhIo/maxresdefault.jpg)](https://www.youtube.com/watch?v=awc-yAnkhIo)
+[![OpenFrame Preview Webinar](https://img.youtube.com/vi/bINdW0CQbvY/maxresdefault.jpg)](https://www.youtube.com/watch?v=bINdW0CQbvY)
 
 ## ✨ Features
 
@@ -57,19 +57,19 @@ The foundational library for secure, scalable device and organization management
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Java 17 or higher
-- Gradle 8.0+
+- Java 21 or higher
+- Maven 3.6+
 - MongoDB 7.0+
 - Redis 7.0+ (optional, for caching)
 
 ### 1. Add Dependency
 
-```gradle
-dependencies {
-    implementation 'com.openframe:openframe-oss-lib:latest'
-    implementation 'org.springframework.boot:spring-boot-starter-data-mongodb'
-    implementation 'org.springframework.boot:spring-boot-starter-security'
-}
+```xml
+<dependency>
+    <groupId>com.openframe</groupId>
+    <artifactId>openframe-oss-lib</artifactId>
+    <version>latest</version>
+</dependency>
 ```
 
 ### 2. Configure Application
@@ -108,7 +108,7 @@ public class DeviceManagementService {
 ### 4. Run Your Application
 
 ```bash
-./gradlew bootRun
+mvn spring-boot:run
 ```
 
 Your OpenFrame-powered application is now running! 🎉
@@ -227,13 +227,13 @@ Licensed under the [Flamingo AI Unified License v1.0](./LICENSE.md) - see the li
 - 📖 **Documentation**: [Complete guides and API reference](./docs/README.md)
 - 💬 **Community Discussions**: [GitHub Discussions](https://github.com/flamingo-stack/openframe-oss-lib/discussions)
 - 🐛 **Bug Reports**: [GitHub Issues](https://github.com/flamingo-stack/openframe-oss-lib/issues)
-- 💼 **Enterprise Support**: [Contact our team](mailto:enterprise@openframe.io)
+- 💼 **Enterprise Support**: [Contact our team](mailto:enterprise@openframe.ai)
 
 ## 🚀 Ecosystem
 
 OpenFrame OSS Library is part of the larger OpenFrame ecosystem:
 
-- **[OpenFrame Platform](https://openframe.io)** - Complete device management solution
+- **[OpenFrame Platform](https://openframe.ai)** - Complete device management solution
 - **[OpenFrame Gateway](https://github.com/flamingo-stack/openframe-gateway)** - API gateway and routing
 - **[OpenFrame Auth](https://github.com/flamingo-stack/openframe-auth)** - Authentication service
 - **[OpenFrame Dashboard](https://github.com/flamingo-stack/openframe-dashboard)** - Web interface

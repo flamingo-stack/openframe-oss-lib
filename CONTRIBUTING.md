@@ -1,423 +1,368 @@
 # Contributing to OpenFrame OSS Library
 
-Thank you for your interest in contributing to OpenFrame OSS Library! This document provides guidelines and information for contributors.
-
-## 🤝 How to Contribute
-
-### Ways to Contribute
-
-- **🐛 Bug Reports** - Help us identify and fix issues
-- **💡 Feature Requests** - Suggest new capabilities  
-- **📝 Documentation** - Improve guides and examples
-- **🔧 Code Contributions** - Submit bug fixes and new features
-- **🧪 Testing** - Add test coverage and quality improvements
-- **💬 Community Support** - Help others in discussions
+Thank you for your interest in contributing to the OpenFrame OSS Library! We welcome contributions from developers of all skill levels. This guide will help you get started with contributing to our open-source project.
 
 ## 🚀 Getting Started
 
-### 1. Development Setup
+### Prerequisites
 
-First, set up your development environment:
+Before you begin contributing, ensure you have the following installed:
 
-```bash
-# Clone the repository
-git clone https://github.com/flamingo-stack/openframe-oss-lib.git
-cd openframe-oss-lib
+- **Java 21** or higher
+- **Maven 3.6+** 
+- **Git**
+- **Docker & Docker Compose** (for local development)
+- **IDE** (IntelliJ IDEA or VS Code recommended)
 
-# Set up your development environment
-./gradlew build
+### Development Setup
 
-# Run tests to ensure everything works
-./gradlew test
+1. **Fork and Clone**
+   ```bash
+   git clone https://github.com/your-username/openframe-oss-lib.git
+   cd openframe-oss-lib
+   ```
+
+2. **Set up Local Environment**
+   ```bash
+   # Start required services
+   docker-compose up -d mongodb redis kafka
+   
+   # Install dependencies
+   mvn clean install
+   ```
+
+3. **Verify Setup**
+   ```bash
+   mvn test
+   ```
+
+For detailed setup instructions, see our [Development Documentation](./docs/development/setup/environment.md).
+
+## 🏗️ Project Structure
+
+```
+openframe-oss-lib/
+├── openframe-api-lib/              # Core API DTOs and interfaces
+├── openframe-core/                 # Shared utilities and validation
+├── openframe-security-core/        # JWT and OAuth2 infrastructure
+├── openframe-data-mongo/          # MongoDB models and repositories
+├── openframe-api-service-core/     # Main API implementation
+├── openframe-client-core/          # Agent and client management
+├── sdk/                           # Integration SDKs
+│   ├── fleetmdm/                  # FleetDM integration
+│   └── tacticalrmm/               # Tactical RMM integration
+└── docs/                          # Documentation
 ```
 
-See our [Development Environment Setup](./docs/development/setup/environment.md) for detailed instructions.
+## 🎯 How to Contribute
 
-### 2. Understanding the Codebase
+### Types of Contributions
 
-Before contributing, familiarize yourself with:
+We welcome several types of contributions:
 
-- **[Architecture Overview](./docs/development/architecture/overview.md)** - System design and components
-- **[API Documentation](./docs/reference/architecture/overview.md)** - Core APIs and DTOs
-- **[Testing Guide](./docs/development/testing/overview.md)** - Testing strategies and tools
+- **🐛 Bug Fixes** - Help us squash bugs and improve stability
+- **✨ New Features** - Add new capabilities to the library
+- **📚 Documentation** - Improve guides, examples, and API documentation
+- **🧪 Tests** - Expand test coverage and improve test quality
+- **🏗️ Architecture** - Propose architectural improvements
+- **🔧 Tools & CI/CD** - Enhance development workflows
 
-## 📋 Contribution Process
+### Contribution Workflow
 
-### For Bug Fixes and Features
+1. **Choose an Issue**
+   - Browse [open issues](https://github.com/flamingo-stack/openframe-oss-lib/issues)
+   - Look for `good first issue` or `help wanted` labels
+   - Comment on the issue to let others know you're working on it
 
-1. **📋 Create an Issue**
-   - Search existing issues first
-   - Use issue templates when available
-   - Provide clear reproduction steps for bugs
-   - Describe the desired behavior for features
-
-2. **🌿 Create a Branch**
+2. **Create a Feature Branch**
    ```bash
    git checkout -b feature/your-feature-name
    # or
-   git checkout -b bugfix/issue-description
+   git checkout -b fix/issue-number-description
    ```
 
-3. **💻 Make Changes**
-   - Follow our coding standards (see below)
-   - Add tests for new functionality
+3. **Make Your Changes**
+   - Follow our [coding standards](#coding-standards)
+   - Write tests for new functionality
    - Update documentation as needed
-   - Ensure all tests pass
 
-4. **✅ Test Your Changes**
+4. **Test Your Changes**
    ```bash
-   # Run all tests
-   ./gradlew test
+   # Run unit tests
+   mvn test
    
    # Run integration tests
-   ./gradlew integrationTest
+   mvn verify -P integration-tests
    
    # Check code quality
-   ./gradlew check
+   mvn spotbugs:check checkstyle:check
    ```
 
-5. **📤 Submit a Pull Request**
-   - Use the PR template
-   - Link to related issues
-   - Provide clear description of changes
-   - Include screenshots/examples if applicable
+5. **Commit Your Changes**
+   ```bash
+   git add .
+   git commit -m "feat: add device health monitoring API"
+   ```
 
-### For Documentation
+6. **Push and Create Pull Request**
+   ```bash
+   git push origin feature/your-feature-name
+   ```
 
-1. **📝 Documentation Changes**
-   - Fork the repository
-   - Make your documentation improvements
-   - Test documentation builds locally
-   - Submit a pull request
+   Then create a pull request on GitHub with:
+   - Clear description of changes
+   - Reference to related issues
+   - Screenshots/examples if applicable
 
-2. **📚 Content Guidelines**
-   - Use clear, concise language
-   - Include code examples where helpful
-   - Follow existing formatting patterns
-   - Update table of contents if needed
-
-## 🎨 Code Standards
+## 📝 Coding Standards
 
 ### Java Code Style
 
-We follow **Google Java Style Guide** with these key points:
+We follow Google Java Style with some modifications:
 
 ```java
-// ✅ Good: Clear naming and structure
+// ✅ Good - Clear naming and structure
 @Service
 public class DeviceManagementService {
+    
+    private static final Logger LOG = LoggerFactory.getLogger(DeviceManagementService.class);
     
     private final DeviceRepository deviceRepository;
-    private final EventPublisher eventPublisher;
     
-    public DeviceManagementService(DeviceRepository deviceRepository, 
-                                  EventPublisher eventPublisher) {
+    public DeviceManagementService(DeviceRepository deviceRepository) {
         this.deviceRepository = deviceRepository;
-        this.eventPublisher = eventPublisher;
     }
     
-    public Optional<DeviceResponse> findDevice(String deviceId) {
-        return deviceRepository.findById(deviceId)
-                .map(this::mapToResponse);
-    }
-}
-```
-
-### Code Quality Requirements
-
-- **✅ Test Coverage** - Minimum 80% line coverage for new code
-- **✅ Documentation** - Javadoc for all public APIs
-- **✅ Validation** - Input validation on all public methods
-- **✅ Error Handling** - Proper exception handling and logging
-- **✅ Security** - No hardcoded secrets or SQL injection vulnerabilities
-
-### Commit Messages
-
-Use conventional commit format:
-
-```bash
-# Format
-<type>(<scope>): <description>
-
-# Examples
-feat(api): add device filtering by organization
-fix(auth): resolve JWT token validation issue  
-docs(readme): update quick start guide
-test(device): add integration tests for device creation
-```
-
-**Types:**
-- `feat` - New feature
-- `fix` - Bug fix  
-- `docs` - Documentation changes
-- `test` - Test additions or modifications
-- `refactor` - Code refactoring
-- `perf` - Performance improvements
-- `chore` - Build/tooling changes
-
-### Branch Naming
-
-```bash
-# Feature branches
-feature/device-health-monitoring
-feature/oauth-integration
-
-# Bug fix branches  
-bugfix/device-query-performance
-bugfix/auth-token-expiry
-
-# Documentation branches
-docs/api-reference-update
-docs/contributing-guide
-```
-
-## 🧪 Testing Guidelines
-
-### Test Types
-
-| Test Type | Purpose | Coverage |
-|-----------|---------|----------|
-| **Unit Tests** | Test individual components | All public methods |
-| **Integration Tests** | Test component interactions | Service layer |
-| **Repository Tests** | Test data access layer | Database operations |
-| **Contract Tests** | Test API contracts | External interfaces |
-
-### Writing Good Tests
-
-```java
-// ✅ Good: Clear, focused test
-@Test
-@DisplayName("Should return device when valid ID provided")
-void shouldReturnDeviceWhenValidIdProvided() {
-    // Given
-    String deviceId = "device-123";
-    Device device = createTestDevice(deviceId);
-    when(deviceRepository.findById(deviceId)).thenReturn(Optional.of(device));
-    
-    // When
-    Optional<DeviceResponse> result = deviceService.findDevice(deviceId);
-    
-    // Then
-    assertThat(result)
-        .isPresent()
-        .get()
-        .extracting(DeviceResponse::getId)
-        .isEqualTo(deviceId);
-}
-```
-
-### Test Requirements
-
-- **✅ Descriptive Names** - Test method names should describe the scenario
-- **✅ AAA Pattern** - Arrange, Act, Assert structure
-- **✅ Edge Cases** - Test both success and failure scenarios  
-- **✅ Mock External Dependencies** - Use mocks for external services
-- **✅ Clean Test Data** - Use test builders and factories
-
-## 📝 Documentation Standards
-
-### Code Documentation
-
-```java
-/**
- * Service for managing device lifecycle and operations.
- * 
- * <p>This service provides CRUD operations for devices and handles
- * device state transitions, health monitoring, and audit logging.
- * 
- * @author OpenFrame Team
- * @since 1.0.0
- */
-@Service
-public class DeviceManagementService {
-    
-    /**
-     * Retrieves a device by its unique identifier.
-     * 
-     * @param deviceId the unique device identifier
-     * @return device response if found, empty optional otherwise
-     * @throws IllegalArgumentException if deviceId is null or blank
-     */
-    public Optional<DeviceResponse> findDevice(String deviceId) {
+    public PageResponse<DeviceResponse> findDevices(DeviceFilter filter) {
+        LOG.debug("Finding devices with filter: {}", filter);
         // Implementation
     }
 }
 ```
 
-### Markdown Documentation
+### Key Conventions
 
-- Use clear headings and structure
-- Include code examples for complex concepts
-- Link to related documentation
-- Keep line length under 100 characters
-- Use tables for structured information
+- **Class Names**: PascalCase (`DeviceService`, `OrganizationController`)
+- **Method Names**: camelCase (`findDevices`, `createOrganization`)
+- **Constants**: UPPER_SNAKE_CASE (`MAX_RETRY_ATTEMPTS`)
+- **Package Names**: lowercase with dots (`com.openframe.api.service`)
 
-## 🔍 Code Review Process
+### Documentation Requirements
 
-### For Contributors
+- **Public APIs**: Must have Javadoc comments
+- **Complex Logic**: Inline comments explaining approach
+- **Configuration**: Document all configuration properties
 
-1. **📋 Self Review**
-   - Review your own code before submitting
-   - Check for typos and formatting issues
-   - Ensure tests pass and coverage is adequate
-   - Verify documentation is updated
+```java
+/**
+ * Service for managing device operations including creation, updates, and queries.
+ * Supports multi-tenant operations with proper data isolation.
+ * 
+ * @author Your Name
+ * @since 1.0.0
+ */
+@Service
+public class DeviceService {
+    
+    /**
+     * Finds devices matching the provided filter criteria.
+     *
+     * @param filter The device filter criteria
+     * @return Paginated list of devices matching the filter
+     * @throws ValidationException if filter parameters are invalid
+     */
+    public PageResponse<DeviceResponse> findDevices(DeviceFilter filter) {
+        // Implementation
+    }
+}
+```
 
-2. **👥 Peer Review**
-   - Address review comments promptly
-   - Ask questions if feedback is unclear
-   - Make requested changes or explain why not
-   - Re-request review after making changes
+## 🧪 Testing Guidelines
 
-### For Reviewers
+### Test Structure
 
-1. **🎯 Review Focus Areas**
-   - Code correctness and logic
-   - Test coverage and quality
-   - Documentation completeness
-   - Security considerations
-   - Performance implications
+We use a comprehensive testing approach:
 
-2. **💬 Feedback Guidelines**
-   - Be constructive and specific
-   - Explain the "why" behind suggestions
-   - Acknowledge good practices
-   - Ask questions rather than make demands
-   - Focus on the code, not the person
+```
+src/
+├── test/java/                     # Unit tests
+├── integration-test/java/         # Integration tests
+└── e2e-test/java/                # End-to-end tests
+```
 
-## 🏷️ Issue Labels
+### Writing Good Tests
 
-We use labels to organize and prioritize issues:
+```java
+@ExtendWith(MockitoExtension.class)
+class DeviceServiceTest {
+    
+    @Mock
+    private DeviceRepository deviceRepository;
+    
+    @InjectMocks
+    private DeviceService deviceService;
+    
+    @Test
+    @DisplayName("Should return paginated devices when valid filter provided")
+    void shouldReturnPaginatedDevicesWhenValidFilter() {
+        // Given
+        DeviceFilter filter = DeviceFilter.builder()
+            .organizationId("org-123")
+            .status(DeviceStatus.ACTIVE)
+            .build();
+        
+        // When
+        PageResponse<DeviceResponse> result = deviceService.findDevices(filter);
+        
+        // Then
+        assertThat(result.getData()).hasSize(2);
+        assertThat(result.hasNextPage()).isFalse();
+    }
+}
+```
 
-### Type Labels
-- `bug` - Something isn't working
-- `enhancement` - New feature or request
-- `documentation` - Improvements or additions to docs
-- `question` - Further information is requested
+### Test Categories
 
-### Priority Labels  
-- `priority: high` - Critical issues affecting functionality
-- `priority: medium` - Important improvements
-- `priority: low` - Nice-to-have features
+- **Unit Tests**: Fast, isolated tests for individual components
+- **Integration Tests**: Test component interactions with real dependencies
+- **E2E Tests**: Full workflow tests simulating real user scenarios
 
-### Status Labels
-- `status: pending` - Waiting for more information
-- `status: in-progress` - Currently being worked on
-- `status: review` - Ready for review
-- `status: blocked` - Cannot proceed due to dependencies
+## 📋 Pull Request Guidelines
 
-### Component Labels
-- `component: api` - API DTOs and interfaces
-- `component: data` - Data models and repositories  
-- `component: security` - Authentication and authorization
-- `component: config` - Configuration and setup
+### PR Title Format
 
-## 🚦 Release Process
+Use conventional commit format:
 
-### Versioning
+```
+feat: add device health monitoring API
+fix: resolve JWT token expiration issue
+docs: update API documentation for events
+test: add integration tests for organization service
+```
 
-We follow [Semantic Versioning](https://semver.org/):
-- **MAJOR** (1.0.0) - Breaking changes
-- **MINOR** (1.1.0) - New features, backwards compatible
-- **PATCH** (1.1.1) - Bug fixes, backwards compatible
+### PR Description Template
 
-### Release Criteria
+```markdown
+## Description
+Brief description of the changes and why they were made.
 
-Before releasing a new version:
-- ✅ All tests pass
-- ✅ Documentation is updated
-- ✅ Security review completed
-- ✅ Performance benchmarks met
-- ✅ Breaking changes documented
+## Type of Change
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Documentation update
+- [ ] Refactoring
+- [ ] Performance improvement
 
-## 🆘 Getting Help
+## Testing
+- [ ] Unit tests pass
+- [ ] Integration tests pass
+- [ ] Manual testing completed
 
-### For Contributors
+## Screenshots/Examples
+<!-- If applicable, add screenshots or code examples -->
 
-- 💬 **GitHub Discussions** - Ask questions and get help
-- 📧 **Email** - dev@openframe.io for private inquiries
-- 📖 **Documentation** - Check existing docs first
-- 🐛 **Issues** - Search existing issues for similar problems
+## Related Issues
+Closes #123
+```
 
-### For Maintainers
+### Review Process
 
-- 📋 **Triage Issues** - Label and prioritize new issues
-- 👥 **Review PRs** - Provide timely, constructive feedback  
-- 📖 **Update Documentation** - Keep guides current
-- 🎯 **Plan Releases** - Coordinate release planning
+1. **Automated Checks**: All CI/CD checks must pass
+2. **Code Review**: At least one maintainer approval required
+3. **Testing**: Verify test coverage meets minimum requirements (80%+)
+4. **Documentation**: Ensure documentation is updated if needed
 
-## 📜 Code of Conduct
+## 🐛 Reporting Issues
 
-### Our Standards
+### Bug Reports
 
-- **✅ Be Respectful** - Treat everyone with respect and kindness
-- **✅ Be Inclusive** - Welcome developers of all skill levels
-- **✅ Be Constructive** - Provide helpful, actionable feedback
-- **✅ Be Patient** - Remember that we're all learning
-- **✅ Be Professional** - Maintain a professional tone in all interactions
+When reporting bugs, please include:
 
-### Unacceptable Behavior
+- **Environment details** (Java version, OS, etc.)
+- **Steps to reproduce** the issue
+- **Expected vs. actual behavior**
+- **Error logs** or stack traces
+- **Minimal code example** demonstrating the issue
 
-- ❌ Harassment or discrimination
-- ❌ Offensive or inappropriate language
-- ❌ Personal attacks or trolling
-- ❌ Spam or off-topic content
-- ❌ Sharing private information without consent
+### Feature Requests
 
-### Enforcement
+For new features, provide:
 
-Violations of our code of conduct should be reported to conduct@openframe.io. All reports will be investigated and appropriate action will be taken.
+- **Use case description** and business value
+- **Proposed API/interface** if applicable
+- **Implementation considerations**
+- **Alternative solutions** considered
 
-## 🙏 Recognition
+## 🏷️ Versioning and Releases
 
-### Contributors
+We follow [Semantic Versioning (SemVer)](https://semver.org/):
 
-We value all contributions and recognize contributors through:
+- **MAJOR** (X.0.0): Breaking changes
+- **MINOR** (0.X.0): New features, backward compatible
+- **PATCH** (0.0.X): Bug fixes, backward compatible
 
-- 🏆 **Contributor Recognition** - Credits in release notes
-- 📊 **GitHub Profile** - Contribution graphs and statistics  
-- 🎖️ **Special Mentions** - Highlighting significant contributions
-- 💫 **Contributor Badge** - Special badge for regular contributors
+### Release Process
 
-### Types of Recognition
+1. Update version in `pom.xml`
+2. Update `CHANGELOG.md`
+3. Create release branch
+4. Run full test suite
+5. Create GitHub release with changelog
 
-- **🐛 Bug Hunters** - Finding and reporting bugs
-- **🚀 Feature Champions** - Implementing new capabilities
-- **📚 Documentation Masters** - Improving guides and examples
-- **🧪 Testing Heroes** - Adding comprehensive test coverage
-- **💬 Community Leaders** - Helping others in discussions
+## 🤝 Community Guidelines
 
-## 📋 Checklist
+### Code of Conduct
 
-Before submitting your contribution:
+- **Be respectful** and inclusive
+- **Collaborate effectively** with other contributors  
+- **Provide constructive feedback** in reviews
+- **Help newcomers** get started
 
-### Code Changes
-- [ ] Code follows style guidelines
-- [ ] Tests are added/updated and passing
-- [ ] Documentation is updated
-- [ ] Commit messages follow conventional format
-- [ ] No merge conflicts with main branch
-- [ ] Security considerations addressed
+### Communication Channels
 
-### Pull Request
-- [ ] PR title is clear and descriptive
-- [ ] PR description explains the changes
-- [ ] Related issues are linked
-- [ ] Screenshots/examples included if applicable
-- [ ] Breaking changes are documented
-- [ ] Reviewers are assigned
+- **GitHub Issues**: Bug reports and feature requests
+- **GitHub Discussions**: General questions and community discussions
+- **Discord/Slack**: Real-time collaboration and support
 
-## 🎯 What's Next?
+## 📚 Resources
 
-Ready to contribute? Here are some good first steps:
+### Development Resources
 
-1. **🔍 Browse Issues** - Look for `good first issue` labels
-2. **📖 Read Documentation** - Familiarize yourself with the architecture
-3. **🚀 Set Up Development** - Follow the environment setup guide
-4. **💬 Join Discussions** - Introduce yourself in GitHub discussions
-5. **🤝 Find a Mentor** - Reach out to maintainers for guidance
+- [Development Setup Guide](./docs/development/setup/environment.md)
+- [Architecture Overview](./docs/development/architecture/overview.md)
+- [API Documentation](./docs/reference/architecture/overview.md)
+- [Testing Guide](./docs/development/testing/overview.md)
 
-Thank you for contributing to OpenFrame OSS Library! Together, we're building the future of device management platforms. 🚀
+### External Resources
+
+- [Spring Boot Documentation](https://docs.spring.io/spring-boot/docs/current/reference/html/)
+- [MongoDB Java Driver](https://mongodb.github.io/mongo-java-driver/)
+- [Apache Kafka Documentation](https://kafka.apache.org/documentation/)
+
+## 🙋‍♂️ Getting Help
+
+If you need help with contributing:
+
+1. Check existing [documentation](./docs/README.md)
+2. Search [GitHub Discussions](https://github.com/flamingo-stack/openframe-oss-lib/discussions)
+3. Ask questions in our community channels
+4. Reach out to maintainers in issues or discussions
+
+## 🎉 Recognition
+
+Contributors are recognized in several ways:
+
+- **Contributors List**: Added to repository contributors
+- **Release Notes**: Highlighted in release announcements  
+- **Community Recognition**: Featured in community updates
+- **Maintainer Opportunities**: Potential path to becoming a maintainer
 
 ---
 
-*For questions about contributing, please reach out to our team at dev@openframe.io or start a discussion on GitHub.*
+Thank you for contributing to OpenFrame OSS Library! Together, we're building the future of open-source MSP platforms. 🚀
+
+<div align="center">
+  <a href="https://github.com/flamingo-stack/openframe-oss-lib/graphs/contributors">
+    <img src="https://contrib.rocks/image?repo=flamingo-stack/openframe-oss-lib" />
+  </a>
+</div>

@@ -1,391 +1,163 @@
 # Local Development Guide
 
-This guide covers everything you need to know about running, debugging, and developing OpenFrame OSS Library locally. From the initial setup to advanced debugging techniques, this is your complete reference for local development.
+This guide covers running OpenFrame services locally, enabling hot reload for rapid development, and setting up debugging configurations for effective troubleshooting.
 
-## Clone and Initial Setup
+## Quick Start: Running Services Locally
 
-### Repository Structure
+### Start Infrastructure Services
 
-When you clone OpenFrame OSS Library, you'll get this structure:
-
-```text
-openframe-oss-lib/
-├── 📁 openframe-api-lib/           # Core API DTOs and services
-├── 📁 openframe-data-mongo/        # MongoDB data models
-├── 📁 openframe-core/              # Core utilities
-├── 📁 openframe-security-core/     # Security components
-├── 📁 openframe-client-core/       # Client service components
-├── 📁 openframe-authorization-service-core/ # Auth service
-├── 📁 openframe-gateway-service-core/       # Gateway service
-├── 📁 openframe-management-service-core/    # Management service
-├── 📁 examples/                    # Example applications
-│   └── 📁 device-management/       # Device management example
-├── 📄 build.gradle                 # Root build configuration
-├── 📄 gradle.properties            # Gradle properties
-└── 📄 docker-compose.yml           # Development dependencies
-```
-
-### Quick Clone and Setup
+First, ensure all required infrastructure services are running:
 
 ```bash
-# Clone the repository
-git clone https://github.com/openframe/openframe-oss-lib.git
+# Navigate to your OpenFrame project directory
 cd openframe-oss-lib
 
-# Check Java version
-java -version  # Should be 17+
-
-# Verify Gradle wrapper
-./gradlew --version
-
-# Start development dependencies
-docker-compose up -d
-```
-
-## Running the Application Locally
-
-### Method 1: Using Gradle (Recommended)
-
-#### Start Dependencies First
-
-```bash
-# Start MongoDB and Redis
-docker-compose up -d mongodb redis
+# Start development infrastructure
+docker-compose -f docker-compose.dev.yml up -d
 
 # Verify services are running
-docker ps
+docker-compose -f docker-compose.dev.yml ps
 ```
 
-#### Build and Run
+**Expected output:**
+```bash
+Name                          Command               State            Ports
+--------------------------------------------------------------------------------
+openframe-dev-kafka          /etc/confluent/docker/run   Up      0.0.0.0:9092->9092/tcp
+openframe-dev-mongodb        docker-entrypoint.sh mongod Up      0.0.0.0:27017->27017/tcp
+openframe-dev-mongo-express  tini -- /docker-entrypoint. Up      0.0.0.0:8081->8081/tcp
+openframe-dev-redis          docker-entrypoint.sh redis  Up      0.0.0.0:6379->6379/tcp
+openframe-dev-zookeeper      /etc/confluent/docker/run   Up      0.0.0.0:2181->2181/tcp
+```
+
+### Build All Modules
 
 ```bash
-# Clean build (first time)
-./gradlew clean build
+# Clean build all OpenFrame modules
+mvn clean install -DskipTests
 
-# Run the device management example
-./gradlew :examples:device-management:bootRun
-
-# Or run with debug enabled
-./gradlew :examples:device-management:bootRun --debug-jvm
+# This installs all modules to your local Maven repository
+# Takes ~2-3 minutes on first run
 ```
 
-#### Multiple Service Development
+## Running Individual Services
 
-To run multiple services simultaneously:
+OpenFrame is designed as a collection of microservices. Here's how to run them individually for development.
+
+### API Service
+
+The main API service provides REST and GraphQL endpoints.
+
+**Create a launcher module:**
 
 ```bash
-# Terminal 1: API Service
-./gradlew :openframe-api-service-core:bootRun
-
-# Terminal 2: Authorization Service  
-./gradlew :openframe-authorization-service-core:bootRun
-
-# Terminal 3: Gateway Service
-./gradlew :openframe-gateway-service-core:bootRun
-
-# Terminal 4: Management Service
-./gradlew :openframe-management-service-core:bootRun
+mkdir -p dev-launchers/api-service
+cd dev-launchers/api-service
 ```
 
-### Method 2: Using IDE
+**`pom.xml`:**
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
 
-#### IntelliJ IDEA
+    <groupId>com.openframe.dev</groupId>
+    <artifactId>api-service-launcher</artifactId>
+    <version>1.0.0</version>
 
-**1. Import Project**
-```text
-File → Open → Select openframe-oss-lib folder
-IntelliJ will auto-detect Gradle project
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.3.0</version>
+    </parent>
+
+    <properties>
+        <java.version>21</java.version>
+        <openframe.version>5.10.1</openframe.version>
+    </properties>
+
+    <dependencies>
+        <!-- OpenFrame Core Services -->
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-api-service-core</artifactId>
+            <version>${openframe.version}</version>
+        </dependency>
+        
+        <!-- Development Tools -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
+            <scope>runtime</scope>
+            <optional>true</optional>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
 ```
 
-**2. Create Run Configuration**
-```text
-Run → Edit Configurations → + → Spring Boot
-Name: Device Management Local
-Main class: com.openframe.examples.DeviceManagementApplication
-Module: examples.device-management.main
-Environment variables:
-  SPRING_PROFILES_ACTIVE=development
-  MONGODB_URI=mongodb://localhost:27017/openframe-dev
-  SERVER_PORT=8080
-```
+**`src/main/java/com/openframe/dev/ApiServiceApplication.java`:**
+```java
+package com.openframe.dev;
 
-**3. Run/Debug**
-```text
-Click the green run button or Shift+F10
-For debugging: Click debug button or Shift+F9
-```
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
 
-#### VS Code
-
-**1. Open Project**
-```bash
-cd openframe-oss-lib
-code .
-```
-
-**2. Configure Launch Settings**
-
-Create `.vscode/launch.json`:
-
-```json
-{
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "type": "java",
-      "name": "Device Management",
-      "request": "launch",
-      "mainClass": "com.openframe.examples.DeviceManagementApplication",
-      "projectName": "device-management",
-      "env": {
-        "SPRING_PROFILES_ACTIVE": "development",
-        "MONGODB_URI": "mongodb://localhost:27017/openframe-dev",
-        "SERVER_PORT": "8080"
-      },
-      "vmArgs": "-Dspring.profiles.active=development"
-    },
-    {
-      "type": "java",
-      "name": "Debug Device Management",
-      "request": "launch",
-      "mainClass": "com.openframe.examples.DeviceManagementApplication",
-      "projectName": "device-management",
-      "env": {
-        "SPRING_PROFILES_ACTIVE": "development",
-        "MONGODB_URI": "mongodb://localhost:27017/openframe-dev",
-        "SERVER_PORT": "8080",
-        "LOGGING_LEVEL_OPENFRAME": "DEBUG"
-      }
+@SpringBootApplication(scanBasePackages = {
+    "com.openframe.api.service.core",
+    "com.openframe.data.config",
+    "com.openframe.security.config"
+})
+public class ApiServiceApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(ApiServiceApplication.class, args);
     }
-  ]
 }
 ```
 
-### Method 3: Using JAR Files
-
-For production-like testing:
-
-```bash
-# Build JAR files
-./gradlew bootJar
-
-# Run the JAR
-java -jar examples/device-management/build/libs/device-management-1.0.0.jar \
-  --spring.profiles.active=development \
-  --spring.data.mongodb.uri=mongodb://localhost:27017/openframe-dev
-```
-
-## Hot Reload and Development Features
-
-### Spring Boot DevTools
-
-DevTools provides automatic restart and live reload capabilities.
-
-#### Enable DevTools
-
-Already included in `build.gradle`:
-
-```gradle
-dependencies {
-    developmentOnly 'org.springframework.boot:spring-boot-devtools'
-}
-```
-
-#### DevTools Features
-
-| Feature | Benefit | How to Use |
-|---------|---------|------------|
-| **Automatic Restart** | Restart app on classpath changes | Save file, app restarts automatically |
-| **Live Reload** | Browser refresh on changes | Install LiveReload browser extension |
-| **Property Defaults** | Development-friendly defaults | Automatic caching disabled |
-| **Remote Debugging** | Connect debugger remotely | Use IDE remote debug configuration |
-
-#### DevTools Configuration
-
-Create `src/main/resources/application-development.yml`:
-
+**`src/main/resources/application-dev.yml`:**
 ```yaml
 spring:
-  devtools:
-    restart:
-      enabled: true
-      poll-interval: 1s
-      quiet-period: 400ms
-      exclude: static/**,public/**
-    livereload:
-      enabled: true
-      port: 35729
+  application:
+    name: openframe-api-service
   
-  # Development optimizations
-  jpa:
-    show-sql: true
+  profiles:
+    active: dev
+  
   data:
     mongodb:
-      auto-index-creation: true
-  
-  # Disable caching
-  cache:
-    type: none
-  thymeleaf:
-    cache: false
+      uri: mongodb://admin:password123@localhost:27017/openframe_dev?authSource=admin
+    
+    redis:
+      host: localhost
+      port: 6379
+      database: 1
 
-# Enhanced logging for development
-logging:
-  level:
-    com.openframe: DEBUG
-    org.springframework.data.mongodb: DEBUG
-    org.springframework.security: DEBUG
-  pattern:
-    console: "%clr(%d{HH:mm:ss.SSS}){blue} %clr(%-5level) %clr([%thread]){magenta} %clr(%logger{36}){cyan} - %msg%n"
-```
-
-### File Watching and Auto-rebuild
-
-#### IntelliJ IDEA Auto-build
-
-```text
-Settings → Build, Execution, Deployment → Compiler
-✅ Build project automatically
-
-Registry (Ctrl+Shift+Alt+/)
-✅ compiler.automake.allow.when.app.running = true
-```
-
-#### Gradle Continuous Build
-
-```bash
-# Continuous build - rebuilds on file changes
-./gradlew --continuous build
-
-# Continuous run - restarts on changes
-./gradlew --continuous :examples:device-management:bootRun
-```
-
-## Debugging Techniques
-
-### Application Debugging
-
-#### Debug Mode Startup
-
-```bash
-# Start with debug port 5005
-./gradlew :examples:device-management:bootRun --debug-jvm
-
-# Or with custom debug port
-JAVA_OPTS="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5006" \
-./gradlew :examples:device-management:bootRun
-```
-
-#### IDE Debug Connection
-
-**IntelliJ IDEA:**
-```text
-Run → Edit Configurations → + → Remote JVM Debug
-Host: localhost
-Port: 5005
-Command line arguments for running remote JVM:
--agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
-```
-
-**VS Code:**
-```json
-{
-  "type": "java",
-  "name": "Debug (Attach)",
-  "request": "attach",
-  "hostName": "localhost",
-  "port": 5005
-}
-```
-
-### Database Debugging
-
-#### MongoDB Query Debugging
-
-Enable MongoDB query logging:
-
-```yaml
-# application-development.yml
-logging:
-  level:
-    org.springframework.data.mongodb.core.MongoTemplate: DEBUG
-    org.springframework.data.mongodb.repository: DEBUG
-```
-
-#### MongoDB Compass Integration
-
-1. **Connect to local MongoDB**: `mongodb://localhost:27017`
-2. **Select database**: `openframe-dev`
-3. **Monitor collections in real-time**
-4. **Execute test queries**
-
-#### Redis Debugging
-
-Monitor Redis operations:
-
-```bash
-# Monitor Redis commands in real-time
-redis-cli monitor
-
-# Check Redis keys
-redis-cli keys "openframe:*"
-
-# View specific key
-redis-cli get "openframe:session:12345"
-
-# Clear Redis cache for testing
-redis-cli flushdb
-```
-
-### Logging Configuration
-
-#### Development Logging Setup
-
-**Detailed Application Logging:**
-
-```yaml
-logging:
-  level:
-    root: INFO
-    com.openframe: DEBUG
-    org.springframework.web: DEBUG
-    org.springframework.security: DEBUG
-    org.springframework.data.mongodb: DEBUG
-  pattern:
-    console: "%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%5p) %clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n%wEx"
-    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
-  file:
-    name: logs/openframe-dev.log
-```
-
-#### Request/Response Logging
-
-Log all HTTP requests and responses:
-
-```yaml
-logging:
-  level:
-    org.springframework.web.filter.CommonsRequestLoggingFilter: DEBUG
-    org.springframework.web.servlet.DispatcherServlet: DEBUG
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: openframe-api-dev
+      auto-offset-reset: earliest
 
 server:
-  # Log request details
-  servlet:
-    context-path: /
-  # Enable request logging
-  undertow:
-    accesslog:
-      enabled: true
-      dir: logs
-```
+  port: 8080
 
-### Performance Profiling
+logging:
+  level:
+    com.openframe: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.data.mongodb.core.MongoTemplate: DEBUG
 
-#### Spring Boot Actuator
-
-Enable all actuator endpoints for development:
-
-```yaml
 management:
   endpoints:
     web:
@@ -394,405 +166,414 @@ management:
   endpoint:
     health:
       show-details: always
-    metrics:
-      enabled: true
-  metrics:
-    export:
-      simple:
-        enabled: true
-```
-
-**Useful Actuator Endpoints:**
-
-| Endpoint | Purpose | URL |
-|----------|---------|-----|
-| **Health Check** | Application health | `http://localhost:8080/actuator/health` |
-| **Metrics** | Application metrics | `http://localhost:8080/actuator/metrics` |
-| **Environment** | Configuration properties | `http://localhost:8080/actuator/env` |
-| **Beans** | Spring beans | `http://localhost:8080/actuator/beans` |
-| **Thread Dump** | Thread analysis | `http://localhost:8080/actuator/threaddump` |
-| **Heap Dump** | Memory analysis | `http://localhost:8080/actuator/heapdump` |
-
-#### JVM Profiling
-
-**Enable JFR (Java Flight Recorder):**
-
-```bash
-# Start with JFR enabled
-JAVA_OPTS="-XX:+FlightRecorder -XX:StartFlightRecording=duration=30s,filename=openframe-profile.jfr" \
-./gradlew :examples:device-management:bootRun
-```
-
-**Memory Analysis:**
-
-```bash
-# Generate heap dump
-jcmd <pid> GC.run_finalization
-jcmd <pid> VM.gc
-jcmd <pid> GC.dump_heap heap-dump.hprof
-
-# Analyze with jhat
-jhat heap-dump.hprof
-# Visit http://localhost:7000
-```
-
-## Testing During Development
-
-### Unit Testing
-
-#### Run Tests During Development
-
-```bash
-# Run all tests
-./gradlew test
-
-# Run tests continuously
-./gradlew --continuous test
-
-# Run specific test class
-./gradlew test --tests "*DeviceServiceTest"
-
-# Run tests with detailed output
-./gradlew test --info
-
-# Run tests for specific module
-./gradlew :openframe-api-lib:test
-```
-
-#### Test Configuration
-
-**Test Database Setup:**
-
-```yaml
-# src/test/resources/application-test.yml
-spring:
-  profiles:
-    active: test
-  data:
-    mongodb:
-      uri: mongodb://localhost:27017/openframe-test
-  redis:
-    host: localhost
-    port: 6379
-    database: 1  # Use different database for tests
-
-logging:
-  level:
-    com.openframe: DEBUG
-    org.springframework.test: DEBUG
-```
-
-### Integration Testing
-
-#### Testcontainers Integration
-
-Run integration tests with real databases:
-
-```bash
-# Run integration tests (uses Testcontainers)
-./gradlew integrationTest
-
-# Or run specific integration test
-./gradlew integrationTest --tests "*DeviceRepositoryIntegrationTest"
-```
-
-#### Manual Integration Testing
-
-```bash
-# Reset test database
-mongosh mongodb://localhost:27017/openframe-test --eval "db.dropDatabase()"
-
-# Run application in test mode
-SPRING_PROFILES_ACTIVE=test ./gradlew :examples:device-management:bootRun
-
-# Test with curl
-curl -X POST http://localhost:8080/api/devices \
-  -H "Content-Type: application/json" \
-  -d '{
-    "machineId": "test-machine",
-    "serialNumber": "TEST123456",
-    "model": "Test Device",
-    "type": "DESKTOP",
-    "status": "ACTIVE"
-  }'
-```
-
-## Local Configuration Management
-
-### Environment-Specific Configuration
-
-#### Development Configuration
-
-**`application-development.yml`:**
-
-```yaml
-spring:
-  profiles:
-    active: development
-  
-  # Database configuration
-  data:
-    mongodb:
-      uri: mongodb://localhost:27017/openframe-dev
-      auto-index-creation: true
-  
-  # Cache configuration  
-  redis:
-    host: localhost
-    port: 6379
-    database: 0
-    timeout: 2000ms
-  
-  # Security disabled for local development
-  security:
-    oauth2:
-      client:
-        registration:
-          google:
-            client-id: fake-client-id
-            client-secret: fake-client-secret
-
-# Server configuration
-server:
-  port: 8080
-  servlet:
-    context-path: /
 
 # OpenFrame specific configuration
 openframe:
   security:
-    enabled: false
     jwt:
-      secret: development-secret-key
-  pagination:
-    default-size: 20
-    max-size: 100
-  features:
-    audit-logging: true
-    metrics-collection: true
-
-# Development tools
-management:
-  endpoints:
-    web:
-      exposure:
-        include: "*"
-  endpoint:
-    health:
-      show-details: always
-
-# Enhanced logging
-logging:
-  level:
-    com.openframe: DEBUG
-    org.springframework.data: DEBUG
-  pattern:
-    console: "%clr(%d{HH:mm:ss.SSS}){blue} %clr(%-5level) %clr([%thread]){magenta} %clr(%logger{36}){cyan} - %msg%n"
+      secret: dev-secret-key-please-change-in-production-use-proper-256-bit-key
+      expiration: 86400
+  
+  data:
+    initialization:
+      enabled: true
 ```
 
-#### Local Override Configuration
+**Start the API service:**
+```bash
+cd dev-launchers/api-service
+mvn spring-boot:run -Dspring-boot.run.profiles=dev
+```
 
-Create `application-local.yml` (gitignored) for personal settings:
+### Gateway Service
+
+The gateway service handles routing and authentication.
+
+**Create gateway launcher:**
+
+```bash
+mkdir -p dev-launchers/gateway-service
+cd dev-launchers/gateway-service
+```
+
+Similar setup as API service, but use `openframe-gateway-service-core` dependency and run on port 8081:
 
 ```yaml
-# Personal development settings
-spring:
-  data:
-    mongodb:
-      uri: mongodb://your-custom-host:27017/your-db
-  
 server:
-  port: 8081  # Custom port
-
-logging:
-  level:
-    com.openframe.your.package: TRACE  # Extra debugging
+  port: 8081
 ```
 
-### Environment Variables
+### Client Service
 
-Create `.env.local` file:
+Handles agent connectivity and device management.
 
 ```bash
-# Database URLs
-MONGODB_URI=mongodb://localhost:27017/openframe-dev
-REDIS_URL=redis://localhost:6379/0
-
-# Application settings
-SERVER_PORT=8080
-SPRING_PROFILES_ACTIVE=development
-
-# Security settings (development only)
-JWT_SECRET=development-jwt-secret-key
-SECURITY_ENABLED=false
-
-# Feature flags
-FEATURE_AUDIT_LOGGING=true
-FEATURE_METRICS_COLLECTION=true
-
-# External integrations (optional)
-FLEET_MDM_URL=http://localhost:8000
-TACTICAL_RMM_URL=http://localhost:8001
-
-# Debug settings
-LOGGING_LEVEL_OPENFRAME=DEBUG
-DEBUG_MODE=true
+mkdir -p dev-launchers/client-service
+cd dev-launchers/client-service
 ```
 
-## Troubleshooting Local Development
+Use `openframe-client-core` dependency and run on port 8082.
 
-### Common Issues and Solutions
+## Hot Reload Configuration
 
-#### Build Issues
+### Spring Boot DevTools
 
-**1. Gradle Build Failure**
+DevTools is already included in the launcher projects and provides:
+
+- **Automatic Restart**: Restarts application when classpath changes
+- **Live Reload**: Refreshes browser when resources change
+- **Property Defaults**: Development-friendly default properties
+
+### IDE-Specific Hot Reload
+
+#### IntelliJ IDEA
+
+**Enable automatic compilation:**
+1. `File` → `Settings` → `Build, Execution, Deployment` → `Compiler`
+2. ✅ Build project automatically
+3. ✅ Compile independent modules in parallel
+
+**Enable hot swap:**
+1. `Run/Debug Configurations` → Select your configuration
+2. `On 'Update' action` → `Update classes and resources`
+3. `On frame deactivation` → `Update classes and resources`
+
+**Use the following JVM options:**
+```bash
+-XX:+AllowEnhancedClassRedefinition
+-javaagent:/path/to/hotswap-agent.jar
+```
+
+#### VS Code
+
+Add to `.vscode/settings.json`:
+```json
+{
+    "java.autobuild.enabled": true,
+    "java.compile.nullAnalysis.mode": "automatic",
+    "spring-boot.ls.java.home": "/path/to/java21"
+}
+```
+
+### File Watching Script
+
+For manual hot reload, create a file watcher:
 
 ```bash
-# Clear Gradle cache
-./gradlew --stop
-rm -rf ~/.gradle/caches/
+#!/bin/bash
+# scripts/dev-watch.sh
 
-# Clean build
-./gradlew clean build --refresh-dependencies
+echo "🔍 Watching for file changes..."
 
-# Check for dependency conflicts
-./gradlew dependencies
+# Watch for Java file changes and recompile
+fswatch -o src/main/java/ | while read f; do
+    echo "📝 Files changed, recompiling..."
+    mvn compile -q
+    
+    # Trigger DevTools restart
+    touch target/classes/restart.txt
+    
+    echo "✅ Recompilation complete"
+done
 ```
 
-**2. Compilation Errors**
+## Debugging Configuration
+
+### Remote Debugging
+
+Start any service with debugging enabled:
 
 ```bash
-# Check Java version
-java -version
-echo $JAVA_HOME
+# API Service with debug port 5005
+mvn spring-boot:run \
+    -Dspring-boot.run.jvmArguments="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005" \
+    -Dspring-boot.run.profiles=dev
 
-# Refresh IDE project
-# IntelliJ: File → Reload Gradle Project
-# VS Code: Java: Restart Projects (Ctrl+Shift+P)
+# Gateway Service with debug port 5006  
+mvn spring-boot:run \
+    -Dspring-boot.run.jvmArguments="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5006" \
+    -Dspring-boot.run.profiles=dev
 ```
 
-#### Runtime Issues
+#### IDE Debug Configuration
 
-**1. Port Already in Use**
+**IntelliJ IDEA:**
+1. `Run` → `Edit Configurations`
+2. Add `Remote JVM Debug`
+3. Set `Host: localhost`, `Port: 5005`
+4. Set breakpoints and attach debugger
+
+**VS Code:**
+Add to `.vscode/launch.json`:
+```json
+{
+    "type": "java",
+    "name": "Debug OpenFrame API",
+    "request": "attach",
+    "hostName": "localhost",
+    "port": 5005
+}
+```
+
+### Advanced Debugging
+
+#### JVM Flight Recorder
+
+```bash
+# Start with flight recording
+mvn spring-boot:run \
+    -Dspring-boot.run.jvmArguments="-XX:+FlightRecorder -XX:StartFlightRecording=duration=60s,filename=openframe.jfr"
+
+# Analyze with JProfiler or VisualVM
+```
+
+#### Memory Analysis
+
+```bash
+# Enable heap dumps on OutOfMemoryError
+-XX:+HeapDumpOnOutOfMemoryError
+-XX:HeapDumpPath=/tmp/openframe-heapdump.hprof
+
+# Generate heap dump manually
+jcmd <pid> GC.run_finalization
+jcmd <pid> VM.gc
+jcmd <pid> GC.heap_dump /tmp/heap-dump.hprof
+```
+
+## Development Workflows
+
+### Multi-Service Development
+
+When working on features that span multiple services, use this workflow:
+
+```mermaid
+graph TD
+    A[Start Infrastructure] --> B[Start Gateway:8081]
+    B --> C[Start API:8080]
+    C --> D[Start Client:8082]
+    D --> E[Test Integration]
+    E --> F{Feature Complete?}
+    F -->|No| G[Code Changes]
+    G --> H[Hot Reload]
+    H --> E
+    F -->|Yes| I[Write Tests]
+    I --> J[Commit Changes]
+```
+
+### Service Startup Script
+
+Create `scripts/dev-start-all.sh`:
+
+```bash
+#!/bin/bash
+set -e
+
+echo "🚀 Starting OpenFrame development environment..."
+
+# Check if infrastructure is running
+if ! docker-compose -f docker-compose.dev.yml ps | grep -q "Up"; then
+    echo "📦 Starting infrastructure services..."
+    docker-compose -f docker-compose.dev.yml up -d
+    sleep 15
+fi
+
+# Start services in background
+echo "🌐 Starting Gateway Service on :8081..."
+(cd dev-launchers/gateway-service && mvn spring-boot:run -Dspring-boot.run.profiles=dev) &
+GATEWAY_PID=$!
+
+sleep 10
+
+echo "🔌 Starting API Service on :8080..."
+(cd dev-launchers/api-service && mvn spring-boot:run -Dspring-boot.run.profiles=dev) &
+API_PID=$!
+
+sleep 10
+
+echo "📱 Starting Client Service on :8082..."
+(cd dev-launchers/client-service && mvn spring-boot:run -Dspring-boot.run.profiles=dev) &
+CLIENT_PID=$!
+
+# Wait for services to start
+sleep 20
+
+echo "✅ All services started!"
+echo "🌐 Gateway: http://localhost:8081"
+echo "🔌 API: http://localhost:8080"
+echo "📱 Client: http://localhost:8082"
+echo "💾 MongoDB: http://localhost:8081 (admin/password123)"
+
+# Wait for user to stop
+echo "Press Ctrl+C to stop all services..."
+trap "kill $GATEWAY_PID $API_PID $CLIENT_PID; exit" INT TERM
+wait
+```
+
+### Testing Integration
+
+Test that services are communicating correctly:
+
+```bash
+# Test service health
+curl http://localhost:8081/actuator/health  # Gateway
+curl http://localhost:8080/actuator/health  # API  
+curl http://localhost:8082/actuator/health  # Client
+
+# Test gateway routing to API
+curl http://localhost:8081/api/health
+
+# Create test organization through gateway
+curl -X POST http://localhost:8081/api/organizations \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Development MSP",
+    "domain": "dev-msp.local",
+    "email": "dev@msp.local",
+    "phone": "+1-555-DEV1"
+  }'
+```
+
+## Performance Monitoring
+
+### Application Metrics
+
+All services expose actuator endpoints for monitoring:
+
+```bash
+# Memory usage
+curl http://localhost:8080/actuator/metrics/jvm.memory.used
+
+# HTTP metrics  
+curl http://localhost:8080/actuator/metrics/http.server.requests
+
+# Custom OpenFrame metrics
+curl http://localhost:8080/actuator/metrics/openframe.devices.total
+curl http://localhost:8080/actuator/metrics/openframe.events.processed
+```
+
+### Database Monitoring
+
+Monitor MongoDB performance:
+
+```bash
+# MongoDB stats
+docker exec openframe-dev-mongodb mongosh --eval "db.stats()"
+
+# Redis stats
+docker exec openframe-dev-redis redis-cli info stats
+
+# Kafka consumer lag
+docker exec openframe-dev-kafka kafka-consumer-groups.sh \
+  --bootstrap-server localhost:9092 --describe --group openframe-api-dev
+```
+
+## Troubleshooting
+
+### Service Won't Start
+
+<details>
+<summary>Port already in use</summary>
 
 ```bash
 # Find process using port
 lsof -i :8080
-netstat -tlnp | grep :8080
 
 # Kill process
-kill -9 <PID>
+kill -9 $(lsof -t -i:8080)
 
-# Or change port
-export SERVER_PORT=8081
+# Or use different port
+mvn spring-boot:run -Dspring-boot.run.arguments=--server.port=8090
 ```
+</details>
 
-**2. Database Connection Issues**
+<details>
+<summary>Database connection failed</summary>
 
 ```bash
-# Check MongoDB status
-docker ps | grep mongo
-mongosh --eval "db.adminCommand('ping')"
+# Check MongoDB container
+docker logs openframe-dev-mongodb
+
+# Test connection manually
+mongosh "mongodb://admin:password123@localhost:27017/?authSource=admin"
 
 # Restart MongoDB
-docker-compose restart mongodb
-
-# Check logs
-docker logs mongodb
+docker restart openframe-dev-mongodb
 ```
+</details>
 
-**3. Memory Issues**
+<details>
+<summary>Hot reload not working</summary>
 
+**IntelliJ IDEA:**
+1. Check auto-compilation is enabled
+2. Verify DevTools is on classpath  
+3. Try rebuilding project
+4. Check file system permissions
+
+**VS Code:**
+1. Restart Java language server
+2. Check workspace trust settings
+3. Verify Java extension is enabled
+</details>
+
+### Performance Issues
+
+<details>
+<summary>Application slow startup</summary>
+
+**Solutions:**
+- Increase JVM memory: `-Xmx2G -Xms1G`
+- Use parallel GC: `-XX:+UseParallelGC`
+- Reduce logging verbosity
+- Disable unnecessary auto-configuration
+</details>
+
+<details>
+<summary>High memory usage</summary>
+
+**Diagnosis:**
 ```bash
-# Increase heap size
-export JAVA_OPTS="-Xmx2g -Xms1g"
+# Get heap dump
+jcmd <pid> GC.heap_dump /tmp/heapdump.hprof
 
-# Monitor memory usage
-jstat -gc <pid> 1s
+# Analyze with Eclipse MAT or VisualVM
 ```
 
-#### Development Workflow Issues
+**Common causes:**
+- Memory leaks in caches
+- Too many database connections
+- Large collections in memory
+</details>
 
-**1. Hot Reload Not Working**
+## Best Practices
 
-```text
-IntelliJ IDEA:
-- Settings → Build → Compiler → Build project automatically ✅
-- Registry → compiler.automake.allow.when.app.running ✅
+### Development Efficiency
 
-VS Code:
-- Ensure Java Extension Pack is installed
-- Restart Java Language Server
-```
+1. **Use Profiles**: Keep development settings separate
+2. **Hot Reload**: Configure IDE for automatic compilation
+3. **Service Isolation**: Test services independently
+4. **Mock External Services**: Use WireMock for external API dependencies
+5. **Database Seeding**: Create dev data scripts for consistent testing
 
-**2. Tests Failing**
+### Code Quality
 
-```bash
-# Reset test database
-mongosh mongodb://localhost:27017/openframe-test --eval "db.dropDatabase()"
+1. **Immediate Feedback**: Use IDE inspections and linting
+2. **Unit Testing**: Write tests as you develop
+3. **Integration Testing**: Test service interactions regularly
+4. **Code Coverage**: Monitor coverage with JaCoCo
+5. **Documentation**: Keep README and docs updated
 
-# Clear test cache
-./gradlew cleanTest test
+### Resource Management
 
-# Run with debug info
-./gradlew test --info --stacktrace
-```
-
-### Debug Commands
-
-#### Application Health Check
-
-```bash
-#!/bin/bash
-# health-check.sh
-
-echo "🏥 OpenFrame Health Check"
-
-# Check application
-curl -s http://localhost:8080/actuator/health | jq '.'
-
-# Check MongoDB
-mongosh --quiet --eval "db.adminCommand('ping')" 2>/dev/null && echo "✅ MongoDB OK" || echo "❌ MongoDB DOWN"
-
-# Check Redis
-redis-cli ping 2>/dev/null && echo "✅ Redis OK" || echo "❌ Redis DOWN"
-
-# Check processes
-echo "📊 Process Status:"
-ps aux | grep -E '(java|mongod|redis)' | grep -v grep
-```
-
-#### Development Status
-
-```bash
-#!/bin/bash
-# dev-status.sh
-
-echo "🔧 Development Environment Status"
-
-echo "📁 Project Directory: $(pwd)"
-echo "☕ Java Version: $(java -version 2>&1 | head -n 1)"
-echo "🔨 Gradle Version: $(./gradlew --version | head -n 3 | tail -n 1)"
-echo "🍃 MongoDB: $(mongosh --quiet --eval 'db.version()' 2>/dev/null || echo 'Not running')"
-echo "🔴 Redis: $(redis-cli --version 2>/dev/null || echo 'Not installed')"
-
-echo "🌐 Active Ports:"
-netstat -tlnp 2>/dev/null | grep -E ':(8080|27017|6379)' || echo "No OpenFrame ports active"
-```
+1. **Container Limits**: Set memory/CPU limits on development containers
+2. **Connection Pooling**: Configure appropriate pool sizes
+3. **Log Management**: Use appropriate log levels and rotation
+4. **Cleanup**: Regularly clean up test data and containers
 
 ## Next Steps
 
-Now that you have local development running smoothly:
+✅ **Local Development Running?** Continue to [Architecture Overview](../architecture/overview.md) to understand how everything fits together.
 
-1. **[Architecture Overview](../architecture/overview.md)** - Understand the system design
-2. **[Testing Guide](../testing/overview.md)** - Write comprehensive tests
-3. **[Contributing Guidelines](../contributing/guidelines.md)** - Start contributing to the project
+---
 
-## Need Help?
-
-- 💬 **GitHub Discussions** - Ask the community
-- 🐛 **GitHub Issues** - Report bugs or request features
-- 📖 **Documentation** - Check other guides in this repository
-- 📧 **Email** - Contact the maintainers for complex issues
-
-Happy coding! 🎉 You're now ready to develop amazing features with OpenFrame OSS Library.
+You now have a complete local development environment for OpenFrame! You can develop, debug, and test with hot reload capabilities across all services. 🚀

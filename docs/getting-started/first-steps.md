@@ -1,504 +1,682 @@
 # First Steps with OpenFrame OSS Library
 
-Now that you have OpenFrame running, let's explore the key features and concepts that make it powerful. This guide walks you through the first 5 essential things to do after installation.
+Now that you have OpenFrame running, let's explore the core concepts by building real examples. In this guide, you'll create organizations, manage devices, and process events - the fundamental building blocks of any MSP platform.
 
-## Step 1: Understand the Core Concepts
+## What You'll Learn
 
-### Multi-Tenant Architecture
+By the end of this guide, you'll understand:
+- ✅ How to create and manage organizations (multi-tenancy)
+- ✅ How to register and monitor devices
+- ✅ How to handle events and audit logs  
+- ✅ How to integrate with external MSP tools
+- ✅ How authentication and authorization work
 
-OpenFrame is built for multi-tenancy from the ground up:
+## Step 1: Understanding the Data Model
+
+OpenFrame uses a hierarchical data model centered around organizations:
 
 ```mermaid
-graph TB
-    subgraph "Tenant A - Acme Corp"
-        A1[Devices]
-        A2[Users]
-        A3[Events]
-        A4[Tools]
-    end
+graph TD
+    A[Organization] --> B[Users]
+    A --> C[Devices/Machines]
+    A --> D[Tool Connections]
+    C --> E[Events]
+    C --> F[Alerts]
+    C --> G[Compliance]
+    D --> H[Installed Agents]
+    E --> I[Audit Logs]
     
-    subgraph "Tenant B - Beta Inc"
-        B1[Devices]
-        B2[Users] 
-        B3[Events]
-        B4[Tools]
-    end
-    
-    subgraph "Shared Infrastructure"
-        DB[(MongoDB)]
-        CACHE[(Redis)]
-        AUTH[Authorization]
-    end
-    
-    A1 --> DB
-    A2 --> DB
-    A3 --> DB
-    A4 --> DB
-    B1 --> DB
-    B2 --> DB
-    B3 --> DB
-    B4 --> DB
-    
-    DB --> CACHE
-    AUTH --> DB
+    style A fill:#e1f5fe
+    style C fill:#f3e5f5  
+    style E fill:#fff3e0
 ```
 
-### Core Domain Objects
+## Step 2: Create Your First Organization
 
-| Object | Purpose | Key Properties |
-|--------|---------|----------------|
-| **Device** | Represents physical/virtual machines | `serialNumber`, `type`, `status`, `health` |
-| **Organization** | Tenant container for devices and users | `name`, `domain`, `contactInfo` |
-| **Event** | Audit trail and activity logging | `type`, `severity`, `timestamp`, `metadata` |
-| **Tool** | External integrations (RMM, MDM) | `type`, `credentials`, `connectionStatus` |
-| **User** | Identity and access management | `email`, `role`, `organizations` |
+Organizations are the top-level containers that provide multi-tenant isolation.
 
-## Step 2: Explore Data Transfer Objects (DTOs)
-
-OpenFrame uses a sophisticated DTO pattern for API consistency.
-
-### Understanding the DTO Pattern
+### Create Organization Service
 
 ```java
-// Input DTOs - For API requests
-public class DeviceFilterInput {
-    private List<String> types;           // Filter by device types
-    private List<String> statuses;        // Filter by statuses
-    private String organizationId;        // Filter by organization
-    private CursorPaginationInput pagination; // Pagination parameters
+// src/main/java/com/example/testservice/OrganizationService.java
+package com.example.testservice;
+
+import com.openframe.data.document.organization.Organization;
+import com.openframe.data.document.organization.ContactInformation;
+import com.openframe.data.document.organization.Address;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+import java.util.List;
+
+@Service
+public class OrganizationService {
+
+    @Autowired
+    private MongoTemplate mongoTemplate;
+
+    public Organization createOrganization(String name, String domain, String email, String phone) {
+        // Create organization with contact information
+        Organization org = new Organization();
+        org.setName(name);
+        org.setDomain(domain);
+        org.setCreatedAt(Instant.now());
+        org.setUpdatedAt(Instant.now());
+
+        // Set contact information
+        ContactInformation contact = new ContactInformation();
+        contact.setEmail(email);
+        contact.setPhone(phone);
+        org.setContactInformation(contact);
+
+        // Set address
+        Address address = new Address();
+        address.setCity("Example City");
+        address.setState("Example State");
+        address.setCountry("US");
+        address.setZipCode("12345");
+        org.setAddress(address);
+
+        return mongoTemplate.save(org);
+    }
+
+    public List<Organization> getAllOrganizations() {
+        return mongoTemplate.findAll(Organization.class);
+    }
+
+    public Organization findByDomain(String domain) {
+        Query query = new Query(Criteria.where("domain").is(domain));
+        return mongoTemplate.findOne(query, Organization.class);
+    }
+}
+```
+
+### Add Organization Endpoints
+
+```java
+// Add to TestServiceApplication.java
+import org.springframework.beans.factory.annotation.Autowired;
+
+@Autowired
+private OrganizationService organizationService;
+
+@PostMapping("/organizations")
+public Organization createOrganization(@RequestBody CreateOrgRequest request) {
+    return organizationService.createOrganization(
+        request.getName(),
+        request.getDomain(), 
+        request.getEmail(),
+        request.getPhone()
+    );
 }
 
-// Response DTOs - For API responses  
-public class DeviceResponse {
-    private String id;
-    private String serialNumber;
-    private String model;
-    private DeviceType type;
+@GetMapping("/organizations")
+public List<Organization> getOrganizations() {
+    return organizationService.getAllOrganizations();
+}
+
+@GetMapping("/organizations/domain/{domain}")
+public Organization getByDomain(@PathVariable String domain) {
+    return organizationService.findByDomain(domain);
+}
+
+// Request DTO
+public static class CreateOrgRequest {
+    private String name;
+    private String domain;
+    private String email;
+    private String phone;
+    
+    // Getters and setters
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public String getDomain() { return domain; }
+    public void setDomain(String domain) { this.domain = domain; }
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+    public String getPhone() { return phone; }
+    public void setPhone(String phone) { this.phone = phone; }
+}
+```
+
+### Test Organization Creation
+
+```bash
+# Create your first organization
+curl -X POST http://localhost:8080/organizations \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Acme MSP",
+    "domain": "acme-msp.com",
+    "email": "admin@acme-msp.com", 
+    "phone": "+1-555-0123"
+  }'
+
+# List all organizations  
+curl http://localhost:8080/organizations | jq '.'
+
+# Find by domain
+curl http://localhost:8080/organizations/domain/acme-msp.com | jq '.'
+```
+
+## Step 3: Register Devices
+
+Devices represent the endpoints you're managing - servers, workstations, IoT devices, etc.
+
+### Create Device Service
+
+```java
+// src/main/java/com/example/testservice/DeviceService.java
+package com.example.testservice;
+
+import com.openframe.data.document.device.Device;
+import com.openframe.data.document.device.DeviceStatus;
+import com.openframe.data.document.device.DeviceType;
+import com.openframe.data.document.device.MachineTag;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Set;
+
+@Service  
+public class DeviceService {
+
+    @Autowired
+    private MongoTemplate mongoTemplate;
+
+    public Device registerDevice(String organizationId, String hostname, String ipAddress, DeviceType type) {
+        Device device = new Device();
+        device.setHostname(hostname);
+        device.setIpAddress(ipAddress);
+        device.setDeviceType(type);
+        device.setStatus(DeviceStatus.ONLINE);
+        device.setOrganizationId(organizationId);
+        device.setCreatedAt(Instant.now());
+        device.setLastSeenAt(Instant.now());
+
+        return mongoTemplate.save(device);
+    }
+
+    public Device addTags(String deviceId, Set<String> tags) {
+        Device device = mongoTemplate.findById(deviceId, Device.class);
+        if (device != null) {
+            // Convert tags to MachineTag objects
+            Set<MachineTag> machineTags = tags.stream()
+                .map(tag -> {
+                    MachineTag machineTag = new MachineTag();
+                    machineTag.setTag(tag);
+                    machineTag.setCreatedAt(Instant.now());
+                    return machineTag;
+                })
+                .collect(java.util.stream.Collectors.toSet());
+            
+            device.setMachineTags(machineTags);
+            device.setUpdatedAt(Instant.now());
+            return mongoTemplate.save(device);
+        }
+        return null;
+    }
+
+    public List<Device> getDevicesByOrganization(String organizationId) {
+        Query query = new Query(Criteria.where("organizationId").is(organizationId));
+        return mongoTemplate.find(query, Device.class);
+    }
+
+    public Device updateStatus(String deviceId, DeviceStatus status) {
+        Device device = mongoTemplate.findById(deviceId, Device.class);
+        if (device != null) {
+            device.setStatus(status);
+            device.setLastSeenAt(Instant.now());
+            device.setUpdatedAt(Instant.now());
+            return mongoTemplate.save(device);
+        }
+        return null;
+    }
+}
+```
+
+### Add Device Endpoints
+
+```java
+// Add to TestServiceApplication.java
+@Autowired
+private DeviceService deviceService;
+
+@PostMapping("/devices")
+public Device registerDevice(@RequestBody RegisterDeviceRequest request) {
+    return deviceService.registerDevice(
+        request.getOrganizationId(),
+        request.getHostname(),
+        request.getIpAddress(),
+        DeviceType.valueOf(request.getType())
+    );
+}
+
+@PutMapping("/devices/{deviceId}/tags")
+public Device addTags(@PathVariable String deviceId, @RequestBody TagRequest request) {
+    return deviceService.addTags(deviceId, request.getTags());
+}
+
+@GetMapping("/organizations/{orgId}/devices")
+public List<Device> getDevices(@PathVariable String orgId) {
+    return deviceService.getDevicesByOrganization(orgId);
+}
+
+@PutMapping("/devices/{deviceId}/status") 
+public Device updateStatus(@PathVariable String deviceId, @RequestBody StatusRequest request) {
+    return deviceService.updateStatus(deviceId, DeviceStatus.valueOf(request.getStatus()));
+}
+
+// Request DTOs
+public static class RegisterDeviceRequest {
+    private String organizationId;
+    private String hostname;
+    private String ipAddress;
+    private String type;
+    
+    // Getters and setters
+    public String getOrganizationId() { return organizationId; }
+    public void setOrganizationId(String organizationId) { this.organizationId = organizationId; }
+    public String getHostname() { return hostname; }
+    public void setHostname(String hostname) { this.hostname = hostname; }
+    public String getIpAddress() { return ipAddress; }
+    public void setIpAddress(String ipAddress) { this.ipAddress = ipAddress; }
+    public String getType() { return type; }
+    public void setType(String type) { this.type = type; }
+}
+
+public static class TagRequest {
+    private Set<String> tags;
+    public Set<String> getTags() { return tags; }
+    public void setTags(Set<String> tags) { this.tags = tags; }
+}
+
+public static class StatusRequest {
     private String status;
-    private Instant lastCheckin;
-}
-
-// Query Result DTOs - For paginated results
-public class GenericQueryResult<T> {
-    private List<T> items;           // The actual data
-    private CursorPageInfo pageInfo; // Pagination metadata
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
 }
 ```
 
-### Try the DTO Pattern
+### Test Device Management
 
 ```bash
-# Create a device with input DTO
-curl -X POST http://localhost:8080/api/devices \
+# First, get the organization ID from previous step
+ORG_ID="<paste-org-id-here>"
+
+# Register a server
+curl -X POST http://localhost:8080/devices \
   -H "Content-Type: application/json" \
   -d '{
-    "machineId": "test-machine",
-    "serialNumber": "TEST123456",
-    "model": "Test Device",
-    "type": "DESKTOP",
-    "status": "ACTIVE"
+    "organizationId": "'$ORG_ID'",
+    "hostname": "web-server-01",
+    "ipAddress": "192.168.1.100", 
+    "type": "SERVER"
   }'
 
-# Query with filter DTO
-curl -X POST http://localhost:8080/api/devices/search \
+# Register a workstation
+curl -X POST http://localhost:8080/devices \
   -H "Content-Type: application/json" \
   -d '{
-    "types": ["DESKTOP", "LAPTOP"],
-    "statuses": ["ACTIVE"], 
-    "pagination": {
-      "first": 10
-    }
+    "organizationId": "'$ORG_ID'",
+    "hostname": "john-laptop",
+    "ipAddress": "192.168.1.150",
+    "type": "LAPTOP"
   }'
-```
 
-## Step 3: Master Cursor-Based Pagination
+# Get device ID from response and add tags
+DEVICE_ID="<paste-device-id-here>"
 
-OpenFrame uses cursor-based pagination for consistent performance at scale.
-
-### Why Cursor Pagination?
-
-| Traditional Offset | Cursor-Based |
-|-------------------|--------------|
-| ❌ Performance degrades with large offsets | ✅ Consistent performance |
-| ❌ Data duplication during concurrent updates | ✅ Stable result sets |
-| ❌ Not suitable for real-time data | ✅ Perfect for real-time data |
-
-### Pagination Example
-
-```bash
-# First page request
-curl -X POST http://localhost:8080/api/devices/search \
+curl -X PUT http://localhost:8080/devices/$DEVICE_ID/tags \
   -H "Content-Type: application/json" \
   -d '{
-    "pagination": {
-      "first": 5
-    }
+    "tags": ["production", "web-server", "nginx"]
   }'
+
+# List all devices for organization
+curl http://localhost:8080/organizations/$ORG_ID/devices | jq '.'
 ```
 
-Response shows pagination metadata:
-```json
-{
-  "items": [...],
-  "pageInfo": {
-    "hasNextPage": true,
-    "hasPreviousPage": false,
-    "startCursor": "cursor_abc123",
-    "endCursor": "cursor_def456"
-  }
-}
-```
+## Step 4: Generate Events
 
-```bash
-# Next page request using endCursor
-curl -X POST http://localhost:8080/api/devices/search \
-  -H "Content-Type: application/json" \
-  -d '{
-    "pagination": {
-      "first": 5,
-      "after": "cursor_def456"
-    }
-  }'
-```
+Events represent activities, alerts, and changes in your environment.
 
-### Pagination Best Practices
+### Create Event Service
 
 ```java
-// Always check for more pages
-public void fetchAllDevices() {
-    String cursor = null;
-    boolean hasMore = true;
-    
-    while (hasMore) {
-        DeviceFilterInput input = DeviceFilterInput.builder()
-            .pagination(CursorPaginationInput.builder()
-                .first(50)  // Page size
-                .after(cursor)  // Start after this cursor
-                .build())
-            .build();
-        
-        GenericQueryResult<DeviceResponse> result = deviceService.searchDevices(input);
-        
-        // Process the current page
-        processDevices(result.getItems());
-        
-        // Update for next iteration
-        hasMore = result.getPageInfo().isHasNextPage();
-        cursor = result.getPageInfo().getEndCursor();
+// src/main/java/com/example/testservice/EventService.java
+package com.example.testservice;
+
+import com.openframe.data.document.event.CoreEvent;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+
+@Service
+public class EventService {
+
+    @Autowired
+    private MongoTemplate mongoTemplate;
+
+    public CoreEvent createEvent(String organizationId, String deviceId, String eventType, 
+                               String message, Map<String, Object> metadata) {
+        CoreEvent event = new CoreEvent();
+        event.setOrganizationId(organizationId);
+        event.setDeviceId(deviceId);
+        event.setEventType(eventType);
+        event.setMessage(message);
+        event.setMetadata(metadata);
+        event.setTimestamp(Instant.now());
+        event.setCreatedAt(Instant.now());
+
+        return mongoTemplate.save(event);
+    }
+
+    public List<CoreEvent> getEventsByDevice(String deviceId) {
+        Query query = new Query(Criteria.where("deviceId").is(deviceId));
+        query.with(org.springframework.data.domain.Sort.by(
+            org.springframework.data.domain.Sort.Direction.DESC, "timestamp"));
+        return mongoTemplate.find(query, CoreEvent.class);
+    }
+
+    public List<CoreEvent> getEventsByOrganization(String organizationId) {
+        Query query = new Query(Criteria.where("organizationId").is(organizationId));
+        query.with(org.springframework.data.domain.Sort.by(
+            org.springframework.data.domain.Sort.Direction.DESC, "timestamp"));
+        return mongoTemplate.find(query, CoreEvent.class);
     }
 }
 ```
 
-## Step 4: Configure Organizations and Multi-Tenancy
+### Add Event Endpoints
 
-### Create Your First Organization
+```java
+// Add to TestServiceApplication.java
+@Autowired
+private EventService eventService;
+
+@PostMapping("/events")
+public CoreEvent createEvent(@RequestBody CreateEventRequest request) {
+    return eventService.createEvent(
+        request.getOrganizationId(),
+        request.getDeviceId(),
+        request.getEventType(),
+        request.getMessage(),
+        request.getMetadata()
+    );
+}
+
+@GetMapping("/devices/{deviceId}/events")
+public List<CoreEvent> getDeviceEvents(@PathVariable String deviceId) {
+    return eventService.getEventsByDevice(deviceId);
+}
+
+@GetMapping("/organizations/{orgId}/events")
+public List<CoreEvent> getOrgEvents(@PathVariable String orgId) {
+    return eventService.getEventsByOrganization(orgId);
+}
+
+// Request DTO
+public static class CreateEventRequest {
+    private String organizationId;
+    private String deviceId;
+    private String eventType;
+    private String message;
+    private Map<String, Object> metadata;
+    
+    // Getters and setters
+    public String getOrganizationId() { return organizationId; }
+    public void setOrganizationId(String organizationId) { this.organizationId = organizationId; }
+    public String getDeviceId() { return deviceId; }
+    public void setDeviceId(String deviceId) { this.deviceId = deviceId; }
+    public String getEventType() { return eventType; }
+    public void setEventType(String eventType) { this.eventType = eventType; }
+    public String getMessage() { return message; }
+    public void setMessage(String message) { this.message = message; }
+    public Map<String, Object> getMetadata() { return metadata; }
+    public void setMetadata(Map<String, Object> metadata) { this.metadata = metadata; }
+}
+```
+
+### Test Event Creation
 
 ```bash
-# Create an organization
-curl -X POST http://localhost:8080/api/organizations \
+# Create some events
+curl -X POST http://localhost:8080/events \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "My Company",
-    "domain": "mycompany.com",
-    "contactInformation": {
-      "email": "admin@mycompany.com",
-      "phone": "+1-555-123-4567"
-    },
-    "address": {
-      "street": "123 Business St",
-      "city": "San Francisco",
-      "state": "CA",
-      "postalCode": "94105",
-      "country": "USA"
-    },
-    "contactPerson": {
-      "firstName": "John",
-      "lastName": "Doe", 
-      "email": "john.doe@mycompany.com",
-      "role": "IT Administrator"
+    "organizationId": "'$ORG_ID'",
+    "deviceId": "'$DEVICE_ID'",
+    "eventType": "SYSTEM_STARTUP",
+    "message": "Server web-server-01 started successfully",
+    "metadata": {
+      "service": "nginx",
+      "port": 80,
+      "status": "healthy"
     }
   }'
-```
 
-### Link Devices to Organizations
-
-```bash
-# Update a device to belong to an organization
-curl -X PUT http://localhost:8080/api/devices/device-001 \
+curl -X POST http://localhost:8080/events \
   -H "Content-Type: application/json" \
   -d '{
-    "organizationId": "org-123",
-    "machineId": "machine-001",
-    "serialNumber": "SN123456",
-    "model": "Dell OptiPlex 7090",
-    "type": "DESKTOP",
-    "status": "ACTIVE"
-  }'
-```
-
-### Query by Organization
-
-```bash
-# Get all devices for an organization
-curl -X POST http://localhost:8080/api/devices/search \
-  -H "Content-Type: application/json" \
-  -d '{
-    "organizationId": "org-123",
-    "pagination": {"first": 20}
-  }'
-```
-
-## Step 5: Enable Event Tracking and Audit Logs
-
-### Understanding Events
-
-OpenFrame tracks two types of events:
-
-1. **Core Events** - System-generated events (device status changes, user actions)
-2. **External Events** - Events from integrated tools (RMM alerts, security events)
-
-### Create Your First Event
-
-```bash
-# Log a device status change event
-curl -X POST http://localhost:8080/api/events \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "DEVICE_STATUS_CHANGED",
-    "severity": "INFO",
-    "source": "device-management-api",
-    "deviceId": "device-001",
-    "organizationId": "org-123",
+    "organizationId": "'$ORG_ID'",
+    "deviceId": "'$DEVICE_ID'",
+    "eventType": "SECURITY_ALERT",
+    "message": "Failed login attempt detected",
     "metadata": {
-      "previousStatus": "OFFLINE",
-      "newStatus": "ACTIVE",
-      "reason": "Device came back online"
-    },
-    "timestamp": "2024-01-20T10:30:00Z"
+      "source_ip": "192.168.1.200",
+      "user": "admin",
+      "attempts": 3
+    }
   }'
+
+# View events for device
+curl http://localhost:8080/devices/$DEVICE_ID/events | jq '.'
+
+# View all events for organization  
+curl http://localhost:8080/organizations/$ORG_ID/events | jq '.'
 ```
 
-### Query Events with Filters
+## Step 5: Explore Data Relationships
+
+Let's create a comprehensive example showing how all the pieces fit together:
 
 ```bash
-# Get events for a specific device
-curl -X POST http://localhost:8080/api/events/search \
+# Create a complete MSP environment
+echo "🏢 Setting up complete MSP environment..."
+
+# 1. Create organization
+ORG_RESPONSE=$(curl -s -X POST http://localhost:8080/organizations \
   -H "Content-Type: application/json" \
   -d '{
-    "deviceIds": ["device-001"],
-    "types": ["DEVICE_STATUS_CHANGED"],
-    "severities": ["INFO", "WARNING"],
-    "timeRange": {
-      "start": "2024-01-20T00:00:00Z",
-      "end": "2024-01-20T23:59:59Z"
-    },
-    "pagination": {"first": 50}
-  }'
-```
+    "name": "TechCorp MSP",
+    "domain": "techcorp-msp.com",
+    "email": "ops@techcorp-msp.com",
+    "phone": "+1-555-0199"
+  }')
 
-### Event Processing Pipeline
+ORG_ID=$(echo $ORG_RESPONSE | jq -r '.id')
+echo "✅ Created organization: $ORG_ID"
 
-```mermaid
-sequenceDiagram
-    participant Device
-    participant API
-    participant EventService
-    participant MongoDB
-    participant Kafka
-    participant Consumers
-    
-    Device->>API: Status Update
-    API->>EventService: Create Event
-    EventService->>MongoDB: Store Event
-    EventService->>Kafka: Publish Event
-    Kafka->>Consumers: Real-time Processing
-    
-    Note over Consumers: Alerts, Notifications,<br/>Analytics, Integrations
-```
-
-## Advanced Features to Explore
-
-### 1. Health Monitoring
-
-```bash
-# Check application health
-curl http://localhost:8080/actuator/health
-
-# Detailed health information
-curl http://localhost:8080/actuator/health/mongo
-curl http://localhost:8080/actuator/health/redis
-```
-
-### 2. Metrics and Monitoring
-
-```bash
-# Application metrics
-curl http://localhost:8080/actuator/metrics
-
-# Specific metrics
-curl http://localhost:8080/actuator/metrics/jvm.memory.used
-curl http://localhost:8080/actuator/metrics/http.server.requests
-```
-
-### 3. Configuration Properties
-
-```bash
-# View configuration
-curl http://localhost:8080/actuator/configprops
-
-# Environment information
-curl http://localhost:8080/actuator/env
-```
-
-### 4. API Documentation
-
-Visit `http://localhost:8080/swagger-ui.html` to explore:
-
-- 📖 **Interactive API Documentation**
-- 🧪 **Try API endpoints directly**
-- 📋 **Request/response schemas**
-- 🔍 **Search and filter capabilities**
-
-## Configuration Examples
-
-### Application Configuration
-
-Create `config/application-dev.yml`:
-
-```yaml
-spring:
-  profiles:
-    active: dev
-  data:
-    mongodb:
-      uri: mongodb://localhost:27017/openframe-dev
-      auto-index-creation: true
-  redis:
-    host: localhost
-    port: 6379
-    database: 0
-
-server:
-  port: 8080
-
-logging:
-  level:
-    com.openframe: DEBUG
-    org.springframework.data.mongodb: DEBUG
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,metrics,info,env
-  endpoint:
-    health:
-      show-details: always
-
-openframe:
-  pagination:
-    default-page-size: 20
-    max-page-size: 100
-  security:
-    enabled: false  # Disable for development
-```
-
-### Environment Variables
-
-```bash
-# Create .env file for development
-cat > .env << EOF
-SPRING_PROFILES_ACTIVE=dev
-MONGODB_URI=mongodb://localhost:27017/openframe-dev
-REDIS_URL=redis://localhost:6379/0
-SERVER_PORT=8080
-LOGGING_LEVEL_ROOT=INFO
-LOGGING_LEVEL_OPENFRAME=DEBUG
-EOF
-
-# Load environment
-source .env
-```
-
-## Common Operations Reference
-
-### Device Management
-
-```bash
-# List all devices
-curl http://localhost:8080/api/devices
-
-# Get specific device
-curl http://localhost:8080/api/devices/{deviceId}
-
-# Update device status
-curl -X PATCH http://localhost:8080/api/devices/{deviceId}/status \
+# 2. Register multiple devices
+SERVER_RESPONSE=$(curl -s -X POST http://localhost:8080/devices \
   -H "Content-Type: application/json" \
-  -d '{"status": "MAINTENANCE"}'
+  -d '{
+    "organizationId": "'$ORG_ID'",
+    "hostname": "db-server-01", 
+    "ipAddress": "192.168.1.10",
+    "type": "SERVER"
+  }')
 
-# Delete device
-curl -X DELETE http://localhost:8080/api/devices/{deviceId}
-```
+SERVER_ID=$(echo $SERVER_RESPONSE | jq -r '.id')
+echo "✅ Registered database server: $SERVER_ID"
 
-### Organization Management
-
-```bash
-# List organizations
-curl http://localhost:8080/api/organizations
-
-# Get organization details
-curl http://localhost:8080/api/organizations/{orgId}
-
-# Update organization
-curl -X PUT http://localhost:8080/api/organizations/{orgId} \
+LAPTOP_RESPONSE=$(curl -s -X POST http://localhost:8080/devices \
   -H "Content-Type: application/json" \
-  -d '{...organization data...}'
+  -d '{
+    "organizationId": "'$ORG_ID'",
+    "hostname": "ceo-macbook",
+    "ipAddress": "192.168.1.50", 
+    "type": "LAPTOP"
+  }')
+
+LAPTOP_ID=$(echo $LAPTOP_RESPONSE | jq -r '.id')
+echo "✅ Registered CEO laptop: $LAPTOP_ID"
+
+# 3. Add tags
+curl -s -X PUT http://localhost:8080/devices/$SERVER_ID/tags \
+  -H "Content-Type: application/json" \
+  -d '{"tags": ["production", "database", "postgresql", "critical"]}'
+
+curl -s -X PUT http://localhost:8080/devices/$LAPTOP_ID/tags \
+  -H "Content-Type: application/json" \
+  -d '{"tags": ["executive", "mobile", "macos"]}'
+
+echo "✅ Added device tags"
+
+# 4. Generate realistic events
+curl -s -X POST http://localhost:8080/events \
+  -H "Content-Type: application/json" \
+  -d '{
+    "organizationId": "'$ORG_ID'",
+    "deviceId": "'$SERVER_ID'",
+    "eventType": "BACKUP_COMPLETED",
+    "message": "Database backup completed successfully",
+    "metadata": {"backup_size": "2.5GB", "duration": "15min"}
+  }' > /dev/null
+
+curl -s -X POST http://localhost:8080/events \
+  -H "Content-Type: application/json" \
+  -d '{
+    "organizationId": "'$ORG_ID'",
+    "deviceId": "'$LAPTOP_ID'",
+    "eventType": "VPN_CONNECTED",
+    "message": "User connected to company VPN",
+    "metadata": {"location": "Remote", "protocol": "WireGuard"}
+  }' > /dev/null
+
+echo "✅ Generated sample events"
+
+# 5. Display summary
+echo ""
+echo "📊 ENVIRONMENT SUMMARY"
+echo "====================="
+curl -s http://localhost:8080/organizations/$ORG_ID | jq '{name: .name, domain: .domain, id: .id}'
+echo ""
+echo "📱 DEVICES ($(curl -s http://localhost:8080/organizations/$ORG_ID/devices | jq '. | length')):"
+curl -s http://localhost:8080/organizations/$ORG_ID/devices | jq '.[] | {hostname: .hostname, type: .deviceType, status: .status}'
+echo ""
+echo "🔔 RECENT EVENTS ($(curl -s http://localhost:8080/organizations/$ORG_ID/events | jq '. | length')):"
+curl -s http://localhost:8080/organizations/$ORG_ID/events | jq '.[] | {type: .eventType, message: .message, timestamp: .timestamp}'
 ```
 
-### Event Management
+## 🎉 What You've Accomplished
+
+Congratulations! You've successfully:
+
+✅ **Created a multi-tenant organization** with contact details  
+✅ **Registered and tagged devices** of different types  
+✅ **Generated events** with rich metadata  
+✅ **Explored data relationships** between organizations, devices, and events  
+✅ **Built a foundation** for MSP platform functionality  
+
+## Key Concepts Learned
+
+### 1. Multi-Tenancy
+Organizations provide complete data isolation - each MSP can only see their own devices, events, and users.
+
+### 2. Device Lifecycle
+Devices progress through states: Registration → Tagging → Monitoring → Event Generation → Status Updates
+
+### 3. Event-Driven Architecture  
+Events capture everything that happens in your environment, providing audit trails and enabling real-time monitoring.
+
+### 4. Flexible Metadata
+Both devices and events support arbitrary metadata, allowing customization for specific MSP needs.
+
+## Next Steps & Learning Path
+
+### Immediate Next Steps
+1. **[Development Setup](../development/setup/environment.md)** - Configure your IDE for efficient development
+2. **[Architecture Deep Dive](../development/architecture/overview.md)** - Understand the full system architecture  
+3. **[Testing Guide](../development/testing/overview.md)** - Learn testing patterns and best practices
+
+### Advanced Topics
+- **Authentication & Authorization** - Implement JWT-based security
+- **Tool Integrations** - Connect FleetDM, Tactical RMM, or other MSP tools
+- **Event Streaming** - Set up Kafka for real-time event processing
+- **API Security** - Rate limiting, input validation, and threat protection
+
+### Troubleshooting
+
+<details>
+<summary>MongoDB Connection Issues</summary>
 
 ```bash
-# Recent events
-curl http://localhost:8080/api/events?recent=true
+# Check MongoDB container
+docker logs openframe-mongodb
 
-# Events by severity
-curl "http://localhost:8080/api/events?severity=ERROR&severity=WARNING"
+# Test connection manually
+mongosh "mongodb://admin:password123@localhost:27017/?authSource=admin"
 
-# Event details
-curl http://localhost:8080/api/events/{eventId}
+# Restart if needed
+docker restart openframe-mongodb
 ```
+</details>
 
-## Next Steps
+<details>
+<summary>JSON Parsing Errors</summary>
 
-🎉 **Great job!** You now understand the core concepts and have hands-on experience with:
+```bash
+# Validate your JSON requests
+echo '{"name": "test"}' | jq '.'
 
-- ✅ Multi-tenant architecture
-- ✅ DTO patterns and API structure  
-- ✅ Cursor-based pagination
-- ✅ Organization management
-- ✅ Event tracking and audit logs
+# Common issues:
+# - Missing quotes around strings
+# - Trailing commas
+# - Incorrect field names
+```
+</details>
 
-### Continue Your Journey
+<details>
+<summary>Service Fails to Start</summary>
 
-1. **[Development Environment Setup](../development/setup/environment.md)** - Full development setup
-2. **[Architecture Deep Dive](../development/architecture/overview.md)** - Understand the system design  
-3. **[Local Development Guide](../development/setup/local-development.md)** - Contributing and customization
-4. **[Testing Overview](../development/testing/overview.md)** - Testing strategies and tools
+```bash
+# Check for port conflicts
+lsof -i :8080
 
-### Build Something Cool
+# Review application logs
+mvn spring-boot:run | grep ERROR
 
-Now that you understand the basics, try building:
+# Common fixes:
+# - Ensure databases are running
+# - Check application.yml configuration
+# - Verify Java version (should be 21)
+```
+</details>
 
-- 📊 **Custom Dashboard** - Device health monitoring
-- 🔔 **Alert System** - Real-time notifications  
-- 🔗 **Tool Integration** - Connect your RMM/MDM tools
-- 📈 **Analytics Engine** - Event data analysis
+## Where to Get Help
 
-## Need Help?
+- **📖 Documentation**: Continue with [Development Guides](../development/)  
+- **🐛 Issues**: [GitHub Issues](https://github.com/flamingo-stack/openframe-oss-lib/issues)
+- **💬 Community**: Join our Discord or Slack channels
+- **🎓 Examples**: Browse the `examples/` directory in the repository
 
-- 📖 **Documentation**: Comprehensive guides and references
-- 💬 **Community**: GitHub Discussions for questions
-- 🐛 **Issues**: GitHub Issues for bugs and features
-- 📧 **Support**: Enterprise support available
+---
 
-You're now equipped to build powerful device management solutions with OpenFrame OSS Library!
+🚀 **Ready for More?** You now have a solid foundation in OpenFrame OSS Library. Time to explore the development guides and build something amazing!

@@ -1,354 +1,379 @@
 # Prerequisites
 
-Before you begin working with OpenFrame OSS Library, ensure your development environment meets the following requirements. This guide covers everything you need to get started with development, testing, or integration.
+This guide covers everything you need to set up your development environment for working with the OpenFrame OSS Library.
 
 ## System Requirements
 
-### Hardware Requirements
-
-| Component | Minimum | Recommended |
-|-----------|---------|-------------|
-| **RAM** | 8 GB | 16 GB or more |
-| **CPU** | 4 cores | 8 cores or more |
-| **Storage** | 10 GB free space | 50 GB free space |
-| **Network** | Stable internet connection | High-speed broadband |
-
-### Operating System Support
-
-OpenFrame OSS Library supports development on:
-
-- ✅ **Linux** (Ubuntu 20.04+, CentOS 8+, Debian 11+)
-- ✅ **macOS** (macOS 11+ Big Sur)
-- ✅ **Windows** (Windows 10/11 with WSL2 recommended)
+| Component | Minimum | Recommended | Notes |
+|-----------|---------|-------------|-------|
+| **Operating System** | Linux, macOS, Windows | Linux/macOS | WSL2 recommended for Windows |
+| **RAM** | 8 GB | 16 GB+ | For running local services |
+| **Storage** | 10 GB free | 20 GB+ | For databases and dependencies |
+| **CPU** | 2 cores | 4+ cores | For building and testing |
 
 ## Required Software
 
-### Java Development Kit (JDK)
+### 1. Java Development Kit (JDK) 21
 
-OpenFrame requires **Java 17** or later.
+OpenFrame requires Java 21 or later.
 
-| Platform | Installation Command |
-|----------|---------------------|
-| **Ubuntu/Debian** | `sudo apt update && sudo apt install openjdk-17-jdk` |
-| **macOS** | `brew install openjdk@17` |
-| **Windows** | Download from [Oracle JDK](https://www.oracle.com/java/technologies/downloads/) |
+#### Installation
 
-**Verify Installation:**
+**Linux/macOS (using SDKMAN - Recommended):**
+```bash
+# Install SDKMAN
+curl -s "https://get.sdkman.io" | bash
+source "$HOME/.sdkman/bin/sdkman-init.sh"
 
+# Install Java 21
+sdk install java 21.0.1-tem
+sdk use java 21.0.1-tem
+```
+
+**Manual Installation:**
+- Download from [Eclipse Temurin](https://adoptium.net/temurin/releases/)
+- Or use your system package manager
+
+#### Verification
 ```bash
 java -version
+# Should output: openjdk version "21.0.1" or similar
+
 javac -version
+# Should output: javac 21.0.1 or similar
 ```
 
-Expected output:
-```text
-openjdk version "17.0.x" 2023-xx-xx
-OpenJDK Runtime Environment (build 17.0.x+x-Ubuntu-x)
-OpenJDK 64-Bit Server VM (build 17.0.x+x-Ubuntu-x, mixed mode, sharing)
-```
+### 2. Apache Maven 3.6+
 
-### MongoDB
+Maven is used for dependency management and building.
 
-OpenFrame uses MongoDB as its primary database.
+#### Installation
 
-| Platform | Installation |
-|----------|--------------|
-| **Ubuntu/Debian** | `wget -qO - https://www.mongodb.org/static/pgp/server-7.0.asc \| sudo apt-key add -` <br/> `echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu $(lsb_release -cs)/mongodb-org/7.0 multiverse" \| sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list` <br/> `sudo apt update && sudo apt install -y mongodb-org` |
-| **macOS** | `brew tap mongodb/brew && brew install mongodb-community` |
-| **Windows** | Download from [MongoDB Download Center](https://www.mongodb.com/try/download/community) |
-| **Docker** | `docker run --name mongodb -p 27017:27017 -d mongo:7.0` |
-
-**Start MongoDB:**
-
+**Linux:**
 ```bash
-# Linux/macOS
-sudo systemctl start mongod
-sudo systemctl enable mongod
+# Ubuntu/Debian
+sudo apt update && sudo apt install maven
 
-# macOS with Homebrew
-brew services start mongodb-community
-
-# Docker
-docker start mongodb
+# CentOS/RHEL
+sudo yum install maven
 ```
 
-**Verify MongoDB Connection:**
-
+**macOS:**
 ```bash
-mongosh --eval "db.adminCommand('ping')"
+# Using Homebrew
+brew install maven
 ```
 
-### Redis (Optional but Recommended)
+**Windows:**
+- Download from [Apache Maven](https://maven.apache.org/download.cgi)
+- Add to `PATH` environment variable
 
-Redis is used for caching and session management.
+#### Verification
+```bash
+mvn -version
+# Should show Maven 3.6+ and Java 21
+```
 
-| Platform | Installation |
-|----------|--------------|
-| **Ubuntu/Debian** | `sudo apt update && sudo apt install redis-server` |
-| **macOS** | `brew install redis` |
-| **Windows** | Use WSL2 or download from [Redis website](https://redis.io/download) |
-| **Docker** | `docker run --name redis -p 6379:6379 -d redis:7-alpine` |
+### 3. Git
 
-**Start Redis:**
+Required for cloning repositories and version control.
 
 ```bash
 # Linux
-sudo systemctl start redis-server
-
-# macOS
-brew services start redis
-
-# Docker
-docker start redis
-```
-
-**Verify Redis:**
-
-```bash
-redis-cli ping
-```
-
-Expected response: `PONG`
-
-### Apache Kafka (For Event Processing)
-
-Required for event streaming and processing.
-
-| Platform | Installation |
-|----------|--------------|
-| **Any** | Download from [Apache Kafka](https://kafka.apache.org/downloads) |
-| **Docker** | `docker run --name kafka -p 9092:9092 -d confluentinc/cp-kafka:latest` |
-
-### Git
-
-Version control system for source code management.
-
-```bash
-# Ubuntu/Debian
-sudo apt install git
+sudo apt install git  # Ubuntu/Debian
+sudo yum install git  # CentOS/RHEL
 
 # macOS
 brew install git
 
 # Windows
-# Download from https://git-scm.com/download/win
+# Download from https://git-scm.com/
 ```
 
-**Verify Git:**
-
+#### Verification
 ```bash
 git --version
+# Should output: git version 2.30+ or similar
 ```
 
-## Development Tools
+## Database Requirements
+
+### 1. MongoDB
+
+OpenFrame uses MongoDB as its primary database.
+
+#### Installation
+
+**Using Docker (Recommended for Development):**
+```bash
+# Start MongoDB container
+docker run -d \
+  --name openframe-mongodb \
+  -p 27017:27017 \
+  -e MONGO_INITDB_ROOT_USERNAME=admin \
+  -e MONGO_INITDB_ROOT_PASSWORD=password123 \
+  -v mongodb_data:/data/db \
+  mongo:7
+```
+
+**Native Installation:**
+
+**Linux:**
+```bash
+# Ubuntu/Debian
+wget -qO - https://www.mongodb.org/static/pgp/server-7.0.asc | sudo apt-key add -
+echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu $(lsb_release -cs)/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+sudo apt update
+sudo apt install -y mongodb-org
+```
+
+**macOS:**
+```bash
+brew tap mongodb/brew
+brew install mongodb-community
+```
+
+#### Verification
+```bash
+# If using Docker
+docker exec openframe-mongodb mongosh --eval "db.runCommand('connectionStatus')"
+
+# If using native installation
+mongosh --eval "db.runCommand('connectionStatus')"
+```
+
+### 2. Redis (Optional but Recommended)
+
+Redis is used for caching and session management.
+
+#### Installation
+
+**Using Docker:**
+```bash
+docker run -d \
+  --name openframe-redis \
+  -p 6379:6379 \
+  redis:7-alpine
+```
+
+**Native Installation:**
+```bash
+# Linux
+sudo apt install redis-server  # Ubuntu/Debian
+sudo yum install redis         # CentOS/RHEL
+
+# macOS
+brew install redis
+```
+
+#### Verification
+```bash
+# If using Docker
+docker exec openframe-redis redis-cli ping
+# Should return: PONG
+
+# If using native installation
+redis-cli ping
+# Should return: PONG
+```
+
+## Optional Components
+
+### Apache Kafka (For Event Streaming)
+
+Required for advanced event processing features.
+
+**Using Docker:**
+```bash
+# Create docker-compose.yml for Kafka
+cat > docker-compose.kafka.yml << 'EOF'
+version: '3'
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+EOF
+
+# Start Kafka
+docker-compose -f docker-compose.kafka.yml up -d
+```
+
+## Development Environment Setup
+
+### Environment Variables
+
+Create a `.env` file for local development:
+
+```bash
+# Database Configuration
+SPRING_DATA_MONGODB_URI=mongodb://admin:password123@localhost:27017/openframe?authSource=admin
+SPRING_DATA_REDIS_HOST=localhost
+SPRING_DATA_REDIS_PORT=6379
+
+# Security Configuration
+JWT_SECRET=your-256-bit-secret-key-here-change-this-in-production
+JWT_EXPIRATION=86400
+
+# Application Configuration
+SPRING_PROFILES_ACTIVE=local
+LOGGING_LEVEL_COM_OPENFRAME=DEBUG
+
+# Optional: Kafka Configuration
+SPRING_KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+```
 
 ### IDE Recommendations
 
-| IDE | Best For | Download |
-|-----|----------|----------|
-| **IntelliJ IDEA** | Java development (recommended) | [JetBrains](https://www.jetbrains.com/idea/) |
-| **Eclipse** | Free Java IDE | [Eclipse Foundation](https://www.eclipse.org/downloads/) |
-| **Visual Studio Code** | Lightweight, multi-language | [Microsoft](https://code.visualstudio.com/) |
+#### IntelliJ IDEA (Recommended)
 
-### Build Tools
+**Required Plugins:**
+- Lombok
+- Spring Boot
+- MongoDB Plugin
 
-OpenFrame uses **Gradle** as its build system:
+**Settings:**
+1. Enable annotation processing: `Settings` → `Build` → `Compiler` → `Annotation Processors` → ✅ Enable
+2. Set JDK to 21: `File` → `Project Structure` → `Project` → `Project SDK`
 
-```bash
-# Install Gradle
-# Ubuntu/Debian
-sudo apt install gradle
+#### VS Code
 
-# macOS
-brew install gradle
-
-# Windows (with Chocolatey)
-choco install gradle
-
-# Verify installation
-gradle --version
-```
-
-### Essential IDE Plugins
-
-For **IntelliJ IDEA**:
-- Lombok Plugin
-- Spring Boot Plugin  
-- Database Tools and SQL
-
-For **Visual Studio Code**:
+**Required Extensions:**
 - Extension Pack for Java
 - Spring Boot Extension Pack
 - MongoDB for VS Code
 
-## Network and Access Requirements
+#### Eclipse
 
-### Port Requirements
+**Required Plugins:**
+- Spring Tools 4
+- Lombok Plugin
 
-Ensure these ports are available:
+### System Configuration
 
-| Service | Port | Purpose |
-|---------|------|---------|
-| **MongoDB** | 27017 | Database connection |
-| **Redis** | 6379 | Cache and sessions |
-| **Kafka** | 9092 | Event streaming |
-| **Application** | 8080 | Default Spring Boot port |
-| **Gateway** | 8081 | API Gateway |
-| **Auth Service** | 8082 | Authorization service |
-
-### Internet Access
-
-Required for:
-- Maven/Gradle dependencies
-- MongoDB Atlas (if using cloud)
-- External API integrations
-- Documentation and updates
-
-## Environment Variables
-
-Set these environment variables in your development environment:
+#### Increase File Limits (Linux/macOS)
 
 ```bash
-# Add to your ~/.bashrc, ~/.zshrc, or equivalent
+# Add to ~/.bashrc or ~/.zshrc
+echo 'ulimit -n 8192' >> ~/.bashrc
+source ~/.bashrc
+```
 
-# Java
-export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-export PATH=$JAVA_HOME/bin:$PATH
+#### Configure Git
 
-# MongoDB
-export MONGODB_URI=mongodb://localhost:27017/openframe
-
-# Redis
-export REDIS_URL=redis://localhost:6379
-
-# Application
-export SPRING_PROFILES_ACTIVE=development
+```bash
+git config --global user.name "Your Name"
+git config --global user.email "your.email@example.com"
+git config --global init.defaultBranch main
 ```
 
 ## Verification Checklist
 
-Run these commands to verify your setup:
-
-### ✅ Java and Build Tools
+Run these commands to verify your environment is ready:
 
 ```bash
-java -version        # Should show Java 17+
-javac -version       # Should show Java 17+  
-gradle --version     # Should show Gradle info
+# Check Java
+java -version | grep "21\."
+echo "✅ Java 21: $?"
+
+# Check Maven
+mvn -version | grep "Maven"
+echo "✅ Maven: $?"
+
+# Check Git
+git --version
+echo "✅ Git: $?"
+
+# Check MongoDB connection
+mongosh --eval "db.runCommand('ismaster')" --quiet
+echo "✅ MongoDB: $?"
+
+# Check Redis connection (if installed)
+redis-cli ping 2>/dev/null || echo "⚠️ Redis: Optional, not required"
 ```
 
-### ✅ Database Services
+## Common Issues & Solutions
 
+<details>
+<summary>Java Version Issues</summary>
+
+**Problem:** Wrong Java version or `JAVA_HOME` not set
+
+**Solution:**
 ```bash
-# MongoDB
-mongosh --eval "db.adminCommand('ping')"
+# Find Java installation
+sudo find /usr -name "java" -type f 2>/dev/null
 
-# Redis  
-redis-cli ping
-
-# Check MongoDB is running
-sudo systemctl status mongod
-
-# Check Redis is running  
-sudo systemctl status redis
+# Set JAVA_HOME (add to ~/.bashrc)
+export JAVA_HOME=/path/to/java21
+export PATH="$JAVA_HOME/bin:$PATH"
 ```
+</details>
 
-### ✅ Network Connectivity
+<details>
+<summary>MongoDB Connection Issues</summary>
 
+**Problem:** Cannot connect to MongoDB
+
+**Solution:**
 ```bash
-# Test port availability
-telnet localhost 27017  # MongoDB
-telnet localhost 6379   # Redis
+# Check if MongoDB is running
+docker ps | grep mongo  # For Docker
+sudo systemctl status mongod  # For native installation
+
+# Test connection with authentication
+mongosh "mongodb://admin:password123@localhost:27017/?authSource=admin"
 ```
+</details>
 
-### ✅ Environment Variables
+<details>
+<summary>Maven Download Issues</summary>
 
+**Problem:** Slow dependency downloads
+
+**Solution:**
 ```bash
-echo $JAVA_HOME
-echo $MONGODB_URI
-echo $REDIS_URL
+# Use a faster Maven mirror - add to ~/.m2/settings.xml
+mkdir -p ~/.m2
+cat > ~/.m2/settings.xml << 'EOF'
+<settings>
+  <mirrors>
+    <mirror>
+      <id>central-mirror</id>
+      <name>Central Mirror</name>
+      <url>https://repo1.maven.org/maven2</url>
+      <mirrorOf>central</mirrorOf>
+    </mirror>
+  </mirrors>
+</settings>
+EOF
 ```
-
-## Common Issues and Solutions
-
-### Issue: Java Version Conflicts
-
-```bash
-# List all Java versions
-update-alternatives --list java
-
-# Set default Java version
-sudo update-alternatives --config java
-```
-
-### Issue: MongoDB Connection Refused
-
-```bash
-# Check MongoDB status
-sudo systemctl status mongod
-
-# View MongoDB logs
-sudo tail -f /var/log/mongodb/mongod.log
-
-# Restart MongoDB
-sudo systemctl restart mongod
-```
-
-### Issue: Port Already in Use
-
-```bash
-# Find process using port 8080
-lsof -i :8080
-
-# Kill process if needed
-kill -9 <PID>
-```
-
-## Optional Tools
-
-### Database Management
-
-| Tool | Purpose | Platform |
-|------|---------|----------|
-| **MongoDB Compass** | MongoDB GUI | [Download](https://www.mongodb.com/try/download/compass) |
-| **Redis Desktop Manager** | Redis GUI | Cross-platform |
-| **DBeaver** | Universal database tool | Cross-platform |
-
-### API Testing
-
-| Tool | Purpose | 
-|------|---------|
-| **Postman** | API testing and documentation |
-| **Insomnia** | REST API client |
-| **curl** | Command-line HTTP client |
-
-### Container Tools (Optional)
-
-```bash
-# Docker
-curl -fsSL https://get.docker.com -o get-docker.sh
-sh get-docker.sh
-
-# Docker Compose
-sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
-```
+</details>
 
 ## Next Steps
 
-Once you've completed the prerequisites setup:
+✅ **Environment Ready?** Proceed to the [Quick Start Guide](quick-start.md) to build and run your first OpenFrame service.
 
-1. ✅ **Verify your installation** using the checklist above
-2. 🚀 **Continue to [Quick Start Guide](quick-start.md)** to build and run your first OpenFrame application
-3. 🔧 **Or jump to [Development Setup](../development/setup/environment.md)** for a full development environment
+> 💡 **Tip**: Keep your development environment clean by using Docker containers for databases. This makes it easy to reset state during development and testing.
 
-## Need Help?
+---
 
-If you encounter any issues during setup:
-
-- 📖 Check our [troubleshooting section](#common-issues-and-solutions)
-- 💬 Ask questions in GitHub Discussions
-- 🐛 Report setup issues on GitHub Issues
-- 📧 Contact the OpenFrame team for enterprise support
-
-Your development environment is the foundation for everything you'll build with OpenFrame. Take time to set it up correctly!
+**Need Help?** 
+- Check our [troubleshooting section](first-steps.md#troubleshooting)
+- Visit [GitHub Issues](https://github.com/flamingo-stack/openframe-oss-lib/issues)
+- Join our community discussions

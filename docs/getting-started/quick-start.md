@@ -1,357 +1,394 @@
 # Quick Start Guide
 
-Get OpenFrame OSS Library up and running in 5 minutes! This guide provides the fastest path to see the library in action with a working device management example.
+Get OpenFrame OSS Library running in 5 minutes! This guide will have you building, running, and testing your first OpenFrame service.
 
-## TL;DR - 5 Minute Setup
+> **⚡ TL;DR Goal**: Clone the repo, build the libraries, and run a basic service to verify everything works.
+
+## Step 1: Clone the Repository
 
 ```bash
 # Clone the repository
-git clone https://github.com/openframe/openframe-oss-lib.git
+git clone https://github.com/flamingo-stack/openframe-oss-lib.git
 cd openframe-oss-lib
 
-# Start dependencies
-docker-compose up -d mongodb redis
-
-# Build the project
-./gradlew build
-
-# Run the example application
-./gradlew :examples:device-management:bootRun
+# Verify the structure
+ls -la
 ```
 
-Navigate to `http://localhost:8080` to see your device management dashboard.
-
-## Step 1: Clone and Setup
-
-### Clone the Repository
-
+**Expected output:**
 ```bash
-git clone https://github.com/openframe/openframe-oss-lib.git
-cd openframe-oss-lib
+total 64
+drwxr-xr-x  20 user  staff    640 Nov 19 10:00 .
+drwxr-xr-x   3 user  staff     96 Nov 19 10:00 ..
+-rw-r--r--   1 user  staff    123 Nov 19 10:00 .gitignore
+-rw-r--r--   1 user  staff   1234 Nov 19 10:00 LICENSE
+-rw-r--r--   1 user  staff    789 Nov 19 10:00 README.md
+-rw-r--r--   1 user  staff  10456 Nov 19 10:00 pom.xml
+drwxr-xr-x   8 user  staff    256 Nov 19 10:00 openframe-api-lib/
+drwxr-xr-x   6 user  staff    192 Nov 19 10:00 openframe-core/
+drwxr-xr-x   7 user  staff    224 Nov 19 10:00 openframe-data-mongo/
+# ... other modules
 ```
 
-### Quick Dependencies with Docker
-
-The fastest way to get dependencies running:
+## Step 2: Build the Libraries
 
 ```bash
-# Start MongoDB and Redis
-docker-compose up -d
+# Clean and install all modules
+mvn clean install -DskipTests
 
-# Verify services are running
+# This will:
+# 1. Download all dependencies (~5-10 minutes first time)
+# 2. Compile all modules
+# 3. Install artifacts to local repository
+```
+
+**Expected output (final lines):**
+```bash
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  02:34 min
+[INFO] Finished at: 2024-11-19T10:05:42-05:00
+[INFO] ------------------------------------------------------------------------
+```
+
+## Step 3: Set Up Local Database
+
+```bash
+# Start MongoDB and Redis using Docker
+docker run -d \
+  --name openframe-mongodb \
+  -p 27017:27017 \
+  -e MONGO_INITDB_ROOT_USERNAME=admin \
+  -e MONGO_INITDB_ROOT_PASSWORD=password123 \
+  mongo:7
+
+docker run -d \
+  --name openframe-redis \
+  -p 6379:6379 \
+  redis:7-alpine
+
+# Verify databases are running
 docker ps
 ```
 
-You should see:
-```text
-CONTAINER ID   IMAGE         PORTS                      NAMES
-xxxxx         mongo:7.0     0.0.0.0:27017->27017/tcp   mongodb
-xxxxx         redis:7-alpine 0.0.0.0:6379->6379/tcp    redis
-```
+## Step 4: Create a Simple Test Service
 
-## Step 2: Build the Project
-
-### Build All Modules
+Create a minimal Spring Boot application to test the libraries:
 
 ```bash
-./gradlew build
+# Create a test directory
+mkdir -p test-service/src/main/java/com/example/testservice
+cd test-service
 ```
 
-This command will:
-- ✅ Download all dependencies
-- ✅ Compile Java source code
-- ✅ Run unit tests
-- ✅ Create library JARs
+**Create `pom.xml`:**
 
-Expected output:
-```text
-BUILD SUCCESSFUL in 2m 15s
-45 actionable tasks: 45 executed
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>openframe-test-service</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.3.0</version>
+    </parent>
+
+    <properties>
+        <java.version>21</java.version>
+        <openframe.version>5.10.1</openframe.version>
+    </properties>
+
+    <dependencies>
+        <!-- Spring Boot Starters -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        
+        <!-- OpenFrame OSS Libraries -->
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-core</artifactId>
+            <version>${openframe.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-api-lib</artifactId>
+            <version>${openframe.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-data-mongo</artifactId>
+            <version>${openframe.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
 ```
 
-### Quick Build (Skip Tests)
+**Create the main application class:**
 
-For faster builds during development:
+```java
+// src/main/java/com/example/testservice/TestServiceApplication.java
+package com.example.testservice;
 
-```bash
-./gradlew build -x test
-```
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-## Step 3: Run Example Application
+@SpringBootApplication
+@RestController
+public class TestServiceApplication {
 
-### Start the Device Management Example
-
-```bash
-./gradlew :examples:device-management:bootRun
-```
-
-The application will start on `http://localhost:8080`
-
-You should see:
-```text
-  ____                   _____                          
- / __ \                 |  __ \                         
-| |  | |_ __   ___ _ __ | |__) |_ _ _ __ ___   ___       
-| |  | | '_ \ / _ \ '_ \|  _  /| '_| '_  _ \ / _ \      
-| |__| | |_) |  __/ | | | | \ \| | | | | | |  __/      
- \____/| .__/ \___|_| |_|_|  \_\_| |_| |_| |_|\___|     
-       | |                                             
-       |_|                                             
-
-2024-01-20 10:30:00.000  INFO --- [  restartedMain] c.o.examples.DeviceManagementApp : Starting DeviceManagementApp
-2024-01-20 10:30:02.000  INFO --- [  restartedMain] c.o.examples.DeviceManagementApp : Started DeviceManagementApp in 2.5 seconds
-```
-
-## Step 4: Explore the Example
-
-### Access the Web Dashboard
-
-Open your browser to: `http://localhost:8080`
-
-You'll see the OpenFrame device management dashboard with:
-
-- 📊 **Device Overview** - Total devices, online/offline status
-- 💻 **Device List** - Sample devices with different types
-- 🔍 **Search & Filter** - Find devices by type, status, or organization
-- 📈 **Health Metrics** - Device health and compliance status
-
-### Sample API Calls
-
-The example includes sample data. Try these API calls:
-
-```bash
-# List all devices
-curl http://localhost:8080/api/devices
-
-# Get device by ID
-curl http://localhost:8080/api/devices/device-001
-
-# Filter devices by type
-curl "http://localhost:8080/api/devices?type=LAPTOP"
-
-# Get organizations
-curl http://localhost:8080/api/organizations
-```
-
-### Expected Response
-
-```json
-{
-  "items": [
-    {
-      "id": "device-001",
-      "machineId": "machine-123",
-      "serialNumber": "SN123456789",
-      "model": "Dell OptiPlex 7090", 
-      "osVersion": "Windows 11 Pro",
-      "status": "ACTIVE",
-      "type": "DESKTOP",
-      "lastCheckin": "2024-01-20T10:30:00Z"
+    public static void main(String[] args) {
+        SpringApplication.run(TestServiceApplication.class, args);
     }
-  ],
-  "pageInfo": {
-    "hasNextPage": false,
-    "hasPreviousPage": false,
-    "startCursor": "cursor_start",
-    "endCursor": "cursor_end"
-  }
+
+    @GetMapping("/health")
+    public String health() {
+        return "OpenFrame OSS Library is working! 🚀";
+    }
+
+    @GetMapping("/info")
+    public java.util.Map<String, Object> info() {
+        return java.util.Map.of(
+            "service", "OpenFrame Test Service",
+            "version", "1.0.0",
+            "timestamp", java.time.Instant.now(),
+            "libraries", java.util.List.of(
+                "openframe-core",
+                "openframe-api-lib", 
+                "openframe-data-mongo"
+            )
+        );
+    }
 }
 ```
 
-## Step 5: Understanding What You Built
+**Create application configuration:**
 
-### Architecture Components
-
-```mermaid
-graph LR
-    subgraph "What You Just Created"
-        WEB[Web Dashboard :8080]
-        API[REST API :8080]
-        LIB[OpenFrame OSS Lib]
-    end
-    
-    subgraph "Data Layer"
-        MONGO[(MongoDB :27017)]
-        REDIS[(Redis :6379)]
-    end
-    
-    WEB --> API
-    API --> LIB
-    LIB --> MONGO
-    LIB --> REDIS
-```
-
-### Key Files Created
-
-| Component | File | Purpose |
-|-----------|------|---------|
-| **DTOs** | `DeviceResponse.java` | API response objects |
-| **Services** | `DeviceService.java` | Business logic |
-| **Models** | `Device.java` | MongoDB entities |
-| **Controllers** | `DeviceController.java` | REST endpoints |
-| **Config** | `MongoConfig.java` | Database configuration |
-
-### Data Flow
-
-```mermaid
-sequenceDiagram
-    participant Browser
-    participant Controller
-    participant Service
-    participant Repository
-    participant MongoDB
-    
-    Browser->>Controller: GET /api/devices
-    Controller->>Service: findAllDevices()
-    Service->>Repository: findAll()
-    Repository->>MongoDB: Query devices collection
-    MongoDB-->>Repository: Return documents
-    Repository-->>Service: Return Device entities
-    Service-->>Controller: Return DeviceResponse DTOs
-    Controller-->>Browser: JSON response
-```
-
-## What's Working Now
-
-✅ **Device Management**
-- Device CRUD operations
-- Device filtering by type and status
-- Device health monitoring
-
-✅ **Organization Management**
-- Organization listing and details
-- Contact information management
-
-✅ **API Infrastructure**
-- RESTful API endpoints
-- Cursor-based pagination
-- Input validation and error handling
-
-✅ **Data Persistence**
-- MongoDB document storage
-- Redis caching layer
-- Automatic data mapping
-
-## Testing Your Setup
-
-### Verify Components
-
-```bash
-# Check application health
-curl http://localhost:8080/actuator/health
-
-# Expected response
-{
-  "status": "UP",
-  "components": {
-    "mongo": {"status": "UP"},
-    "redis": {"status": "UP"}
-  }
-}
-```
-
-### Create Your First Device
-
-```bash
-curl -X POST http://localhost:8080/api/devices \
-  -H "Content-Type: application/json" \
-  -d '{
-    "machineId": "my-machine-001",
-    "serialNumber": "MY123456789", 
-    "model": "MacBook Pro M2",
-    "osVersion": "macOS 14.0",
-    "status": "ACTIVE",
-    "type": "LAPTOP"
-  }'
-```
-
-### Query Your Device
-
-```bash
-curl http://localhost:8080/api/devices | jq '.items[] | select(.serialNumber=="MY123456789")'
-```
-
-## Next Steps
-
-🎉 **Congratulations!** You have OpenFrame OSS Library running with a complete device management example.
-
-### Immediate Next Steps
-
-1. **[First Steps Guide](first-steps.md)** - Explore key features and concepts
-2. **[Development Environment](../development/setup/environment.md)** - Set up full development environment
-3. **[Architecture Overview](../development/architecture/overview.md)** - Understand the system design
-
-### Explore Further
-
-- **Add Organizations**: Create organizations and assign devices
-- **Event Logging**: Enable audit trails and event tracking
-- **Tool Integration**: Connect external RMM tools
-- **Security**: Add authentication and authorization
-
-### Customize Your Setup
-
-```bash
-# Edit application configuration
-vim examples/device-management/src/main/resources/application.yml
-
-# Add your database URL
+```yaml
+# src/main/resources/application.yml
 spring:
+  application:
+    name: openframe-test-service
+  
   data:
     mongodb:
-      uri: mongodb://your-mongodb-url:27017/openframe
+      uri: mongodb://admin:password123@localhost:27017/openframe_test?authSource=admin
+    
+    redis:
+      host: localhost
+      port: 6379
 
-# Restart the application
-./gradlew :examples:device-management:bootRun
+server:
+  port: 8080
+
+logging:
+  level:
+    com.openframe: DEBUG
+    root: INFO
 ```
 
-## Common Issues & Solutions
-
-### Port 8080 Already in Use
+## Step 5: Run the Test Service
 
 ```bash
-# Find and kill the process
+# Build and run the test service
+mvn clean package -DskipTests
+mvn spring-boot:run
+```
+
+**Expected output:**
+```bash
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.3.0)
+
+2024-11-19T10:10:15.123  INFO --- [           main] c.e.t.TestServiceApplication : Starting TestServiceApplication...
+2024-11-19T10:10:16.456  INFO --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port(s): 8080 (http)
+2024-11-19T10:10:16.789  INFO --- [           main] c.e.t.TestServiceApplication : Started TestServiceApplication in 1.666 seconds
+```
+
+## Step 6: Test the Service
+
+Open a new terminal and test the endpoints:
+
+```bash
+# Test health endpoint
+curl http://localhost:8080/health
+# Expected: OpenFrame OSS Library is working! 🚀
+
+# Test info endpoint
+curl http://localhost:8080/info | jq '.'
+```
+
+**Expected JSON response:**
+```json
+{
+  "service": "OpenFrame Test Service",
+  "version": "1.0.0", 
+  "timestamp": "2024-11-19T15:10:30.123Z",
+  "libraries": [
+    "openframe-core",
+    "openframe-api-lib",
+    "openframe-data-mongo"
+  ]
+}
+```
+
+## Step 7: Test Database Connection
+
+Add a simple database test:
+
+```java
+// Add to TestServiceApplication.java
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
+
+@Autowired
+private MongoTemplate mongoTemplate;
+
+@GetMapping("/db-test")
+public String testDatabase() {
+    try {
+        // Test MongoDB connection
+        mongoTemplate.getCollection("test").countDocuments();
+        return "✅ Database connection successful!";
+    } catch (Exception e) {
+        return "❌ Database connection failed: " + e.getMessage();
+    }
+}
+```
+
+```bash
+# Restart the service and test
+mvn spring-boot:run
+
+# In another terminal
+curl http://localhost:8080/db-test
+# Expected: ✅ Database connection successful!
+```
+
+## Step 8: Create Your First Document
+
+Test creating a simple organization document:
+
+```java
+// Add to TestServiceApplication.java
+import com.openframe.data.document.organization.Organization;
+
+@GetMapping("/create-org")
+public String createOrganization() {
+    try {
+        Organization org = new Organization();
+        org.setName("Test MSP Company");
+        org.setDomain("testmsp.com");
+        org.setStatus(/* appropriate status */);
+        
+        mongoTemplate.save(org);
+        
+        return "✅ Created organization: " + org.getName();
+    } catch (Exception e) {
+        return "❌ Failed to create organization: " + e.getMessage();
+    }
+}
+```
+
+```bash
+# Test organization creation
+curl http://localhost:8080/create-org
+# Expected: ✅ Created organization: Test MSP Company
+```
+
+## 🎉 Success! What You've Accomplished
+
+In just 5 minutes, you've:
+
+✅ **Built** the entire OpenFrame OSS Library  
+✅ **Set up** MongoDB and Redis databases  
+✅ **Created** a working Spring Boot service  
+✅ **Tested** API endpoints and database connectivity  
+✅ **Verified** that OpenFrame libraries are working correctly  
+
+## Quick Verification Checklist
+
+- [ ] Repository cloned successfully
+- [ ] Maven build completed without errors
+- [ ] Databases are running in Docker
+- [ ] Test service starts on port 8080
+- [ ] Health endpoint returns success message
+- [ ] Database connection test passes
+- [ ] Organization creation works
+
+## What's Next?
+
+Now that your environment is working, you can:
+
+1. **[Explore First Steps](first-steps.md)** - Learn core concepts with hands-on examples
+2. **[Set up Development Environment](../development/setup/environment.md)** - Configure your IDE and tools
+3. **[Explore the Architecture](../development/architecture/overview.md)** - Understand how everything fits together
+
+## Troubleshooting
+
+### Build Fails
+
+```bash
+# Check Java version
+java -version
+
+# Clear Maven cache and rebuild
+rm -rf ~/.m2/repository/com/openframe
+mvn clean install -U
+```
+
+### Service Won't Start
+
+```bash
+# Check if port 8080 is already in use
 lsof -i :8080
-kill -9 <PID>
 
-# Or change the port
-export SERVER_PORT=8081
-./gradlew :examples:device-management:bootRun
+# Kill any process using the port
+kill -9 $(lsof -t -i:8080)
+
+# Start service on different port
+mvn spring-boot:run -Dspring-boot.run.arguments=--server.port=8081
 ```
 
-### MongoDB Connection Error
+### Database Connection Issues
 
 ```bash
-# Check MongoDB is running
-docker ps | grep mongo
+# Check if databases are running
+docker ps | grep -E "(mongo|redis)"
 
-# If not running
-docker-compose up -d mongodb
+# Restart databases
+docker restart openframe-mongodb openframe-redis
 
 # Check logs
-docker logs mongodb
+docker logs openframe-mongodb
 ```
 
-### Build Failures
+---
 
-```bash
-# Clean and rebuild
-./gradlew clean build
-
-# Check Java version
-java -version  # Should be 17+
-```
-
-## Resources
-
-- 📖 **[Full Documentation](../development/README.md)**
-- 🔧 **[Configuration Guide](../development/setup/local-development.md)**
-- 🏗️ **[Architecture Deep Dive](../development/architecture/overview.md)**
-- 🧪 **[Testing Guide](../development/testing/overview.md)**
-
-## Need Help?
-
-- 💬 GitHub Discussions for community support
-- 🐛 GitHub Issues for bug reports
-- 📧 Email support for enterprise customers
-
-You're now ready to build powerful device management applications with OpenFrame OSS Library!
+🎊 **Congratulations!** You've successfully set up OpenFrame OSS Library. The foundation is ready - now let's build something amazing!
