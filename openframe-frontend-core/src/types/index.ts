@@ -48,3 +48,6 @@ export * from './shell.types'
 
 // OS types
 export * from './os.types'
+
+// Marketing types
+export * from './marketing'
