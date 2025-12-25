@@ -57,8 +57,8 @@ The foundational library for secure, scalable device and organization management
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Java 17 or higher
-- Gradle 8.0+
+- Java 21 or higher
+- Maven 3.6+
 - MongoDB 7.0+
 - Redis 7.0+ (optional, for caching)
 
