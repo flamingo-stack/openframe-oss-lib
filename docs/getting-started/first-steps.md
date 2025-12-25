@@ -1,504 +1,557 @@
 # First Steps with OpenFrame OSS Library
 
-Now that you have OpenFrame running, let's explore the key features and concepts that make it powerful. This guide walks you through the first 5 essential things to do after installation.
+Now that you have OpenFrame up and running, let's explore the essential patterns and features you'll use in daily development. This guide covers the first 5 things every developer should master when working with OpenFrame.
 
-## Step 1: Understand the Core Concepts
+## 🎯 The Essential 5
 
-### Multi-Tenant Architecture
+After completing the Quick Start, focus on these core areas:
 
-OpenFrame is built for multi-tenancy from the ground up:
+1. **[Understanding DTOs and Data Flow](#1-understanding-dtos-and-data-flow)**
+2. **[Mastering Cursor-Based Pagination](#2-mastering-cursor-based-pagination)**
+3. **[Working with Service Interfaces](#3-working-with-service-interfaces)**
+4. **[Implementing Validation Patterns](#4-implementing-validation-patterns)**  
+5. **[Exploring Domain Models](#5-exploring-domain-models)**
 
-```mermaid
-graph TB
-    subgraph "Tenant A - Acme Corp"
-        A1[Devices]
-        A2[Users]
-        A3[Events]
-        A4[Tools]
-    end
-    
-    subgraph "Tenant B - Beta Inc"
-        B1[Devices]
-        B2[Users] 
-        B3[Events]
-        B4[Tools]
-    end
-    
-    subgraph "Shared Infrastructure"
-        DB[(MongoDB)]
-        CACHE[(Redis)]
-        AUTH[Authorization]
-    end
-    
-    A1 --> DB
-    A2 --> DB
-    A3 --> DB
-    A4 --> DB
-    B1 --> DB
-    B2 --> DB
-    B3 --> DB
-    B4 --> DB
-    
-    DB --> CACHE
-    AUTH --> DB
-```
+---
 
-### Core Domain Objects
+## 1️⃣ Understanding DTOs and Data Flow
 
-| Object | Purpose | Key Properties |
-|--------|---------|----------------|
-| **Device** | Represents physical/virtual machines | `serialNumber`, `type`, `status`, `health` |
-| **Organization** | Tenant container for devices and users | `name`, `domain`, `contactInfo` |
-| **Event** | Audit trail and activity logging | `type`, `severity`, `timestamp`, `metadata` |
-| **Tool** | External integrations (RMM, MDM) | `type`, `credentials`, `connectionStatus` |
-| **User** | Identity and access management | `email`, `role`, `organizations` |
+OpenFrame uses a layered approach with Data Transfer Objects (DTOs) that define clear contracts between services.
 
-## Step 2: Explore Data Transfer Objects (DTOs)
-
-OpenFrame uses a sophisticated DTO pattern for API consistency.
-
-### Understanding the DTO Pattern
-
-```java
-// Input DTOs - For API requests
-public class DeviceFilterInput {
-    private List<String> types;           // Filter by device types
-    private List<String> statuses;        // Filter by statuses
-    private String organizationId;        // Filter by organization
-    private CursorPaginationInput pagination; // Pagination parameters
-}
-
-// Response DTOs - For API responses  
-public class DeviceResponse {
-    private String id;
-    private String serialNumber;
-    private String model;
-    private DeviceType type;
-    private String status;
-    private Instant lastCheckin;
-}
-
-// Query Result DTOs - For paginated results
-public class GenericQueryResult<T> {
-    private List<T> items;           // The actual data
-    private CursorPageInfo pageInfo; // Pagination metadata
-}
-```
-
-### Try the DTO Pattern
-
-```bash
-# Create a device with input DTO
-curl -X POST http://localhost:8080/api/devices \
-  -H "Content-Type: application/json" \
-  -d '{
-    "machineId": "test-machine",
-    "serialNumber": "TEST123456",
-    "model": "Test Device",
-    "type": "DESKTOP",
-    "status": "ACTIVE"
-  }'
-
-# Query with filter DTO
-curl -X POST http://localhost:8080/api/devices/search \
-  -H "Content-Type: application/json" \
-  -d '{
-    "types": ["DESKTOP", "LAPTOP"],
-    "statuses": ["ACTIVE"], 
-    "pagination": {
-      "first": 10
-    }
-  }'
-```
-
-## Step 3: Master Cursor-Based Pagination
-
-OpenFrame uses cursor-based pagination for consistent performance at scale.
-
-### Why Cursor Pagination?
-
-| Traditional Offset | Cursor-Based |
-|-------------------|--------------|
-| ❌ Performance degrades with large offsets | ✅ Consistent performance |
-| ❌ Data duplication during concurrent updates | ✅ Stable result sets |
-| ❌ Not suitable for real-time data | ✅ Perfect for real-time data |
-
-### Pagination Example
-
-```bash
-# First page request
-curl -X POST http://localhost:8080/api/devices/search \
-  -H "Content-Type: application/json" \
-  -d '{
-    "pagination": {
-      "first": 5
-    }
-  }'
-```
-
-Response shows pagination metadata:
-```json
-{
-  "items": [...],
-  "pageInfo": {
-    "hasNextPage": true,
-    "hasPreviousPage": false,
-    "startCursor": "cursor_abc123",
-    "endCursor": "cursor_def456"
-  }
-}
-```
-
-```bash
-# Next page request using endCursor
-curl -X POST http://localhost:8080/api/devices/search \
-  -H "Content-Type: application/json" \
-  -d '{
-    "pagination": {
-      "first": 5,
-      "after": "cursor_def456"
-    }
-  }'
-```
-
-### Pagination Best Practices
-
-```java
-// Always check for more pages
-public void fetchAllDevices() {
-    String cursor = null;
-    boolean hasMore = true;
-    
-    while (hasMore) {
-        DeviceFilterInput input = DeviceFilterInput.builder()
-            .pagination(CursorPaginationInput.builder()
-                .first(50)  // Page size
-                .after(cursor)  // Start after this cursor
-                .build())
-            .build();
-        
-        GenericQueryResult<DeviceResponse> result = deviceService.searchDevices(input);
-        
-        // Process the current page
-        processDevices(result.getItems());
-        
-        // Update for next iteration
-        hasMore = result.getPageInfo().isHasNextPage();
-        cursor = result.getPageInfo().getEndCursor();
-    }
-}
-```
-
-## Step 4: Configure Organizations and Multi-Tenancy
-
-### Create Your First Organization
-
-```bash
-# Create an organization
-curl -X POST http://localhost:8080/api/organizations \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "My Company",
-    "domain": "mycompany.com",
-    "contactInformation": {
-      "email": "admin@mycompany.com",
-      "phone": "+1-555-123-4567"
-    },
-    "address": {
-      "street": "123 Business St",
-      "city": "San Francisco",
-      "state": "CA",
-      "postalCode": "94105",
-      "country": "USA"
-    },
-    "contactPerson": {
-      "firstName": "John",
-      "lastName": "Doe", 
-      "email": "john.doe@mycompany.com",
-      "role": "IT Administrator"
-    }
-  }'
-```
-
-### Link Devices to Organizations
-
-```bash
-# Update a device to belong to an organization
-curl -X PUT http://localhost:8080/api/devices/device-001 \
-  -H "Content-Type: application/json" \
-  -d '{
-    "organizationId": "org-123",
-    "machineId": "machine-001",
-    "serialNumber": "SN123456",
-    "model": "Dell OptiPlex 7090",
-    "type": "DESKTOP",
-    "status": "ACTIVE"
-  }'
-```
-
-### Query by Organization
-
-```bash
-# Get all devices for an organization
-curl -X POST http://localhost:8080/api/devices/search \
-  -H "Content-Type: application/json" \
-  -d '{
-    "organizationId": "org-123",
-    "pagination": {"first": 20}
-  }'
-```
-
-## Step 5: Enable Event Tracking and Audit Logs
-
-### Understanding Events
-
-OpenFrame tracks two types of events:
-
-1. **Core Events** - System-generated events (device status changes, user actions)
-2. **External Events** - Events from integrated tools (RMM alerts, security events)
-
-### Create Your First Event
-
-```bash
-# Log a device status change event
-curl -X POST http://localhost:8080/api/events \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "DEVICE_STATUS_CHANGED",
-    "severity": "INFO",
-    "source": "device-management-api",
-    "deviceId": "device-001",
-    "organizationId": "org-123",
-    "metadata": {
-      "previousStatus": "OFFLINE",
-      "newStatus": "ACTIVE",
-      "reason": "Device came back online"
-    },
-    "timestamp": "2024-01-20T10:30:00Z"
-  }'
-```
-
-### Query Events with Filters
-
-```bash
-# Get events for a specific device
-curl -X POST http://localhost:8080/api/events/search \
-  -H "Content-Type: application/json" \
-  -d '{
-    "deviceIds": ["device-001"],
-    "types": ["DEVICE_STATUS_CHANGED"],
-    "severities": ["INFO", "WARNING"],
-    "timeRange": {
-      "start": "2024-01-20T00:00:00Z",
-      "end": "2024-01-20T23:59:59Z"
-    },
-    "pagination": {"first": 50}
-  }'
-```
-
-### Event Processing Pipeline
+### The DTO Pattern
 
 ```mermaid
 sequenceDiagram
-    participant Device
-    participant API
-    participant EventService
+    participant Client
+    participant Controller
+    participant Service  
+    participant Repository
     participant MongoDB
-    participant Kafka
-    participant Consumers
+
+    Client->>Controller: Request DTO
+    Controller->>Service: Business Logic DTO
+    Service->>Repository: Query/Filter DTO
+    Repository->>MongoDB: Entity Model
+    MongoDB-->>Repository: Entity Model
+    Repository-->>Service: Response DTO
+    Service-->>Controller: Response DTO
+    Controller-->>Client: API Response DTO
+```
+
+### Core DTO Categories
+
+| Category | Purpose | Example DTOs |
+|----------|---------|-------------|
+| **Request DTOs** | Input validation and parsing | `CreateOrganizationRequest`, `DeviceFilterInput` |
+| **Response DTOs** | Output formatting | `OrganizationResponse`, `DeviceResponse` |  
+| **Filter DTOs** | Query parameters | `DeviceFilters`, `EventFilters` |
+| **Shared DTOs** | Cross-cutting concerns | `CursorPaginationInput`, `PageResponse` |
+
+### Practical Example: Device Query Flow
+
+```java
+// 1. Create filter input (Request DTO)
+DeviceFilterInput filterInput = DeviceFilterInput.builder()
+    .pagination(CursorPaginationInput.builder()
+        .limit(20)
+        .cursor(lastPageCursor)
+        .build())
+    .filters(DeviceFilters.builder()
+        // Add specific device filters
+        .build())
+    .build();
+
+// 2. Service processes business logic  
+CountedGenericQueryResult<Device> result = deviceService.findDevices(filterInput);
+
+// 3. Response contains paginated data
+List<Device> devices = result.getItems();
+String nextCursor = result.getPageInfo().getNextCursor();
+long totalCount = result.getTotalCount();
+
+System.out.println("Found " + devices.size() + " devices");
+System.out.println("Total available: " + totalCount);
+System.out.println("Next page cursor: " + nextCursor);
+```
+
+---
+
+## 2️⃣ Mastering Cursor-Based Pagination
+
+OpenFrame uses cursor-based pagination for efficient navigation through large datasets. This is crucial for MSP platforms handling thousands of devices and events.
+
+### Why Cursor Pagination?
+
+| Traditional Offset | Cursor-Based | Winner |
+|-------------------|-------------|--------|
+| `LIMIT 1000 OFFSET 50000` | `WHERE id > 'cursor_value' LIMIT 1000` | 🏆 Cursor |
+| Performance degrades | Consistent performance | 🏆 Cursor |
+| Data shifts cause duplicates | Stable pagination | 🏆 Cursor |
+| Simple implementation | Requires cursor handling | 🤝 Tie |
+
+### Implementation Pattern
+
+```java
+public class PaginationExample {
     
-    Device->>API: Status Update
-    API->>EventService: Create Event
-    EventService->>MongoDB: Store Event
-    EventService->>Kafka: Publish Event
-    Kafka->>Consumers: Real-time Processing
+    public void demonstrateNavigation() {
+        String currentCursor = null;
+        int pageSize = 25;
+        
+        do {
+            // Create pagination input
+            CursorPaginationInput pagination = CursorPaginationInput.builder()
+                .limit(pageSize)
+                .cursor(currentCursor)
+                .build();
+                
+            // Query with pagination
+            CountedGenericQueryResult<Device> page = deviceService.findDevices(
+                DeviceFilterInput.builder()
+                    .pagination(pagination)
+                    .build()
+            );
+            
+            // Process current page
+            processDevices(page.getItems());
+            
+            // Get cursor for next page
+            currentCursor = page.getPageInfo().getNextCursor();
+            
+            System.out.println("Processed page with " + page.getItems().size() + " devices");
+            
+        } while (currentCursor != null); // Continue while more pages exist
+        
+        System.out.println("Finished processing all devices");
+    }
     
-    Note over Consumers: Alerts, Notifications,<br/>Analytics, Integrations
+    private void processDevices(List<Device> devices) {
+        devices.forEach(device -> {
+            System.out.println("Processing device: " + device.getId());
+            // Your business logic here
+        });
+    }
+}
 ```
 
-## Advanced Features to Explore
+### Validation and Best Practices
 
-### 1. Health Monitoring
+```java
+// OpenFrame enforces sensible defaults
+CursorPaginationInput pagination = CursorPaginationInput.builder()
+    .limit(101)  // ❌ Will fail validation (max 100)
+    .limit(0)    // ❌ Will fail validation (min 1)  
+    .limit(25)   // ✅ Valid range
+    .cursor("eyJpZCI6IjEyMyIsInRzIjoiMjAyNC0wMS0xNSJ9")  // ✅ Base64 cursor
+    .build();
 
-```bash
-# Check application health
-curl http://localhost:8080/actuator/health
+// Always validate your pagination input
+ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
+Validator validator = factory.getValidator();
+Set<ConstraintViolation<CursorPaginationInput>> violations = validator.validate(pagination);
 
-# Detailed health information
-curl http://localhost:8080/actuator/health/mongo
-curl http://localhost:8080/actuator/health/redis
+if (!violations.isEmpty()) {
+    violations.forEach(v -> System.out.println("Validation error: " + v.getMessage()));
+}
 ```
 
-### 2. Metrics and Monitoring
+---
 
-```bash
-# Application metrics
-curl http://localhost:8080/actuator/metrics
+## 3️⃣ Working with Service Interfaces
 
-# Specific metrics
-curl http://localhost:8080/actuator/metrics/jvm.memory.used
-curl http://localhost:8080/actuator/metrics/http.server.requests
+OpenFrame provides clean service interfaces that abstract business logic from implementation details.
+
+### Core Service Interfaces
+
+```java
+// Device management
+public interface DeviceService {
+    CountedGenericQueryResult<Device> findDevices(DeviceFilterInput input);
+    Device findDeviceById(String deviceId);
+    Device updateDeviceStatus(String deviceId, DeviceStatus status);
+}
+
+// Event processing  
+public interface EventService {
+    CountedGenericQueryResult<Event> findEvents(EventFilterInput input);
+    Event createEvent(CreateEventInput input);
+}
+
+// Organization management
+public interface OrganizationService {
+    CountedGenericQueryResult<Organization> findOrganizations(OrganizationFilterInput input);
+    Organization createOrganization(CreateOrganizationRequest request);
+}
 ```
 
-### 3. Configuration Properties
+### Service Implementation Pattern
 
-```bash
-# View configuration
-curl http://localhost:8080/actuator/configprops
-
-# Environment information
-curl http://localhost:8080/actuator/env
+```java
+@Service
+@Transactional
+public class MyDeviceServiceImpl implements DeviceService {
+    
+    private final DeviceRepository deviceRepository;
+    private final DeviceMapper deviceMapper;
+    
+    public MyDeviceServiceImpl(DeviceRepository deviceRepository, 
+                              DeviceMapper deviceMapper) {
+        this.deviceRepository = deviceRepository;
+        this.deviceMapper = deviceMapper;
+    }
+    
+    @Override
+    public CountedGenericQueryResult<Device> findDevices(DeviceFilterInput input) {
+        // 1. Validate input
+        validateDeviceFilterInput(input);
+        
+        // 2. Convert to repository query
+        DeviceQueryFilter queryFilter = deviceMapper.toQueryFilter(input);
+        
+        // 3. Execute repository query with pagination
+        Page<DeviceDocument> page = deviceRepository.findDevicesWithFilters(queryFilter);
+        
+        // 4. Convert to DTOs
+        List<Device> devices = deviceMapper.toDeviceList(page.getContent());
+        
+        // 5. Build paginated response
+        return CountedGenericQueryResult.<Device>builder()
+            .items(devices)
+            .totalCount(page.getTotalElements())
+            .pageInfo(buildPageInfo(page))
+            .build();
+    }
+    
+    private void validateDeviceFilterInput(DeviceFilterInput input) {
+        if (input == null) {
+            throw new IllegalArgumentException("Device filter input cannot be null");
+        }
+        // Additional validation logic
+    }
+    
+    private CursorPageInfo buildPageInfo(Page<DeviceDocument> page) {
+        return CursorPageInfo.builder()
+            .hasNextPage(page.hasNext())
+            .nextCursor(page.hasNext() ? generateCursor(page.getContent()) : null)
+            .build();
+    }
+}
 ```
 
-### 4. API Documentation
+---
 
-Visit `http://localhost:8080/swagger-ui.html` to explore:
+## 4️⃣ Implementing Validation Patterns
 
-- 📖 **Interactive API Documentation**
-- 🧪 **Try API endpoints directly**
-- 📋 **Request/response schemas**
-- 🔍 **Search and filter capabilities**
+OpenFrame leverages Jakarta Bean Validation for robust input validation with meaningful error messages.
 
-## Configuration Examples
+### Built-in Validations
 
-### Application Configuration
+```java
+// OpenFrame DTOs include validation annotations
+public class CreateOrganizationRequest {
+    
+    @NotBlank(message = "Organization name is required")
+    @Size(min = 2, max = 100, message = "Organization name must be between 2 and 100 characters")
+    private String name;
+    
+    @Email(message = "Valid email address is required")
+    private String email;
+    
+    @Valid  // Validates nested objects
+    private AddressDto address;
+    
+    @Valid
+    private ContactPersonDto primaryContact;
+}
 
-Create `config/application-dev.yml`:
-
-```yaml
-spring:
-  profiles:
-    active: dev
-  data:
-    mongodb:
-      uri: mongodb://localhost:27017/openframe-dev
-      auto-index-creation: true
-  redis:
-    host: localhost
-    port: 6379
-    database: 0
-
-server:
-  port: 8080
-
-logging:
-  level:
-    com.openframe: DEBUG
-    org.springframework.data.mongodb: DEBUG
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,metrics,info,env
-  endpoint:
-    health:
-      show-details: always
-
-openframe:
-  pagination:
-    default-page-size: 20
-    max-page-size: 100
-  security:
-    enabled: false  # Disable for development
+public class CursorPaginationInput {
+    
+    @Min(value = 1, message = "Limit must be at least 1")
+    @Max(value = 100, message = "Limit cannot exceed 100")
+    private Integer limit;
+    
+    // Cursor can be null for first page
+    private String cursor;
+}
 ```
 
-### Environment Variables
+### Custom Validation Example
 
-```bash
-# Create .env file for development
-cat > .env << EOF
-SPRING_PROFILES_ACTIVE=dev
-MONGODB_URI=mongodb://localhost:27017/openframe-dev
-REDIS_URL=redis://localhost:6379/0
-SERVER_PORT=8080
-LOGGING_LEVEL_ROOT=INFO
-LOGGING_LEVEL_OPENFRAME=DEBUG
-EOF
-
-# Load environment
-source .env
+```java
+public class ValidationService {
+    
+    private final Validator validator;
+    
+    public ValidationService() {
+        ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
+        this.validator = factory.getValidator();
+    }
+    
+    public <T> void validateAndThrow(T object) {
+        Set<ConstraintViolation<T>> violations = validator.validate(object);
+        
+        if (!violations.isEmpty()) {
+            List<String> errorMessages = violations.stream()
+                .map(ConstraintViolation::getMessage)
+                .collect(Collectors.toList());
+                
+            throw new ValidationException("Validation failed: " + String.join(", ", errorMessages));
+        }
+    }
+    
+    public void demonstrateValidation() {
+        // This will pass validation
+        CursorPaginationInput validPagination = CursorPaginationInput.builder()
+            .limit(10)
+            .cursor("valid-cursor")
+            .build();
+        validateAndThrow(validPagination);
+        System.out.println("✅ Valid pagination object");
+        
+        try {
+            // This will fail validation
+            CursorPaginationInput invalidPagination = CursorPaginationInput.builder()
+                .limit(200)  // Exceeds maximum
+                .build();
+            validateAndThrow(invalidPagination);
+        } catch (ValidationException e) {
+            System.out.println("❌ Validation failed: " + e.getMessage());
+        }
+    }
+}
 ```
 
-## Common Operations Reference
+---
 
-### Device Management
+## 5️⃣ Exploring Domain Models
 
-```bash
-# List all devices
-curl http://localhost:8080/api/devices
+OpenFrame organizes functionality into clear domains, each with its own DTOs and data models.
 
-# Get specific device
-curl http://localhost:8080/api/devices/{deviceId}
+### Domain Overview
 
-# Update device status
-curl -X PATCH http://localhost:8080/api/devices/{deviceId}/status \
-  -H "Content-Type: application/json" \
-  -d '{"status": "MAINTENANCE"}'
-
-# Delete device
-curl -X DELETE http://localhost:8080/api/devices/{deviceId}
+```mermaid
+graph TD
+    subgraph "Device Domain"
+        D1[Device DTOs]
+        D2[Device Models]
+        D3[Device Services]
+    end
+    
+    subgraph "Event Domain"  
+        E1[Event DTOs]
+        E2[Event Models]
+        E3[Event Services]
+    end
+    
+    subgraph "Organization Domain"
+        O1[Organization DTOs] 
+        O2[Organization Models]
+        O3[Organization Services]
+    end
+    
+    subgraph "Tool Domain"
+        T1[Tool DTOs]
+        T2[Tool Models] 
+        T3[Tool Services]
+    end
+    
+    subgraph "Audit Domain"
+        A1[Audit DTOs]
+        A2[Audit Models]
+        A3[Audit Services]
+    end
+    
+    subgraph "Shared"
+        S1[Common DTOs]
+        S2[Utilities]
+        S3[Validation]
+    end
+    
+    S1 --> D1
+    S1 --> E1
+    S1 --> O1
+    S1 --> T1
+    S1 --> A1
 ```
 
-### Organization Management
+### Exploring Each Domain
 
-```bash
-# List organizations
-curl http://localhost:8080/api/organizations
+**1. Device Domain**
+```java
+// Key DTOs and patterns for device management
+DeviceFilterOptions filterOptions = DeviceFilterOptions.builder().build();
+TagFilterOption tagFilter = TagFilterOption.builder().build();
 
-# Get organization details
-curl http://localhost:8080/api/organizations/{orgId}
-
-# Update organization
-curl -X PUT http://localhost:8080/api/organizations/{orgId} \
-  -H "Content-Type: application/json" \
-  -d '{...organization data...}'
+// Devices represent endpoints in your MSP environment
+// - Workstations, servers, mobile devices
+// - Health monitoring and compliance tracking
+// - Integration with RMM tools
 ```
 
-### Event Management
+**2. Event Domain**
+```java
+// Event processing for audit trails and monitoring
+EventFilterOptions eventFilters = EventFilterOptions.builder().build();
 
-```bash
-# Recent events
-curl http://localhost:8080/api/events?recent=true
-
-# Events by severity
-curl "http://localhost:8080/api/events?severity=ERROR&severity=WARNING"
-
-# Event details
-curl http://localhost:8080/api/events/{eventId}
+// Events capture system activities:
+// - User actions, system changes
+// - Integration events from tools
+// - Compliance and security events
 ```
 
-## Next Steps
+**3. Organization Domain**
+```java
+// Multi-tenant organization management
+CreateOrganizationRequest orgRequest = CreateOrganizationRequest.builder()
+    .name("Example MSP")
+    .build();
 
-🎉 **Great job!** You now understand the core concepts and have hands-on experience with:
+// Organizations represent:
+// - MSP customers/tenants
+// - Contact information and billing
+// - Hierarchical relationships
+```
 
-- ✅ Multi-tenant architecture
-- ✅ DTO patterns and API structure  
-- ✅ Cursor-based pagination
-- ✅ Organization management
-- ✅ Event tracking and audit logs
+**4. Tool Domain**  
+```java
+// Integration with MSP tools
+ToolFilterOptions toolFilters = ToolFilterOptions.builder().build();
 
-### Continue Your Journey
+// Tools include:
+// - RMM platforms (TacticalRMM, Fleet MDM)
+// - Monitoring systems
+// - Security tools
+```
 
-1. **[Development Environment Setup](../development/setup/environment.md)** - Full development setup
-2. **[Architecture Deep Dive](../development/architecture/overview.md)** - Understand the system design  
-3. **[Local Development Guide](../development/setup/local-development.md)** - Contributing and customization
-4. **[Testing Overview](../development/testing/overview.md)** - Testing strategies and tools
+**5. Audit Domain**
+```java
+// Comprehensive audit logging
+LogFilterOptions logFilters = LogFilterOptions.builder().build();
 
-### Build Something Cool
+// Audit trails for:
+// - User actions and API calls
+// - System changes and integrations
+// - Compliance reporting
+```
 
-Now that you understand the basics, try building:
+---
 
-- 📊 **Custom Dashboard** - Device health monitoring
-- 🔔 **Alert System** - Real-time notifications  
-- 🔗 **Tool Integration** - Connect your RMM/MDM tools
-- 📈 **Analytics Engine** - Event data analysis
+## 🎯 Practical Exercise: Build a Mini MSP Dashboard
 
-## Need Help?
+Let's combine everything you've learned into a practical example:
 
-- 📖 **Documentation**: Comprehensive guides and references
-- 💬 **Community**: GitHub Discussions for questions
-- 🐛 **Issues**: GitHub Issues for bugs and features
-- 📧 **Support**: Enterprise support available
+```java
+public class MiniMSPDashboard {
+    
+    private final DeviceService deviceService;
+    private final EventService eventService;  
+    private final OrganizationService organizationService;
+    
+    public void generateDashboard() {
+        System.out.println("=== MSP Dashboard ===\n");
+        
+        // 1. Show organization summary
+        showOrganizationSummary();
+        
+        // 2. Show device overview  
+        showDeviceOverview();
+        
+        // 3. Show recent events
+        showRecentEvents();
+    }
+    
+    private void showOrganizationSummary() {
+        System.out.println("📊 Organization Summary:");
+        
+        CursorPaginationInput pagination = CursorPaginationInput.builder()
+            .limit(5)
+            .build();
+            
+        OrganizationFilterInput filter = OrganizationFilterInput.builder()
+            .pagination(pagination)
+            .build();
+            
+        CountedGenericQueryResult<Organization> orgs = 
+            organizationService.findOrganizations(filter);
+            
+        System.out.println("  Total Organizations: " + orgs.getTotalCount());
+        System.out.println("  Active Organizations: " + orgs.getItems().size());
+        System.out.println();
+    }
+    
+    private void showDeviceOverview() {
+        System.out.println("💻 Device Overview:");
+        
+        CursorPaginationInput pagination = CursorPaginationInput.builder()
+            .limit(10)
+            .build();
+            
+        DeviceFilterInput filter = DeviceFilterInput.builder()
+            .pagination(pagination)
+            .build();
+            
+        CountedGenericQueryResult<Device> devices = 
+            deviceService.findDevices(filter);
+            
+        System.out.println("  Total Devices: " + devices.getTotalCount());
+        System.out.println("  Showing: " + devices.getItems().size());
+        
+        devices.getItems().forEach(device -> 
+            System.out.println("    - Device: " + device.getId())
+        );
+        System.out.println();
+    }
+    
+    private void showRecentEvents() {
+        System.out.println("📝 Recent Events:");
+        
+        CursorPaginationInput pagination = CursorPaginationInput.builder()
+            .limit(5)
+            .build();
+            
+        EventFilterInput filter = EventFilterInput.builder()
+            .pagination(pagination)
+            .build();
+            
+        CountedGenericQueryResult<Event> events = 
+            eventService.findEvents(filter);
+            
+        System.out.println("  Recent Events: " + events.getItems().size());
+        events.getItems().forEach(event -> 
+            System.out.println("    - Event: " + event.getId())
+        );
+    }
+}
+```
 
-You're now equipped to build powerful device management solutions with OpenFrame OSS Library!
+---
+
+## 🚀 What's Next?
+
+You've now mastered the essential OpenFrame patterns! Here's your continued learning path:
+
+### Immediate Next Steps
+1. **[Local Development Setup](../development/setup/local-development.md)** - Set up a complete development environment
+2. **[Architecture Deep Dive](../development/architecture/overview.md)** - Understand the full system design
+
+### Advanced Topics
+1. **MongoDB Integration** - Connect to persistent storage
+2. **Security Patterns** - Implement authentication and authorization  
+3. **Custom Service Implementation** - Build your own service implementations
+4. **Tool Integrations** - Connect with RMM and monitoring platforms
+
+### Building Real Applications
+1. **Create a device monitoring dashboard**
+2. **Build organization management features** 
+3. **Implement event processing pipelines**
+4. **Develop custom MSP integrations**
+
+## 🤝 Community Resources
+
+- **Questions?** Join [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
+- **Examples**: Check the test files for more usage patterns
+- **Documentation**: Browse the `/docs/reference` folder for detailed API docs
+
+---
+
+**🎉 Congratulations!** You now understand the core patterns that power OpenFrame. Ready to build something amazing?

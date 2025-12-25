@@ -214,29 +214,30 @@ We welcome contributions! Please see our [Contributing Guidelines](./CONTRIBUTIN
 
 - Code standards and style guide
 - Pull request process
-- Issue reporting
 - Development setup
 - Testing requirements
-
-## 📄 License
-
-Licensed under the [Flamingo AI Unified License v1.0](./LICENSE.md) - see the license file for details.
 
 ## 🆘 Support
 
 - 📖 **Documentation**: [Complete guides and API reference](./docs/README.md)
-- 💬 **Community Discussions**: [GitHub Discussions](https://github.com/flamingo-stack/openframe-oss-lib/discussions)
-- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/flamingo-stack/openframe-oss-lib/issues)
-- 💼 **Enterprise Support**: [Contact our team](mailto:enterprise@openframe.io)
+- 💬 **Community**: [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) - Get help and connect with developers
+- 🚀 **Platform**: [OpenFrame.ai](https://openframe.ai) - Product information and platform access
+- 🏢 **About Flamingo**: [Flamingo.run](https://flamingo.run) - Learn about our mission and team
 
-## 🚀 Ecosystem
+> **Note**: We manage all discussions and support through our **OpenMSP Slack community**. GitHub Issues and Discussions are not actively monitored.
 
-OpenFrame OSS Library is part of the larger OpenFrame ecosystem:
+## 🚀 OpenFrame Ecosystem
 
-- **[OpenFrame Platform](https://openframe.io)** - Complete device management solution
+OpenFrame OSS Library is part of the comprehensive OpenFrame platform:
+
+- **[OpenFrame Platform](https://openframe.ai)** - Unified MSP management platform
 - **[OpenFrame Gateway](https://github.com/flamingo-stack/openframe-gateway)** - API gateway and routing
-- **[OpenFrame Auth](https://github.com/flamingo-stack/openframe-auth)** - Authentication service
-- **[OpenFrame Dashboard](https://github.com/flamingo-stack/openframe-dashboard)** - Web interface
+- **[OpenFrame Auth](https://github.com/flamingo-stack/openframe-auth)** - Authentication and authorization
+- **[OpenFrame Dashboard](https://github.com/flamingo-stack/openframe-dashboard)** - Web management interface
+
+## 📄 License
+
+Licensed under the [Flamingo AI Unified License v1.0](./LICENSE.md) - see the license file for details.
 
 ---
 

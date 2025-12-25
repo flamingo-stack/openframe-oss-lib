@@ -1,357 +1,407 @@
 # Quick Start Guide
 
-Get OpenFrame OSS Library up and running in 5 minutes! This guide provides the fastest path to see the library in action with a working device management example.
+Get the OpenFrame OSS Library up and running in just 5 minutes! This guide will have you building your first integration with OpenFrame's core DTOs and services.
 
-## TL;DR - 5 Minute Setup
+## 🚀 TL;DR - 5 Minute Setup
+
+```bash
+# 1. Clone the repository  
+git clone https://github.com/openframe/openframe-oss-lib.git
+cd openframe-oss-lib
+
+# 2. Build the project
+mvn clean install -DskipTests
+
+# 3. Run a quick verification
+mvn test -Dtest="**/*Test" -Dmaven.test.failure.ignore=true
+
+# 4. You're ready! 🎉
+```
+
+## 📦 Step 1: Get the Library
+
+### Option 1: Add as Maven Dependency (Recommended)
+
+Add to your `pom.xml`:
+
+```xml
+<dependencies>
+    <!-- Core OpenFrame API Library -->
+    <dependency>
+        <groupId>com.openframe</groupId>
+        <artifactId>openframe-api-lib</artifactId>
+        <version>latest</version>
+    </dependency>
+    
+    <!-- MongoDB Data Models -->
+    <dependency>
+        <groupId>com.openframe</groupId>
+        <artifactId>openframe-data-mongo</artifactId>
+        <version>latest</version>
+    </dependency>
+    
+    <!-- Core Utilities -->
+    <dependency>
+        <groupId>com.openframe</groupId>
+        <artifactId>openframe-core</artifactId>
+        <version>latest</version>
+    </dependency>
+</dependencies>
+```
+
+### Option 2: Clone and Build Locally
 
 ```bash
 # Clone the repository
 git clone https://github.com/openframe/openframe-oss-lib.git
 cd openframe-oss-lib
 
-# Start dependencies
-docker-compose up -d mongodb redis
-
-# Build the project
-./gradlew build
-
-# Run the example application
-./gradlew :examples:device-management:bootRun
+# Build all modules
+mvn clean install
 ```
 
-Navigate to `http://localhost:8080` to see your device management dashboard.
+## ⚡ Step 2: Hello OpenFrame - First Integration
 
-## Step 1: Clone and Setup
+Create a simple Java application that uses OpenFrame DTOs:
 
-### Clone the Repository
+### Create Your Project Structure
 
 ```bash
-git clone https://github.com/openframe/openframe-oss-lib.git
-cd openframe-oss-lib
+mkdir openframe-hello-world
+cd openframe-hello-world
+
+# Create Maven structure
+mkdir -p src/main/java/com/example/hello
 ```
 
-### Quick Dependencies with Docker
+### Basic `pom.xml`
 
-The fastest way to get dependencies running:
-
-```bash
-# Start MongoDB and Redis
-docker-compose up -d
-
-# Verify services are running
-docker ps
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    
+    <groupId>com.example</groupId>
+    <artifactId>openframe-hello-world</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+    
+    <properties>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+    
+    <dependencies>
+        <dependency>
+            <groupId>com.openframe</groupId>
+            <artifactId>openframe-api-lib</artifactId>
+            <version>latest</version>
+        </dependency>
+        <dependency>
+            <groupId>com.openframe</groupId>
+            <artifactId>openframe-core</artifactId>
+            <version>latest</version>
+        </dependency>
+    </dependencies>
+</project>
 ```
 
-You should see:
-```text
-CONTAINER ID   IMAGE         PORTS                      NAMES
-xxxxx         mongo:7.0     0.0.0.0:27017->27017/tcp   mongodb
-xxxxx         redis:7-alpine 0.0.0.0:6379->6379/tcp    redis
-```
+### Your First OpenFrame Application
 
-## Step 2: Build the Project
+Create `src/main/java/com/example/hello/HelloOpenFrame.java`:
 
-### Build All Modules
+```java
+package com.example.hello;
 
-```bash
-./gradlew build
-```
+import com.openframe.api.dto.device.DeviceFilterOptions;
+import com.openframe.api.dto.shared.CursorPaginationInput;
+import com.openframe.api.dto.organization.CreateOrganizationRequest;
+import com.openframe.api.dto.organization.ContactPersonDto;
+import com.openframe.api.dto.organization.AddressDto;
+import com.openframe.core.util.SlugUtil;
 
-This command will:
-- ✅ Download all dependencies
-- ✅ Compile Java source code
-- ✅ Run unit tests
-- ✅ Create library JARs
-
-Expected output:
-```text
-BUILD SUCCESSFUL in 2m 15s
-45 actionable tasks: 45 executed
-```
-
-### Quick Build (Skip Tests)
-
-For faster builds during development:
-
-```bash
-./gradlew build -x test
-```
-
-## Step 3: Run Example Application
-
-### Start the Device Management Example
-
-```bash
-./gradlew :examples:device-management:bootRun
-```
-
-The application will start on `http://localhost:8080`
-
-You should see:
-```text
-  ____                   _____                          
- / __ \                 |  __ \                         
-| |  | |_ __   ___ _ __ | |__) |_ _ _ __ ___   ___       
-| |  | | '_ \ / _ \ '_ \|  _  /| '_| '_  _ \ / _ \      
-| |__| | |_) |  __/ | | | | \ \| | | | | | |  __/      
- \____/| .__/ \___|_| |_|_|  \_\_| |_| |_| |_|\___|     
-       | |                                             
-       |_|                                             
-
-2024-01-20 10:30:00.000  INFO --- [  restartedMain] c.o.examples.DeviceManagementApp : Starting DeviceManagementApp
-2024-01-20 10:30:02.000  INFO --- [  restartedMain] c.o.examples.DeviceManagementApp : Started DeviceManagementApp in 2.5 seconds
-```
-
-## Step 4: Explore the Example
-
-### Access the Web Dashboard
-
-Open your browser to: `http://localhost:8080`
-
-You'll see the OpenFrame device management dashboard with:
-
-- 📊 **Device Overview** - Total devices, online/offline status
-- 💻 **Device List** - Sample devices with different types
-- 🔍 **Search & Filter** - Find devices by type, status, or organization
-- 📈 **Health Metrics** - Device health and compliance status
-
-### Sample API Calls
-
-The example includes sample data. Try these API calls:
-
-```bash
-# List all devices
-curl http://localhost:8080/api/devices
-
-# Get device by ID
-curl http://localhost:8080/api/devices/device-001
-
-# Filter devices by type
-curl "http://localhost:8080/api/devices?type=LAPTOP"
-
-# Get organizations
-curl http://localhost:8080/api/organizations
-```
-
-### Expected Response
-
-```json
-{
-  "items": [
-    {
-      "id": "device-001",
-      "machineId": "machine-123",
-      "serialNumber": "SN123456789",
-      "model": "Dell OptiPlex 7090", 
-      "osVersion": "Windows 11 Pro",
-      "status": "ACTIVE",
-      "type": "DESKTOP",
-      "lastCheckin": "2024-01-20T10:30:00Z"
+public class HelloOpenFrame {
+    
+    public static void main(String[] args) {
+        System.out.println("🚀 Hello OpenFrame OSS Library!");
+        
+        // Example 1: Working with Pagination
+        demonstratePagination();
+        
+        // Example 2: Creating Organization DTOs
+        demonstrateOrganizationCreation();
+        
+        // Example 3: Device Filtering
+        demonstrateDeviceFiltering();
+        
+        // Example 4: Utility Functions
+        demonstrateUtilities();
+        
+        System.out.println("✅ OpenFrame integration successful!");
     }
-  ],
-  "pageInfo": {
-    "hasNextPage": false,
-    "hasPreviousPage": false,
-    "startCursor": "cursor_start",
-    "endCursor": "cursor_end"
-  }
+    
+    private static void demonstratePagination() {
+        System.out.println("\n📄 Cursor Pagination Example:");
+        
+        CursorPaginationInput pagination = CursorPaginationInput.builder()
+            .limit(10)
+            .cursor("eyJpZCI6IjEyMyJ9")  // Base64 encoded cursor
+            .build();
+            
+        System.out.println("  Limit: " + pagination.getLimit());
+        System.out.println("  Cursor: " + pagination.getCursor());
+    }
+    
+    private static void demonstrateOrganizationCreation() {
+        System.out.println("\n🏢 Organization DTO Example:");
+        
+        // Create address
+        AddressDto address = AddressDto.builder()
+            .street("123 MSP Street")
+            .city("Tech City")
+            .state("CA")
+            .postalCode("90210")
+            .country("USA")
+            .build();
+            
+        // Create contact person
+        ContactPersonDto contact = ContactPersonDto.builder()
+            .firstName("John")
+            .lastName("Doe")
+            .email("john.doe@example.com")
+            .phone("+1-555-0123")
+            .build();
+            
+        // Create organization request
+        CreateOrganizationRequest orgRequest = CreateOrganizationRequest.builder()
+            .name("Example MSP Company")
+            .website("https://example-msp.com")
+            .address(address)
+            .primaryContact(contact)
+            .build();
+            
+        System.out.println("  Organization: " + orgRequest.getName());
+        System.out.println("  Contact: " + contact.getFirstName() + " " + contact.getLastName());
+        System.out.println("  Address: " + address.getCity() + ", " + address.getState());
+    }
+    
+    private static void demonstrateDeviceFiltering() {
+        System.out.println("\n💻 Device Filtering Example:");
+        
+        DeviceFilterOptions filterOptions = DeviceFilterOptions.builder()
+            .build();
+            
+        System.out.println("  Device filter options created successfully");
+        System.out.println("  Ready for device queries with pagination and filtering");
+    }
+    
+    private static void demonstrateUtilities() {
+        System.out.println("\n🔧 Utility Functions Example:");
+        
+        String companyName = "Example MSP Company";
+        String slug = SlugUtil.generateSlug(companyName);
+        
+        System.out.println("  Original: " + companyName);
+        System.out.println("  Slug: " + slug);
+    }
 }
 ```
 
-## Step 5: Understanding What You Built
-
-### Architecture Components
-
-```mermaid
-graph LR
-    subgraph "What You Just Created"
-        WEB[Web Dashboard :8080]
-        API[REST API :8080]
-        LIB[OpenFrame OSS Lib]
-    end
-    
-    subgraph "Data Layer"
-        MONGO[(MongoDB :27017)]
-        REDIS[(Redis :6379)]
-    end
-    
-    WEB --> API
-    API --> LIB
-    LIB --> MONGO
-    LIB --> REDIS
-```
-
-### Key Files Created
-
-| Component | File | Purpose |
-|-----------|------|---------|
-| **DTOs** | `DeviceResponse.java` | API response objects |
-| **Services** | `DeviceService.java` | Business logic |
-| **Models** | `Device.java` | MongoDB entities |
-| **Controllers** | `DeviceController.java` | REST endpoints |
-| **Config** | `MongoConfig.java` | Database configuration |
-
-### Data Flow
-
-```mermaid
-sequenceDiagram
-    participant Browser
-    participant Controller
-    participant Service
-    participant Repository
-    participant MongoDB
-    
-    Browser->>Controller: GET /api/devices
-    Controller->>Service: findAllDevices()
-    Service->>Repository: findAll()
-    Repository->>MongoDB: Query devices collection
-    MongoDB-->>Repository: Return documents
-    Repository-->>Service: Return Device entities
-    Service-->>Controller: Return DeviceResponse DTOs
-    Controller-->>Browser: JSON response
-```
-
-## What's Working Now
-
-✅ **Device Management**
-- Device CRUD operations
-- Device filtering by type and status
-- Device health monitoring
-
-✅ **Organization Management**
-- Organization listing and details
-- Contact information management
-
-✅ **API Infrastructure**
-- RESTful API endpoints
-- Cursor-based pagination
-- Input validation and error handling
-
-✅ **Data Persistence**
-- MongoDB document storage
-- Redis caching layer
-- Automatic data mapping
-
-## Testing Your Setup
-
-### Verify Components
+## 🏃‍♂️ Step 3: Run Your Application
 
 ```bash
-# Check application health
-curl http://localhost:8080/actuator/health
+# Compile and run
+mvn clean compile exec:java -Dexec.mainClass="com.example.hello.HelloOpenFrame"
+```
 
-# Expected response
-{
-  "status": "UP",
-  "components": {
-    "mongo": {"status": "UP"},
-    "redis": {"status": "UP"}
-  }
+### Expected Output
+
+```text
+🚀 Hello OpenFrame OSS Library!
+
+📄 Cursor Pagination Example:
+  Limit: 10
+  Cursor: eyJpZCI6IjEyMyJ9
+
+🏢 Organization DTO Example:
+  Organization: Example MSP Company
+  Contact: John Doe
+  Address: Tech City, CA
+
+💻 Device Filtering Example:
+  Device filter options created successfully
+  Ready for device queries with pagination and filtering
+
+🔧 Utility Functions Example:
+  Original: Example MSP Company
+  Slug: example-msp-company
+
+✅ OpenFrame integration successful!
+```
+
+## 🎯 Step 4: Verify Integration Features
+
+Let's test some key OpenFrame patterns:
+
+### Validation Testing
+
+Create `src/main/java/com/example/hello/ValidationExample.java`:
+
+```java
+package com.example.hello;
+
+import com.openframe.api.dto.shared.CursorPaginationInput;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
+import jakarta.validation.ValidatorFactory;
+import java.util.Set;
+
+public class ValidationExample {
+    
+    public static void main(String[] args) {
+        ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
+        Validator validator = factory.getValidator();
+        
+        // Test invalid pagination (limit too high)
+        CursorPaginationInput invalidPagination = CursorPaginationInput.builder()
+            .limit(150)  // Exceeds max of 100
+            .cursor("test-cursor")
+            .build();
+            
+        Set<ConstraintViolation<CursorPaginationInput>> violations = 
+            validator.validate(invalidPagination);
+            
+        if (!violations.isEmpty()) {
+            System.out.println("✅ Validation working! Found " + violations.size() + " violations:");
+            violations.forEach(v -> 
+                System.out.println("  - " + v.getMessage())
+            );
+        }
+        
+        // Test valid pagination
+        CursorPaginationInput validPagination = CursorPaginationInput.builder()
+            .limit(10)  // Within valid range
+            .cursor("test-cursor")
+            .build();
+            
+        Set<ConstraintViolation<CursorPaginationInput>> validViolations = 
+            validator.validate(validPagination);
+            
+        if (validViolations.isEmpty()) {
+            System.out.println("✅ Valid pagination object created successfully!");
+        }
+    }
 }
 ```
 
-### Create Your First Device
-
+Run it:
 ```bash
-curl -X POST http://localhost:8080/api/devices \
-  -H "Content-Type: application/json" \
-  -d '{
-    "machineId": "my-machine-001",
-    "serialNumber": "MY123456789", 
-    "model": "MacBook Pro M2",
-    "osVersion": "macOS 14.0",
-    "status": "ACTIVE",
-    "type": "LAPTOP"
-  }'
+mvn clean compile exec:java -Dexec.mainClass="com.example.hello.ValidationExample"
 ```
 
-### Query Your Device
+## 📊 What You Just Accomplished
 
-```bash
-curl http://localhost:8080/api/devices | jq '.items[] | select(.serialNumber=="MY123456789")'
+Congratulations! In just 5 minutes, you've:
+
+- ✅ **Integrated OpenFrame OSS Library** into a Java project
+- ✅ **Used Core DTOs** like `CursorPaginationInput` and organization models
+- ✅ **Implemented Validation** with Jakarta Bean Validation
+- ✅ **Applied Utility Functions** like slug generation
+- ✅ **Followed OpenFrame Patterns** for pagination and data modeling
+
+## 🎨 Common Patterns You Can Use Now
+
+### 1. Paginated API Requests
+```java
+// Standard pagination for any list endpoint
+CursorPaginationInput pagination = CursorPaginationInput.builder()
+    .limit(25)
+    .cursor(nextCursor)
+    .build();
 ```
 
-## Next Steps
-
-🎉 **Congratulations!** You have OpenFrame OSS Library running with a complete device management example.
-
-### Immediate Next Steps
-
-1. **[First Steps Guide](first-steps.md)** - Explore key features and concepts
-2. **[Development Environment](../development/setup/environment.md)** - Set up full development environment
-3. **[Architecture Overview](../development/architecture/overview.md)** - Understand the system design
-
-### Explore Further
-
-- **Add Organizations**: Create organizations and assign devices
-- **Event Logging**: Enable audit trails and event tracking
-- **Tool Integration**: Connect external RMM tools
-- **Security**: Add authentication and authorization
-
-### Customize Your Setup
-
-```bash
-# Edit application configuration
-vim examples/device-management/src/main/resources/application.yml
-
-# Add your database URL
-spring:
-  data:
-    mongodb:
-      uri: mongodb://your-mongodb-url:27017/openframe
-
-# Restart the application
-./gradlew :examples:device-management:bootRun
+### 2. Organization Management
+```java
+// Creating organizations with full contact info
+CreateOrganizationRequest request = CreateOrganizationRequest.builder()
+    .name("My MSP")
+    .website("https://my-msp.com")
+    .address(addressDto)
+    .primaryContact(contactDto)
+    .build();
 ```
 
-## Common Issues & Solutions
-
-### Port 8080 Already in Use
-
-```bash
-# Find and kill the process
-lsof -i :8080
-kill -9 <PID>
-
-# Or change the port
-export SERVER_PORT=8081
-./gradlew :examples:device-management:bootRun
+### 3. Device Operations
+```java
+// Device filtering with options
+DeviceFilterOptions filters = DeviceFilterOptions.builder()
+    // Add specific filters as needed
+    .build();
 ```
 
-### MongoDB Connection Error
+## ⚡ Next Steps
 
+Now that you have OpenFrame working, here are immediate next actions:
+
+### Immediate (Next 10 minutes)
+1. **[Explore First Steps](first-steps.md)** - Learn the 5 essential patterns
+2. **Check out core features** - Dive deeper into device, event, and tool management
+
+### Short Term (Next Hour)  
+1. **[Architecture Overview](../development/architecture/overview.md)** - Understand the full system design
+2. **[Local Development Setup](../development/setup/local-development.md)** - Set up a complete dev environment
+
+### Medium Term (Next Day)
+1. **Build a real integration** using the service interfaces
+2. **Connect to MongoDB** for persistent data storage
+3. **Explore authentication patterns** with the security modules
+
+## 🆘 Troubleshooting
+
+### Build Issues
 ```bash
-# Check MongoDB is running
-docker ps | grep mongo
+# Clear Maven cache
+rm -rf ~/.m2/repository/com/openframe
 
-# If not running
-docker-compose up -d mongodb
-
-# Check logs
-docker logs mongodb
+# Clean rebuild
+mvn clean install -U
 ```
 
-### Build Failures
-
+### Dependency Conflicts
 ```bash
-# Clean and rebuild
-./gradlew clean build
+# Check dependency tree
+mvn dependency:tree
 
-# Check Java version
-java -version  # Should be 17+
+# Resolve conflicts by excluding transitive dependencies in pom.xml
+<dependency>
+    <groupId>com.openframe</groupId>
+    <artifactId>openframe-api-lib</artifactId>
+    <version>latest</version>
+    <exclusions>
+        <exclusion>
+            <groupId>conflicting-group</groupId>
+            <artifactId>conflicting-artifact</artifactId>
+        </exclusion>
+    </exclusions>
+</dependency>
 ```
 
-## Resources
+### IDE Issues
+- **IntelliJ**: File → Reload Maven Projects
+- **Eclipse**: Right-click project → Maven → Reload Projects  
+- **VS Code**: `Ctrl+Shift+P` → "Java: Reload Projects"
 
-- 📖 **[Full Documentation](../development/README.md)**
-- 🔧 **[Configuration Guide](../development/setup/local-development.md)**
-- 🏗️ **[Architecture Deep Dive](../development/architecture/overview.md)**
-- 🧪 **[Testing Guide](../development/testing/overview.md)**
+## 🤝 Get Help
 
-## Need Help?
+- **Questions?** Join [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
+- **Documentation**: [OpenFrame Docs](https://openframe.ai)
+- **Examples**: Check the test files in the repository for more usage patterns
 
-- 💬 GitHub Discussions for community support
-- 🐛 GitHub Issues for bug reports
-- 📧 Email support for enterprise customers
+---
 
-You're now ready to build powerful device management applications with OpenFrame OSS Library!
+**🎉 Awesome work!** You've successfully integrated OpenFrame OSS Library. Ready to explore what you can build with it?
