@@ -95,7 +95,7 @@ export interface CreateAIContentInput {
 // =============================================================================
 
 export type MediaType = 'image' | 'video' | 'figma_export';
-export type MediaProvider = 'dalle' | 'sdxl' | 'replicate' | 'figma' | 'manual' | 'midjourney';
+export type MediaProvider = 'dalle' | 'dalle-3' | 'sdxl' | 'replicate' | 'figma' | 'manual' | 'midjourney' | 'flux-pro' | 'flux-dev' | 'ideogram-v2' | 'recraft-v3' | 'kling-v2.5' | 'luma-ray2' | 'hailuo' | 'ltx-video' | 'stable-video-diffusion';
 export type MediaStatus = 'draft' | 'pending_review' | 'pending_approval' | 'approved' | 'rejected' | 'published' | 'generating';
 
 export interface AIMedia {
@@ -252,7 +252,7 @@ export interface CreateContentApprovalInput {
 // AI Usage Tracking Types
 // =============================================================================
 
-export type AIService = 'anthropic' | 'openai' | 'replicate' | 'figma';
+export type AIService = 'anthropic' | 'openai' | 'replicate' | 'figma' | 'google';
 export type AIOperation = 'text_generation' | 'image_generation' | 'video_generation' | 'figma_export';
 
 export interface AIUsage {
