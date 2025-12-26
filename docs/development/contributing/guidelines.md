@@ -1,949 +1,721 @@
 # Contributing Guidelines
 
-Welcome to the OpenFrame OSS Library contributing guide! We're excited to have you contribute to making device management better for everyone. This guide covers everything you need to know about contributing to the project.
+Welcome to the OpenFrame OSS Library contributor community! This guide outlines our development standards, workflow processes, and review criteria to help you make meaningful contributions to the project.
 
-## Table of Contents
+## 🎯 Contributing Philosophy
 
-- [Code of Conduct](#code-of-conduct)
-- [Getting Started](#getting-started)
-- [Development Workflow](#development-workflow)
-- [Coding Standards](#coding-standards)
-- [Testing Requirements](#testing-requirements)
-- [Documentation Standards](#documentation-standards)
-- [Pull Request Process](#pull-request-process)
-- [Issue Guidelines](#issue-guidelines)
-- [Release Process](#release-process)
+OpenFrame follows these core principles for contributions:
 
-## Code of Conduct
+- **Quality over Quantity**: Well-crafted, tested code that follows established patterns
+- **Documentation First**: All contributions include comprehensive documentation
+- **Community Driven**: Decisions are made transparently with community input
+- **Backward Compatibility**: Changes maintain API compatibility whenever possible
 
-### Our Commitment
+## 📋 Prerequisites for Contributing
 
-We are committed to providing a welcoming, inclusive environment for all contributors, regardless of background, experience level, gender, gender identity and expression, sexual orientation, disability, personal appearance, body size, race, ethnicity, age, religion, or nationality.
+Before making your first contribution, ensure you have:
 
-### Expected Behavior
+- ✅ **Completed Setup**: Followed [Environment Setup](../setup/environment.md) and [Local Development](../setup/local-development.md)
+- ✅ **Read Architecture**: Understood the [Architecture Overview](../architecture/overview.md)
+- ✅ **Joined Community**: Active in [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
+- ✅ **Explored Codebase**: Familiarized yourself with existing patterns and tests
 
-- **Be Respectful** - Treat everyone with respect and courtesy
-- **Be Inclusive** - Welcome newcomers and help them succeed
-- **Be Collaborative** - Share knowledge and work together
-- **Be Professional** - Focus on constructive feedback and solutions
-- **Be Patient** - Everyone is learning and growing
+## 🔄 Development Workflow
 
-### Unacceptable Behavior
+### 1. Planning Your Contribution
 
-- Harassment, discrimination, or hate speech
-- Personal attacks or inflammatory comments  
-- Trolling, spamming, or disruptive behavior
-- Sharing private information without consent
-- Any behavior that would be inappropriate in a professional setting
+**Before Writing Code:**
+1. **Check Existing Issues**: Look for related issues or discussions
+2. **Discuss in Slack**: Use `#contributors` channel for design discussions  
+3. **Create Issue**: For substantial changes, create an issue first
+4. **Get Alignment**: Ensure your approach aligns with project goals
 
-## Getting Started
+**For Bug Fixes:**
+- Can proceed directly with fix and tests
+- Reference issue number in commit message
 
-### Prerequisites for Contributors
+**For New Features:**
+- **Must** discuss in Slack first
+- Create design document for complex features
+- Get maintainer approval before implementation
 
-Before contributing, ensure you have:
-
-1. ✅ **Development Environment** - Set up per [Environment Setup Guide](../setup/environment.md)
-2. ✅ **GitHub Account** - With 2FA enabled
-3. ✅ **Git Configuration** - Proper name and email
-4. ✅ **Code Editor** - With OpenFrame-specific configurations
-
-### First-Time Contributor Setup
+### 2. Git Workflow
 
 ```bash
-# 1. Fork the repository on GitHub
-# Click "Fork" button on https://github.com/openframe/openframe-oss-lib
-
-# 2. Clone your fork
-git clone https://github.com/YOUR_USERNAME/openframe-oss-lib.git
+# 1. Fork and clone the repository
+git clone https://github.com/YOUR-USERNAME/openframe-oss-lib.git
 cd openframe-oss-lib
 
-# 3. Add upstream remote
+# 2. Add upstream remote
 git remote add upstream https://github.com/openframe/openframe-oss-lib.git
 
-# 4. Verify remotes
-git remote -v
-# origin    https://github.com/YOUR_USERNAME/openframe-oss-lib.git (fetch)
-# origin    https://github.com/YOUR_USERNAME/openframe-oss-lib.git (push)  
-# upstream  https://github.com/openframe/openframe-oss-lib.git (fetch)
-# upstream  https://github.com/openframe/openframe-oss-lib.git (push)
-
-# 5. Install dependencies and verify build
-./gradlew build
-```
-
-### Finding Issues to Work On
-
-Great first contributions:
-
-| Label | Description | Good For |
-|-------|-------------|----------|
-| `good first issue` | Well-scoped issues for new contributors | First-time contributors |
-| `help wanted` | Issues that need community help | All levels |
-| `bug` | Bug fixes needed | Developers familiar with codebase |
-| `enhancement` | Feature requests | Experienced contributors |
-| `documentation` | Documentation improvements | Technical writers |
-
-**Find issues:** [GitHub Issues](https://github.com/openframe/openframe-oss-lib/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
-
-## Development Workflow
-
-### Branch Strategy
-
-We use **GitHub Flow** with feature branches:
-
-```mermaid
-graph LR
-    MAIN[main] --> FEATURE[feature/device-search-optimization]
-    FEATURE --> PR[Pull Request]
-    PR --> REVIEW[Code Review]
-    REVIEW --> MERGE[Merge to main]
-    MERGE --> MAIN
-```
-
-### Creating Feature Branches
-
-```bash
-# 1. Start from latest main
+# 3. Create feature branch from main
 git checkout main
 git pull upstream main
-
-# 2. Create feature branch
 git checkout -b feature/your-feature-name
 
-# Examples of good branch names:
-git checkout -b feature/device-search-optimization
-git checkout -b bugfix/pagination-cursor-encoding  
-git checkout -b docs/contributing-guidelines
-git checkout -b refactor/service-layer-cleanup
+# 4. Make your changes
+# ... develop, test, document ...
+
+# 5. Commit with conventional commit format
+git add .
+git commit -m "feat(api-lib): add device filtering by compliance status
+
+- Add ComplianceStatus enum to device DTOs
+- Implement filtering logic in DeviceFilters
+- Add validation for compliance status values
+- Include comprehensive unit tests
+
+Closes #123"
+
+# 6. Push to your fork
+git push origin feature/your-feature-name
+
+# 7. Create pull request from GitHub UI
 ```
 
-### Branch Naming Convention
+### 3. Branch Naming Conventions
 
 | Type | Format | Example |
 |------|--------|---------|
-| **Features** | `feature/description` | `feature/device-health-monitoring` |
-| **Bug Fixes** | `bugfix/description` | `bugfix/device-status-update-error` |
-| **Documentation** | `docs/description` | `docs/api-documentation-update` |
-| **Refactoring** | `refactor/description` | `refactor/repository-layer-cleanup` |
-| **Testing** | `test/description` | `test/integration-test-coverage` |
+| **Feature** | `feature/description` | `feature/device-compliance-filtering` |
+| **Bug Fix** | `bugfix/description` | `bugfix/pagination-cursor-encoding` |
+| **Documentation** | `docs/description` | `docs/update-api-examples` |
+| **Refactoring** | `refactor/description` | `refactor/service-layer-organization` |
+| **Performance** | `perf/description` | `perf/optimize-device-queries` |
 
-### Making Changes
+## ✍️ Code Style and Conventions
 
-#### Development Process
+### Java Code Standards
 
-1. **Write Tests First** (TDD approach)
-   ```bash
-   # Create failing test
-   ./gradlew test --tests "DeviceServiceTest.shouldUpdateDeviceStatus"
-   ```
-
-2. **Implement Feature**
-   ```bash
-   # Make changes to make test pass
-   # Run tests continuously
-   ./gradlew --continuous test
-   ```
-
-3. **Verify All Tests Pass**
-   ```bash
-   # Run full test suite
-   ./gradlew clean build
-   ```
-
-4. **Update Documentation**
-   ```bash
-   # Update relevant documentation
-   # Add JavaDoc for public APIs
-   ```
-
-#### Commit Guidelines
-
-**Commit Message Format:**
-
-```text
-type(scope): short description
-
-Longer description explaining what changed and why.
-
-Fixes #123
-Closes #456
-```
-
-**Commit Types:**
-
-| Type | Description | Example |
-|------|-------------|---------|
-| `feat` | New feature | `feat(device): add device health monitoring` |
-| `fix` | Bug fix | `fix(pagination): correct cursor encoding issue` |
-| `docs` | Documentation | `docs(api): add device search examples` |
-| `test` | Adding tests | `test(device): add integration tests for search` |
-| `refactor` | Code refactoring | `refactor(service): simplify device service layer` |
-| `perf` | Performance improvement | `perf(query): optimize device search query` |
-| `style` | Code style changes | `style(format): fix code formatting` |
-
-**Good Commit Examples:**
-
-```bash
-git commit -m "feat(device): add device health monitoring
-
-- Add DeviceHealth entity and DTOs
-- Implement health check service
-- Add REST endpoints for health monitoring
-- Include comprehensive test coverage
-
-Closes #234"
-
-git commit -m "fix(pagination): correct cursor encoding for special characters
-
-The cursor encoding was failing when device IDs contained special
-characters like + or /. Updated to use URL-safe base64 encoding.
-
-Fixes #345"
-```
-
-### Keeping Your Branch Updated
-
-```bash
-# Regularly sync with upstream
-git fetch upstream
-git checkout main
-git merge upstream/main
-git push origin main
-
-# Rebase your feature branch
-git checkout feature/your-feature-name
-git rebase main
-
-# Force push if needed (only on your branch!)
-git push --force-with-lease origin feature/your-feature-name
-```
-
-## Coding Standards
-
-### Java Code Style
-
-We follow **Google Java Style** with OpenFrame-specific customizations.
-
-#### Code Formatting
-
-**IntelliJ IDEA Setup:**
-```text
-Settings → Editor → Code Style → Java
-Import Scheme → Eclipse XML Profile → config/codestyle/openframe-java-style.xml
-```
-
-**Key Style Rules:**
-
-| Rule | Example |
-|------|---------|
-| **Indentation** | 4 spaces, no tabs |
-| **Line Length** | 120 characters maximum |
-| **Braces** | Opening brace on same line |
-| **Imports** | No wildcard imports, organized groups |
-| **Naming** | camelCase for variables, PascalCase for classes |
-
-#### Code Example
-
+**1. Formatting and Structure**
 ```java
+// Use 4 spaces for indentation (no tabs)
+// Maximum line length: 120 characters
+// Use descriptive variable and method names
+
 @Service
-@Transactional
-@Slf4j
 public class DeviceServiceImpl implements DeviceService {
+    
+    private static final int DEFAULT_PAGE_SIZE = 25;
+    private static final String DEVICE_NOT_FOUND_MESSAGE = "Device not found with ID: %s";
     
     private final DeviceRepository deviceRepository;
     private final DeviceMapper deviceMapper;
-    private final EventService eventService;
+    private final OrganizationService organizationService;
     
     public DeviceServiceImpl(DeviceRepository deviceRepository,
-                           DeviceMapper deviceMapper,
-                           EventService eventService) {
+                            DeviceMapper deviceMapper,
+                            OrganizationService organizationService) {
         this.deviceRepository = deviceRepository;
         this.deviceMapper = deviceMapper;
-        this.eventService = eventService;
+        this.organizationService = organizationService;
     }
     
     @Override
-    public GenericQueryResult<DeviceResponse> searchDevices(DeviceFilterInput filter) {
-        log.debug("Searching devices with filter: {}", filter);
+    @Transactional(readOnly = true)
+    public CountedGenericQueryResult<Device> findDevices(DeviceFilterInput input) {
+        validateDeviceFilterInput(input);
         
-        // Validate input
-        validateSearchFilter(filter);
+        DeviceQueryFilter queryFilter = deviceMapper.toQueryFilter(input);
+        Page<DeviceDocument> devicePage = deviceRepository.findDevicesWithFilters(queryFilter);
         
-        // Convert to query filter
-        DeviceQueryFilter queryFilter = deviceMapper.toQueryFilter(filter);
+        List<Device> devices = deviceMapper.toDeviceList(devicePage.getContent());
+        CursorPageInfo pageInfo = buildPageInfo(devicePage, input.getPagination());
         
-        // Execute search
-        GenericQueryResult<Device> result = deviceRepository.findWithFilter(queryFilter);
-        
-        // Map to DTOs
-        List<DeviceResponse> responses = result.getItems().stream()
-            .map(deviceMapper::toResponseDTO)
-            .collect(Collectors.toList());
-        
-        // Log event
-        eventService.logDeviceSearch(filter, responses.size());
-        
-        return GenericQueryResult.<DeviceResponse>builder()
-            .items(responses)
-            .pageInfo(result.getPageInfo())
+        return CountedGenericQueryResult.<Device>builder()
+            .items(devices)
+            .totalCount(devicePage.getTotalElements())
+            .pageInfo(pageInfo)
             .build();
     }
     
-    private void validateSearchFilter(DeviceFilterInput filter) {
-        if (filter.getPagination() == null) {
-            throw new ValidationException("Pagination is required");
+    private void validateDeviceFilterInput(DeviceFilterInput input) {
+        if (input == null) {
+            throw new IllegalArgumentException("Device filter input cannot be null");
         }
         
-        if (filter.getPagination().getFirst() != null 
-            && filter.getPagination().getFirst() > 100) {
-            throw new ValidationException("Page size cannot exceed 100");
+        if (input.getPagination() == null) {
+            throw new IllegalArgumentException("Pagination input is required");
         }
     }
 }
 ```
 
-### API Design Standards
-
-#### REST Endpoint Design
-
-**URL Patterns:**
-```text
-✅ Good:
-POST /api/devices/search           # Search devices
-GET  /api/devices/{id}            # Get specific device
-PUT  /api/devices/{id}            # Update device
-DELETE /api/devices/{id}          # Delete device
-
-❌ Avoid:
-GET /api/searchDevices            # Non-RESTful
-POST /api/device/create           # Redundant 'create'
-GET /api/devices/get/{id}         # Redundant 'get'
-```
-
-**Request/Response DTOs:**
+**2. Lombok Usage**
 ```java
-// Request DTOs - Input validation
+// Prefer @Builder for DTOs and request objects
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CreateDeviceRequest {
-    
-    @NotBlank(message = "Machine ID is required")
-    private String machineId;
-    
-    @NotBlank(message = "Serial number is required")  
-    @Size(max = 50, message = "Serial number cannot exceed 50 characters")
-    private String serialNumber;
-    
-    @NotNull(message = "Device type is required")
-    private DeviceType type;
+public class DeviceFilterInput {
     
     @Valid
-    private DeviceConfiguration configuration;
+    @NotNull(message = "Pagination is required")
+    private CursorPaginationInput pagination;
+    
+    @Valid
+    private DeviceFilters filters;
 }
 
-// Response DTOs - Clean data transfer
-@Data
+// Use @Value for immutable objects
+@Value
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class DeviceResponse {
-    
-    private String id;
-    private String machineId;
-    private String serialNumber;
-    private String model;
-    private String osVersion;
-    private DeviceType type;
-    private String status;
-    private Instant lastCheckin;
-    private Instant createdAt;
-    private Instant updatedAt;
-}
-```
-
-### Database Design Standards
-
-#### Entity Design
-
-```java
-@Document(collection = "devices")
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-@CompoundIndex(name = "org_status_idx", def = "{'organizationId': 1, 'status': 1}")
-@CompoundIndex(name = "org_type_checkin_idx", def = "{'organizationId': 1, 'type': 1, 'lastCheckin': -1}")
-public class Device {
-    
-    @Id
-    private String id;
-    
-    @Indexed
     @NotNull
-    private String organizationId;  // Tenant isolation
-    
-    @Indexed
-    @NotNull
-    private String machineId;
-    
-    @Indexed(unique = true)
-    @NotBlank
-    private String serialNumber;
-    
-    @NotBlank
-    private String model;
-    
-    private String osVersion;
+    String id;
     
     @NotNull
-    private DeviceType type;
+    String name;
     
-    @Indexed
-    private String status;
+    @NotNull
+    DeviceType deviceType;
     
-    private Instant lastCheckin;
+    @NotNull
+    DeviceStatus status;
     
-    @Embedded
-    private DeviceConfiguration configuration;
+    List<String> tags;
     
-    @Embedded
-    private DeviceHealth health;
+    @NotNull
+    LocalDateTime createdAt;
     
-    @CreatedDate
-    private Instant createdAt;
-    
-    @LastModifiedDate
-    private Instant updatedAt;
+    @NotNull
+    LocalDateTime updatedAt;
 }
 ```
 
-#### Index Strategy
-
+**3. Validation Annotations**
 ```java
-// Compound indexes for common queries
-@CompoundIndex(def = "{'organizationId': 1, 'status': 1}")          // Filter by org + status
-@CompoundIndex(def = "{'organizationId': 1, 'type': 1}")            // Filter by org + type  
-@CompoundIndex(def = "{'organizationId': 1, 'lastCheckin': -1}")    // Sort by checkin time
-@CompoundIndex(def = "{'serialNumber': 1}", unique = true)          // Unique constraint
-```
-
-## Testing Requirements
-
-### Test Coverage Standards
-
-- **Minimum Coverage**: 80% line coverage
-- **Critical Path Coverage**: 100% for business logic
-- **Integration Tests**: All repository and service layers
-- **Unit Tests**: All public methods
-
-### Test Categories
-
-#### Unit Tests
-
-```java
-@ExtendWith(MockitoExtension.class)
-@DisplayName("Device Service Tests")
-class DeviceServiceImplTest {
+// Use comprehensive validation on all DTOs
+public class CreateDeviceRequest {
     
-    @Mock
-    private DeviceRepository deviceRepository;
+    @NotBlank(message = "Device name is required")
+    @Size(min = 2, max = 100, message = "Device name must be between 2 and 100 characters")
+    private String name;
     
-    @Mock
-    private EventService eventService;
+    @NotNull(message = "Device type is required")
+    private DeviceType deviceType;
     
-    @InjectMocks
-    private DeviceServiceImpl deviceService;
+    @NotNull(message = "Organization ID is required")
+    @Pattern(regexp = "^[a-zA-Z0-9-_]+$", message = "Organization ID contains invalid characters")
+    private String organizationId;
     
-    @Test
-    @DisplayName("Should create device successfully")
-    void shouldCreateDeviceSuccessfully() {
-        // Given
-        CreateDeviceRequest request = CreateDeviceRequest.builder()
-            .machineId("machine-001")
-            .serialNumber("SN123456789")
-            .type(DeviceType.DESKTOP)
-            .build();
-        
-        Device savedDevice = Device.builder()
-            .id("device-001")
-            .machineId("machine-001")
-            .serialNumber("SN123456789")
-            .type(DeviceType.DESKTOP)
-            .build();
-        
-        when(deviceRepository.save(any(Device.class))).thenReturn(savedDevice);
-        
-        // When
-        DeviceResponse response = deviceService.createDevice(request);
-        
-        // Then
-        assertThat(response.getId()).isEqualTo("device-001");
-        assertThat(response.getSerialNumber()).isEqualTo("SN123456789");
-        
-        verify(eventService).logDeviceCreated(any(Device.class));
-    }
+    @Valid
+    private List<@NotBlank String> tags;
 }
 ```
 
-#### Integration Tests
+### Documentation Standards
 
-```java
-@SpringBootTest
-@Testcontainers
-@ActiveProfiles("test")
-@DisplayName("Device Repository Integration Tests")
-class DeviceRepositoryIntegrationTest {
-    
-    @Container
-    static MongoDBContainer mongoDBContainer = new MongoDBContainer("mongo:7.0");
-    
-    @Autowired
-    private DeviceRepository deviceRepository;
-    
-    @Test
-    @DisplayName("Should support cursor-based pagination")
-    void shouldSupportCursorBasedPagination() {
-        // Given - Create test devices
-        List<Device> devices = createTestDevices(20);
-        deviceRepository.saveAll(devices);
-        
-        // When - Get first page
-        CursorPaginationInput pagination = CursorPaginationInput.builder()
-            .first(5)
-            .build();
-        
-        GenericQueryResult<Device> firstPage = deviceRepository.findWithPagination(pagination);
-        
-        // Then
-        assertThat(firstPage.getItems()).hasSize(5);
-        assertThat(firstPage.getPageInfo().isHasNextPage()).isTrue();
-        
-        // When - Get second page
-        CursorPaginationInput nextPagination = CursorPaginationInput.builder()
-            .first(5)  
-            .after(firstPage.getPageInfo().getEndCursor())
-            .build();
-        
-        GenericQueryResult<Device> secondPage = deviceRepository.findWithPagination(nextPagination);
-        
-        // Then
-        assertThat(secondPage.getItems()).hasSize(5);
-        assertThat(secondPage.getPageInfo().isHasPreviousPage()).isTrue();
-    }
-}
-```
-
-### Test Data Management
-
-```java
-public class DeviceTestDataBuilder {
-    
-    public static Device.DeviceBuilder aDevice() {
-        return Device.builder()
-            .id(UUID.randomUUID().toString())
-            .organizationId("test-org-" + System.currentTimeMillis())
-            .machineId("machine-" + System.currentTimeMillis())
-            .serialNumber("SN" + System.currentTimeMillis())
-            .model("Test Device Model")
-            .osVersion("Test OS 1.0")
-            .type(DeviceType.DESKTOP)
-            .status("ACTIVE")
-            .lastCheckin(Instant.now())
-            .createdAt(Instant.now())
-            .updatedAt(Instant.now());
-    }
-    
-    public static Device activeDesktop() {
-        return aDevice()
-            .type(DeviceType.DESKTOP)
-            .status("ACTIVE")
-            .build();
-    }
-    
-    public static Device offlineLaptop() {
-        return aDevice()
-            .type(DeviceType.LAPTOP)
-            .status("OFFLINE")
-            .lastCheckin(Instant.now().minus(1, ChronoUnit.HOURS))
-            .build();
-    }
-}
-```
-
-## Documentation Standards
-
-### JavaDoc Requirements
-
-All public APIs must have comprehensive JavaDoc:
-
+**1. JavaDoc for Public APIs**
 ```java
 /**
- * Service for managing device operations including creation, updates, and search functionality.
+ * Service interface for managing devices within organizations.
  * 
- * <p>This service provides a high-level interface for device management operations,
- * including validation, business logic, and integration with external systems.</p>
- * 
- * <h3>Usage Example:</h3>
- * <pre>{@code
- * DeviceFilterInput filter = DeviceFilterInput.builder()
- *     .types(List.of("DESKTOP", "LAPTOP"))
- *     .organizationId("org-123")
- *     .pagination(CursorPaginationInput.builder().first(20).build())
- *     .build();
- * 
- * GenericQueryResult<DeviceResponse> result = deviceService.searchDevices(filter);
- * }</pre>
+ * <p>Provides operations for querying, creating, updating, and deleting devices
+ * with proper multi-tenant isolation and pagination support.</p>
  *
- * @author OpenFrame Team
+ * @author OpenFrame Contributors
  * @since 1.0.0
- * @see DeviceRepository
- * @see DeviceMapper
  */
 public interface DeviceService {
     
     /**
-     * Searches for devices based on the provided filter criteria.
+     * Finds devices based on provided filter criteria with pagination.
+     * 
+     * <p>This method supports:
+     * <ul>
+     *   <li>Cursor-based pagination for efficient large dataset navigation</li>
+     *   <li>Filtering by device type, status, tags, and organization</li>
+     *   <li>Multi-tenant isolation (automatically scoped to organization)</li>
+     * </ul>
      *
-     * <p>This method supports filtering by device type, status, organization,
-     * and includes cursor-based pagination for efficient large dataset handling.</p>
-     *
-     * @param filter the search criteria including type filters, organization scope,
-     *               and pagination parameters
-     * @return a paginated result containing matching devices and pagination metadata
-     * @throws ValidationException if the filter criteria are invalid
-     * @throws TenantViolationException if attempting to access devices outside
-     *                                  the current tenant scope
+     * @param input the filter input containing pagination and filter criteria
+     * @return paginated result containing devices and pagination info
+     * @throws IllegalArgumentException if input is null or invalid
+     * @throws SecurityException if user lacks permission to access organization
+     * 
      * @since 1.0.0
      */
-    GenericQueryResult<DeviceResponse> searchDevices(DeviceFilterInput filter);
+    CountedGenericQueryResult<Device> findDevices(DeviceFilterInput input);
+    
+    /**
+     * Retrieves a single device by its unique identifier.
+     *
+     * @param deviceId the unique device identifier
+     * @return the device if found
+     * @throws DeviceNotFoundException if no device exists with the given ID
+     * @throws SecurityException if user lacks permission to access the device
+     * 
+     * @since 1.0.0
+     */
+    Device findDeviceById(String deviceId);
 }
 ```
 
-### Code Comments
+**2. Class-Level Documentation**
+```java
+/**
+ * MongoDB document representing a device in the OpenFrame system.
+ * 
+ * <p>Devices represent managed endpoints such as workstations, servers, 
+ * mobile devices, and IoT devices. Each device belongs to an organization
+ * and can have multiple associated tools and monitoring agents.</p>
+ * 
+ * <p>This entity supports:</p>
+ * <ul>
+ *   <li>Multi-tenant data isolation via organizationId</li>
+ *   <li>Flexible metadata storage for tool-specific information</li>
+ *   <li>Tag-based categorization and filtering</li>
+ *   <li>Compliance tracking and security monitoring</li>
+ * </ul>
+ *
+ * @since 1.0.0
+ */
+@Document(collection = "devices")
+@CompoundIndex(name = "org_status_idx", def = "{'organizationId': 1, 'status': 1}")
+@CompoundIndex(name = "org_type_idx", def = "{'organizationId': 1, 'deviceType': 1}")
+public class Device {
+    // Implementation
+}
+```
+
+## 🧪 Writing Tests
+
+### Test Requirements
+
+**Every contribution must include:**
+- ✅ **Unit tests** for all new business logic
+- ✅ **Integration tests** for API endpoints
+- ✅ **Repository tests** for data operations  
+- ✅ **Validation tests** for DTOs
+- ✅ **Edge case coverage** (null inputs, boundary conditions)
+
+### Test Naming and Structure
 
 ```java
-public class DeviceServiceImpl implements DeviceService {
+@DisplayName("DeviceService Implementation Tests")
+class DeviceServiceImplTest {
     
-    @Override
-    public GenericQueryResult<DeviceResponse> searchDevices(DeviceFilterInput filter) {
-        // Validate input parameters to ensure data integrity
-        validateSearchFilter(filter);
+    @Nested
+    @DisplayName("Device Retrieval")
+    class DeviceRetrieval {
         
-        // Convert API DTO to internal query format for repository layer
-        DeviceQueryFilter queryFilter = deviceMapper.toQueryFilter(filter);
+        @Test
+        @DisplayName("Should find devices with valid filters successfully")
+        void shouldFindDevicesWithValidFiltersSuccessfully() {
+            // Given
+            DeviceFilterInput validInput = createValidDeviceFilterInput();
+            Page<DeviceDocument> expectedPage = createMockDevicePage();
+            List<Device> expectedDevices = createExpectedDevices();
+            
+            when(deviceRepository.findDevicesWithFilters(any())).thenReturn(expectedPage);
+            when(deviceMapper.toDeviceList(any())).thenReturn(expectedDevices);
+            
+            // When
+            CountedGenericQueryResult<Device> result = deviceService.findDevices(validInput);
+            
+            // Then
+            assertThat(result).isNotNull();
+            assertThat(result.getItems()).hasSize(2);
+            assertThat(result.getTotalCount()).isEqualTo(10L);
+            
+            verify(deviceRepository).findDevicesWithFilters(any());
+            verify(deviceMapper).toDeviceList(any());
+        }
         
-        // Execute database query with tenant-scoped filtering
-        GenericQueryResult<Device> result = deviceRepository.findWithFilter(queryFilter);
+        @ParameterizedTest
+        @DisplayName("Should reject invalid filter inputs")
+        @MethodSource("invalidFilterInputs")
+        void shouldRejectInvalidFilterInputs(DeviceFilterInput invalidInput, String expectedMessage) {
+            // When & Then
+            assertThatThrownBy(() -> deviceService.findDevices(invalidInput))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage(expectedMessage);
+            
+            verifyNoInteractions(deviceRepository);
+        }
         
-        // Transform internal entities to API response DTOs
-        List<DeviceResponse> responses = result.getItems().stream()
-            .map(deviceMapper::toResponseDTO)
-            .collect(Collectors.toList());
+        private static Stream<Arguments> invalidFilterInputs() {
+            return Stream.of(
+                Arguments.of(null, "Device filter input cannot be null"),
+                Arguments.of(DeviceFilterInput.builder().build(), "Pagination input is required"),
+                Arguments.of(DeviceFilterInput.builder()
+                    .pagination(CursorPaginationInput.builder().limit(0).build())
+                    .build(), "Limit must be at least 1")
+            );
+        }
+    }
+    
+    @Nested
+    @DisplayName("Error Handling")
+    class ErrorHandling {
         
-        // Create audit trail for compliance and debugging
-        eventService.logDeviceSearch(filter, responses.size());
-        
-        // Return paginated result with metadata for client-side pagination
-        return GenericQueryResult.<DeviceResponse>builder()
-            .items(responses)
-            .pageInfo(result.getPageInfo())
-            .build();
+        @Test
+        @DisplayName("Should handle repository exceptions gracefully")
+        void shouldHandleRepositoryExceptionsGracefully() {
+            // Given
+            DeviceFilterInput input = createValidDeviceFilterInput();
+            when(deviceRepository.findDevicesWithFilters(any()))
+                .thenThrow(new RuntimeException("Database connection failed"));
+            
+            // When & Then
+            assertThatThrownBy(() -> deviceService.findDevices(input))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("Database connection failed");
+        }
     }
 }
 ```
 
-### README and Documentation Updates
+### Integration Test Standards
 
-When adding new features, update relevant documentation:
-
-1. **API Documentation** - Update OpenAPI specs
-2. **README Files** - Update module-specific READMEs  
-3. **User Guides** - Update getting started guides
-4. **Examples** - Add usage examples
-5. **Migration Guides** - For breaking changes
-
-## Pull Request Process
-
-### Before Submitting
-
-**Pre-submission Checklist:**
-
-- [ ] ✅ Code follows style guidelines
-- [ ] ✅ All tests pass locally
-- [ ] ✅ New tests added for new functionality
-- [ ] ✅ Documentation updated
-- [ ] ✅ No merge conflicts with main
-- [ ] ✅ Commit messages follow convention
-- [ ] ✅ Changes are focused and atomic
-
-### Creating Pull Request
-
-```bash
-# 1. Push your branch
-git push origin feature/your-feature-name
-
-# 2. Create pull request on GitHub
-# Use the GitHub web interface or CLI:
-gh pr create --title "feat(device): add health monitoring" \
-             --body "Adds comprehensive device health monitoring with real-time status updates"
+```java
+@SpringBootTest
+@Testcontainers
+@DisplayName("Device API Integration Tests")
+class DeviceApiIntegrationTest {
+    
+    @Container
+    static MongoDBContainer mongoDBContainer = new MongoDBContainer("mongo:7");
+    
+    @Autowired
+    private TestRestTemplate restTemplate;
+    
+    @Test
+    @DisplayName("Should create and retrieve device successfully")
+    void shouldCreateAndRetrieveDeviceSuccessfully() {
+        // Given
+        CreateDeviceRequest createRequest = CreateDeviceRequest.builder()
+            .name("Integration Test Device")
+            .deviceType(DeviceType.DESKTOP)
+            .organizationId("test-org-123")
+            .tags(Arrays.asList("test", "integration"))
+            .build();
+        
+        // When - Create device
+        ResponseEntity<DeviceResponse> createResponse = restTemplate.postForEntity(
+            "/api/devices", createRequest, DeviceResponse.class);
+        
+        // Then - Verify creation
+        assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(createResponse.getBody()).isNotNull();
+        
+        String deviceId = createResponse.getBody().getId();
+        
+        // When - Retrieve device
+        ResponseEntity<DeviceResponse> getResponse = restTemplate.getForEntity(
+            "/api/devices/" + deviceId, DeviceResponse.class);
+        
+        // Then - Verify retrieval
+        assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        DeviceResponse device = getResponse.getBody();
+        assertThat(device.getName()).isEqualTo("Integration Test Device");
+        assertThat(device.getDeviceType()).isEqualTo(DeviceType.DESKTOP);
+        assertThat(device.getTags()).containsExactlyInAnyOrder("test", "integration");
+    }
+}
 ```
 
-### PR Template
+## 📝 Commit Message Format
+
+We use [Conventional Commits](https://www.conventionalcommits.org/) for consistent commit history and automated changelog generation.
+
+### Commit Message Structure
+
+```text
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+### Commit Types
+
+| Type | Description | Example |
+|------|-------------|---------|
+| **feat** | New feature | `feat(api-lib): add device compliance filtering` |
+| **fix** | Bug fix | `fix(pagination): handle null cursor values correctly` |
+| **docs** | Documentation only | `docs(contributing): update code style guidelines` |
+| **style** | Code style changes | `style(device-service): fix formatting and imports` |
+| **refactor** | Code refactoring | `refactor(repository): extract common query logic` |
+| **perf** | Performance improvement | `perf(device-query): optimize MongoDB aggregation` |
+| **test** | Test changes | `test(device-service): add edge case coverage` |
+| **chore** | Build/tools changes | `chore(deps): update Spring Boot to 3.2.1` |
+
+### Commit Examples
+
+**Good Commits:**
+```bash
+# Feature addition
+feat(api-lib): add device health monitoring DTOs
+
+- Add DeviceHealth entity with vitals tracking
+- Include HealthStatus enum and validation rules
+- Support for CPU, memory, disk metrics
+- Add comprehensive unit tests for new DTOs
+
+Closes #234
+
+# Bug fix
+fix(cursor-pagination): handle edge case with empty result sets
+
+Previously, empty result sets would return null cursor causing
+NPE in subsequent pagination requests. Now returns appropriate
+empty state with hasNext=false.
+
+Fixes #189
+
+# Documentation
+docs(architecture): add sequence diagrams for authentication flow
+
+- Add OAuth2 authentication sequence
+- Include JWT validation process
+- Document error handling patterns
+- Update architecture overview with new diagrams
+```
+
+**Avoid These Patterns:**
+```bash
+# Too vague
+fix: bug fix
+
+# No description
+feat(api): stuff
+
+# Not following format
+Added new feature for devices
+
+# Multiple unrelated changes
+feat: add device filtering and fix user authentication and update docs
+```
+
+## 🔍 Pull Request Process
+
+### Before Creating a PR
+
+1. **Self Review Checklist:**
+   - [ ] Code follows style guidelines
+   - [ ] All tests pass locally  
+   - [ ] Documentation is updated
+   - [ ] Commit messages follow conventions
+   - [ ] No merge conflicts with main branch
+
+2. **Testing Checklist:**
+   - [ ] Unit tests cover new functionality
+   - [ ] Integration tests validate API changes
+   - [ ] Manual testing performed
+   - [ ] Performance impact assessed
+
+### Pull Request Template
 
 ```markdown
 ## Description
-Brief description of changes made.
+Brief description of changes and their purpose.
 
 ## Type of Change
-- [ ] 🐛 Bug fix (non-breaking change that fixes an issue)
-- [ ] ✨ New feature (non-breaking change that adds functionality)
-- [ ] 💥 Breaking change (fix or feature that would cause existing functionality to not work as expected)
-- [ ] 📚 Documentation update
+- [ ] Bug fix (non-breaking change that fixes an issue)
+- [ ] New feature (non-breaking change that adds functionality)
+- [ ] Breaking change (fix or feature that causes existing functionality to not work as expected)
+- [ ] Documentation update
 
 ## Testing
-- [ ] Unit tests pass
-- [ ] Integration tests pass
-- [ ] Manual testing completed
+- [ ] Unit tests added/updated
+- [ ] Integration tests added/updated  
+- [ ] Manual testing performed
+- [ ] Performance testing completed (if applicable)
 
-## Documentation
-- [ ] Code comments updated
-- [ ] JavaDoc updated for public APIs
-- [ ] User documentation updated
-- [ ] Examples added/updated
+## Screenshots (if applicable)
+Include screenshots for UI changes or API response examples.
 
 ## Checklist
 - [ ] My code follows the style guidelines
-- [ ] I have performed a self-review
+- [ ] I have performed a self-review of my code
 - [ ] I have commented my code, particularly in hard-to-understand areas
 - [ ] I have made corresponding changes to the documentation
 - [ ] My changes generate no new warnings
-- [ ] I have added tests that prove my fix is effective or that my feature works
+- [ ] I have added tests that prove my fix is effective or my feature works
+- [ ] New and existing unit tests pass locally with my changes
 
 ## Related Issues
-Fixes #123
-Closes #456
+Closes #123
+Related to #456
 ```
 
 ### Review Process
 
-#### For Contributors
+**Automatic Checks:**
+- ✅ All tests pass
+- ✅ Code coverage meets thresholds  
+- ✅ No security vulnerabilities
+- ✅ Code style validation
+- ✅ Documentation builds successfully
 
-1. **Address Feedback** - Respond to all review comments
-2. **Make Changes** - Update code based on feedback
-3. **Request Re-review** - When ready for another review
-4. **Stay Engaged** - Respond promptly to reviewer questions
+**Manual Review Focuses On:**
+- **Architecture Consistency**: Follows established patterns
+- **API Design**: RESTful, consistent with existing endpoints
+- **Security**: Proper validation, authorization, data handling
+- **Performance**: Efficient queries, appropriate caching
+- **Testability**: Adequate test coverage and quality
+- **Documentation**: Clear, comprehensive, accurate
 
-#### For Reviewers
+### Addressing Review Feedback
 
-**Review Checklist:**
+```bash
+# Make requested changes
+git add .
+git commit -m "fix: address review feedback
 
-- [ ] ✅ Code quality and style
-- [ ] ✅ Test coverage and quality  
-- [ ] ✅ Documentation completeness
-- [ ] ✅ API design consistency
-- [ ] ✅ Performance considerations
-- [ ] ✅ Security implications
+- Update validation error messages per reviewer feedback
+- Extract common validation logic to utility method
+- Add missing edge case test for null organization ID"
 
-**Review Feedback Examples:**
+# Push changes
+git push origin feature/your-feature-name
 
-```markdown
-# ✅ Good feedback - Specific and actionable
-"Consider using Optional.ofNullable() here to handle potential null values more elegantly. This would make the code more robust and follow our null-safety guidelines."
-
-# ✅ Good feedback - Explains reasoning  
-"This method is getting quite long. Consider extracting the validation logic into a separate private method for better readability and testability."
-
-# ❌ Avoid vague feedback
-"This looks wrong"
-
-# ❌ Avoid unconstructive criticism
-"This is terrible code"
+# PR will automatically update
 ```
 
-## Issue Guidelines
-
-### Creating Quality Issues
-
-#### Bug Reports
-
-**Bug Report Template:**
-
-```markdown
-## Bug Description
-Clear description of the issue.
-
-## Steps to Reproduce
-1. Step 1
-2. Step 2  
-3. Step 3
-
-## Expected Behavior
-What should happen.
-
-## Actual Behavior
-What actually happens.
-
-## Environment
-- OpenFrame Version: 1.2.0
-- Java Version: 17.0.7
-- OS: Ubuntu 22.04
-- Database: MongoDB 7.0
-
-## Additional Context
-Screenshots, logs, or other relevant information.
-```
-
-#### Feature Requests
-
-**Feature Request Template:**
-
-```markdown
-## Feature Description
-Clear description of the proposed feature.
-
-## Problem Statement
-What problem does this solve?
-
-## Proposed Solution
-How should this feature work?
-
-## Alternatives Considered
-Other solutions you've considered.
-
-## Additional Context
-Use cases, mockups, or other relevant information.
-```
-
-### Issue Labels
-
-| Label | Description | Usage |
-|-------|-------------|--------|
-| `bug` | Something isn't working | Bug reports |
-| `enhancement` | New feature or request | Feature requests |
-| `good first issue` | Good for newcomers | Beginner-friendly issues |
-| `help wanted` | Extra attention needed | Community help needed |
-| `question` | Further information requested | Q&A and support |
-| `documentation` | Documentation improvements | Doc updates |
-| `duplicate` | This issue already exists | Duplicate issues |
-| `wontfix` | This will not be worked on | Rejected issues |
-
-## Release Process
+## 🚀 Release Process
 
 ### Semantic Versioning
 
-We follow [Semantic Versioning (SemVer)](https://semver.org/):
+OpenFrame follows [Semantic Versioning](https://semver.org/):
+
+- **MAJOR** (X.0.0): Breaking changes to public API
+- **MINOR** (0.X.0): New features, backward compatible
+- **PATCH** (0.0.X): Bug fixes, backward compatible
+
+### Contribution Impact
+
+| Change Type | Version Impact | Examples |
+|-------------|----------------|----------|
+| **Bug fixes** | PATCH | Fix pagination edge case, correct validation message |
+| **New features** | MINOR | Add device filtering, new API endpoint |
+| **Breaking changes** | MAJOR | Change DTO structure, remove deprecated method |
+| **Documentation** | None | Update guides, fix typos |
+
+## 🎨 Advanced Contributing
+
+### Creating New Modules
+
+When adding significant functionality, consider creating a new module:
 
 ```text
-MAJOR.MINOR.PATCH
-
-MAJOR: Breaking changes
-MINOR: New features (backward compatible)  
-PATCH: Bug fixes (backward compatible)
-
-Examples:
-1.0.0 → 1.0.1 (bug fix)
-1.0.1 → 1.1.0 (new feature)
-1.1.0 → 2.0.0 (breaking change)
+openframe-new-module/
+├── src/
+│   ├── main/java/com/openframe/newmodule/
+│   │   ├── dto/           # Data Transfer Objects
+│   │   ├── service/       # Service interfaces and implementations  
+│   │   ├── config/        # Configuration classes
+│   │   └── exception/     # Module-specific exceptions
+│   └── test/java/com/openframe/newmodule/
+│       ├── service/       # Service tests
+│       └── integration/   # Integration tests
+├── pom.xml               # Module dependencies
+└── README.md             # Module documentation
 ```
 
-### Release Workflow
+### Adding New Tool Integrations
 
-```mermaid
-graph LR
-    DEV[Development] --> RC[Release Candidate]
-    RC --> TEST[Testing]
-    TEST --> RELEASE[Release]
-    RELEASE --> TAG[Git Tag]
-    TAG --> PUBLISH[Publish Artifacts]
-    PUBLISH --> ANNOUNCE[Announce]
+For integrating new MSP tools:
+
+1. **Create SDK Module** under `sdk/{tool-name}/`
+2. **Define Tool Client** with proper error handling
+3. **Add Integration Service** in appropriate service module
+4. **Create Event Mappers** for tool-specific events
+5. **Add Configuration** for tool connection settings
+
+### Performance Optimization Contributions
+
+When contributing performance improvements:
+
+1. **Create Benchmark Tests** using JMH
+2. **Document Performance Impact** with before/after metrics
+3. **Consider Memory Usage** and GC impact
+4. **Test Under Load** with realistic data volumes
+5. **Monitor Database Performance** for query optimizations
+
+## ❓ Getting Help
+
+### Before Asking for Help
+
+1. **Search Existing Issues** and discussions
+2. **Check Documentation** including architecture guides
+3. **Review Similar Code** in the codebase
+4. **Test Locally** to isolate the issue
+
+### Where to Get Help
+
+| Question Type | Where to Ask | Expected Response Time |
+|---------------|--------------|----------------------|
+| **Quick Questions** | `#general` Slack channel | < 2 hours |
+| **Technical Issues** | `#dev-help` Slack channel | < 4 hours |
+| **Design Discussions** | `#contributors` Slack channel | < 1 day |
+| **Bug Reports** | GitHub Issues | < 2 days |
+| **Feature Requests** | GitHub Issues + Slack discussion | < 1 week |
+
+### Effective Questions
+
+**Good Question:**
+```text
+I'm implementing device filtering by compliance status and getting a 
+MongoDB aggregation error: "FieldPath field names may not contain '.'". 
+
+I'm trying to filter on 'compliance.status' field. Looking at existing 
+filters in DeviceFilters.java, should I be using dot notation or a 
+nested approach?
+
+My current attempt:
+```java
+Query query = new Query(Criteria.where("compliance.status").is(status));
 ```
 
-### Release Checklist
+Has anyone solved similar nested field filtering?
+```
 
-**Pre-Release:**
-- [ ] All tests passing
-- [ ] Documentation updated  
-- [ ] Changelog updated
-- [ ] Version numbers updated
-- [ ] Breaking changes documented
+**Avoid:**
+```text
+Device filtering doesn't work. Help?
+```
 
-**Release:**
-- [ ] Create release branch
-- [ ] Final testing
-- [ ] Create Git tag
-- [ ] Publish artifacts
-- [ ] Update documentation site
+## 📊 Contribution Recognition
 
-**Post-Release:**
-- [ ] Announce release
-- [ ] Update examples
-- [ ] Plan next release
+### Contributor Levels
 
-## Getting Help
+| Level | Criteria | Recognition |
+|-------|----------|-------------|
+| **First-Time Contributor** | Merged PR | Welcome message, contributor badge |
+| **Regular Contributor** | 5+ merged PRs | Listed in CONTRIBUTORS.md |
+| **Core Contributor** | 20+ PRs, design participation | Commit access, technical decisions |
+| **Maintainer** | Long-term commitment | Release management, project direction |
 
-### Community Channels
+### Monthly Contributor Spotlight
 
-- 💬 **[GitHub Discussions](https://github.com/openframe/openframe-oss-lib/discussions)** - Q&A and general discussion
-- 🐛 **[GitHub Issues](https://github.com/openframe/openframe-oss-lib/issues)** - Bug reports and feature requests
-- 📧 **[Mailing List](mailto:dev@openframe.io)** - Developer discussions
-- 💡 **[Feature Requests](https://github.com/openframe/openframe-oss-lib/discussions/categories/ideas)** - Propose new features
+Outstanding contributors are featured monthly in:
+- OpenMSP Slack announcements
+- Release notes acknowledgments
+- OpenFrame website contributor page
 
-### Mentorship Program
+## 🎯 What's Next?
 
-New contributors can request a mentor:
+Ready to contribute? Here's your action plan:
 
-1. **Comment on Issue** - "@openframe/mentors please assign a mentor"
-2. **Get Matched** - Mentor will reach out within 48 hours
-3. **One-on-One Support** - Regular check-ins and guidance
-4. **Gradual Independence** - Learn to contribute independently
+1. **Join the Community**: [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) and introduce yourself
+2. **Pick Your First Issue**: Look for "good first issue" labels
+3. **Set Up Development**: Follow the [Local Development](../setup/local-development.md) guide
+4. **Make Your First PR**: Start small with documentation or test improvements
+5. **Engage with Reviews**: Learn from feedback and help review others' code
 
-### Office Hours
+## 📚 Additional Resources
 
-**Weekly Office Hours:**
-- **When**: Thursdays 2:00 PM UTC
-- **Where**: GitHub Discussions Live Chat
-- **Format**: Open Q&A and code reviews
-- **Who**: Core team and experienced contributors
-
-## Recognition
-
-### Contributor Recognition
-
-We recognize contributions in multiple ways:
-
-- 🏆 **Hall of Fame** - Top contributors featured on website
-- 🎖️ **Badges** - GitHub profile badges for contributors  
-- 📰 **Blog Posts** - Feature contributor stories
-- 🎁 **Swag** - OpenFrame swag for regular contributors
-- 🎤 **Speaking Opportunities** - Conference speaking invitations
-
-### Types of Contributions
-
-We value all types of contributions:
-
-| Contribution Type | Examples | Recognition |
-|-------------------|----------|-------------|
-| **Code** | Features, bug fixes, optimizations | Commit attribution, changelog |
-| **Documentation** | Guides, examples, API docs | Author bylines |
-| **Testing** | Test coverage, test automation | Quality champion badge |
-| **Design** | UI/UX, architecture | Design contributor badge |
-| **Community** | Mentoring, support, advocacy | Community leader badge |
-
-## Thank You!
-
-Contributing to open source is about more than just code - it's about building something amazing together. Every contribution, whether it's a bug fix, documentation improvement, or helping other contributors, makes OpenFrame better for everyone.
-
-We're grateful for your time and effort, and we're here to help you succeed. Welcome to the OpenFrame community! 🚀
+- **Spring Boot Best Practices**: [spring.io/guides](https://spring.io/guides)
+- **MongoDB Java Driver**: [mongodb.github.io/mongo-java-driver/](https://mongodb.github.io/mongo-java-driver/)
+- **Testing Patterns**: [martinfowler.com/articles/practical-test-pyramid.html](https://martinfowler.com/articles/practical-test-pyramid.html)
+- **API Design Guidelines**: [restfulapi.net](https://restfulapi.net/)
 
 ---
 
-## Quick Links
-
-- 📖 **[Development Setup](../setup/environment.md)** - Get your environment ready
-- 🧪 **[Testing Guide](../testing/overview.md)** - Write great tests
-- 🏗️ **[Architecture Guide](../architecture/overview.md)** - Understand the system
-- 🚀 **[Getting Started](../../getting-started/introduction.md)** - Start using OpenFrame
-
-**Questions?** Don't hesitate to ask in [GitHub Discussions](https://github.com/openframe/openframe-oss-lib/discussions) - we're here to help!
+**Thank you for contributing to OpenFrame!** Your efforts help build better MSP tools for the entire community. Let's create something amazing together! 🚀

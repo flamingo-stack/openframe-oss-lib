@@ -1,65 +1,187 @@
 # Testing Overview
 
-Comprehensive testing is essential for maintaining the quality and reliability of OpenFrame OSS Library. This guide covers testing strategies, best practices, and tools used throughout the development process.
+Comprehensive testing is fundamental to maintaining OpenFrame OSS Library's reliability and enabling confident development. This guide covers the testing philosophy, structure, tools, and practices used throughout the project.
 
-## Testing Philosophy
+## 🎯 Testing Philosophy
 
-OpenFrame follows a **test-driven development (TDD)** approach with comprehensive test coverage across all layers of the application.
+OpenFrame follows a **test-driven development (TDD)** approach with emphasis on:
+
+- **Reliability**: High confidence in code changes through comprehensive test coverage
+- **Maintainability**: Tests serve as living documentation of system behavior
+- **Performance**: Tests validate performance characteristics and prevent regressions
+- **Security**: Testing security patterns and validation rules
 
 ### Testing Pyramid
 
 ```mermaid
-graph TB
+graph TD
     subgraph "Testing Pyramid"
-        E2E[End-to-End Tests<br/>Selenium, API Tests<br/>~5% of tests]
-        INTEGRATION[Integration Tests<br/>Spring Boot Test, Testcontainers<br/>~25% of tests]
-        UNIT[Unit Tests<br/>JUnit 5, Mockito<br/>~70% of tests]
+        E2E["End-to-End Tests<br/>5-10%<br/>Full system integration"]
+        Integration["Integration Tests<br/>20-30%<br/>Component interaction"]
+        Unit["Unit Tests<br/>60-70%<br/>Individual components"]
     end
     
-    E2E --> INTEGRATION
-    INTEGRATION --> UNIT
+    subgraph "Test Types"
+        Manual["Manual Testing<br/>Exploratory & UAT"]
+        Perf["Performance Tests<br/>Load & stress testing"]
+        Security["Security Tests<br/>Authentication & authorization"]
+    end
+    
+    Unit --> Integration
+    Integration --> E2E
+    
+    Manual -.-> E2E
+    Perf -.-> Integration
+    Security -.-> Unit
+    
+    style Unit fill:#e8f5e8
+    style Integration fill:#e1f5fe
+    style E2E fill:#f3e5f5
 ```
 
-### Testing Principles
+## 📁 Test Structure and Organization
 
-| Principle | Description | Implementation |
-|-----------|-------------|----------------|
-| **Fast Feedback** | Tests run quickly to enable rapid development | Unit tests complete in <1s, full suite <5min |
-| **Reliable** | Tests are deterministic and stable | Proper mocking, isolated test environments |
-| **Maintainable** | Tests are easy to understand and modify | Clear naming, good structure, minimal duplication |
-| **Comprehensive** | All critical paths are covered | 80%+ code coverage, edge case testing |
-| **Realistic** | Tests reflect real-world usage | Integration tests with real databases |
+### Directory Structure
 
-## Testing Framework and Tools
+```text
+openframe-oss-lib/
+├── openframe-api-lib/
+│   └── src/
+│       └── test/java/com/openframe/api/
+│           ├── dto/                     # DTO validation tests
+│           │   ├── device/
+│           │   ├── event/
+│           │   └── organization/
+│           ├── service/                 # Service interface tests
+│           └── validation/              # Custom validation tests
+├── openframe-api-service-core/
+│   └── src/
+│       └── test/java/com/openframe/api/
+│           ├── controller/              # Controller integration tests
+│           ├── service/                 # Service implementation tests
+│           ├── integration/             # Full integration tests
+│           └── testconfig/              # Test configurations
+├── openframe-data-mongo/
+│   └── src/
+│       └── test/java/com/openframe/data/
+│           ├── repository/              # Repository tests
+│           ├── document/                # Entity tests
+│           └── integration/             # Database integration tests
+└── test-resources/
+    ├── test-data/                       # Sample test data
+    ├── test-containers/                 # Docker test configurations
+    └── fixtures/                       # Test fixtures and utilities
+```
 
-### Core Testing Stack
+### Test Categories
 
-| Tool | Purpose | Usage |
-|------|---------|--------|
-| **JUnit 5** | Unit testing framework | All unit tests |
-| **Mockito** | Mocking framework | Mock dependencies in unit tests |
-| **Spring Boot Test** | Integration testing | Service and repository layer tests |
-| **Testcontainers** | Database testing | Integration tests with real databases |
-| **WireMock** | HTTP mocking | Mock external API calls |
-| **AssertJ** | Assertion library | Fluent assertions in all tests |
+| Category | Purpose | Location | Tools |
+|----------|---------|----------|--------|
+| **Unit Tests** | Test individual methods/classes | `src/test/java/**/*Test.java` | JUnit 5, Mockito |
+| **Integration Tests** | Test component interactions | `src/test/java/**/integration/` | Spring Boot Test, TestContainers |
+| **Repository Tests** | Test data layer operations | `src/test/java/**/repository/` | Spring Data Test, MongoDB Test |
+| **Controller Tests** | Test API endpoints | `src/test/java/**/controller/` | MockMvc, WebTestClient |
+| **Performance Tests** | Test system performance | `src/test/java/**/performance/` | JMH, custom utilities |
 
-### Additional Testing Tools
+## 🧪 Unit Testing
 
-| Tool | Purpose | When to Use |
-|------|---------|-------------|
-| **TestBench** | UI testing | End-to-end web UI tests |
-| **REST Assured** | API testing | Integration tests for REST endpoints |
-| **JSONPath** | JSON assertions | Validate JSON response structure |
-| **Awaitility** | Async testing | Test asynchronous operations |
+### Testing Framework Stack
 
-## Unit Testing
+```xml
+<!-- Core testing dependencies -->
+<dependencies>
+    <!-- JUnit 5 -->
+    <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter</artifactId>
+        <scope>test</scope>
+    </dependency>
+    
+    <!-- Mockito for mocking -->
+    <dependency>
+        <groupId>org.mockito</groupId>
+        <artifactId>mockito-core</artifactId>
+        <scope>test</scope>
+    </dependency>
+    
+    <!-- AssertJ for fluent assertions -->
+    <dependency>
+        <groupId>org.assertj</groupId>
+        <artifactId>assertj-core</artifactId>
+        <scope>test</scope>
+    </dependency>
+    
+    <!-- Spring Boot Test -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-test</artifactId>
+        <scope>test</scope>
+    </dependency>
+</dependencies>
+```
 
-Unit tests focus on testing individual components in isolation with mocked dependencies.
+### Unit Test Examples
 
-### Unit Test Structure
+**Testing DTOs and Validation**
+```java
+@DisplayName("CursorPaginationInput Tests")
+class CursorPaginationInputTest {
+    
+    private Validator validator;
+    
+    @BeforeEach
+    void setUp() {
+        ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
+        validator = factory.getValidator();
+    }
+    
+    @Test
+    @DisplayName("Should validate successful with valid input")
+    void shouldValidateSuccessfullyWithValidInput() {
+        // Given
+        CursorPaginationInput pagination = CursorPaginationInput.builder()
+            .limit(25)
+            .cursor("valid-cursor-token")
+            .build();
+        
+        // When
+        Set<ConstraintViolation<CursorPaginationInput>> violations = validator.validate(pagination);
+        
+        // Then
+        assertThat(violations).isEmpty();
+        assertThat(pagination.getLimit()).isEqualTo(25);
+        assertThat(pagination.getCursor()).isEqualTo("valid-cursor-token");
+    }
+    
+    @ParameterizedTest
+    @ValueSource(ints = {0, -1, 101, 200})
+    @DisplayName("Should reject invalid limit values")
+    void shouldRejectInvalidLimitValues(int invalidLimit) {
+        // Given
+        CursorPaginationInput pagination = CursorPaginationInput.builder()
+            .limit(invalidLimit)
+            .cursor("valid-cursor")
+            .build();
+        
+        // When
+        Set<ConstraintViolation<CursorPaginationInput>> violations = validator.validate(pagination);
+        
+        // Then
+        assertThat(violations)
+            .hasSize(1)
+            .extracting(ConstraintViolation::getMessage)
+            .containsAnyOf(
+                "Limit must be at least 1",
+                "Limit cannot exceed 100"
+            );
+    }
+}
+```
 
+**Testing Service Layer**
 ```java
 @ExtendWith(MockitoExtension.class)
+@DisplayName("DeviceService Implementation Tests")
 class DeviceServiceImplTest {
     
     @Mock
@@ -69,205 +191,68 @@ class DeviceServiceImplTest {
     private DeviceMapper deviceMapper;
     
     @Mock
-    private EventService eventService;
+    private OrganizationService organizationService;
     
     @InjectMocks
     private DeviceServiceImpl deviceService;
     
     @Test
-    @DisplayName("Should return devices when valid filter is provided")
-    void shouldReturnDevicesWhenValidFilterProvided() {
+    @DisplayName("Should find devices with filters successfully")
+    void shouldFindDevicesWithFiltersSuccessfully() {
         // Given
-        DeviceFilterInput filter = DeviceFilterInput.builder()
-            .types(List.of("DESKTOP", "LAPTOP"))
-            .pagination(CursorPaginationInput.builder().first(10).build())
-            .build();
-            
-        Device device1 = Device.builder()
-            .id("device-1")
-            .type(DeviceType.DESKTOP)
-            .status("ACTIVE")
-            .build();
-            
-        DeviceResponse response1 = DeviceResponse.builder()
-            .id("device-1")
-            .type("DESKTOP")
-            .status("ACTIVE")
-            .build();
+        DeviceFilterInput filterInput = createValidDeviceFilterInput();
+        Page<DeviceDocument> mockPage = createMockDevicePage();
+        List<Device> expectedDevices = createExpectedDevices();
         
-        GenericQueryResult<Device> repositoryResult = GenericQueryResult.<Device>builder()
-            .items(List.of(device1))
-            .pageInfo(CursorPageInfo.builder()
-                .hasNextPage(false)
-                .hasPreviousPage(false)
-                .build())
-            .build();
-            
+        when(deviceMapper.toQueryFilter(filterInput)).thenReturn(new DeviceQueryFilter());
+        when(deviceRepository.findDevicesWithFilters(any())).thenReturn(mockPage);
+        when(deviceMapper.toDeviceList(mockPage.getContent())).thenReturn(expectedDevices);
+        
         // When
-        when(deviceMapper.toQueryFilter(filter)).thenReturn(new DeviceQueryFilter());
-        when(deviceRepository.findWithFilter(any())).thenReturn(repositoryResult);
-        when(deviceMapper.toResponseDTO(device1)).thenReturn(response1);
-        
-        GenericQueryResult<DeviceResponse> result = deviceService.searchDevices(filter);
+        CountedGenericQueryResult<Device> result = deviceService.findDevices(filterInput);
         
         // Then
-        assertThat(result.getItems()).hasSize(1);
-        assertThat(result.getItems().get(0).getId()).isEqualTo("device-1");
-        assertThat(result.getItems().get(0).getType()).isEqualTo("DESKTOP");
+        assertThat(result).isNotNull();
+        assertThat(result.getItems()).hasSize(2);
+        assertThat(result.getTotalCount()).isEqualTo(10L);
+        assertThat(result.getPageInfo().getHasNextPage()).isTrue();
         
-        verify(eventService).logDeviceQuery(filter, 1);
-        verify(deviceRepository).findWithFilter(any(DeviceQueryFilter.class));
-    }
-}
-```
-
-### Unit Testing Best Practices
-
-#### Test Naming Convention
-
-```java
-// Pattern: should[ExpectedBehavior]When[Condition]
-@Test
-void shouldThrowExceptionWhenDeviceNotFound() { }
-
-@Test  
-void shouldReturnEmptyListWhenNoDevicesMatchFilter() { }
-
-@Test
-void shouldUpdateDeviceStatusWhenValidStatusProvided() { }
-```
-
-#### Test Data Builders
-
-Use the builder pattern for test data creation:
-
-```java
-public class DeviceTestDataBuilder {
-    
-    public static Device.DeviceBuilder aDevice() {
-        return Device.builder()
-            .id("device-001")
-            .machineId("machine-001")
-            .serialNumber("SN123456789")
-            .model("Dell OptiPlex 7090")
-            .osVersion("Windows 11 Pro")
-            .status("ACTIVE")
-            .type(DeviceType.DESKTOP)
-            .lastCheckin(Instant.now())
-            .createdAt(Instant.now())
-            .updatedAt(Instant.now());
-    }
-    
-    public static Device activeDesktopDevice() {
-        return aDevice()
-            .type(DeviceType.DESKTOP)
-            .status("ACTIVE")
-            .build();
-    }
-    
-    public static Device offlineLaptopDevice() {
-        return aDevice()
-            .type(DeviceType.LAPTOP)
-            .status("OFFLINE")
-            .model("MacBook Pro M2")
-            .osVersion("macOS 14.0")
-            .build();
-    }
-}
-```
-
-#### Parameterized Tests
-
-Test multiple scenarios efficiently:
-
-```java
-@ParameterizedTest
-@CsvSource({
-    "DESKTOP, true",
-    "LAPTOP, true", 
-    "SERVER, true",
-    "INVALID, false"
-})
-@DisplayName("Should validate device types correctly")
-void shouldValidateDeviceTypesCorrectly(String deviceType, boolean expectedValid) {
-    // Test logic
-    boolean isValid = DeviceType.isValid(deviceType);
-    assertThat(isValid).isEqualTo(expectedValid);
-}
-
-@ParameterizedTest
-@ValueSource(strings = {"", " ", "null"})
-@DisplayName("Should reject invalid serial numbers") 
-void shouldRejectInvalidSerialNumbers(String serialNumber) {
-    // Test logic
-    assertThatThrownBy(() -> deviceService.createDevice(serialNumber))
-        .isInstanceOf(ValidationException.class);
-}
-```
-
-## Integration Testing
-
-Integration tests verify that components work together correctly, including database interactions.
-
-### Spring Boot Test Configuration
-
-```java
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Testcontainers
-@ActiveProfiles("test")
-class DeviceRepositoryIntegrationTest {
-    
-    @Container
-    static MongoDBContainer mongoDBContainer = new MongoDBContainer("mongo:7.0")
-            .withExposedPorts(27017);
-            
-    @Container
-    static GenericContainer<?> redisContainer = new GenericContainer<>("redis:7-alpine")
-            .withExposedPorts(6379);
-    
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.data.mongodb.uri", mongoDBContainer::getReplicaSetUrl);
-        registry.add("spring.redis.host", redisContainer::getHost);
-        registry.add("spring.redis.port", redisContainer::getFirstMappedPort);
-    }
-    
-    @Autowired
-    private DeviceRepository deviceRepository;
-    
-    @Autowired
-    private MongoTemplate mongoTemplate;
-    
-    @BeforeEach
-    void setUp() {
-        mongoTemplate.getCollection("devices").deleteMany(new Document());
+        verify(deviceRepository).findDevicesWithFilters(any());
+        verify(deviceMapper).toDeviceList(mockPage.getContent());
     }
     
     @Test
-    @DisplayName("Should persist and retrieve device correctly")
-    void shouldPersistAndRetrieveDeviceCorrectly() {
-        // Given
-        Device device = DeviceTestDataBuilder.activeDesktopDevice();
+    @DisplayName("Should throw exception for null filter input")
+    void shouldThrowExceptionForNullFilterInput() {
+        // When & Then
+        assertThatThrownBy(() -> deviceService.findDevices(null))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Device filter input cannot be null");
         
-        // When
-        Device savedDevice = deviceRepository.save(device);
-        Optional<Device> retrievedDevice = deviceRepository.findById(savedDevice.getId());
-        
-        // Then
-        assertThat(retrievedDevice).isPresent();
-        assertThat(retrievedDevice.get().getSerialNumber()).isEqualTo(device.getSerialNumber());
-        assertThat(retrievedDevice.get().getType()).isEqualTo(device.getType());
+        verifyNoInteractions(deviceRepository);
+    }
+    
+    private DeviceFilterInput createValidDeviceFilterInput() {
+        return DeviceFilterInput.builder()
+            .pagination(CursorPaginationInput.builder()
+                .limit(10)
+                .build())
+            .filters(DeviceFilters.builder().build())
+            .build();
     }
 }
 ```
 
-### Repository Testing
+## 🔗 Integration Testing
 
-Test MongoDB queries and aggregations:
+Integration tests verify that components work correctly together, especially focusing on database operations and API interactions.
+
+### Repository Integration Tests
 
 ```java
 @DataMongoTest
-class DeviceRepositoryTest {
+@DisplayName("Device Repository Integration Tests")
+class DeviceRepositoryIntegrationTest {
     
     @Autowired
     private TestEntityManager entityManager;
@@ -279,205 +264,83 @@ class DeviceRepositoryTest {
     @DisplayName("Should find devices by organization ID")
     void shouldFindDevicesByOrganizationId() {
         // Given
-        Device device1 = DeviceTestDataBuilder.aDevice()
-            .organizationId("org-1")
-            .build();
-        Device device2 = DeviceTestDataBuilder.aDevice()
-            .organizationId("org-2")
-            .build();
-            
-        deviceRepository.saveAll(List.of(device1, device2));
+        String orgId = "test-org-123";
+        Device device1 = createTestDevice("device-1", orgId);
+        Device device2 = createTestDevice("device-2", orgId);
+        Device deviceOtherOrg = createTestDevice("device-3", "other-org");
+        
+        entityManager.persistAndFlush(device1);
+        entityManager.persistAndFlush(device2);
+        entityManager.persistAndFlush(deviceOtherOrg);
+        
+        Pageable pageable = PageRequest.of(0, 10);
         
         // When
-        List<Device> org1Devices = deviceRepository.findByOrganizationId("org-1");
+        Page<Device> result = deviceRepository.findByOrganizationId(orgId, pageable);
         
         // Then
-        assertThat(org1Devices).hasSize(1);
-        assertThat(org1Devices.get(0).getOrganizationId()).isEqualTo("org-1");
+        assertThat(result.getContent()).hasSize(2);
+        assertThat(result.getContent())
+            .extracting(Device::getOrganizationId)
+            .containsOnly(orgId);
     }
     
     @Test
-    @DisplayName("Should support cursor pagination") 
-    void shouldSupportCursorPagination() {
-        // Given - Create 15 devices
-        List<Device> devices = IntStream.range(1, 16)
-            .mapToObj(i -> DeviceTestDataBuilder.aDevice()
-                .id("device-" + String.format("%03d", i))
-                .serialNumber("SN" + String.format("%03d", i))
-                .build())
-            .collect(Collectors.toList());
-            
-        deviceRepository.saveAll(devices);
-        
-        // When - Get first page
-        CursorPaginationInput pagination = CursorPaginationInput.builder()
-            .first(5)
-            .build();
-            
-        GenericQueryResult<Device> firstPage = deviceRepository
-            .findWithPagination(pagination);
-        
-        // Then
-        assertThat(firstPage.getItems()).hasSize(5);
-        assertThat(firstPage.getPageInfo().isHasNextPage()).isTrue();
-        assertThat(firstPage.getPageInfo().isHasPreviousPage()).isFalse();
-        
-        // When - Get second page
-        CursorPaginationInput nextPagePagination = CursorPaginationInput.builder()
-            .first(5)
-            .after(firstPage.getPageInfo().getEndCursor())
-            .build();
-            
-        GenericQueryResult<Device> secondPage = deviceRepository
-            .findWithPagination(nextPagePagination);
-        
-        // Then
-        assertThat(secondPage.getItems()).hasSize(5);
-        assertThat(secondPage.getPageInfo().isHasPreviousPage()).isTrue();
-    }
-}
-```
-
-### Service Layer Integration Testing
-
-Test service layer with real database interactions:
-
-```java
-@SpringBootTest
-@ActiveProfiles("test")
-@Transactional
-class DeviceServiceIntegrationTest {
-    
-    @Autowired
-    private DeviceService deviceService;
-    
-    @Autowired
-    private DeviceRepository deviceRepository;
-    
-    @Test
-    @DisplayName("Should create device and log event")
-    void shouldCreateDeviceAndLogEvent() {
+    @DisplayName("Should find devices by status and type")
+    void shouldFindDevicesByStatusAndType() {
         // Given
-        CreateDeviceRequest request = CreateDeviceRequest.builder()
-            .machineId("machine-001")
-            .serialNumber("SN123456789")
-            .model("Dell OptiPlex 7090")
-            .type("DESKTOP")
-            .status("ACTIVE")
-            .build();
+        Device onlineDesktop = createTestDevice("desktop-1", DeviceStatus.ONLINE, DeviceType.DESKTOP);
+        Device onlineServer = createTestDevice("server-1", DeviceStatus.ONLINE, DeviceType.SERVER);
+        Device offlineDesktop = createTestDevice("desktop-2", DeviceStatus.OFFLINE, DeviceType.DESKTOP);
+        
+        entityManager.persistAndFlush(onlineDesktop);
+        entityManager.persistAndFlush(onlineServer);
+        entityManager.persistAndFlush(offlineDesktop);
         
         // When
-        DeviceResponse response = deviceService.createDevice(request);
+        List<Device> result = deviceRepository.findByStatusAndDeviceType(
+            DeviceStatus.ONLINE, DeviceType.DESKTOP);
         
         // Then
-        assertThat(response.getId()).isNotNull();
-        assertThat(response.getSerialNumber()).isEqualTo("SN123456789");
-        
-        // Verify device was persisted
-        Optional<Device> savedDevice = deviceRepository.findById(response.getId());
-        assertThat(savedDevice).isPresent();
-        
-        // Verify event was logged
-        // (Would need EventService mock or event verification)
+        assertThat(result)
+            .hasSize(1)
+            .first()
+            .satisfies(device -> {
+                assertThat(device.getStatus()).isEqualTo(DeviceStatus.ONLINE);
+                assertThat(device.getDeviceType()).isEqualTo(DeviceType.DESKTOP);
+            });
+    }
+    
+    private Device createTestDevice(String name, String organizationId) {
+        return Device.builder()
+            .name(name)
+            .organizationId(organizationId)
+            .status(DeviceStatus.ONLINE)
+            .deviceType(DeviceType.DESKTOP)
+            .createdAt(LocalDateTime.now())
+            .updatedAt(LocalDateTime.now())
+            .build();
     }
 }
 ```
 
-## Web Layer Testing
-
-Test REST controllers and API endpoints.
-
-### Controller Testing with MockMvc
-
-```java
-@WebMvcTest(DeviceController.class)
-class DeviceControllerTest {
-    
-    @Autowired
-    private MockMvc mockMvc;
-    
-    @MockBean
-    private DeviceService deviceService;
-    
-    @Autowired
-    private ObjectMapper objectMapper;
-    
-    @Test
-    @DisplayName("Should return devices when valid search request")
-    void shouldReturnDevicesWhenValidSearchRequest() throws Exception {
-        // Given
-        DeviceFilterInput filter = DeviceFilterInput.builder()
-            .types(List.of("DESKTOP"))
-            .pagination(CursorPaginationInput.builder().first(10).build())
-            .build();
-        
-        DeviceResponse device = DeviceResponse.builder()
-            .id("device-001")
-            .serialNumber("SN123456789")
-            .type("DESKTOP")
-            .status("ACTIVE")
-            .build();
-        
-        GenericQueryResult<DeviceResponse> result = GenericQueryResult.<DeviceResponse>builder()
-            .items(List.of(device))
-            .pageInfo(CursorPageInfo.builder()
-                .hasNextPage(false)
-                .hasPreviousPage(false)
-                .build())
-            .build();
-        
-        when(deviceService.searchDevices(any(DeviceFilterInput.class)))
-            .thenReturn(result);
-        
-        // When & Then
-        mockMvc.perform(post("/api/devices/search")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(filter)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items").isArray())
-                .andExpected(jsonPath("$.items", hasSize(1)))
-                .andExpected(jsonPath("$.items[0].id").value("device-001"))
-                .andExpected(jsonPath("$.items[0].type").value("DESKTOP"))
-                .andExpected(jsonPath("$.pageInfo.hasNextPage").value(false));
-    }
-    
-    @Test
-    @DisplayName("Should return 400 when invalid request body")
-    void shouldReturn400WhenInvalidRequestBody() throws Exception {
-        // Given - Invalid request with null pagination
-        String invalidJson = """
-            {
-                "types": ["DESKTOP"],
-                "pagination": null
-            }
-            """;
-        
-        // When & Then
-        mockMvc.perform(post("/api/devices/search")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(invalidJson))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
-    }
-}
-```
-
-### Full Integration API Testing
+### API Integration Tests
 
 ```java
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
-@ActiveProfiles("test")
+@DisplayName("Device API Integration Tests")
 class DeviceControllerIntegrationTest {
+    
+    @Container
+    static MongoDBContainer mongoDBContainer = new MongoDBContainer("mongo:7")
+            .withExposedPorts(27017);
     
     @Autowired
     private TestRestTemplate restTemplate;
     
-    @LocalServerPort
-    private int port;
-    
-    @Container
-    static MongoDBContainer mongoDBContainer = new MongoDBContainer("mongo:7.0");
+    @Autowired
+    private DeviceRepository deviceRepository;
     
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
@@ -485,589 +348,544 @@ class DeviceControllerIntegrationTest {
     }
     
     @Test
-    @DisplayName("Should create and retrieve device via API")
-    void shouldCreateAndRetrieveDeviceViaAPI() {
+    @DisplayName("Should get devices with pagination")
+    void shouldGetDevicesWithPagination() {
         // Given
-        CreateDeviceRequest request = CreateDeviceRequest.builder()
-            .machineId("machine-api-test")
-            .serialNumber("API123456789")
-            .model("Dell OptiPlex 7090")
-            .type("DESKTOP")
-            .status("ACTIVE")
-            .build();
+        String orgId = "test-org";
+        createTestDevices(orgId, 25); // Create 25 test devices
         
-        // When - Create device
-        ResponseEntity<DeviceResponse> createResponse = restTemplate.postForEntity(
-            "http://localhost:" + port + "/api/devices",
-            request,
-            DeviceResponse.class
-        );
-        
-        // Then
-        assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(createResponse.getBody().getId()).isNotNull();
-        
-        // When - Retrieve device
-        ResponseEntity<DeviceResponse> getResponse = restTemplate.getForEntity(
-            "http://localhost:" + port + "/api/devices/" + createResponse.getBody().getId(),
-            DeviceResponse.class
-        );
-        
-        // Then
-        assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(getResponse.getBody().getSerialNumber()).isEqualTo("API123456789");
-    }
-}
-```
-
-## External Integration Testing
-
-Test integrations with external systems using mocks and test containers.
-
-### WireMock for External API Testing
-
-```java
-@SpringBootTest
-@ActiveProfiles("test")
-class FleetMdmIntegrationTest {
-    
-    @RegisterExtension
-    static WireMockExtension wireMock = WireMockExtension.newInstance()
-        .options(wireMockConfig().port(8089))
-        .build();
-    
-    @Autowired
-    private FleetMdmService fleetMdmService;
-    
-    @Test
-    @DisplayName("Should sync devices from Fleet MDM")
-    void shouldSyncDevicesFromFleetMdm() {
-        // Given - Mock Fleet MDM API response
-        wireMock.stubFor(get(urlEqualTo("/api/v1/fleet/hosts"))
-            .willReturn(aResponse()
-                .withStatus(200)
-                .withHeader("Content-Type", "application/json")
-                .withBody("""
-                    {
-                        "hosts": [
-                            {
-                                "id": 123,
-                                "hostname": "desktop-001",
-                                "os_version": "Windows 11",
-                                "hardware_serial": "SN123456789"
-                            }
-                        ]
-                    }
-                    """)));
+        String url = "/api/devices?limit=10&organizationId=" + orgId;
         
         // When
-        List<Device> syncedDevices = fleetMdmService.syncDevices("connection-123");
+        ResponseEntity<DevicesResponse> response = restTemplate.getForEntity(url, DevicesResponse.class);
         
         // Then
-        assertThat(syncedDevices).hasSize(1);
-        assertThat(syncedDevices.get(0).getSerialNumber()).isEqualTo("SN123456789");
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull();
         
-        // Verify API was called
-        wireMock.verify(getRequestedFor(urlEqualTo("/api/v1/fleet/hosts")));
+        DevicesResponse devicesResponse = response.getBody();
+        assertThat(devicesResponse.getItems()).hasSize(10);
+        assertThat(devicesResponse.getTotalCount()).isEqualTo(25);
+        assertThat(devicesResponse.getPageInfo().getHasNextPage()).isTrue();
+        assertThat(devicesResponse.getPageInfo().getNextCursor()).isNotNull();
+    }
+    
+    @Test
+    @DisplayName("Should create device successfully")
+    void shouldCreateDeviceSuccessfully() {
+        // Given
+        CreateDeviceRequest request = CreateDeviceRequest.builder()
+            .name("Test Device")
+            .deviceType(DeviceType.DESKTOP)
+            .organizationId("test-org")
+            .build();
+        
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<CreateDeviceRequest> entity = new HttpEntity<>(request, headers);
+        
+        // When
+        ResponseEntity<DeviceResponse> response = restTemplate.postForEntity(
+            "/api/devices", entity, DeviceResponse.class);
+        
+        // Then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(response.getBody()).isNotNull();
+        
+        DeviceResponse deviceResponse = response.getBody();
+        assertThat(deviceResponse.getName()).isEqualTo("Test Device");
+        assertThat(deviceResponse.getDeviceType()).isEqualTo(DeviceType.DESKTOP);
+        
+        // Verify device was persisted
+        Optional<Device> persistedDevice = deviceRepository.findById(deviceResponse.getId());
+        assertThat(persistedDevice).isPresent();
+    }
+    
+    private void createTestDevices(String organizationId, int count) {
+        List<Device> devices = IntStream.range(0, count)
+            .mapToObj(i -> Device.builder()
+                .name("Test Device " + i)
+                .organizationId(organizationId)
+                .status(DeviceStatus.ONLINE)
+                .deviceType(DeviceType.DESKTOP)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build())
+            .collect(Collectors.toList());
+        
+        deviceRepository.saveAll(devices);
     }
 }
 ```
 
-## Test Configuration and Setup
-
-### Test Application Properties
-
-**`application-test.yml`:**
-
-```yaml
-spring:
-  profiles:
-    active: test
-    
-  # Test database configuration
-  data:
-    mongodb:
-      auto-index-creation: true
-  
-  # Test Redis configuration
-  redis:
-    database: 1  # Use different database for tests
-    timeout: 1s
-  
-  # Disable security for tests
-  security:
-    enabled: false
-  
-  # Test-specific JPA settings
-  jpa:
-    hibernate:
-      ddl-auto: create-drop
-    show-sql: false
-
-# Logging configuration for tests
-logging:
-  level:
-    com.openframe: DEBUG
-    org.springframework.test: INFO
-    org.testcontainers: INFO
-  pattern:
-    console: "%clr(%d{HH:mm:ss.SSS}){blue} %clr(%-5level) %clr([%thread]){magenta} %clr(%logger{20}){cyan} - %msg%n"
-
-# OpenFrame test configuration
-openframe:
-  security:
-    enabled: false
-    jwt:
-      secret: test-secret-key
-  features:
-    audit-logging: false  # Disable for faster tests
-    metrics-collection: false
-
-# Management endpoints for testing
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,metrics
-```
-
-### Test Database Management
-
-```java
-@TestConfiguration
-public class TestDatabaseConfiguration {
-    
-    @Bean
-    @Primary
-    public MongoTemplate testMongoTemplate() {
-        return new MongoTemplate(MongoClients.create("mongodb://localhost:27017"), "openframe-test");
-    }
-    
-    @EventListener
-    public void handleContextRefresh(ContextRefreshedEvent event) {
-        // Clean up test data before each test class
-        MongoTemplate mongoTemplate = event.getApplicationContext()
-            .getBean(MongoTemplate.class);
-        mongoTemplate.getCollectionNames().forEach(mongoTemplate::dropCollection);
-    }
-}
-```
-
-## Test Data Management
+## 🧩 Testing Utilities and Fixtures
 
 ### Test Data Builders
 
 ```java
-public class TestDataFactory {
+@UtilityClass
+public class DeviceTestDataBuilder {
     
-    public static Organization createTestOrganization() {
-        return Organization.builder()
-            .id("test-org-" + UUID.randomUUID().toString())
-            .name("Test Organization")
-            .domain("testorg.com")
-            .contactInformation(ContactInformation.builder()
-                .email("admin@testorg.com")
-                .phone("+1-555-123-4567")
+    public Device.DeviceBuilder defaultDevice() {
+        return Device.builder()
+            .name("Test Device")
+            .organizationId("test-org-123")
+            .status(DeviceStatus.ONLINE)
+            .deviceType(DeviceType.DESKTOP)
+            .tags(Arrays.asList("test", "development"))
+            .createdAt(LocalDateTime.now())
+            .updatedAt(LocalDateTime.now());
+    }
+    
+    public Device onlineDesktop(String name, String organizationId) {
+        return defaultDevice()
+            .name(name)
+            .organizationId(organizationId)
+            .deviceType(DeviceType.DESKTOP)
+            .status(DeviceStatus.ONLINE)
+            .build();
+    }
+    
+    public Device offlineServer(String name, String organizationId) {
+        return defaultDevice()
+            .name(name)
+            .organizationId(organizationId)
+            .deviceType(DeviceType.SERVER)
+            .status(DeviceStatus.OFFLINE)
+            .build();
+    }
+    
+    public List<Device> createDevices(String organizationId, int count) {
+        return IntStream.range(0, count)
+            .mapToObj(i -> defaultDevice()
+                .name("Device " + i)
+                .organizationId(organizationId)
+                .build())
+            .collect(Collectors.toList());
+    }
+}
+```
+
+### Test Configuration
+
+```java
+@TestConfiguration
+public class TestConfig {
+    
+    @Bean
+    @Primary
+    public Clock testClock() {
+        return Clock.fixed(Instant.parse("2024-01-15T10:00:00Z"), ZoneOffset.UTC);
+    }
+    
+    @Bean
+    @Primary
+    public PasswordEncoder testPasswordEncoder() {
+        return new BCryptPasswordEncoder(4); // Faster for tests
+    }
+    
+    @EventListener
+    public void handleContextRefresh(ContextRefreshedEvent event) {
+        // Clear test data or perform setup
+    }
+}
+```
+
+## 📊 Running Tests
+
+### Maven Test Commands
+
+```bash
+# Run all tests
+mvn test
+
+# Run tests for specific module
+mvn test -pl openframe-api-lib
+
+# Run only unit tests (exclude integration tests)
+mvn test -Dtest.profile=unit
+
+# Run only integration tests  
+mvn test -Dtest.profile=integration
+
+# Run tests with coverage report
+mvn test jacoco:report
+
+# Run tests in parallel (faster execution)
+mvn test -Dmaven.test.parallel=true
+
+# Run specific test class
+mvn test -Dtest=DeviceServiceImplTest
+
+# Run specific test method
+mvn test -Dtest=DeviceServiceImplTest#shouldFindDevicesWithFiltersSuccessfully
+
+# Skip tests (for quick builds)
+mvn install -DskipTests
+
+# Run tests with debug output
+mvn test -X
+```
+
+### Test Profiles
+
+Configure different test profiles in `application-test.yml`:
+
+```yaml
+# Test profile configuration
+spring:
+  profiles:
+    active: test
+    
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driver-class-name: org.h2.Driver
+    
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/openframe-test
+      
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+      
+  cache:
+    type: simple  # Use simple cache for tests
+
+# Logging for tests
+logging:
+  level:
+    com.openframe: DEBUG
+    org.springframework.test: INFO
+    
+# Test-specific configurations  
+openframe:
+  test:
+    data-initialization: true
+    mock-external-services: true
+```
+
+## 📈 Test Coverage and Quality
+
+### Coverage Requirements
+
+| Component | Target Coverage | Minimum Coverage |
+|-----------|----------------|------------------|
+| **Service Layer** | 90% | 80% |
+| **Repository Layer** | 85% | 75% |
+| **Controller Layer** | 80% | 70% |
+| **DTO Validation** | 95% | 90% |
+| **Utility Classes** | 95% | 85% |
+
+### Coverage Configuration
+
+```xml
+<!-- JaCoCo plugin configuration -->
+<plugin>
+    <groupId>org.jacoco</groupId>
+    <artifactId>jacoco-maven-plugin</artifactId>
+    <version>0.8.8</version>
+    <executions>
+        <execution>
+            <goals>
+                <goal>prepare-agent</goal>
+            </goals>
+        </execution>
+        <execution>
+            <id>report</id>
+            <phase>test</phase>
+            <goals>
+                <goal>report</goal>
+            </goals>
+        </execution>
+        <execution>
+            <id>check</id>
+            <goals>
+                <goal>check</goal>
+            </goals>
+            <configuration>
+                <rules>
+                    <rule>
+                        <element>PACKAGE</element>
+                        <limits>
+                            <limit>
+                                <counter>LINE</counter>
+                                <value>COVEREDRATIO</value>
+                                <minimum>0.80</minimum>
+                            </limit>
+                        </limits>
+                    </rule>
+                </rules>
+            </configuration>
+        </execution>
+    </executions>
+</plugin>
+```
+
+### Generate Coverage Reports
+
+```bash
+# Generate coverage report
+mvn clean test jacoco:report
+
+# View coverage report
+open target/site/jacoco/index.html
+
+# Generate coverage for all modules
+mvn clean test jacoco:report jacoco:report-aggregate
+
+# Check coverage thresholds
+mvn jacoco:check
+```
+
+## 🔧 Test Configuration and Best Practices
+
+### TestContainers Setup
+
+```java
+@Testcontainers
+public class BaseIntegrationTest {
+    
+    @Container
+    static MongoDBContainer mongoDBContainer = new MongoDBContainer("mongo:7")
+            .withExposedPorts(27017)
+            .withReuse(true);  // Reuse container across tests
+    
+    @Container 
+    static GenericContainer<?> redisContainer = new GenericContainer<>("redis:7-alpine")
+            .withExposedPorts(6379)
+            .withReuse(true);
+    
+    @DynamicPropertySource
+    static void configureProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.data.mongodb.uri", mongoDBContainer::getReplicaSetUrl);
+        registry.add("spring.redis.host", redisContainer::getHost);
+        registry.add("spring.redis.port", () -> redisContainer.getMappedPort(6379));
+    }
+}
+```
+
+### Testing Best Practices
+
+1. **Test Naming Conventions**
+   ```java
+   // Use descriptive test names
+   @Test
+   @DisplayName("Should return empty result when no devices match filters")
+   void shouldReturnEmptyResultWhenNoDevicesMatchFilters() { }
+   
+   // Use Given-When-Then structure
+   @Test
+   void shouldCalculateCorrectPagination() {
+       // Given
+       DeviceFilterInput input = createFilterInput();
+       
+       // When  
+       CountedGenericQueryResult<Device> result = service.findDevices(input);
+       
+       // Then
+       assertThat(result.getPageInfo()).isNotNull();
+   }
+   ```
+
+2. **Test Data Management**
+   ```java
+   @BeforeEach
+   void setUp() {
+       // Clean database before each test
+       deviceRepository.deleteAll();
+   }
+   
+   @AfterEach  
+   void tearDown() {
+       // Clean up test data
+       deviceRepository.deleteAll();
+   }
+   ```
+
+3. **Assertion Best Practices**
+   ```java
+   // Use AssertJ for fluent assertions
+   assertThat(result.getItems())
+       .hasSize(5)
+       .extracting(Device::getStatus)
+       .containsOnly(DeviceStatus.ONLINE);
+   
+   // Verify complex objects
+   assertThat(device)
+       .satisfies(d -> {
+           assertThat(d.getName()).isEqualTo("Expected Name");
+           assertThat(d.getStatus()).isEqualTo(DeviceStatus.ONLINE);
+           assertThat(d.getTags()).containsExactly("tag1", "tag2");
+       });
+   ```
+
+## ⚡ Performance Testing
+
+### Benchmark Tests with JMH
+
+```java
+@BenchmarkMode(Mode.AverageTime)
+@OutputTimeUnit(TimeUnit.MICROSECONDS)
+@State(Scope.Benchmark)
+public class PaginationBenchmark {
+    
+    private DeviceService deviceService;
+    private DeviceFilterInput filterInput;
+    
+    @Setup
+    public void setup() {
+        // Initialize service and test data
+        filterInput = DeviceFilterInput.builder()
+            .pagination(CursorPaginationInput.builder()
+                .limit(100)
                 .build())
             .build();
     }
     
-    public static Device createTestDevice(String organizationId) {
-        return Device.builder()
-            .id("test-device-" + UUID.randomUUID().toString())
-            .organizationId(organizationId)
-            .machineId("test-machine-" + UUID.randomUUID().toString())
-            .serialNumber("TEST" + System.currentTimeMillis())
-            .model("Test Device")
-            .osVersion("Test OS 1.0")
-            .type(DeviceType.DESKTOP)
-            .status("ACTIVE")
-            .lastCheckin(Instant.now())
+    @Benchmark
+    public CountedGenericQueryResult<Device> benchmarkDeviceQuery() {
+        return deviceService.findDevices(filterInput);
+    }
+    
+    @Benchmark
+    public CountedGenericQueryResult<Device> benchmarkDeviceQueryWithFilters() {
+        DeviceFilterInput filterWithTags = filterInput.toBuilder()
+            .filters(DeviceFilters.builder()
+                .tags(Arrays.asList("production", "server"))
+                .build())
             .build();
-    }
-}
-```
-
-### Database State Management
-
-```java
-@Component
-@Profile("test")
-public class DatabaseTestHelper {
-    
-    @Autowired
-    private MongoTemplate mongoTemplate;
-    
-    public void clearAllCollections() {
-        mongoTemplate.getCollectionNames().forEach(collectionName -> {
-            if (!collectionName.startsWith("system.")) {
-                mongoTemplate.remove(new Query(), collectionName);
-            }
-        });
-    }
-    
-    public void seedTestData() {
-        // Create test organizations
-        Organization testOrg = TestDataFactory.createTestOrganization();
-        mongoTemplate.save(testOrg);
         
-        // Create test devices
-        Device testDevice = TestDataFactory.createTestDevice(testOrg.getId());
-        mongoTemplate.save(testDevice);
-    }
-    
-    public long getDocumentCount(String collection) {
-        return mongoTemplate.getCollection(collection).countDocuments();
+        return deviceService.findDevices(filterWithTags);
     }
 }
 ```
 
-## Performance Testing
-
-### Load Testing with JUnit
+### Load Testing
 
 ```java
 @Test
-@DisplayName("Should handle concurrent device creation")
-void shouldHandleConcurrentDeviceCreation() throws InterruptedException {
-    // Given
-    int numberOfThreads = 10;
-    int devicesPerThread = 100;
-    CountDownLatch latch = new CountDownLatch(numberOfThreads);
-    List<Future<Integer>> futures = new ArrayList<>();
+@Timeout(value = 5, unit = TimeUnit.SECONDS)
+void shouldHandleConcurrentRequests() throws InterruptedException {
+    int threadCount = 10;
+    int requestsPerThread = 100;
+    ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+    CountDownLatch latch = new CountDownLatch(threadCount);
+    AtomicInteger successCount = new AtomicInteger(0);
+    AtomicInteger errorCount = new AtomicInteger(0);
     
-    ExecutorService executor = Executors.newFixedThreadPool(numberOfThreads);
-    
-    // When - Create devices concurrently
-    for (int i = 0; i < numberOfThreads; i++) {
-        final int threadId = i;
-        Future<Integer> future = executor.submit(() -> {
+    for (int i = 0; i < threadCount; i++) {
+        executor.submit(() -> {
             try {
-                int created = 0;
-                for (int j = 0; j < devicesPerThread; j++) {
-                    CreateDeviceRequest request = CreateDeviceRequest.builder()
-                        .machineId("machine-" + threadId + "-" + j)
-                        .serialNumber("SN" + threadId + "-" + j)
-                        .model("Test Device")
-                        .type("DESKTOP")
-                        .status("ACTIVE")
-                        .build();
-                    
-                    deviceService.createDevice(request);
-                    created++;
+                for (int j = 0; j < requestsPerThread; j++) {
+                    try {
+                        CountedGenericQueryResult<Device> result = deviceService.findDevices(
+                            createValidDeviceFilterInput());
+                        if (result != null) {
+                            successCount.incrementAndGet();
+                        }
+                    } catch (Exception e) {
+                        errorCount.incrementAndGet();
+                    }
                 }
-                return created;
             } finally {
                 latch.countDown();
             }
         });
-        futures.add(future);
     }
     
-    // Wait for all threads to complete
-    latch.await(30, TimeUnit.SECONDS);
-    
-    // Then
-    int totalCreated = futures.stream()
-        .mapToInt(future -> {
-            try {
-                return future.get();
-            } catch (Exception e) {
-                return 0;
-            }
-        })
-        .sum();
-    
-    assertThat(totalCreated).isEqualTo(numberOfThreads * devicesPerThread);
-    
+    latch.await();
     executor.shutdown();
+    
+    int totalRequests = threadCount * requestsPerThread;
+    assertThat(successCount.get()).isEqualTo(totalRequests);
+    assertThat(errorCount.get()).isZero();
 }
 ```
 
-## Test Execution and Reporting
+## 🚨 Troubleshooting Tests
 
-### Running Tests
+### Common Issues and Solutions
 
-#### Command Line Test Execution
-
+**Test Container Startup Issues**
 ```bash
-# Run all tests
-./gradlew test
+# Check Docker daemon
+docker ps
 
-# Run specific test class
-./gradlew test --tests "DeviceServiceImplTest"
+# Clean up test containers
+docker container prune -f
 
-# Run specific test method
-./gradlew test --tests "DeviceServiceImplTest.shouldReturnDevicesWhenValidFilterProvided"
-
-# Run integration tests only
-./gradlew integrationTest
-
-# Run tests with coverage
-./gradlew test jacocoTestReport
-
-# Run tests in parallel
-./gradlew test --parallel --max-workers=4
-
-# Run tests with detailed output
-./gradlew test --info
+# Restart Docker if needed
+# macOS: Docker Desktop -> Restart
+# Linux: sudo systemctl restart docker
 ```
 
-#### Test Categories
-
-```java
-// Fast unit tests
-@Tag("unit")
-@Test
-void shouldValidateDeviceType() { }
-
-// Slow integration tests  
-@Tag("integration")
-@Test
-void shouldPersistToDatabase() { }
-
-// External integration tests
-@Tag("external")
-@Test
-void shouldConnectToFleetMdm() { }
-```
-
+**Database Test Issues**
 ```bash
-# Run only unit tests
-./gradlew test -Dgroups="unit"
+# Clear test database
+mongo openframe-test --eval "db.dropDatabase()"
 
-# Run only integration tests
-./gradlew test -Dgroups="integration"
-
-# Exclude external tests
-./gradlew test -DexcludedGroups="external"
+# Reset test data
+mvn clean test -Dtest.reset.database=true
 ```
 
-### Test Coverage
-
-#### JaCoCo Configuration
-
-**`build.gradle`:**
-
-```gradle
-plugins {
-    id 'jacoco'
-}
-
-jacocoTestReport {
-    reports {
-        xml.enabled true
-        csv.enabled false
-        html.destination file("${buildDir}/jacocoHtml")
-    }
-    
-    afterEvaluate {
-        classDirectories.setFrom(files(classDirectories.files.collect {
-            fileTree(dir: it, exclude: [
-                '**/dto/**',  // Exclude DTOs
-                '**/config/**',  // Exclude configuration classes
-                '**/*Application.*'  // Exclude main application class
-            ])
-        }))
-    }
-}
-
-jacocoTestCoverageVerification {
-    violationRules {
-        rule {
-            limit {
-                minimum = 0.8  // 80% minimum coverage
-            }
-        }
-    }
-}
-
-test {
-    finalizedBy jacocoTestReport
-}
-```
-
-#### Coverage Verification
-
+**Memory Issues During Tests**
 ```bash
-# Generate coverage report
-./gradlew test jacocoTestReport
+# Increase memory for tests
+export MAVEN_OPTS="-Xmx2g -XX:MaxMetaspaceSize=512m"
 
-# Verify coverage thresholds
-./gradlew jacocoTestCoverageVerification
-
-# Open HTML coverage report
-open build/jacocoHtml/index.html
+# Run tests with memory profiling
+mvn test -Dmaven.test.jvmargs="-Xmx2g -XX:+PrintGCDetails"
 ```
 
-## Continuous Integration Testing
-
-### GitHub Actions Configuration
-
-**`.github/workflows/tests.yml`:**
-
-```yaml
-name: Tests
-
-on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main ]
-
-jobs:
-  unit-tests:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up JDK 17
-      uses: actions/setup-java@v3
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-    
-    - name: Cache Gradle packages
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~/.gradle/caches
-          ~/.gradle/wrapper
-        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-    
-    - name: Run unit tests
-      run: ./gradlew test --tests "*Test" --exclude-task integrationTest
-    
-    - name: Generate coverage report
-      run: ./gradlew jacocoTestReport
-    
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./build/reports/jacoco/test/jacocoTestReport.xml
-
-  integration-tests:
-    runs-on: ubuntu-latest
-    
-    services:
-      mongodb:
-        image: mongo:7.0
-        ports:
-          - 27017:27017
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-    
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up JDK 17
-      uses: actions/setup-java@v3
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-    
-    - name: Run integration tests
-      run: ./gradlew integrationTest
-      env:
-        MONGODB_URI: mongodb://localhost:27017/openframe-test
-        REDIS_URL: redis://localhost:6379/1
-```
-
-## Testing Best Practices
-
-### Test Organization
-
-1. **Clear Test Structure** - Arrange, Act, Assert pattern
-2. **Descriptive Names** - Test names describe behavior
-3. **Single Responsibility** - One test, one behavior
-4. **Independent Tests** - Tests don't depend on each other
-5. **Fast Execution** - Optimize for speed
-
-### Mocking Guidelines
-
+**Flaky Tests**
 ```java
-// ✅ Good: Mock external dependencies
-@Mock
-private ExternalApiClient externalApiClient;
+// Use @RepeatedTest for flaky tests
+@RepeatedTest(10)
+void shouldBeStable() {
+    // Test that should pass consistently
+}
 
-// ✅ Good: Mock complex collaborators
-@Mock  
-private DeviceRepository deviceRepository;
-
-// ❌ Avoid: Mocking value objects
-// Don't mock DTOs, entities, or simple data structures
-
-// ❌ Avoid: Over-mocking
-// Don't mock everything - test real interactions when possible
-```
-
-### Test Data Management
-
-```java
-// ✅ Good: Use builders for test data
-Device device = DeviceTestDataBuilder.aDevice()
-    .withType(DeviceType.LAPTOP)
-    .withStatus("ACTIVE")
-    .build();
-
-// ✅ Good: Create meaningful test data
-Device expiredDevice = DeviceTestDataBuilder.aDevice()
-    .withLastCheckin(Instant.now().minus(30, ChronoUnit.DAYS))
-    .build();
-
-// ❌ Avoid: Hard-coded magic values
-Device device = new Device();
-device.setId("123");  // What does "123" represent?
-device.setStatus("A");  // What does "A" mean?
-```
-
-## Troubleshooting Tests
-
-### Common Issues
-
-| Issue | Symptoms | Solution |
-|-------|----------|----------|
-| **Flaky Tests** | Tests pass/fail randomly | Fix timing issues, improve test isolation |
-| **Slow Tests** | Tests take too long | Mock external dependencies, optimize database queries |
-| **Test Pollution** | Tests affect each other | Use `@Transactional` or proper cleanup |
-| **Memory Leaks** | Tests run out of memory | Clean up resources, use test slices |
-
-### Debugging Test Failures
-
-```java
-// Enable detailed logging for failing tests
-@Test
-@EnabledIf("#{systemProperties['test.debug'] == 'true'}")
-void debuggingTest() {
-    // Test implementation with detailed logging
-    log.debug("Test state: {}", testState);
+// Add proper wait conditions
+@Test  
+void shouldWaitForAsyncOperation() {
+    // Trigger async operation
+    service.processAsync();
+    
+    // Wait for completion with timeout
+    await().atMost(5, SECONDS).until(() -> {
+        return service.isComplete();
+    });
 }
 ```
 
-```bash
-# Run with debug output
-./gradlew test --info --debug-jvm -Dtest.debug=true
+## 📋 Testing Checklist
 
-# Run single test with debugging
-./gradlew test --tests "DeviceServiceTest.shouldCreateDevice" --debug-jvm
-```
+Before submitting code, ensure:
 
-## Next Steps
+- [ ] **All new code has tests** (minimum coverage requirements met)
+- [ ] **Tests follow naming conventions** and have clear descriptions
+- [ ] **Integration tests cover happy and error paths**
+- [ ] **Performance tests validate critical operations**
+- [ ] **Test data is properly cleaned up**
+- [ ] **Tests are deterministic** (no flaky tests)
+- [ ] **Coverage report shows green** for all modified modules
 
-With comprehensive testing in place:
+## 🎯 Next Steps
 
-1. **[Contributing Guidelines](../contributing/guidelines.md)** - Learn how to contribute
-2. **[Local Development](../setup/local-development.md)** - Set up development environment
-3. **[Architecture Overview](../architecture/overview.md)** - Understand system design
+Now that you understand the testing approach:
 
-## Resources
+1. **[Run the Test Suite](../setup/local-development.md#step-6-run-tests)** - Execute tests locally
+2. **[Write Your First Test](../contributing/guidelines.md#writing-tests)** - Contribute new test coverage
+3. **[Review Testing Patterns](#testing-best-practices)** - Apply these patterns in your code
 
-- 📖 **[JUnit 5 Documentation](https://junit.org/junit5/docs/current/user-guide/)**
-- 📖 **[Spring Boot Testing](https://spring.io/guides/gs/testing-web/)**
-- 📖 **[Testcontainers Documentation](https://www.testcontainers.org/)**
-- 📖 **[Mockito Documentation](https://javadoc.io/doc/org.mockito/mockito-core/latest/org/mockito/Mockito.html)**
+## 📚 Additional Resources
 
-Remember: **Good tests are the foundation of reliable software**. Invest time in writing comprehensive, maintainable tests that give you confidence in your code! 🧪
+- **JUnit 5 User Guide**: [junit.org/junit5/docs/current/user-guide/](https://junit.org/junit5/docs/current/user-guide/)
+- **AssertJ Documentation**: [assertj.github.io/doc/](https://assertj.github.io/doc/)
+- **TestContainers**: [testcontainers.org/](https://www.testcontainers.org/)
+- **Spring Boot Testing**: [docs.spring.io/spring-boot/docs/current/reference/html/boot-features-testing.html](https://docs.spring.io/spring-boot/docs/current/reference/html/boot-features-testing.html)
+
+---
+
+**Testing is not just about finding bugs—it's about building confidence in your code and enabling fearless refactoring.** Happy testing! 🧪

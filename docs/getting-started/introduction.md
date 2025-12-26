@@ -1,179 +1,147 @@
-# Introduction to OpenFrame OSS Library
+# OpenFrame OSS Library Introduction
 
-Welcome to the OpenFrame OSS Library - the foundational building block for secure, scalable device and organization management platforms. This comprehensive library provides the core data models, API DTOs, and service interfaces that power the entire OpenFrame ecosystem.
+Welcome to **OpenFrame OSS Library** - the foundational building blocks for the OpenFrame platform! This library provides the core Data Transfer Objects (DTOs), service interfaces, and data models that power OpenFrame's unified MSP (Managed Service Provider) platform.
 
 ## What is OpenFrame OSS Library?
 
-OpenFrame OSS Library (`openframe-oss-lib`) is the cornerstone library that enables organizations to build robust, multi-tenant device management solutions. It provides standardized data transfer objects (DTOs), service interfaces, and MongoDB data models for managing devices, organizations, events, tools, and audit logs across distributed environments.
+OpenFrame OSS Library (`openframe-oss-lib`) is a comprehensive Java library that standardizes data models, API contracts, and service interfaces across the entire OpenFrame ecosystem. Think of it as the "common language" that all OpenFrame services speak.
 
 [![OpenFrame Product Walkthrough (Beta Access)](https://img.youtube.com/vi/awc-yAnkhIo/maxresdefault.jpg)](https://www.youtube.com/watch?v=awc-yAnkhIo)
 
-## Key Features
+## 🚀 Key Features
 
-### 🏢 Organization Management
-- Multi-tenant organization structure
-- Contact information and address management
-- User invitation and role management
-- SSO configuration support
+### Core Capabilities
+- **Standardized DTOs**: Consistent data transfer objects for all domains (devices, events, organizations, tools, audit logs)
+- **Service Interfaces**: Well-defined contracts for business logic implementation
+- **MongoDB Data Models**: Complete entity definitions for multi-tenant SaaS architecture
+- **Cursor-based Pagination**: Efficient navigation through large datasets
+- **Multi-tenant Security**: Built-in patterns for secure, isolated tenant operations
 
-### 💻 Device Management
-- Comprehensive device inventory and tracking
-- Support for multiple device types (Desktop, Laptop, Server)
-- Health monitoring and compliance tracking
-- Integration with popular MDM tools (Fleet, Tactical RMM, MeshCentral)
+### Domain Coverage
+- **Device Management**: Models and DTOs for endpoint management, compliance tracking, and health monitoring
+- **Event Processing**: Structured event handling for audit trails and system monitoring  
+- **Organization Management**: Multi-tenant organization structures with contact management
+- **Tool Integration**: Framework for integrating MSP tools like TacticalRMM, Fleet MDM, and MeshCentral
+- **User & Authentication**: Comprehensive user management with SSO and invitation workflows
 
-### 📊 Event & Audit System
-- Centralized event logging and tracking
-- Comprehensive audit trail capabilities
-- Flexible filtering and querying
-- Real-time event processing
+## 🎯 Who Should Use This Library?
 
-### 🔧 Tool Integration
-- Extensible tool connection framework
-- API key and credential management
-- Tool agent installation and management
-- Support for external tool integrations
+### Primary Audiences
 
-### 🔐 Security & Authentication
-- JWT-based authentication
-- OAuth 2.0 and OIDC support
-- Multi-tenant security isolation
-- API key management with rate limiting
+| Audience | Use Case | Benefits |
+|----------|----------|----------|
+| **MSP Platform Developers** | Building OpenFrame-compatible services | Consistent APIs, reduced development time |
+| **Integration Partners** | Connecting existing tools to OpenFrame | Standardized data models, clear contracts |
+| **Enterprise Developers** | Extending OpenFrame functionality | Well-documented interfaces, modular design |
+| **Open Source Contributors** | Contributing to the OpenFrame ecosystem | Foundation knowledge, architectural patterns |
 
-## Architecture Overview
+## 🏗️ High-Level Architecture
+
+The library follows a layered architecture with clear separation of concerns:
 
 ```mermaid
-graph TB
-    subgraph "Client Applications"
-        WEB[Web Dashboard]
-        API[External APIs]
-        CLI[CLI Tools]
+graph TD
+    subgraph "API Layer"
+        A1["Controllers<br/>(REST Endpoints)"]
+        A2["DTOs<br/>(Request/Response)"]
     end
     
-    subgraph "OpenFrame Services"
-        GW[Gateway Service]
-        AUTH[Authorization Service]
-        CORE[API Service Core]
-        MGMT[Management Service]
-    end
-    
-    subgraph "OpenFrame OSS Library"
-        DTOS[API DTOs]
-        SERVICES[Service Interfaces]
-        MODELS[Data Models]
-        CONFIG[Configuration]
+    subgraph "Service Layer"  
+        B1["Service Interfaces<br/>(Business Logic Contracts)"]
+        B2["Service Implementations<br/>(Core Business Logic)"]
     end
     
     subgraph "Data Layer"
-        MONGO[(MongoDB)]
-        REDIS[(Redis Cache)]
-        KAFKA[Kafka Streams]
+        C1["MongoDB Documents<br/>(Entity Models)"]
+        C2["Repository Interfaces<br/>(Data Access)"]
     end
     
-    WEB --> GW
-    API --> GW
-    CLI --> GW
+    subgraph "Cross-Cutting"
+        D1["Pagination<br/>(Cursor-based)"]
+        D2["Validation<br/>(Input Validation)"]
+        D3["Security<br/>(Multi-tenant)"]
+    end
     
-    GW --> AUTH
-    GW --> CORE
-    GW --> MGMT
+    A1 --> A2
+    A2 --> B1
+    B1 --> B2
+    B2 --> C2
+    C2 --> C1
     
-    AUTH --> DTOS
-    CORE --> SERVICES
-    MGMT --> MODELS
+    D1 -.-> A2
+    D2 -.-> A2
+    D3 -.-> B2
     
-    SERVICES --> MONGO
-    MODELS --> MONGO
-    CONFIG --> REDIS
-    
-    CORE --> KAFKA
+    style A1 fill:#e1f5fe
+    style B1 fill:#f3e5f5
+    style C1 fill:#e8f5e8
+    style D1 fill:#fff3e0
 ```
 
-## Who Should Use This Library?
-
-### Platform Developers
-Build custom device management solutions with standardized APIs and data models.
-
-### MSP/IT Teams
-Integrate with existing RMM tools and create unified device management dashboards.
-
-### Enterprise Organizations
-Deploy secure, scalable device management infrastructure with multi-tenant capabilities.
-
-### Integration Partners
-Develop third-party integrations using consistent DTOs and service interfaces.
-
-## Core Modules
+## 📦 Core Modules
 
 | Module | Purpose | Key Components |
 |--------|---------|----------------|
-| **API DTOs** | Data transfer objects | Device, Organization, Event, Tool, Audit DTOs |
-| **Service Interfaces** | Business logic contracts | DeviceService, OrganizationService, EventService |
-| **Data Models** | MongoDB entities | Device, Organization, Event, Tool documents |
-| **Configuration** | Spring configuration | Security, Database, Validation configs |
-| **Utilities** | Shared utilities | Pagination, Validation, Encryption |
+| `api-lib` | Core DTOs and service interfaces | Device, Event, Organization, Tool, Audit DTOs |
+| `data-mongo` | MongoDB data models and repositories | Entity documents, repository interfaces |
+| `core` | Shared utilities and validation | Pagination, validation, security utilities |
+| `security-core` | Authentication and authorization | JWT handling, multi-tenant security |
 
-## Quick Overview
+## 🌟 Key Benefits
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Gateway
-    participant API
-    participant Library
-    participant MongoDB
+### For Developers
+- **Reduced Boilerplate**: Pre-built DTOs and models eliminate repetitive code
+- **Type Safety**: Strong typing with Java generics and validation annotations
+- **Consistent APIs**: Standardized pagination, filtering, and response patterns
+- **Documentation**: Comprehensive inline documentation and architectural guides
+
+### For Organizations  
+- **Faster Time-to-Market**: Leverage existing, battle-tested components
+- **Scalability**: Built-in support for multi-tenancy and high-volume operations
+- **Interoperability**: Seamless integration with OpenFrame ecosystem
+- **Open Source**: No vendor lock-in, full source code access
+
+## 🚦 Quick Start Preview
+
+Here's a taste of what working with the library looks like:
+
+```java
+// Paginated device query with filtering
+@Data
+@Builder
+public class DeviceFilterInput {
+    @Valid
+    private CursorPaginationInput pagination;
     
-    Client->>Gateway: API Request
-    Gateway->>API: Forward Request
-    API->>Library: Use DTOs & Services
-    Library->>MongoDB: Query/Update Data
-    MongoDB-->>Library: Return Results
-    Library-->>API: Map to Response DTOs
-    API-->>Gateway: API Response
-    Gateway-->>Client: Final Response
+    @Valid 
+    private DeviceFilters filters;
+}
+
+// Service interface for device operations
+public interface DeviceService {
+    CountedGenericQueryResult<Device> findDevices(DeviceFilterInput input);
+    Device findDeviceById(String deviceId);
+    Device updateDeviceStatus(String deviceId, DeviceStatus status);
+}
 ```
 
-## Benefits
-
-### ✅ Standardization
-- Consistent data models across all services
-- Unified API patterns and responses
-- Standardized pagination and filtering
-
-### ✅ Scalability
-- Multi-tenant architecture support
-- Cursor-based pagination for large datasets
-- Microservices-ready design patterns
-
-### ✅ Security
-- Built-in validation and security patterns
-- JWT and OAuth 2.0 support
-- Tenant isolation and data security
-
-### ✅ Extensibility
-- Modular design for easy customization
-- Plugin architecture for tool integrations
-- Flexible configuration options
-
-## Getting Started
+## 📋 What's Next?
 
 Ready to dive in? Here's your learning path:
 
 1. **[Prerequisites](prerequisites.md)** - Set up your development environment
-2. **[Quick Start](quick-start.md)** - Get running in 5 minutes
-3. **[First Steps](first-steps.md)** - Explore key features and concepts
-4. **[Development Setup](../development/setup/environment.md)** - Full development environment
-5. **[Architecture Overview](../development/architecture/overview.md)** - Deep dive into the system design
+2. **[Quick Start](quick-start.md)** - Get the library running in 5 minutes  
+3. **[First Steps](first-steps.md)** - Explore core features and common patterns
+4. **[Development Guide](../development/README.md)** - Deep dive into architecture and implementation
 
-## Community and Support
+## 🤝 Community & Support
 
-- 📖 **Documentation**: Comprehensive guides and API references
-- 🐛 **Issues**: Report bugs and request features on GitHub
-- 💬 **Discussions**: Community discussions and Q&A
-- 🚀 **Contributions**: Open source contributions welcome
+- **Slack Community**: [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) - Get help and connect with other developers
+- **Platform Website**: [OpenFrame.ai](https://openframe.ai) - Product information and updates  
+- **Company Website**: [Flamingo.run](https://flamingo.run) - About the team and mission
 
-## What's Next?
+> **Note**: We don't use GitHub Issues or Discussions. All community interaction happens on our OpenMSP Slack community where you'll find active developers, documentation, and real-time support.
 
-Start with our [Prerequisites Guide](prerequisites.md) to set up your environment, then follow the [Quick Start Guide](quick-start.md) to see OpenFrame OSS Library in action.
+---
 
-Whether you're building a simple device inventory system or a complex multi-tenant management platform, OpenFrame OSS Library provides the foundation you need to succeed.
+**Ready to build the future of MSP platforms?** Let's get you set up with the prerequisites and your first OpenFrame integration!
