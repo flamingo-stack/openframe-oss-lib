@@ -125,8 +125,9 @@ export interface AIMedia {
 }
 
 export interface MediaDimensions {
-  width: number;
-  height: number;
+  width?: number;
+  height?: number;
+  aspectRatio?: string; // e.g., "16:9", "9:16", "1:1"
 }
 
 export interface CreateAIMediaInput {
