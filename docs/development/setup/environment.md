@@ -1,555 +1,593 @@
 # Development Environment Setup
 
-This guide walks you through setting up a complete development environment for OpenFrame OSS Library. Whether you're contributing to the project or building applications with the library, this setup will give you everything you need.
+Setting up an optimal development environment for OpenFrame OSS Library will significantly improve your productivity and development experience. This guide covers IDE configuration, essential tools, editor extensions, and development workflows.
 
-## IDE Setup and Configuration
+## 🎯 Overview
 
-### IntelliJ IDEA (Recommended)
+A well-configured development environment for OpenFrame should include:
 
-IntelliJ IDEA provides the best Java development experience for OpenFrame.
+- **Optimized IDE** with Java development features
+- **Integrated build tools** (Maven, Git)
+- **Code quality tools** (linting, formatting, static analysis)
+- **MongoDB integration** for database development
+- **Debugging capabilities** with remote debugging support
+
+## 💻 IDE Recommendations
+
+### IntelliJ IDEA (Highly Recommended)
+
+IntelliJ IDEA provides the best experience for OpenFrame development with excellent Java support and Spring Boot integration.
 
 #### Installation
 
-| Platform | Installation Method |
-|----------|-------------------|
-| **Windows** | Download from [JetBrains website](https://www.jetbrains.com/idea/download/#section=windows) |
-| **macOS** | `brew install --cask intellij-idea` |
-| **Linux** | Download tar.gz or use snap: `sudo snap install intellij-idea-community --classic` |
+**Option 1: JetBrains Toolbox (Recommended)**
+```bash
+# Download and install JetBrains Toolbox
+# https://www.jetbrains.com/toolbox-app/
 
-#### Essential Plugins
-
-Install these plugins via **Settings → Plugins**:
-
-```text
-Required:
-✅ Lombok Plugin (for @Data, @Builder annotations)
-✅ Spring Boot Plugin (for Spring configuration)
-✅ Database Tools and SQL (for MongoDB inspection)
-
-Recommended:
-🔶 SonarLint (code quality analysis)
-🔶 CheckStyle-IDEA (code style enforcement)
-🔶 Maven Helper (dependency management)
-🔶 GitToolBox (enhanced Git integration)
-🔶 Docker Plugin (container management)
+# Then install IntelliJ IDEA Ultimate through Toolbox
+# Ultimate edition includes advanced database tools and Spring Boot support
 ```
 
-#### IntelliJ Configuration
+**Option 2: Direct Download**
+```bash
+# Community Edition (Free)
+# Download from: https://www.jetbrains.com/idea/download/
 
-**1. Import Code Style**
-
-```text
-Settings → Editor → Code Style → Java
-→ Import Scheme → Eclipse XML Profile
-→ Select: config/codestyle/openframe-java-style.xml
+# Ultimate Edition (Paid, recommended for professional development)
+# Includes database integration, Spring Boot tools, and advanced features
 ```
 
-**2. Configure Lombok**
+#### Essential Configuration
 
+**1. Configure JDK**
 ```text
-Settings → Build, Execution, Deployment → Compiler → Annotation Processors
+File → Project Structure → Project Settings → Project
+- Project SDK: Java 17 or later
+- Project language level: 17 or later
+
+File → Project Structure → Platform Settings → SDKs
+- Add JDK: Point to your Java installation
+```
+
+**2. Import Code Style**
+```text
+File → Settings → Editor → Code Style → Java
+- Import from: .editorconfig (if available in project)
+- Or configure manually:
+  - Indent: 4 spaces
+  - Continuation indent: 8 spaces  
+  - Tab size: 4
+  - Use tab character: No
+```
+
+**3. Enable Annotation Processing**
+```text
+File → Settings → Build → Compiler → Annotation Processors
 ✅ Enable annotation processing
 ✅ Obtain processors from project classpath
 ```
 
-**3. Set Up Run Configurations**
+#### Essential Plugins
 
-Create run configurations for the example applications:
+| Plugin | Purpose | Installation |
+|--------|---------|-------------|
+| **Lombok** | Reduces boilerplate code | Settings → Plugins → Install "Lombok" |
+| **Maven Helper** | Enhanced Maven integration | Settings → Plugins → Install "Maven Helper" |
+| **Database Navigator** | Database development | Settings → Plugins → Install "Database Navigator" |
+| **Docker** | Container management | Settings → Plugins → Install "Docker" |
+| **GitToolBox** | Enhanced Git integration | Settings → Plugins → Install "GitToolBox" |
+| **SonarLint** | Code quality analysis | Settings → Plugins → Install "SonarLint" |
 
+**Install Plugins Command:**
 ```text
-Run → Edit Configurations → + → Spring Boot
-Name: Device Management Example
-Main class: com.openframe.examples.DeviceManagementApplication
-Module: examples.device-management.main
-Environment variables:
-  SPRING_PROFILES_ACTIVE=development
-  MONGODB_URI=mongodb://localhost:27017/openframe-dev
+File → Settings → Plugins → Marketplace
+Search and install each plugin above
+Restart IDE when prompted
 ```
 
-### Visual Studio Code (Alternative)
+### VS Code
 
-For developers who prefer VS Code:
+VS Code is an excellent free alternative with strong Java support through extensions.
 
-#### Required Extensions
+#### Essential Extensions
 
 ```bash
 # Install VS Code extensions
 code --install-extension vscjava.vscode-java-pack
-code --install-extension vmware.vscode-spring-boot
-code --install-extension ms-vscode.vscode-json
+code --install-extension vscjava.vscode-spring-boot-dashboard
+code --install-extension ms-vscode.vscode-java-debug
+code --install-extension redhat.java
+code --install-extension mongodb.mongodb-vscode
 code --install-extension ms-azuretools.vscode-docker
+code --install-extension gabrielbb.vscode-lombok
 ```
 
-#### VS Code Configuration
+#### Configuration
 
 Create `.vscode/settings.json`:
-
 ```json
 {
-  "java.home": "/usr/lib/jvm/java-17-openjdk-amd64",
-  "java.configuration.runtimes": [
-    {
-      "name": "JavaSE-17",
-      "path": "/usr/lib/jvm/java-17-openjdk-amd64"
-    }
-  ],
-  "java.compile.nullAnalysis.mode": "automatic",
-  "spring-boot.ls.checkJVM": false,
-  "files.exclude": {
-    "**/.gradle": true,
-    "**/build": true,
-    "**/.DS_Store": true
-  }
+    "java.home": "/path/to/java/17",
+    "java.configuration.runtimes": [
+        {
+            "name": "JavaSE-17",
+            "path": "/path/to/java/17"
+        }
+    ],
+    "java.compile.nullAnalysis.mode": "automatic",
+    "java.format.settings.url": "https://raw.githubusercontent.com/google/styleguide/gh-pages/eclipse-java-google-style.xml",
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true,
+    "files.trimTrailingWhitespace": true,
+    "mongodb.connectionSaving": "Workspace"
 }
 ```
 
-## Project Import and Setup
+### Eclipse IDE
 
-### Clone and Import
+Eclipse is a robust, free alternative with excellent Java development features.
 
+#### Installation and Setup
 ```bash
-# Clone the repository
-git clone https://github.com/openframe/openframe-oss-lib.git
-cd openframe-oss-lib
+# Download Eclipse IDE for Enterprise Java Developers
+# https://www.eclipse.org/downloads/packages/
 
-# Import in IntelliJ IDEA
-# File → Open → Select openframe-oss-lib folder
-# IntelliJ will automatically detect it as a Gradle project
+# Install Lombok support
+# Download lombok.jar from https://projectlombok.org/
+java -jar lombok.jar
+# Follow installer to configure Eclipse
 ```
 
-### Gradle Configuration
-
-Ensure Gradle is properly configured:
-
-#### Gradle Wrapper Verification
-
-```bash
-# Verify Gradle wrapper
-./gradlew --version
-
-# Expected output:
-# Gradle 8.5
-# Build time: 2023-11-29 14:08:57 UTC
-# Revision: 28aca86a7180baa17117e0e5ba01d8ea9feca598
-# Kotlin: 1.9.20
-# Groovy: 3.0.17
-# Ant: Apache Ant(TM) version 1.10.13 compiled on January 4 2023
-# JVM: 17.0.x (Eclipse Adoptium 17.0.x+x)
-# OS: Linux x.x.x amd64
-```
-
-#### Build Configuration
-
-Create `gradle.properties` for development:
-
-```properties
-# Gradle configuration
-org.gradle.parallel=true
-org.gradle.caching=true
-org.gradle.configureondemand=true
-
-# JVM settings
-org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m
-
-# Spring Boot settings
-spring.output.ansi.enabled=always
-
-# Development settings
-skipTests=false
-```
-
-### Database Setup for Development
-
-#### MongoDB Development Configuration
-
-Create MongoDB for development with Docker:
-
-```bash
-# Start MongoDB with persistent data
-docker run --name mongodb-dev \
-  -p 27017:27017 \
-  -v mongodb_data:/data/db \
-  -e MONGO_INITDB_DATABASE=openframe-dev \
-  -d mongo:7.0
-
-# Verify connection
-mongosh mongodb://localhost:27017/openframe-dev --eval "db.adminCommand('ping')"
-```
-
-#### MongoDB Compass Setup
-
-Install and configure MongoDB Compass for database management:
-
-1. **Download**: [MongoDB Compass](https://www.mongodb.com/try/download/compass)
-2. **Connect**: `mongodb://localhost:27017`
-3. **Create Database**: `openframe-dev`
-
-#### Redis Development Setup
-
-```bash
-# Start Redis for caching
-docker run --name redis-dev \
-  -p 6379:6379 \
-  -d redis:7-alpine
-
-# Test connection
-redis-cli -h localhost -p 6379 ping
-```
-
-## Development Tools Configuration
+## 🔧 Required Development Tools
 
 ### Git Configuration
 
-Set up Git for OpenFrame development:
+Configure Git for OpenFrame development:
 
 ```bash
-# Configure Git user
+# Set identity
 git config --global user.name "Your Name"
 git config --global user.email "your.email@example.com"
 
-# Configure OpenFrame-specific settings
-git config --local commit.template .gitmessage
-git config --local core.autocrlf input
-git config --local push.default simple
+# Configure line endings (important for cross-platform development)
+git config --global core.autocrlf input  # Linux/macOS
+git config --global core.autocrlf true   # Windows
 
-# Install Git hooks (optional)
-cp config/git-hooks/* .git/hooks/
-chmod +x .git/hooks/*
+# Configure default editor
+git config --global core.editor "code --wait"  # VS Code
+# or
+git config --global core.editor "idea --wait"  # IntelliJ
+
+# Configure useful aliases
+git config --global alias.co checkout
+git config --global alias.br branch
+git config --global alias.ci commit
+git config --global alias.st status
+git config --global alias.unstage 'reset HEAD --'
+git config --global alias.last 'log -1 HEAD'
+git config --global alias.visual '!gitk'
 ```
 
-### Code Quality Tools
+### Maven Integration
 
-#### SpotBugs Configuration
+Configure Maven for optimal development experience:
 
-Add SpotBugs to your IDE:
-
-**IntelliJ IDEA:**
-```text
-Settings → Plugins → Install "SpotBugs"
-Settings → Tools → SpotBugs
-✅ Enable SpotBugs
-Analysis effort: High
-Report effort threshold: Low
+**1. Maven Settings (`~/.m2/settings.xml`)**
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 
+          http://maven.apache.org/xsd/settings-1.0.0.xsd">
+  
+  <profiles>
+    <profile>
+      <id>openframe-dev</id>
+      <properties>
+        <!-- Development profile properties -->
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+      </properties>
+    </profile>
+  </profiles>
+  
+  <activeProfiles>
+    <activeProfile>openframe-dev</activeProfile>
+  </activeProfiles>
+  
+</settings>
 ```
 
-#### Checkstyle Setup
-
-Configure Checkstyle for code formatting:
-
+**2. Maven Wrapper Configuration**
 ```bash
-# Download Google checkstyle configuration
-curl -o config/checkstyle/google_checks.xml \
-  https://raw.githubusercontent.com/checkstyle/checkstyle/master/src/main/resources/google_checks.xml
+# Always use the Maven wrapper provided with the project
+./mvnw clean install  # Linux/macOS
+./mvnw.cmd clean install  # Windows
 
-# Customize for OpenFrame
-cp config/checkstyle/openframe_checks.xml config/checkstyle/checkstyle.xml
+# This ensures consistent Maven version across development environments
 ```
 
-**IntelliJ Integration:**
+## 🗄️ Database Development Tools
+
+### MongoDB Integration
+
+**IntelliJ IDEA Ultimate (Built-in)**
 ```text
-Settings → Tools → Checkstyle
-+ Add → Description: "OpenFrame Style"
-File: config/checkstyle/openframe_checks.xml
-✅ Active
+View → Tool Windows → Database
+Add → MongoDB
+Configure connection:
+- Host: localhost
+- Port: 27017
+- Authentication: None (for local development)
+- Database: openframe-dev
 ```
 
-### API Testing Tools
-
-#### Postman Configuration
-
-1. **Install Postman**: [Download](https://www.postman.com/downloads/)
-2. **Import Collection**: 
-   ```bash
-   # Import the OpenFrame API collection
-   # File → Import → config/postman/OpenFrame-API.postman_collection.json
-   ```
-3. **Set Environment Variables**:
-   ```json
-   {
-     "baseUrl": "http://localhost:8080",
-     "mongodbUrl": "mongodb://localhost:27017",
-     "redisUrl": "redis://localhost:6379"
-   }
-   ```
-
-#### cURL Configuration
-
-Create shell aliases for common API calls:
-
+**VS Code with MongoDB Extension**
 ```bash
-# Add to ~/.bashrc or ~/.zshrc
-alias of-devices='curl -H "Content-Type: application/json" http://localhost:8080/api/devices'
-alias of-orgs='curl -H "Content-Type: application/json" http://localhost:8080/api/organizations'
-alias of-health='curl http://localhost:8080/actuator/health'
+# Extension provides:
+# - Connection management
+# - Query execution
+# - Document viewing and editing
+# - Schema exploration
 
-# Source the file
-source ~/.bashrc
+# Connect using Command Palette:
+Ctrl+Shift+P → "MongoDB: Connect"
+# Or click MongoDB icon in activity bar
 ```
 
-## Environment Variables
-
-### Development Environment File
-
-Create `.env.development`:
-
+**MongoDB Compass (Standalone GUI)**
 ```bash
-# Application
-SPRING_PROFILES_ACTIVE=development
-SERVER_PORT=8080
-
-# Database
-MONGODB_URI=mongodb://localhost:27017/openframe-dev
-REDIS_URL=redis://localhost:6379/0
-
-# Security (development only)
-JWT_SECRET=development-secret-key-change-in-production
-SECURITY_ENABLED=false
-
-# Logging
-LOGGING_LEVEL_ROOT=INFO
-LOGGING_LEVEL_OPENFRAME=DEBUG
-LOGGING_LEVEL_MONGODB=DEBUG
-
-# Management endpoints
-MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,metrics,info,env,beans
-
-# Development features
-SPRING_DEVTOOLS_RESTART_ENABLED=true
-SPRING_DEVTOOLS_LIVERELOAD_ENABLED=true
+# Download from: https://www.mongodb.com/products/compass
+# Provides visual database management
+# Connection string for local development:
+mongodb://localhost:27017/openframe-dev
 ```
 
-### IDE Environment Configuration
+### Database Connection Testing
 
-**IntelliJ IDEA Run Configuration:**
+Create a test connection script:
 
-```text
-Run/Debug Configurations → Environment variables:
+```java
+// DatabaseConnectionTest.java
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoClients;
+import com.mongodb.client.MongoDatabase;
 
-SPRING_PROFILES_ACTIVE=development
-MONGODB_URI=mongodb://localhost:27017/openframe-dev
-REDIS_URL=redis://localhost:6379/0
-LOGGING_LEVEL_OPENFRAME=DEBUG
-```
-
-**VS Code launch.json:**
-
-```json
-{
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "type": "java",
-      "name": "DeviceManagementApplication",
-      "request": "launch",
-      "mainClass": "com.openframe.examples.DeviceManagementApplication",
-      "env": {
-        "SPRING_PROFILES_ACTIVE": "development",
-        "MONGODB_URI": "mongodb://localhost:27017/openframe-dev",
-        "REDIS_URL": "redis://localhost:6379/0"
-      }
+public class DatabaseConnectionTest {
+    public static void main(String[] args) {
+        try {
+            String connectionString = "mongodb://localhost:27017";
+            MongoClient mongoClient = MongoClients.create(connectionString);
+            MongoDatabase database = mongoClient.getDatabase("openframe-dev");
+            
+            System.out.println("✅ Successfully connected to MongoDB");
+            System.out.println("Database: " + database.getName());
+            
+            mongoClient.close();
+        } catch (Exception e) {
+            System.err.println("❌ Failed to connect to MongoDB: " + e.getMessage());
+        }
     }
-  ]
 }
 ```
 
-## Development Workflow Setup
+## 🧪 Code Quality Tools
 
-### Hot Reload Configuration
+### SonarLint Integration
 
-Enable Spring Boot DevTools for automatic restart:
-
-**Add to `build.gradle`:**
-
-```gradle
-dependencies {
-    developmentOnly 'org.springframework.boot:spring-boot-devtools'
-}
-```
-
-**IntelliJ IDEA Auto-build:**
-
+**IntelliJ IDEA**
 ```text
-Settings → Build, Execution, Deployment → Compiler
-✅ Build project automatically
-
-Settings → Advanced Settings  
-✅ Allow auto-make to start even if developed application is currently running
+Settings → Plugins → Install "SonarLint"
+Settings → Tools → SonarLint
+- Automatically trigger analysis: ✅
+- Show verbose logs: ✅
+- Include test files: ✅
 ```
 
-### Testing Configuration
-
-#### Test Database Setup
-
+**VS Code**
 ```bash
-# Create test database
-mongosh mongodb://localhost:27017/openframe-test --eval "db.dropDatabase()"
+code --install-extension sonarlint.sonarlint-vscode
 
-# Configure test properties
-cat > src/test/resources/application-test.yml << EOF
-spring:
-  profiles:
-    active: test
-  data:
-    mongodb:
-      uri: mongodb://localhost:27017/openframe-test
-  redis:
-    host: localhost
-    port: 6379
-    database: 1
-
-logging:
-  level:
-    com.openframe: DEBUG
-EOF
+# Configure in VS Code settings:
+{
+    "sonarlint.analyzerProperties": {
+        "sonar.java.source": "17"
+    }
+}
 ```
 
-#### Test Run Configuration
+### Code Formatting
 
-**IntelliJ IDEA Test Configuration:**
+**EditorConfig (Recommended)**
 
-```text
-Run/Debug Configurations → Templates → JUnit
-Environment variables:
-  SPRING_PROFILES_ACTIVE=test
-  MONGODB_URI=mongodb://localhost:27017/openframe-test
+Create `.editorconfig` in project root:
+```ini
+root = true
 
-VM options:
--Dspring.profiles.active=test
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.java]
+indent_style = space
+indent_size = 4
+max_line_length = 120
+
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+[*.xml]
+indent_style = space
+indent_size = 2
+
+[*.json]
+indent_style = space
+indent_size = 2
 ```
 
-### Docker Development Setup (Optional)
+**Google Java Style (Alternative)**
+```bash
+# Download Google Java Style configuration
+# IntelliJ: https://github.com/google/styleguide/blob/gh-pages/intellij-java-google-style.xml
+# Eclipse: https://github.com/google/styleguide/blob/gh-pages/eclipse-java-google-style.xml
 
-For containerized development:
+# Import in IDE:
+# IntelliJ: Settings → Editor → Code Style → Java → Import Scheme
+# Eclipse: Preferences → Java → Code Style → Formatter → Import
+```
 
-**Create `docker-compose.dev.yml`:**
+## 🐳 Docker Integration
 
+### Docker for Development Services
+
+**Docker Compose for Local Services**
+
+Create `docker-compose.dev.yml`:
 ```yaml
 version: '3.8'
 services:
-  mongodb-dev:
-    image: mongo:7.0
+  mongodb:
+    image: mongo:7
+    container_name: openframe-dev-mongo
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_DATABASE: openframe-dev
+      - MONGO_INITDB_DATABASE=openframe-dev
     volumes:
-      - mongodb_dev_data:/data/db
-    
-  redis-dev:
-    image: redis:7-alpine
+      - mongodb_data:/data/db
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+
+  mongo-express:
+    image: mongo-express
+    container_name: openframe-dev-mongo-express
     ports:
-      - "6379:6379"
-    command: redis-server --appendonly yes
-    volumes:
-      - redis_dev_data:/data
+      - "8081:8081"
+    environment:
+      - ME_CONFIG_MONGODB_URL=mongodb://mongodb:27017/
+      - ME_CONFIG_BASICAUTH_USERNAME=admin
+      - ME_CONFIG_BASICAUTH_PASSWORD=admin
+    depends_on:
+      - mongodb
 
 volumes:
-  mongodb_dev_data:
-  redis_dev_data:
+  mongodb_data:
 ```
 
-**Start development services:**
-
+**Start Development Services**
 ```bash
+# Start MongoDB and Mongo Express
 docker-compose -f docker-compose.dev.yml up -d
+
+# Initialize MongoDB replica set (required for transactions)
+docker exec openframe-dev-mongo mongosh --eval "rs.initiate()"
+
+# Access Mongo Express at http://localhost:8081
+# Username: admin, Password: admin
 ```
 
-## Verification and Testing
+## 🔍 Debugging Configuration
 
-### Environment Verification
+### Remote Debugging Setup
 
-Run this script to verify your setup:
+**Maven Configuration**
+```xml
+<!-- Add to pom.xml for debug profile -->
+<profiles>
+    <profile>
+        <id>debug</id>
+        <properties>
+            <spring-boot.run.jvmArguments>
+                -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5005
+            </spring-boot.run.jvmArguments>
+        </properties>
+    </profile>
+</profiles>
+```
 
+**Run with Debug Profile**
+```bash
+# Start application with remote debugging enabled
+mvn spring-boot:run -Pdebug
+
+# Application will accept debugger connections on port 5005
+```
+
+**IDE Debug Configuration**
+
+**IntelliJ IDEA**
+```text
+Run → Edit Configurations → Add New → Remote JVM Debug
+- Host: localhost
+- Port: 5005
+- Use module classpath: Select your project module
+```
+
+**VS Code**
+```json
+// Add to .vscode/launch.json
+{
+    "type": "java",
+    "name": "Attach to OpenFrame",
+    "request": "attach",
+    "hostName": "localhost",
+    "port": 5005
+}
+```
+
+## ⚙️ Environment Variables
+
+### Development Environment Variables
+
+Create `.env.development`:
+```bash
+# Database
+MONGODB_URL=mongodb://localhost:27017/openframe-dev
+MONGODB_DATABASE=openframe-dev
+
+# Logging
+LOGGING_LEVEL_ROOT=INFO
+LOGGING_LEVEL_COM_OPENFRAME=DEBUG
+LOGGING_PATTERN_CONSOLE=%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n
+
+# Development flags
+SPRING_PROFILES_ACTIVE=development
+OPENFRAME_ENV=development
+
+# Debug configuration
+JAVA_TOOL_OPTIONS=-agentlib:jdwp=transport=dt_socket,address=5005,server=y,suspend=n
+```
+
+**Load Environment Variables**
+```bash
+# In your shell profile (.bashrc, .zshrc, etc.)
+if [ -f .env.development ]; then
+    export $(cat .env.development | xargs)
+fi
+
+# Or use direnv for automatic loading
+# https://direnv.net/
+```
+
+## ✅ Environment Validation
+
+### Validation Script
+
+Create `validate-dev-environment.sh`:
 ```bash
 #!/bin/bash
-# verify-dev-environment.sh
-
-echo "🔍 Verifying OpenFrame Development Environment..."
+echo "🔍 Validating OpenFrame Development Environment..."
 
 # Check Java
-echo "☕ Checking Java..."
-java -version 2>&1 | grep "17\."
-if [ $? -eq 0 ]; then
-  echo "✅ Java 17+ detected"
+echo "Checking Java..."
+if java -version 2>&1 | grep -q "17\|18\|19\|20\|21"; then
+    echo "✅ Java 17+ detected"
 else
-  echo "❌ Java 17+ required"
-  exit 1
+    echo "❌ Java 17+ required"
 fi
 
-# Check Gradle
-echo "🔨 Checking Gradle..."
-./gradlew --version > /dev/null 2>&1
-if [ $? -eq 0 ]; then
-  echo "✅ Gradle working"
+# Check Maven
+echo "Checking Maven..."
+if mvn --version > /dev/null 2>&1; then
+    echo "✅ Maven detected"
 else
-  echo "❌ Gradle not working"
-  exit 1
+    echo "❌ Maven not found"
 fi
 
-# Check MongoDB
-echo "🍃 Checking MongoDB..."
-mongosh --eval "db.adminCommand('ping')" > /dev/null 2>&1
-if [ $? -eq 0 ]; then
-  echo "✅ MongoDB connected"
+# Check Git
+echo "Checking Git..."
+if git --version > /dev/null 2>&1; then
+    echo "✅ Git detected"
 else
-  echo "❌ MongoDB connection failed"
-  exit 1
+    echo "❌ Git not found"
 fi
 
-# Check Redis
-echo "🔴 Checking Redis..."
-redis-cli ping > /dev/null 2>&1
-if [ $? -eq 0 ]; then
-  echo "✅ Redis connected"
+# Check MongoDB connection
+echo "Checking MongoDB..."
+if mongosh --eval "db.adminCommand('ping')" > /dev/null 2>&1; then
+    echo "✅ MongoDB connection successful"
 else
-  echo "❌ Redis connection failed"
-  exit 1
+    echo "⚠️ MongoDB not accessible (optional for library development)"
 fi
 
-echo "🎉 Development environment ready!"
+# Check Docker
+echo "Checking Docker..."
+if docker --version > /dev/null 2>&1; then
+    echo "✅ Docker detected"
+else
+    echo "⚠️ Docker not found (recommended for services)"
+fi
+
+echo "🎉 Environment validation complete!"
 ```
 
-### Build and Test
-
+Run validation:
 ```bash
-# Full build with tests
-./gradlew clean build
-
-# Quick build without tests
-./gradlew clean build -x test
-
-# Run specific test suite
-./gradlew test --tests "*.DeviceServiceTest"
-
-# Run integration tests
-./gradlew integrationTest
+chmod +x validate-dev-environment.sh
+./validate-dev-environment.sh
 ```
 
-## Troubleshooting
+## 🚀 Next Steps
+
+Once your development environment is set up:
+
+1. **[Continue to Local Development](local-development.md)** - Clone and build the project
+2. **[Explore Architecture](../architecture/overview.md)** - Understand the system design  
+3. **[Review Contributing Guidelines](../contributing/guidelines.md)** - Learn the contribution process
+
+## 🆘 Troubleshooting
 
 ### Common Issues
 
-| Issue | Symptoms | Solution |
-|-------|----------|----------|
-| **Lombok not working** | Getters/setters not found | Enable annotation processing in IDE |
-| **MongoDB connection** | Connection refused | Start MongoDB: `docker-compose up mongodb-dev` |
-| **Port conflicts** | Address already in use | Kill process: `lsof -ti:8080 \| xargs kill -9` |
-| **Gradle build fails** | Dependency download errors | Clear Gradle cache: `./gradlew --stop && rm -rf ~/.gradle/caches` |
-| **Tests failing** | Database-related test failures | Reset test database: `mongosh openframe-test --eval "db.dropDatabase()"` |
+**Lombok Not Working**
+```bash
+# IntelliJ IDEA
+# Settings → Plugins → Ensure Lombok plugin is installed and enabled
+# Settings → Build → Compiler → Annotation Processors → Enable annotation processing
 
-### Getting Help
+# VS Code  
+# Ensure Extension Pack for Java is installed
+# Check that lombok is in project dependencies
 
-- 📖 **Documentation**: Check the [local development guide](local-development.md)
-- 💬 **Community**: Ask in [GitHub Discussions](https://github.com/openframe/openframe-oss-lib/discussions)
-- 🐛 **Bug Reports**: Create an issue on [GitHub](https://github.com/openframe/openframe-oss-lib/issues)
+# Eclipse
+# Download lombok.jar and run: java -jar lombok.jar
+# Restart Eclipse after installation
+```
 
-## Next Steps
+**Maven Build Issues**
+```bash
+# Clear local repository
+rm -rf ~/.m2/repository/com/openframe
 
-With your development environment set up:
+# Update dependencies
+mvn clean install -U
 
-1. **[Local Development Guide](local-development.md)** - Learn to run and debug the application
-2. **[Architecture Overview](../architecture/overview.md)** - Understand the system design
-3. **[Testing Guide](../testing/overview.md)** - Write and run tests
-4. **[Contributing Guidelines](../contributing/guidelines.md)** - Start contributing
+# Skip tests if needed during setup
+mvn clean install -DskipTests
+```
 
-Your development environment is now ready! Time to start building amazing things with OpenFrame! 🚀
+**Database Connection Issues**
+```bash
+# Check MongoDB status
+docker ps | grep mongo
+
+# Restart MongoDB
+docker-compose -f docker-compose.dev.yml restart mongodb
+
+# Check connection
+mongosh mongodb://localhost:27017/openframe-dev
+```
+
+## 🤝 Get Help
+
+- **Slack Community**: [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
+- **Development Channel**: `#openframe-dev` on Slack
+- **Documentation**: Continue reading the development guides
+
+---
+
+**Great job setting up your development environment!** You're now ready to dive into local development.
