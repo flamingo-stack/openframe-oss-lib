@@ -9,19 +9,13 @@
 // Core Campaign Types
 // =============================================================================
 
-export type CampaignStatus = 'draft' | 'active' | 'paused' | 'completed' | 'archived';
-
 export interface MarketingCampaign {
   id: number;
   name: string;
   description: string | null;
   platform: string;
-  status: CampaignStatus;
   start_date: string | null;
   end_date: string | null;
-  budget_cents: number | null;
-  spent_cents: number | null;
-  target_audience: Record<string, unknown> | null;
   goals: string[] | null;
   created_by: string;
   created_at: string;
@@ -32,21 +26,13 @@ export interface CreateCampaignInput {
   name: string;
   description?: string;
   start_date?: string;
-  end_date?: string;
-  budget_cents?: number;
-  target_audience?: Record<string, unknown>;
   goals?: string[];
 }
 
 export interface UpdateCampaignInput {
   name?: string;
   description?: string;
-  status?: CampaignStatus;
   start_date?: string;
-  end_date?: string;
-  budget_cents?: number;
-  spent_cents?: number;
-  target_audience?: Record<string, unknown>;
   goals?: string[];
 }
 
@@ -75,6 +61,11 @@ export interface AIContent {
   platform: string;
   created_at: string;
   updated_at: string;
+  // Publishing & Override fields
+  selected_for_publish: boolean;
+  override_url: string | null;
+  override_at: string | null;
+  override_by: string | null;
 }
 
 export interface CreateAIContentInput {
@@ -122,6 +113,11 @@ export interface AIMedia {
   platform: string;
   created_at: string;
   updated_at: string;
+  // Publishing & Override fields
+  selected_for_publish: boolean;
+  override_url: string | null;
+  override_at: string | null;
+  override_by: string | null;
 }
 
 export interface MediaDimensions {
@@ -289,10 +285,6 @@ export interface TrackAIUsageInput {
 
 export interface CampaignStats {
   totalCampaigns: number;
-  activeCampaigns: number;
-  totalBudget: number;
-  totalSpent: number;
-  byStatus: Record<string, number>;
 }
 
 export interface AIUsageSummary {
