@@ -100,7 +100,8 @@ export function getDefaultIconForPlatform(platformName: string): string {
  */
 export function transformPlatformConfigsToOptions(platformConfigs: PlatformConfig[]): SelectableOption[] {
   return platformConfigs.map((platform: PlatformConfig) => ({
-    id: platform.name,
+    id: platform.id || platform.name, // Use UUID if available, fallback to name
+    value: platform.name, // Keep platform name as value for filtering
     name: platform.display_name,
     description: platform.description,
     icon: platformIcons[platform.name as keyof typeof platformIcons] || platformIcons.universal,
