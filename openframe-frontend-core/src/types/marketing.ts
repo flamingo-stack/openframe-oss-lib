@@ -285,6 +285,9 @@ export interface TrackAIUsageInput {
 
 export interface CampaignStats {
   totalCampaigns: number;
+  drafts: number;      // Campaigns with 0 workflow runs
+  active: number;      // Campaigns with ≥1 workflow run (not completed)
+  completed: number;   // Campaigns marked as completed
 }
 
 export interface AIUsageSummary {
