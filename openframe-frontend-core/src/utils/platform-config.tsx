@@ -95,14 +95,11 @@ export function getDefaultIconForPlatform(platformName: string): string {
   return platformIconNames[platformName as keyof typeof platformIconNames] || platformIconNames.universal;
 }
 
-/**
- * Convert platform configurations to selectable options for UI components
- */
 export function transformPlatformConfigsToOptions(platformConfigs: PlatformConfig[]): SelectableOption[] {
   return platformConfigs.map((platform: PlatformConfig) => ({
-    id: platform.id || platform.name, // Use UUID if available, fallback to name
-    value: platform.name, // Keep platform name as value for filtering
-    name: platform.display_name,
+    id: platform.id,                    // Database UUID for matching
+    name: platform.name,                // Platform name enum
+    displayName: platform.display_name, // Human-readable name
     description: platform.description,
     icon: platformIcons[platform.name as keyof typeof platformIcons] || platformIcons.universal,
     color: platformColors[platform.name as keyof typeof platformColors] || platformColors.universal

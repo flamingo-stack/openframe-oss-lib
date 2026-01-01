@@ -1,7 +1,7 @@
 import type { UserProfile } from "./user"
 
-// Core Platform Types (using existing platform enum)
-export type Platform = 'openmsp' | 'openframe' | 'flamingo' | 'flamingo-teaser' | 'universal';
+// Core Platform Types (dynamically fetched from database via API)
+export type Platform = string;
 export type BlogStatus = 'draft' | 'published' | 'scheduled' | 'archived';
 
 // Author interface for blog posts
