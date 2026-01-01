@@ -176,40 +176,9 @@ export interface BlogPostStats {
   recent_posts: BlogPost[];
 }
 
-// Platform Configuration
-export interface PlatformConfig {
-  name: Platform;
-  display_name: string;
-  default_color: string;
-  default_icon: string;
-}
-
-export const PLATFORM_CONFIGS: PlatformConfig[] = [
-  {
-    name: 'openmsp',
-    display_name: 'OpenMSP',
-    default_color: 'var(--ods-open-yellow-base)',     // CSS variable instead of hex
-    default_icon: 'openmsp-logo'
-  },
-  {
-    name: 'openframe',
-    display_name: 'OpenFrame', 
-    default_color: 'var(--ods-open-yellow-base)',     // CSS variable instead of hex
-    default_icon: 'openframe-logo'
-  },
-  {
-    name: 'flamingo',
-    display_name: 'Flamingo',
-    default_color: 'var(--ods-flamingo-pink-base)',   // CSS variable instead of hex
-    default_icon: 'flamingo-logo'
-  },
-  {
-    name: 'universal',
-    display_name: 'Universal',
-    default_color: 'var(--ods-open-yellow-base)',     // CSS variable instead of hex
-    default_icon: 'globe'
-  }
-];
+// Import unified platform configuration (removed duplicate definition)
+// PLATFORM_CONFIGS removed - all platform data now comes from database via getPlatformsConfig()
+export type { PlatformConfig } from './platform';
 
 // SEO Analysis Types
 export interface SEOAnalysisResult {

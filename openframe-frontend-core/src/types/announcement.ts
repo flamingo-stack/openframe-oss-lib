@@ -208,13 +208,8 @@ export interface AnnouncementValidation {
   };
 }
 
-// Platform Configuration
-export interface PlatformConfig {
-  name: string;
-  display_name: string;
-  default_color: string;
-  default_icon: string;
-}
+// Import unified platform configuration (removed duplicate definition)
+export type { PlatformConfig } from './platform';
 
 // Admin Dashboard Types
 export interface AnnouncementStats {
@@ -268,26 +263,7 @@ export interface SvgIcon {
 }
 
 // Platform display configuration
-export const PLATFORM_CONFIGS: PlatformConfig[] = [
-  {
-    name: 'openframe',
-    display_name: 'OpenFrame',
-    default_color: 'var(--ods-open-yellow-base)',     // CSS variable instead of hex
-    default_icon: 'openframe-logo'
-  },
-  {
-    name: 'openmsp',
-    display_name: 'OpenMSP',
-    default_color: 'var(--ods-open-yellow-base)',     // CSS variable instead of hex
-    default_icon: 'openmsp-logo'
-  },
-  {
-    name: 'flamingo',
-    display_name: 'Flamingo',
-    default_color: 'var(--ods-flamingo-pink-base)',   // CSS variable instead of hex
-    default_icon: 'flamingo-logo'
-  }
-];
+// PLATFORM_CONFIGS removed - all platform data now comes from database via getPlatformsConfig()
 
 // Available SVG icons configuration
 export const AVAILABLE_SVG_ICONS: SvgIcon[] = [
