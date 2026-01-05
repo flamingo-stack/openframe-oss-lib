@@ -1,0 +1,11 @@
+sequenceDiagram
+    participant Client as Client
+    participant Controller as IntegratedToolController
+    participant Service as IntegratedToolService
+    participant Repo as ToolRepository
+    Client->>Controller: POST /integrated-tool (SaveToolRequest)
+    Controller->>Service: saveTool(SaveToolRequest)
+    Service->>Repo: save(ToolEntity)
+    Repo-->>Service: ToolEntity (saved)
+    Service-->>Controller: SaveResult
+    Controller-->>Client: HTTP Response

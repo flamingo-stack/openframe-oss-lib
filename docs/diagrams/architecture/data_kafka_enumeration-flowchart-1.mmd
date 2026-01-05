@@ -1,0 +1,6 @@
+flowchart TD
+    Producer["Kafka Producer"] -->|attaches headers| KafkaHeader["KafkaHeader Enum\n(data_kafka_enumeration)"]
+    KafkaHeader -->|used by| Consumer["Kafka Consumer"]
+    KafkaHeader -->|referenced by| RetryHandler["KafkaRecoveryHandlerImpl\n(data_kafka_producer_retry)"]
+    KafkaHeader -->|referenced by| MessageModel["MachinePinotMessage, DebeziumMessage\n(data_kafka_model, data_kafka_model_debezium)"]
+    KafkaHeader -->|referenced by| StreamHandler["DebeziumKafkaMessageHandler, etc.\n(stream_service_core_handler)"]

@@ -1,0 +1,14 @@
+flowchart TD
+    ServiceA["Service A (e.g., Device Controller)"] -->|publishes| NATSBus["NATS Message Bus"]
+    NATSBus -->|delivers| ServiceB["Service B (e.g., Agent Service)"]
+    NATSBus -->|delivers| ServiceC["Service C (e.g., Tool Service)"]
+    subgraph DataModelNats["data_model_nats"]
+        ClientConnectionEvent["ClientConnectionEvent"]
+        DownloadConfiguration["DownloadConfiguration"]
+        InstalledAgentMessage["InstalledAgentMessage"]
+        ToolConnectionMessage["ToolConnectionMessage"]
+        ToolInstallationMessage["ToolInstallationMessage"]
+    end
+    ServiceA -->|uses| DataModelNats
+    ServiceB -->|uses| DataModelNats
+    ServiceC -->|uses| DataModelNats

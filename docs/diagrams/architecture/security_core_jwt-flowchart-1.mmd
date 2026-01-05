@@ -1,0 +1,5 @@
+flowchart TD
+    JwtConfig["JwtConfig"] -->|provides config to| JwtSecurityConfig["JwtSecurityConfig (security_core_config)"]
+    JwtConfig -->|used by| JwtAuthConfig["JwtAuthConfig (gateway_service_core_security)"]
+    JwtSecurityConfig -->|enables| SecurityConfig["SecurityConfig (api_service_core_config)"]
+    JwtAuthConfig -->|enables| GatewaySecurityConfig["GatewaySecurityConfig (gateway_service_core_security)"]

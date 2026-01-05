@@ -1,0 +1,3 @@
+flowchart TD
+    Service["MachineTagEventServiceImpl\n[data_service_impl]"] -->|calls| Repository["PinotClientDeviceRepository\n[data_repository_pinot]"]
+    Repository -->|returns| Entity["PinotEventEntity\n[data_model_pinot]"]

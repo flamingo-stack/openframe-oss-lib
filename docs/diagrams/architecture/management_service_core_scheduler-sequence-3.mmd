@@ -1,0 +1,9 @@
+sequenceDiagram
+    participant Scheduler as DebeziumHealthCheckScheduler
+    participant Service as Service Layer
+    participant Monitoring as Monitoring/Alerting
+    Scheduler->>Service: Check Debezium connector health
+    Service-->>Scheduler: Return health status
+    alt Issue detected
+        Scheduler->>Monitoring: Trigger alert/notification
+    end

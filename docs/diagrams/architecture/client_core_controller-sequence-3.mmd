@@ -1,0 +1,9 @@
+sequenceDiagram
+    participant AgentClient as "Agent Client"
+    participant ToolAgentFileController
+    participant ToolAgentFileService
+
+    AgentClient->>ToolAgentFileController: GET /tool-agent-file/{toolId}
+    ToolAgentFileController->>ToolAgentFileService: fetch tool agent file
+    ToolAgentFileService-->>ToolAgentFileController: file data/URL
+    ToolAgentFileController-->>AgentClient: file response

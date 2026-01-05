@@ -1,0 +1,5 @@
+flowchart TD
+    UserAction["User navigates to profile"] --> FetchProfile["Fetch profile data from API"]
+    FetchProfile --> ParseResponse["Parse API response using ActivitiesApiResponse, FavoritesApiResponse, CommentsApiResponse"]
+    ParseResponse --> UpdateState["Update ProfileData and ProfileLoadingState"]
+    UpdateState --> RenderComponents["Render ProfileHeader, ActivitiesFeed, FavoritesGrid, CommentsSection"]

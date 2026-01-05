@@ -1,0 +1,5 @@
+flowchart TD
+    Request["Incoming HTTP Request"] --> Filter["TenantContextFilter"]
+    Filter -->|extracts tenant| Context["TenantContext"]
+    Context -->|provides tenant info| Downstream["Downstream Services & SecurityConfig"]
+    Downstream -->|uses tenant| Repo["TenantRepository"]

@@ -1,0 +1,5 @@
+flowchart TD
+    OrgSelector["OrganizationSelectorProps"] --> UIOrgSelector["OrganizationSelector UI Component"]
+    UIOrgSelector -->|renders| App
+    OrgSelector -->|typed by| OrgTypes["Organization Types (from frontend_core_types_*)"]
+    UIOrgSelector -->|fetches| OrgAPI["Organization API"]

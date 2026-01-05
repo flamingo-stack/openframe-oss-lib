@@ -1,0 +1,15 @@
+sequenceDiagram
+    participant Client
+    participant DeviceController
+    participant RestProxyService
+    participant DeviceDataFetcher
+    participant MongoDB
+    participant Pinot
+    Client->>DeviceController: GET /devices?filter=...
+    DeviceController->>RestProxyService: getDevices(filter)
+    RestProxyService->>DeviceDataFetcher: fetchDevices(filter)
+    DeviceDataFetcher->>MongoDB: Query device collection
+    DeviceDataFetcher->>Pinot: Query analytics data
+    DeviceDataFetcher-->>RestProxyService: Aggregated device data
+    RestProxyService-->>DeviceController: DeviceResponse DTO
+    DeviceController-->>Client: DevicesResponse

@@ -1,0 +1,10 @@
+flowchart TD
+    EventController["EventController\n(external_api_service_core_controller)"] -->|uses| EventFilterCriteria["EventFilterCriteria\n(external_api_service_core_dto_event)"]
+    EventController -->|uses| EventResponse["EventResponse\n(external_api_service_core_dto_event)"]
+    EventController -->|uses| EventsResponse["EventsResponse\n(external_api_service_core_dto_event)"]
+    EventController -->|uses| EventFilterResponse["EventFilterResponse\n(external_api_service_core_dto_event)"]
+    EventController -->|uses| PaginationCriteria["PaginationCriteria\n(external_api_service_core_dto_shared)"]
+    EventController -->|uses| EventFilters["EventFilters\n(api_lib_dto_event)"]
+    EventController -->|uses| EventFilterOptions["EventFilterOptions\n(api_lib_dto_event)"]
+    EventController -->|uses| EventFilterInput["EventFilterInput\n(api_service_core_dto_event)"]
+    EventController -->|uses| CreateEventInput["CreateEventInput\n(api_service_core_dto_event)"]

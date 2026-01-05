@@ -1,0 +1,17 @@
+sequenceDiagram
+    participant Client
+    participant API as API Layer
+    participant Controller as DeviceController
+    participant Service as DeviceService
+    participant Repo as DeviceRepository
+    participant DB as MongoDB
+    Client->>API: POST /devices (device data)
+    API->>Controller: handle request
+    Controller->>Service: validate & process
+    Service->>Repo: save(device)
+    Repo->>DB: persist Device Document
+    DB-->>Repo: confirmation
+    Repo-->>Service: saved device
+    Service-->>Controller: response
+    Controller-->>API: response
+    API-->>Client: device created/updated

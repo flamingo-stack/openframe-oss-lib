@@ -1,0 +1,11 @@
+sequenceDiagram
+    participant Controller as DeviceController
+    participant DataFetcher as DeviceDataFetcher
+    participant Service as DeviceService
+    participant Repo as DeviceRepository
+    Controller->>DataFetcher: Query devices (with filters)
+    DataFetcher->>Service: Fetch devices (apply business logic)
+    Service->>Repo: Query devices (with filters)
+    Repo-->>Service: Return device entities
+    Service-->>DataFetcher: Return processed devices
+    DataFetcher-->>Controller: Return device DTOs

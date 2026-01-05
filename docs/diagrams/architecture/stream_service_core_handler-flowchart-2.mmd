@@ -1,0 +1,6 @@
+graph TD
+    A["JsonKafkaListener"] --> B["Deserializer"]
+    B --> C["DebeziumMessageHandler"]
+    C -->|Cassandra| D["DebeziumCassandraMessageHandler"]
+    C -->|Kafka| E["DebeziumKafkaMessageHandler"]
+    C -->|Other| F["GenericMessageHandler"]

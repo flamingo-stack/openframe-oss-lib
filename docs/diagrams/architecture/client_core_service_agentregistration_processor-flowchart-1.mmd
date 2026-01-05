@@ -1,0 +1,7 @@
+flowchart TD
+    AgentClient["Agent Client"] -->|submits registration| AgentAuthController["AgentAuthController"]
+    AgentAuthController -->|parses| AgentRegistrationRequest["AgentRegistrationRequest DTO"]
+    AgentAuthController -->|delegates| DefaultAgentRegistrationProcessor["DefaultAgentRegistrationProcessor"]
+    DefaultAgentRegistrationProcessor -->|uses| AgentIdTransformer["Agent ID Transformer(s)"]
+    DefaultAgentRegistrationProcessor -->|persists| DeviceService["Device Service"]
+    DefaultAgentRegistrationProcessor -->|notifies| ClientConnectionListener["ClientConnectionListener"]

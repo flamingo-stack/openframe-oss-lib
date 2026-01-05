@@ -1,0 +1,5 @@
+flowchart TD
+    Client["Client / Admin UI"] -->|REST API| LoggingConfigController["LoggingConfigController"]
+    LoggingConfigController -->|delegates| ConfigServerConfiguration["ConfigServerConfiguration\n(config_core_core)"]
+    LoggingConfigController -->|may interact| SecurityConfig["SecurityConfig\n(api_service_core_config)"]
+    LoggingConfigController -->|may interact| DataInitializer["DataInitializer\n(api_service_core_config)"]

@@ -1,0 +1,11 @@
+flowchart TD
+    GatewayService["Gateway Service"] --> WebClientConfig["WebClientConfig"]
+    WebClientConfig --> GatewaySecurityConfig["GatewaySecurityConfig"]
+    WebClientConfig --> CorsConfig["CorsConfig"]
+    WebClientConfig --> IssuerUrlProvider["IssuerUrlProvider"]
+    WebClientConfig --> AddAuthorizationHeaderFilter["AddAuthorizationHeaderFilter"]
+    WebClientConfig --> OriginSanitizerFilter["OriginSanitizerFilter"]
+    WebClientConfig --> ToolAgentWebSocketProxyUrlFilter["ToolAgentWebSocketProxyUrlFilter"]
+    WebClientConfig --> ToolApiWebSocketProxyUrlFilter["ToolApiWebSocketProxyUrlFilter"]
+    WebClientConfig --> WebSocketGatewayConfig["WebSocketGatewayConfig"]
+    WebClientConfig --> RateLimitConstants["RateLimitConstants"]

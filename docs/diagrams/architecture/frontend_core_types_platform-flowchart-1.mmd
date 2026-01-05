@@ -1,0 +1,4 @@
+flowchart TD
+    BackendServices["Backend Services"] -->|aggregate data| PlatformStatsProvider["PlatformStats Provider"]
+    PlatformStatsProvider -->|provides| FrontendComponents["Frontend Components"]
+    FrontendComponents -->|display| UserInterface["User Interface"]

@@ -1,0 +1,6 @@
+graph TD
+    ActivityMessage --> HostActivityMessage
+    HostActivity --> HostActivityMessage
+    ActivityMessage --> ActivityEnrichmentService["ActivityEnrichmentService"]
+    HostActivity --> ActivityEnrichmentService
+    HostActivityMessage --> DownstreamProcessors["Downstream Processors"]

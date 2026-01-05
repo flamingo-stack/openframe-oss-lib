@@ -10,10 +10,10 @@ import {
   SelectValue,
 } from "./select"
 
-export type MediaType = 'video' | 'png' | 'jpg' | 'svg' | 'document' | 'pdf' | 'zip' | 'guide' | 'checklist'
+export type ResourceMediaType = 'video' | 'png' | 'jpg' | 'svg' | 'document' | 'pdf' | 'zip' | 'guide' | 'checklist'
 
 interface MediaTypeOption {
-  value: MediaType
+  value: ResourceMediaType
   label: string
   icon: React.ReactNode
 }
@@ -31,8 +31,8 @@ const mediaTypeOptions: MediaTypeOption[] = [
 ]
 
 interface MediaTypeSelectorProps {
-  value?: MediaType
-  onValueChange?: (value: MediaType) => void
+  value?: ResourceMediaType
+  onValueChange?: (value: ResourceMediaType) => void
   placeholder?: string
   className?: string
   disabled?: boolean

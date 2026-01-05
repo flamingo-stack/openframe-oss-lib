@@ -1,0 +1,3 @@
+flowchart TD
+    UI_Components["UI Components<br/>(e.g., Table, List)"] -->|use| HooksUI["frontend_core_hooks_ui<br/>(Pagination Config)"]
+    HooksUI -->|provides config| DataFetchers["Data Fetchers<br/>(API calls, local data)"]

@@ -1,0 +1,6 @@
+graph TD
+    A["Registration Request"] --> B["DefaultRegistrationProcessor"]
+    B --> C["MongoAuthorizationService"]
+    B --> D["UserService"]
+    C --> E["MongoRegisteredClientRepository"]
+    D --> F["BaseUserRepository"]

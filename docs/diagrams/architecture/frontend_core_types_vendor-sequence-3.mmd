@@ -1,0 +1,10 @@
+sequenceDiagram
+    participant User
+    participant UI as "UI Component"
+    participant Types as "DetailedVendorFeature Type"
+    participant API as "Backend API"
+    User->>UI: Requests vendor details
+    UI->>API: Fetch vendor data (including features)
+    API-->>UI: Returns vendor data with features
+    UI->>Types: Parse features into DetailedVendorFeature
+    UI-->>User: Render vendor features on page

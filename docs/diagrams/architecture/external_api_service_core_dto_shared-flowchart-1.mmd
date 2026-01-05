@@ -1,0 +1,6 @@
+flowchart TD
+    APIClient["API Client"] -->|sends paginated request| Controller["API Controller"]
+    Controller -->|uses| FilterDTO["Filter/Criteria DTOs"]
+    FilterDTO -->|includes| PaginationCriteria["PaginationCriteria (shared)"]
+    Controller -->|returns| ResponseDTO["Paginated Response DTOs"]
+    ResponseDTO -->|references| PaginationCriteria

@@ -1,0 +1,6 @@
+flowchart TD
+    SdkTacticalRmmModel["sdk_tacticalrmm_model"] -->|Defines models for| SdkTacticalRmm["sdk_tacticalrmm"]
+    SdkTacticalRmm -->|Used by| ApiServiceCoreController["api_service_core_controller"]
+    SdkTacticalRmmModel -->|Models referenced by| ApiServiceCoreDto["api_service_core_dto"]
+    SdkTacticalRmmModel -->|Models referenced by| ApiLibDtoDevice["api_lib_dto_device"]
+    SdkTacticalRmmModel -->|Models referenced by| ApiLibDtoAudit["api_lib_dto_audit"]

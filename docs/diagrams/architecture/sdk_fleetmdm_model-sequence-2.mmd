@@ -1,0 +1,12 @@
+sequenceDiagram
+    participant Client
+    participant DeviceController
+    participant HostSearchResponse
+    participant QueryResult
+
+    Client->>DeviceController: Request device search
+    DeviceController->>HostSearchResponse: Construct response with Host list
+    DeviceController-->>Client: Return HostSearchResponse
+    Client->>DeviceController: Request query execution on Host
+    DeviceController->>QueryResult: Execute query, build result
+    DeviceController-->>Client: Return QueryResult

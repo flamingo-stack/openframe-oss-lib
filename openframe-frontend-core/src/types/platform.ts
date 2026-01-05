@@ -16,6 +16,7 @@ export interface PlatformRecord {
 
 // Platform Configuration for API
 export interface PlatformConfig {
+  id: string;  // UUID from database (required)
   value: string;  // same as name
   label: string;  // same as display_name
   name: string;   // same as name

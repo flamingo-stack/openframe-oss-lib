@@ -1,0 +1,13 @@
+sequenceDiagram
+    participant UI as UI Component
+    participant Hook as API Hook
+    participant Types as frontend_core_types_team
+    participant API as Backend API
+
+    UI->>Hook: Request team data (with GetTeamOptions)
+    Hook->>Types: Use GetTeamOptions for query
+    Hook->>API: Fetch team data
+    API-->>Hook: Return team data (TeamData[])
+    Hook->>Types: Parse as TeamData[]
+    Hook-->>UI: Provide typed team data
+    UI->>Types: Render using TeamData

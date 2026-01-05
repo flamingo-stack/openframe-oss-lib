@@ -1,0 +1,9 @@
+classDiagram
+    AccessCodeCohort <|-- CohortWithStats
+    AccessCodeCohort "1" o-- "*" AccessCode : contains
+    AccessCodeCohort "1" o-- "*" CohortMembership : has
+    AccessCode "*" o-- "1" AccessCodeCohort : belongs to
+    CohortMembership "*" o-- "1" AccessCodeCohort : member of
+    AccessCodeValidation ..> AccessCode : validates
+    CreateAccessCodeCohort ..> AccessCodeCohort : creates
+    UpdateAccessCodeCohort ..> AccessCodeCohort : updates

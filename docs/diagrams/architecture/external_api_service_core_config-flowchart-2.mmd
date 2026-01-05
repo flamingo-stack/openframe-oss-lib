@@ -1,0 +1,6 @@
+flowchart TD
+    Client["API Client"] -->|requests| API["External API Endpoint"]
+    API -->|handled by| Controller["Controller"]
+    Controller -->|uses| DTO["DTO"]
+    Controller -->|calls| Service["Service"]
+    OpenApiConfig -.->|documents| API

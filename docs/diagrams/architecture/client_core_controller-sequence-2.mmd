@@ -1,0 +1,15 @@
+sequenceDiagram
+    participant AgentClient as "Agent Client"
+    participant AgentAuthController
+    participant DefaultAgentRegistrationProcessor
+    participant FleetMdmAgentIdTransformer
+    participant MeshCentralAgentIdTransformer
+    participant PasswordEncoderConfig
+
+    AgentClient->>AgentAuthController: POST /register (AgentRegistrationRequest)
+    AgentAuthController->>DefaultAgentRegistrationProcessor: validate & process registration
+    DefaultAgentRegistrationProcessor->>FleetMdmAgentIdTransformer: transform agent ID (if needed)
+    DefaultAgentRegistrationProcessor->>MeshCentralAgentIdTransformer: transform agent ID (if needed)
+    DefaultAgentRegistrationProcessor->>PasswordEncoderConfig: encode password
+    DefaultAgentRegistrationProcessor-->>AgentAuthController: registration result
+    AgentAuthController-->>AgentClient: registration response

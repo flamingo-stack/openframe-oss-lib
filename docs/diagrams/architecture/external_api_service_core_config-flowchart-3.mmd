@@ -1,0 +1,6 @@
+flowchart TD
+    Start["Application Startup"] --> InitOpenApi["Initialize OpenApiConfig"]
+    InitOpenApi --> ScanControllers["Scan Controllers for Endpoints"]
+    ScanControllers --> GenerateSpec["Generate OpenAPI Specification"]
+    GenerateSpec --> ExposeDocs["Expose Swagger UI / OpenAPI JSON"]
+    ExposeDocs --> End["API Documentation Available"]

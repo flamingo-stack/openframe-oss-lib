@@ -1,0 +1,7 @@
+flowchart TD
+    A["Tenant Admin UI"] -->|requests SSO config| B["SsoDiscoveryController"]
+    B -->|fetches default| C["GoogleDefaultProviderConfig"]
+    B -->|fetches default| D["MicrosoftDefaultProviderConfig"]
+    C -->|returns config| B
+    D -->|returns config| B
+    B -->|returns options| A

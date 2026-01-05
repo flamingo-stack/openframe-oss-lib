@@ -1,0 +1,6 @@
+flowchart TD
+    Start["Start"] --> ValidateInvitation["Validate SSO Invitation"]
+    ValidateInvitation -->|valid| GenerateKeys["Retrieve/Generate Keys"]
+    GenerateKeys --> RegisterClient["Register SSO Client"]
+    RegisterClient --> Success["Onboarding Complete"]
+    ValidateInvitation -->|invalid| Error["Error Handling"]

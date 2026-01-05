@@ -1,0 +1,9 @@
+flowchart TD
+    A["frontend_core_types_report"] -->|defines types for| B["frontend_core_components_features"]
+    A -->|used by| C["frontend_core_components_ui"]
+    A -->|used by| D["frontend_core_components"]
+    A -->|used by| E["frontend_core_hooks_ui"]
+    B -->|renders| F["MarginReport UI"]
+    C -->|renders| F
+    D -->|provides context| F
+    E -->|fetches data| F

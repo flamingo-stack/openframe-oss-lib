@@ -1,0 +1,13 @@
+flowchart TD
+    Client["API Client"] -->|sends create request| Controller["InvitationController"]
+    Controller -->|maps to| CreateInvitationRequest["CreateInvitationRequest DTO"]
+    CreateInvitationRequest -->|processed by| Processor["DefaultInvitationProcessor"]
+    Processor -->|returns| InvitationResponse["InvitationResponse DTO"]
+    Controller -->|returns| InvitationResponse
+    
+    Client -.->|requests list| Controller
+    Controller -->|maps to| InvitationPageResponse["InvitationPageResponse DTO"]
+    
+    Client -.->|updates status| Controller
+    Controller -->|maps to| UpdateInvitationStatusRequest["UpdateInvitationStatusRequest DTO"]
+    UpdateInvitationStatusRequest -->|processed by| Processor

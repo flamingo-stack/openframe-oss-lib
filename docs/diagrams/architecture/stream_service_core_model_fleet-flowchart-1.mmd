@@ -1,0 +1,7 @@
+flowchart TD
+    Kafka["Kafka Topic"] -->|consumed by| JsonKafkaListener["JsonKafkaListener"]
+    JsonKafkaListener -->|deserializes| FleetEventDeserializer["FleetEventDeserializer"]
+    FleetEventDeserializer -->|yields| ActivityMessage["ActivityMessage"]
+    ActivityMessage -->|enriched by| ActivityEnrichmentService["ActivityEnrichmentService"]
+    ActivityEnrichmentService -->|produces| HostActivityMessage["HostActivityMessage"]
+    HostActivityMessage -->|used by| DownstreamProcessors["Downstream Processors"]

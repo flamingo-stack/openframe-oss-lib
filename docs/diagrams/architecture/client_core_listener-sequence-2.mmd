@@ -1,0 +1,11 @@
+sequenceDiagram
+    participant EventBus as "Event Bus"
+    participant Listener as "Listener (e.g., InstalledAgentListener)"
+    participant Service as "Service Layer"
+    participant DB as "Database"
+
+    EventBus->>Listener: Receive event (e.g., Agent Installed)
+    Listener->>Service: Parse and validate event data
+    Service->>DB: Update agent/device/tool state
+    Service-->>Listener: Acknowledge processing
+    Listener-->>EventBus: Commit/acknowledge event
