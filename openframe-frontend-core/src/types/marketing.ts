@@ -58,7 +58,8 @@ export interface AIContent {
   status: ContentStatus;
   reviewed_by: string | null;
   reviewed_at: string | null;
-  platform: string;
+  platform?: string; // Optional - legacy field, use social_account_id instead
+  social_account_id: number | null; // FK to social_accounts table - primary source of truth
   created_at: string;
   updated_at: string;
   // Publishing & Override fields
@@ -110,7 +111,8 @@ export interface AIMedia {
   reviewed_by: string | null;
   reviewed_at: string | null;
   metadata: Record<string, unknown> | null;
-  platform: string;
+  platform?: string; // Optional - legacy field, use social_account_id instead
+  social_account_id: number | null; // FK to social_accounts table - primary source of truth
   created_at: string;
   updated_at: string;
   // Publishing & Override fields
