@@ -81,24 +81,18 @@ public class InvitationService {
         Invitation old = invitationRepository.findById(expiredInvitationId)
                 .orElseThrow(() -> new IllegalArgumentException("Invitation not found"));
 
-        // Consider expired if past TTL by time, regardless of stored status
-        if (old.getExpiresAt() == null || !old.getExpiresAt().isBefore(Instant.now())) {
-            throw new IllegalStateException("Only expired invitations can be renewed");
-        }
-
-        // Mark old as REVOKED
-        old.setStatus(InvitationStatus.REVOKED);
-        Invitation revoked = invitationRepository.save(old);
-        invitationProcessor.postProcessInvitationRevoked(revoked);
-
-        // Delegate creation to existing createInvitation to avoid duplication
         CreateInvitationRequest req = CreateInvitationRequest.builder()
                 .email(old.getEmail())
                 .roles(old.getRoles().stream().map(r -> Role.valueOf(r.name())).toList())
                 .build();
 
         InvitationResponse created = createInvitation(req);
-        log.info("Renewed invitation from id={} to new id={} email={}",
+
+        old.setStatus(InvitationStatus.REVOKED);
+        Invitation revoked = invitationRepository.save(old);
+        invitationProcessor.postProcessInvitationRevoked(revoked);
+
+        log.info("Resent invitation from id={} to new id={} email={}",
                 old.getId(), created.getId(), created.getEmail());
         return created;
     }
