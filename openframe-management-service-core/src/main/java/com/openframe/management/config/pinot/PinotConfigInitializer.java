@@ -11,6 +11,7 @@ import javax.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.http.HttpEntity;
@@ -31,6 +32,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class PinotConfigInitializer {
 
     private final ResourceLoader resourceLoader;
+    private final Environment environment;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
@@ -51,8 +53,9 @@ public class PinotConfigInitializer {
             new PinotConfig("logs","schema-logs.json","table-config-logs.json")
     );
 
-    public PinotConfigInitializer(ResourceLoader resourceLoader) {
+    public PinotConfigInitializer(ResourceLoader resourceLoader, Environment environment) {
         this.resourceLoader = resourceLoader;
+        this.environment = environment;
         this.restTemplate = new RestTemplate();
         this.objectMapper = new ObjectMapper();
     }
@@ -82,7 +85,7 @@ public class PinotConfigInitializer {
 
         try {
             String schemaConfig = loadResource(config.getSchemaFile());
-            String tableConfig = loadResource(config.getTableConfigFile());
+            String tableConfig = resolvePlaceholders(loadResource(config.getTableConfigFile()));
 
             deployWithRetry(() -> deploySchema(schemaConfig), "schema for " + config.getName());
             deployWithRetry(() -> deployTableConfig(tableConfig, config.getName()), "table config for " + config.getName());
@@ -103,6 +106,10 @@ public class PinotConfigInitializer {
         try (var inputStream = resource.getInputStream()) {
             return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
         }
+    }
+
+    private String resolvePlaceholders(String config) {
+        return environment.resolvePlaceholders(config);
     }
 
     private void deployWithRetry(Runnable deployment, String configType) {
