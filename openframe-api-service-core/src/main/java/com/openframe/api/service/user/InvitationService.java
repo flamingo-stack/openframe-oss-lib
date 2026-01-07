@@ -3,6 +3,7 @@ package com.openframe.api.service.user;
 import com.openframe.api.dto.invitation.CreateInvitationRequest;
 import com.openframe.api.dto.invitation.InvitationPageResponse;
 import com.openframe.api.dto.invitation.InvitationResponse;
+import com.openframe.api.dto.Role;
 import com.openframe.api.mapper.InvitationMapper;
 import com.openframe.api.service.processor.InvitationProcessor;
 import com.openframe.data.document.user.Invitation;
@@ -15,6 +16,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -45,7 +49,10 @@ public class InvitationService {
 
     public InvitationPageResponse listInvitations(int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        Page<Invitation> p = invitationRepository.findAll(pageable);
+        Page<Invitation> p = invitationRepository.findByStatusNotIn(
+                List.of(InvitationStatus.ACCEPTED, InvitationStatus.REVOKED),
+                pageable
+        );
         return InvitationPageResponse.builder()
                 .items(p.getContent().stream().map(invitationMapper::toResponse).toList())
                 .page(p.getNumber())
@@ -68,6 +75,34 @@ public class InvitationService {
         Invitation revokedInvitation = invitationRepository.save(invitation);
 
         invitationProcessor.postProcessInvitationRevoked(revokedInvitation);
+    }
+
+    public InvitationResponse renewInvitation(String expiredInvitationId) {
+        Invitation old = invitationRepository.findById(expiredInvitationId)
+                .orElseThrow(() -> new IllegalArgumentException("Invitation not found"));
+
+        // Validate status and time-based expiration to avoid inconsistent states
+        if (!InvitationStatus.PENDING.equals(old.getStatus())) {
+            throw new IllegalStateException("Only pending invitations can be resent");
+        }
+        if (old.getExpiresAt() == null || !old.getExpiresAt().isBefore(Instant.now())) {
+            throw new IllegalStateException("Only expired invitations can be resent");
+        }
+
+        CreateInvitationRequest req = CreateInvitationRequest.builder()
+                .email(old.getEmail())
+                .roles(old.getRoles().stream().map(r -> Role.valueOf(r.name())).toList())
+                .build();
+
+        InvitationResponse created = createInvitation(req);
+
+        old.setStatus(InvitationStatus.REVOKED);
+        Invitation revoked = invitationRepository.save(old);
+        invitationProcessor.postProcessInvitationRevoked(revoked);
+
+        log.info("Resent invitation from id={} to new id={} email={}",
+                old.getId(), created.getId(), created.getEmail());
+        return created;
     }
 }
 
