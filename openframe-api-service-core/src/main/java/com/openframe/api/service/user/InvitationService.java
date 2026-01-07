@@ -81,6 +81,14 @@ public class InvitationService {
         Invitation old = invitationRepository.findById(expiredInvitationId)
                 .orElseThrow(() -> new IllegalArgumentException("Invitation not found"));
 
+        // Validate status and time-based expiration to avoid inconsistent states
+        if (!InvitationStatus.PENDING.equals(old.getStatus())) {
+            throw new IllegalStateException("Only pending invitations can be resent");
+        }
+        if (old.getExpiresAt() == null || !old.getExpiresAt().isBefore(Instant.now())) {
+            throw new IllegalStateException("Only expired invitations can be resent");
+        }
+
         CreateInvitationRequest req = CreateInvitationRequest.builder()
                 .email(old.getEmail())
                 .roles(old.getRoles().stream().map(r -> Role.valueOf(r.name())).toList())
