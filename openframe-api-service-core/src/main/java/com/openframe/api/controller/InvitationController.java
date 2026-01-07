@@ -36,4 +36,10 @@ public class InvitationController {
     public void revokeInvitation(@PathVariable String id) {
         invitationService.revokeInvitation(id);
     }
+
+    @PostMapping("/{id}/resend")
+    @ResponseStatus(HttpStatus.CREATED)
+    public InvitationResponse resendInvitation(@PathVariable String id) {
+        return invitationService.renewInvitation(id);
+    }
 }
