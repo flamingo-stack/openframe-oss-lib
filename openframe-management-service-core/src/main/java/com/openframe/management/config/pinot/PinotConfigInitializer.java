@@ -110,7 +110,7 @@ public class PinotConfigInitializer {
     }
 
     private String resolvePlaceholders(String config) {
-        return environment.resolvePlaceholders(config);
+        return environment.resolveRequiredPlaceholders(config);
     }
 
     private void deployWithRetry(Runnable deployment, String configType) {
