@@ -33,13 +33,13 @@ public class ActivityEnrichmentService {
     private final Serde<ActivityMessage> outgoingActivityMessageSerde;
     private final Serde<HostActivityMessage> hostActivityMessageSerde;
 
-    @Value("${openframe.oss-tenant.kafka.topics.inbound.fleet-mdm-activities}")
+    @Value("${openframe.oss-tenant.kafka.topics.inbound.fleet-mdm-activities.name}")
     private String activitiesTopic;
 
-    @Value("${openframe.oss-tenant.kafka.topics.inbound.fleet-mdm-host-activities}")
+    @Value("${openframe.oss-tenant.kafka.topics.inbound.fleet-mdm-host-activities.name}")
     private String hostActivitiesTopic;
 
-    @Value("${openframe.oss-tenant.kafka.topics.inbound.fleet-mdm-events}")
+    @Value("${openframe.oss-tenant.kafka.topics.inbound.fleet-mdm-events.name}")
     private String enrichedActivitiesTopic;
 
     private static final Duration JOIN_WINDOW_DURATION = Duration.ofSeconds(5);
