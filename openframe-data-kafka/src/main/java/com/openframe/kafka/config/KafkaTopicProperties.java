@@ -11,6 +11,8 @@ import lombok.Data;
 @ConfigurationProperties(prefix = "openframe.oss-tenant.kafka.topics")
 public class KafkaTopicProperties {
 
+    private boolean autoCreate = true;
+
     private Map<String, TopicConfig> inbound = new HashMap<>();
 
     @Data
