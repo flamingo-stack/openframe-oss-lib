@@ -40,7 +40,7 @@
     "sortedColumn": ["eventTimestamp"],
     "streamConfigs": {
       "streamType": "kafka",
-      "stream.kafka.topic.name": "${openframe.oss-tenant.kafka.topics.inbound.integrated-tool-events}",
+      "stream.kafka.topic.name": "${openframe.oss-tenant.kafka.topics.inbound.integrated-tool-events.name}",
       "stream.kafka.broker.list": "${spring.oss-tenant.kafka.bootstrap-servers}",
       "stream.kafka.consumer.type": "lowlevel",
       "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
