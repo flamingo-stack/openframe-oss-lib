@@ -91,7 +91,9 @@ export function getDynamicIcon(
   size: DynamicIconSize = 'md',
   className?: string
 ): React.ReactNode {
+
   if (!iconName) {
+    console.warn('[getDynamicIcon] No iconName provided, using Globe fallback');
     return <Globe className={SIZE_CLASSES[size]} />;
   }
 
@@ -107,7 +109,7 @@ export function getDynamicIcon(
   }
 
   // Fallback
-  console.warn(`[dynamic-icons] Icon not found in registry: ${iconName}. Add to ICON_REGISTRY in ui-kit/src/utils/dynamic-icons.tsx`);
+  console.error(`[getDynamicIcon] Icon NOT found in registry: "${iconName}". Available icons:`, Object.keys(ICON_REGISTRY));
   return <Globe className={finalClassName} />;
 }
 
