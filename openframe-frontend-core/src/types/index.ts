@@ -51,3 +51,5 @@ export * from './os.types'
 
 // Marketing types
 export * from './marketing'
+
+export * from './permissions'
