@@ -101,7 +101,10 @@ public class DebeziumService {
      */
     public void restartTask(String connectorName, int taskId) {
         String url = getDebeziumConnectorUrl(connectorName) + "/tasks/" + taskId + "/restart";
-        restTemplate.postForEntity(url, null, Void.class);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+        restTemplate.postForEntity(url, entity, Void.class);
         log.info("Restarted task {} for connector {}", taskId, connectorName);
     }
 
