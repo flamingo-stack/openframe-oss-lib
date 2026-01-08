@@ -13,6 +13,7 @@ import javax.annotation.PostConstruct;
 @Component
 @RequiredArgsConstructor
 @Slf4j
+@ConditionalOnProperty(name = "openframe.debezium.health-check.enabled", havingValue = "true")
 public class DebeziumHealthCheckScheduler {
 
     private final DebeziumService debeziumService;
