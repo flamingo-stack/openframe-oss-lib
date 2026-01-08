@@ -38,3 +38,4 @@ export * from './os-platform-selector'
 export { DynamicThemeProvider, useDynamicTheme } from '../providers/dynamic-theme-provider'
 // AI Enrich components
 export * from './ai-enrich'
+export * from './policy-configuration-panel'
