@@ -54,10 +54,11 @@ public class ToolInstallationNatsPublisher {
         message.setToolId(toolAgent.getToolId() == null ? "" : toolAgent.getToolId());
         message.setToolType(tool.getToolType() == null ? "" : tool.getToolType() );
 
-        message.setVersion(toolAgent.getVersion());
+        String version = toolAgent.getVersion();
+        message.setVersion(version);
         message.setSessionType(toolAgent.getSessionType());
-        message.setDownloadConfigurations(downloadConfigurationMapper.map(toolAgent.getDownloadConfigurations(), toolAgent.getVersion()));
-        message.setAssets(mapAssets(toolAgent.getAssets()));
+        message.setDownloadConfigurations(downloadConfigurationMapper.map(toolAgent.getDownloadConfigurations(), version));
+        message.setAssets(mapAssets(toolAgent.getAssets(), version));
         message.setInstallationCommandArgs(toolAgent.getInstallationCommandArgs());
         message.setUninstallationCommandArgs(toolAgent.getUninstallationCommandArgs());
         message.setRunCommandArgs(toolAgent.getRunCommandArgs());
@@ -66,22 +67,24 @@ public class ToolInstallationNatsPublisher {
         return message;
     }
 
-    private List<ToolInstallationMessage.Asset> mapAssets(List<ToolAgentAsset> assets) {
+    private List<ToolInstallationMessage.Asset> mapAssets(List<ToolAgentAsset> assets, String version) {
         if (assets == null) {
             return null;
         }
         return assets.stream()
-                .map(this::mapAsset)
+                .map(asset -> mapAsset(asset, version))
                 .collect(Collectors.toList());
     }
 
-    private ToolInstallationMessage.Asset mapAsset(ToolAgentAsset asset) {
+    private ToolInstallationMessage.Asset mapAsset(ToolAgentAsset asset, String version) {
         ToolInstallationMessage.Asset messageAsset = new ToolInstallationMessage.Asset();
         messageAsset.setId(asset.getId());
         messageAsset.setLocalFilename(asset.getLocalFilename());
         messageAsset.setSource(mapAssetSource(asset.getSource()));
         messageAsset.setPath(asset.getPath());
         messageAsset.setExecutable(asset.isExecutable());
+        messageAsset.setDownloadConfigurations(
+                downloadConfigurationMapper.map(asset.getDownloadConfigurations(), version));
         return messageAsset;
     }
 
@@ -92,6 +95,7 @@ public class ToolInstallationNatsPublisher {
         return switch (source) {
             case ARTIFACTORY -> ToolInstallationMessage.AssetSource.ARTIFACTORY;
             case TOOL_API -> ToolInstallationMessage.AssetSource.TOOL_API;
+            case GITHUB -> ToolInstallationMessage.AssetSource.GITHUB;
         };
     }
 

@@ -37,8 +37,22 @@
     {
       "id": "osqueryd",
       "localFilename": "osqueryd",
-      "source": "ARTIFACTORY",
-      "executable": true
+      "source": "GITHUB",
+      "executable": true,
+      "downloadConfigurations": [
+        {
+          "os": "windows",
+          "linkTemplate": "https://github.com/flamingo-stack/osquery/releases/download/{version}/osqueryd-windows-amd64.zip",
+          "fileName": "osqueryd-windows-amd64.zip",
+          "agentFileName": "osqueryd.exe"
+        },
+        {
+          "os": "macos",
+          "linkTemplate": "https://github.com/flamingo-stack/osquery/releases/download/{version}/osqueryd-macos-universal.tar.gz",
+          "fileName": "osqueryd-macos-universal.tar.gz",
+          "agentFileName": "osqueryd"
+        }
+      ]
     }
   ]
 }
