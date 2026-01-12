@@ -146,12 +146,9 @@ export function useCursorPaginationState(
         setHasLoadedBeyondFirst(true)
       }
 
-      // Call the initial load
-      onInitialLoad(search, cursor)
-
-      // Mark initial load as complete AFTER a microtask to ensure
-      // the onInitialLoad has started and refs are set
-      Promise.resolve().then(() => {
+      // Call the initial load and wait for it to complete before
+      // marking initial load as done (handles async onInitialLoad)
+      Promise.resolve(onInitialLoad(search, cursor)).finally(() => {
         isInitialLoadInProgress.current = false
         setInitialLoadCount(1)
       })

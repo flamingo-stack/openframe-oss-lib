@@ -332,8 +332,14 @@ export function useApiParams<TSchema extends ParamSchema>(
 
   // Helper to check if value is empty
   const isEmptyValue = (value: unknown): boolean => {
-    return value === undefined || value === null || value === '' ||
-      (Array.isArray(value) && value.length === 0)
+    if (value === undefined || value === null || value === '') {
+      return true
+    }
+    if (Array.isArray(value)) {
+      // Empty array or array with all empty/null/undefined values
+      return value.length === 0 || value.every(v => v === undefined || v === null || v === '')
+    }
+    return false
   }
 
   // Set a single parameter
