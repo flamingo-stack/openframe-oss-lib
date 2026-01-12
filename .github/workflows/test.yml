@@ -100,6 +100,11 @@ jobs:
         run: npm run type-check
         continue-on-error: true
 
+      - name: Test
+        if: steps.should_run.outputs.run == 'true'
+        working-directory: ${{ matrix.path }}
+        run: npm run test:run
+
       - name: Build
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
