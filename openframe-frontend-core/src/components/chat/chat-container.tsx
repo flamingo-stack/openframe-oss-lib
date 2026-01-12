@@ -148,7 +148,7 @@ const ChatFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDiv
       <div
         ref={ref}
         className={cn(
-          "w-full px-0 pb-0 pt-6 sm:px-0 flex-shrink-0",
+          "w-full px-0 pb-0 pt-2 sm:px-0 flex-shrink-0",
           className
         )}
         {...props}

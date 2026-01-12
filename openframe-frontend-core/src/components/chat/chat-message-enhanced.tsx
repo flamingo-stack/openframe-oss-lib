@@ -23,6 +23,7 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
   isTyping?: boolean
   timestamp?: Date
   showAvatar?: boolean
+  assistantType?: 'fae' | 'mingo'
 }
 
 function normalizeContent(content: MessageContent): MessageSegment[] {
@@ -33,15 +34,16 @@ function normalizeContent(content: MessageContent): MessageSegment[] {
 }
 
 const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>(
-  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, ...props }, ref) => {
+  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, ...props }, ref) => {
     const isUser = role === 'user'
     const isError = role === 'error'
 
     const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set())
     
     const getAvatarProps = () => {
-      const displayName = name || (isUser ? "User" : "Fae")
+      const displayName = name || (isUser ? "User" : assistantType === 'mingo' ? "Mingo" : "Fae")
       const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase()
+      const isMingo = assistantType === 'mingo'
       
       return {
         src: avatar || undefined,
@@ -53,6 +55,8 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           "flex-shrink-0 mt-1",
           isUser 
             ? "invisible"
+            : isMingo
+            ? "bg-gradient-to-br from-cyan-400 to-cyan-600"
             : "bg-gradient-to-br from-pink-400 to-pink-600"
         )
       }
@@ -81,7 +85,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       <div
         ref={ref}
         className={cn(
-          "flex flex-row items-start gap-4 py-3",
+          "flex flex-row items-start gap-4",
           !isUser && "bg-ods-card/50 rounded-lg px-4 -mx-4",
           className
         )}
@@ -101,9 +105,10 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           <div className="flex items-center justify-between pr-2">
             <span className={cn(
               "text-sm font-semibold text-[18px]",
-              isUser ? "text-ods-text-secondary" : "text-[var(--ods-flamingo-pink-base)]"
+              isUser ? "text-ods-text-secondary" : 
+              assistantType === 'mingo' ? "text-[var(--ods-flamingo-cyan-base)]" : "text-[var(--ods-flamingo-pink-base)]"
             )}>
-              {name || (isUser ? "User" : "Fae")}:
+              {name || (isUser ? "User" : assistantType === 'mingo' ? "Mingo" : "Fae")}:
             </span>
             {timestamp && (
               <span className="text-xs text-ods-text-muted text-[18px]">
@@ -113,7 +118,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           </div>
           
           {/* Message segments */}
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col">
             {isTyping && segments.length === 0 ? (
               <ChatTypingIndicator />
             ) : (
