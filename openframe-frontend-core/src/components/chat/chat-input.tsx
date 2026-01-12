@@ -4,16 +4,18 @@ import { useState, useRef, useImperativeHandle, forwardRef, useCallback, type Te
 import { cn } from "../../utils/cn"
 import { Send } from "lucide-react"
 import { Textarea } from "../ui/textarea"
+import { ChatTypingIndicator } from "./chat-typing-indicator"
 
 export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'onSubmit'> {
   onSend?: (message: string) => void
   sending?: boolean
+  awaitingResponse?: boolean
   reserveAvatarOffset?: boolean
   disabled?: boolean
 }
 
 const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
-  ({ className, onSend, sending = false, placeholder = "Enter your request here...", reserveAvatarOffset = true, disabled = false, ...props }, ref) => {
+  ({ className, onSend, sending = false, awaitingResponse = false, placeholder = "Enter your request here...", reserveAvatarOffset = true, disabled = false, ...props }, ref) => {
     const [value, setValue] = useState('')
     const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -47,6 +49,35 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       }
     }, [])
     
+    // Show awaiting response state
+    if (awaitingResponse) {
+      return (
+        <div
+          className={cn(
+            "mx-auto w-full max-w-3xl items-end gap-6",
+            reserveAvatarOffset ? "grid grid-cols-[32px_1fr]" : "grid grid-cols-[1fr]",
+            "flex-shrink-0",
+            className
+          )}
+        >
+          {reserveAvatarOffset && <div className="invisible h-8 w-8" aria-hidden />}
+          <div
+            className={cn(
+              "relative flex items-center justify-center gap-2",
+              "rounded-md bg-ods-card border border-ods-border",
+              "px-3 py-3",
+              "transition-colors",
+            )}
+          >
+            <ChatTypingIndicator size="sm" dotClassName="bg-ods-text-primary" />
+            <p className="font-['DM_Sans'] font-medium text-[18px] leading-[24px] text-ods-text-secondary">
+              Waiting for Technician Response
+            </p>
+          </div>
+        </div>
+      )
+    }
+
     return (
       <div
         className={cn(
@@ -60,7 +91,7 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         <div
           className={cn(
             "relative flex items-center gap-2",
-            "rounded-lg bg-ods-bg-card border border-ods-border",
+            "rounded-lg bg-ods-card border border-ods-border",
             "px-3 py-1.5",
             "transition-colors",
             "text-left text-ods-text-primary",

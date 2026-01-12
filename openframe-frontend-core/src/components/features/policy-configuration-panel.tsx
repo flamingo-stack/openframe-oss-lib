@@ -139,7 +139,7 @@ const CategorySection: React.FC<{
 
         {/* Category Info */}
         <div className="flex-1 flex flex-col">
-          <p className="sm:!test-sm font-medium text-ods-text-primary">
+          <p className="sm:!text-sm font-medium text-ods-text-primary">
             {category.name}
           </p>
           <p className="text-[14px] text-ods-text-secondary">

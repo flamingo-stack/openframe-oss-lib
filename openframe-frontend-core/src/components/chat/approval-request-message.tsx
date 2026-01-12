@@ -3,14 +3,13 @@
 import { forwardRef, HTMLAttributes, useState } from "react"
 import { cn } from "../../utils/cn"
 import { Button } from "../ui/button"
+import { StatusTag } from "../ui/status-tag"
 import { CheckCircle, XCircle } from "lucide-react"
-import { SimpleMarkdownRenderer } from "../ui/simple-markdown-renderer"
 
 export interface ApprovalRequestData {
   command: string
-  description?: string
-  risk?: 'low' | 'medium' | 'high'
-  details?: string[]
+  explanation?: string
+  icon?: React.ReactNode
   requestId?: string
 }
 
@@ -25,22 +24,22 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
   ({ className, data, onApprove, onReject, status = 'pending', ...props }, ref) => {
     const [isProcessing, setIsProcessing] = useState(false)
     
-    const handleApprove = async () => {
+    const handleApprove = () => {
       setIsProcessing(true)
       try {
         if (onApprove) {
-          await onApprove(data.requestId)
+          onApprove(data.requestId)
         }
       } finally {
         setIsProcessing(false)
       }
     }
     
-    const handleReject = async () => {
+    const handleReject = () => {
       setIsProcessing(true)
       try {
         if (onReject) {
-          await onReject(data.requestId)
+          onReject(data.requestId)
         }
       } finally {
         setIsProcessing(false)
@@ -52,26 +51,38 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
         <div
           ref={ref}
           className={cn(
-            "rounded-lg p-4 flex items-center gap-3",
-            "bg-ods-card border border-ods-border",
+            "bg-ods-card border border-ods-border rounded-md p-4 flex flex-col gap-4",
             className
           )}
           {...props}
         >
-          {status === 'approved' ? (
-            <CheckCircle className="w-5 h-5 text-ods-success flex-shrink-0" />
-          ) : (
-            <XCircle className="w-5 h-5 text-ods-error flex-shrink-0" />
-          )}
-          <div className="flex-1">
-            <p className={cn(
-              "text-xs font-medium text-ods-text-secondary mb-2 uppercase tracking-wider"
-            )}>
-              {status === 'approved' ? 'Approved' : 'Rejected'}
-            </p>
-            <p className="text-sm text-ods-text-secondary mt-1">
-              <code className="font-mono">{data.command}</code>
-            </p>
+          {/* Command and icon section */}
+          <div className="flex flex-col gap-1">
+            <div className="bg-ods-bg border border-ods-border rounded-md p-3 flex gap-2 items-start">
+              <code className="font-['DM_Sans'] font-medium text-sm text-ods-text-primary flex-1 leading-5">
+                {data.command}
+              </code>
+              {data.icon && (
+                <div className="w-4 h-4 shrink-0 text-ods-text-tertiary">
+                  {data.icon}
+                </div>
+              )}
+            </div>
+            
+            {data.explanation && (
+              <p className="font-['DM_Sans'] font-medium text-sm text-ods-text-secondary leading-5">
+                {data.explanation}
+              </p>
+            )}
+          </div>
+          
+          {/* Status indicator */}
+          <div className="flex">
+            <StatusTag
+              label={status === 'approved' ? 'Approved' : 'Rejected'}
+              variant={status === 'approved' ? 'success' : 'error'}
+              leftIcon={status === 'approved' ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+            />
           </div>
         </div>
       )
@@ -80,28 +91,57 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
     return (
       <div
         ref={ref}
-        className={cn("flex flex-col gap-2", className)}
+        className={cn(
+          "bg-ods-card border border-ods-border rounded-md p-4 flex flex-col gap-4",
+          className
+        )}
         {...props}
       >
-        <SimpleMarkdownRenderer content={`Would you like me to run: \`${data.command}\`?`}/>
+        {/* Command and icon section */}
+        <div className="flex flex-col gap-1">
+          <div className="bg-ods-bg border border-ods-border rounded-md p-3 flex gap-2 items-start">
+            <code className="font-['DM_Sans'] font-medium text-sm text-ods-text-primary flex-1 leading-5">
+              {data.command}
+            </code>
+            {data.icon && (
+              <div className="w-4 h-4 shrink-0 text-ods-text-tertiary">
+                {data.icon}
+              </div>
+            )}
+          </div>
+          
+          {data.explanation && (
+            <p className="font-['DM_Sans'] font-medium text-sm text-ods-text-secondary leading-5">
+              {data.explanation}
+            </p>
+          )}
+        </div>
         
-        {/* approve/reject buttons */}
-        <div className="flex gap-2">
+        {/* Approve/Reject buttons */}
+        <div className="flex gap-4 items-center">
           <Button
             size="sm"
-            variant="ghost"
+            variant="primary"
             onClick={handleApprove}
             disabled={isProcessing}
-            className="!h-8 !px-2 !py-0 bg-ods-card border border-ods-border !text-[14px] font-medium text-ods-text-primary uppercase tracking-wider hover:bg-ods-bg-hover"
+            className={cn(
+              "bg-ods-accent hover:bg-ods-accent/90",
+              "font-['Azeret_Mono'] font-medium sm:!text-sm text-ods-bg uppercase tracking-[-0.28px]",
+              "px-2 py-1 h-auto"
+            )}
           >
             Approve
           </Button>
           <Button
             size="sm"
-            variant="ghost"
+            variant="outline"
             onClick={handleReject}
             disabled={isProcessing}
-            className="!h-8 !px-2 !py-0 bg-ods-card border border-ods-border !text-[14px] font-medium text-ods-text-primary uppercase tracking-wider hover:bg-ods-bg-hover"
+            className={cn(
+              "bg-ods-bg-secondary border-ods-border",
+              "font-['Azeret_Mono'] font-medium sm:!text-sm text-ods-text-primary uppercase tracking-[-0.28px]",
+              "hover:bg-ods-bg px-2 py-1 h-auto"
+            )}
           >
             Reject
           </Button>

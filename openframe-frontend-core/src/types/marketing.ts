@@ -12,11 +12,15 @@
 export interface MarketingCampaign {
   id: number;
   name: string;
-  description: string | null;
+  description: string | null;  // Optional - ONLY used for blog_post + new mode
   platform: string;
   start_date: string | null;
   end_date: string | null;
-  goals: string[] | null;
+  goals: string[] | null;  // Optional - ONLY used for blog_post + new mode
+  // NEW: Content seed fields
+  content_source_type?: 'product_release' | 'blog_post' | 'case_study' | null;
+  content_source_id?: number | null;
+  content_source_url?: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -24,16 +28,24 @@ export interface MarketingCampaign {
 
 export interface CreateCampaignInput {
   name: string;
-  description?: string;
+  description?: string;  // Optional - ONLY for blog_post + new mode
   start_date?: string;
-  goals?: string[];
+  goals?: string[];  // Optional - ONLY for blog_post + new mode
+  // NEW: Content seed fields
+  content_source_type?: 'product_release' | 'blog_post' | 'case_study';
+  content_source_id?: number;
+  content_source_url?: string;
 }
 
 export interface UpdateCampaignInput {
   name?: string;
-  description?: string;
+  description?: string;  // Optional - ONLY for blog_post + new mode
   start_date?: string;
-  goals?: string[];
+  goals?: string[];  // Optional - ONLY for blog_post + new mode
+  // NEW: Content seed fields
+  content_source_type?: 'product_release' | 'blog_post' | 'case_study' | null;
+  content_source_id?: number | null;
+  content_source_url?: string | null;
 }
 
 // =============================================================================
@@ -67,6 +79,8 @@ export interface AIContent {
   override_url: string | null;
   override_at: string | null;
   override_by: string | null;
+  // NEW: URL injection preference (per-item control)
+  url_injection_preference?: 'none' | 'in_post' | 'as_comment';
 }
 
 export interface CreateAIContentInput {
@@ -306,4 +320,20 @@ export interface CampaignWithDetails {
   campaign: MarketingCampaign;
   content: AIContent[];
   media: AIMedia[];
+}
+
+// =============================================================================
+// Content Source Types (NEW)
+// =============================================================================
+
+export type ContentSourceType = 'product_release' | 'blog_post' | 'case_study';
+export type URLInjectionPreference = 'none' | 'in_post' | 'as_comment';
+
+export interface ContentSourceOption {
+  id: number;
+  type: ContentSourceType;
+  title: string;
+  summary?: string;
+  url?: string;
+  published_at?: string;
 }
