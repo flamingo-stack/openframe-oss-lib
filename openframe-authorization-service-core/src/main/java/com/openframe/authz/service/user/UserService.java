@@ -189,4 +189,18 @@ public class UserService {
             userRepository.save(user);
         });
     }
+
+    /**
+     * Mark user's email as verified.
+     */
+    public void markEmailVerified(String userId) {
+        if (userId == null || userId.isBlank()) {
+            return;
+        }
+        userRepository.findById(userId).ifPresent(user -> {
+            user.setEmailVerified(true);
+            user.setUpdatedAt(now());
+            userRepository.save(user);
+        });
+    }
 }

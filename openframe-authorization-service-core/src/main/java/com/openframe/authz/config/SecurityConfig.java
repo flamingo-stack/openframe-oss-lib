@@ -1,6 +1,7 @@
 package com.openframe.authz.config;
 
 import com.openframe.authz.config.tenant.TenantContext;
+import com.openframe.authz.security.AuthSuccessHandler;
 import com.openframe.authz.security.SsoAuthorizationRequestResolver;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.service.policy.GlobalDomainPolicyLookup;
@@ -62,7 +63,7 @@ public class SecurityConfig {
     @Order(2)
     public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http,
                                                           OAuth2UserService<OidcUserRequest, OidcUser> oidcUserService,
-                                                          com.openframe.authz.security.AuthSuccessHandler authSuccessHandler,
+                                                          AuthSuccessHandler authSuccessHandler,
                                                           ClientRegistrationRepository clientRegistrationRepository,
                                                           SsoCookieCodec ssoCookieCodec) throws Exception {
         return http
@@ -74,6 +75,7 @@ public class SecurityConfig {
                                 "/oauth/**",
                                 "/invitations/**",
                                 "/password-reset/**",
+                                "/email/verify",
                                 "/oauth2/**",
                                 "/login",
                                 "/favicon.ico",
