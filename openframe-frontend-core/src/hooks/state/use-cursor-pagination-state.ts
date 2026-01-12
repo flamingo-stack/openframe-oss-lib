@@ -6,8 +6,8 @@
  * - Debounced search input
  * - hasLoadedBeyondFirst tracking
  * - Initial load detection
- * - Search/filter change detection
- * - Pagination handlers (next, reset, filter change)
+ * - Search change detection
+ * - Pagination handlers (next, reset)
  *
  * This eliminates ~60-80 lines of boilerplate from each paginated component.
  *
@@ -17,29 +17,16 @@
  *   hasLoadedBeyondFirst,
  *   handleNextPage, handleResetToFirstPage
  * } = useCursorPaginationState({
- *   paramPrefix: 'current',
  *   onInitialLoad: (search, cursor) => fetchDialogs(false, search, true, cursor),
  *   onSearchChange: (search) => fetchDialogs(false, search)
  * })
  */
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { useApiParams, type ParamSchema } from './use-api-params'
-import { useDebounce } from '../ui/use-debounce'
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useDebounce } from '../ui/use-debounce';
+import { useApiParams, type UseApiParamsReturn } from './use-api-params';
 
 export interface UseCursorPaginationStateOptions {
-  /**
-   * URL param prefix for tabs (e.g., 'current' → currentSearch, currentCursor)
-   * If empty string, uses 'search' and 'cursor' directly
-   */
-  paramPrefix?: string
-
-  /**
-   * Additional filter params schema
-   * Keys will be prefixed if paramPrefix is set
-   */
-  filterSchema?: Record<string, { type: 'string' | 'array'; default: string | string[] }>
-
   /**
    * Debounce delay for search input (default: 300ms)
    */
@@ -56,13 +43,17 @@ export interface UseCursorPaginationStateOptions {
    * Called after URL is updated, cursor is already reset
    */
   onSearchChange: (search: string) => void | Promise<unknown>
-
-  /**
-   * Callback when filters change
-   * Called after URL is updated, cursor is already reset
-   */
-  onFiltersChange?: (filters: Record<string, any>) => void | Promise<unknown>
 }
+
+const urlSchema = {
+  search: { type: 'string' as const, default: '' },
+  cursor: { type: 'string' as const, default: '' },
+}
+
+type ApiParamsReturn = UseApiParamsReturn<typeof urlSchema>
+
+/** Pagination params managed by this hook */
+export type PaginationParams = ApiParamsReturn['params']
 
 export interface CursorPaginationStateReturn {
   // Search
@@ -77,56 +68,25 @@ export interface CursorPaginationStateReturn {
   handleNextPage: (endCursor: string, fetchFn: () => Promise<unknown>) => Promise<void>
   handleResetToFirstPage: (fetchFn: () => Promise<unknown>) => Promise<void>
 
-  // Filter handler
-  handleFilterChange: (columnFilters: Record<string, any[]>) => void
-
   // URL params access (for advanced use cases)
-  params: Record<string, any>
-  setParam: (key: string, value: any) => void
-  setParams: (updates: Record<string, any>) => void
-
-  // Key names (for consumers who need to know the actual param names)
-  searchKey: string
-  cursorKey: string
+  params: PaginationParams
+  setParam: ApiParamsReturn['setParam']
+  setParams: ApiParamsReturn['setParams']
 }
 
 export function useCursorPaginationState(
   options: UseCursorPaginationStateOptions
 ): CursorPaginationStateReturn {
   const {
-    paramPrefix = '',
-    filterSchema = {},
     debounceMs = 300,
     onInitialLoad,
     onSearchChange,
-    onFiltersChange
   } = options
-
-  // Build URL schema with prefix
-  const prefix = paramPrefix ? `${paramPrefix}` : ''
-  const searchKey = prefix ? `${prefix}Search` : 'search'
-  const cursorKey = prefix ? `${prefix}Cursor` : 'cursor'
-
-  // Build the complete URL schema
-  const urlSchema = useMemo(() => {
-    const schema: ParamSchema = {
-      [searchKey]: { type: 'string', default: '' },
-      [cursorKey]: { type: 'string', default: '' }
-    }
-
-    // Add filter params with prefix
-    for (const [key, value] of Object.entries(filterSchema)) {
-      const prefixedKey = prefix ? `${prefix}${key.charAt(0).toUpperCase()}${key.slice(1)}` : key
-      schema[prefixedKey] = value
-    }
-
-    return schema
-  }, [searchKey, cursorKey, prefix, filterSchema])
 
   const { params, setParam, setParams } = useApiParams(urlSchema)
 
   // Local search input with debounce
-  const [searchInput, setSearchInput] = useState(params[searchKey] || '')
+  const [searchInput, setSearchInput] = useState(params.search || '')
   const debouncedSearch = useDebounce(searchInput, debounceMs)
 
   // Pagination tracking
@@ -135,7 +95,6 @@ export function useCursorPaginationState(
   const [initialLoadCount, setInitialLoadCount] = useState(0)
   // Initialize to null to distinguish "never set" from "set to empty string"
   const lastSearchRef = useRef<string | null>(null)
-  const lastFiltersRef = useRef<string | null>(null)
   // Track if we're syncing from URL to prevent loops
   const isSyncingFromUrl = useRef(false)
   // Track if initial load is in progress to block ALL other effects
@@ -147,7 +106,7 @@ export function useCursorPaginationState(
     // Block during initial load
     if (isInitialLoadInProgress.current) return
 
-    const urlSearch = params[searchKey] || ''
+    const urlSearch = params.search || ''
     // Only sync if URL differs from current input
     if (urlSearch !== searchInput) {
       isSyncingFromUrl.current = true
@@ -156,7 +115,7 @@ export function useCursorPaginationState(
       setTimeout(() => { isSyncingFromUrl.current = false }, 0)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params[searchKey], searchKey, initialLoadCount]) // Add initialLoadCount to re-run after initial load
+  }, [params.search, initialLoadCount]) // Add initialLoadCount to re-run after initial load
 
   // Sync debounced search to URL, reset cursor when search changes
   useEffect(() => {
@@ -165,19 +124,19 @@ export function useCursorPaginationState(
     // Skip if we're syncing from URL to prevent loops
     if (isSyncingFromUrl.current) return
 
-    if (debouncedSearch !== params[searchKey]) {
+    if (debouncedSearch !== params.search) {
       setParams({
-        [searchKey]: debouncedSearch,
-        [cursorKey]: '' // Reset cursor when search changes
+        search: debouncedSearch,
+        cursor: '' // Reset cursor when search changes
       })
     }
-  }, [debouncedSearch, params, searchKey, cursorKey, setParams, initialLoadCount])
+  }, [debouncedSearch, params.search, setParams, initialLoadCount])
 
   // Initial load effect - runs once and blocks all other effects until complete
   useEffect(() => {
     if (initialLoadCount === 0) {
-      const cursor = params[cursorKey] || null
-      const search = params[searchKey] || ''
+      const cursor = params.cursor || null
+      const search = params.search || ''
 
       // Set all refs BEFORE calling onInitialLoad
       lastSearchRef.current = search
@@ -206,7 +165,7 @@ export function useCursorPaginationState(
     if (isInitialLoadInProgress.current) return
     if (initialLoadCount === 0) return
 
-    const currentSearch = params[searchKey] || ''
+    const currentSearch = params.search || ''
     // Only trigger search change if:
     // 1. lastSearchRef has been set (not null - means initial load happened)
     // 2. The search actually changed
@@ -215,64 +174,25 @@ export function useCursorPaginationState(
       setHasLoadedBeyondFirst(false)
       onSearchChange(currentSearch)
     }
-  }, [params, searchKey, onSearchChange, initialLoadCount])
-
-  // Filter change detection (if filters provided)
-  const filtersKey = useMemo(() => {
-    if (!Object.keys(filterSchema).length) return null
-
-    const filterValues: Record<string, any> = {}
-    for (const key of Object.keys(filterSchema)) {
-      const prefixedKey = prefix ? `${prefix}${key.charAt(0).toUpperCase()}${key.slice(1)}` : key
-      filterValues[key] = params[prefixedKey]
-    }
-    return JSON.stringify(filterValues)
-  }, [params, filterSchema, prefix])
-
-  useEffect(() => {
-    // Block during initial load
-    if (isInitialLoadInProgress.current) return
-    if (initialLoadCount === 0) return
-
-    if (filtersKey && onFiltersChange) {
-      if (lastFiltersRef.current !== null && lastFiltersRef.current !== filtersKey) {
-        setHasLoadedBeyondFirst(false)
-        onFiltersChange(JSON.parse(filtersKey))
-      }
-      lastFiltersRef.current = filtersKey
-    }
-  }, [filtersKey, onFiltersChange, initialLoadCount])
+  }, [params.search, onSearchChange, initialLoadCount])
 
   // Pagination handlers
   const handleNextPage = useCallback(
     async (endCursor: string, fetchFn: () => Promise<unknown>) => {
-      setParam(cursorKey, endCursor)
+      setParam('cursor', endCursor)
       await fetchFn()
       setHasLoadedBeyondFirst(true)
     },
-    [cursorKey, setParam]
+    [setParam]
   )
 
   const handleResetToFirstPage = useCallback(
     async (fetchFn: () => Promise<unknown>) => {
-      setParam(cursorKey, '')
+      setParam('cursor', '')
       await fetchFn()
       setHasLoadedBeyondFirst(false)
     },
-    [cursorKey, setParam]
-  )
-
-  const handleFilterChange = useCallback(
-    (columnFilters: Record<string, any[]>) => {
-      const updates: Record<string, any> = { [cursorKey]: '' }
-      for (const [key, value] of Object.entries(columnFilters)) {
-        const prefixedKey = prefix ? `${prefix}${key.charAt(0).toUpperCase()}${key.slice(1)}` : key
-        updates[prefixedKey] = value
-      }
-      setParams(updates)
-      setHasLoadedBeyondFirst(false)
-    },
-    [cursorKey, prefix, setParams]
+    [setParam]
   )
 
   return {
@@ -282,11 +202,8 @@ export function useCursorPaginationState(
     setHasLoadedBeyondFirst,
     handleNextPage,
     handleResetToFirstPage,
-    handleFilterChange,
     params,
     setParam,
     setParams,
-    searchKey,
-    cursorKey
   }
 }
