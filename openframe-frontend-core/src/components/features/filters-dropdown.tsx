@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useState, useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { cn } from "../../utils/cn"
 
 // Types for filter configuration
@@ -270,9 +270,8 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
       defaults[section.id] = section.defaultSelected || []
     })
     setSelectedFilters(defaults)
-    if (onReset) {
-      onReset()
-    }
+    onReset?.()
+    setIsOpen(false)
   }
 
   const handleApply = () => {
