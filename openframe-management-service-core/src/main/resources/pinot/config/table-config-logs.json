@@ -1,5 +1,5 @@
 {
-  "tableName": "logs",
+  "tableName": "${pinot.tables.logs.name}",
   "tableType": "REALTIME",
   "segmentsConfig": {
     "timeColumnName": "eventTimestamp",
