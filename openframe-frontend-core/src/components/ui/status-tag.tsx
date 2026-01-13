@@ -6,13 +6,17 @@ export interface StatusTagProps {
   variant?: 'success' | 'warning' | 'error' | 'critical' | 'info' | 'active' | 'inactive' | 'offline'
   isMobile?: boolean
   className?: string
+  leftIcon?: React.ReactNode
+  rightIcon?: React.ReactNode
 }
 
 export function StatusTag({ 
   label, 
   variant = 'success', 
   isMobile = false, 
-  className 
+  className,
+  leftIcon,
+  rightIcon
 }: StatusTagProps) {
   const variantStyles = {
     success: 'bg-[#2e461f] text-[#5ea62e]',
@@ -28,15 +32,26 @@ export function StatusTag({
   return (
     <div className={cn(
       "inline-flex items-center justify-center rounded-[6px] h-8 px-2",
+      (leftIcon || rightIcon) && "gap-1.5",
       variantStyles[variant] || variantStyles.info,
       className
     )}>
+      {leftIcon && (
+        <span className="flex items-center justify-center w-4 h-4">
+          {leftIcon}
+        </span>
+      )}
       <span className={cn(
         "font-['Azeret_Mono'] font-medium tracking-[-0.28px] uppercase",
         isMobile ? "text-[12px] leading-[16px] tracking-[-0.24px]" : "text-[14px] leading-[20px]"
       )}>
         {label}
       </span>
+      {rightIcon && (
+        <span className="flex items-center justify-center w-4 h-4">
+          {rightIcon}
+        </span>
+      )}
     </div>
   )
 }

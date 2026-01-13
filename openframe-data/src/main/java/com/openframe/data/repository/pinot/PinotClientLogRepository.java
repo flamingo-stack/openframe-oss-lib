@@ -27,7 +27,7 @@ public class PinotClientLogRepository implements PinotLogRepository {
 
     private final Connection pinotConnection;
 
-    @Value("${pinot.logs.table:logs}")
+    @Value("${pinot.tables.logs.name:logs}")
     private String logsTable;
 
     public PinotClientLogRepository(@Qualifier("pinotBrokerConnection") Connection pinotConnection) {
