@@ -16,7 +16,7 @@ public class PinotClientDeviceRepository implements PinotDeviceRepository {
 
     private final Connection pinotConnection;
 
-    @Value("${pinot.devices.table:devices}")
+    @Value("${pinot.tables.devices.name:devices}")
     private String devicesTable;
 
     public PinotClientDeviceRepository(@Qualifier("pinotBrokerConnection") Connection pinotConnection) {
