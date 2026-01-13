@@ -12,13 +12,13 @@
 export interface MarketingCampaign {
   id: number;
   name: string;
-  description: string | null;  // Optional - ONLY used for blog_post + new mode
+  description: string | null;  // Optional - ONLY used for blog_post + new mode OR from_scratch
   platform: string;
   start_date: string | null;
   end_date: string | null;
-  goals: string[] | null;  // Optional - ONLY used for blog_post + new mode
+  goals: string[] | null;  // Optional - ONLY used for blog_post + new mode OR from_scratch
   // NEW: Content seed fields
-  content_source_type?: 'product_release' | 'blog_post' | 'case_study' | null;
+  content_source_type?: 'product_release' | 'blog_post' | 'case_study' | 'from_scratch' | null;
   content_source_id?: number | null;
   content_source_url?: string | null;
   created_by: string;
@@ -28,22 +28,22 @@ export interface MarketingCampaign {
 
 export interface CreateCampaignInput {
   name: string;
-  description?: string;  // Optional - ONLY for blog_post + new mode
+  description?: string;  // Optional - ONLY for blog_post + new mode OR from_scratch
   start_date?: string;
-  goals?: string[];  // Optional - ONLY for blog_post + new mode
+  goals?: string[];  // Optional - ONLY for blog_post + new mode OR from_scratch
   // NEW: Content seed fields
-  content_source_type?: 'product_release' | 'blog_post' | 'case_study';
+  content_source_type?: 'product_release' | 'blog_post' | 'case_study' | 'from_scratch';
   content_source_id?: number;
   content_source_url?: string;
 }
 
 export interface UpdateCampaignInput {
   name?: string;
-  description?: string;  // Optional - ONLY for blog_post + new mode
+  description?: string;  // Optional - ONLY for blog_post + new mode OR from_scratch
   start_date?: string;
-  goals?: string[];  // Optional - ONLY for blog_post + new mode
+  goals?: string[];  // Optional - ONLY for blog_post + new mode OR from_scratch
   // NEW: Content seed fields
-  content_source_type?: 'product_release' | 'blog_post' | 'case_study' | null;
+  content_source_type?: 'product_release' | 'blog_post' | 'case_study' | 'from_scratch' | null;
   content_source_id?: number | null;
   content_source_url?: string | null;
 }
@@ -326,7 +326,7 @@ export interface CampaignWithDetails {
 // Content Source Types (NEW)
 // =============================================================================
 
-export type ContentSourceType = 'product_release' | 'blog_post' | 'case_study';
+export type ContentSourceType = 'product_release' | 'blog_post' | 'case_study' | 'from_scratch';
 export type URLInjectionPreference = 'none' | 'in_post' | 'as_comment';
 
 export interface ContentSourceOption {
