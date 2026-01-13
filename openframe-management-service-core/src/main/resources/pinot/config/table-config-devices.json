@@ -1,5 +1,5 @@
 {
-  "tableName": "devices",
+  "tableName": "${pinot.tables.devices.name}",
   "tableType": "REALTIME",
   "segmentsConfig": {
     "timeColumnName": "ingestionTime",
