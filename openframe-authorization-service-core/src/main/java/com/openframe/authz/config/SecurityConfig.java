@@ -75,7 +75,7 @@ public class SecurityConfig {
                                 "/oauth/**",
                                 "/invitations/**",
                                 "/password-reset/**",
-                                "/email/verify",
+                                "/email/verify/**",
                                 "/oauth2/**",
                                 "/login",
                                 "/favicon.ico",
