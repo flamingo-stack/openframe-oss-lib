@@ -10,5 +10,6 @@ import lombok.NoArgsConstructor;
 public class PinotConfig {
     private String name;
     private String schemaFile;
-    private String tableConfigFile;
-} 
+    private String tableRealtimeConfigFile;
+    private String tableOfflineConfigFile;
+}

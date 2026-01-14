@@ -7,11 +7,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.event.EventListener;
 import org.springframework.core.env.Environment;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
@@ -50,8 +49,8 @@ public class PinotConfigInitializer {
     private long retryDelayMs;
 
     private static final List<PinotConfig> PINOT_CONFIGS = Arrays.asList(
-            new PinotConfig("devices", "schema-devices.json", "table-config-devices.json"),
-            new PinotConfig("logs","schema-logs.json","table-config-logs.json")
+            new PinotConfig("devices", "schema-devices.json", "table-config-devices.json", null),
+            new PinotConfig("logs","schema-logs.json","table-config-logs-realtime.json", "table-config-logs-offline.json")
     );
 
     public PinotConfigInitializer(ResourceLoader resourceLoader, Environment environment) {
@@ -61,7 +60,7 @@ public class PinotConfigInitializer {
         this.objectMapper = new ObjectMapper();
     }
 
-    @EventListener(ApplicationReadyEvent.class)
+    @PostConstruct
     public void init() {
         if (!pinotConfigEnabled) {
             log.info("Pinot configuration deployment is disabled");
@@ -85,11 +84,18 @@ public class PinotConfigInitializer {
         log.info("Deploying Pinot configuration for: {}", config.getName());
 
         try {
-            String schemaConfig = loadResource(config.getSchemaFile());
-            String tableConfig = resolvePlaceholders(loadResource(config.getTableConfigFile()));
+            String schemaConfig = resolvePlaceholders(loadResource(config.getSchemaFile()));
+            String realtimeTableConfig = resolvePlaceholders(loadResource(config.getTableRealtimeConfigFile()));
 
             deployWithRetry(() -> deploySchema(schemaConfig), "schema for " + config.getName());
-            deployWithRetry(() -> deployTableConfig(tableConfig, config.getName()), "table config for " + config.getName());
+            deployWithRetry(() -> deployTableConfig(realtimeTableConfig, config.getName()), "realtime table config for " + config.getName());
+
+
+            if (config.getTableOfflineConfigFile() != null) {
+                String offlineTableConfig = resolvePlaceholders(loadResource(config.getTableOfflineConfigFile()));
+                deployWithRetry(() -> deployTableConfig(offlineTableConfig, config.getName()), "offline table config for " + config.getName());
+
+            }
 
             log.info("Successfully deployed Pinot configuration for: {}", config.getName());
 
@@ -175,7 +181,9 @@ public class PinotConfigInitializer {
     private void deployTableConfig(String tableConfig, String configName) {
         try {
             JsonNode tableConfigJson = objectMapper.readTree(tableConfig);
-            String tableName = tableConfigJson.get("tableName").asText() + "_REALTIME";
+            String baseTableName = tableConfigJson.get("tableName").asText();
+            String tableType = tableConfigJson.get("tableType").asText();
+            String tableName = baseTableName + ("REALTIME".equalsIgnoreCase(tableType) ? "_REALTIME" : "_OFFLINE");
 
             String updateUrl = String.format("http://%s/tables/%s", pinotControllerUrl, tableName);
             String createUrl = String.format("http://%s/tables", pinotControllerUrl);

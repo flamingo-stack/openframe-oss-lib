@@ -1,5 +1,5 @@
 {
-  "schemaName": "devices",
+  "schemaName": "${pinot.tables.devices.name}",
   "primaryKeyColumns": ["machineId"],
   "dimensionFieldSpecs": [
     {
