@@ -21,6 +21,7 @@ export interface MarketingCampaign {
   content_source_type?: 'product_release' | 'blog_post' | 'case_study' | 'from_scratch' | null;
   content_source_id?: number | null;
   content_source_url?: string | null;
+  future_blog_social_account_id?: number | null;  // For blog_post + new mode - target account for AI-generated blog
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -35,6 +36,7 @@ export interface CreateCampaignInput {
   content_source_type?: 'product_release' | 'blog_post' | 'case_study' | 'from_scratch';
   content_source_id?: number;
   content_source_url?: string;
+  future_blog_social_account_id?: number;  // For blog_post + new mode - target account for AI-generated blog
 }
 
 export interface UpdateCampaignInput {
@@ -46,6 +48,7 @@ export interface UpdateCampaignInput {
   content_source_type?: 'product_release' | 'blog_post' | 'case_study' | 'from_scratch' | null;
   content_source_id?: number | null;
   content_source_url?: string | null;
+  future_blog_social_account_id?: number | null;  // For blog_post + new mode - target account for AI-generated blog
 }
 
 // =============================================================================
