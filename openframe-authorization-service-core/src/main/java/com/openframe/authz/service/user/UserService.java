@@ -59,6 +59,21 @@ public class UserService {
                 .orElseGet(() -> createUser(tenantId, email, firstName, lastName, password, roles));
     }
 
+    /**
+     * Register a user via invitation.
+     * Invitation acceptance implies control of the invited email address, so the created/reactivated user is verified.
+     */
+    public AuthUser registerUserFromInvitation(String tenantId,
+                                              String email,
+                                              String firstName,
+                                              String lastName,
+                                              String password,
+                                              List<UserRole> roles) {
+        AuthUser user = registerUser(tenantId, email, firstName, lastName, password, roles);
+        user.setEmailVerified(true);
+        return userRepository.save(user);
+    }
+
     public void deactivateUser(AuthUser user) {
         user.setStatus(DELETED);
         userRepository.save(user);
@@ -74,7 +89,6 @@ public class UserService {
         user.setPasswordHash(passwordEncoder.encode(rawPassword));
         user.setRoles(roles);
         user.setStatus(ACTIVE);
-        user.setUpdatedAt(now());
         return userRepository.save(user);
     }
 
@@ -126,7 +140,6 @@ public class UserService {
                     if (u.getStatus() == ACTIVE) {
                         u.setEmailVerified(true);
                         u.setLoginProvider(providerRegistrationId);
-                        u.setUpdatedAt(now());
                         return userRepository.save(u);
                     }
                     return reactivateUserFromSso(u, firstName, lastName, roles, providerRegistrationId);
@@ -147,7 +160,6 @@ public class UserService {
         user.setStatus(ACTIVE);
         user.setEmailVerified(true);
         user.setLoginProvider(providerRegistrationId);
-        user.setUpdatedAt(now());
         return userRepository.save(user);
     }
 
@@ -185,7 +197,6 @@ public class UserService {
         String normalized = email.trim().toLowerCase(Locale.ROOT);
         userRepository.findByEmailAndTenantId(normalized, tenantId).ifPresent(user -> {
             user.setLastLogin(Instant.now());
-            user.setUpdatedAt(now());
             userRepository.save(user);
         });
     }
@@ -199,7 +210,6 @@ public class UserService {
         }
         userRepository.findById(userId).ifPresent(user -> {
             user.setEmailVerified(true);
-            user.setUpdatedAt(now());
             userRepository.save(user);
         });
     }
