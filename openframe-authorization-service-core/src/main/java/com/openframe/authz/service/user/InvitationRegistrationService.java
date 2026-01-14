@@ -38,9 +38,11 @@ public class InvitationRegistrationService {
 
         var existing = userService.findActiveByEmail(invitation.getEmail());
         if (existing.isPresent()) {
-            AuthUser completed = handleExistingActiveUser(existing.get(), targetTenantId, invitation, request);
-            if (completed != null) {
-                return completed;
+            AuthUser reuse = handleExistingActiveUser(existing.get(), targetTenantId, invitation, request);
+            if (reuse != null) {
+                markVerifiedQuietly(reuse);
+                acceptInvitation(invitation, reuse, request);
+                return reuse;
             }
         }
 
@@ -67,7 +69,6 @@ public class InvitationRegistrationService {
                                               AuthInvitation invitation,
                                               InvitationRegistrationRequest request) {
         if (targetTenantId.equals(current.getTenantId())) {
-            acceptInvitation(invitation, current, request);
             return current;
         }
         if (TRUE.equals(request.getSwitchTenant())) {
@@ -81,7 +82,7 @@ public class InvitationRegistrationService {
     private AuthUser createUserForInvitation(String targetTenantId,
                                              AuthInvitation invitation,
                                              InvitationRegistrationRequest request) {
-        return userService.registerUser(
+        return userService.registerUserFromInvitation(
                 targetTenantId,
                 invitation.getEmail(),
                 request.getFirstName(),
@@ -95,6 +96,14 @@ public class InvitationRegistrationService {
         invitation.setStatus(ACCEPTED);
         invitationRepository.save(invitation);
         registrationProcessor.postProcessInvitationRegistration(user, invitation.getId(), request);
+    }
+
+    private void markVerifiedQuietly(AuthUser user) {
+        try {
+            userService.markEmailVerified(user.getId());
+        } catch (Exception ignored) {
+            // Do not block invitation acceptance if verification update fails
+        }
     }
 }
 

@@ -30,6 +30,9 @@ public class HubspotApiEmailService implements EmailService {
     @Value("${openframe.password-reset.link-template:}")
     private String resetLinkTemplate;
 
+    @Value("${openframe.email-verify.link-template:}")
+    private String verifyLinkTemplate;
+
     @Value("${openframe.mail.hubspot.access-token}")
     private String accessToken;
 
@@ -38,6 +41,9 @@ public class HubspotApiEmailService implements EmailService {
 
     @Value("${openframe.mail.hubspot.reset-email-id:}")
     private String resetEmailId;
+
+    @Value("${openframe.mail.hubspot.verify-email-id:}")
+    private String verifyEmailId;
 
     @Value("${openframe.mail.hubspot.base-url}")
     private String baseUrl;
@@ -57,6 +63,12 @@ public class HubspotApiEmailService implements EmailService {
     public void sendPasswordResetEmail(String toEmail, String resetToken) {
         String link = resetLinkTemplate.replace("{token}", resetToken);
         sendWithTemplate(resetEmailId, toEmail, "Reset your OpenFrame password", link, "Password reset");
+    }
+
+    @Override
+    public void sendEmailVerificationEmail(String toEmail, String verifyToken) {
+        String link = verifyLinkTemplate.replace("{token}", verifyToken);
+        sendWithTemplate(verifyEmailId, toEmail, "Verify your email and continue", link, "Email verification");
     }
 
     private void sendWithTemplate(String emailTemplateId, String toEmail, String subject, String link, String debugContext) {

@@ -1,5 +1,7 @@
 package com.openframe.api.service.user;
 
+import com.openframe.api.dto.user.UpdateUserRequest;
+import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.dto.user.UserPageResponse;
 import com.openframe.api.exception.OperationNotAllowedException;
 import com.openframe.api.exception.UserSelfDeleteNotAllowedException;
@@ -51,6 +53,27 @@ public class UserService {
         return response;
     }
 
+    public UserResponse getUserById(String id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + id));
+        return userMapper.toResponse(user);
+    }
+
+    public UserResponse updateUser(String id, UpdateUserRequest request) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + id));
+
+        if (request.getFirstName() != null) {
+            user.setFirstName(request.getFirstName());
+        }
+        if (request.getLastName() != null) {
+            user.setLastName(request.getLastName());
+        }
+
+        User savedUser = userRepository.save(user);
+        return userMapper.toResponse(savedUser);
+    }
+
     public void softDeleteUser(String id, String requesterUserId) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + id));
@@ -65,7 +88,6 @@ public class UserService {
 
         if (user.getStatus() != DELETED) {
             user.setStatus(DELETED);
-            user.setUpdatedAt(now());
             User savedUser = userRepository.save(user);
 
             userProcessor.postProcessUserDeleted(savedUser);

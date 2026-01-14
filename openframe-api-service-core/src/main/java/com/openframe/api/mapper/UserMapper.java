@@ -11,6 +11,7 @@ public class UserMapper {
         return UserResponse.builder()
                 .id(entity.getId())
                 .email(entity.getEmail())
+                .emailVerified(entity.isEmailVerified())
                 .firstName(entity.getFirstName())
                 .lastName(entity.getLastName())
                 .roles(entity.getRoles().stream().map(Enum::name).toList())
