@@ -65,7 +65,6 @@ public class UserService {
 
         if (user.getStatus() != DELETED) {
             user.setStatus(DELETED);
-            user.setUpdatedAt(now());
             User savedUser = userRepository.save(user);
 
             userProcessor.postProcessUserDeleted(savedUser);
