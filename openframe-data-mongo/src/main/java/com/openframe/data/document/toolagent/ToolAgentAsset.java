@@ -15,6 +15,7 @@ public class ToolAgentAsset {
     private ToolAgentAssetSource source;
     private String path;
     private boolean executable;
+    private String version;
     private List<DownloadConfiguration> downloadConfigurations;
     
 }

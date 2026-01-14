@@ -39,6 +39,7 @@
       "localFilename": "osqueryd",
       "source": "GITHUB",
       "executable": true,
+      "version": "0.0.2",
       "downloadConfigurations": [
         {
           "os": "windows",

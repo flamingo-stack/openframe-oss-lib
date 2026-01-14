@@ -32,6 +32,7 @@ public class ToolInstallationMessage {
         private AssetSource source;
         private String path;
         private boolean executable;
+        private String version;
         private List<DownloadConfiguration> downloadConfigurations;
     }
 

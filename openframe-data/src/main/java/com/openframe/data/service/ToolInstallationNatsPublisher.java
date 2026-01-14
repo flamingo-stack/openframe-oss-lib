@@ -83,8 +83,11 @@ public class ToolInstallationNatsPublisher {
         messageAsset.setSource(mapAssetSource(asset.getSource()));
         messageAsset.setPath(asset.getPath());
         messageAsset.setExecutable(asset.isExecutable());
+        messageAsset.setVersion(asset.getVersion());
+
+        String assetVersion = asset.getVersion();
         messageAsset.setDownloadConfigurations(
-                downloadConfigurationMapper.map(asset.getDownloadConfigurations(), version));
+                downloadConfigurationMapper.map(asset.getDownloadConfigurations(), assetVersion));
         return messageAsset;
     }
 
