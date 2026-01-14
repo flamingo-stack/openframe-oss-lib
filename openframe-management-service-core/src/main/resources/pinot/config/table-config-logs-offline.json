@@ -1,5 +1,5 @@
 {
-  "tableName": "${pinot.tables.logs.name}_OFFLINE",
+  "tableName": "${pinot.tables.logs.name}",
   "tableType": "OFFLINE",
   "segmentsConfig": {
     "timeColumnName": "eventTimestamp",

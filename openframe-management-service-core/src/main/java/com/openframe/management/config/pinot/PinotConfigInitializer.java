@@ -182,7 +182,9 @@ public class PinotConfigInitializer {
     private void deployTableConfig(String tableConfig, String configName) {
         try {
             JsonNode tableConfigJson = objectMapper.readTree(tableConfig);
-            String tableName = tableConfigJson.get("tableName").asText() + "_REALTIME";
+            String baseTableName = tableConfigJson.get("tableName").asText();
+            String tableType = tableConfigJson.get("tableType").asText();
+            String tableName = baseTableName + ("REALTIME".equalsIgnoreCase(tableType) ? "_REALTIME" : "_OFFLINE");
 
             String updateUrl = String.format("http://%s/tables/%s", pinotControllerUrl, tableName);
             String createUrl = String.format("http://%s/tables", pinotControllerUrl);

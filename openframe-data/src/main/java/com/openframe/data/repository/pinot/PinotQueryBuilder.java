@@ -274,7 +274,7 @@ public class PinotQueryBuilder {
     }
     
     private void buildFromClause(StringBuilder query) {
-        query.append(SQL_FROM).append(tableName);
+        query.append(SQL_FROM).append("\"%s\"".formatted(tableName));
     }
     
     private void buildWhereClause(StringBuilder query) {

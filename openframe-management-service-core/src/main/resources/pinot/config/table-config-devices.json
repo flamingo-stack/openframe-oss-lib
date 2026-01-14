@@ -4,14 +4,10 @@
   "segmentsConfig": {
     "timeColumnName": "ingestionTime",
     "timeType": "MILLISECONDS",
-    "replication": "2",
+    "replication": "${pinot.tables.devices.replication}",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "retentionTimeUnit": "DAYS",
-    "retentionTimeValue": "3650",
-    "realtimeSegmentConfig": {
-      "flushThresholdTime": "24h",
-      "flushThresholdRows": "500000"
-    }
+    "retentionTimeValue": "3650"
   },
   "tableIndexConfig": {
     "loadMode": "MMAP",
@@ -31,14 +27,14 @@
       "stream.kafka.broker.list": "${spring.oss-tenant.kafka.bootstrap-servers}",
       "stream.kafka.consumer.type": "lowlevel",
       "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
-      "stream.kafka.consumer.prop.auto.offset.reset": "smallest"
+      "stream.kafka.consumer.prop.auto.offset.reset": "smallest",
+      "realtime.segment.flush.threshold.time": "24h",
+      "realtime.segment.flush.threshold.rows": "500000"
     }
   },
   "fieldConfigList": [
     {
       "name": "tags",
-      "dataType": "STRING",
-      "singleValueField": false,
       "encodingType": "DICTIONARY",
       "properties": {
         "maxMultiValueEntries": 50
