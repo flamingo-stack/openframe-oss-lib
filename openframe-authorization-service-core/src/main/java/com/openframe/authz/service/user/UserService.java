@@ -3,6 +3,7 @@ package com.openframe.authz.service.user;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.user.UserRole;
 import com.openframe.data.repository.auth.AuthUserRepository;
+import com.openframe.authz.service.processor.UserEmailVerifiedProcessor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,7 @@ public class UserService {
 
     private final AuthUserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final UserEmailVerifiedProcessor userEmailVerifiedProcessor;
 
     public Optional<AuthUser> findActiveByEmail(String email) {
         return userRepository.findByEmailAndStatus(email, ACTIVE);
@@ -209,8 +211,14 @@ public class UserService {
             return;
         }
         userRepository.findById(userId).ifPresent(user -> {
+            if (user.isEmailVerified()) {
+                return;
+            }
             user.setEmailVerified(true);
-            userRepository.save(user);
+            AuthUser saved = userRepository.save(user);
+            if (saved.isEmailVerified()) {
+                userEmailVerifiedProcessor.postProcessEmailVerified(saved);
+            }
         });
     }
 }

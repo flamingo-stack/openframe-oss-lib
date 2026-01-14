@@ -8,7 +8,6 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.Indexed;
-import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 
@@ -31,8 +30,6 @@ public class AuthUser extends User {
     private String tenantId;
 
     private String passwordHash;
-
-    private boolean emailVerified = false;
 
     private String loginProvider; // LOCAL, GOOGLE, etc.
     private String externalUserId;

@@ -12,6 +12,7 @@ import java.util.List;
 public class UserResponse {
     private String id;
     private String email;
+    private boolean emailVerified;
     private String firstName;
     private String lastName;
     private List<String> roles;
