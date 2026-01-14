@@ -25,6 +25,8 @@ export const ToolIcon = React.forwardRef<
       case 'TACTICAL_RMM':
       case 'TACTICAL-RMM':
         return <TacticalIcon size={size} />
+      case 'OPENFRAME':
+        return <OpenFrameLogo className="h-4 w-auto" lowerPathColor="var(--color-accent-primary)" upperPathColor="var(--color-text-primary)" />
       case 'OPENFRAME_CHAT':
         return <OpenFrameLogo className="h-4 w-auto" lowerPathColor="var(--color-accent-primary)" upperPathColor="var(--color-text-primary)" />
       case 'OPENFRAME_CLIENT':
