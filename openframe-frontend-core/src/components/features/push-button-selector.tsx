@@ -14,6 +14,7 @@ export interface SelectableOption {
   updatedAt?: string;
   icon?: React.ReactNode;
   color?: string;
+  disabled?: boolean;      // If true, option is shown grayed out and not selectable
 }
 
 interface PushButtonSelectorProps {
@@ -152,13 +153,15 @@ export function PushButtonSelector({
             <div
               key={option.id}
               className={`
-                p-4 rounded-lg border transition-all duration-200 cursor-pointer group
-                ${isSelected
-                  ? 'bg-ods-bg-secondary border-ods-accent shadow-sm'
-                  : 'bg-ods-bg-primary border-ods-border hover:border-ods-border-hover hover:bg-ods-bg-hover'
+                p-4 rounded-lg border transition-all duration-200 group
+                ${option.disabled
+                  ? 'cursor-not-allowed opacity-40 bg-ods-card border-ods-border'
+                  : isSelected
+                    ? 'cursor-pointer bg-ods-bg-secondary border-ods-accent shadow-sm'
+                    : 'cursor-pointer bg-ods-bg-primary border-ods-border hover:border-ods-border-hover hover:bg-ods-bg-hover'
                 }
               `}
-              onClick={() => toggleSelection(option.id)}
+              onClick={() => !option.disabled && toggleSelection(option.id)}
             >
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3 flex-1 min-w-0">

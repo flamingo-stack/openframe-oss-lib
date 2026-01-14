@@ -13,3 +13,5 @@ export * from './confidence-helpers'
 // Release date formatting utilities
 export * from './date-formatters'
 export * from './format-relative-time'
+// Dynamic icon registry
+export * from './dynamic-icons'

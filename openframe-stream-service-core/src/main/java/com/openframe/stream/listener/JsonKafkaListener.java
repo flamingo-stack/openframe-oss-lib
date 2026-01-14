@@ -20,10 +20,10 @@ public class JsonKafkaListener {
 
     @KafkaListener(
             topics = {
-                    "${openframe.oss-tenant.kafka.topics.inbound.meshcentral-events}",
-                    "${openframe.oss-tenant.kafka.topics.inbound.tactical-rmm-events}",
-                    "${openframe.oss-tenant.kafka.topics.inbound.fleet-mdm-events}",
-                    "${openframe.oss-tenant.kafka.topics.inbound.fleet-mdm-query-result-events}"
+                    "${openframe.oss-tenant.kafka.topics.inbound.meshcentral-events.name}",
+                    "${openframe.oss-tenant.kafka.topics.inbound.tactical-rmm-events.name}",
+                    "${openframe.oss-tenant.kafka.topics.inbound.fleet-mdm-events.name}",
+                    "${openframe.oss-tenant.kafka.topics.inbound.fleet-mdm-query-result-events.name}"
             },
             groupId = "${spring.oss-tenant.kafka.consumer.group-id}"
     )

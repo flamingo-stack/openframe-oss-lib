@@ -3,7 +3,7 @@
 import { useRef, useCallback, useLayoutEffect, useEffect, useImperativeHandle, forwardRef, type HTMLAttributes } from "react"
 import { cn } from "../../utils/cn"
 import { ChatMessage } from "./chat-message"
-import { ChatMessageEnhanced, type MessageContent } from "./chat-message-enhanced"
+import { ChatMessageEnhanced, type MessageContent, type MessageSegment } from "./chat-message-enhanced"
 
 export interface Message {
   id: string
@@ -12,6 +12,7 @@ export interface Message {
   content: string | MessageContent
   timestamp: Date
   avatar?: string | null
+  assistantType?: 'fae' | 'mingo'
 }
 
 export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
@@ -20,10 +21,12 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
   autoScroll?: boolean
   showAvatars?: boolean
   contentClassName?: string
+  assistantType?: 'fae' | 'mingo'
+  pendingApprovals?: MessageSegment[]
 }
 
 const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
-  ({ className, messages, isTyping = false, autoScroll = true, showAvatars = true, contentClassName, ...props }, ref) => {
+  ({ className, messages, isTyping = false, autoScroll = true, showAvatars = true, contentClassName, assistantType, pendingApprovals, ...props }, ref) => {
     const scrollRef = useRef<HTMLDivElement>(null)
     const isPinnedToBottomRef = useRef(true)
     const resizeObserverRef = useRef<ResizeObserver | null>(null)
@@ -192,18 +195,18 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     useImperativeHandle(ref, () => scrollRef.current!)
     
     return (
-      <div className="relative flex-1 min-h-0">
+      <div className="relative flex-1 min-h-0 flex flex-col">
         <div
           ref={scrollRef}
           className={cn(
-            "flex h-full w-full flex-col overflow-y-auto overflow-x-hidden",
+            "flex h-full w-full flex-col overflow-y-auto overflow-x-hidden flex-1",
             "[scroll-behavior:smooth]",
             "scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30 hover:scrollbar-thumb-ods-text-secondary/30",
             className
           )}
           {...props}
         >
-          <div className={cn("mx-auto flex w-full max-w-3xl flex-col gap-1 pt-8 min-w-0", contentClassName || "px-12")} style={{ minHeight: '100%' }}>
+          <div className={cn("mx-auto flex w-full max-w-3xl flex-col pb-2 min-w-0", contentClassName || "px-4")} style={{ minHeight: '100%' }}>
             <div className="flex-1" />
             {messages.map((message, index) => {
               const useEnhanced = Array.isArray(message.content) || message.role === 'assistant'
@@ -219,6 +222,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                     isTyping={index === messages.length - 1 && isTyping && message.role === 'assistant'}
                     avatar={showAvatars ? message.avatar : null}
                     showAvatar={showAvatars}
+                    assistantType={message.assistantType || assistantType}
                   />
                 )
               } else {
@@ -232,12 +236,32 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                     isTyping={index === messages.length - 1 && isTyping && message.role === 'assistant'}
                     avatar={showAvatars ? message.avatar : null}
                     showAvatar={showAvatars}
+                    assistantType={message.assistantType || assistantType}
                   />
                 )
               }
             })}
           </div>
         </div>
+        
+        {/* Sticky Pending Approvals Section */}
+        {pendingApprovals && pendingApprovals.length > 0 && (
+          <div className={cn(
+            "border-t border-ods-border bg-ods-bg/95 backdrop-blur-sm",
+            "mx-auto w-full max-w-3xl",
+            contentClassName || "px-4"
+          )}>
+            <ChatMessageEnhanced
+              role="assistant"
+              name={assistantType === 'mingo' ? 'Mingo' : 'Fae'}
+              content={pendingApprovals}
+              timestamp={new Date()}
+              showAvatar={showAvatars}
+              assistantType={assistantType}
+              className="py-3"
+            />
+          </div>
+        )}
       </div>
     )
   }

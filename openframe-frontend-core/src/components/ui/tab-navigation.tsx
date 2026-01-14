@@ -110,7 +110,7 @@ export function TabNavigation({
 
   return (
     <>
-      <div className={cn("bg-ods-bg relative w-full h-14 border-b border-ods-border", className)}>
+      <div className={cn("relative w-full h-14 border-b border-ods-border", className)}>
         <div className="flex gap-1 items-center justify-start h-full overflow-x-auto">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id
@@ -160,7 +160,7 @@ export function TabNavigation({
           })}
 
           {/* Gradient overlay */}
-          <div className="absolute right-0 top-0 w-10 h-14 bg-gradient-to-r from-transparent to-ods-bg pointer-events-none" />
+          <div className="absolute right-0 top-0 w-10 h-14 pointer-events-none" />
         </div>
       </div>
 

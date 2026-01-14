@@ -1,9 +1,9 @@
 package com.openframe.authz.config;
 
 import com.openframe.authz.config.tenant.TenantContext;
+import com.openframe.authz.security.AuthSuccessHandler;
 import com.openframe.authz.security.SsoAuthorizationRequestResolver;
 import com.openframe.authz.security.SsoCookieCodec;
-import com.openframe.authz.security.SsoTenantRegistrationSuccessHandler;
 import com.openframe.authz.service.policy.GlobalDomainPolicyLookup;
 import com.openframe.authz.service.processor.RegistrationProcessor;
 import com.openframe.authz.service.sso.SSOConfigService;
@@ -39,7 +39,6 @@ import org.springframework.security.web.SecurityFilterChain;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import java.util.regex.Pattern;
 
 import static com.openframe.authz.util.OidcUserUtils.resolveEmail;
@@ -64,7 +63,7 @@ public class SecurityConfig {
     @Order(2)
     public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http,
                                                           OAuth2UserService<OidcUserRequest, OidcUser> oidcUserService,
-                                                          SsoTenantRegistrationSuccessHandler ssoSuccessHandler,
+                                                          AuthSuccessHandler authSuccessHandler,
                                                           ClientRegistrationRepository clientRegistrationRepository,
                                                           SsoCookieCodec ssoCookieCodec) throws Exception {
         return http
@@ -76,6 +75,7 @@ public class SecurityConfig {
                                 "/oauth/**",
                                 "/invitations/**",
                                 "/password-reset/**",
+                                "/email/verify/**",
                                 "/oauth2/**",
                                 "/login",
                                 "/favicon.ico",
@@ -87,14 +87,17 @@ public class SecurityConfig {
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
-                .formLogin(form -> form.loginPage("/login").permitAll())
+                .formLogin(form -> form
+                        .loginPage("/login")
+                        .successHandler(authSuccessHandler)
+                        .permitAll())
                 .oauth2Login(o -> o
                         .loginPage("/login")
                         .authorizationEndpoint(a -> a.authorizationRequestResolver(
                                 new SsoAuthorizationRequestResolver(clientRegistrationRepository, ssoCookieCodec)
                         ))
                         .userInfoEndpoint(u -> u.oidcUserService(oidcUserService))
-                        .successHandler(ssoSuccessHandler)
+                        .successHandler(authSuccessHandler)
                         .withObjectPostProcessor(new ObjectPostProcessor<OidcAuthorizationCodeAuthenticationProvider>() {
                             @Override
                             public <O extends OidcAuthorizationCodeAuthenticationProvider> O postProcess(O provider) {
@@ -187,7 +190,7 @@ public class SecurityConfig {
                         }
                         if (isEmailAllowedByDomains(cfg.getAllowedDomains(), email)) {
                             if (userService.findActiveByEmailAndTenant(normalizedEmail, tenantId).isEmpty()) {
-                                AuthUser created = registerUser(userService, tenantId, email, user);
+                                AuthUser created = registerUser(userService, tenantId, email, user, provider);
                                 registrationProcessor.postProcessAutoProvision(created);
                             }
                         }
@@ -199,7 +202,7 @@ public class SecurityConfig {
                             globalDomainPolicyLookup.findTenantIdByDomainIfAutoAllowed(domain)
                                     .ifPresent(mappedTenantId -> {
                                         if (tenantId.equals(mappedTenantId)) {
-                                            AuthUser created = registerUser(userService, tenantId, email, user);
+                                            AuthUser created = registerUser(userService, tenantId, email, user, provider);
                                             registrationProcessor.postProcessAutoProvision(created);
                                         }
                                     });
@@ -210,11 +213,10 @@ public class SecurityConfig {
         }
     }
 
-    private AuthUser registerUser(UserService userService, String tenantId, String email, OidcUser user) {
+    private AuthUser registerUser(UserService userService, String tenantId, String email, OidcUser user, String provider) {
         String givenName = stringClaim(user.getClaims().get("given_name"));
         String familyName = stringClaim(user.getClaims().get("family_name"));
-        String password = UUID.randomUUID().toString();
-        return userService.registerUser(tenantId, email, givenName, familyName, password, List.of(ADMIN));
+        return userService.registerOrReactivateFromSso(tenantId, email, givenName, familyName, List.of(ADMIN), provider);
     }
 
     /**

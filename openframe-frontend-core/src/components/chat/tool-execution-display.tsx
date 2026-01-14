@@ -41,8 +41,10 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
     const isExecuted = message.type === "EXECUTED_TOOL"
     const expanded = onToggleExpand ? isExpanded : localExpanded
 
+    const integratedToolType = message.integratedToolType || 'OPENFRAME'
+
     const formatToolName = (toolType: string) => {
-      return toolType.replace(/_/g, ' ')
+      return toolType?.replace(/_/g, ' ')
     }
 
     const formatParameters = (params: Record<string, any>) => {
@@ -84,12 +86,12 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
 
             {/* Tool Icon */}
             <div className="flex-shrink-0">
-              <ToolIcon toolType={message.integratedToolType as ToolType} size={20} />
+              <ToolIcon toolType={integratedToolType as ToolType} size={20} />
             </div>
 
             {/* Tool Name */}
             <span className="text-sm font-medium text-ods-text-primary flex-1">
-              {formatToolName(message.integratedToolType)}
+              {formatToolName(integratedToolType)}
             </span>
 
             {/* Status Indicator */}
