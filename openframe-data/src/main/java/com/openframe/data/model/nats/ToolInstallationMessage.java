@@ -32,10 +32,12 @@ public class ToolInstallationMessage {
         private AssetSource source;
         private String path;
         private boolean executable;
+        private String version;
+        private List<DownloadConfiguration> downloadConfigurations;
     }
 
     public enum AssetSource {
-        ARTIFACTORY, TOOL_API
+        ARTIFACTORY, TOOL_API, GITHUB
     }
 
 }
