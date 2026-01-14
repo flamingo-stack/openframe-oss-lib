@@ -50,8 +50,8 @@ public class PinotConfigInitializer {
     private long retryDelayMs;
 
     private static final List<PinotConfig> PINOT_CONFIGS = Arrays.asList(
-            new PinotConfig("devices", "schema-devices.json", "table-config-devices.json"),
-            new PinotConfig("logs","schema-logs.json","table-config-logs.json")
+            new PinotConfig("devices", "schema-devices.json", "table-config-devices.json", null),
+            new PinotConfig("logs","schema-logs.json","table-config-logs-realtime.json", "table-config-logs-offline.json")
     );
 
     public PinotConfigInitializer(ResourceLoader resourceLoader, Environment environment) {
@@ -85,11 +85,18 @@ public class PinotConfigInitializer {
         log.info("Deploying Pinot configuration for: {}", config.getName());
 
         try {
-            String schemaConfig = loadResource(config.getSchemaFile());
-            String tableConfig = resolvePlaceholders(loadResource(config.getTableConfigFile()));
+            String schemaConfig = resolvePlaceholders(loadResource(config.getSchemaFile()));
+            String realtimeTableConfig = resolvePlaceholders(loadResource(config.getTableRealtimeConfigFile()));
 
             deployWithRetry(() -> deploySchema(schemaConfig), "schema for " + config.getName());
-            deployWithRetry(() -> deployTableConfig(tableConfig, config.getName()), "table config for " + config.getName());
+            deployWithRetry(() -> deployTableConfig(realtimeTableConfig, config.getName()), "realtime table config for " + config.getName());
+
+
+            if (config.getTableOfflineConfigFile() != null) {
+                String offlineTableConfig = resolvePlaceholders(loadResource(config.getTableOfflineConfigFile()));
+                deployWithRetry(() -> deployTableConfig(offlineTableConfig, config.getName()), "offline table config for " + config.getName());
+
+            }
 
             log.info("Successfully deployed Pinot configuration for: {}", config.getName());
 

@@ -4,11 +4,13 @@
   "segmentsConfig": {
     "timeColumnName": "ingestionTime",
     "timeType": "MILLISECONDS",
-    "replication": "1",
+    "replication": "2",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "retentionTimeUnit": "DAYS",
+    "retentionTimeValue": "3650",
     "realtimeSegmentConfig": {
-      "flushThresholdRows": "50000",
-      "flushThresholdTime": "24h"
+      "flushThresholdTime": "24h",
+      "flushThresholdRows": "500000"
     }
   },
   "tableIndexConfig": {
@@ -43,15 +45,24 @@
       }
     }
   ],
-  "ingestionConfig": {},
   "routing": {
     "instanceSelectorType": "strictReplicaGroup"
   },
   "upsertConfig": {
-    "mode": "FULL"
+    "mode": "FULL",
+    "comparisonColumn": "ingestionTime"
   },
   "tenants": {
     "broker": "DefaultTenant",
     "server": "DefaultTenant"
+  },
+  "task": {
+    "taskTypeConfigsMap": {
+      "UpsertCompactionTask": {
+        "schedule": "0 0 3 * * ?",
+        "bufferTimePeriod": "4h",
+        "invalidRecordsThresholdPercent": "30"
+      }
+    }
   }
 }
