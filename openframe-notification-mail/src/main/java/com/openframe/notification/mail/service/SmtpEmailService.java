@@ -39,6 +39,11 @@ public class SmtpEmailService implements EmailService {
         sendPlainText(toEmail, subject, body);
     }
 
+    @Override
+    public void sendEmailVerificationEmail(String toEmail, String verifyToken) {
+        throw new UnsupportedOperationException("Email verification via SMTP is not supported; use HubSpot provider");
+    }
+
     private void sendPlainText(String toEmail, String subject, String body) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(toEmail);
