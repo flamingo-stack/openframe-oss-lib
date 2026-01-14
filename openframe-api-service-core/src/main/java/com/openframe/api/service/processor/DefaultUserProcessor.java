@@ -24,4 +24,9 @@ public class DefaultUserProcessor implements UserProcessor {
     public void postProcessUserGet(UserPageResponse response) {
         log.debug("Users fetched. Count: {}", response.getItems().size());
     }
+
+    @Override
+    public void postProcessUserUpdated(User user) {
+        log.debug("User updated: {}", user.getId());
+    }
 }
