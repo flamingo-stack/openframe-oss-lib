@@ -2,13 +2,13 @@ package com.openframe.authz.service.user;
 
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.user.UserRole;
-import com.openframe.data.document.user.UserStatus;
 import com.openframe.data.repository.auth.AuthUserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -59,6 +59,21 @@ public class UserService {
                 .orElseGet(() -> createUser(tenantId, email, firstName, lastName, password, roles));
     }
 
+    /**
+     * Register a user via invitation.
+     * Invitation acceptance implies control of the invited email address, so the created/reactivated user is verified.
+     */
+    public AuthUser registerUserFromInvitation(String tenantId,
+                                              String email,
+                                              String firstName,
+                                              String lastName,
+                                              String password,
+                                              List<UserRole> roles) {
+        AuthUser user = registerUser(tenantId, email, firstName, lastName, password, roles);
+        user.setEmailVerified(true);
+        return userRepository.save(user);
+    }
+
     public void deactivateUser(AuthUser user) {
         user.setStatus(DELETED);
         userRepository.save(user);
@@ -74,7 +89,6 @@ public class UserService {
         user.setPasswordHash(passwordEncoder.encode(rawPassword));
         user.setRoles(roles);
         user.setStatus(ACTIVE);
-        user.setUpdatedAt(now());
         return userRepository.save(user);
     }
 
@@ -106,6 +120,97 @@ public class UserService {
             userRepository.save(user);
         }, () -> {
             throw new IllegalArgumentException("User not found: " + userId);
+        });
+    }
+
+    /**
+     * Register or reactivate a user via SSO provider.
+     * Sets emailVerified=true and loginProvider to the given provider.
+     */
+    public AuthUser registerOrReactivateFromSso(String tenantId,
+                                                String email,
+                                                String firstName,
+                                                String lastName,
+                                                List<UserRole> roles,
+                                                String providerRegistrationId) {
+        String normalized = email.trim().toLowerCase(Locale.ROOT);
+        var existing = userRepository.findByEmailAndTenantId(normalized, tenantId);
+        return existing
+                .map(u -> {
+                    if (u.getStatus() == ACTIVE) {
+                        u.setEmailVerified(true);
+                        u.setLoginProvider(providerRegistrationId);
+                        return userRepository.save(u);
+                    }
+                    return reactivateUserFromSso(u, firstName, lastName, roles, providerRegistrationId);
+                })
+                .orElseGet(() -> createUserFromSso(tenantId, email, firstName, lastName, roles, providerRegistrationId));
+    }
+
+    private AuthUser reactivateUserFromSso(AuthUser user,
+                                           String firstName,
+                                           String lastName,
+                                           List<UserRole> roles,
+                                           String providerRegistrationId) {
+        String randomPassword = randomUUID().toString();
+        user.setFirstName(firstName);
+        user.setLastName(lastName);
+        user.setPasswordHash(passwordEncoder.encode(randomPassword));
+        user.setRoles(roles);
+        user.setStatus(ACTIVE);
+        user.setEmailVerified(true);
+        user.setLoginProvider(providerRegistrationId);
+        return userRepository.save(user);
+    }
+
+    private AuthUser createUserFromSso(String tenantId,
+                                       String email,
+                                       String firstName,
+                                       String lastName,
+                                       List<UserRole> roles,
+                                       String providerRegistrationId) {
+        String randomPassword = randomUUID().toString();
+        AuthUser user = AuthUser.builder()
+                .id(randomUUID().toString())
+                .tenantId(tenantId)
+                .email(email)
+                .firstName(firstName)
+                .lastName(lastName)
+                .passwordHash(passwordEncoder.encode(randomPassword))
+                .status(ACTIVE)
+                .emailVerified(true)
+                .createdAt(now())
+                .roles(roles)
+                .loginProvider(providerRegistrationId)
+                .build();
+        return userRepository.save(user);
+    }
+
+    /**
+     * Update lastLogin timestamp for a user identified by email within the given tenant.
+     * No-op if user is not found.
+     */
+    public void touchLastLogin(String email, String tenantId) {
+        if (email == null || tenantId == null) {
+            return;
+        }
+        String normalized = email.trim().toLowerCase(Locale.ROOT);
+        userRepository.findByEmailAndTenantId(normalized, tenantId).ifPresent(user -> {
+            user.setLastLogin(Instant.now());
+            userRepository.save(user);
+        });
+    }
+
+    /**
+     * Mark user's email as verified.
+     */
+    public void markEmailVerified(String userId) {
+        if (userId == null || userId.isBlank()) {
+            return;
+        }
+        userRepository.findById(userId).ifPresent(user -> {
+            user.setEmailVerified(true);
+            userRepository.save(user);
         });
     }
 }
