@@ -1,6 +1,7 @@
 package com.openframe.authz.exception;
 
 import com.openframe.core.dto.ErrorResponse;
+import com.openframe.data.exception.UserNotFoundException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
@@ -69,6 +70,13 @@ public class GlobalExceptionHandler {
     public ErrorResponse handleUserActiveInAnotherTenant(UserActiveInAnotherTenantException ex) {
         log.warn("Conflict: {}", ex.getMessage());
         return new ErrorResponse("USER_IS_ACTIVE_IN_ANOTHER_TENANT", ex.getMessage());
+    }
+
+    @ExceptionHandler(UserNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ErrorResponse handleUserNotFound(UserActiveInAnotherTenantException ex) {
+        log.warn("Not found: {}", ex.getMessage());
+        return new ErrorResponse("USER_NOT_FOUND", ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)
