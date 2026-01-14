@@ -9,11 +9,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.util.Locale;
 
 import static com.openframe.authz.util.OidcUserUtils.resolveEmail;
 
@@ -39,6 +41,7 @@ public class AuthSuccessHandler extends SavedRequestAwareAuthenticationSuccessHa
             String email = extractEmail(authentication);
             if (tenantId != null && email != null && !email.isBlank()) {
                 userService.touchLastLogin(email, tenantId);
+                maybeMarkEmailVerifiedFromSso(authentication, tenantId, email);
             }
         } catch (Exception e) {
             // Do not block login flow if updating lastLogin fails
@@ -47,6 +50,35 @@ public class AuthSuccessHandler extends SavedRequestAwareAuthenticationSuccessHa
 
         // Delegate to SSO success handler so SSO-specific flows continue to work.
         ssoTenantRegistrationSuccessHandler.onAuthenticationSuccess(request, response, authentication);
+    }
+
+    private void maybeMarkEmailVerifiedFromSso(Authentication authentication, String tenantId, String email) {
+        if (!(authentication instanceof OAuth2AuthenticationToken oauth2)) {
+            return;
+        }
+        String provider = oauth2.getAuthorizedClientRegistrationId();
+        if (provider == null) {
+            return;
+        }
+        String p = provider.toLowerCase(Locale.ROOT);
+        if (!"google".equals(p) && !"microsoft".equals(p)) {
+            return;
+        }
+
+        // Best practice: only mark verified if the IdP asserts it (when claim is present).
+        // Google typically provides email_verified. Microsoft may omit it; we treat omission as verified for trusted providers.
+        if (authentication.getPrincipal() instanceof OidcUser oidcUser) {
+            Object claim = oidcUser.getClaims().get("email_verified");
+            if (claim instanceof Boolean b && !b) {
+                return;
+            }
+            if (claim instanceof String s && "false".equalsIgnoreCase(s)) {
+                return;
+            }
+        }
+
+        userService.findActiveByEmailAndTenant(email.trim().toLowerCase(Locale.ROOT), tenantId)
+                .ifPresent(u -> userService.markEmailVerified(u.getId()));
     }
 
     private String extractEmail(Authentication authentication) {
