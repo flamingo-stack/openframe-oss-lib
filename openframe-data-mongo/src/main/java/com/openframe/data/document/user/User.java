@@ -31,6 +31,13 @@ public class User {
     @Builder.Default
     private List<UserRole> roles = new ArrayList<>();
 
+    /**
+     * Indicates whether the user's email is verified.
+     * For SSO users this is typically true on first login.
+     */
+    @Builder.Default
+    private boolean emailVerified = false;
+
     @Indexed
     @Builder.Default
     private UserStatus status = UserStatus.ACTIVE;
