@@ -202,7 +202,7 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
   }
 
   async function connect(): Promise<void> {
-    if (nc) return
+    if (nc && !nc.isClosed()) return
     assertClientSide()
 
     emitStatus({ status: 'connecting' })
@@ -221,10 +221,18 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
         for await (const s of conn.status()) {
           if (signal.aborted) return
           const mapped = mapNatsTypeToStatus((s as any)?.type)
-          if (mapped) emitStatus({ status: mapped, data: (s as any)?.data })
+          if (mapped) {
+            emitStatus({ status: mapped, data: (s as any)?.data })
+            if (mapped === 'closed') {
+              nc = null
+            }
+          }
         }
       } catch (e) {
-        if (!signal.aborted) emitStatus({ status: 'error', data: e })
+        if (!signal.aborted) {
+          emitStatus({ status: 'error', data: e })
+          nc = null
+        }
       }
     })().catch(() => {
       // ignore
