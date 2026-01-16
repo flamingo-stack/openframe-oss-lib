@@ -84,6 +84,8 @@ export interface AIContent {
   override_by: string | null;
   // NEW: URL injection preference (per-item control)
   url_injection_preference?: 'none' | 'in_post' | 'as_comment';
+  // NEW: External comment ID tracking (for 'as_comment' mode)
+  external_comment_id?: string | null;
 }
 
 export interface CreateAIContentInput {
