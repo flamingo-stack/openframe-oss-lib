@@ -1,0 +1,30 @@
+import type { SVGProps } from "react";
+export interface WifiLockIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function WifiLockIcon({
+  className = "",
+  size = 24,
+  color = "#888888",
+  ...props
+}: WifiLockIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M6.896 14.683c2.81-2.982 7.397-2.982 10.208 0a1.126 1.126 0 0 1-1.636 1.544c-1.923-2.04-5.012-2.04-6.935 0a1.126 1.126 0 0 1-1.637-1.544M12 8.16a1.125 1.125 0 0 1 0 2.25c-2.278 0-4.567.92-6.326 2.785l-.082.079a1.125 1.125 0 0 1-1.554-1.623l.418-.42c2.129-2.04 4.831-3.07 7.544-3.07Zm.447-4.279a1.125 1.125 0 1 1-.07 2.249c-3.436-.106-6.915 1.23-9.559 4.034A1.126 1.126 0 0 1 1.18 8.62c3.09-3.275 7.193-4.863 11.267-4.738Zm-.23 13.005a2.125 2.125 0 1 1-2.332 2.332L9.875 19l.01-.217a2.126 2.126 0 0 1 2.116-1.908zm4.908-8.011h3.75v-1.75h-3.75zm2.5-5.125a.626.626 0 0 0-1.25 0v1.125h1.25zm2.25 1.314A2.12 2.12 0 0 1 23.125 7v2a2.123 2.123 0 0 1-2.124 2.124h-4A2.125 2.125 0 0 1 14.874 9V7c0-.862.514-1.602 1.25-1.936V3.75a2.875 2.875 0 1 1 5.75 0z"
+      />
+    </svg>
+  );
+}

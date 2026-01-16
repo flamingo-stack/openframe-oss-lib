@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface PackageCheckIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function PackageCheckIcon({
+  className = "",
+  size = 24,
+  color = "#888888",
+  ...props
+}: PackageCheckIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M18.875 14.04V8.413l-6.75 3.749v7.774a1.12 1.12 0 0 1-.27 2.102 4 4 0 0 1-.855.089l-.255-.007a4.1 4.1 0 0 1-1.49-.38l-.234-.118-6-3.28a4.13 4.13 0 0 1-2.146-3.62V8.28c0-.705.182-1.381.508-1.978a1.1 1.1 0 0 1 .17-.285A4.1 4.1 0 0 1 3.021 4.66l6-3.28.234-.118a4.13 4.13 0 0 1 3.724.118l6 3.28.242.144c.5.319.915.738 1.23 1.221a1.1 1.1 0 0 1 .166.277c.326.597.508 1.273.508 1.978v5.76a1.125 1.125 0 0 1-2.25 0M11.899 3.354a1.88 1.88 0 0 0-1.583-.101l-.215.101-5.772 3.154L11 10.213l6.67-3.704-5.77-3.154ZM3.125 14.722c0 .686.374 1.316.976 1.645l5.774 3.155v-7.36l-6.75-3.749v6.31Z"
+      />
+      <path
+        fill={color}
+        d="M21.204 16.705a1.125 1.125 0 0 1 1.59 1.59l-4.5 4.5c-.438.44-1.15.44-1.59 0l-2-2-.077-.086a1.125 1.125 0 0 1 1.583-1.582l.085.078L17.5 20.41l3.705-3.704Z"
+      />
+    </svg>
+  );
+}

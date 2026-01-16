@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface TvMusicIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function TvMusicIcon({
+  className = "",
+  size = 24,
+  color = "#888888",
+  ...props
+}: TvMusicIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M20.875 6c0-1.036-.84-1.875-1.875-1.875H5c-1.036 0-1.875.84-1.875 1.875v8c0 1.035.84 1.874 1.875 1.874h14a1.875 1.875 0 0 0 1.875-1.875zm2.25 8A4.125 4.125 0 0 1 19 18.124H5a4.125 4.125 0 0 1-4.125-4.126V6A4.125 4.125 0 0 1 5 1.875h14A4.125 4.125 0 0 1 23.125 6z"
+      />
+      <path
+        fill={color}
+        d="m18 19.875.116.006a1.125 1.125 0 0 1 0 2.239l-.116.005H6a1.125 1.125 0 0 1 0-2.25zM14.892 5.378A2.126 2.126 0 0 1 17.125 7.5v4.4l-.002.05.002.052a2.126 2.126 0 0 1-4.239.217l-.011-.217.011-.217a2.124 2.124 0 0 1 1.99-1.903V7.647l-3.75.625v4.73l-.012.217a2.125 2.125 0 0 1-4.228 0l-.011-.217.011-.218a2.12 2.12 0 0 1 1.99-1.901V8.167c0-1.039.75-1.925 1.775-2.096l4-.667z"
+      />
+    </svg>
+  );
+}

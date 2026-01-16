@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface NotebookIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function NotebookIcon({
+  className = "",
+  size = 24,
+  color = "#888888",
+  ...props
+}: NotebookIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M19.875 5c0-1.036-.84-1.875-1.875-1.875h-6.875v17.75H18c1.035 0 1.875-.84 1.875-1.875zM5.125 19c0 1.035.84 1.875 1.875 1.875h1.875V3.125H7c-1.036 0-1.875.84-1.875 1.875zm17 0A4.125 4.125 0 0 1 18 23.125H7A4.125 4.125 0 0 1 2.875 19V5A4.125 4.125 0 0 1 7 .875h11A4.125 4.125 0 0 1 22.125 5z"
+      />
+      <path
+        fill={color}
+        d="m5.5 15.876.116.005a1.125 1.125 0 0 1 0 2.239l-.116.005h-3a1.125 1.125 0 0 1 0-2.25zm0-5.002.116.006a1.126 1.126 0 0 1 0 2.239l-.116.005h-3a1.125 1.125 0 0 1 0-2.25zm0-4.999a1.125 1.125 0 0 1 0 2.25h-3a1.125 1.125 0 0 1 0-2.25z"
+      />
+    </svg>
+  );
+}

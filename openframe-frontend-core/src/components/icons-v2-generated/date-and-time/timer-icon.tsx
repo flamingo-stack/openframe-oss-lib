@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface TimerIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function TimerIcon({
+  className = "",
+  size = 24,
+  color = "#888888",
+  ...props
+}: TimerIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M10.876 5V2l.005-.116a1.125 1.125 0 0 1 1.12-1.009c6.143 0 11.124 4.981 11.124 11.126 0 6.143-4.98 11.123-11.124 11.124C5.856 23.125.875 18.145.875 12c0-3.032 1.214-5.784 3.18-7.79a1.125 1.125 0 0 1 1.607 1.577 8.875 8.875 0 1 0 7.463-2.59V5a1.125 1.125 0 0 1-2.25 0Z"
+      />
+      <path
+        fill={color}
+        d="M7.703 7.706a1.125 1.125 0 0 1 1.506-.08l.085.077 3.5 3.49a1.125 1.125 0 0 1-1.588 1.593l-3.5-3.49-.078-.084a1.125 1.125 0 0 1 .075-1.506"
+      />
+    </svg>
+  );
+}

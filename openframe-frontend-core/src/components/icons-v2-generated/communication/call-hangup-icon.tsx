@@ -1,0 +1,30 @@
+import type { SVGProps } from "react";
+export interface CallHangupIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function CallHangupIcon({
+  className = "",
+  size = 24,
+  color = "#888888",
+  ...props
+}: CallHangupIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M2.025 9.867c6.104-4.656 13.842-4.656 19.947 0 1.04.793 1.357 2.137 1.022 3.293l-.075.229-.833 2.23c-.512 1.37-1.909 2.233-3.378 1.955l-1.528-.29c-1.48-.281-2.487-1.615-2.487-3.088v-.944a7.25 7.25 0 0 0-5.386 0v.944c0 1.473-1.007 2.805-2.488 3.086l-1.529.292c-1.47.279-2.865-.585-3.378-1.956l-.833-2.23c-.45-1.202-.163-2.675.946-3.52Zm14.918 4.329c0 .475.318.812.656.876l1.528.291c.322.061.696-.118.851-.533l.833-2.23.044-.149c.072-.344-.059-.65-.248-.795-5.299-4.041-11.919-4.041-17.217 0-.217.165-.355.542-.205.945l.834 2.23c.154.415.529.593.85.532l1.531-.291.126-.037c.288-.114.53-.423.53-.84v-1.659c0-.416.23-.8.598-.995 2.663-1.413 6.028-1.413 8.691 0 .368.196.598.579.598.995z"
+      />
+    </svg>
+  );
+}

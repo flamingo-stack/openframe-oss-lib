@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface Standard4kIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function Standard4kIcon({
+  className = "",
+  size = 24,
+  color = "#888888",
+  ...props
+}: Standard4kIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M20.875 7c0-1.036-.84-1.875-1.875-1.875H5c-1.036 0-1.875.84-1.875 1.875v10c0 1.036.84 1.875 1.875 1.875h14c1.035 0 1.874-.84 1.875-1.875zm2.25 10A4.125 4.125 0 0 1 19 21.125H5A4.125 4.125 0 0 1 .875 17V7A4.125 4.125 0 0 1 5 2.875h14A4.125 4.125 0 0 1 23.125 7z"
+      />
+      <path
+        fill={color}
+        d="M8.125 16v-.624H5.5a1.375 1.375 0 0 1-1.174-2.09l3.5-5.75.149-.202c.796-.917 2.4-.386 2.4.916v4.876h.376l.115.005a1.125 1.125 0 0 1 0 2.239l-.115.006h-.375v.623a1.125 1.125 0 0 1-2.25 0Zm4.75 0V8a1.125 1.125 0 0 1 2.25 0v1.94l2.267-2.668.08-.085a1.126 1.126 0 0 1 1.635 1.541l-2.376 2.793 3.134 3.76a1.124 1.124 0 0 1-1.729 1.44l-2.883-3.46-.129.153V16a1.125 1.125 0 0 1-2.25 0Zm-5.817-2.874h1.067V11.37z"
+      />
+    </svg>
+  );
+}

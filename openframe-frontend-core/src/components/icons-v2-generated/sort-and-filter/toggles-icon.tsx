@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface TogglesIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function TogglesIcon({
+  className = "",
+  size = 24,
+  color = "#888888",
+  ...props
+}: TogglesIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M19.875 17.5c0-.76-.616-1.375-1.375-1.375H9a1.125 1.125 0 0 1 0-2.25h9.5a3.626 3.626 0 0 1 0 7.25H9a1.125 1.125 0 0 1 0-2.25h9.5c.759 0 1.375-.616 1.375-1.375m-18-11A3.626 3.626 0 0 1 5.5 2.875H15a1.125 1.125 0 0 1 0 2.25H5.5a1.376 1.376 0 0 0 0 2.75H15l.116.005a1.126 1.126 0 0 1 0 2.239l-.116.005H5.5A3.625 3.625 0 0 1 1.875 6.5"
+      />
+      <path
+        fill={color}
+        d="M8.875 17.5a2.376 2.376 0 1 0-4.75 0 2.376 2.376 0 0 0 4.75 0m11-11a2.375 2.375 0 1 0-4.75 0 2.375 2.375 0 0 0 4.75 0m-8.75 11a4.626 4.626 0 1 1-9.251-.002 4.626 4.626 0 0 1 9.252.002Zm11-11a4.626 4.626 0 1 1-9.252 0 4.626 4.626 0 0 1 9.252 0"
+      />
+    </svg>
+  );
+}

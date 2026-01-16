@@ -1,0 +1,30 @@
+import type { SVGProps } from "react";
+export interface VolumeXmarkIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function VolumeXmarkIcon({
+  className = "",
+  size = 24,
+  color = "#888888",
+  ...props
+}: VolumeXmarkIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M14.124 20c0 1.932-2.368 2.862-3.682 1.446l-4.932-5.32H4A3.126 3.126 0 0 1 .875 13v-2A3.125 3.125 0 0 1 4 7.876h1.508l4.935-5.315.126-.126c1.334-1.23 3.555-.299 3.555 1.572zM3.125 13c0 .483.391.875.875.876h1.564c.517 0 1.014.188 1.399.525l.158.154 4.753 5.126V4.325l-4.753 5.12c-.402.434-.966.68-1.557.68H4a.875.875 0 0 0-.875.875zm18.079-4.295a1.125 1.125 0 0 1 1.59 1.59L21.09 12l1.705 1.705.078.086a1.124 1.124 0 0 1-1.582 1.583l-.087-.078L19.5 13.59l-1.704 1.705a1.125 1.125 0 1 1-1.59-1.59l1.703-1.706-1.703-1.704-.078-.085a1.125 1.125 0 0 1 1.583-1.583l.085.078 1.704 1.703z"
+      />
+    </svg>
+  );
+}

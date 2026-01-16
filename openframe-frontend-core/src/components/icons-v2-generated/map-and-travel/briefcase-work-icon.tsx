@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface BriefcaseWorkIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function BriefcaseWorkIcon({
+  className = "",
+  size = 24,
+  color = "#888888",
+  ...props
+}: BriefcaseWorkIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M10.876 16v-1a1.125 1.125 0 0 1 2.25 0v1a1.126 1.126 0 0 1-2.25 0m10.643-7.096a1.124 1.124 0 1 1 .963 2.034l-6.084 2.881c-.69.327-1.416.114-1.874-.327l-.178-.202a2.943 2.943 0 0 0-4.478-.252l-.214.252c-.401.535-1.16.861-1.903.592l-.15-.063-6.083-2.881-.101-.055a1.126 1.126 0 0 1 .958-2.022l.107.043 5.665 2.683a5.195 5.195 0 0 1 7.705 0z"
+      />
+      <path
+        fill={color}
+        d="M20.875 9c0-1.035-.84-1.875-1.875-1.875H5c-1.036 0-1.875.84-1.875 1.875v10c0 1.035.84 1.875 1.875 1.875h14c1.035 0 1.875-.84 1.875-1.875zm-6-5A.875.875 0 0 0 14 3.125h-4A.875.875 0 0 0 9.125 4v.875h5.75zm2.25.875H19A4.125 4.125 0 0 1 23.125 9v10A4.125 4.125 0 0 1 19 23.125H5A4.125 4.125 0 0 1 .875 19V9A4.125 4.125 0 0 1 5 4.875h1.875V4A3.125 3.125 0 0 1 10 .875h4A3.125 3.125 0 0 1 17.125 4z"
+      />
+    </svg>
+  );
+}

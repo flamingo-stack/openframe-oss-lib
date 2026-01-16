@@ -1,0 +1,42 @@
+import type { SVGProps } from "react";
+export interface GoogleLogoIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function GoogleLogoIcon({
+  className = "",
+  size = 24,
+  color = "#888888",
+  ...props
+}: GoogleLogoIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill="#4285F4"
+        d="M21.224 12.222c0-.822-.066-1.422-.207-2.044h-9.209v3.71h5.405c-.109.923-.697 2.312-2.005 3.245l-.018.125 2.911 2.3.202.02c1.853-1.745 2.92-4.311 2.92-7.356Z"
+      />
+      <path
+        fill="#34A853"
+        d="M11.808 22c2.648 0 4.87-.889 6.495-2.422l-3.095-2.445c-.829.59-1.94 1-3.4 1-2.594 0-4.795-1.744-5.58-4.155l-.115.01-3.028 2.389-.04.112C4.66 19.756 7.973 22 11.809 22Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M6.228 13.978A6.3 6.3 0 0 1 5.901 12c0-.689.12-1.355.316-1.978l-.005-.132-3.066-2.428-.1.05A10.2 10.2 0 0 0 2 12c0 1.611.381 3.133 1.046 4.489z"
+      />
+      <path
+        fill="#EB4335"
+        d="M11.808 5.867c1.841 0 3.084.81 3.792 1.489L18.368 4.6c-1.7-1.611-3.912-2.6-6.56-2.6-3.836 0-7.15 2.244-8.762 5.511l3.171 2.511c.796-2.41 2.997-4.155 5.59-4.155Z"
+      />
+    </svg>
+  );
+}

@@ -1,0 +1,30 @@
+import type { SVGProps } from "react";
+export interface Collapse01IconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function Collapse01Icon({
+  className = "",
+  size = 24,
+  color = "#888888",
+  ...props
+}: Collapse01IconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M7.875 20v-2c0-1.036-.84-1.875-1.875-1.875H4a1.125 1.125 0 0 1 0-2.25h2A4.125 4.125 0 0 1 10.124 18v2a1.125 1.125 0 0 1-2.25 0Zm6 0v-2A4.126 4.126 0 0 1 18 13.873h2l.115.006a1.126 1.126 0 0 1 0 2.239l-.114.006h-2.002c-1.035 0-1.874.84-1.874 1.875v2a1.125 1.125 0 0 1-2.25 0Zm-6-14V4a1.125 1.125 0 0 1 2.25 0v2l-.021.421a4.13 4.13 0 0 1-3.683 3.683l-.421.02H4a1.125 1.125 0 1 1 0-2.25h2l.191-.008A1.876 1.876 0 0 0 7.866 6.19zm6 0V4a1.125 1.125 0 0 1 2.25 0v2c0 1.035.84 1.874 1.875 1.875h2l.115.005a1.126 1.126 0 0 1 0 2.239l-.114.005h-2.002A4.125 4.125 0 0 1 13.876 6Z"
+      />
+    </svg>
+  );
+}

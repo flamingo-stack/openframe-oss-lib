@@ -1,0 +1,30 @@
+import type { SVGProps } from "react";
+export interface CarouselHrIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function CarouselHrIcon({
+  className = "",
+  size = 24,
+  color = "#888888",
+  ...props
+}: CarouselHrIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M15.375 6a.875.875 0 0 0-.875-.875h-5A.875.875 0 0 0 8.624 6v12c0 .483.391.875.874.875H14.5a.876.876 0 0 0 .875-.875zm2.25 12a3.126 3.126 0 0 1-3.125 3.125h-5A3.126 3.126 0 0 1 6.374 18V6a3.125 3.125 0 0 1 3.124-3.125H14.5A3.125 3.125 0 0 1 17.625 6zM2.874 15.047V8.952c0-.63-.429-1.181-1.041-1.334l-.106-.027-.11-.033a1.125 1.125 0 0 1 .543-2.171l.112.022.107.026a3.625 3.625 0 0 1 2.745 3.517v6.095c0 1.56-.995 2.932-2.449 3.43l-.296.087-.107.027a1.124 1.124 0 1 1-.545-2.183l.106-.026.221-.075c.492-.216.82-.708.82-1.26m16 0V8.952a3.625 3.625 0 0 1 2.746-3.517l.107-.026a1.125 1.125 0 0 1 .546 2.182l-.107.027a1.376 1.376 0 0 0-1.041 1.334v6.095c0 .631.43 1.182 1.041 1.335l.107.026a1.126 1.126 0 0 1-.546 2.183l-.107-.027a3.626 3.626 0 0 1-2.745-3.517Z"
+      />
+    </svg>
+  );
+}

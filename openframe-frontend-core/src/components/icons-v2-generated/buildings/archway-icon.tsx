@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface ArchwayIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function ArchwayIcon({
+  className = "",
+  size = 24,
+  color = "#888888",
+  ...props
+}: ArchwayIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M19.875 8a1.125 1.125 0 0 1 2.25 0v11.883a1.124 1.124 0 0 1-.01 2.237l-.115.005h-6A1.127 1.127 0 0 1 14.874 21v-4a2.875 2.875 0 1 0-5.749 0v4c0 .622-.504 1.125-1.125 1.125H2a1.125 1.125 0 0 1-.125-2.244V8a1.125 1.125 0 0 1 2.25 0v11.875h2.75V17a5.126 5.126 0 0 1 10.25 0v2.875h2.75z"
+      />
+      <path
+        fill={color}
+        d="M20.875 4.5a.375.375 0 0 0-.375-.375h-17a.375.375 0 0 0-.375.375v2c0 .207.168.375.375.375h17a.375.375 0 0 0 .375-.375zm2.25 2A2.625 2.625 0 0 1 20.5 9.125h-17A2.625 2.625 0 0 1 .875 6.5v-2A2.625 2.625 0 0 1 3.5 1.875h17A2.625 2.625 0 0 1 23.125 4.5z"
+      />
+    </svg>
+  );
+}
