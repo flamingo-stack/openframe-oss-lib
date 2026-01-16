@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface Megaphone01IconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function Megaphone01Icon({
+  className = "",
+  size = 24,
+  color = "#888888",
+  ...props
+}: Megaphone01IconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M4.875 19.5V15a1.125 1.125 0 0 1 2.25 0v4.5a.375.375 0 0 0 .75 0V15c0-.58.438-1.058 1-1.12V7a1.125 1.125 0 0 1 2.25 0v8c0 .578-.438 1.053-1 1.116v3.383a2.625 2.625 0 1 1-5.25 0Z"
+      />
+      <path
+        fill={color}
+        d="M22.125 17.993a2.126 2.126 0 0 1-2.663 2.056l-.264-.087-9.417-3.837H6A4.125 4.125 0 0 1 1.875 12v-2A4.125 4.125 0 0 1 6 5.877h3.775l9.422-3.846.263-.087a2.125 2.125 0 0 1 2.665 2.055v13.995ZM4.125 12c0 1.036.84 1.874 1.875 1.874l4 .001.216.02q.105.021.208.064l9.451 3.846V4.184l-9.45 3.858a1.1 1.1 0 0 1-.425.084H6c-1.036 0-1.875.84-1.875 1.875v2Z"
+      />
+    </svg>
+  );
+}

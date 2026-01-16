@@ -1,0 +1,30 @@
+import type { SVGProps } from "react";
+export interface LineHeightIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function LineHeightIcon({
+  className = "",
+  size = 24,
+  color = "#888888",
+  ...props
+}: LineHeightIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="m21 18.375.115.006a1.125 1.125 0 0 1 0 2.238l-.116.006h-9.5a1.125 1.125 0 1 1 0-2.25zm0-5 .115.006a1.125 1.125 0 0 1 0 2.239l-.116.005h-9.5a1.125 1.125 0 0 1 0-2.25zm0-5 .115.005a1.125 1.125 0 0 1 0 2.239l-.116.005h-9.5a1.125 1.125 0 1 1 0-2.25zm0-5 .115.006a1.125 1.125 0 0 1 0 2.238L21 5.625h-9.5a1.125 1.125 0 0 1 0-2.25zM4.29 3.127a1.125 1.125 0 0 1 1.505.078l3 3 .078.084a1.125 1.125 0 0 1-1.584 1.584l-.084-.078-1.08-1.08v10.57l1.08-1.08a1.125 1.125 0 0 1 1.59 1.59l-3 3a1.125 1.125 0 0 1-1.59 0l-3-3-.078-.086a1.125 1.125 0 0 1 1.583-1.582l.085.078 1.08 1.08V6.715l-1.08 1.08a1.125 1.125 0 1 1-1.59-1.59l3-3 .084-.078Z"
+      />
+    </svg>
+  );
+}

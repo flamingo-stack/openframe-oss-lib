@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface CreditCardEditIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function CreditCardEditIcon({
+  className = "",
+  size = 24,
+  color = "#888888",
+  ...props
+}: CreditCardEditIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="m9 11.874.115.006a1.126 1.126 0 0 1 0 2.239L9 14.124H6a1.125 1.125 0 0 1 0-2.25zm13-4.999.115.006a1.125 1.125 0 0 1 0 2.238L22 9.125H2a1.125 1.125 0 0 1 0-2.25z"
+      />
+      <path
+        fill={color}
+        d="M18.088 12.646a2.626 2.626 0 0 1 3.714 0l.553.553.18.2a2.63 2.63 0 0 1 0 3.313l-.18.2-4.75 4.748a4.13 4.13 0 0 1-2.238 1.153l-1.779.296a1.476 1.476 0 0 1-1.697-1.698l.296-1.778a4.13 4.13 0 0 1 1.152-2.238l4.75-4.75Zm-3.158 6.34a1.88 1.88 0 0 0-.523 1.017l-.118.708.707-.117.144-.03c.33-.081.632-.253.874-.495l2.608-2.607-1.084-1.084-2.608 2.607Zm5.28-4.75a.375.375 0 0 0-.53 0l-.552.551 1.084 1.084.551-.55a.375.375 0 0 0 .048-.472l-.048-.059-.554-.554Zm.665-4.838V7c0-1.036-.84-1.875-1.875-1.875H5c-1.036 0-1.875.84-1.875 1.875v10c0 1.036.84 1.875 1.875 1.875h4.214l.116.006a1.125 1.125 0 0 1 0 2.239l-.116.005H5A4.125 4.125 0 0 1 .875 17V7A4.125 4.125 0 0 1 5 2.875h14A4.125 4.125 0 0 1 23.125 7v2.398a1.125 1.125 0 0 1-2.25 0"
+      />
+    </svg>
+  );
+}

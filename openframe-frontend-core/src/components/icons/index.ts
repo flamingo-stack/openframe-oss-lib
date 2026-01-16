@@ -1,3 +1,20 @@
+/**
+ * @deprecated This icon module is deprecated. Use `@flamingo-stack/openframe-frontend-core/components/icons-v2` instead.
+ *
+ * The new icons-v2 module provides:
+ * - 1600+ icons organized by category
+ * - Consistent API with size, color, and className props
+ * - Better TypeScript support
+ * - Smaller bundle size
+ *
+ * @example
+ * // Old (deprecated)
+ * import { CopyIcon } from '@flamingo-stack/openframe-frontend-core/components/icons';
+ *
+ * // New (recommended)
+ * import { CopyIcon } from '@flamingo-stack/openframe-frontend-core/components/icons-v2';
+ */
+
 // Logo icons
 export { OpenmspLogo } from './openmsp-logo';
 export { OpenFrameLogo } from './openframe-logo';

@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface CakeSliceIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function CakeSliceIcon({
+  className = "",
+  size = 24,
+  color = "#888888",
+  ...props
+}: CakeSliceIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="m22 15.375.115.006a1.125 1.125 0 0 1 0 2.238l-.115.006H2a1.125 1.125 0 0 1 0-2.25z"
+      />
+      <path
+        fill={color}
+        d="M20.875 13.126H3.125V19l.018.177a.876.876 0 0 0 .857.698h16a.875.875 0 0 0 .875-.875zm-5.898-8.971c-.116-.05-.304-.055-.511.064l-.09.059-8.953 6.598h15.329c-.246-1.164-.85-2.364-1.711-3.468-1.138-1.458-2.637-2.637-4.064-3.253M23.125 19A3.125 3.125 0 0 1 20 22.125H4A3.126 3.126 0 0 1 .875 19v-6l.01-.217.006-.037a3.12 3.12 0 0 1 1.255-2.251l10.896-8.028.297-.193c.724-.416 1.65-.564 2.53-.185 1.816.784 3.605 2.218 4.945 3.936 1.336 1.712 2.31 3.82 2.31 5.976V19Z"
+      />
+    </svg>
+  );
+}

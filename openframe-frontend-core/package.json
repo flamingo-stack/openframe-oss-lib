@@ -117,6 +117,12 @@
     "./tailwind.config.ts": {
       "types": "./dist/tailwind.config.d.ts",
       "default": "./tailwind.config.ts"
+    },
+    "./components/icons-v2": {
+      "types": "./dist/components/icons-v2-generated/index.d.ts",
+      "import": "./dist/components/icons-v2-generated/index.js",
+      "require": "./dist/components/icons-v2-generated/index.cjs",
+      "default": "./dist/components/icons-v2-generated/index.js"
     }
   },
   "scripts": {
@@ -132,7 +138,8 @@
     "test:coverage": "vitest run --coverage",
     "yalc:watch": "nodemon --watch src --watch '*.json' --watch '*.ts' --watch '*.tsx' -e ts,tsx,json,css --exec 'npm run build && yalc push --changed'",
     "yalc:push": "npm run build && yalc push",
-    "yalc:publish": "yalc publish"
+    "yalc:publish": "yalc publish",
+    "generate:icons": "node scripts/generate-icons.mjs"
   },
   "peerDependencies": {
     "@tanstack/react-query": "^5.0.0",
@@ -202,6 +209,7 @@
     "vaul": "^1.1.2"
   },
   "devDependencies": {
+    "@svgr/cli": "^8.1.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",
     "@types/node": "^24.10.4",

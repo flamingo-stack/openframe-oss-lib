@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface FloppyDiscIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function FloppyDiscIcon({
+  className = "",
+  size = 24,
+  color = "#888888",
+  ...props
+}: FloppyDiscIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="m12 5.875.115.006a1.125 1.125 0 0 1 0 2.238L12 8.125H7a1.125 1.125 0 0 1 0-2.25zM18.124 21a1.125 1.125 0 0 1-2.25 0v-5.874h-7.75V21a1.125 1.125 0 0 1-2.25 0v-6c0-1.174.952-2.124 2.125-2.124h8c1.173 0 2.125.95 2.125 2.123v6Z"
+      />
+      <path
+        fill={color}
+        d="M1.875 18V6A4.125 4.125 0 0 1 6 1.875h7.758c1.094 0 2.143.435 2.916 1.208l4.242 4.243.274.303a4.12 4.12 0 0 1 .935 2.613V18A4.125 4.125 0 0 1 18 22.125H6A4.125 4.125 0 0 1 1.875 18m2.25 0c0 1.035.84 1.875 1.875 1.875h12c1.035 0 1.875-.84 1.875-1.875v-7.758c0-.435-.151-.854-.425-1.188l-.124-.138-4.242-4.242a1.88 1.88 0 0 0-1.326-.549H6c-1.036 0-1.875.84-1.875 1.875z"
+      />
+    </svg>
+  );
+}

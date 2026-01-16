@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface LockOpenKeyholeIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function LockOpenKeyholeIcon({
+  className = "",
+  size = 24,
+  color = "#888888",
+  ...props
+}: LockOpenKeyholeIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M20.875 9V6a2.875 2.875 0 1 0-5.75 0v4a1.125 1.125 0 0 1-2.25 0V6a5.126 5.126 0 0 1 10.25 0v3a1.125 1.125 0 0 1-2.25 0"
+      />
+      <path
+        fill={color}
+        d="M16.875 13c0-1.035-.84-1.875-1.874-1.875H5c-1.036 0-1.875.84-1.875 1.875v6c0 1.035.84 1.875 1.875 1.875h10c1.036 0 1.875-.84 1.875-1.875zM9.5 14.629a.62.62 0 0 0-.125.37l.012.127c.019.09.06.172.113.244zm1 .741a.6.6 0 0 0 .112-.244l.013-.127-.013-.126a.6.6 0 0 0-.111-.244zm1.126-.37c0 .46-.194.876-.502 1.171V18a1.125 1.125 0 0 1-2.25 0v-1.83c-.27-.26-.45-.61-.49-1.004L8.375 15l.009-.165A1.625 1.625 0 0 1 10 13.375l.166.009c.82.083 1.46.774 1.46 1.615Zm7.5 4A4.125 4.125 0 0 1 15 23.125H5A4.125 4.125 0 0 1 .875 19v-6A4.125 4.125 0 0 1 5 8.875h10A4.125 4.125 0 0 1 19.126 13z"
+      />
+    </svg>
+  );
+}

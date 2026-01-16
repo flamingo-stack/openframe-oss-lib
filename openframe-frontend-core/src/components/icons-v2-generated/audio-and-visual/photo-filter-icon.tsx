@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface PhotoFilterIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function PhotoFilterIcon({
+  className = "",
+  size = 24,
+  color = "#888888",
+  ...props
+}: PhotoFilterIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M11.999 21.897A7.126 7.126 0 1 1 6.125 9.125l.113-.025a1.126 1.126 0 0 1 .477 2.196l-.38.121A4.876 4.876 0 0 0 8 20.875c.836 0 1.621-.215 2.31-.587a7.1 7.1 0 0 1-1.436-4.287c0-.925.177-1.812.499-2.625a1.125 1.125 0 0 1 2.092.829 4.876 4.876 0 1 0 6.2-2.788l-.382-.121-.11-.035a1.126 1.126 0 0 1 .59-2.161l.112.025.28.083A7.127 7.127 0 0 1 16 23.126a7.1 7.1 0 0 1-4.001-1.23Z"
+      />
+      <path
+        fill={color}
+        d="M16.875 8a4.875 4.875 0 1 0-9.75 0 4.875 4.875 0 0 0 9.75 0m2.25 0a7.125 7.125 0 1 1-14.25 0 7.125 7.125 0 0 1 14.25 0"
+      />
+    </svg>
+  );
+}
