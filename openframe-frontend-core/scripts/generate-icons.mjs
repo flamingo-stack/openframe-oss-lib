@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 import { execSync } from 'child_process';
-import { readdirSync, statSync, writeFileSync, readFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
-import { join, basename, dirname } from 'path';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'fs';
+import { basename, dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -35,9 +35,22 @@ function getCategories() {
 
 // Get original SVG file names for a category (kebab-case base names)
 function getOriginalSvgNames(categoryPath) {
-  return readdirSync(categoryPath)
+  const svgFiles = readdirSync(categoryPath)
     .filter(f => f.endsWith('.svg'))
     .map(f => basename(f, '.svg'));
+
+  // Validate that no file names start with a number
+  for (const name of svgFiles) {
+    if (/^\d/.test(name)) {
+      throw new Error(
+        `Invalid icon name: "${name}" starts with a number. ` +
+        `Icon names cannot start with numbers as they would generate invalid JavaScript/TypeScript identifiers. ` +
+        `Please rename the file to start with a letter (e.g., "point-100" instead of "100-point").`
+      );
+    }
+  }
+
+  return svgFiles;
 }
 
 // Process generated files in a category

@@ -9,6 +9,7 @@ export default defineConfig({
     'components/features/index': 'src/components/features/index.ts',
     'components/toast/index': 'src/components/toast/index.ts',
     'components/icons/index': 'src/components/icons/index.ts',
+    'components/icons-v2-generated/index': 'src/components/icons-v2-generated/index.ts',
     'components/navigation/index': 'src/components/navigation/index.ts',
     'hooks/index': 'src/hooks/index.ts',
     'nats/index': 'src/nats/index.ts',

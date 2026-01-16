@@ -1,4 +1,3 @@
-export { 100PointIcon } from './100-point-icon';
 export { AtomIcon } from './atom-icon';
 export { BackpackIcon } from './backpack-icon';
 export { BookAltIcon } from './book-alt-icon';
@@ -31,6 +30,7 @@ export { NotebookAltIcon } from './notebook-alt-icon';
 export { NotebookIcon } from './notebook-icon';
 export { PianoKeyIcon } from './piano-key-icon';
 export { PlanetIcon } from './planet-icon';
+export { Point100Icon } from './point-100-icon';
 export { QuoteLeftIcon } from './quote-left-icon';
 export { QuoteRightIcon } from './quote-right-icon';
 export { QuoteSquareIcon } from './quote-square-icon';

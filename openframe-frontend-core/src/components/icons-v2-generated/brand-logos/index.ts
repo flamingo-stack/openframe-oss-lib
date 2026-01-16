@@ -6,7 +6,7 @@ export { AdobePsIcon } from './adobe-ps-icon';
 export { AdobeXdIcon } from './adobe-xd-icon';
 export { AndroidIcon } from './android-icon';
 export { AnthropicLogoIcon } from './anthropic-logo-icon';
-export { AppleIcon } from './apple-icon';
+export { AppleIncIcon } from './apple-inc-icon';
 export { AppleLogoIcon } from './apple-logo-icon';
 export { AppStoreIcon } from './app-store-icon';
 export { AuthentikLogoIcon } from './authentik-logo-icon';

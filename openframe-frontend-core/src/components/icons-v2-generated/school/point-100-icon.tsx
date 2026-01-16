@@ -1,16 +1,16 @@
 import type { SVGProps } from "react";
-export interface 100PointIconProps
+export interface Point100IconProps
   extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function 100PointIcon({
+export function Point100Icon({
   className = "",
   size = 24,
   color = "#888888",
   ...props
-}: 100PointIconProps) {
+}: Point100IconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
