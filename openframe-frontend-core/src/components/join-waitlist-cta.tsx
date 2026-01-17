@@ -71,7 +71,7 @@ const JoinWaitlistCTA: React.FC<JoinWaitlistCTAProps> = ({ showBottomText = true
 
           <div className="flex flex-col items-center gap-6 text-center">
             <h2 className="font-['Azeret_Mono'] text-5xl md:text-[56px] font-semibold text-white leading-[1.14em] tracking-[-0.02em]">
-              Join the Waitlist
+              Get Early Access
             </h2>
             <p className="font-['DM_Sans'] text-lg font-medium text-white leading-[1.33em] max-w-[560px]">
               OpenFrame launches in Q4 2025. Be among the first MSPs to experience the future of unified, open-source operations.
@@ -83,7 +83,7 @@ const JoinWaitlistCTA: React.FC<JoinWaitlistCTAProps> = ({ showBottomText = true
             loading={isLoading}
             className="px-4 py-3 text-lg"
           >
-            Join Waitlist
+            Get Early Access
           </JoinWaitlistButton>
         </div>
 
