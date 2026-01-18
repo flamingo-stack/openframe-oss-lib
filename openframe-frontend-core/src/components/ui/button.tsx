@@ -52,7 +52,7 @@ const buttonVariants = cva(
         "filter-active": "w-full justify-start text-[16px] py-3 px-2 font-medium font-['DM_Sans'] rounded-lg h-12 transition-all duration-150 leading-[1.33em] bg-ods-border border border-ods-border text-ods-text-primary text-left relative",
         // Section selector variant - for feature/section selection buttons
         "section": "bg-ods-card border border-ods-border shadow-ods-card !text-left !justify-start !items-start transition-all duration-200 hover:bg-ods-card-hover disabled:opacity-50 disabled:cursor-not-allowed",
-        "section-active": "bg-ods-card border border-[var(--ods-open-yellow-base)] shadow-ods-card !text-left !justify-start !items-start transition-all duration-200 hover:bg-ods-card-hover disabled:opacity-50 disabled:cursor-not-allowed",
+        "section-active": "bg-ods-card border border-ods-accent shadow-ods-card !text-left !justify-start !items-start transition-all duration-200 hover:bg-ods-card-hover disabled:opacity-50 disabled:cursor-not-allowed",
         // Table display variant - for non-interactive display in tables (no hover, no padding)
         "table-display": "bg-transparent text-ods-text-primary cursor-default pointer-events-none font-normal",
         // Device action variant - for device detail page action buttons
