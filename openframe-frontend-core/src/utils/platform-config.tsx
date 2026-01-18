@@ -10,7 +10,10 @@ export const platformIcons = {
   openmsp: <OpenmspLogo className="h-5 w-5" />,
   flamingo: <FlamingoLogo className="h-5 w-5" fill="#EC4899" />,
   'flamingo-teaser': <FlamingoLogo className="h-5 w-5" fill="#EC4899" />,
-  'admin-hub': <FlamingoLogo className="h-5 w-5" fill="#FFC008" />,
+  'marketing-hub': <FlamingoLogo className="h-5 w-5" fill="#F357BB" />,
+  'product-hub': <FlamingoLogo className="h-5 w-5" fill="#5EA62E" />,
+  'revenue-hub': <FlamingoLogo className="h-5 w-5" fill="#FFC008" />,
+  'people-hub': <FlamingoLogo className="h-5 w-5" fill="#5EFAF0" />,
   tmcg: <MiamiCyberGangLogoFaceOnly  className="h-5 w-5" />,
   universal: <Globe className="h-5 w-5 text-[#10B981]" />
 };
@@ -21,7 +24,10 @@ export const platformColors = {
   openframe: 'bg-[#8B5CF6]',
   flamingo: 'bg-[#EC4899]',
   'flamingo-teaser': 'bg-[#F59E0B]',
-  'admin-hub': 'bg-[#FF6B9D]',
+  'marketing-hub': 'bg-[#F357BB]',
+  'product-hub': 'bg-[#5EA62E]',
+  'revenue-hub': 'bg-[#FFC008]',
+  'people-hub': 'bg-[#5EFAF0]',
   tmcg: 'bg-[#FF6B6B]',
   universal: 'bg-[#10B981]'
 };
@@ -154,8 +160,15 @@ export function getSmallPlatformIcon(platformName: string): React.ReactNode {
       return <OpenmspLogo className={className} frontBubbleColor="#f1f1f1" innerFrontBubbleColor="#000000" backBubbleColor="#FFC008" />;
     case 'flamingo':
     case 'flamingo-teaser':
-    case 'admin-hub':
-      return <FlamingoLogo className={`${className} text-white`} />;
+      return <FlamingoLogo className={`${className}`} fill="#EC4899" />;
+    case 'marketing-hub':
+      return <FlamingoLogo className={className} fill="var(--ods-flamingo-pink-base)" />;
+    case 'product-hub':
+      return <FlamingoLogo className={className} fill="var(--ods-attention-green-success)" />;
+    case 'revenue-hub':
+      return <FlamingoLogo className={className} fill="var(--ods-attention-yellow-warning)" />;
+    case 'people-hub':
+      return <FlamingoLogo className={className} fill="var(--ods-flamingo-cyan-base)" />;
     case 'tmcg':
       return <MiamiCyberGangLogoFaceOnly className={className} />;
     case 'universal':
@@ -177,6 +190,14 @@ export function getPlatformIconComponent(platformName: string, className: string
     case 'flamingo-teaser':
     case 'admin-hub':
       return <FlamingoLogo className={`${className} text-white`} />;
+    case 'marketing-hub':
+      return <FlamingoLogo className={className} fill="var(--ods-flamingo-pink-base)" />;
+    case 'product-hub':
+      return <FlamingoLogo className={className} fill="var(--ods-attention-green-success)" />;
+    case 'revenue-hub':
+      return <FlamingoLogo className={className} fill="var(--ods-attention-yellow-warning)" />;
+    case 'people-hub':
+      return <FlamingoLogo className={className} fill="var(--ods-flamingo-cyan-base)" />;
     case 'tmcg':
       return <MiamiCyberGangLogoFaceOnly size={24} className={className} />;
     case 'universal':
