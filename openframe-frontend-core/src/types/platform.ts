@@ -10,6 +10,7 @@ export interface PlatformRecord {
   display_name: string;
   description?: string;
   is_active: boolean;
+  is_internal: boolean; // Whether this is an internal admin platform vs public-facing
   created_at: string;
   updated_at: string;
 }
