@@ -65,7 +65,7 @@ const SectionButton: React.FC<{
 }) => {
   const titleClasses = "font-['DM_Sans'] text-ods-text-primary"
   const subtitleClasses = "font-['DM_Sans'] text-ods-text-secondary"
-  const numberClasses = "font-['DM_Sans'] font-bold text-[var(--ods-open-yellow-base)]"
+  const numberClasses = "font-['DM_Sans'] font-bold text-ods-accent"
 
   const isDisabled = section.disabled || disabled;
 
