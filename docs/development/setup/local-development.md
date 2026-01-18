@@ -1,651 +1,747 @@
-# Local Development Setup
+# Local Development Guide
 
-This guide will get you running the complete OpenFrame OSS Library locally with all dependencies, services, and development tools. By the end, you'll have a fully functional local development environment that mirrors the production setup.
+Learn the development workflow for building applications with OpenFrame OSS Library, including hot reload, debugging, and testing workflows.
 
-[![OpenFrame v0.3.7 - Enhanced Developer Experience](https://img.youtube.com/vi/O8hbBO5Mym8/maxresdefault.jpg)](https://www.youtube.com/watch?v=O8hbBO5Mym8)
+## Clone and Setup Commands
 
-## 🎯 What You'll Accomplish
-
-- **Clone and build** the complete OpenFrame OSS Library
-- **Set up local services** (MongoDB, message queues, etc.)
-- **Configure development databases** with sample data
-- **Enable hot reload** for rapid development
-- **Set up debugging** with IDE integration
-
-## 📋 Prerequisites
-
-Before starting, ensure you have completed:
-- ✅ [Prerequisites](../../getting-started/prerequisites.md) - Java, Maven, Git installed
-- ✅ [Environment Setup](environment.md) - IDE configured with necessary plugins
-
-## 🚀 Step 1: Clone and Initial Setup
-
-### Clone the Repository
+### Repository Setup
 
 ```bash
-# Clone the main repository
-git clone https://github.com/openframe/openframe-oss-lib.git
-cd openframe-oss-lib
+# Clone the repository
+git clone https://github.com/your-org/openframe-project.git
+cd openframe-project
 
-# Check the project structure
-ls -la
+# Create development branch
+git checkout -b feature/my-new-feature
+
+# Install dependencies
+./mvnw clean install
+
+# Verify setup
+./mvnw spring-boot:run
 ```
 
-**Expected Project Structure:**
+### Project Structure
+
 ```text
-openframe-oss-lib/
-├── openframe-api-lib/              # Core DTOs and service interfaces
-├── openframe-api-service-core/     # Main API service implementation
-├── openframe-authorization-service-core/ # OAuth2 and SSO services
-├── openframe-client-core/          # Client/agent communication
-├── openframe-core/                 # Shared utilities and validation
-├── openframe-data-mongo/           # MongoDB models and repositories
-├── openframe-data/                 # Data layer abstractions
-├── openframe-gateway-service-core/ # API gateway and routing
-├── openframe-security-core/        # Security utilities
-├── sdk/                            # Integration SDKs (TacticalRMM, Fleet MDM)
-├── pom.xml                         # Root Maven configuration
-├── docker-compose.yml              # Local services configuration
-└── README.md                       # Project documentation
+openframe-project/
+├── src/
+│   ├── main/
+│   │   ├── java/com/openframe/
+│   │   │   ├── config/          # Configuration classes
+│   │   │   ├── controller/      # REST controllers
+│   │   │   ├── service/         # Business logic
+│   │   │   ├── repository/      # Data access layer
+│   │   │   ├── model/          # Domain models
+│   │   │   └── Application.java # Main application class
+│   │   └── resources/
+│   │       ├── application.yml  # Configuration
+│   │       ├── application-dev.yml # Development config
+│   │       └── static/         # Static resources
+│   └── test/
+│       ├── java/               # Unit and integration tests
+│       └── resources/          # Test resources
+├── docker/                     # Docker configurations
+├── scripts/                    # Development scripts
+├── docs/                      # Project documentation
+├── pom.xml                    # Maven configuration
+└── README.md                  # Project README
 ```
 
-### Initial Build
+## Running Locally
 
-```bash
-# Clean and build all modules (this may take 5-10 minutes on first run)
-mvn clean install
+### Development Database Setup
 
-# If you encounter test failures during initial setup, skip tests
-mvn clean install -DskipTests
+#### Option 1: Docker Compose (Recommended)
 
-# Verify build success
-echo "Build Status: $?"  # Should print "Build Status: 0"
+Create `docker/docker-compose.dev.yml`:
+
+```yaml
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: openframe-mongo-dev
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: openframe_dev
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: devpassword
+    volumes:
+      - mongodb_dev:/data/db
+      - ../scripts/mongo-init.js:/docker-entrypoint-initdb.d/init.js:ro
+
+  redis:
+    image: redis:7.0-alpine
+    container_name: openframe-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev:/data
+    command: redis-server --appendonly yes
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: openframe-kafka-dev
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    depends_on:
+      - zookeeper
+    volumes:
+      - kafka_dev:/var/lib/kafka/data
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: openframe-zookeeper-dev
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper_dev:/var/lib/zookeeper/data
+
+volumes:
+  mongodb_dev:
+  redis_dev:
+  kafka_dev:
+  zookeeper_dev:
 ```
 
-## 🐳 Step 2: Set Up Local Services
-
-OpenFrame uses several services that need to be running for full functionality.
-
-### Start Core Services with Docker Compose
+Start development environment:
 
 ```bash
-# Start all required services
-docker-compose up -d
+# Start all services
+docker-compose -f docker/docker-compose.dev.yml up -d
 
-# This starts:
-# - MongoDB (primary database)
-# - Redis (caching and sessions) 
-# - NATS (message streaming)
-# - Kafka (event processing)
+# Check services status
+docker-compose -f docker/docker-compose.dev.yml ps
+
+# View logs
+docker-compose -f docker/docker-compose.dev.yml logs -f mongodb
 ```
 
-### Verify Services
+#### Option 2: Local Services
 
 ```bash
-# Check all services are running
-docker-compose ps
+# Start MongoDB
+sudo systemctl start mongod  # Linux
+brew services start mongodb-community  # macOS
 
-# Expected output:
-# NAME                          STATUS
-# openframe-mongodb            Up
-# openframe-redis              Up  
-# openframe-nats               Up
-# openframe-kafka              Up
-# openframe-zookeeper         Up
+# Start Redis (optional)
+sudo systemctl start redis  # Linux
+brew services start redis  # macOS
 
-# Test MongoDB connection
-mongosh mongodb://localhost:27017/openframe-dev --eval "db.adminCommand('ping')"
-
-# Test Redis connection  
+# Verify services
+mongosh --eval "db.runCommand({ connectionStatus: 1 })"
 redis-cli ping
 ```
 
-### Alternative: Individual Service Setup
-
-If you prefer not to use Docker Compose:
-
-<details>
-<summary><strong>Click to expand individual service setup</strong></summary>
-
-**MongoDB**
-```bash
-# Option 1: Docker
-docker run --name openframe-mongo -p 27017:27017 -d mongo:7
-
-# Option 2: Local installation (macOS)
-brew install mongodb-community
-brew services start mongodb/brew/mongodb-community
-
-# Option 3: Local installation (Ubuntu)
-sudo apt install -y mongodb
-sudo systemctl start mongodb
-```
-
-**Redis (Optional - for caching)**
-```bash
-# Option 1: Docker
-docker run --name openframe-redis -p 6379:6379 -d redis:7-alpine
-
-# Option 2: Local installation (macOS)
-brew install redis
-brew services start redis
-
-# Option 3: Local installation (Ubuntu)
-sudo apt install -y redis-server
-sudo systemctl start redis
-```
-
-</details>
-
-## 🗄️ Step 3: Database Initialization
-
-### Initialize MongoDB with Development Data
-
-Create initialization script `scripts/init-dev-db.js`:
-
-```javascript
-// MongoDB initialization script for development
-use('openframe-dev');
-
-// Create collections with sample data
-db.organizations.insertMany([
-    {
-        _id: ObjectId(),
-        name: "Demo MSP Company",
-        slug: "demo-msp-company",
-        website: "https://demo-msp.com",
-        status: "ACTIVE",
-        createdAt: new Date(),
-        updatedAt: new Date()
-    },
-    {
-        _id: ObjectId(),
-        name: "Local Test Organization", 
-        slug: "local-test-org",
-        website: "https://test-org.local",
-        status: "ACTIVE",
-        createdAt: new Date(),
-        updatedAt: new Date()
-    }
-]);
-
-db.devices.insertMany([
-    {
-        _id: ObjectId(),
-        name: "DEV-WORKSTATION-01",
-        deviceType: "DESKTOP",
-        status: "ONLINE",
-        organizationId: db.organizations.findOne({name: "Demo MSP Company"})._id,
-        tags: ["development", "windows"],
-        createdAt: new Date(),
-        updatedAt: new Date()
-    },
-    {
-        _id: ObjectId(), 
-        name: "DEV-SERVER-01",
-        deviceType: "SERVER",
-        status: "ONLINE",
-        organizationId: db.organizations.findOne({name: "Demo MSP Company"})._id,
-        tags: ["development", "linux", "docker"],
-        createdAt: new Date(),
-        updatedAt: new Date()
-    }
-]);
-
-print("✅ Development database initialized successfully");
-print("Organizations:", db.organizations.countDocuments());
-print("Devices:", db.devices.countDocuments());
-```
-
-Run the initialization:
-```bash
-# Execute the initialization script
-mongosh mongodb://localhost:27017 --file scripts/init-dev-db.js
-
-# Verify data was created
-mongosh mongodb://localhost:27017/openframe-dev --eval "
-    print('Organizations:', db.organizations.countDocuments());
-    print('Devices:', db.devices.countDocuments());
-"
-```
-
-## 🔧 Step 4: Configure Development Properties
-
 ### Application Configuration
 
-Create `application-development.yml`:
+Create `src/main/resources/application-dev.yml`:
 
 ```yaml
-# Development-specific configuration
 spring:
   profiles:
-    active: development
-    
+    active: dev
+  
+  # Database Configuration
   data:
     mongodb:
-      uri: mongodb://localhost:27017/openframe-dev
-      
-  redis:
-    host: localhost
-    port: 6379
-    timeout: 2000ms
-    
+      uri: mongodb://root:devpassword@localhost:27017/openframe_dev?authSource=admin
+      auto-index-creation: true
+  
+  # Redis Configuration
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 2000ms
+  
+  # Kafka Configuration (optional)
   kafka:
     bootstrap-servers: localhost:9092
-    producer:
-      retries: 3
-      batch-size: 16384
-      
-  security:
-    oauth2:
-      client:
-        registration:
-          openframe:
-            client-id: openframe-dev
-            client-secret: dev-secret
-            scope: openid,profile,email
+    consumer:
+      group-id: openframe-dev
+      auto-offset-reset: earliest
+  
+  # Development Features
+  devtools:
+    restart:
+      enabled: true
+      poll-interval: 1000ms
+      quiet-period: 400ms
+    livereload:
+      enabled: true
 
-# Logging configuration for development
+# OpenFrame Configuration
+openframe:
+  security:
+    jwt:
+      secret: development-jwt-secret-for-local-development-only-32chars
+      expiration: 86400 # 24 hours
+      refresh-expiration: 604800 # 7 days
+    oauth:
+      enabled: false # Disable OAuth for local development
+  
+  # Cache Configuration
+  cache:
+    enabled: true
+    ttl: 3600 # 1 hour
+  
+  # Pagination Defaults
+  pagination:
+    default-size: 20
+    max-size: 100
+
+# Logging Configuration
 logging:
   level:
+    root: INFO
     com.openframe: DEBUG
-    org.springframework.data.mongodb: DEBUG
-    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG
+    org.mongodb.driver: INFO
   pattern:
     console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
 
-# Development-specific settings
-openframe:
-  development:
-    hot-reload: true
-    debug-mode: true
-    sample-data: true
-    
+# Management Endpoints
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,beans,env
+        include: health,info,metrics,env,configprops,beans
   endpoint:
     health:
       show-details: always
+  health:
+    mongo:
+      enabled: true
+    redis:
+      enabled: true
 ```
 
-### Environment Variables for Development
+### Running the Application
 
-Create `.env.local`:
+#### Option 1: Maven Spring Boot Plugin
 
 ```bash
-# Development Environment Variables
-SPRING_PROFILES_ACTIVE=development
-MONGODB_URL=mongodb://localhost:27017/openframe-dev
-REDIS_URL=redis://localhost:6379
-KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+# Run with development profile
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
 
-# Debug configuration
-DEBUG=true
-LOGGING_LEVEL_COM_OPENFRAME=DEBUG
+# Run with JVM options
+./mvnw spring-boot:run -Dspring-boot.run.jvmArguments="-Xmx1g -Xdebug"
 
-# Development flags
-OPENFRAME_HOT_RELOAD=true
-OPENFRAME_SAMPLE_DATA=true
-
-# OAuth development settings
-OAUTH_CLIENT_ID=openframe-dev
-OAUTH_CLIENT_SECRET=dev-secret-change-in-production
+# Run with environment variables
+MONGODB_URI=mongodb://localhost:27017/custom_db ./mvnw spring-boot:run
 ```
 
-Load environment variables:
-```bash
-# Load into current session
-export $(cat .env.local | xargs)
+#### Option 2: IDE Integration
 
-# Or use direnv for automatic loading
-echo "dotenv .env.local" > .envrc
-direnv allow
-```
+**IntelliJ IDEA Run Configuration:**
 
-## 🏃‍♂️ Step 5: Run the Application
-
-### Start Individual Services
-
-**Terminal 1: API Service**
-```bash
-cd openframe-api-service-core
-mvn spring-boot:run -Dspring-boot.run.profiles=development
-
-# Wait for: "Started OpenFrameApiApplication in X.XXX seconds"
-# API will be available at: http://localhost:8080
-```
-
-**Terminal 2: Gateway Service**
-```bash
-cd openframe-gateway-service-core  
-mvn spring-boot:run -Dspring-boot.run.profiles=development
-
-# Wait for: "Started OpenFrameGatewayApplication in X.XXX seconds"
-# Gateway will be available at: http://localhost:8081
-```
-
-**Terminal 3: Authorization Service**
-```bash
-cd openframe-authorization-service-core
-mvn spring-boot:run -Dspring-boot.run.profiles=development
-
-# Wait for: "Started OpenFrameAuthorizationApplication in X.XXX seconds"  
-# Auth will be available at: http://localhost:8082
-```
-
-### Verify Services Are Running
-
-```bash
-# Check API service health
-curl http://localhost:8080/actuator/health
-
-# Check Gateway service health  
-curl http://localhost:8081/actuator/health
-
-# Check Authorization service health
-curl http://localhost:8082/actuator/health
-
-# All should return: {"status":"UP"}
-```
-
-### Test API Endpoints
-
-```bash
-# Test organization listing
-curl -X GET "http://localhost:8080/api/organizations?limit=10" \
-  -H "Content-Type: application/json"
-
-# Test device listing
-curl -X GET "http://localhost:8080/api/devices?limit=10" \
-  -H "Content-Type: application/json"
-
-# Expected: JSON responses with sample data
-```
-
-## ⚡ Step 6: Enable Hot Reload
-
-### Maven Configuration for Hot Reload
-
-Add to each service module's `pom.xml`:
-
-```xml
-<plugin>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-maven-plugin</artifactId>
-    <configuration>
-        <addResources>true</addResources>
-    </configuration>
-</plugin>
-```
-
-### IDE Configuration
-
-**IntelliJ IDEA**
 ```text
-1. Settings → Build → Compiler → Build project automatically: ✅
-2. Registry → compiler.automake.allow.when.app.running: ✅ 
-3. Run configurations → Spring Boot → Update classes and resources: ✅
+Main class: com.openframe.Application
+VM options: -Dspring.profiles.active=dev -Xmx1024m
+Environment variables: 
+  SPRING_PROFILES_ACTIVE=dev
+  MONGODB_URI=mongodb://localhost:27017/openframe_dev
+Working directory: $MODULE_WORKING_DIR$
+Use classpath of module: openframe-project
 ```
 
-**VS Code**
+**VS Code Launch Configuration (`.vscode/launch.json`):**
+
 ```json
-// In .vscode/settings.json
 {
-    "java.autobuild.enabled": true,
-    "java.compile.nullAnalysis.mode": "automatic"
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "OpenFrame Development",
+      "request": "launch",
+      "mainClass": "com.openframe.Application",
+      "projectName": "openframe-project",
+      "env": {
+        "SPRING_PROFILES_ACTIVE": "dev",
+        "MONGODB_URI": "mongodb://localhost:27017/openframe_dev"
+      },
+      "vmArgs": "-Dspring.profiles.active=dev -Xmx1024m",
+      "console": "integratedTerminal"
+    }
+  ]
 }
 ```
 
-### Test Hot Reload
+## Hot Reload / Watch Mode
 
-1. **Start a service** with hot reload enabled
-2. **Make a code change** (e.g., modify a controller endpoint)
-3. **Save the file** - changes should be automatically detected
-4. **Test the endpoint** - should reflect your changes without restart
+### Spring Boot DevTools
 
-```bash
-# Example: Modify a controller method and test
-# The service should reload automatically
-curl http://localhost:8080/your-modified-endpoint
+DevTools provides automatic restart and live reload capabilities.
+
+**Configuration in `application-dev.yml`:**
+
+```yaml
+spring:
+  devtools:
+    restart:
+      enabled: true
+      additional-paths: src/main/java,src/main/resources
+      exclude: static/**,templates/**
+      poll-interval: 1000ms
+      quiet-period: 400ms
+    livereload:
+      enabled: true
+      port: 35729
 ```
 
-## 🔍 Step 7: Set Up Debugging
+### File Watching Workflow
 
-### Remote Debugging Configuration
-
-**Start services with debug enabled:**
-
-```bash
-# API Service with debug
-cd openframe-api-service-core
-mvn spring-boot:run -Dspring-boot.run.jvmArguments="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5005"
-
-# Gateway Service with debug  
-cd openframe-gateway-service-core
-mvn spring-boot:run -Dspring-boot.run.jvmArguments="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5006"
-
-# Authorization Service with debug
-cd openframe-authorization-service-core
-mvn spring-boot:run -Dspring-boot.run.jvmArguments="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5007"
+```mermaid
+flowchart LR
+    A[Edit Code] --> B[Save File]
+    B --> C[DevTools Detects Change]
+    C --> D[Restart Application]
+    D --> E[Live Reload Browser]
+    E --> F[Test Changes]
+    F --> A
 ```
 
-**IDE Debug Configuration:**
+### IDE-Specific Hot Reload
 
-**IntelliJ IDEA**
+**IntelliJ IDEA:**
+
+1. Enable automatic compilation:
+   - `File > Settings > Build, Execution, Deployment > Compiler`
+   - Check "Build project automatically"
+
+2. Enable automatic make:
+   - `File > Settings > Advanced Settings`
+   - Check "Allow auto-make to start even if developed application is currently running"
+
+**VS Code:**
+
+Hot reload works automatically when files are saved with Spring Boot DevTools enabled.
+
+### Testing Hot Reload
+
+1. **Start the application** with DevTools enabled
+2. **Make a change** to a controller or service
+3. **Save the file** - DevTools will restart the application
+4. **Test the API** to verify changes
+
+Example test:
+
+```bash
+# Make change to controller
+# Save file
+# Test endpoint
+curl -H "Authorization: Bearer $TOKEN" \
+  http://localhost:8080/api/devices
+```
+
+## Debug Configuration
+
+### Application Debugging
+
+#### Enable Debug Mode
+
+**Maven:**
+```bash
+# Run with debug port 5005
+./mvnw spring-boot:run -Dspring-boot.run.jvmArguments="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"
+```
+
+**IDE Debug Run:**
+
+**IntelliJ IDEA:**
+1. Set breakpoints in your code
+2. Run > Debug 'Application' 
+3. Application starts in debug mode
+
+**VS Code:**
+1. Set breakpoints by clicking line numbers
+2. Press `F5` or use Debug panel
+3. Select "OpenFrame Development" configuration
+
+#### Remote Debugging
+
+For debugging deployed applications:
+
+```bash
+# Start application with debug agent
+java -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005 \
+  -jar target/openframe-project.jar
+```
+
+**IDE Remote Debug Setup:**
 ```text
-Run → Edit Configurations → Add → Remote JVM Debug
-- Name: OpenFrame API Debug
-- Host: localhost  
-- Port: 5005 (or 5006, 5007 for other services)
-- Use module classpath: openframe-api-service-core
+Host: localhost (or remote server IP)
+Port: 5005
+Transport: Socket
+Debugger mode: Attach
 ```
 
-**VS Code**
-```json
-// Add to .vscode/launch.json
-{
-    "configurations": [
-        {
-            "type": "java",
-            "name": "Debug OpenFrame API",
-            "request": "attach",
-            "hostName": "localhost",
-            "port": 5005
-        },
-        {
-            "type": "java", 
-            "name": "Debug OpenFrame Gateway",
-            "request": "attach",
-            "hostName": "localhost", 
-            "port": 5006
-        }
-    ]
-}
+### Database Debugging
+
+#### MongoDB Query Logging
+
+Enable MongoDB query logging in `application-dev.yml`:
+
+```yaml
+logging:
+  level:
+    org.springframework.data.mongodb.core.MongoTemplate: DEBUG
+    org.springframework.data.mongodb.repository: DEBUG
 ```
 
-### Test Debugging
+#### Redis Monitoring
 
-1. **Set a breakpoint** in a controller method
-2. **Attach debugger** from your IDE
-3. **Make an API request** that hits the breakpoint
-4. **Verify debugging works** - execution should pause at your breakpoint
+```bash
+# Monitor Redis commands
+redis-cli monitor
 
-## 📊 Step 8: Development Dashboard
+# View Redis info
+redis-cli info
 
-Create a simple script to monitor your local environment:
+# List all keys
+redis-cli keys "*"
+```
 
+### HTTP Request Debugging
+
+#### Enable Request Logging
+
+```yaml
+logging:
+  level:
+    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG
+    org.apache.http: DEBUG
+```
+
+#### Use HTTP Client Tools
+
+**cURL Examples:**
+```bash
+# GET request with headers
+curl -v \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  http://localhost:8080/api/devices
+
+# POST request with JSON body
+curl -v -X POST \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Test Device", "type": "LAPTOP"}' \
+  http://localhost:8080/api/devices
+```
+
+**HTTPie (user-friendly alternative):**
+```bash
+# Install HTTPie
+pip install httpie
+
+# GET request
+http GET localhost:8080/api/devices Authorization:"Bearer $JWT_TOKEN"
+
+# POST request  
+http POST localhost:8080/api/devices \
+  Authorization:"Bearer $JWT_TOKEN" \
+  name="Test Device" \
+  type="LAPTOP"
+```
+
+## Development Scripts
+
+Create useful development scripts in `scripts/` directory:
+
+### Database Management Scripts
+
+**`scripts/reset-db.sh`:**
 ```bash
 #!/bin/bash
-# monitor-dev-environment.sh
+echo "Resetting development database..."
 
-clear
-echo "🚀 OpenFrame Development Environment Status"
-echo "=========================================="
+# Drop development database
+mongosh openframe_dev --eval "db.dropDatabase()"
 
-# Check services
-echo "📊 Service Status:"
-echo -n "MongoDB: "
-if mongosh --eval "db.adminCommand('ping')" > /dev/null 2>&1; then
-    echo "✅ Running"
-else
-    echo "❌ Down"
-fi
+# Clear Redis cache
+redis-cli FLUSHALL
 
-echo -n "Redis: "
-if redis-cli ping > /dev/null 2>&1; then
-    echo "✅ Running"
-else
-    echo "❌ Down"
-fi
-
-# Check API endpoints
-echo
-echo "🔗 API Endpoint Status:"
-api_status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/actuator/health)
-if [ "$api_status" = "200" ]; then
-    echo "API Service: ✅ Running (http://localhost:8080)"
-else
-    echo "API Service: ❌ Down"
-fi
-
-gateway_status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/actuator/health) 
-if [ "$gateway_status" = "200" ]; then
-    echo "Gateway Service: ✅ Running (http://localhost:8081)"
-else
-    echo "Gateway Service: ❌ Down"
-fi
-
-auth_status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8082/actuator/health)
-if [ "$auth_status" = "200" ]; then
-    echo "Auth Service: ✅ Running (http://localhost:8082)"
-else
-    echo "Auth Service: ❌ Down"
-fi
-
-# Database stats
-echo
-echo "📊 Database Status:"
-org_count=$(mongosh --quiet mongodb://localhost:27017/openframe-dev --eval "db.organizations.countDocuments()")
-device_count=$(mongosh --quiet mongodb://localhost:27017/openframe-dev --eval "db.devices.countDocuments()")
-echo "Organizations: $org_count"
-echo "Devices: $device_count"
-
-echo
-echo "🔧 Development URLs:"
-echo "API Documentation: http://localhost:8080/swagger-ui.html"
-echo "Health Checks: http://localhost:8080/actuator/health"
-echo "Database Admin: http://localhost:8081 (if mongo-express running)"
+# Restart application to trigger database initialization
+echo "Database reset complete. Restart your application."
 ```
 
-Run it:
+**`scripts/seed-data.sh`:**
 ```bash
-chmod +x monitor-dev-environment.sh
-./monitor-dev-environment.sh
-```
+#!/bin/bash
+echo "Seeding development data..."
 
-## ✅ Verification Checklist
-
-Ensure your local development environment is fully functional:
-
-- [ ] **All services start without errors**
-- [ ] **Database contains sample data**
-- [ ] **API endpoints respond correctly**
-- [ ] **Hot reload works when you make changes**
-- [ ] **Debugging connects successfully**
-- [ ] **Environment monitoring script shows all green**
-
-### Test Full Workflow
-
-```bash
-# 1. Create a new organization via API
-curl -X POST "http://localhost:8080/api/organizations" \
+# Create sample organization
+curl -X POST http://localhost:8080/api/organizations \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $DEV_TOKEN" \
   -d '{
-    "name": "Test Development Org",
-    "website": "https://test-dev.com"
+    "name": "Development Org",
+    "slug": "dev-org",
+    "contactInformation": {
+      "email": "dev@example.com"
+    }
   }'
 
-# 2. List organizations to verify creation
-curl -X GET "http://localhost:8080/api/organizations?limit=10"
+# Create sample devices
+for i in {1..5}; do
+  curl -X POST http://localhost:8080/api/devices \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $DEV_TOKEN" \
+    -d "{
+      \"machineId\": \"dev-device-$i\",
+      \"serialNumber\": \"DEV$i\",
+      \"model\": \"Development Device $i\",
+      \"type\": \"DESKTOP\"
+    }"
+done
 
-# 3. Check database directly
-mongosh mongodb://localhost:27017/openframe-dev --eval "
-  db.organizations.find({name: 'Test Development Org'}).pretty()
+echo "Sample data created successfully!"
+```
+
+### Development Workflow Scripts
+
+**`scripts/dev-start.sh`:**
+```bash
+#!/bin/bash
+echo "Starting OpenFrame development environment..."
+
+# Start Docker services
+docker-compose -f docker/docker-compose.dev.yml up -d
+
+# Wait for services to be ready
+echo "Waiting for MongoDB to be ready..."
+until mongosh --eval "print('MongoDB is ready')" > /dev/null 2>&1; do
+  sleep 2
+done
+
+echo "Waiting for Redis to be ready..."
+until redis-cli ping > /dev/null 2>&1; do
+  sleep 2
+done
+
+echo "Services are ready! Starting application..."
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+```
+
+**`scripts/dev-stop.sh`:**
+```bash
+#!/bin/bash
+echo "Stopping OpenFrame development environment..."
+
+# Stop Docker services
+docker-compose -f docker/docker-compose.dev.yml down
+
+echo "Development environment stopped."
+```
+
+### Testing Scripts
+
+**`scripts/run-tests.sh`:**
+```bash
+#!/bin/bash
+echo "Running OpenFrame tests..."
+
+# Unit tests
+echo "Running unit tests..."
+./mvnw test
+
+# Integration tests
+echo "Running integration tests..."
+./mvnw verify -P integration-tests
+
+# API tests
+echo "Running API tests..."
+./mvnw test -Dtest="**/*ApiTest"
+
+echo "All tests completed!"
+```
+
+## Common Development Tasks
+
+### Adding New Features
+
+1. **Create Feature Branch:**
+   ```bash
+   git checkout -b feature/device-filtering
+   ```
+
+2. **Implement Feature:**
+   - Add/modify controllers
+   - Update services and repositories
+   - Create/update DTOs
+   - Add tests
+
+3. **Test Locally:**
+   ```bash
+   ./mvnw test
+   curl http://localhost:8080/api/devices?filter=active
+   ```
+
+4. **Commit Changes:**
+   ```bash
+   git add .
+   git commit -m "feat: add device filtering capability"
+   ```
+
+### Working with Database Changes
+
+1. **MongoDB Schema Changes:**
+   - Update document models
+   - Create migration scripts if needed
+   - Update indexes
+
+2. **Test Migration:**
+   ```bash
+   # Reset database
+   ./scripts/reset-db.sh
+   
+   # Start application (triggers auto-indexing)
+   ./mvnw spring-boot:run
+   
+   # Verify indexes
+   mongosh openframe_dev --eval "db.devices.getIndexes()"
+   ```
+
+### API Development Workflow
+
+1. **Design API Endpoint:**
+   ```java
+   @GetMapping("/api/devices/{id}/health")
+   public DeviceHealthResponse getDeviceHealth(@PathVariable String id) {
+       // Implementation
+   }
+   ```
+
+2. **Test with curl:**
+   ```bash
+   curl -H "Authorization: Bearer $TOKEN" \
+     http://localhost:8080/api/devices/device-123/health
+   ```
+
+3. **Add Integration Test:**
+   ```java
+   @Test
+   public void testGetDeviceHealth() {
+       // Test implementation
+   }
+   ```
+
+## Troubleshooting Common Issues
+
+### Application Won't Start
+
+**Check Database Connection:**
+```bash
+# Test MongoDB connection
+mongosh --eval "db.runCommand({ connectionStatus: 1 })"
+
+# Check application logs
+tail -f target/spring.log
+```
+
+### Hot Reload Not Working
+
+**IntelliJ IDEA:**
+1. Verify "Build project automatically" is enabled
+2. Check that DevTools is in classpath
+3. Try `Build > Rebuild Project`
+
+**VS Code:**
+1. Restart Java Language Server: `Ctrl+Shift+P` > "Java: Reload Projects"
+2. Check that DevTools is properly configured
+
+### Port Already in Use
+
+```bash
+# Find process using port 8080
+lsof -i :8080
+netstat -tulpn | grep :8080
+
+# Kill the process
+kill -9 PID
+
+# Or use a different port
+SERVER_PORT=8081 ./mvnw spring-boot:run
+```
+
+### Database Connection Issues
+
+**MongoDB Authentication:**
+```bash
+# Test connection with credentials
+mongosh "mongodb://root:devpassword@localhost:27017/openframe_dev?authSource=admin"
+```
+
+**Check Docker Services:**
+```bash
+# View service logs
+docker-compose -f docker/docker-compose.dev.yml logs mongodb
+
+# Restart services
+docker-compose -f docker/docker-compose.dev.yml restart
+```
+
+## Performance Optimization
+
+### JVM Tuning for Development
+
+```bash
+# Optimized JVM settings for development
+export JAVA_OPTS="-Xms512m -Xmx2g -XX:+UseG1GC -XX:+UseStringDeduplication"
+./mvnw spring-boot:run
+```
+
+### Database Performance
+
+**MongoDB Indexes:**
+```bash
+# Create compound index for common queries
+mongosh openframe_dev --eval "
+  db.devices.createIndex({ 
+    'organizationId': 1, 
+    'status': 1, 
+    'lastCheckin': -1 
+  })
 "
-
-# If all these work, your environment is properly set up!
 ```
 
-## 🚨 Common Issues and Solutions
-
-### Build Failures
-
-```bash
-# Clear Maven cache and rebuild
-rm -rf ~/.m2/repository/com/openframe
-mvn clean install -U
-
-# Skip tests during development setup
-mvn clean install -DskipTests
-
-# Check for port conflicts
-lsof -i :8080  # API service port
-lsof -i :8081  # Gateway service port 
-lsof -i :27017 # MongoDB port
+**Redis Cache Configuration:**
+```yaml
+spring:
+  cache:
+    redis:
+      time-to-live: 3600000 # 1 hour
+      cache-null-values: false
 ```
 
-### Service Startup Issues
+## Next Steps
 
-```bash
-# Check Java version
-java -version  # Should be 17+
+Your local development environment is ready! Continue with:
 
-# Verify environment variables
-echo $SPRING_PROFILES_ACTIVE  # Should be 'development'
+1. **[Architecture Overview](../architecture/overview.md)** - Understand system design
+2. **[Testing Overview](../testing/overview.md)** - Learn testing strategies
+3. **[Contributing Guidelines](../contributing/guidelines.md)** - Contribute to the project
 
-# Check database connection
-mongosh mongodb://localhost:27017 --eval "db.adminCommand('ping')"
-```
+## Support & Resources
 
-### Docker Service Issues
+- 💬 **Community**: [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
+- 📚 **Documentation**: [Development Guide](../README.md)
+- 🚀 **Platform**: [OpenFrame.ai](https://openframe.ai)
 
-```bash
-# Restart all services
-docker-compose down && docker-compose up -d
-
-# Check service logs
-docker-compose logs mongodb
-docker-compose logs redis
-
-# Remove and recreate volumes
-docker-compose down -v && docker-compose up -d
-```
-
-## 🎯 What's Next?
-
-Your local development environment is now ready! Next steps:
-
-1. **[Explore Architecture](../architecture/overview.md)** - Understand the system design
-2. **[Review Testing](../testing/overview.md)** - Learn testing patterns and run tests
-3. **[Read Contributing Guidelines](../contributing/guidelines.md)** - Start contributing to the project
-
-### Development Workflow
-
-Now you can:
-- **Make code changes** with hot reload
-- **Debug issues** with IDE integration
-- **Test APIs** with sample data
-- **Contribute features** following the established patterns
-
-## 🤝 Get Help
-
-- **Issues with setup?** Join [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) `#dev-help` channel
-- **Want to contribute?** Check `#contributors` channel
-- **General questions?** Use `#general` channel
-
----
-
-**🎉 Congratulations!** You now have a fully functional local development environment for OpenFrame OSS Library. Happy coding!
+Happy developing with OpenFrame! 🚀

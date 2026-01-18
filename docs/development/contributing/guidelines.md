@@ -1,721 +1,861 @@
 # Contributing Guidelines
 
-Welcome to the OpenFrame OSS Library contributor community! This guide outlines our development standards, workflow processes, and review criteria to help you make meaningful contributions to the project.
+Welcome to the OpenFrame OSS Library community! This guide will help you contribute effectively to the project, whether you're fixing bugs, adding features, or improving documentation.
 
-## 🎯 Contributing Philosophy
+## Getting Started
 
-OpenFrame follows these core principles for contributions:
-
-- **Quality over Quantity**: Well-crafted, tested code that follows established patterns
-- **Documentation First**: All contributions include comprehensive documentation
-- **Community Driven**: Decisions are made transparently with community input
-- **Backward Compatibility**: Changes maintain API compatibility whenever possible
-
-## 📋 Prerequisites for Contributing
-
-Before making your first contribution, ensure you have:
-
-- ✅ **Completed Setup**: Followed [Environment Setup](../setup/environment.md) and [Local Development](../setup/local-development.md)
-- ✅ **Read Architecture**: Understood the [Architecture Overview](../architecture/overview.md)
-- ✅ **Joined Community**: Active in [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
-- ✅ **Explored Codebase**: Familiarized yourself with existing patterns and tests
-
-## 🔄 Development Workflow
-
-### 1. Planning Your Contribution
-
-**Before Writing Code:**
-1. **Check Existing Issues**: Look for related issues or discussions
-2. **Discuss in Slack**: Use `#contributors` channel for design discussions  
-3. **Create Issue**: For substantial changes, create an issue first
-4. **Get Alignment**: Ensure your approach aligns with project goals
-
-**For Bug Fixes:**
-- Can proceed directly with fix and tests
-- Reference issue number in commit message
-
-**For New Features:**
-- **Must** discuss in Slack first
-- Create design document for complex features
-- Get maintainer approval before implementation
-
-### 2. Git Workflow
+### 1. Fork and Clone
 
 ```bash
-# 1. Fork and clone the repository
-git clone https://github.com/YOUR-USERNAME/openframe-oss-lib.git
+# Fork the repository on GitHub, then clone your fork
+git clone https://github.com/YOUR_USERNAME/openframe-oss-lib.git
 cd openframe-oss-lib
 
-# 2. Add upstream remote
-git remote add upstream https://github.com/openframe/openframe-oss-lib.git
+# Add upstream remote
+git remote add upstream https://github.com/flamingo-stack/openframe-oss-lib.git
 
-# 3. Create feature branch from main
+# Verify remotes
+git remote -v
+```
+
+### 2. Set Up Development Environment
+
+Follow our [Environment Setup Guide](../setup/environment.md) to configure your development environment.
+
+### 3. Create Feature Branch
+
+```bash
+# Update main branch
 git checkout main
 git pull upstream main
-git checkout -b feature/your-feature-name
 
-# 4. Make your changes
-# ... develop, test, document ...
-
-# 5. Commit with conventional commit format
-git add .
-git commit -m "feat(api-lib): add device filtering by compliance status
-
-- Add ComplianceStatus enum to device DTOs
-- Implement filtering logic in DeviceFilters
-- Add validation for compliance status values
-- Include comprehensive unit tests
-
-Closes #123"
-
-# 6. Push to your fork
-git push origin feature/your-feature-name
-
-# 7. Create pull request from GitHub UI
+# Create feature branch with descriptive name
+git checkout -b feature/device-filtering-enhancement
+# or
+git checkout -b bugfix/device-status-update-issue
+# or  
+git checkout -b docs/api-documentation-improvements
 ```
 
-### 3. Branch Naming Conventions
+## Code Standards and Style Guide
 
-| Type | Format | Example |
-|------|--------|---------|
-| **Feature** | `feature/description` | `feature/device-compliance-filtering` |
-| **Bug Fix** | `bugfix/description` | `bugfix/pagination-cursor-encoding` |
-| **Documentation** | `docs/description` | `docs/update-api-examples` |
-| **Refactoring** | `refactor/description` | `refactor/service-layer-organization` |
-| **Performance** | `perf/description` | `perf/optimize-device-queries` |
+### Java Code Style
 
-## ✍️ Code Style and Conventions
+We follow **Google Java Style** with minor customizations:
 
-### Java Code Standards
+#### 1. **Formatting Rules**
 
-**1. Formatting and Structure**
 ```java
-// Use 4 spaces for indentation (no tabs)
-// Maximum line length: 120 characters
-// Use descriptive variable and method names
-
-@Service
-public class DeviceServiceImpl implements DeviceService {
-    
-    private static final int DEFAULT_PAGE_SIZE = 25;
-    private static final String DEVICE_NOT_FOUND_MESSAGE = "Device not found with ID: %s";
+// ✅ Good: Proper indentation and spacing
+public class DeviceService {
     
     private final DeviceRepository deviceRepository;
-    private final DeviceMapper deviceMapper;
-    private final OrganizationService organizationService;
+    private final EventService eventService;
     
-    public DeviceServiceImpl(DeviceRepository deviceRepository,
-                            DeviceMapper deviceMapper,
-                            OrganizationService organizationService) {
+    public DeviceService(DeviceRepository deviceRepository, EventService eventService) {
         this.deviceRepository = deviceRepository;
-        this.deviceMapper = deviceMapper;
-        this.organizationService = organizationService;
+        this.eventService = eventService;
     }
     
-    @Override
-    @Transactional(readOnly = true)
-    public CountedGenericQueryResult<Device> findDevices(DeviceFilterInput input) {
-        validateDeviceFilterInput(input);
+    public Device createDevice(CreateDeviceRequest request) {
+        Device device = mapToDevice(request);
+        Device savedDevice = deviceRepository.save(device);
         
-        DeviceQueryFilter queryFilter = deviceMapper.toQueryFilter(input);
-        Page<DeviceDocument> devicePage = deviceRepository.findDevicesWithFilters(queryFilter);
+        eventService.publishEvent(
+            EventType.DEVICE_CREATED,
+            savedDevice.getId(),
+            Map.of("deviceType", savedDevice.getType())
+        );
         
-        List<Device> devices = deviceMapper.toDeviceList(devicePage.getContent());
-        CursorPageInfo pageInfo = buildPageInfo(devicePage, input.getPagination());
-        
-        return CountedGenericQueryResult.<Device>builder()
-            .items(devices)
-            .totalCount(devicePage.getTotalElements())
-            .pageInfo(pageInfo)
+        return savedDevice;
+    }
+}
+```
+
+#### 2. **Naming Conventions**
+
+| Element | Convention | Examples |
+|---------|------------|----------|
+| **Classes** | PascalCase | `DeviceService`, `OrganizationMapper` |
+| **Methods** | camelCase | `createDevice()`, `findByOrganizationId()` |
+| **Variables** | camelCase | `deviceRepository`, `organizationId` |
+| **Constants** | UPPER_SNAKE_CASE | `DEFAULT_PAGE_SIZE`, `MAX_RETRY_ATTEMPTS` |
+| **Packages** | lowercase | `com.openframe.api.service` |
+
+#### 3. **Documentation Standards**
+
+```java
+/**
+ * Service for managing device lifecycle and operations.
+ * 
+ * <p>This service provides comprehensive device management capabilities including
+ * device registration, status updates, and integration with external tools.
+ * 
+ * @author OpenFrame Team
+ * @since 1.0.0
+ */
+@Service
+@Transactional
+public class DeviceService {
+    
+    /**
+     * Creates a new device in the system.
+     * 
+     * @param request the device creation request containing device details
+     * @return the created device with generated ID and metadata
+     * @throws ValidationException if the request contains invalid data
+     * @throws DuplicateDeviceException if a device with the same machine ID exists
+     */
+    public Device createDevice(CreateDeviceRequest request) {
+        // Implementation
+    }
+}
+```
+
+### Spring Boot Conventions
+
+#### 1. **Component Annotations**
+
+```java
+// ✅ Good: Specific component annotations
+@RestController
+@RequestMapping("/api/devices")
+public class DeviceController { }
+
+@Service
+@Transactional
+public class DeviceService { }
+
+@Repository
+public interface DeviceRepository extends MongoRepository<Device, String> { }
+
+@Configuration
+@EnableConfigurationProperties(OpenFrameProperties.class)
+public class OpenFrameConfig { }
+```
+
+#### 2. **Dependency Injection**
+
+```java
+// ✅ Good: Constructor injection
+@Service
+public class DeviceService {
+    
+    private final DeviceRepository deviceRepository;
+    private final EventService eventService;
+    
+    // Constructor injection (preferred)
+    public DeviceService(DeviceRepository deviceRepository, EventService eventService) {
+        this.deviceRepository = deviceRepository;
+        this.eventService = eventService;
+    }
+}
+
+// ❌ Avoid: Field injection
+@Service
+public class DeviceService {
+    @Autowired
+    private DeviceRepository deviceRepository; // Not recommended
+}
+```
+
+#### 3. **Error Handling**
+
+```java
+// ✅ Good: Specific exception handling
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+    
+    @ExceptionHandler(DeviceNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleDeviceNotFound(DeviceNotFoundException ex) {
+        ErrorResponse error = ErrorResponse.builder()
+            .code("DEVICE_NOT_FOUND")
+            .message(ex.getMessage())
+            .timestamp(Instant.now())
             .build();
+        
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
     }
     
-    private void validateDeviceFilterInput(DeviceFilterInput input) {
-        if (input == null) {
-            throw new IllegalArgumentException("Device filter input cannot be null");
-        }
+    @ExceptionHandler(ValidationException.class)
+    public ResponseEntity<ErrorResponse> handleValidation(ValidationException ex) {
+        ErrorResponse error = ErrorResponse.builder()
+            .code("VALIDATION_ERROR")
+            .message("Request validation failed")
+            .details(ex.getValidationErrors())
+            .timestamp(Instant.now())
+            .build();
         
-        if (input.getPagination() == null) {
-            throw new IllegalArgumentException("Pagination input is required");
-        }
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 }
 ```
 
-**2. Lombok Usage**
-```java
-// Prefer @Builder for DTOs and request objects
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class DeviceFilterInput {
-    
-    @Valid
-    @NotNull(message = "Pagination is required")
-    private CursorPaginationInput pagination;
-    
-    @Valid
-    private DeviceFilters filters;
-}
+### API Design Standards
 
-// Use @Value for immutable objects
-@Value
-@Builder
+#### 1. **RESTful Endpoints**
+
+```java
+// ✅ Good: RESTful design
+@RestController
+@RequestMapping("/api/devices")
+public class DeviceController {
+    
+    @GetMapping
+    public ResponseEntity<PageResponse<DeviceResponse>> getDevices(
+        @RequestParam(defaultValue = "20") int limit,
+        @RequestParam(required = false) String cursor,
+        @RequestParam(required = false) String status,
+        @RequestParam(required = false) String type
+    ) {
+        // Implementation
+    }
+    
+    @GetMapping("/{id}")
+    public ResponseEntity<DeviceResponse> getDevice(@PathVariable String id) {
+        // Implementation
+    }
+    
+    @PostMapping
+    public ResponseEntity<DeviceResponse> createDevice(
+        @Valid @RequestBody CreateDeviceRequest request
+    ) {
+        // Implementation
+    }
+    
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<DeviceResponse> updateDeviceStatus(
+        @PathVariable String id,
+        @Valid @RequestBody UpdateDeviceStatusRequest request
+    ) {
+        // Implementation
+    }
+}
+```
+
+#### 2. **DTO Design**
+
+```java
+// ✅ Good: Well-structured DTOs
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class DeviceResponse {
-    @NotNull
-    String id;
     
-    @NotNull
-    String name;
+    @JsonProperty("id")
+    private String id;
     
-    @NotNull
-    DeviceType deviceType;
+    @JsonProperty("machineId")
+    private String machineId;
     
-    @NotNull
-    DeviceStatus status;
+    @JsonProperty("serialNumber")
+    private String serialNumber;
     
-    List<String> tags;
+    @JsonProperty("status")
+    private String status;
     
-    @NotNull
-    LocalDateTime createdAt;
+    @JsonProperty("type")
+    private String type;
     
-    @NotNull
-    LocalDateTime updatedAt;
+    @JsonProperty("lastCheckin")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
+    private Instant lastCheckin;
+    
+    @JsonProperty("health")
+    private DeviceHealthResponse health;
+    
+    // Constructors, getters, setters
 }
 ```
 
-**3. Validation Annotations**
-```java
-// Use comprehensive validation on all DTOs
-public class CreateDeviceRequest {
-    
-    @NotBlank(message = "Device name is required")
-    @Size(min = 2, max = 100, message = "Device name must be between 2 and 100 characters")
-    private String name;
-    
-    @NotNull(message = "Device type is required")
-    private DeviceType deviceType;
-    
-    @NotNull(message = "Organization ID is required")
-    @Pattern(regexp = "^[a-zA-Z0-9-_]+$", message = "Organization ID contains invalid characters")
-    private String organizationId;
-    
-    @Valid
-    private List<@NotBlank String> tags;
-}
+## Branch Naming and PR Process
+
+### Branch Naming Convention
+
+Use descriptive branch names that indicate the type and scope of work:
+
+```bash
+# Feature branches
+feature/device-filtering-api
+feature/organization-sso-integration
+feature/event-stream-processing
+
+# Bug fix branches
+bugfix/device-status-sync-issue
+bugfix/pagination-cursor-encoding
+bugfix/jwt-token-expiration
+
+# Documentation branches
+docs/api-reference-update
+docs/setup-guide-improvements
+docs/architecture-diagrams
+
+# Maintenance branches
+chore/dependency-updates
+chore/code-style-cleanup
+refactor/service-layer-restructure
 ```
 
-### Documentation Standards
+### Pull Request Process
 
-**1. JavaDoc for Public APIs**
-```java
-/**
- * Service interface for managing devices within organizations.
- * 
- * <p>Provides operations for querying, creating, updating, and deleting devices
- * with proper multi-tenant isolation and pagination support.</p>
- *
- * @author OpenFrame Contributors
- * @since 1.0.0
- */
-public interface DeviceService {
-    
-    /**
-     * Finds devices based on provided filter criteria with pagination.
-     * 
-     * <p>This method supports:
-     * <ul>
-     *   <li>Cursor-based pagination for efficient large dataset navigation</li>
-     *   <li>Filtering by device type, status, tags, and organization</li>
-     *   <li>Multi-tenant isolation (automatically scoped to organization)</li>
-     * </ul>
-     *
-     * @param input the filter input containing pagination and filter criteria
-     * @return paginated result containing devices and pagination info
-     * @throws IllegalArgumentException if input is null or invalid
-     * @throws SecurityException if user lacks permission to access organization
-     * 
-     * @since 1.0.0
-     */
-    CountedGenericQueryResult<Device> findDevices(DeviceFilterInput input);
-    
-    /**
-     * Retrieves a single device by its unique identifier.
-     *
-     * @param deviceId the unique device identifier
-     * @return the device if found
-     * @throws DeviceNotFoundException if no device exists with the given ID
-     * @throws SecurityException if user lacks permission to access the device
-     * 
-     * @since 1.0.0
-     */
-    Device findDeviceById(String deviceId);
-}
+#### 1. **Pre-PR Checklist**
+
+Before creating a PR, ensure:
+
+- [ ] **Code compiles** without warnings
+- [ ] **All tests pass** locally
+- [ ] **Code style** follows project conventions
+- [ ] **Documentation** is updated where needed
+- [ ] **CHANGELOG** entry added (if applicable)
+
+```bash
+# Run pre-PR checks
+./mvnw clean compile
+./mvnw test
+./mvnw checkstyle:check
+./mvnw spotbugs:check
 ```
 
-**2. Class-Level Documentation**
-```java
-/**
- * MongoDB document representing a device in the OpenFrame system.
- * 
- * <p>Devices represent managed endpoints such as workstations, servers, 
- * mobile devices, and IoT devices. Each device belongs to an organization
- * and can have multiple associated tools and monitoring agents.</p>
- * 
- * <p>This entity supports:</p>
- * <ul>
- *   <li>Multi-tenant data isolation via organizationId</li>
- *   <li>Flexible metadata storage for tool-specific information</li>
- *   <li>Tag-based categorization and filtering</li>
- *   <li>Compliance tracking and security monitoring</li>
- * </ul>
- *
- * @since 1.0.0
- */
-@Document(collection = "devices")
-@CompoundIndex(name = "org_status_idx", def = "{'organizationId': 1, 'status': 1}")
-@CompoundIndex(name = "org_type_idx", def = "{'organizationId': 1, 'deviceType': 1}")
-public class Device {
-    // Implementation
-}
+#### 2. **PR Template**
+
+Use this template for your pull requests:
+
+```markdown
+## Description
+Brief description of the changes and their purpose.
+
+## Type of Change
+- [ ] Bug fix (non-breaking change that fixes an issue)
+- [ ] New feature (non-breaking change that adds functionality)  
+- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
+- [ ] Documentation update
+
+## Changes Made
+- List specific changes made
+- Include any new endpoints, methods, or classes
+- Mention any configuration changes required
+
+## Testing
+- [ ] Unit tests added/updated
+- [ ] Integration tests added/updated
+- [ ] Manual testing completed
+- [ ] Performance impact assessed
+
+## Documentation
+- [ ] Code comments added/updated
+- [ ] API documentation updated
+- [ ] User guides updated (if applicable)
+
+## Breaking Changes
+List any breaking changes and migration path (if applicable).
+
+## Screenshots
+Include screenshots for UI changes (if applicable).
+
+## Additional Notes
+Any additional information, context, or considerations.
 ```
 
-## 🧪 Writing Tests
+#### 3. **PR Review Process**
 
-### Test Requirements
+```mermaid
+flowchart LR
+    A[Create PR] --> B[Automated Checks]
+    B --> C{Checks Pass?}
+    C -->|No| D[Fix Issues]
+    D --> B
+    C -->|Yes| E[Peer Review]
+    E --> F{Review Approved?}
+    F -->|No| G[Address Feedback]
+    G --> E
+    F -->|Yes| H[Security Review]
+    H --> I{Security OK?}
+    I -->|No| J[Fix Security Issues]
+    J --> H
+    I -->|Yes| K[Merge to Main]
+```
 
-**Every contribution must include:**
-- ✅ **Unit tests** for all new business logic
-- ✅ **Integration tests** for API endpoints
-- ✅ **Repository tests** for data operations  
-- ✅ **Validation tests** for DTOs
-- ✅ **Edge case coverage** (null inputs, boundary conditions)
+**Review Criteria:**
+- **Functionality** - Does the code work as intended?
+- **Code Quality** - Is the code clean, readable, and maintainable?
+- **Testing** - Are there adequate tests with good coverage?
+- **Security** - Are there any security implications?
+- **Performance** - Will this impact system performance?
+- **Documentation** - Is the documentation clear and complete?
 
-### Test Naming and Structure
+### Commit Message Format
+
+We use [Conventional Commits](https://www.conventionalcommits.org/) specification:
+
+```bash
+# Format: type(scope): description
+# 
+# Types: feat, fix, docs, style, refactor, test, chore
+# Scope: api, service, repository, config, security, etc.
+
+# Examples:
+feat(api): add device filtering endpoint with pagination support
+
+fix(security): resolve JWT token validation issue in multi-tenant context
+
+docs(setup): update environment setup guide with Docker instructions
+
+test(service): add comprehensive unit tests for DeviceService
+
+refactor(repository): optimize device query performance with compound indexes
+
+chore(deps): update Spring Boot to version 3.2.1
+```
+
+**Detailed Format:**
+
+```bash
+feat(api): add comprehensive device filtering capabilities
+
+- Add DeviceFilterOptions with status, type, and date range filters
+- Implement cursor-based pagination for consistent performance  
+- Add search functionality across device name, model, and serial number
+- Include proper validation and error handling for filter parameters
+
+Closes #123
+```
+
+## Code Review Checklist
+
+### For Contributors
+
+Before requesting review:
+
+- [ ] **Self-review** - Review your own code first
+- [ ] **Test coverage** - Ensure adequate test coverage (>80%)
+- [ ] **Documentation** - Update relevant documentation
+- [ ] **Breaking changes** - Document any breaking changes
+- [ ] **Performance** - Consider performance implications
+- [ ] **Security** - Review for security vulnerabilities
+
+### For Reviewers
+
+When reviewing PRs:
+
+#### **Code Quality**
+- [ ] Code follows style guidelines
+- [ ] Naming is clear and descriptive
+- [ ] Methods are focused and single-purpose
+- [ ] Error handling is comprehensive
+- [ ] No code duplication
+
+#### **Architecture & Design**
+- [ ] Changes align with project architecture
+- [ ] Proper separation of concerns
+- [ ] Dependencies are minimal and justified
+- [ ] APIs are consistent with existing patterns
+
+#### **Testing**
+- [ ] Unit tests cover new functionality
+- [ ] Integration tests verify behavior
+- [ ] Edge cases are tested
+- [ ] Tests are clear and maintainable
+
+#### **Security**
+- [ ] Input validation is thorough
+- [ ] No sensitive data exposure
+- [ ] Proper authentication/authorization
+- [ ] SQL injection prevention
+- [ ] XSS protection measures
+
+#### **Performance**
+- [ ] Database queries are optimized
+- [ ] No N+1 query problems
+- [ ] Appropriate caching strategy
+- [ ] Resource usage is reasonable
+
+## Testing Requirements
+
+### Minimum Coverage Requirements
+
+| Test Type | Coverage Target | Required |
+|-----------|-----------------|----------|
+| **Unit Tests** | 80% line coverage | ✅ Mandatory |
+| **Integration Tests** | 70% service paths | ✅ Mandatory |  
+| **API Tests** | 90% endpoints | ✅ Mandatory |
+| **End-to-End** | Critical flows | ⚠️ As needed |
+
+### Writing Quality Tests
+
+#### 1. **Unit Test Example**
 
 ```java
-@DisplayName("DeviceService Implementation Tests")
-class DeviceServiceImplTest {
+@ExtendWith(MockitoExtension.class)
+class DeviceServiceTest {
     
-    @Nested
-    @DisplayName("Device Retrieval")
-    class DeviceRetrieval {
+    @Mock private DeviceRepository deviceRepository;
+    @Mock private EventService eventService;
+    @InjectMocks private DeviceService deviceService;
+    
+    @Test
+    @DisplayName("Should create device and publish creation event")
+    void shouldCreateDeviceAndPublishCreationEvent() {
+        // Given
+        CreateDeviceRequest request = createValidDeviceRequest();
+        Device savedDevice = createTestDevice();
+        savedDevice.setId("device-123");
         
-        @Test
-        @DisplayName("Should find devices with valid filters successfully")
-        void shouldFindDevicesWithValidFiltersSuccessfully() {
-            // Given
-            DeviceFilterInput validInput = createValidDeviceFilterInput();
-            Page<DeviceDocument> expectedPage = createMockDevicePage();
-            List<Device> expectedDevices = createExpectedDevices();
-            
-            when(deviceRepository.findDevicesWithFilters(any())).thenReturn(expectedPage);
-            when(deviceMapper.toDeviceList(any())).thenReturn(expectedDevices);
-            
-            // When
-            CountedGenericQueryResult<Device> result = deviceService.findDevices(validInput);
-            
-            // Then
-            assertThat(result).isNotNull();
-            assertThat(result.getItems()).hasSize(2);
-            assertThat(result.getTotalCount()).isEqualTo(10L);
-            
-            verify(deviceRepository).findDevicesWithFilters(any());
-            verify(deviceMapper).toDeviceList(any());
-        }
+        when(deviceRepository.save(any(Device.class))).thenReturn(savedDevice);
         
-        @ParameterizedTest
-        @DisplayName("Should reject invalid filter inputs")
-        @MethodSource("invalidFilterInputs")
-        void shouldRejectInvalidFilterInputs(DeviceFilterInput invalidInput, String expectedMessage) {
-            // When & Then
-            assertThatThrownBy(() -> deviceService.findDevices(invalidInput))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage(expectedMessage);
-            
-            verifyNoInteractions(deviceRepository);
-        }
+        // When
+        Device result = deviceService.createDevice(request);
         
-        private static Stream<Arguments> invalidFilterInputs() {
-            return Stream.of(
-                Arguments.of(null, "Device filter input cannot be null"),
-                Arguments.of(DeviceFilterInput.builder().build(), "Pagination input is required"),
-                Arguments.of(DeviceFilterInput.builder()
-                    .pagination(CursorPaginationInput.builder().limit(0).build())
-                    .build(), "Limit must be at least 1")
-            );
-        }
+        // Then
+        assertThat(result).isNotNull();
+        assertThat(result.getId()).isEqualTo("device-123");
+        
+        verify(deviceRepository).save(any(Device.class));
+        verify(eventService).publishEvent(
+            eq(EventType.DEVICE_CREATED),
+            eq("device-123"),
+            any(Map.class)
+        );
     }
-    
-    @Nested
-    @DisplayName("Error Handling")
-    class ErrorHandling {
-        
-        @Test
-        @DisplayName("Should handle repository exceptions gracefully")
-        void shouldHandleRepositoryExceptionsGracefully() {
-            // Given
-            DeviceFilterInput input = createValidDeviceFilterInput();
-            when(deviceRepository.findDevicesWithFilters(any()))
-                .thenThrow(new RuntimeException("Database connection failed"));
-            
-            // When & Then
-            assertThatThrownBy(() -> deviceService.findDevices(input))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessage("Database connection failed");
-        }
-    }
 }
 ```
 
-### Integration Test Standards
+#### 2. **Integration Test Example**
 
 ```java
 @SpringBootTest
 @Testcontainers
-@DisplayName("Device API Integration Tests")
-class DeviceApiIntegrationTest {
+class DeviceIntegrationTest {
     
     @Container
-    static MongoDBContainer mongoDBContainer = new MongoDBContainer("mongo:7");
+    static MongoDBContainer mongodb = new MongoDBContainer("mongo:7.0");
     
-    @Autowired
-    private TestRestTemplate restTemplate;
+    @Autowired private DeviceService deviceService;
+    @Autowired private DeviceRepository deviceRepository;
+    
+    @DynamicPropertySource
+    static void configureProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.data.mongodb.uri", mongodb::getReplicaSetUrl);
+    }
     
     @Test
-    @DisplayName("Should create and retrieve device successfully")
-    void shouldCreateAndRetrieveDeviceSuccessfully() {
+    void shouldPersistDeviceToDatabase() {
         // Given
-        CreateDeviceRequest createRequest = CreateDeviceRequest.builder()
-            .name("Integration Test Device")
-            .deviceType(DeviceType.DESKTOP)
-            .organizationId("test-org-123")
-            .tags(Arrays.asList("test", "integration"))
-            .build();
+        CreateDeviceRequest request = createValidDeviceRequest();
         
-        // When - Create device
-        ResponseEntity<DeviceResponse> createResponse = restTemplate.postForEntity(
-            "/api/devices", createRequest, DeviceResponse.class);
+        // When
+        Device createdDevice = deviceService.createDevice(request);
         
-        // Then - Verify creation
-        assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(createResponse.getBody()).isNotNull();
-        
-        String deviceId = createResponse.getBody().getId();
-        
-        // When - Retrieve device
-        ResponseEntity<DeviceResponse> getResponse = restTemplate.getForEntity(
-            "/api/devices/" + deviceId, DeviceResponse.class);
-        
-        // Then - Verify retrieval
-        assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        DeviceResponse device = getResponse.getBody();
-        assertThat(device.getName()).isEqualTo("Integration Test Device");
-        assertThat(device.getDeviceType()).isEqualTo(DeviceType.DESKTOP);
-        assertThat(device.getTags()).containsExactlyInAnyOrder("test", "integration");
+        // Then
+        Optional<Device> foundDevice = deviceRepository.findById(createdDevice.getId());
+        assertThat(foundDevice).isPresent();
+        assertThat(foundDevice.get().getMachineId()).isEqualTo(request.getMachineId());
     }
 }
 ```
 
-## 📝 Commit Message Format
+## Documentation Standards
 
-We use [Conventional Commits](https://www.conventionalcommits.org/) for consistent commit history and automated changelog generation.
+### API Documentation
 
-### Commit Message Structure
+All API endpoints must be documented with OpenAPI/Swagger:
 
-```text
-<type>[optional scope]: <description>
-
-[optional body]
-
-[optional footer(s)]
+```java
+@RestController
+@RequestMapping("/api/devices")
+@Tag(name = "Device Management", description = "APIs for managing devices in the system")
+public class DeviceController {
+    
+    @GetMapping
+    @Operation(
+        summary = "List devices",
+        description = "Retrieve a paginated list of devices with optional filtering",
+        responses = {
+            @ApiResponse(responseCode = "200", description = "Devices retrieved successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid request parameters"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized access")
+        }
+    )
+    public ResponseEntity<PageResponse<DeviceResponse>> getDevices(
+        @Parameter(description = "Maximum number of devices to return", example = "20")
+        @RequestParam(defaultValue = "20") int limit,
+        
+        @Parameter(description = "Cursor for pagination", example = "eyJpZCI6ImRldmljZS0xMjMifQ==")  
+        @RequestParam(required = false) String cursor,
+        
+        @Parameter(description = "Filter by device status", example = "ACTIVE")
+        @RequestParam(required = false) String status
+    ) {
+        // Implementation
+    }
+}
 ```
 
-### Commit Types
+### Code Comments
 
-| Type | Description | Example |
-|------|-------------|---------|
-| **feat** | New feature | `feat(api-lib): add device compliance filtering` |
-| **fix** | Bug fix | `fix(pagination): handle null cursor values correctly` |
-| **docs** | Documentation only | `docs(contributing): update code style guidelines` |
-| **style** | Code style changes | `style(device-service): fix formatting and imports` |
-| **refactor** | Code refactoring | `refactor(repository): extract common query logic` |
-| **perf** | Performance improvement | `perf(device-query): optimize MongoDB aggregation` |
-| **test** | Test changes | `test(device-service): add edge case coverage` |
-| **chore** | Build/tools changes | `chore(deps): update Spring Boot to 3.2.1` |
+```java
+/**
+ * Processes device status updates from external tools.
+ * 
+ * <p>This method handles status updates received from integrated RMM tools,
+ * validates the update against current device state, and publishes appropriate
+ * events for downstream processing.
+ * 
+ * <p><strong>Threading:</strong> This method is thread-safe and can handle
+ * concurrent status updates for different devices.
+ * 
+ * @param deviceId the unique identifier of the device being updated
+ * @param newStatus the new status to set for the device
+ * @param source the source tool that reported the status change
+ * @param metadata additional metadata about the status change
+ * @return the updated device with new status
+ * @throws DeviceNotFoundException if no device exists with the given ID
+ * @throws InvalidStatusTransitionException if the status change is not allowed
+ * @throws SecurityException if the source tool lacks permission to update this device
+ */
+public Device updateDeviceStatus(String deviceId, DeviceStatus newStatus, 
+                               String source, Map<String, Object> metadata) {
+    // Implementation with detailed comments for complex logic
+}
+```
 
-### Commit Examples
+## Security Guidelines
 
-**Good Commits:**
+### Input Validation
+
+```java
+// ✅ Good: Comprehensive validation
+@PostMapping
+public ResponseEntity<DeviceResponse> createDevice(
+    @Valid @RequestBody CreateDeviceRequest request
+) {
+    validateDeviceRequest(request);
+    Device device = deviceService.createDevice(request);
+    return ResponseEntity.status(HttpStatus.CREATED).body(mapToResponse(device));
+}
+
+private void validateDeviceRequest(CreateDeviceRequest request) {
+    if (StringUtils.isBlank(request.getMachineId())) {
+        throw new ValidationException("Machine ID is required");
+    }
+    
+    if (!isValidMachineId(request.getMachineId())) {
+        throw new ValidationException("Invalid machine ID format");
+    }
+    
+    // Additional validation logic
+}
+```
+
+### Multi-Tenant Security
+
+```java
+// ✅ Good: Proper tenant isolation
+@PreAuthorize("hasPermission(#organizationId, 'DEVICE_READ')")
+public List<Device> getDevicesByOrganization(String organizationId) {
+    // Method automatically filtered by tenant context
+    return deviceRepository.findByOrganizationId(organizationId);
+}
+```
+
+### Secret Management
+
+```java
+// ✅ Good: Externalized configuration
+@ConfigurationProperties(prefix = "openframe.integration.fleet")
+public class FleetIntegrationConfig {
+    private String apiKey; // Set via environment variable
+    private String baseUrl;
+    
+    // Getters/setters - never log sensitive values
+}
+
+// ❌ Bad: Hardcoded secrets
+public class FleetClient {
+    private static final String API_KEY = "hardcoded-api-key"; // Never do this!
+}
+```
+
+## Performance Guidelines
+
+### Database Optimization
+
+```java
+// ✅ Good: Optimized queries with proper indexing
+@Repository
+public class DeviceRepositoryImpl implements CustomDeviceRepository {
+    
+    @Override
+    public Page<Device> findDevicesWithFilter(DeviceFilter filter, Pageable pageable) {
+        Criteria criteria = new Criteria();
+        
+        // Always filter by organization first (indexed field)
+        criteria.and("organizationId").is(filter.getOrganizationId());
+        
+        if (filter.getStatus() != null) {
+            criteria.and("status").is(filter.getStatus());
+        }
+        
+        if (filter.getLastCheckinAfter() != null) {
+            criteria.and("lastCheckin").gte(filter.getLastCheckinAfter());
+        }
+        
+        Query query = Query.query(criteria).with(pageable);
+        
+        List<Device> devices = mongoTemplate.find(query, Device.class);
+        long total = mongoTemplate.count(Query.query(criteria), Device.class);
+        
+        return new PageImpl<>(devices, pageable, total);
+    }
+}
+```
+
+### Caching Strategy
+
+```java
+// ✅ Good: Strategic caching
+@Service
+@CacheConfig(cacheNames = "devices")
+public class DeviceService {
+    
+    @Cacheable(key = "#id", unless = "#result == null")
+    public Device getDevice(String id) {
+        return deviceRepository.findById(id)
+            .orElseThrow(() -> new DeviceNotFoundException(id));
+    }
+    
+    @CacheEvict(key = "#device.id")
+    public Device updateDevice(Device device) {
+        return deviceRepository.save(device);
+    }
+    
+    @CacheEvict(allEntries = true)
+    public void clearDeviceCache() {
+        // Clear all cached devices
+    }
+}
+```
+
+## Release Process
+
+### Version Numbering
+
+We follow [Semantic Versioning](https://semver.org/):
+
+- **MAJOR** version: Incompatible API changes
+- **MINOR** version: Backward-compatible functionality additions  
+- **PATCH** version: Backward-compatible bug fixes
+
 ```bash
-# Feature addition
-feat(api-lib): add device health monitoring DTOs
-
-- Add DeviceHealth entity with vitals tracking
-- Include HealthStatus enum and validation rules
-- Support for CPU, memory, disk metrics
-- Add comprehensive unit tests for new DTOs
-
-Closes #234
-
-# Bug fix
-fix(cursor-pagination): handle edge case with empty result sets
-
-Previously, empty result sets would return null cursor causing
-NPE in subsequent pagination requests. Now returns appropriate
-empty state with hasNext=false.
-
-Fixes #189
-
-# Documentation
-docs(architecture): add sequence diagrams for authentication flow
-
-- Add OAuth2 authentication sequence
-- Include JWT validation process
-- Document error handling patterns
-- Update architecture overview with new diagrams
+# Examples:
+1.0.0 -> 1.0.1  # Bug fix
+1.0.1 -> 1.1.0  # New feature
+1.1.0 -> 2.0.0  # Breaking change
 ```
 
-**Avoid These Patterns:**
-```bash
-# Too vague
-fix: bug fix
+### Changelog Updates
 
-# No description
-feat(api): stuff
-
-# Not following format
-Added new feature for devices
-
-# Multiple unrelated changes
-feat: add device filtering and fix user authentication and update docs
-```
-
-## 🔍 Pull Request Process
-
-### Before Creating a PR
-
-1. **Self Review Checklist:**
-   - [ ] Code follows style guidelines
-   - [ ] All tests pass locally  
-   - [ ] Documentation is updated
-   - [ ] Commit messages follow conventions
-   - [ ] No merge conflicts with main branch
-
-2. **Testing Checklist:**
-   - [ ] Unit tests cover new functionality
-   - [ ] Integration tests validate API changes
-   - [ ] Manual testing performed
-   - [ ] Performance impact assessed
-
-### Pull Request Template
+Update `CHANGELOG.md` with your changes:
 
 ```markdown
-## Description
-Brief description of changes and their purpose.
+## [Unreleased]
 
-## Type of Change
-- [ ] Bug fix (non-breaking change that fixes an issue)
-- [ ] New feature (non-breaking change that adds functionality)
-- [ ] Breaking change (fix or feature that causes existing functionality to not work as expected)
-- [ ] Documentation update
+### Added
+- Device filtering API with status, type, and date range filters
+- Cursor-based pagination for consistent performance across large datasets
 
-## Testing
-- [ ] Unit tests added/updated
-- [ ] Integration tests added/updated  
-- [ ] Manual testing performed
-- [ ] Performance testing completed (if applicable)
+### Changed  
+- Improved JWT token validation performance by 40%
+- Updated MongoDB connection pooling configuration
 
-## Screenshots (if applicable)
-Include screenshots for UI changes or API response examples.
+### Fixed
+- Device status synchronization issue with Tactical RMM integration
+- Memory leak in event processing pipeline
 
-## Checklist
-- [ ] My code follows the style guidelines
-- [ ] I have performed a self-review of my code
-- [ ] I have commented my code, particularly in hard-to-understand areas
-- [ ] I have made corresponding changes to the documentation
-- [ ] My changes generate no new warnings
-- [ ] I have added tests that prove my fix is effective or my feature works
-- [ ] New and existing unit tests pass locally with my changes
+### Security
+- Enhanced input validation for device creation endpoints
+- Added rate limiting to authentication endpoints
 
-## Related Issues
-Closes #123
-Related to #456
+### Deprecated
+- Legacy device search API (will be removed in v2.0.0)
+
+### Removed
+- Unused device configuration endpoints
+
+## [1.2.0] - 2024-01-15
+
+### Added
+- Organization SSO integration with OIDC providers
 ```
 
-### Review Process
+## Community Guidelines
 
-**Automatic Checks:**
-- ✅ All tests pass
-- ✅ Code coverage meets thresholds  
-- ✅ No security vulnerabilities
-- ✅ Code style validation
-- ✅ Documentation builds successfully
+### Communication
 
-**Manual Review Focuses On:**
-- **Architecture Consistency**: Follows established patterns
-- **API Design**: RESTful, consistent with existing endpoints
-- **Security**: Proper validation, authorization, data handling
-- **Performance**: Efficient queries, appropriate caching
-- **Testability**: Adequate test coverage and quality
-- **Documentation**: Clear, comprehensive, accurate
+- **Be respectful** - Treat all community members with respect
+- **Be constructive** - Provide helpful, actionable feedback
+- **Be patient** - Remember that contributors have varying experience levels
+- **Ask questions** - Don't hesitate to ask for clarification or help
 
-### Addressing Review Feedback
+### Getting Help
+
+1. **Read the docs** - Check existing documentation first
+2. **Search issues** - Look for existing discussions on your topic
+3. **Ask in community** - Use [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) for questions
+4. **Create an issue** - For bugs or feature requests (via Slack discussion first)
+
+### Recognition
+
+We recognize contributors through:
+
+- **Commit attribution** - All commits are properly attributed
+- **Release notes** - Major contributions highlighted in releases  
+- **Community highlights** - Featured contributors in community updates
+- **Maintainer status** - Active contributors may be invited as maintainers
+
+## Tools and Resources
+
+### Development Tools
+
+- **IDE**: IntelliJ IDEA or VS Code with Java extensions
+- **Code Style**: Google Java Style with project customizations
+- **Testing**: JUnit 5, Mockito, TestContainers
+- **Quality**: SonarQube, Checkstyle, SpotBugs
+- **Documentation**: JavaDoc, OpenAPI/Swagger
+
+### Useful Commands
 
 ```bash
-# Make requested changes
-git add .
-git commit -m "fix: address review feedback
+# Development workflow
+./mvnw clean compile                    # Compile code
+./mvnw test                            # Run all tests
+./mvnw test -Dtest=DeviceServiceTest   # Run specific test
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev  # Run locally
 
-- Update validation error messages per reviewer feedback
-- Extract common validation logic to utility method
-- Add missing edge case test for null organization ID"
+# Code quality
+./mvnw checkstyle:check               # Check code style
+./mvnw spotbugs:check                 # Static analysis
+./mvnw jacoco:report                  # Coverage report
 
-# Push changes
-git push origin feature/your-feature-name
-
-# PR will automatically update
+# Documentation  
+./mvnw javadoc:javadoc               # Generate API docs
+./mvnw spring-boot:run -Dspring-boot.run.arguments="--spring.profiles.active=docs"  # API docs server
 ```
 
-## 🚀 Release Process
+## Getting Started Checklist
 
-### Semantic Versioning
+For new contributors:
 
-OpenFrame follows [Semantic Versioning](https://semver.org/):
+- [ ] Read this contributing guide completely
+- [ ] Set up [development environment](../setup/environment.md)
+- [ ] Read [architecture overview](../architecture/overview.md)
+- [ ] Join [OpenMSP Slack community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
+- [ ] Look for "good first issue" labels
+- [ ] Introduce yourself in the community
+- [ ] Make your first contribution!
 
-- **MAJOR** (X.0.0): Breaking changes to public API
-- **MINOR** (0.X.0): New features, backward compatible
-- **PATCH** (0.0.X): Bug fixes, backward compatible
+## Questions?
 
-### Contribution Impact
+- 💬 **Community**: [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
+- 📚 **Documentation**: [Development Guide](../README.md)
+- 🚀 **Platform**: [OpenFrame.ai](https://openframe.ai)
+- 🏢 **Company**: [Flamingo.run](https://flamingo.run)
 
-| Change Type | Version Impact | Examples |
-|-------------|----------------|----------|
-| **Bug fixes** | PATCH | Fix pagination edge case, correct validation message |
-| **New features** | MINOR | Add device filtering, new API endpoint |
-| **Breaking changes** | MAJOR | Change DTO structure, remove deprecated method |
-| **Documentation** | None | Update guides, fix typos |
-
-## 🎨 Advanced Contributing
-
-### Creating New Modules
-
-When adding significant functionality, consider creating a new module:
-
-```text
-openframe-new-module/
-├── src/
-│   ├── main/java/com/openframe/newmodule/
-│   │   ├── dto/           # Data Transfer Objects
-│   │   ├── service/       # Service interfaces and implementations  
-│   │   ├── config/        # Configuration classes
-│   │   └── exception/     # Module-specific exceptions
-│   └── test/java/com/openframe/newmodule/
-│       ├── service/       # Service tests
-│       └── integration/   # Integration tests
-├── pom.xml               # Module dependencies
-└── README.md             # Module documentation
-```
-
-### Adding New Tool Integrations
-
-For integrating new MSP tools:
-
-1. **Create SDK Module** under `sdk/{tool-name}/`
-2. **Define Tool Client** with proper error handling
-3. **Add Integration Service** in appropriate service module
-4. **Create Event Mappers** for tool-specific events
-5. **Add Configuration** for tool connection settings
-
-### Performance Optimization Contributions
-
-When contributing performance improvements:
-
-1. **Create Benchmark Tests** using JMH
-2. **Document Performance Impact** with before/after metrics
-3. **Consider Memory Usage** and GC impact
-4. **Test Under Load** with realistic data volumes
-5. **Monitor Database Performance** for query optimizations
-
-## ❓ Getting Help
-
-### Before Asking for Help
-
-1. **Search Existing Issues** and discussions
-2. **Check Documentation** including architecture guides
-3. **Review Similar Code** in the codebase
-4. **Test Locally** to isolate the issue
-
-### Where to Get Help
-
-| Question Type | Where to Ask | Expected Response Time |
-|---------------|--------------|----------------------|
-| **Quick Questions** | `#general` Slack channel | < 2 hours |
-| **Technical Issues** | `#dev-help` Slack channel | < 4 hours |
-| **Design Discussions** | `#contributors` Slack channel | < 1 day |
-| **Bug Reports** | GitHub Issues | < 2 days |
-| **Feature Requests** | GitHub Issues + Slack discussion | < 1 week |
-
-### Effective Questions
-
-**Good Question:**
-```text
-I'm implementing device filtering by compliance status and getting a 
-MongoDB aggregation error: "FieldPath field names may not contain '.'". 
-
-I'm trying to filter on 'compliance.status' field. Looking at existing 
-filters in DeviceFilters.java, should I be using dot notation or a 
-nested approach?
-
-My current attempt:
-```java
-Query query = new Query(Criteria.where("compliance.status").is(status));
-```
-
-Has anyone solved similar nested field filtering?
-```
-
-**Avoid:**
-```text
-Device filtering doesn't work. Help?
-```
-
-## 📊 Contribution Recognition
-
-### Contributor Levels
-
-| Level | Criteria | Recognition |
-|-------|----------|-------------|
-| **First-Time Contributor** | Merged PR | Welcome message, contributor badge |
-| **Regular Contributor** | 5+ merged PRs | Listed in CONTRIBUTORS.md |
-| **Core Contributor** | 20+ PRs, design participation | Commit access, technical decisions |
-| **Maintainer** | Long-term commitment | Release management, project direction |
-
-### Monthly Contributor Spotlight
-
-Outstanding contributors are featured monthly in:
-- OpenMSP Slack announcements
-- Release notes acknowledgments
-- OpenFrame website contributor page
-
-## 🎯 What's Next?
-
-Ready to contribute? Here's your action plan:
-
-1. **Join the Community**: [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) and introduce yourself
-2. **Pick Your First Issue**: Look for "good first issue" labels
-3. **Set Up Development**: Follow the [Local Development](../setup/local-development.md) guide
-4. **Make Your First PR**: Start small with documentation or test improvements
-5. **Engage with Reviews**: Learn from feedback and help review others' code
-
-## 📚 Additional Resources
-
-- **Spring Boot Best Practices**: [spring.io/guides](https://spring.io/guides)
-- **MongoDB Java Driver**: [mongodb.github.io/mongo-java-driver/](https://mongodb.github.io/mongo-java-driver/)
-- **Testing Patterns**: [martinfowler.com/articles/practical-test-pyramid.html](https://martinfowler.com/articles/practical-test-pyramid.html)
-- **API Design Guidelines**: [restfulapi.net](https://restfulapi.net/)
-
----
-
-**Thank you for contributing to OpenFrame!** Your efforts help build better MSP tools for the entire community. Let's create something amazing together! 🚀
+Thank you for contributing to OpenFrame OSS Library! 🚀
