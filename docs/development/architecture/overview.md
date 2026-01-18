@@ -1,791 +1,804 @@
 # Architecture Overview
 
-Understanding OpenFrame OSS Library's architecture is essential for effective development. This comprehensive guide covers the high-level system design, data flow patterns, module relationships, and key architectural decisions that shape the platform.
+OpenFrame OSS Library is built with a modular, microservice-ready architecture that supports multi-tenant SaaS applications. This guide provides a comprehensive overview of the system architecture, design patterns, and core components.
 
-## 🏗️ High-Level System Architecture
+## High-Level Architecture
 
-OpenFrame OSS Library follows a modular, microservices-ready architecture with clear separation of concerns and well-defined boundaries between layers.
-
-### System Components
+### System Overview
 
 ```mermaid
 graph TB
-    subgraph "Client Layer"
-        WebApp["Web Application"]
-        MobileApp["Mobile App"]  
-        SDK["Integration SDKs"]
-        CLI["CLI Tools"]
+    subgraph "Client Applications"
+        WEB[Web Dashboard]
+        MOBILE[Mobile Apps]
+        CLI[CLI Tools]
+        API[External APIs]
     end
     
     subgraph "API Gateway Layer"
-        Gateway["openframe-gateway-service-core<br/>• Request routing<br/>• Rate limiting<br/>• Authentication"]
+        GATEWAY[API Gateway]
+        LB[Load Balancer]
     end
     
     subgraph "Service Layer"
-        API["openframe-api-service-core<br/>• Business logic<br/>• Data validation<br/>• Service orchestration"]
-        Auth["openframe-authorization-service-core<br/>• OAuth2/OIDC<br/>• SSO integration<br/>• User management"]
-        Client["openframe-client-core<br/>• Agent communication<br/>• Device registration<br/>• Tool management"]
-        Stream["openframe-stream-service-core<br/>• Event processing<br/>• Real-time data<br/>• Integration events"]
-    end
-    
-    subgraph "Core Libraries"
-        ApiLib["openframe-api-lib<br/>• DTOs<br/>• Service interfaces<br/>• Validation rules"]
-        DataMongo["openframe-data-mongo<br/>• Entity models<br/>• Repository interfaces<br/>• Database operations"]
-        Core["openframe-core<br/>• Utilities<br/>• Common patterns<br/>• Shared logic"]
-        Security["openframe-security-core<br/>• JWT handling<br/>• Auth patterns<br/>• Security utilities"]
+        AUTH[Auth Service]
+        DEVICE[Device Service]
+        ORG[Organization Service]
+        EVENT[Event Service]
+        TOOL[Tool Service]
     end
     
     subgraph "Data Layer"
-        MongoDB["MongoDB<br/>• Primary data store<br/>• Multi-tenant<br/>• ACID transactions"]
-        Redis["Redis<br/>• Caching<br/>• Session storage<br/>• Rate limiting"]
-        Kafka["Apache Kafka<br/>• Event streaming<br/>• Message processing<br/>• Integration events"]
+        MONGO[(MongoDB)]
+        REDIS[(Redis Cache)]
+        KAFKA[Event Stream]
     end
     
     subgraph "External Integrations"
-        TacticalRMM["TacticalRMM"]
-        FleetMDM["Fleet MDM"]
-        MeshCentral["MeshCentral"]
-        Monitoring["Monitoring Tools"]
+        RMM[RMM Tools]
+        SSO[SSO Providers]
+        MONITORING[Monitoring]
     end
     
-    WebApp --> Gateway
-    MobileApp --> Gateway
-    SDK --> Gateway
-    CLI --> Gateway
+    WEB --> GATEWAY
+    MOBILE --> GATEWAY
+    CLI --> GATEWAY
+    API --> GATEWAY
     
-    Gateway --> API
-    Gateway --> Auth
-    Gateway --> Client
+    GATEWAY --> AUTH
+    GATEWAY --> DEVICE
+    GATEWAY --> ORG
+    GATEWAY --> EVENT
+    GATEWAY --> TOOL
     
-    API --> ApiLib
-    Auth --> ApiLib
-    Client --> ApiLib
-    Stream --> ApiLib
+    AUTH --> MONGO
+    DEVICE --> MONGO
+    ORG --> MONGO
+    EVENT --> MONGO
+    TOOL --> MONGO
     
-    ApiLib --> DataMongo
-    DataMongo --> Core
-    DataMongo --> Security
+    AUTH --> REDIS
+    DEVICE --> REDIS
     
-    API --> MongoDB
-    Auth --> MongoDB
-    Client --> MongoDB
-    Stream --> Kafka
+    EVENT --> KAFKA
     
-    API --> Redis
-    Gateway --> Redis
-    
-    Client --> TacticalRMM
-    Client --> FleetMDM
-    Client --> MeshCentral
-    Stream --> Monitoring
-    
-    style Gateway fill:#e1f5fe
-    style API fill:#f3e5f5
-    style ApiLib fill:#e8f5e8
-    style MongoDB fill:#fff3e0
+    TOOL --> RMM
+    AUTH --> SSO
+    EVENT --> MONITORING
 ```
 
-## 🔄 Data Flow Architecture
+### Core Design Principles
 
-Understanding how data flows through the system is crucial for effective development and debugging.
+1. **Multi-Tenant by Design** - Complete tenant isolation at all levels
+2. **Event-Driven Architecture** - Asynchronous communication via events
+3. **Domain-Driven Design** - Clear domain boundaries and models
+4. **CQRS Pattern** - Separate read/write operations for scalability
+5. **API-First** - All functionality exposed through well-defined APIs
 
-### Request/Response Flow
+## Module Architecture
+
+### Core Modules Structure
 
 ```mermaid
-sequenceDiagram
-    participant Client as Client Application
-    participant Gateway as API Gateway
-    participant Auth as Auth Service
-    participant API as API Service
-    participant DataLib as Data Library
-    participant MongoDB as MongoDB
-    participant Cache as Redis Cache
-    
-    Client->>Gateway: API Request
-    Gateway->>Auth: Validate Token
-    Auth->>Gateway: Token Valid
-    Gateway->>API: Forward Request
-    
-    API->>DataLib: Query/Command
-    DataLib->>Cache: Check Cache
-    Cache-->>DataLib: Cache Miss/Hit
-    
-    alt Cache Miss
-        DataLib->>MongoDB: Database Query
-        MongoDB-->>DataLib: Query Result
-        DataLib->>Cache: Store in Cache
+graph TB
+    subgraph "API Layer Modules"
+        API_LIB[openframe-api-lib]
+        API_SERVICE[openframe-api-service-core]
+        EXT_API[openframe-external-api-service-core]
     end
     
-    DataLib-->>API: Return Data
-    API->>API: Business Logic
-    API-->>Gateway: Response DTO
-    Gateway-->>Client: JSON Response
-```
-
-### Event Processing Flow
-
-```mermaid
-sequenceDiagram
-    participant Tool as External Tool
-    participant Client as Client Service
-    participant Stream as Stream Service
-    participant Kafka as Apache Kafka
-    participant API as API Service
-    participant MongoDB as MongoDB
-    participant WebApp as Web Application
-    
-    Tool->>Client: Tool Event (webhook/polling)
-    Client->>Stream: Raw Event Data
-    Stream->>Stream: Event Processing & Enrichment
-    Stream->>Kafka: Processed Event
-    
-    Kafka->>API: Event Notification
-    API->>MongoDB: Store Event
-    API->>WebApp: Real-time Update (WebSocket)
-    
-    Note over Stream, API: Events include device changes,<br/>security alerts, compliance updates
-```
-
-## 📦 Module Architecture
-
-OpenFrame is organized into focused modules with clear responsibilities and minimal coupling.
-
-### Core Modules Overview
-
-| Module | Purpose | Dependencies | Artifacts |
-|--------|---------|--------------|-----------|
-| **openframe-core** | Shared utilities and patterns | None | Validation, utilities, constants |
-| **openframe-api-lib** | DTOs and service contracts | openframe-core | DTOs, interfaces, validation |
-| **openframe-data-mongo** | Data layer implementation | openframe-api-lib | Entities, repositories, queries |
-| **openframe-security-core** | Security patterns | openframe-core | JWT, OAuth, encryption |
-
-### Service Modules Overview
-
-| Module | Purpose | Dependencies | Port |
-|--------|---------|--------------|------|
-| **openframe-api-service-core** | Main business logic API | All core modules | 8080 |
-| **openframe-gateway-service-core** | API gateway and routing | Security modules | 8081 |
-| **openframe-authorization-service-core** | Authentication/authorization | Security, data modules | 8082 |
-| **openframe-client-core** | Agent and tool communication | API lib, data modules | 8083 |
-
-### Module Dependency Graph
-
-```mermaid
-graph TD
-    Core["openframe-core<br/>Utilities & Patterns"]
-    
-    ApiLib["openframe-api-lib<br/>DTOs & Interfaces"]
-    Security["openframe-security-core<br/>Security Patterns"]
-    DataMongo["openframe-data-mongo<br/>Data Models"]
-    
-    ApiService["openframe-api-service-core<br/>Business Logic"]
-    Gateway["openframe-gateway-service-core<br/>API Gateway"]
-    AuthService["openframe-authorization-service-core<br/>Auth Service"]
-    ClientService["openframe-client-core<br/>Client Communication"]
-    
-    Core --> ApiLib
-    Core --> Security
-    Core --> DataMongo
-    
-    ApiLib --> DataMongo
-    ApiLib --> ApiService
-    ApiLib --> Gateway
-    ApiLib --> AuthService
-    ApiLib --> ClientService
-    
-    Security --> Gateway
-    Security --> AuthService
-    
-    DataMongo --> ApiService
-    DataMongo --> AuthService
-    DataMongo --> ClientService
-    
-    style Core fill:#fff3e0
-    style ApiLib fill:#e8f5e8
-    style ApiService fill:#e1f5fe
-    style Gateway fill:#f3e5f5
-```
-
-## 🏛️ Architectural Patterns
-
-OpenFrame employs several well-established patterns to ensure maintainability, testability, and scalability.
-
-### Domain-Driven Design
-
-The system is organized around clear business domains:
-
-```mermaid
-graph LR
-    subgraph "Device Domain"
-        DeviceDTO["Device DTOs"]
-        DeviceService["Device Service"]
-        DeviceRepository["Device Repository"]
-        DeviceEntity["Device Entity"]
+    subgraph "Service Modules"
+        AUTH_SERVICE[openframe-authorization-service-core]
+        CLIENT_SERVICE[openframe-client-core]
+        MGMT_SERVICE[openframe-management-service-core]
+        STREAM_SERVICE[openframe-stream-service-core]
     end
     
-    subgraph "Organization Domain"
-        OrgDTO["Organization DTOs"]
-        OrgService["Organization Service"] 
-        OrgRepository["Organization Repository"]
-        OrgEntity["Organization Entity"]
+    subgraph "Data Modules"
+        DATA_MONGO[openframe-data-mongo]
+        DATA_KAFKA[openframe-data-kafka]
+        DATA_CORE[openframe-data]
     end
     
-    subgraph "Event Domain"
-        EventDTO["Event DTOs"]
-        EventService["Event Service"]
-        EventRepository["Event Repository"]
-        EventEntity["Event Entity"]
+    subgraph "Infrastructure Modules"
+        SECURITY[openframe-security-core]
+        GATEWAY[openframe-gateway-service-core]
+        CONFIG[openframe-config-core]
+        CORE[openframe-core]
     end
     
-    subgraph "Tool Domain"
-        ToolDTO["Tool DTOs"]
-        ToolService["Tool Service"]
-        ToolRepository["Tool Repository"] 
-        ToolEntity["Tool Entity"]
+    subgraph "SDK Modules"
+        SDK_FLEET[sdk/fleetmdm]
+        SDK_TACTICAL[sdk/tacticalrmm]
     end
     
-    DeviceDTO --> DeviceService
-    DeviceService --> DeviceRepository
-    DeviceRepository --> DeviceEntity
+    API_LIB --> DATA_MONGO
+    API_SERVICE --> API_LIB
+    API_SERVICE --> SECURITY
+    AUTH_SERVICE --> SECURITY
+    CLIENT_SERVICE --> DATA_MONGO
+    MGMT_SERVICE --> DATA_CORE
+    STREAM_SERVICE --> DATA_KAFKA
     
-    OrgDTO --> OrgService
-    OrgService --> OrgRepository
-    OrgRepository --> OrgEntity
-    
-    EventDTO --> EventService
-    EventService --> EventRepository
-    EventRepository --> EventEntity
-    
-    ToolDTO --> ToolService
-    ToolService --> ToolRepository
-    ToolRepository --> ToolEntity
+    GATEWAY --> SECURITY
+    EXT_API --> API_LIB
 ```
 
-### Layered Architecture Pattern
+### Module Responsibilities
 
-Each domain follows a consistent layered approach:
+| Module | Purpose | Key Components |
+|--------|---------|----------------|
+| **api-lib** | Shared DTOs and interfaces | Device, Organization, Event DTOs |
+| **api-service-core** | Main API implementation | Controllers, Services, GraphQL |
+| **authorization-service-core** | Authentication & OAuth | JWT, SSO, User management |
+| **client-core** | Client device management | Agent registration, Tool installation |
+| **data-mongo** | MongoDB entities and repos | Documents, Repositories, Services |
+| **security-core** | Security framework | JWT handling, OAuth, RBAC |
+| **gateway-service-core** | API gateway functions | Rate limiting, Routing, Auth |
+| **stream-service-core** | Event processing | Kafka consumers, Stream processing |
 
-```mermaid
-graph TD
-    Controller["Controllers<br/>HTTP endpoints, validation"]
-    ServiceInterface["Service Interfaces<br/>Business logic contracts"]
-    ServiceImpl["Service Implementation<br/>Business logic execution"]
-    Repository["Repository Layer<br/>Data access abstraction"]
-    Entity["Entity Layer<br/>Data models and persistence"]
-    
-    Controller --> ServiceInterface
-    ServiceInterface --> ServiceImpl
-    ServiceImpl --> Repository
-    Repository --> Entity
-    
-    Controller -.-> DTO["Request/Response DTOs"]
-    ServiceInterface -.-> DTO
-    
-    style Controller fill:#e1f5fe
-    style ServiceInterface fill:#f3e5f5
-    style ServiceImpl fill:#e8f5e8
-    style Repository fill:#fff3e0
-    style Entity fill:#fce4ec
-```
+## Data Architecture
 
-### Repository Pattern Implementation
-
-```java
-// Example: Device repository pattern
-public interface DeviceRepository extends MongoRepository<Device, String> {
-    // Standard CRUD operations inherited
-    
-    // Custom query methods
-    Page<Device> findByOrganizationId(String organizationId, Pageable pageable);
-    List<Device> findByStatusAndDeviceType(DeviceStatus status, DeviceType type);
-    
-    // Complex queries with @Query annotation
-    @Query("{'tags': {'$in': ?0}, 'status': ?1}")
-    Page<Device> findByTagsInAndStatus(List<String> tags, DeviceStatus status, Pageable pageable);
-}
-
-// Custom repository for complex operations
-public interface CustomDeviceRepository {
-    CountedGenericQueryResult<Device> findDevicesWithFilters(DeviceQueryFilter filter);
-    List<Device> findDevicesRequiringCompliance();
-    Map<String, Long> getDeviceCountsByOrganization();
-}
-
-@Repository
-public class CustomDeviceRepositoryImpl implements CustomDeviceRepository {
-    
-    private final MongoTemplate mongoTemplate;
-    
-    @Override
-    public CountedGenericQueryResult<Device> findDevicesWithFilters(DeviceQueryFilter filter) {
-        // Implementation using MongoTemplate for complex queries
-        Query query = buildQueryFromFilter(filter);
-        
-        // Get total count for pagination
-        long totalCount = mongoTemplate.count(query, Device.class);
-        
-        // Apply pagination
-        query.with(buildPageable(filter.getPagination()));
-        
-        // Execute query
-        List<Device> devices = mongoTemplate.find(query, Device.class);
-        
-        return CountedGenericQueryResult.<Device>builder()
-            .items(devices)
-            .totalCount(totalCount)
-            .pageInfo(buildPageInfo(filter.getPagination(), totalCount))
-            .build();
-    }
-}
-```
-
-## 🗄️ Data Architecture
-
-OpenFrame uses a sophisticated data architecture designed for multi-tenancy, scalability, and consistency.
-
-### MongoDB Schema Design
+### Domain Model Overview
 
 ```mermaid
 erDiagram
-    Organization ||--o{ Device : owns
-    Organization ||--o{ User : employs
+    Tenant ||--o{ Organization : contains
+    Organization ||--o{ User : has
+    Organization ||--o{ Device : manages
     Organization ||--o{ Tool : uses
+    
+    User ||--o{ Event : creates
     Device ||--o{ Event : generates
-    Device ||--o{ Alert : triggers
-    User ||--o{ Event : performs
-    Tool ||--o{ ToolConnection : connects
-    ToolConnection ||--o{ Event : creates
+    Device ||--o{ InstalledAgent : runs
+    
+    Tool ||--o{ ToolConnection : establishes
+    ToolConnection ||--o{ InstalledAgent : manages
+    
+    Event ||--o{ LogEvent : contains
+    Device ||--o{ DeviceHealth : monitors
+    Device ||--o{ SecurityState : tracks
     
     Organization {
         string id PK
         string name
         string slug UK
-        string website
-        enum status
-        datetime created_at
-        datetime updated_at
-        address address
-        contact primary_contact
+        string tenantId FK
+        timestamp createdAt
+        ContactInformation contactInfo
+        Address address
     }
     
     Device {
         string id PK
-        string organization_id FK
-        string name
-        enum device_type
-        enum status
-        array tags
-        object metadata
-        datetime last_seen
-        datetime created_at
-        datetime updated_at
+        string machineId UK
+        string organizationId FK
+        string serialNumber
+        DeviceType type
+        DeviceStatus status
+        timestamp lastCheckin
+        DeviceHealth health
+        SecurityState security
     }
     
     User {
         string id PK
-        string organization_id FK
+        string organizationId FK
         string email UK
-        string first_name
-        string last_name
-        enum status
-        array roles
-        datetime created_at
-        datetime updated_at
-    }
-    
-    Event {
-        string id PK
-        string organization_id FK
-        string device_id FK
-        string user_id FK
-        enum event_type
-        enum severity
-        object data
-        datetime timestamp
-        datetime created_at
+        UserStatus status
+        timestamp lastLogin
+        Set roles
     }
     
     Tool {
         string id PK
-        string organization_id FK
-        enum tool_type
+        string organizationId FK
+        ToolType type
         string name
-        object configuration
-        enum status
-        datetime created_at
-        datetime updated_at
+        ToolCredentials credentials
+        ConnectionStatus status
     }
 ```
 
-### Multi-Tenant Data Isolation
+### Database Design Patterns
+
+#### 1. Multi-Tenant Data Isolation
 
 ```mermaid
-graph TD
+graph TB
+    subgraph "Tenant A Data"
+        A_ORG[Organizations A]
+        A_DEVICES[Devices A]
+        A_USERS[Users A]
+        A_EVENTS[Events A]
+    end
+    
+    subgraph "Tenant B Data"
+        B_ORG[Organizations B]
+        B_DEVICES[Devices B]
+        B_USERS[Users B]
+        B_EVENTS[Events B]
+    end
+    
+    subgraph "Shared Infrastructure"
+        MONGO[(MongoDB)]
+        INDEXES[Compound Indexes]
+    end
+    
+    A_ORG --> MONGO
+    A_DEVICES --> MONGO
+    A_USERS --> MONGO
+    A_EVENTS --> MONGO
+    
+    B_ORG --> MONGO
+    B_DEVICES --> MONGO
+    B_USERS --> MONGO
+    B_EVENTS --> MONGO
+    
+    MONGO --> INDEXES
+```
+
+**Tenant Isolation Strategy:**
+- All documents include `organizationId` field
+- Compound indexes: `(organizationId, field1, field2)`
+- Automatic tenant filtering in queries
+- No cross-tenant data access possible
+
+#### 2. Event Sourcing for Audit Trail
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant API
+    participant Service
+    participant EventStore
+    participant ReadModel
+    
+    User->>API: Update Device Status
+    API->>Service: Process Command
+    Service->>EventStore: Store Event
+    EventStore->>ReadModel: Project Event
+    Service-->>API: Command Result
+    API-->>User: Response
+    
+    Note over EventStore: DeviceStatusChanged Event
+    Note over ReadModel: Updated Device View
+```
+
+### Caching Strategy
+
+#### Redis Cache Architecture
+
+```mermaid
+graph LR
     subgraph "Application Layer"
-        Request[API Request]
-        TenantContext[Tenant Context]
+        API[API Request]
     end
     
-    subgraph "Service Layer"
-        ServiceMethod[Service Method]
-        TenantFilter[Tenant Filtering]
-    end
-    
-    subgraph "Repository Layer"
-        MongoQuery[MongoDB Query]
-        TenantQuery[Tenant-Scoped Query]
+    subgraph "Cache Layer"
+        REDIS[(Redis)]
+        L1[L1 Cache - Application]
+        L2[L2 Cache - Redis]
     end
     
     subgraph "Data Layer"
-        Collection[MongoDB Collection]
-        TenantData[Tenant-Isolated Data]
+        MONGO[(MongoDB)]
     end
     
-    Request --> TenantContext
-    TenantContext --> ServiceMethod
-    ServiceMethod --> TenantFilter
-    TenantFilter --> MongoQuery
-    MongoQuery --> TenantQuery
-    TenantQuery --> Collection
-    Collection --> TenantData
+    API --> L1
+    L1 -->|Cache Miss| L2
+    L2 -->|Cache Miss| MONGO
     
-    Note1[Every query automatically<br/>includes organization_id filter]
-    Note2[Ensures complete<br/>tenant data isolation]
-    
-    TenantFilter -.-> Note1
-    TenantData -.-> Note2
+    MONGO -->|Store| L2
+    L2 -->|Store| L1
+    L1 -->|Response| API
 ```
 
-### Pagination Strategy
+**Cache Patterns:**
+- **User Sessions** - JWT token validation cache
+- **Organization Data** - Frequently accessed org info
+- **Device Status** - Real-time device state cache
+- **API Rate Limits** - Request counting and throttling
 
-OpenFrame uses cursor-based pagination for optimal performance:
-
-```java
-// Cursor pagination implementation
-@Data
-@Builder
-public class CursorPaginationInput {
-    @Min(1) @Max(100)
-    private Integer limit;
-    private String cursor; // Base64 encoded last item identifier
-}
-
-// Service implementation
-public CountedGenericQueryResult<Device> findDevices(DeviceFilterInput input) {
-    Query query = buildBaseQuery(input.getFilters());
-    
-    // Apply cursor if provided
-    if (input.getPagination().getCursor() != null) {
-        String decodedCursor = decodeCursor(input.getPagination().getCursor());
-        query.addCriteria(Criteria.where("_id").gt(new ObjectId(decodedCursor)));
-    }
-    
-    // Apply limit + 1 to check if there are more results
-    query.limit(input.getPagination().getLimit() + 1);
-    
-    List<Device> devices = mongoTemplate.find(query, Device.class);
-    
-    boolean hasNext = devices.size() > input.getPagination().getLimit();
-    if (hasNext) {
-        devices.remove(devices.size() - 1); // Remove the extra item
-    }
-    
-    String nextCursor = hasNext ? encodeCursor(devices.get(devices.size() - 1).getId()) : null;
-    
-    return CountedGenericQueryResult.<Device>builder()
-        .items(devices)
-        .totalCount(getTotalCount(input.getFilters()))
-        .pageInfo(CursorPageInfo.builder()
-            .hasNextPage(hasNext)
-            .nextCursor(nextCursor)
-            .build())
-        .build();
-}
-```
-
-## 🔐 Security Architecture
-
-Security is built into every layer of the OpenFrame architecture.
+## Security Architecture
 
 ### Authentication & Authorization Flow
 
 ```mermaid
 sequenceDiagram
-    participant Client as Client App
-    participant Gateway as API Gateway
-    participant AuthService as Auth Service
-    participant API as API Service
-    participant MongoDB as Database
+    participant Client
+    participant Gateway
+    participant AuthService
+    participant ResourceAPI
+    participant Database
     
-    Client->>AuthService: Login Request
-    AuthService->>MongoDB: Validate Credentials
-    MongoDB-->>AuthService: User Data
-    AuthService->>AuthService: Generate JWT
-    AuthService-->>Client: JWT Token
-    
-    Client->>Gateway: API Request + JWT
-    Gateway->>Gateway: Validate JWT Signature
-    Gateway->>AuthService: Get User Details (if needed)
-    AuthService-->>Gateway: User Details
-    Gateway->>Gateway: Check Permissions
-    Gateway->>API: Forward Request + User Context
-    API->>API: Apply Tenant Filtering
-    API->>MongoDB: Tenant-Scoped Query
-    MongoDB-->>API: Results
-    API-->>Gateway: Response
-    Gateway-->>Client: Response
+    Client->>Gateway: Request + JWT
+    Gateway->>AuthService: Validate Token
+    AuthService->>Database: Verify User/Org
+    Database-->>AuthService: User Details
+    AuthService-->>Gateway: Auth Context
+    Gateway->>ResourceAPI: Authorized Request
+    ResourceAPI->>Database: Query with Tenant Filter
+    Database-->>ResourceAPI: Tenant Data Only
+    ResourceAPI-->>Gateway: Response
+    Gateway-->>Client: Filtered Response
 ```
 
-### JWT Token Structure
+### Security Layers
 
-```javascript
-// JWT Payload Example
-{
-  "sub": "user123",                    // User ID
-  "email": "user@example.com",         // User email
-  "org_id": "org456",                  // Organization ID (tenant)
-  "roles": ["admin", "device_manager"], // User roles
-  "permissions": [                     // Specific permissions
-    "devices:read",
-    "devices:write", 
-    "organizations:read"
-  ],
-  "iat": 1640995200,                   // Issued at
-  "exp": 1641081600,                   // Expires at
-  "iss": "openframe-auth",             // Issuer
-  "aud": "openframe-api"               // Audience
+#### 1. API Gateway Security
+
+```mermaid
+graph TB
+    subgraph "Security Filters"
+        CORS[CORS Filter]
+        RATE[Rate Limiting]
+        JWT[JWT Validation]
+        TENANT[Tenant Context]
+        RBAC[Role-Based Access]
+    end
+    
+    subgraph "Request Pipeline"
+        REQUEST[Incoming Request]
+        RESPONSE[Outgoing Response]
+    end
+    
+    REQUEST --> CORS
+    CORS --> RATE
+    RATE --> JWT
+    JWT --> TENANT
+    TENANT --> RBAC
+    RBAC --> RESPONSE
+```
+
+#### 2. Multi-Tenant Security Model
+
+```mermaid
+graph TB
+    subgraph "Tenant A"
+        A_ADMIN[Admin User A]
+        A_USER[Regular User A]
+        A_DATA[Tenant A Data]
+    end
+    
+    subgraph "Tenant B"
+        B_ADMIN[Admin User B]
+        B_USER[Regular User B]
+        B_DATA[Tenant B Data]
+    end
+    
+    subgraph "Security Boundary"
+        FILTER[Tenant Filter]
+        AUTH[Authorization Service]
+    end
+    
+    A_ADMIN --> AUTH
+    A_USER --> AUTH
+    B_ADMIN --> AUTH
+    B_USER --> AUTH
+    
+    AUTH --> FILTER
+    FILTER --> A_DATA
+    FILTER --> B_DATA
+    
+    A_ADMIN -.->|No Access| B_DATA
+    B_ADMIN -.->|No Access| A_DATA
+```
+
+## Event-Driven Architecture
+
+### Event Processing Pipeline
+
+```mermaid
+graph LR
+    subgraph "Event Sources"
+        API[API Changes]
+        DEVICE[Device Events]
+        USER[User Actions]
+        TOOL[Tool Integration]
+    end
+    
+    subgraph "Event Processing"
+        KAFKA[Kafka Streams]
+        PROCESSOR[Event Processors]
+        ENRICHER[Data Enrichment]
+    end
+    
+    subgraph "Event Consumers"
+        AUDIT[Audit Service]
+        NOTIFICATION[Notifications]
+        ANALYTICS[Analytics]
+        WEBHOOK[Webhooks]
+    end
+    
+    API --> KAFKA
+    DEVICE --> KAFKA
+    USER --> KAFKA
+    TOOL --> KAFKA
+    
+    KAFKA --> PROCESSOR
+    PROCESSOR --> ENRICHER
+    
+    ENRICHER --> AUDIT
+    ENRICHER --> NOTIFICATION
+    ENRICHER --> ANALYTICS
+    ENRICHER --> WEBHOOK
+```
+
+### Event Types & Schema
+
+#### Core Event Schema
+
+```java
+public class EventBase {
+    private String id;
+    private String tenantId;
+    private String organizationId;
+    private String userId;
+    private EventType type;
+    private Instant timestamp;
+    private String source;
+    private Map<String, Object> payload;
+    private Map<String, String> metadata;
 }
 ```
 
-## ⚡ Performance Considerations
+#### Event Categories
 
-### Caching Strategy
+| Category | Examples | Purpose |
+|----------|----------|---------|
+| **Device Events** | `DEVICE_REGISTERED`, `DEVICE_STATUS_CHANGED` | Device lifecycle tracking |
+| **User Events** | `USER_LOGIN`, `USER_PERMISSION_CHANGED` | User activity auditing |
+| **Organization Events** | `ORG_CREATED`, `ORG_SETTINGS_UPDATED` | Tenant management |
+| **Tool Events** | `TOOL_CONNECTED`, `TOOL_SYNC_COMPLETED` | Integration monitoring |
+| **Security Events** | `AUTHENTICATION_FAILED`, `PERMISSION_DENIED` | Security auditing |
 
-```mermaid
-graph TD
-    subgraph "Cache Layers"
-        L1[Application Cache<br/>In-memory caching]
-        L2[Redis Cache<br/>Distributed caching]
-        L3[Database Cache<br/>MongoDB internal]
-    end
-    
-    subgraph "Cache Patterns"
-        ReadThrough[Read-through<br/>Cache miss loads from DB]
-        WriteBack[Write-back<br/>Async DB updates]
-        CacheAside[Cache-aside<br/>App manages cache]
-    end
-    
-    API[API Service] --> L1
-    L1 --> L2
-    L2 --> L3
-    L3 --> Database[(MongoDB)]
-    
-    L1 -.-> ReadThrough
-    L2 -.-> WriteBack
-    API -.-> CacheAside
-    
-    style L1 fill:#e1f5fe
-    style L2 fill:#f3e5f5
-    style Database fill:#e8f5e8
+## API Design Patterns
+
+### RESTful API Design
+
+#### Resource Naming Conventions
+
+```text
+# Organizations
+GET    /api/organizations                    # List organizations
+POST   /api/organizations                    # Create organization
+GET    /api/organizations/{id}               # Get organization
+PUT    /api/organizations/{id}               # Update organization
+DELETE /api/organizations/{id}               # Delete organization
+
+# Nested Resources
+GET    /api/organizations/{id}/devices       # List org devices
+GET    /api/organizations/{id}/users         # List org users
+POST   /api/organizations/{id}/users         # Add user to org
+
+# Device Management
+GET    /api/devices                          # List all devices
+GET    /api/devices/{id}                     # Get device details
+POST   /api/devices                          # Register device
+PATCH  /api/devices/{id}/status              # Update device status
+GET    /api/devices/{id}/health              # Get device health
 ```
 
-### Database Optimization
+#### Response Format Standards
 
-- **Indexes**: Strategic indexing on query patterns
-- **Aggregation**: MongoDB aggregation pipelines for complex operations
-- **Connection Pooling**: Optimized connection management
-- **Read Replicas**: Separate read/write operations for scaling
+**Success Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "device-123",
+    "name": "Production Server",
+    "status": "ACTIVE",
+    "lastCheckin": "2024-01-15T10:30:00Z"
+  },
+  "pagination": {
+    "hasNext": true,
+    "cursor": "eyJpZCI6ImRldmljZS0xMjMifQ==",
+    "limit": 20
+  },
+  "meta": {
+    "total": 150,
+    "took": 45,
+    "timestamp": "2024-01-15T10:30:00Z"
+  }
+}
+```
 
-### Key Performance Metrics
+**Error Response:**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid device configuration",
+    "details": [
+      {
+        "field": "serialNumber",
+        "message": "Serial number is required",
+        "rejectedValue": null
+      }
+    ]
+  },
+  "meta": {
+    "timestamp": "2024-01-15T10:30:00Z",
+    "requestId": "req-abc-123"
+  }
+}
+```
 
-| Metric | Target | Monitoring |
-|--------|--------|------------|
-| **API Response Time** | < 200ms (95th percentile) | Application metrics |
-| **Database Query Time** | < 50ms (average) | MongoDB profiling |
-| **Cache Hit Rate** | > 90% | Redis monitoring |
-| **Memory Usage** | < 80% of available | JVM metrics |
+### GraphQL API Design
 
-## 🔄 Integration Architecture
+#### Schema Structure
 
-OpenFrame integrates with various MSP tools through a unified integration framework.
+```graphql
+type Query {
+  # Organizations
+  organization(id: ID!): Organization
+  organizations(filter: OrganizationFilter, pagination: CursorInput): OrganizationConnection
+  
+  # Devices
+  device(id: ID!): Device
+  devices(filter: DeviceFilter, pagination: CursorInput): DeviceConnection
+  
+  # Events
+  events(filter: EventFilter, pagination: CursorInput): EventConnection
+}
 
-### Tool Integration Pattern
+type Mutation {
+  # Device Management
+  createDevice(input: CreateDeviceInput!): DevicePayload
+  updateDevice(id: ID!, input: UpdateDeviceInput!): DevicePayload
+  updateDeviceStatus(id: ID!, status: DeviceStatus!): DevicePayload
+  
+  # Organization Management
+  createOrganization(input: CreateOrganizationInput!): OrganizationPayload
+  updateOrganization(id: ID!, input: UpdateOrganizationInput!): OrganizationPayload
+}
+
+type Subscription {
+  # Real-time updates
+  deviceStatusUpdated(organizationId: ID): Device
+  eventCreated(organizationId: ID, types: [EventType!]): Event
+}
+```
+
+## Integration Architecture
+
+### External Tool Integration
 
 ```mermaid
 graph TB
     subgraph "OpenFrame Core"
-        ClientService[Client Service]
-        StreamService[Stream Service]
-        EventProcessor[Event Processor]
+        API[REST API]
+        SERVICE[Tool Service]
+        REGISTRY[Tool Registry]
     end
     
-    subgraph "Tool SDKs"
-        TacticalSDK[TacticalRMM SDK]
-        FleetSDK[Fleet MDM SDK]
-        MeshSDK[MeshCentral SDK]
+    subgraph "Integration Layer"
+        SDK[Tool SDKs]
+        ADAPTER[Protocol Adapters]
+        CONNECTOR[Connection Manager]
     end
     
     subgraph "External Tools"
-        TacticalRMM[(TacticalRMM)]
-        FleetMDM[(Fleet MDM)]
-        MeshCentral[(MeshCentral)]
+        FLEET[Fleet MDM]
+        TACTICAL[Tactical RMM]
+        MESH[MeshCentral]
+        CUSTOM[Custom Tools]
     end
     
-    ClientService --> TacticalSDK
-    ClientService --> FleetSDK
-    ClientService --> MeshSDK
+    API --> SERVICE
+    SERVICE --> REGISTRY
+    REGISTRY --> SDK
     
-    TacticalSDK <--> TacticalRMM
-    FleetSDK <--> FleetMDM
-    MeshSDK <--> MeshCentral
+    SDK --> ADAPTER
+    ADAPTER --> CONNECTOR
     
-    TacticalSDK --> StreamService
-    FleetSDK --> StreamService
-    MeshSDK --> StreamService
-    
-    StreamService --> EventProcessor
-    
-    style ClientService fill:#e1f5fe
-    style StreamService fill:#f3e5f5
-    style EventProcessor fill:#e8f5e8
+    CONNECTOR --> FLEET
+    CONNECTOR --> TACTICAL
+    CONNECTOR --> MESH
+    CONNECTOR --> CUSTOM
 ```
 
-## 📊 Monitoring & Observability
+### Integration Patterns
 
-### Application Metrics
+#### 1. SDK-Based Integration
 
-```mermaid
-graph TD
-    subgraph "Metrics Collection"
-        AppMetrics[Application Metrics]
-        JVMMetrics[JVM Metrics]
-        CustomMetrics[Custom Business Metrics]
-    end
+```java
+@Component
+public class FleetMdmIntegration {
     
-    subgraph "Monitoring Stack"
-        Prometheus[Prometheus]
-        Grafana[Grafana]
-        AlertManager[Alert Manager]
-    end
+    private final FleetMdmClient client;
     
-    subgraph "Logging"
-        AppLogs[Application Logs]
-        AccessLogs[Access Logs]
-        ErrorLogs[Error Logs]
-    end
-    
-    AppMetrics --> Prometheus
-    JVMMetrics --> Prometheus
-    CustomMetrics --> Prometheus
-    
-    Prometheus --> Grafana
-    Prometheus --> AlertManager
-    
-    AppLogs --> LogAggregation[Log Aggregation]
-    AccessLogs --> LogAggregation
-    ErrorLogs --> LogAggregation
-    
-    style Prometheus fill:#e1f5fe
-    style Grafana fill:#f3e5f5
-    style LogAggregation fill:#e8f5e8
+    public List<Device> syncDevices(String organizationId) {
+        FleetCredentials creds = getCredentials(organizationId);
+        return client.getHosts(creds).stream()
+                    .map(this::mapToDevice)
+                    .collect(Collectors.toList());
+    }
+}
 ```
 
-## 🚀 Deployment Architecture
+#### 2. Event-Based Integration
 
-### Microservices Deployment
+```java
+@EventListener
+public void handleToolEvent(IntegratedToolEvent event) {
+    switch (event.getType()) {
+        case DEVICE_UPDATED:
+            syncDeviceFromTool(event);
+            break;
+        case AGENT_INSTALLED:
+            registerNewAgent(event);
+            break;
+    }
+}
+```
+
+## Performance Architecture
+
+### Scalability Patterns
+
+#### Horizontal Scaling
 
 ```mermaid
 graph TB
-    subgraph "Load Balancer"
-        LB[Application Load Balancer]
+    subgraph "Load Balancers"
+        LB[Load Balancer]
+        ALB[Application Load Balancer]
     end
     
-    subgraph "API Gateway Cluster"
-        GW1[Gateway Instance 1]
-        GW2[Gateway Instance 2]
+    subgraph "Application Instances"
+        APP1[App Instance 1]
+        APP2[App Instance 2]
+        APP3[App Instance 3]
     end
     
-    subgraph "Service Clusters"
-        API1[API Service 1]
-        API2[API Service 2]
-        AUTH1[Auth Service 1]
-        AUTH2[Auth Service 2]
-        CLIENT1[Client Service 1]
-        CLIENT2[Client Service 2]
+    subgraph "Data Tier"
+        MONGO_PRIMARY[(MongoDB Primary)]
+        MONGO_SECONDARY1[(MongoDB Secondary 1)]
+        MONGO_SECONDARY2[(MongoDB Secondary 2)]
+        REDIS_CLUSTER[Redis Cluster]
     end
     
-    subgraph "Data Layer"
-        MongoDB[(MongoDB Cluster)]
-        Redis[(Redis Cluster)]
-        Kafka[(Kafka Cluster)]
-    end
+    LB --> ALB
+    ALB --> APP1
+    ALB --> APP2
+    ALB --> APP3
     
-    LB --> GW1
-    LB --> GW2
+    APP1 --> MONGO_PRIMARY
+    APP1 --> REDIS_CLUSTER
+    APP2 --> MONGO_PRIMARY
+    APP2 --> REDIS_CLUSTER
+    APP3 --> MONGO_PRIMARY
+    APP3 --> REDIS_CLUSTER
     
-    GW1 --> API1
-    GW1 --> AUTH1
-    GW1 --> CLIENT1
-    GW2 --> API2
-    GW2 --> AUTH2
-    GW2 --> CLIENT2
-    
-    API1 --> MongoDB
-    API2 --> MongoDB
-    AUTH1 --> MongoDB
-    AUTH2 --> MongoDB
-    CLIENT1 --> MongoDB
-    CLIENT2 --> MongoDB
-    
-    API1 --> Redis
-    API2 --> Redis
-    GW1 --> Redis
-    GW2 --> Redis
-    
-    CLIENT1 --> Kafka
-    CLIENT2 --> Kafka
-    
-    style LB fill:#e1f5fe
-    style MongoDB fill:#e8f5e8
-    style Redis fill:#f3e5f5
-    style Kafka fill:#fff3e0
+    MONGO_PRIMARY --> MONGO_SECONDARY1
+    MONGO_PRIMARY --> MONGO_SECONDARY2
 ```
 
-## 🎯 Key Architectural Decisions
+#### Database Optimization
 
-### Decision 1: Cursor-Based Pagination
-**Why**: Better performance for large datasets, consistent results during real-time updates
-**Trade-offs**: More complex implementation vs. better scalability
+**Index Strategy:**
+```javascript
+// Compound indexes for multi-tenant queries
+db.devices.createIndex({ 
+  "organizationId": 1, 
+  "status": 1, 
+  "lastCheckin": -1 
+});
 
-### Decision 2: MongoDB as Primary Database  
-**Why**: Document model fits MSP data, built-in multi-tenancy support, ACID transactions
-**Trade-offs**: NoSQL learning curve vs. flexible schema evolution
+// Text search index
+db.devices.createIndex({ 
+  "name": "text", 
+  "model": "text", 
+  "serialNumber": "text" 
+});
 
-### Decision 3: Microservices Architecture
-**Why**: Independent scaling, technology flexibility, clear service boundaries
-**Trade-offs**: Operational complexity vs. development velocity
+// Geospatial index for location-based queries
+db.devices.createIndex({ "location": "2dsphere" });
+```
 
-### Decision 4: JWT for Authentication
-**Why**: Stateless, scalable, standard-compliant
-**Trade-offs**: Token size vs. no server-side session storage
+**Query Optimization:**
+```java
+// Efficient pagination with cursor
+public PageResponse<Device> getDevices(CursorPaginationInput pagination) {
+    Criteria criteria = Criteria.where("organizationId").is(orgId);
+    
+    if (pagination.getCursor() != null) {
+        criteria.and("id").gt(decodeCursor(pagination.getCursor()));
+    }
+    
+    Query query = Query.query(criteria)
+                      .limit(pagination.getLimit() + 1)
+                      .with(Sort.by("id"));
+    
+    List<Device> devices = mongoTemplate.find(query, Device.class);
+    return buildPageResponse(devices, pagination.getLimit());
+}
+```
 
-### Decision 5: Event-Driven Integration
-**Why**: Loose coupling, scalability, real-time processing
-**Trade-offs**: Eventual consistency vs. system resilience
+## Monitoring & Observability
 
-## 📚 Further Reading
+### Observability Stack
 
-- **[Local Development Setup](../setup/local-development.md)** - Get the architecture running locally
-- **[Testing Overview](../testing/overview.md)** - Test architectural patterns
-- **[Contributing Guidelines](../contributing/guidelines.md)** - Architectural contribution standards
+```mermaid
+graph TB
+    subgraph "Application Metrics"
+        MICROMETER[Micrometer]
+        ACTUATOR[Spring Boot Actuator]
+        CUSTOM[Custom Metrics]
+    end
+    
+    subgraph "Monitoring Tools"
+        PROMETHEUS[Prometheus]
+        GRAFANA[Grafana]
+        JAEGER[Jaeger Tracing]
+    end
+    
+    subgraph "Alerting"
+        ALERTMANAGER[AlertManager]
+        PAGERDUTY[PagerDuty]
+        SLACK[Slack Alerts]
+    end
+    
+    MICROMETER --> PROMETHEUS
+    ACTUATOR --> PROMETHEUS
+    CUSTOM --> PROMETHEUS
+    
+    PROMETHEUS --> GRAFANA
+    PROMETHEUS --> ALERTMANAGER
+    
+    ALERTMANAGER --> PAGERDUTY
+    ALERTMANAGER --> SLACK
+```
 
----
+### Key Metrics
 
-Understanding this architecture will enable you to:
-- **Navigate the codebase** efficiently
-- **Make architectural decisions** consistent with the system design
-- **Implement new features** following established patterns
-- **Debug issues** by understanding data flow
-- **Scale components** based on architectural constraints
+| Metric Category | Examples | Purpose |
+|----------------|----------|---------|
+| **Application** | Request rate, Response time, Error rate | Performance monitoring |
+| **Business** | Active devices, Organizations, Events/hour | Business insights |
+| **Infrastructure** | CPU, Memory, Disk, Network | Resource monitoring |
+| **Database** | Query time, Connection pool, Index usage | Database performance |
+| **Security** | Failed logins, Permission denials, API abuse | Security monitoring |
 
-Ready to dive deeper? Start with the [Testing Overview](../testing/overview.md) to see these patterns in action!
+## Key Design Decisions
+
+### 1. **MongoDB for Primary Storage**
+- **Why**: Document-based model fits domain objects well
+- **Trade-offs**: No ACID transactions across collections
+- **Mitigation**: Event sourcing for consistency
+
+### 2. **JWT for Authentication**
+- **Why**: Stateless, scalable, standard
+- **Trade-offs**: Token revocation complexity
+- **Mitigation**: Short expiration + refresh tokens
+
+### 3. **Cursor-based Pagination**
+- **Why**: Consistent performance, no offset issues
+- **Trade-offs**: No random page access
+- **Mitigation**: Search functionality for discovery
+
+### 4. **Event-Driven Architecture**
+- **Why**: Loose coupling, scalability, audit trail
+- **Trade-offs**: Eventual consistency, complexity
+- **Mitigation**: Careful event design, monitoring
+
+## Next Steps
+
+Now that you understand the architecture, explore specific areas:
+
+1. **[API Design Patterns](../api/design-patterns.md)** - Learn API conventions
+2. **[Testing Architecture](../testing/overview.md)** - Understand testing strategy  
+3. **[Security Implementation](../../reference/architecture/security_core_config.md)** - Dive into security details
+4. **[Performance Optimization](../performance/optimization.md)** - Learn performance best practices
+
+## Resources
+
+- 📚 **API Reference**: [Complete API Documentation](../../reference/architecture/overview.md)
+- 💬 **Community**: [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
+- 🚀 **Platform**: [OpenFrame.ai](https://openframe.ai)
+
+This architecture provides the foundation for building scalable, secure, and maintainable device management platforms with OpenFrame OSS Library! 🏗️

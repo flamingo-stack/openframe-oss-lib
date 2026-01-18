@@ -1,148 +1,239 @@
 # OpenFrame OSS Library Documentation
 
-Welcome to the comprehensive documentation for **OpenFrame OSS Library** - the foundational building blocks for secure, scalable device and organization management platforms.
+Welcome to the comprehensive documentation for **OpenFrame OSS Library** - the foundational library for secure, scalable device and organization management platforms.
+
+OpenFrame OSS Library provides standardized data models, API DTOs, and service interfaces that power the entire OpenFrame ecosystem, enabling organizations to build robust, multi-tenant device management solutions.
+
+## 🚀 Quick Navigation
+
+### New to OpenFrame?
+Start here to understand the platform and get up and running quickly:
+
+- **[Introduction](./getting-started/introduction.md)** - What is OpenFrame OSS Library?
+- **[Prerequisites](./getting-started/prerequisites.md)** - What you need before starting
+- **[Quick Start](./getting-started/quick-start.md)** - Get running in 5 minutes
+- **[First Steps](./getting-started/first-steps.md)** - What to do after installation
+
+### Building with OpenFrame?
+Essential guides for developers and integrators:
+
+- **[Development Overview](./development/README.md)** - Complete development guide
+- **[Environment Setup](./development/setup/environment.md)** - Configure your development environment
+- **[Local Development](./development/setup/local-development.md)** - Run OpenFrame locally
+- **[Architecture Overview](./development/architecture/overview.md)** - Understand the system design
+
+### Contributing to OpenFrame?
+Guidelines for contributors and maintainers:
+
+- **[Contributing Guidelines](./development/contributing/guidelines.md)** - How to contribute to OpenFrame
+- **[Testing Guide](./development/testing/overview.md)** - Testing strategies and best practices
 
 ## 📚 Table of Contents
 
 ### Getting Started
-Start here if you're new to the OpenFrame OSS Library:
-- [Introduction](./getting-started/introduction.md) - What is OpenFrame OSS Library and who should use it
-- [Prerequisites](./getting-started/prerequisites.md) - Development environment requirements
-- [Quick Start](./getting-started/quick-start.md) - Get up and running in 5 minutes
-- [First Steps](./getting-started/first-steps.md) - Explore core features and common patterns
+Start your journey with OpenFrame OSS Library:
+
+| Document | Description |
+|----------|-------------|
+| **[Introduction](./getting-started/introduction.md)** | Overview of OpenFrame OSS Library, key features, and target audience |
+| **[Prerequisites](./getting-started/prerequisites.md)** | System requirements, dependencies, and setup preparation |
+| **[Quick Start](./getting-started/quick-start.md)** | Step-by-step guide to get your first OpenFrame application running |
+| **[First Steps](./getting-started/first-steps.md)** | Next steps after installation and initial exploration |
 
 ### Development
-For contributors and developers integrating with the library:
-- [Development Overview](./development/README.md) - Development section index and overview
-- [Environment Setup](./development/setup/environment.md) - Set up your development environment
-- [Local Development](./development/setup/local-development.md) - Run and test locally
-- [Architecture Overview](./development/architecture/overview.md) - System architecture and design patterns
-- [Testing Guide](./development/testing/overview.md) - Testing strategies and best practices
-- [Contributing Guidelines](./development/contributing/guidelines.md) - How to contribute to the project
+Comprehensive guides for developers building with OpenFrame:
+
+| Document | Description |
+|----------|-------------|
+| **[Development Overview](./development/README.md)** | Main development guide with workflow and principles |
+| **[Environment Setup](./development/setup/environment.md)** | IDE configuration, tools, and development environment |
+| **[Local Development](./development/setup/local-development.md)** | Running OpenFrame locally with hot reload and debugging |
+| **[Architecture Overview](./development/architecture/overview.md)** | System architecture, design patterns, and technical overview |
+| **[Testing Overview](./development/testing/overview.md)** | Testing strategy, tools, and best practices |
+| **[Contributing Guidelines](./development/contributing/guidelines.md)** | How to contribute code, documentation, and improvements |
 
 ### Reference
 Technical reference documentation and API specifications:
 
-#### Architecture Documentation
-- [System Overview](./reference/architecture/overview.md) - High-level architecture and module organization
-- [API Service Core](./reference/architecture/api_service_core_controller.md) - REST API controllers and endpoints
-- [Data Models](./reference/architecture/data_mongo_document_device.md) - MongoDB entity models and schemas
-- [Service Interfaces](./reference/architecture/api_lib_service.md) - Business logic service contracts
-
-#### Core Components
-- [DTOs and Data Transfer](./reference/architecture/api_lib_dto_shared.md) - Standardized data transfer objects
-- [Device Management](./reference/architecture/api_lib_dto_device.md) - Device domain DTOs and models
-- [Event Management](./reference/architecture/api_lib_dto_event.md) - Event processing and audit DTOs
-- [Organization Management](./reference/architecture/api_lib_dto_organization.md) - Multi-tenant organization models
-- [Tool Integration](./reference/architecture/api_lib_dto_tool.md) - Tool connectivity and management
-- [Security Core](./reference/architecture/security_core_jwt.md) - Authentication and authorization
-
-#### Data Layer
-- [MongoDB Documents](./reference/architecture/data_mongo_document_event.md) - Entity models and database schemas
-- [Repository Patterns](./reference/architecture/data_mongo_repository_event.md) - Data access layer interfaces
-- [Configuration Management](./reference/architecture/data_config.md) - Data layer configuration and setup
-
-#### External Integrations
-- [TacticalRMM SDK](./reference/architecture/sdk_tacticalrmm.md) - TacticalRMM integration models
-- [Fleet MDM SDK](./reference/architecture/sdk_fleetmdm_model.md) - Fleet MDM integration support
-- [OAuth Services](./reference/architecture/security_oauth_service.md) - OAuth 2.0 and OIDC providers
+| Document | Description |
+|----------|-------------|
+| **[Architecture Overview](./reference/architecture/overview.md)** | Detailed technical architecture and module documentation |
+| **[API Library DTOs](./reference/architecture/api_lib_dto.md)** | API data transfer objects and shared models |
+| **[Data Models](./reference/architecture/data_mongo_document_device.md)** | MongoDB document models and database design |
+| **[Security Framework](./reference/architecture/security_core_jwt.md)** | Authentication, authorization, and security implementation |
+| **[Service Interfaces](./reference/architecture/api_service_core_service.md)** | Business logic service interfaces and contracts |
 
 ### Diagrams
-Visual documentation and architecture diagrams:
-- [System Architecture](./diagrams/README.md) - Mermaid diagrams showing system structure and data flow
-- [Service Interactions](./diagrams/README.md) - Component interaction and dependency diagrams
-- [Data Flow Diagrams](./diagrams/README.md) - Request/response flow and processing pipelines
+Visual documentation and architectural diagrams:
+
+| Document | Description |
+|----------|-------------|
+| **[Architecture Diagrams](./diagrams/README.md)** | Mermaid diagrams showing system architecture and data flow |
+| **[System Overview](./diagrams/system-overview.mmd)** | High-level system architecture visualization |
+| **[Data Flow](./diagrams/data-flow.mmd)** | Request/response flow through OpenFrame components |
+
+## 🎯 Documentation by Use Case
+
+### For MSP/IT Service Providers
+Building multi-tenant device management platforms:
+- **[Getting Started Guide](./getting-started/introduction.md)** - Understand multi-tenant architecture
+- **[Organization Management](./reference/architecture/api_lib_dto_organization.md)** - Multi-client organization structure
+- **[Device Management](./reference/architecture/api_lib_dto_device.md)** - Device inventory and monitoring
+
+### For Enterprise Organizations
+Deploying secure device management infrastructure:
+- **[Security Framework](./reference/architecture/security_core_jwt.md)** - Enterprise authentication and authorization
+- **[Event & Audit System](./reference/architecture/api_lib_dto_event.md)** - Compliance and audit trails
+- **[Integration Guide](./reference/architecture/api_lib_dto_tool.md)** - Connect existing tools and systems
+
+### For Software Vendors
+Integrating device management into products:
+- **[API Reference](./reference/architecture/overview.md)** - Complete API documentation
+- **[SDK Documentation](./reference/architecture/sdk_tacticalrmm.md)** - Integration SDKs and examples
+- **[Development Guide](./development/README.md)** - Development patterns and best practices
+
+### For Platform Developers
+Building custom device management solutions:
+- **[Architecture Overview](./development/architecture/overview.md)** - System design and patterns
+- **[Data Models](./reference/architecture/data_mongo_document_device.md)** - Database design and optimization
+- **[Testing Guide](./development/testing/overview.md)** - Testing strategies for platform development
+
+## 🏗️ Core Architecture
+
+OpenFrame OSS Library follows a modular, layered architecture:
+
+```mermaid
+graph TB
+    subgraph "Application Layer"
+        API[REST APIs]
+        WEB[Web Interface]
+        CLI[CLI Tools]
+    end
+    
+    subgraph "OpenFrame OSS Library"
+        DTOS[API DTOs]
+        SERVICES[Service Interfaces] 
+        MODELS[Data Models]
+        SECURITY[Security Framework]
+        UTILS[Core Utilities]
+    end
+    
+    subgraph "Data & Infrastructure"
+        MONGO[(MongoDB)]
+        REDIS[(Redis Cache)]
+        KAFKA[Event Streams]
+    end
+    
+    API --> DTOS
+    WEB --> SERVICES
+    CLI --> MODELS
+    
+    DTOS --> SECURITY
+    SERVICES --> MODELS
+    MODELS --> UTILS
+    
+    SERVICES --> MONGO
+    SECURITY --> REDIS
+    MODELS --> KAFKA
+```
+
+## 📊 Key Features Overview
+
+### Multi-Tenant Organization Management
+- **[Organization DTOs](./reference/architecture/api_lib_dto_organization.md)** - Data structures for multi-tenant organizations
+- **[Contact Management](./reference/architecture/data_mongo_document_organization.md)** - Contact and relationship management
+- **[User Invitations](./reference/architecture/api_service_core_dto_invitation.md)** - User invitation and onboarding
+
+### Device Management & Monitoring
+- **[Device DTOs](./reference/architecture/api_lib_dto_device.md)** - Device filtering, tagging, and querying
+- **[Device Models](./reference/architecture/data_mongo_document_device.md)** - MongoDB models for devices and alerts
+- **[Tool Integration](./reference/architecture/api_lib_dto_tool.md)** - RMM tool connections and management
+
+### Security & Authentication
+- **[JWT Framework](./reference/architecture/security_core_jwt.md)** - JWT-based authentication
+- **[OAuth Integration](./reference/architecture/security_oauth_service.md)** - OAuth 2.0 and OIDC support
+- **[Tenant Security](./reference/architecture/gateway_service_core_security_tenant.md)** - Multi-tenant data isolation
+
+### Event Processing & Audit
+- **[Event DTOs](./reference/architecture/api_lib_dto_event.md)** - Event filtering and querying
+- **[Event Models](./reference/architecture/data_mongo_document_event.md)** - Core and external event tracking
+- **[Audit Logging](./reference/architecture/api_lib_dto_audit.md)** - Comprehensive audit trails
+
+## 🔧 Development Resources
+
+### Code Examples
+- **[Service Implementation](./development/setup/local-development.md)** - Example service implementations
+- **[API Usage](./getting-started/quick-start.md)** - Basic API usage examples
+- **[Integration Patterns](./development/architecture/overview.md)** - Common integration patterns
+
+### Testing & Quality
+- **[Test Examples](./development/testing/overview.md)** - Unit and integration test examples
+- **[Quality Standards](./development/contributing/guidelines.md)** - Code quality requirements
+- **[CI/CD Pipeline](./development/setup/environment.md)** - Continuous integration setup
+
+### Configuration & Deployment
+- **[Environment Setup](./development/setup/environment.md)** - Development environment configuration
+- **[Production Deployment](./development/setup/local-development.md)** - Production deployment guidelines
+- **[Performance Optimization](./development/architecture/overview.md)** - Performance best practices
 
 ## 📖 Quick Links
 
-### Essential Resources
-- [Project README](../README.md) - Main project overview and quick start
-- [Contributing Guide](../CONTRIBUTING.md) - How to contribute to the project
-- [License Information](../LICENSE.md) - Licensing terms and conditions
+### Project Resources
+- **[Main README](../README.md)** - Project overview and quick start
+- **[Contributing Guide](../CONTRIBUTING.md)** - How to contribute to OpenFrame
+- **[License](../LICENSE.md)** - Flamingo AI Unified License v1.0
 
-### Core Concepts
-- **Multi-Tenancy**: Built-in support for secure, isolated tenant operations
-- **Cursor Pagination**: Efficient navigation through large datasets
-- **Event Processing**: Comprehensive audit trails and system monitoring
-- **Tool Integration**: Plugin architecture for MSP tool connectivity
-- **Security First**: JWT authentication with OAuth 2.0/OIDC support
+### External Links
+- **[OpenFrame Platform](https://openframe.ai)** - Official product information
+- **[Flamingo Company](https://flamingo.run)** - About Flamingo and our mission
+- **[OpenMSP Community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)** - Join our Slack community for support
 
-### Common Use Cases
-- **MSP Platform Development**: Building multi-client management dashboards
-- **Device Management**: Inventory tracking, compliance monitoring, health alerts
-- **Integration Projects**: Connecting existing tools to OpenFrame ecosystem
-- **Enterprise Solutions**: Scalable device management with SSO and audit trails
-
-## 🎯 Documentation by Audience
-
-### For New Developers
-1. Start with [Introduction](./getting-started/introduction.md) to understand the library's purpose
-2. Review [Prerequisites](./getting-started/prerequisites.md) and set up your environment
-3. Follow the [Quick Start](./getting-started/quick-start.md) guide for hands-on experience
-4. Explore [First Steps](./getting-started/first-steps.md) for common patterns
-
-### For Contributors
-1. Read [Contributing Guidelines](./development/contributing/guidelines.md) for contribution process
-2. Set up [Local Development](./development/setup/local-development.md) environment
-3. Study [Architecture Overview](./development/architecture/overview.md) for design patterns
-4. Review [Testing Guide](./development/testing/overview.md) for quality standards
-
-### For Integrators
-1. Review [System Overview](./reference/architecture/overview.md) for integration points
-2. Study relevant DTOs: [Device](./reference/architecture/api_lib_dto_device.md), [Event](./reference/architecture/api_lib_dto_event.md), [Organization](./reference/architecture/api_lib_dto_organization.md)
-3. Understand [Service Interfaces](./reference/architecture/api_lib_service.md) for business logic
-4. Check [Security Core](./reference/architecture/security_core_jwt.md) for authentication patterns
-
-### For Architects
-1. Start with [Architecture Overview](./reference/architecture/overview.md) for system design
-2. Review [Data Models](./reference/architecture/data_mongo_document_device.md) for persistence patterns
-3. Study [Service Architecture](./reference/architecture/api_service_core_controller.md) for API design
-4. Examine [External Integrations](./reference/architecture/sdk_tacticalrmm.md) for extension patterns
-
-## 🔍 Search and Navigation Tips
-
-### Finding Specific Information
-- Use your browser's search (Ctrl/Cmd + F) within documentation pages
-- Check the [System Overview](./reference/architecture/overview.md) for component relationships
-- Review DTOs for data structure definitions
-- Look at service interfaces for available operations
-
-### Understanding Relationships
-- **DTOs → Data Models**: How API data maps to database entities
-- **Services → Controllers**: How business logic connects to API endpoints
-- **Configuration → Features**: How settings enable specific functionality
-- **Security → Multi-tenancy**: How authentication enables tenant isolation
+### GitHub Repositories
+- **[OpenFrame Gateway](https://github.com/flamingo-stack/openframe-gateway)** - API gateway and routing
+- **[OpenFrame Auth](https://github.com/flamingo-stack/openframe-auth)** - Authentication service
+- **[OpenFrame Dashboard](https://github.com/flamingo-stack/openframe-dashboard)** - Web management interface
 
 ## 🆘 Getting Help
 
-### Community Resources
-- **Slack Community**: [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) - Active developer community
-- **Platform Website**: [OpenFrame.ai](https://openframe.ai) - Product information and updates
-- **Company Website**: [Flamingo.run](https://flamingo.run) - About the team and mission
+### Community Support
+All discussions and support happen through our **OpenMSP Slack community**:
 
-### Documentation Feedback
-Found something unclear or missing? We'd love to hear from you:
-- Join our [Slack community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) and share feedback in `#documentation`
-- Suggest improvements or corrections
-- Request additional examples or clarifications
+- 💬 **[Join OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)** - Real-time help and discussions
+- 🎯 **#openframe-dev** - Development questions and technical discussions
+- 🚀 **#openframe-general** - General questions and platform updates
+- 🐛 **#openframe-bugs** - Bug reports and issue tracking
 
-> **Note**: We manage all community discussions and support through our **OpenMSP Slack community**. GitHub Issues and Discussions are not actively monitored.
+> **Note**: GitHub Issues and Discussions are not actively monitored. Please use our Slack community for all support and discussions.
 
-## 📈 What's Next?
+### Documentation Updates
 
-Ready to dive in? Here are some suggested learning paths:
+Found an error or want to improve the documentation?
 
-### Path 1: Quick Implementation (30 minutes)
-1. [Prerequisites](./getting-started/prerequisites.md) → [Quick Start](./getting-started/quick-start.md) → [First Steps](./getting-started/first-steps.md)
+1. **[Join our Slack community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)** for discussion
+2. **[Review contributing guidelines](./development/contributing/guidelines.md)** for documentation standards
+3. **Submit a pull request** with your improvements
 
-### Path 2: Deep Architecture Understanding (2-3 hours)
-1. [Introduction](./getting-started/introduction.md) → [Architecture Overview](./reference/architecture/overview.md) → [Development Guide](./development/README.md)
+## 🎉 What's Next?
 
-### Path 3: Contribution Preparation (1-2 hours)
-1. [Contributing Guidelines](./development/contributing/guidelines.md) → [Local Development](./development/setup/local-development.md) → [Testing Guide](./development/testing/overview.md)
+### For Newcomers
+1. **[Read the Introduction](./getting-started/introduction.md)** - Understand what OpenFrame OSS Library is
+2. **[Check Prerequisites](./getting-started/prerequisites.md)** - Ensure you have everything needed
+3. **[Follow Quick Start](./getting-started/quick-start.md)** - Build your first application
+
+### For Developers
+1. **[Set up your environment](./development/setup/environment.md)** - Configure your development setup
+2. **[Explore the architecture](./development/architecture/overview.md)** - Understand the system design
+3. **[Start building](./development/setup/local-development.md)** - Begin developing with OpenFrame
+
+### For Contributors
+1. **[Read contributing guidelines](./development/contributing/guidelines.md)** - Learn our contribution process
+2. **[Join the community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)** - Connect with other contributors
+3. **[Start contributing](./development/README.md)** - Make your first contribution
 
 ---
 
 *Documentation generated by [OpenFrame Doc Orchestrator](https://github.com/flamingo-stack/openframe-oss-tenant)*
 
-**Ready to build the future of MSP platforms?** Start with our [Getting Started guide](./getting-started/introduction.md) or jump into the [Quick Start](./getting-started/quick-start.md) for immediate hands-on experience!
+<div align="center">
+  Built with 💛 by the <a href="https://www.flamingo.run/about"><b>Flamingo</b></a> team
+</div>

@@ -1,222 +1,406 @@
 # Development Documentation
 
-Welcome to the OpenFrame OSS Library development documentation! This section contains comprehensive guides for developers who want to contribute to, extend, or deeply integrate with the OpenFrame platform.
+Welcome to the OpenFrame OSS Library development documentation! This section provides comprehensive guides for developers building applications and extensions with OpenFrame.
 
-## 📚 Documentation Structure
+## Quick Navigation
 
-This development documentation is organized into focused sections that build upon each other:
+### 🚀 Getting Started
+- **[Environment Setup](./setup/environment.md)** - Configure your IDE and development tools
+- **[Local Development](./setup/local-development.md)** - Run OpenFrame locally with hot reload
 
-### 🛠️ Setup Guides
-Get your development environment ready and running smoothly:
-
-| Guide | Purpose | Time Required |
-|-------|---------|---------------|
-| **[Environment Setup](setup/environment.md)** | IDE configuration, tools, and development workflow | 15 minutes |
-| **[Local Development](setup/local-development.md)** | Clone, build, and run OpenFrame locally with all services | 30 minutes |
-
-### 🏗️ Architecture Documentation  
-Understand the system design and make informed development decisions:
-
-| Guide | Purpose | Audience |
-|-------|---------|----------|
-| **[Architecture Overview](architecture/overview.md)** | High-level system design, data flow, and module relationships | All developers |
+### 🏗️ Architecture & Design
+- **[Architecture Overview](./architecture/overview.md)** - System architecture and design patterns
+- **[API Design](./architecture/api-design.md)** - RESTful API conventions and standards
 
 ### 🧪 Testing & Quality
-Maintain high code quality and reliability:
-
-| Guide | Purpose | Coverage |
-|-------|---------|----------|
-| **[Testing Overview](testing/overview.md)** | Test structure, running tests, and writing new tests | Unit, Integration, E2E |
+- **[Testing Overview](./testing/overview.md)** - Testing strategy, tools, and best practices
+- **[Code Quality](./testing/code-quality.md)** - Linting, formatting, and quality gates
 
 ### 🤝 Contributing
-Join the OpenFrame development community:
+- **[Contributing Guidelines](./contributing/guidelines.md)** - How to contribute to OpenFrame OSS Library
+- **[Code Standards](./contributing/code-standards.md)** - Coding conventions and style guide
 
-| Guide | Purpose | For |
-|-------|---------|-----|
-| **[Contributing Guidelines](contributing/guidelines.md)** | Code standards, PR process, and review guidelines | Contributors |
-
----
-
-## 🎯 Quick Navigation
-
-### New to OpenFrame Development?
-**Start Here → [Environment Setup](setup/environment.md)**
-
-Follow this path for the optimal learning experience:
-1. **Environment Setup** - Configure your development tools
-2. **Local Development** - Get the full system running
-3. **Architecture Overview** - Understand the system design
-4. **Testing Overview** - Learn testing patterns
-5. **Contributing Guidelines** - Join the community
-
-### Experienced Java Developer?
-**Jump to → [Architecture Overview](architecture/overview.md)**
-
-Focus on these key areas:
-- System architecture and module relationships
-- Data flow patterns and API design
-- Service implementation patterns
-- Testing strategies
-
-### Ready to Contribute?
-**Review → [Contributing Guidelines](contributing/guidelines.md)**
-
-Make sure you understand:
-- Code style and conventions
-- Git workflow and PR process  
-- Review criteria and checklist
-
----
-
-## 🚀 Development Workflow Overview
-
-Understanding the typical development workflow helps you navigate the codebase efficiently:
+## Development Workflow
 
 ```mermaid
-flowchart TD
-    A[Setup Environment] --> B[Clone & Build]
-    B --> C[Understand Architecture]
-    C --> D[Identify Area to Work On]
-    D --> E{Type of Work?}
-    
-    E -->|New Feature| F[Design API/DTOs]
-    E -->|Bug Fix| G[Write Failing Test]
-    E -->|Documentation| H[Update Docs]
-    
-    F --> I[Implement Service Interface]
-    G --> I
-    H --> J[Review Changes]
-    
-    I --> K[Write Tests]
-    K --> L[Update Documentation]
-    L --> J
-    
-    J --> M[Create Pull Request]
-    M --> N[Code Review]
-    N --> O[Merge to Main]
-    
-    style A fill:#e1f5fe
-    style C fill:#f3e5f5
-    style J fill:#e8f5e8
-    style O fill:#fff3e0
+flowchart LR
+    A[Setup Environment] --> B[Clone Repository]
+    B --> C[Local Development]
+    C --> D[Write Code]
+    D --> E[Run Tests]
+    E --> F[Submit PR]
+    F --> G[Code Review]
+    G --> H[Merge]
 ```
 
-## 📦 Module Structure
+## Core Development Concepts
 
-OpenFrame OSS Library follows a modular architecture with clear separation of concerns:
+### Multi-Tenant Architecture
 
-### Core Modules
-- **`openframe-api-lib`** - DTOs and service interfaces
-- **`openframe-data-mongo`** - MongoDB models and repositories  
-- **`openframe-core`** - Shared utilities and validation
-- **`openframe-security-core`** - Authentication and authorization
+OpenFrame is built with multi-tenancy at its core:
 
-### Service Modules  
-- **`openframe-api-service-core`** - Main API service implementation
-- **`openframe-client-core`** - Client/agent communication
-- **`openframe-authorization-service-core`** - OAuth2 and SSO
-- **`openframe-gateway-service-core`** - API gateway and routing
+```mermaid
+graph TB
+    subgraph "Application Layer"
+        API[REST APIs]
+        WEB[Web Interface]
+        CLI[CLI Tools]
+    end
+    
+    subgraph "Service Layer"
+        ORG[Organization Service]
+        DEV[Device Service]
+        AUTH[Auth Service]
+        EVENT[Event Service]
+    end
+    
+    subgraph "Data Layer"
+        MONGO[(MongoDB)]
+        REDIS[(Redis Cache)]
+        KAFKA[Event Stream]
+    end
+    
+    API --> ORG
+    API --> DEV
+    API --> AUTH
+    API --> EVENT
+    
+    ORG --> MONGO
+    DEV --> MONGO
+    AUTH --> MONGO
+    EVENT --> MONGO
+    
+    ORG --> REDIS
+    DEV --> REDIS
+    
+    EVENT --> KAFKA
+```
 
-### Integration Modules
-- **`openframe-data-kafka`** - Event streaming and processing
-- **`openframe-stream-service-core`** - Real-time data processing
-- **`sdk/tacticalrmm`** - TacticalRMM integration SDK
-- **`sdk/fleetmdm`** - Fleet MDM integration SDK
+### Data Model Hierarchy
 
-## 🎨 Development Principles
+Understanding the data relationships:
 
-### Code Quality Standards
-- **Type Safety**: Leverage Java's type system and generics
-- **Validation**: Use Jakarta Bean Validation for input validation  
-- **Documentation**: Comprehensive JavaDoc for public APIs
-- **Testing**: High test coverage with unit and integration tests
+```mermaid
+erDiagram
+    Organization ||--o{ User : contains
+    Organization ||--o{ Device : manages
+    Organization ||--o{ Event : tracks
+    User ||--o{ Event : creates
+    Device ||--o{ Event : generates
+    Device ||--o{ InstalledAgent : runs
+    Tool ||--o{ ToolConnection : connects
+    ToolConnection ||--o{ InstalledAgent : manages
+```
 
-### API Design Principles
-- **Consistency**: Standardized patterns across all endpoints
-- **Pagination**: Cursor-based pagination for all list endpoints
-- **Filtering**: Flexible filtering with shared filter DTOs
-- **Versioning**: Backward-compatible API evolution
+## Development Principles
 
-### Architecture Patterns
-- **Domain-Driven Design**: Clear domain boundaries and models
-- **Service Layer**: Business logic separation from controllers
-- **Repository Pattern**: Data access abstraction
-- **DTO Pattern**: Clear API contracts and validation
+### 1. **Consistency First**
+- Standardized DTOs across all APIs
+- Consistent error handling and responses
+- Unified pagination patterns
 
-## 🔧 Common Development Tasks
+### 2. **Security by Design**
+- Multi-tenant data isolation
+- JWT-based authentication
+- Role-based access control
 
-### Adding a New Domain
-1. Create DTOs in `openframe-api-lib/src/main/java/com/openframe/api/dto/{domain}/`
-2. Define service interface in `openframe-api-lib/src/main/java/com/openframe/api/service/`
-3. Create MongoDB models in `openframe-data-mongo/src/main/java/com/openframe/data/document/{domain}/`
-4. Implement service in `openframe-api-service-core/src/main/java/com/openframe/api/service/`
-5. Add controllers in `openframe-api-service-core/src/main/java/com/openframe/api/controller/`
+### 3. **Extensible Architecture**
+- Plugin-based tool integrations
+- Service interface abstractions
+- Event-driven communication
 
-### Modifying Existing APIs
-1. Update DTOs while maintaining backward compatibility
-2. Update service interfaces with default methods if needed
-3. Implement new functionality in service implementations  
-4. Add comprehensive tests
-5. Update API documentation
+### 4. **Developer Experience**
+- Comprehensive documentation
+- Clear error messages
+- Extensive testing coverage
 
-### Adding Tool Integrations
-1. Create SDK module under `sdk/{tool-name}/`
-2. Define tool-specific DTOs and clients
-3. Add integration service in appropriate service module
-4. Create data models for tool-specific entities
-5. Add monitoring and health checks
+## Key Technologies
 
-## 🚨 Important Development Notes
+| Technology | Purpose | Version |
+|------------|---------|---------|
+| **Java** | Primary language | 21+ |
+| **Spring Boot** | Application framework | 3.2+ |
+| **MongoDB** | Primary database | 7.0+ |
+| **Redis** | Caching & sessions | 7.0+ |
+| **Apache Kafka** | Event streaming | 3.0+ |
+| **Maven** | Build & dependency management | 3.6+ |
 
-### Breaking Changes
-- **Always avoid breaking changes** in public APIs
-- Use **deprecation warnings** for outdated methods  
-- Provide **migration paths** for API changes
-- Update **version compatibility** documentation
+## Development Environment
 
-### Security Considerations
-- **Never commit secrets** or credentials
-- **Validate all inputs** using Jakarta Bean Validation
-- **Implement proper authorization** checks in services
-- **Follow secure coding practices** for data handling
+### Required Tools
 
-### Performance Guidelines  
-- **Use cursor pagination** for large datasets
-- **Implement proper indexing** for MongoDB queries
-- **Cache frequently accessed data** appropriately
-- **Monitor and optimize** database queries
+- **IDE**: IntelliJ IDEA, Eclipse, or VS Code
+- **Java SDK**: OpenJDK 21 or later
+- **Database**: MongoDB 7.0+
+- **Cache**: Redis 7.0+ (optional)
+- **Container**: Docker & Docker Compose
 
-## 📖 Additional Resources
+### Recommended IDE Plugins
 
-### Internal Documentation
-- **API Reference**: Detailed endpoint documentation in `/docs/reference/`
-- **MongoDB Schemas**: Entity relationship diagrams and field definitions
-- **Service Contracts**: Interface definitions and expected behaviors
+**IntelliJ IDEA:**
+- Spring Boot Plugin
+- MongoDB Plugin  
+- SonarLint (code quality)
+- GitToolBox (Git integration)
 
-### External Resources
-- **Java 17+ Documentation**: [Oracle Java Docs](https://docs.oracle.com/en/java/)
-- **Spring Boot**: [Spring Boot Reference](https://spring.io/projects/spring-boot)
-- **MongoDB**: [MongoDB Java Driver](https://mongodb.github.io/mongo-java-driver/)
-- **Jakarta Bean Validation**: [Bean Validation Spec](https://beanvalidation.org/)
+**VS Code:**
+- Extension Pack for Java
+- Spring Boot Extension Pack
+- MongoDB for VS Code
+- SonarLint
 
-### Community
-- **OpenMSP Slack**: [Join the community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) for discussions and support
-- **OpenFrame Website**: [OpenFrame.ai](https://openframe.ai) for product updates
-- **Flamingo Platform**: [Flamingo.run](https://flamingo.run) for company information
+## Code Organization
 
----
+### Module Structure
 
-## 🚀 Ready to Start Developing?
+```text
+openframe-oss-lib/
+├── openframe-api-lib/           # API DTOs and interfaces
+├── openframe-api-service-core/   # Main API implementation
+├── openframe-authorization-service-core/  # Auth & OAuth services
+├── openframe-client-core/       # Client management
+├── openframe-data-mongo/        # MongoDB data models
+├── openframe-security-core/     # Security framework
+├── openframe-core/             # Shared utilities
+└── sdk/                        # Integration SDKs
+```
 
-Choose your path based on your current situation:
+### Package Conventions
 
-| I want to... | Start with... | Estimated time |
-|--------------|---------------|----------------|
-| **Get a local dev environment running** | [Local Development](setup/local-development.md) | 30 minutes |
-| **Understand the architecture first** | [Architecture Overview](architecture/overview.md) | 20 minutes |
-| **Set up my IDE and tools** | [Environment Setup](setup/environment.md) | 15 minutes |
-| **Start contributing immediately** | [Contributing Guidelines](contributing/guidelines.md) | 10 minutes |
+```text
+com.openframe.{module}
+├── config/          # Configuration classes
+├── controller/      # REST controllers  
+├── service/         # Business logic services
+├── repository/      # Data access layer
+├── dto/            # Data Transfer Objects
+├── model/          # Domain models
+├── exception/      # Custom exceptions
+└── util/           # Utility classes
+```
 
----
+## API Design Guidelines
 
-**Happy coding!** Welcome to the OpenFrame development community. Let's build the future of MSP platforms together! 🎉
+### RESTful Conventions
+
+- **GET** `/api/devices` - List devices with filtering
+- **GET** `/api/devices/{id}` - Get specific device
+- **POST** `/api/devices` - Create new device
+- **PUT** `/api/devices/{id}` - Update entire device
+- **PATCH** `/api/devices/{id}` - Partial device update
+- **DELETE** `/api/devices/{id}` - Delete device
+
+### Response Format
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "device-123",
+    "name": "Production Server",
+    "status": "ACTIVE"
+  },
+  "pagination": {
+    "hasNext": true,
+    "cursor": "eyJpZCI6ImRldmljZS0xMjMifQ=="
+  },
+  "meta": {
+    "total": 150,
+    "took": 45
+  }
+}
+```
+
+### Error Responses
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "DEVICE_NOT_FOUND",
+    "message": "Device with ID 'device-123' not found",
+    "details": {
+      "field": "id",
+      "value": "device-123"
+    }
+  },
+  "meta": {
+    "timestamp": "2024-01-15T10:30:00Z",
+    "requestId": "req-abc-123"
+  }
+}
+```
+
+## Testing Strategy
+
+### Test Pyramid
+
+```mermaid
+graph TB
+    subgraph "Test Pyramid"
+        E2E[End-to-End Tests]
+        INT[Integration Tests]
+        UNIT[Unit Tests]
+    end
+    
+    E2E --> |Few, Slow, High Confidence| API[API Tests]
+    INT --> |Some, Medium, Good Coverage| SERVICE[Service Tests]  
+    UNIT --> |Many, Fast, Detailed| LOGIC[Logic Tests]
+```
+
+### Testing Levels
+
+1. **Unit Tests** - Individual methods and classes
+2. **Integration Tests** - Service interactions and database operations
+3. **API Tests** - End-to-end HTTP API testing
+4. **Contract Tests** - API contract validation
+
+## Code Quality Standards
+
+### Formatting & Style
+
+- **Checkstyle** - Java code style enforcement
+- **SpotBugs** - Static code analysis
+- **SonarQube** - Code quality metrics
+- **EditorConfig** - Consistent formatting
+
+### Quality Gates
+
+- ✅ **Test Coverage** - Minimum 80% line coverage
+- ✅ **Code Duplication** - Less than 3% duplication
+- ✅ **Complexity** - Cyclomatic complexity under 10
+- ✅ **Security** - No high/critical security issues
+
+## Development Workflow
+
+### 1. Feature Development
+
+```bash
+# Create feature branch
+git checkout -b feature/new-device-api
+
+# Make changes and test
+./gradlew test
+
+# Commit with conventional commits
+git commit -m "feat: add device filtering API"
+
+# Push and create PR
+git push origin feature/new-device-api
+```
+
+### 2. Code Review Process
+
+1. **Automated Checks** - CI pipeline runs tests and quality checks
+2. **Peer Review** - Team members review code and design
+3. **Security Review** - Security-focused review for sensitive changes
+4. **Documentation** - Ensure documentation is updated
+
+### 3. Release Process
+
+```mermaid
+flowchart LR
+    A[Development] --> B[Feature Complete]
+    B --> C[Integration Testing]
+    C --> D[Release Candidate]
+    D --> E[Production Release]
+    E --> F[Post-Release Monitoring]
+```
+
+## Common Development Tasks
+
+### Adding New Entity
+
+1. **Create MongoDB Document**
+2. **Define API DTOs**
+3. **Implement Repository**
+4. **Create Service Layer**
+5. **Build REST Controller**
+6. **Write Tests**
+7. **Update Documentation**
+
+### Implementing New Integration
+
+1. **Define SDK Interface**
+2. **Create Configuration**
+3. **Implement Client**
+4. **Add Authentication**
+5. **Build Event Processing**
+6. **Integration Testing**
+
+## Performance Considerations
+
+### Database Optimization
+
+- **Indexing Strategy** - Proper compound indexes
+- **Query Optimization** - Efficient aggregation pipelines
+- **Connection Pooling** - Optimized connection management
+
+### Caching Strategy
+
+- **Application Cache** - Frequently accessed data
+- **Session Cache** - User session information
+- **Query Cache** - Complex query results
+
+### Monitoring & Observability
+
+- **Application Metrics** - Performance and usage metrics
+- **Health Checks** - Service health monitoring
+- **Distributed Tracing** - Request flow tracking
+
+## Security Development
+
+### Authentication Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Gateway
+    participant AuthService
+    participant ResourceAPI
+    
+    User->>Gateway: Login Request
+    Gateway->>AuthService: Validate Credentials
+    AuthService-->>Gateway: JWT Token
+    Gateway-->>User: Token Response
+    
+    User->>Gateway: API Request + Token
+    Gateway->>AuthService: Validate Token
+    AuthService-->>Gateway: Token Valid
+    Gateway->>ResourceAPI: Authorized Request
+    ResourceAPI-->>Gateway: Response
+    Gateway-->>User: API Response
+```
+
+### Security Best Practices
+
+- **Input Validation** - Validate all user inputs
+- **Output Encoding** - Prevent XSS attacks
+- **SQL Injection** - Use parameterized queries
+- **CSRF Protection** - Token-based CSRF protection
+- **Rate Limiting** - API rate limiting implementation
+
+## Next Steps
+
+Choose your path based on your needs:
+
+### For New Contributors
+1. **[Environment Setup](./setup/environment.md)** - Set up development environment
+2. **[Contributing Guidelines](./contributing/guidelines.md)** - Learn contribution process
+
+### For Application Developers
+1. **[Local Development](./setup/local-development.md)** - Development workflow
+2. **[Architecture Overview](./architecture/overview.md)** - Understand system design
+
+### For Platform Developers
+1. **[Testing Overview](./testing/overview.md)** - Testing strategies
+2. **[Code Quality](./testing/code-quality.md)** - Quality standards
+
+## Resources & Support
+
+- 💬 **Community**: [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
+- 📚 **API Reference**: [Architecture Documentation](../reference/architecture/overview.md)
+- 🚀 **Platform**: [OpenFrame.ai](https://openframe.ai)
+- 🏢 **Company**: [Flamingo.run](https://flamingo.run)
+
+Happy coding with OpenFrame OSS Library! 🚀
