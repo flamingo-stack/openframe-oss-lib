@@ -215,6 +215,86 @@
   --ods-current: var(--ods-flamingo-pink-base);
 }
 
+[data-app-type="marketing-hub"] {
+  /* Marketing Hub uses pink for content and campaigns */
+  --color-accent-primary: var(--ods-flamingo-pink-base);
+  --color-accent-hover: var(--ods-flamingo-pink-hover);
+  --color-accent-active: var(--ods-flamingo-pink-action);
+  --color-accent-focus: var(--ods-flamingo-pink-base);
+  --color-focus-ring: var(--ods-flamingo-pink-base);
+  --color-focus-visible: var(--ods-flamingo-pink-base);
+  --color-link: var(--ods-flamingo-pink-base);
+  --color-link-hover: var(--ods-flamingo-pink-hover);
+  --color-bg: var(--ods-system-greys-background);
+  --color-bg-card: var(--ods-system-greys-black);
+  --color-bg-hover: var(--ods-system-greys-black-hover);
+  --color-bg-active: var(--ods-system-greys-black-action);
+
+  /* Marketing Hub uses pink as adaptive color and accent */
+  --ods-current: var(--ods-flamingo-pink-base);
+  --ods-accent: var(--ods-flamingo-pink-base);
+}
+
+[data-app-type="product-hub"] {
+  /* Product Hub uses green for user management and releases */
+  --color-accent-primary: var(--ods-attention-green-success);
+  --color-accent-hover: var(--ods-attention-green-success-hover);
+  --color-accent-active: var(--ods-attention-green-success-action);
+  --color-accent-focus: var(--ods-attention-green-success);
+  --color-focus-ring: var(--ods-attention-green-success);
+  --color-focus-visible: var(--ods-attention-green-success);
+  --color-link: var(--ods-attention-green-success);
+  --color-link-hover: var(--ods-attention-green-success-hover);
+  --color-bg: var(--ods-system-greys-background);
+  --color-bg-card: var(--ods-system-greys-black);
+  --color-bg-hover: var(--ods-system-greys-black-hover);
+  --color-bg-active: var(--ods-system-greys-black-action);
+
+  /* Product Hub uses green as adaptive color and accent */
+  --ods-current: var(--ods-attention-green-success);
+  --ods-accent: var(--ods-attention-green-success);
+}
+
+[data-app-type="revenue-hub"] {
+  /* Revenue Hub uses yellow for financial operations */
+  --color-accent-primary: var(--ods-attention-yellow-warning);
+  --color-accent-hover: var(--ods-open-yellow-hover);
+  --color-accent-active: var(--ods-open-yellow-action);
+  --color-accent-focus: var(--ods-attention-yellow-warning);
+  --color-focus-ring: var(--ods-attention-yellow-warning);
+  --color-focus-visible: var(--ods-attention-yellow-warning);
+  --color-link: var(--ods-attention-yellow-warning);
+  --color-link-hover: var(--ods-open-yellow-hover);
+  --color-bg: var(--ods-system-greys-background);
+  --color-bg-card: var(--ods-system-greys-black);
+  --color-bg-hover: var(--ods-system-greys-black-hover);
+  --color-bg-active: var(--ods-system-greys-black-action);
+
+  /* Revenue Hub uses yellow as adaptive color and accent */
+  --ods-current: var(--ods-attention-yellow-warning);
+  --ods-accent: var(--ods-attention-yellow-warning);
+}
+
+[data-app-type="people-hub"] {
+  /* People Hub uses cyan for HR and talent management */
+  --color-accent-primary: var(--ods-flamingo-cyan-base);
+  --color-accent-hover: var(--ods-flamingo-cyan-hover);
+  --color-accent-active: var(--ods-flamingo-cyan-action);
+  --color-accent-focus: var(--ods-flamingo-cyan-base);
+  --color-focus-ring: var(--ods-flamingo-cyan-base);
+  --color-focus-visible: var(--ods-flamingo-cyan-base);
+  --color-link: var(--ods-flamingo-cyan-base);
+  --color-link-hover: var(--ods-flamingo-cyan-hover);
+  --color-bg: var(--ods-system-greys-background);
+  --color-bg-card: var(--ods-system-greys-black);
+  --color-bg-hover: var(--ods-system-greys-black-hover);
+  --color-bg-active: var(--ods-system-greys-black-action);
+
+  /* People Hub uses cyan as adaptive color and accent */
+  --ods-current: var(--ods-flamingo-cyan-base);
+  --ods-accent: var(--ods-flamingo-cyan-base);
+}
+
 /* Light Theme Support */
 .theme-light {
   --color-bg: var(--ods-system-greys-white);

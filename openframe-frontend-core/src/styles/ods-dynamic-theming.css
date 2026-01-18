@@ -28,6 +28,26 @@
   --theme-personality: 'professional';
 }
 
+.theme-marketing-hub {
+  --theme-accent-rgb: 243, 87, 187;  /* Pink */
+  --theme-personality: 'creative';
+}
+
+.theme-product-hub {
+  --theme-accent-rgb: 94, 166, 46;  /* Green */
+  --theme-personality: 'professional';
+}
+
+.theme-revenue-hub {
+  --theme-accent-rgb: 255, 192, 8;  /* Yellow */
+  --theme-personality: 'energetic';
+}
+
+.theme-people-hub {
+  --theme-accent-rgb: 94, 250, 240;  /* Cyan */
+  --theme-personality: 'supportive';
+}
+
 .theme-openframe {
   --theme-accent-rgb: 0, 212, 170;
   --theme-personality: 'technical';
@@ -36,6 +56,11 @@
 .theme-flamingo {
   --theme-accent-rgb: 255, 107, 157;
   --theme-personality: 'creative';
+}
+
+.theme-tmcg {
+  --theme-accent-rgb: 243, 87, 187;  /* Pink */
+  --theme-personality: 'bold';
 }
 
 /* High contrast accessibility mode */
@@ -299,12 +324,37 @@
   outline-offset: 2px;
 }
 
+.theme-marketing-hub :focus-visible {
+  outline: 2px solid var(--ods-flamingo-pink-base);
+  outline-offset: 2px;
+}
+
+.theme-product-hub :focus-visible {
+  outline: 2px solid var(--ods-attention-green-success);
+  outline-offset: 2px;
+}
+
+.theme-revenue-hub :focus-visible {
+  outline: 2px solid var(--ods-attention-yellow-warning);
+  outline-offset: 2px;
+}
+
+.theme-people-hub :focus-visible {
+  outline: 2px solid var(--ods-flamingo-cyan-base);
+  outline-offset: 2px;
+}
+
 .theme-openframe :focus-visible {
   outline: 2px solid var(--ods-flamingo-cyan-base);
   outline-offset: 2px;
 }
 
 .theme-flamingo :focus-visible {
+  outline: 2px solid var(--ods-flamingo-pink-base);
+  outline-offset: 2px;
+}
+
+.theme-tmcg :focus-visible {
   outline: 2px solid var(--ods-flamingo-pink-base);
   outline-offset: 2px;
 }
@@ -537,11 +587,31 @@
   box-shadow: 0 4px 12px color-mix(in srgb, var(--ods-flamingo-pink-base) 20%, transparent);
 }
 
+.theme-marketing-hub .interactive-wrapper.state-hovered {
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--ods-flamingo-pink-base) 20%, transparent);
+}
+
+.theme-product-hub .interactive-wrapper.state-hovered {
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--ods-attention-green-success) 20%, transparent);
+}
+
+.theme-revenue-hub .interactive-wrapper.state-hovered {
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--ods-attention-yellow-warning) 20%, transparent);
+}
+
+.theme-people-hub .interactive-wrapper.state-hovered {
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--ods-flamingo-cyan-base) 20%, transparent);
+}
+
 .theme-openframe .interactive-wrapper.state-hovered {
   box-shadow: 0 4px 12px color-mix(in srgb, var(--ods-flamingo-cyan-base) 20%, transparent);
 }
 
 .theme-flamingo .interactive-wrapper.state-hovered {
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--ods-flamingo-pink-base) 20%, transparent);
+}
+
+.theme-tmcg .interactive-wrapper.state-hovered {
   box-shadow: 0 4px 12px color-mix(in srgb, var(--ods-flamingo-pink-base) 20%, transparent);
 }
 
