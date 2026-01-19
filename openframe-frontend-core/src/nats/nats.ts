@@ -177,9 +177,9 @@ function mapOptionsToConnectionOptions(opts: NatsClientOptions): ConnectionOptio
 
 function mapNatsTypeToStatus(type: unknown): NatsStatus | null {
   const t = String(type).toLowerCase()
-  if (t.includes('connect')) return 'connected'
   if (t.includes('disconnect')) return 'disconnected'
-  if (t.includes('reconnect')) return 'reconnecting'
+  if (t === 'reconnecting') return 'reconnecting'
+  if (t === 'reconnect' || t.includes('connect')) return 'connected'
   if (t.includes('error')) return 'error'
   if (t.includes('close')) return 'closed'
   return null
