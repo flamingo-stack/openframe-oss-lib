@@ -11,7 +11,6 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.DependsOn;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.*;
@@ -125,6 +124,7 @@ public class OssTenantKafkaAutoConfiguration {
     }
 
     @Bean("ossTenantKafkaAdmin")
+    @ConditionalOnProperty(prefix = "spring.oss-tenant.kafka.admin", name = "enabled", havingValue = "true", matchIfMissing = true)
     public KafkaAdmin ossTenantKafkaAdmin(OssTenantKafkaProperties ossTenantKafkaProperties) {
         Map<String, Object> configs = new HashMap<>();
         configs.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG,
@@ -133,6 +133,7 @@ public class OssTenantKafkaAutoConfiguration {
     }
 
     @Bean
+    @ConditionalOnProperty(prefix = "spring.oss-tenant.kafka.admin", name = "enabled", havingValue = "true", matchIfMissing = true)
     public KafkaAdmin.NewTopics kafkaTopics(KafkaTopicProperties properties) {
         List<NewTopic> topics = new ArrayList<>();
 
