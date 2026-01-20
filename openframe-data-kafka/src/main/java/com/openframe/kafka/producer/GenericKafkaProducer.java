@@ -11,13 +11,11 @@ import org.springframework.util.StringUtils;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.TimeUnit;
 
 @Slf4j
 public abstract class GenericKafkaProducer {
 
     private static final int MAX_PAYLOAD_LOG_LEN = 500;
-    private static final long DEFAULT_SYNC_SEND_TIMEOUT_MS = 30_000;
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
@@ -59,9 +57,7 @@ public abstract class GenericKafkaProducer {
      */
     public void sendAndAwait(String topic, String key, Object payload) {
         try {
-            // Avoid indefinite hangs when KafkaTemplate send never completes (e.g. metadata/acks issues).
-            sendAsync(topic, key, payload)
-                    .get(DEFAULT_SYNC_SEND_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+            sendAsync(topic, key, payload).join(); // throws CompletionException on failure
         } catch (CompletionException ce) {
             Throwable cause = ce.getCause();
 
@@ -76,27 +72,6 @@ public abstract class GenericKafkaProducer {
             }
 
             // Retryable (transient)
-            throw new TransientKafkaSendException(
-                    "transient kafka error: topic=%s key=%s".formatted(topic, key), cause);
-        } catch (java.util.concurrent.TimeoutException te) {
-            throw new TransientKafkaSendException(
-                    "transient kafka timeout after %dms: topic=%s key=%s".formatted(DEFAULT_SYNC_SEND_TIMEOUT_MS, topic, key), te);
-        } catch (InterruptedException ie) {
-            Thread.currentThread().interrupt();
-            throw new TransientKafkaSendException(
-                    "transient kafka send interrupted: topic=%s key=%s".formatted(topic, key), ie);
-        } catch (java.util.concurrent.ExecutionException ee) {
-            Throwable cause = ee.getCause();
-            if (cause == null) cause = ee;
-
-            if (cause instanceof RecordTooLargeException
-                    || cause instanceof AuthorizationException
-                    || cause instanceof SerializationException
-                    || cause instanceof InvalidTopicException
-                    || cause instanceof UnknownTopicOrPartitionException) {
-                throw new NonRetryableKafkaException(
-                        "fatal kafka error: topic=%s key=%s".formatted(topic, key), cause);
-            }
             throw new TransientKafkaSendException(
                     "transient kafka error: topic=%s key=%s".formatted(topic, key), cause);
         }
