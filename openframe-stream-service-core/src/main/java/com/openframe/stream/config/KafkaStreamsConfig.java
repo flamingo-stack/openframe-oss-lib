@@ -33,6 +33,13 @@ public class KafkaStreamsConfig {
     @Value("${spring.application.name}")
     private String applicationName;
 
+    /**
+     * Tenant/cluster identifier used to namespace Kafka Streams application.id.
+     * In SaaS deployments this is typically set to TENANT_ID (e.g. tenant-y0-1).
+     */
+    @Value("${openframe.cluster-id:}")
+    private String clusterId;
+
     private final ObjectMapper objectMapper;
 
     public KafkaStreamsConfig(ObjectMapper objectMapper) {
@@ -73,7 +80,7 @@ public class KafkaStreamsConfig {
         Map<String, Object> props = new HashMap<>();
         
         // Basic Kafka Streams configuration
-        props.put(StreamsConfig.APPLICATION_ID_CONFIG, applicationName);
+        props.put(StreamsConfig.APPLICATION_ID_CONFIG, buildStreamsApplicationId());
         props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         
         // Serialization configuration - using String for keys, custom Serde for values
@@ -94,5 +101,16 @@ public class KafkaStreamsConfig {
         props.put(StreamsConfig.producerPrefix(org.apache.kafka.clients.producer.ProducerConfig.BUFFER_MEMORY_CONFIG), 33554432);
         
         return new KafkaStreamsConfiguration(props);
+    }
+
+    private String buildStreamsApplicationId() {
+        if (clusterId == null) {
+            return applicationName;
+        }
+        String trimmed = clusterId.trim();
+        if (trimmed.isEmpty()) {
+            return applicationName;
+        }
+        return applicationName + "-" + trimmed;
     }
 } 
