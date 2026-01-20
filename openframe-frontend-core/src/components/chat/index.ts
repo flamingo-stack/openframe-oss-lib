@@ -9,3 +9,9 @@ export * from './chat-quick-action'
 export * from './chat-typing-indicator'
 export * from './tool-execution-display'
 export * from './model-display'
+
+// Chat types and constants
+export * from './types'
+
+// Chat hooks
+export * from './hooks'
