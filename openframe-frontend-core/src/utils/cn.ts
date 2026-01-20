@@ -74,24 +74,85 @@ export function formatBytes(bytes: number, decimals = 2): string {
 }
 
 /**
- * Get the application base URL for the current environment
- * Priority order:
- * 1. VERCEL_PROJECT_PRODUCTION_URL (Vercel production domain)
- * 2. Production fallback (https://openmsp.ai)
- * 3. Development (http://localhost:3000)
- * @returns The base URL with protocol (https:// or http://)
+ * Platform URL mappings for production (with environment variable overrides)
  */
-export function getBaseUrl(): string {
+function getPlatformProductionUrl(platform: string): string {
+  switch (platform) {
+    case 'marketing-hub':
+      return process.env.NEXT_PUBLIC_MARKETING_URL || 'https://marketing-hub.flamingo.so';
+    case 'product-hub':
+      return process.env.NEXT_PUBLIC_PRODUCT_URL || 'https://product-hub.flamingo.so';
+    case 'revenue-hub':
+      return process.env.NEXT_PUBLIC_REVENUE_URL || 'https://revenue-hub.flamingo.so';
+    case 'people-hub':
+      return process.env.NEXT_PUBLIC_PEOPLE_URL || 'https://people-hub.flamingo.so';
+    case 'admin-hub':
+      return process.env.NEXT_PUBLIC_ADMIN_URL || 'https://admin-hub.flamingo.so';
+    case 'openmsp':
+      return process.env.NEXT_PUBLIC_PLATFORM_URL || 'https://www.openmsp.ai';
+    case 'flamingo':
+      return process.env.NEXT_PUBLIC_FLAMINGO_URL || 'https://flamingo.run';
+    case 'tmcg':
+      return process.env.NEXT_PUBLIC_TMCG_URL || 'https://tmcg.miami';
+    case 'flamingo-teaser':
+      return process.env.NEXT_PUBLIC_TEASER_URL || 'https://flamingo.cx';
+    case 'openframe':
+      return process.env.NEXT_PUBLIC_OPENFRAME_URL || 'https://openframe.ai';
+    case 'universal':
+      return process.env.NEXT_PUBLIC_FLAMINGO_URL || 'https://flamingo.run';
+    default:
+      return process.env.NEXT_PUBLIC_FLAMINGO_URL || 'https://flamingo.run';
+  }
+}
+
+/**
+ * Get the application base URL for the current environment
+ *
+ * @param platform - Optional platform name (openmsp, flamingo, tmcg, openframe, etc.)
+ * @returns The base URL with protocol (https:// or http://)
+ *
+ * Priority order:
+ * 1. Environment variable override (NEXT_PUBLIC_*_URL)
+ * 2. Platform-specific URL (if platform parameter provided)
+ * 3. VERCEL_PROJECT_PRODUCTION_URL (Vercel production domain)
+ * 4. Production fallback (current app or openmsp)
+ * 5. Development (http://localhost:3000)
+ *
+ * Environment Variables (optional overrides):
+ * - NEXT_PUBLIC_MARKETING_URL   -> marketing-hub.flamingo.so
+ * - NEXT_PUBLIC_PRODUCT_URL     -> product-hub.flamingo.so
+ * - NEXT_PUBLIC_REVENUE_URL     -> revenue-hub.flamingo.so
+ * - NEXT_PUBLIC_PEOPLE_URL      -> people-hub.flamingo.so
+ * - NEXT_PUBLIC_ADMIN_URL       -> admin-hub.flamingo.so
+ * - NEXT_PUBLIC_PLATFORM_URL    -> www.openmsp.ai
+ * - NEXT_PUBLIC_FLAMINGO_URL    -> flamingo.run
+ * - NEXT_PUBLIC_TMCG_URL        -> tmcg.miami
+ * - NEXT_PUBLIC_TEASER_URL      -> flamingo.cx
+ * - NEXT_PUBLIC_OPENFRAME_URL   -> openframe.ai
+ *
+ * @example
+ * getBaseUrl() // Current app URL
+ * getBaseUrl('flamingo') // https://flamingo.run (production) or http://localhost:3000 (dev)
+ * getBaseUrl('openmsp') // https://www.openmsp.ai (or NEXT_PUBLIC_PLATFORM_URL if set)
+ */
+export function getBaseUrl(platform?: string): string {
+  // In development, always use localhost (regardless of platform)
+  if (process.env.NODE_ENV !== 'production') {
+    return process.env.NEXT_PUBLIC_DEV_URL || 'http://localhost:3000'
+  }
+
+  // If platform is specified, return its production URL with env variable override support
+  if (platform) {
+    return getPlatformProductionUrl(platform)
+  }
+
+  // Production: Use Vercel domain if available
   if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
     return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
   }
-  
-  if (process.env.NODE_ENV === 'production') {
-    // Use canonical www domain to avoid Google "Page with redirect" issue.
-    // openmsp.ai redirects to www.openmsp.ai, so we set the base URL to the
-    // final destination to ensure canonical URLs do not require a redirect.
-    return 'https://www.openmsp.ai'
-  }
-  
-  return 'http://localhost:3000'
+
+  // Production fallback: Use canonical www domain to avoid Google "Page with redirect" issue.
+  // openmsp.ai redirects to www.openmsp.ai, so we set the base URL to the
+  // final destination to ensure canonical URLs do not require a redirect.
+  return 'https://www.openmsp.ai'
 }
