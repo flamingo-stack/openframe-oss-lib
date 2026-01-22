@@ -25,29 +25,6 @@ let shared: SharedConnection | null = null
  * - Subscribing to dialog topics (message and/or admin-message)
  * - Reconnection and error handling
  * - Shared connection management
- * 
- * @example
- * ```tsx
- * // Client usage (single topic)
- * const { isConnected, isSubscribed } = useNatsDialogSubscription({
- *   enabled: true,
- *   dialogId,
- *   topics: ['message'],
- *   onEvent: (payload, messageType) => handleChunk(payload),
- *   onSubscribed: () => catchUpChunks(),
- *   getNatsWsUrl: () => buildNatsWsUrl(apiBaseUrl, token),
- * })
- * 
- * // Admin usage (multiple topics)
- * const { isConnected, isSubscribed } = useNatsDialogSubscription({
- *   enabled: true,
- *   dialogId,
- *   topics: ['message', 'admin-message'],
- *   onEvent: (payload, messageType) => ingestRealtimeEvent(payload, messageType),
- *   onSubscribed: () => catchUpChunks(),
- *   getNatsWsUrl: () => buildNatsWsUrl(apiBaseUrl),
- * })
- * ```
  */
 export function useNatsDialogSubscription({
   enabled,
@@ -133,11 +110,36 @@ export function useNatsDialogSubscription({
     }, NETWORK_CONFIG.SHARED_CLOSE_DELAY_MS)
   }, [])
 
+  // Store the current WebSocket URL to prevent unnecessary reconnections
+  const currentWsUrlRef = useRef<string>('')
+  
   // Connection effect
   useEffect(() => {
     const wsUrl = getNatsWsUrl()
-    if (!enabled || !wsUrl) return
+    if (!enabled || !wsUrl) {
+      // Clean up if disabled or no URL
+      if (currentWsUrlRef.current && clientRef.current) {
+        releaseClient(currentWsUrlRef.current)
+        clientRef.current = null
+        currentWsUrlRef.current = ''
+        setIsConnected(false)
+      }
+      return
+    }
 
+    // Skip if we're already connected to the same URL
+    if (wsUrl === currentWsUrlRef.current && clientRef.current && clientRef.current.isConnected()) {
+      return
+    }
+
+    // Clean up existing connection if URL changed
+    if (currentWsUrlRef.current && currentWsUrlRef.current !== wsUrl && clientRef.current) {
+      releaseClient(currentWsUrlRef.current)
+      clientRef.current = null
+      setIsConnected(false)
+    }
+
+    currentWsUrlRef.current = wsUrl
     const sharedConn = acquireClient(wsUrl)
     const client = sharedConn.client
 
@@ -194,58 +196,115 @@ export function useNatsDialogSubscription({
       })
       subscriptionRefs.current.clear()
       
-      clientRef.current && releaseClient(wsUrl)
-      clientRef.current = null
+      if (clientRef.current && currentWsUrlRef.current) {
+        releaseClient(currentWsUrlRef.current)
+        clientRef.current = null
+        currentWsUrlRef.current = ''
+      }
     }
   }, [enabled, getNatsWsUrl, acquireClient, releaseClient])
 
-  // Create stable topics string for effect dependency
   const topicsKey = topics.join(',')
-
-  // Subscription effect
+  const lastSubscribedDialogIdRef = useRef<string | null>(null)
+  const isConnectedRef = useRef(isConnected)
+  
   useEffect(() => {
-    if (!enabled || !isConnected || !dialogId) return
-    const client = clientRef.current
-    if (!client) return
+    isConnectedRef.current = isConnected
+  }, [isConnected])
 
-    setIsSubscribed(false)
-
-    // Unsubscribe existing subscriptions
-    subscriptionRefs.current.forEach((sub) => {
-      try {
-        sub?.unsubscribe()
-      } catch {
-        // ignore
-      }
-    })
-    subscriptionRefs.current.clear()
-
-    const abort = new AbortController()
-    const decoder = new TextDecoder()
+  // Track subscription state separately from dialog changes
+  const currentDialogIdRef = useRef<string | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  
+  // Handle dialog changes and subscription lifecycle
+  useEffect(() => {
+    currentDialogIdRef.current = dialogId
     
-    const handleMessage = (messageType: NatsMessageType) => async (msg: any) => {
-      if (!onEventRef.current) return
-      try {
-        const dataStr = decoder.decode(msg.data)
-        const parsed = JSON.parse(dataStr)
-        onEventRef.current(parsed, messageType)
-      } catch {
-        // Ignore parse errors
+    if (!enabled || !dialogId) {
+      // Clean up if disabled or no dialog
+      if (subscriptionRefs.current.size > 0) {
+        setIsSubscribed(false)
+        subscriptionRefs.current.forEach((sub) => {
+          try {
+            sub?.unsubscribe()
+          } catch {
+            // ignore
+          }
+        })
+        subscriptionRefs.current.clear()
+        lastSubscribedDialogIdRef.current = null
+        abortControllerRef.current?.abort()
+        abortControllerRef.current = null
       }
+      return
     }
     
-    // Subscribe to all configured topics
-    topics.forEach((topic) => {
-      const subscription = client.subscribeBytes(
-        `chat.${dialogId}.${topic}`,
-        handleMessage(topic),
-        { signal: abort.signal }
-      )
-      subscriptionRefs.current.set(topic, subscription)
-    })
+    const needsNewSubscription = 
+      lastSubscribedDialogIdRef.current !== dialogId || 
+      subscriptionRefs.current.size === 0
     
-    setIsSubscribed(true)
-    onSubscribedRef.current?.()
+    if (!needsNewSubscription) {
+      return
+    }
+    
+    // Clean up any existing subscriptions before creating new ones
+    if (subscriptionRefs.current.size > 0) {
+      subscriptionRefs.current.forEach((sub) => {
+        try {
+          sub?.unsubscribe()
+        } catch {
+          // ignore
+        }
+      })
+      subscriptionRefs.current.clear()
+      abortControllerRef.current?.abort()
+    }
+    
+    // Create new abort controller for this subscription set
+    abortControllerRef.current = new AbortController()
+    const abort = abortControllerRef.current
+
+    const createSubscriptions = () => {
+      if (!isConnectedRef.current) {
+        return
+      }
+      
+      const client = clientRef.current
+      if (!client || currentDialogIdRef.current !== dialogId) {
+        return
+      }
+
+      const decoder = new TextDecoder()
+      
+      const handleMessage = (messageType: NatsMessageType) => async (msg: any) => {
+        if (!onEventRef.current) return
+        try {
+          const dataStr = decoder.decode(msg.data)
+          const parsed = JSON.parse(dataStr)
+          onEventRef.current(parsed, messageType)
+        } catch {
+          // Ignore parse errors
+        }
+      }
+      
+      // Subscribe to all configured topics
+      topics.forEach((topic) => {
+        const subscription = client.subscribeBytes(
+          `chat.${dialogId}.${topic}`,
+          handleMessage(topic),
+          { signal: abort.signal }
+        )
+        subscriptionRefs.current.set(topic, subscription)
+      })
+      
+      lastSubscribedDialogIdRef.current = dialogId
+      setIsSubscribed(true)
+      onSubscribedRef.current?.()
+    }
+
+    if (isConnectedRef.current) {
+      createSubscriptions()
+    }
 
     return () => {
       setIsSubscribed(false)
@@ -258,15 +317,65 @@ export function useNatsDialogSubscription({
         }
       })
       subscriptionRefs.current.clear()
+      lastSubscribedDialogIdRef.current = null
+      abortControllerRef.current = null
     }
-  }, [enabled, isConnected, dialogId, topicsKey, topics]) // topics is needed for forEach
+  }, [enabled, dialogId, topicsKey, topics])
+  
+  // Separate effect to handle connection state changes
+  useEffect(() => {
+    if (!enabled || !currentDialogIdRef.current || !isConnected) {
+      return
+    }
+    
+    if (subscriptionRefs.current.size === 0 && lastSubscribedDialogIdRef.current !== currentDialogIdRef.current) {
+      const client = clientRef.current
+      if (!client) return
+      
+      const dialogId = currentDialogIdRef.current
+      const decoder = new TextDecoder()
+      
+      const abort = abortControllerRef.current || new AbortController()
+      if (!abortControllerRef.current) {
+        abortControllerRef.current = abort
+      }
+      
+      const handleMessage = (messageType: NatsMessageType) => async (msg: any) => {
+        if (!onEventRef.current) return
+        try {
+          const dataStr = decoder.decode(msg.data)
+          const parsed = JSON.parse(dataStr)
+          onEventRef.current(parsed, messageType)
+        } catch {
+          // Ignore parse errors
+        }
+      }
+      
+      // Subscribe to all configured topics
+      topics.forEach((topic) => {
+        const subscription = client.subscribeBytes(
+          `chat.${dialogId}.${topic}`,
+          handleMessage(topic),
+          { signal: abort.signal }
+        )
+        subscriptionRefs.current.set(topic, subscription)
+      })
+      
+      lastSubscribedDialogIdRef.current = dialogId
+      setIsSubscribed(true)
+      onSubscribedRef.current?.()
+    } else if (subscriptionRefs.current.size > 0) {
+      // We have subscriptions, just update the state
+      setIsSubscribed(true)
+    }
+  }, [isConnected, enabled, topics, topicsKey])
 
   return { isConnected, isSubscribed }
 }
 
 /**
  * Utility function to build NATS WebSocket URL
- * Can be used by consumers to create the getNatsWsUrl callback
+ * Can be used to create the getNatsWsUrl callback
  */
 export function buildNatsWsUrl(
   apiBaseUrl: string,

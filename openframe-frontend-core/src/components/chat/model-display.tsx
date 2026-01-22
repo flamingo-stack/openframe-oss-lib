@@ -5,12 +5,7 @@ import { cn } from '../../utils/cn';
 import { ClaudeIcon } from '../icons/claude-icon';
 import { OpenAiIcon } from '../icons/openai-icon';
 import { GoogleGeminiIcon } from '../icons/google-gemini-icon';
-
-export interface ModelDisplayProps extends React.HTMLAttributes<HTMLDivElement> {
-  provider?: string;
-  modelName?: string;
-  displayName?: string;
-}
+import type { ModelDisplayProps } from './types';
 
 const getProviderIcon = (provider?: string) => {
   if (!provider) return null;

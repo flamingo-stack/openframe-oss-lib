@@ -1,18 +1,11 @@
 "use client"
 
-import { useState, useRef, useImperativeHandle, forwardRef, useCallback, type TextareaHTMLAttributes, type KeyboardEvent, type ChangeEvent } from "react"
+import { useState, useRef, useImperativeHandle, forwardRef, useCallback, type KeyboardEvent, type ChangeEvent } from "react"
 import { cn } from "../../utils/cn"
 import { Send } from "lucide-react"
 import { Textarea } from "../ui/textarea"
 import { ChatTypingIndicator } from "./chat-typing-indicator"
-
-export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'onSubmit'> {
-  onSend?: (message: string) => void
-  sending?: boolean
-  awaitingResponse?: boolean
-  reserveAvatarOffset?: boolean
-  disabled?: boolean
-}
+import type { ChatInputProps } from "./types"
 
 const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
   ({ className, onSend, sending = false, awaitingResponse = false, placeholder = "Enter your request here...", reserveAvatarOffset = true, disabled = false, ...props }, ref) => {

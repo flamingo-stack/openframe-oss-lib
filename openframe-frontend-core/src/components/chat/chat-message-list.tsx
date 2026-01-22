@@ -1,29 +1,9 @@
 "use client"
 
-import { useRef, useCallback, useLayoutEffect, useEffect, useImperativeHandle, forwardRef, type HTMLAttributes } from "react"
+import { useRef, useCallback, useLayoutEffect, useEffect, useImperativeHandle, forwardRef } from "react"
 import { cn } from "../../utils/cn"
-import { ChatMessage } from "./chat-message"
-import { ChatMessageEnhanced, type MessageContent, type MessageSegment } from "./chat-message-enhanced"
-
-export interface Message {
-  id: string
-  role: 'user' | 'assistant' | 'error'
-  name?: string
-  content: string | MessageContent
-  timestamp: Date
-  avatar?: string | null
-  assistantType?: 'fae' | 'mingo'
-}
-
-export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
-  messages: Message[]
-  isTyping?: boolean
-  autoScroll?: boolean
-  showAvatars?: boolean
-  contentClassName?: string
-  assistantType?: 'fae' | 'mingo'
-  pendingApprovals?: MessageSegment[]
-}
+import { ChatMessageEnhanced } from "./chat-message-enhanced"
+import type { ChatMessageListProps, Message } from "./types"
 
 const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
   ({ className, messages, isTyping = false, autoScroll = true, showAvatars = true, contentClassName, assistantType, pendingApprovals, ...props }, ref) => {
@@ -60,36 +40,36 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
 
     useEffect(() => {
       if (!autoScroll || !scrollRef.current) return
-      
+
       if (resizeObserverRef.current) {
         resizeObserverRef.current.disconnect()
       }
-      
+
       const scrollContainer = scrollRef.current
       const contentContainer = scrollContainer.querySelector('.mx-auto.flex.w-full')
-      
+
       if (!contentContainer) return
-      
+
       resizeObserverRef.current = new ResizeObserver((entries) => {
         for (const entry of entries) {
           const newHeight = entry.target.scrollHeight
-          
+
           if (newHeight > lastScrollHeightRef.current && isPinnedToBottomRef.current) {
             scrollContainer.scrollTop = scrollContainer.scrollHeight
-            
+
             requestAnimationFrame(() => {
               if (scrollRef.current && isPinnedToBottomRef.current) {
                 scrollRef.current.scrollTop = scrollRef.current.scrollHeight
               }
             })
           }
-          
+
           lastScrollHeightRef.current = newHeight
         }
       })
-      
+
       resizeObserverRef.current.observe(contentContainer)
-      
+
       return () => {
         if (resizeObserverRef.current) {
           resizeObserverRef.current.disconnect()
@@ -97,34 +77,34 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         }
       }
     }, [autoScroll, messages])
-    
+
     useLayoutEffect(() => {
       if (!autoScroll) return
       if (!scrollRef.current) return
-      
+
       const lastMessage = messages[messages.length - 1]
       if (!lastMessage) return
-      
+
       if (lastMessage.role !== 'assistant') return
-      
+
       if (!isPinnedToBottomRef.current) return
-      
+
       const scrollContainer = scrollRef.current
       const contentContainer = scrollContainer.querySelector('.mx-auto.flex.w-full')
-      
+
       if (mutationObserverRef.current) {
         mutationObserverRef.current.disconnect()
       }
-      
+
       scrollContainer.scrollTop = scrollContainer.scrollHeight
-      
+
       if (contentContainer) {
         mutationObserverRef.current = new MutationObserver(() => {
           if (isPinnedToBottomRef.current && scrollRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight
           }
         })
-        
+
         mutationObserverRef.current.observe(contentContainer, {
           childList: true,
           subtree: true,
@@ -134,25 +114,25 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
           characterDataOldValue: false
         })
       }
-      
+
       const performRAFScroll = (depth: number = 0) => {
         if (depth > 2) return
-        
+
         requestAnimationFrame(() => {
           if (isPinnedToBottomRef.current && scrollRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-            
+
             if (depth < 1) {
               performRAFScroll(depth + 1)
             }
           }
         })
       }
-      
+
       performRAFScroll()
-      
+
       lastScrollHeightRef.current = scrollContainer.scrollHeight
-      
+
       return () => {
         if (mutationObserverRef.current) {
           mutationObserverRef.current.disconnect()
@@ -193,7 +173,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     }, [])
 
     useImperativeHandle(ref, () => scrollRef.current!)
-    
+
     return (
       <div className="relative flex-1 min-h-0 flex flex-col">
         <div
@@ -208,42 +188,22 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         >
           <div className={cn("mx-auto flex w-full max-w-3xl flex-col pb-2 min-w-0", contentClassName || "px-4")} style={{ minHeight: '100%' }}>
             <div className="flex-1" />
-            {messages.map((message, index) => {
-              const useEnhanced = Array.isArray(message.content) || message.role === 'assistant'
-              
-              if (useEnhanced) {
-                return (
-                  <ChatMessageEnhanced
-                    key={message.id}
-                    role={message.role}
-                    name={message.name}
-                    content={message.content}
-                    timestamp={message.timestamp}
-                    isTyping={index === messages.length - 1 && isTyping && message.role === 'assistant'}
-                    avatar={showAvatars ? message.avatar : null}
-                    showAvatar={showAvatars}
-                    assistantType={message.assistantType || assistantType}
-                  />
-                )
-              } else {
-                return (
-                  <ChatMessage
-                    key={message.id}
-                    role={message.role}
-                    name={message.name}
-                    content={typeof message.content === 'string' ? message.content : ''}
-                    timestamp={message.timestamp}
-                    isTyping={index === messages.length - 1 && isTyping && message.role === 'assistant'}
-                    avatar={showAvatars ? message.avatar : null}
-                    showAvatar={showAvatars}
-                    assistantType={message.assistantType || assistantType}
-                  />
-                )
-              }
-            })}
+            {messages.map((message, index) => (
+              <ChatMessageEnhanced
+                key={message.id}
+                role={message.role}
+                name={message.name}
+                content={message.content}
+                timestamp={message.timestamp}
+                isTyping={index === messages.length - 1 && isTyping && message.role === 'assistant'}
+                avatar={showAvatars ? message.avatar : null}
+                showAvatar={showAvatars}
+                assistantType={message.assistantType || assistantType}
+              />
+            ))}
           </div>
         </div>
-        
+
         {/* Sticky Pending Approvals Section */}
         {pendingApprovals && pendingApprovals.length > 0 && (
           <div className={cn(

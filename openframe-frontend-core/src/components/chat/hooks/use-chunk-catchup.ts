@@ -51,29 +51,6 @@ function getChatTypeMessageType(chatType: ChatType): NatsMessageType {
  * - Fetching historical chunks from the API
  * - Deduplicating and ordering chunks
  * - Processing chunks in the correct order
- * 
- * @example
- * ```tsx
- * // Basic usage (client-side, single chat type)
- * const { catchUpChunks, processChunk, resetChunkTracking, startInitialBuffering } = useChunkCatchup({
- *   dialogId,
- *   onChunkReceived: handleChunk,
- *   fetchChunks: async (dialogId, chatType, fromSequenceId) => {
- *     const response = await fetch(`/api/dialogs/${dialogId}/chunks?chatType=${chatType}`)
- *     return response.json()
- *   }
- * })
- * 
- * // Admin usage (multiple chat types)
- * const { catchUpChunks, processChunk, resetChunkTracking, startInitialBuffering } = useChunkCatchup({
- *   dialogId,
- *   onChunkReceived: handleChunk,
- *   chatTypes: [CHAT_TYPE.CLIENT, CHAT_TYPE.ADMIN],
- *   fetchChunks: async (dialogId, chatType, fromSequenceId) => {
- *     return apiClient.get(`/chat/api/v1/dialogs/${dialogId}/chunks?chatType=${chatType}`)
- *   }
- * })
- * ```
  */
 export function useChunkCatchup({
   dialogId,
@@ -162,7 +139,6 @@ export function useChunkCatchup({
     }
     
     if (!fetchChunks) {
-      console.warn('useChunkCatchup: No fetchChunks function provided')
       bufferUntilInitialCatchupComplete.current = false
       hasCompletedInitialCatchup.current = true
       flushBufferedRealtimeChunks()
