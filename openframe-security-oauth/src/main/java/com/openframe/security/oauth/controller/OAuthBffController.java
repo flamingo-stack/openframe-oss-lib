@@ -94,15 +94,20 @@ public class OAuthBffController {
     }
 
     @PostMapping("/refresh")
-    public Mono<ResponseEntity<Void>> refresh(@RequestParam String tenantId,
+    public Mono<ResponseEntity<Void>> refresh(@RequestParam(value = "tenantId", required = false) String tenantId,
                                               @CookieValue(name = REFRESH_TOKEN, required = false) String refreshCookie,
                                               ServerHttpRequest request) {
         String token = hasText(refreshCookie) ? refreshCookie : request.getHeaders().getFirst(REFRESH_TOKEN_HEADER);
         if (!hasText(token)) {
             return Mono.just(ResponseEntity.status(401).build());
         }
-        return oauthBffService.refreshTokensPublic(tenantId, token, request)
-                .map(tokens -> buildNoContentWithCookies(tokens, devTicketEnabled));
+        Mono<TokenResponse> tokensMono = hasText(tenantId)
+                ? oauthBffService.refreshTokensPublic(tenantId, token, request)
+                : oauthBffService.refreshTokensByLookup(token, request);
+
+        return tokensMono
+                .map(tokens -> buildNoContentWithCookies(tokens, devTicketEnabled))
+                .switchIfEmpty(Mono.just(ResponseEntity.status(401).build()));
     }
 
     @GetMapping("/logout")
