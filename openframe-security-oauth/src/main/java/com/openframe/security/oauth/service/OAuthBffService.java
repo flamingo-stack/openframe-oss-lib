@@ -1,5 +1,6 @@
 package com.openframe.security.oauth.service;
 
+import com.openframe.data.repository.oauth.MongoOAuth2AuthorizationRepository;
 import com.openframe.security.jwt.JwtService;
 import com.openframe.security.oauth.dto.OAuthCallbackResult;
 import com.openframe.security.oauth.dto.TokenResponse;
@@ -19,7 +20,9 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
+import java.net.URI;
 import java.util.Base64;
 import java.util.Optional;
 
@@ -40,6 +43,7 @@ public class OAuthBffService {
     private final RedirectTargetResolver redirectTargetResolver;
     private final ForwardedHeadersContributor headersContributor;
     private final JwtService jwtService;
+    private final MongoOAuth2AuthorizationRepository authorizationRepository;
 
     @Value("${openframe.auth.server.url}")
     private String authServerUrl;
@@ -209,6 +213,49 @@ public class OAuthBffService {
                 .retrieve()
                 .bodyToMono(Void.class)
                 .onErrorResume(e -> Mono.empty());
+    }
+
+    /**
+     * Best-effort revoke that does NOT require tenantId parameter.
+     *
+     * Looks up the OAuth2 authorization by refresh token in MongoDB and extracts the tenant id from the saved
+     * authorizationUri (e.g. ".../{tenantId}/oauth2/authorize"). If lookup/parsing fails, it becomes a no-op.
+     */
+    public Mono<Void> revokeRefreshTokenByLookup(String refreshToken) {
+        if (!hasText(refreshToken)) {
+            return Mono.empty();
+        }
+
+        return Mono.defer(() -> Mono.justOrEmpty(authorizationRepository.findByRefreshTokenValue(refreshToken)))
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(auth -> {
+                    String tenantId = extractTenantIdFromAuthorizationUri(auth.getArAuthorizationUri()).orElse(null);
+                    if (!hasText(tenantId)) return Mono.empty();
+                    return revokeRefreshToken(tenantId, refreshToken);
+                })
+                .onErrorResume(e -> Mono.empty());
+    }
+
+    private Optional<String> extractTenantIdFromAuthorizationUri(String authorizationUri) {
+        if (!hasText(authorizationUri)) {
+            return Optional.empty();
+        }
+        try {
+            URI uri = URI.create(authorizationUri);
+            String path = uri.getPath();
+            if (!hasText(path)) {
+                return Optional.empty();
+            }
+            // - "/sas/{tenantId}/oauth2/authorize"
+            String[] parts = path.split("/");
+            // parts[0] = "" because path starts with "/"
+            if (parts.length >= 3 && "sas".equals(parts[1]) && hasText(parts[2])) return Optional.of(parts[2]);
+            if (parts.length >= 2 && hasText(parts[1])) return Optional.of(parts[1]); // fallback for older "/{tenantId}/..."
+            return Optional.empty();
+        } catch (Exception e) {
+            log.warn("Incorrect authorizationUri format: {}", authorizationUri, e);
+            return Optional.empty();
+        }
     }
 
     public record AuthorizeData(String authorizeUrl, String state, String codeVerifier, String tenantId, String redirectToAbs) {}

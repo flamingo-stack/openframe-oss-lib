@@ -106,14 +106,16 @@ public class OAuthBffController {
     }
 
     @GetMapping("/logout")
-    public Mono<ResponseEntity<Void>> logout(@RequestParam String tenantId,
+    public Mono<ResponseEntity<Void>> logout(@RequestParam(value = "tenantId", required = false) String tenantId,
                                              @CookieValue(name = REFRESH_TOKEN, required = false) String refreshCookie,
                                              ServerHttpRequest request) {
         HttpHeaders headers = new HttpHeaders();
         cookieService.addClearAuthCookies(headers);
         String refreshToken = hasText(refreshCookie) ? refreshCookie : request.getHeaders().getFirst(REFRESH_TOKEN_HEADER);
-        return oauthBffService.revokeRefreshToken(tenantId, refreshToken)
-                .then(Mono.just(ResponseEntity.noContent().headers(headers).build()));
+        Mono<Void> revoke = hasText(tenantId)
+                ? oauthBffService.revokeRefreshToken(tenantId, refreshToken)
+                : oauthBffService.revokeRefreshTokenByLookup(refreshToken);
+        return revoke.then(Mono.just(ResponseEntity.noContent().headers(headers).build()));
     }
 
     @GetMapping("/dev-exchange")
