@@ -1,11 +1,6 @@
 import * as React from "react"
 import { cn } from "../../utils/cn"
-
-export interface ChatTypingIndicatorProps extends React.HTMLAttributes<HTMLDivElement> {
-  size?: 'sm' | 'md' | 'lg'
-  showText?: boolean
-  dotClassName?: string
-}
+import type { ChatTypingIndicatorProps } from "./types"
 
 const ChatTypingIndicator = React.forwardRef<HTMLDivElement, ChatTypingIndicatorProps>(
   ({ className, size = 'md', showText = false, dotClassName, ...props }, ref) => {

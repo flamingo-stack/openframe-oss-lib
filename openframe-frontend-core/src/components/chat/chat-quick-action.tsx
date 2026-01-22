@@ -4,16 +4,7 @@ import * as React from 'react'
 import { cn } from '../../utils/cn'
 import { ChevronRight } from 'lucide-react'
 import { Button } from '../ui'
-
-export interface ChatQuickActionProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  text: string
-  onAction?: (text: string) => void
-  /** Whether this action should show the hint animation */
-  isHintActive?: boolean
-  /** Callback when user clicks the action - stops hint */
-  onHintInteraction?: () => void
-  disabled?: boolean
-}
+import type { ChatQuickActionProps } from './types'
 
 const ChatQuickAction = React.forwardRef<HTMLButtonElement, ChatQuickActionProps>(
   ({ className, text, onAction, onClick, isHintActive, onHintInteraction, disabled = false, ...props }, ref) => {

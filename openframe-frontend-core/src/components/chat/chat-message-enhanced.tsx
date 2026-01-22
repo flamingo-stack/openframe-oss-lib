@@ -1,30 +1,13 @@
 "use client"
 
-import { useState, forwardRef, HTMLAttributes } from "react"
+import { useState, forwardRef } from "react"
 import { cn } from "../../utils/cn"
 import { SquareAvatar } from "../ui/square-avatar"
 import { ChatTypingIndicator } from "./chat-typing-indicator"
-import { ToolExecutionDisplay, type ToolExecutionMessage } from "./tool-execution-display"
-import { ApprovalRequestMessage, type ApprovalRequestData } from "./approval-request-message"
+import { ToolExecutionDisplay } from "./tool-execution-display"
+import { ApprovalRequestMessage } from "./approval-request-message"
 import { SimpleMarkdownRenderer } from "../ui/simple-markdown-renderer"
-
-export type MessageSegment =
-  | { type: 'text'; text: string }
-  | { type: 'tool_execution'; data: ToolExecutionMessage }
-  | { type: 'approval_request'; data: ApprovalRequestData; status?: 'pending' | 'approved' | 'rejected'; onApprove?: (requestId?: string) => void; onReject?: (requestId?: string) => void }
-
-export type MessageContent = string | MessageSegment[]
-
-export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivElement>, 'content'> {
-  role: 'user' | 'assistant' | 'error'
-  content: MessageContent
-  name?: string
-  avatar?: string | null
-  isTyping?: boolean
-  timestamp?: Date
-  showAvatar?: boolean
-  assistantType?: 'fae' | 'mingo'
-}
+import type { MessageSegment, MessageContent, ChatMessageEnhancedProps } from "./types"
 
 function normalizeContent(content: MessageContent): MessageSegment[] {
   if (typeof content === 'string') {
