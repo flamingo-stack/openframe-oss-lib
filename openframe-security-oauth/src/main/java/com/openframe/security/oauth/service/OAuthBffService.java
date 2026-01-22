@@ -92,6 +92,24 @@ public class OAuthBffService {
         return refreshTokens(tenantId, refreshToken, request);
     }
 
+    /**
+     * Best-effort refresh that does NOT require tenantId parameter.
+     * If tenant cannot be resolved from MongoDB, returns Mono.empty().
+     */
+    public Mono<TokenResponse> refreshTokensByLookup(String refreshToken, ServerHttpRequest request) {
+        if (!hasText(refreshToken)) {
+            return Mono.empty();
+        }
+
+        return Mono.defer(() -> Mono.justOrEmpty(authorizationRepository.findByRefreshTokenValue(refreshToken)))
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(auth -> {
+                    String tenantId = extractTenantIdFromAuthorizationUri(auth.getArAuthorizationUri()).orElse(null);
+                    if (!hasText(tenantId)) return Mono.empty();
+                    return refreshTokensPublic(tenantId, refreshToken, request);
+                });
+    }
+
     private String buildAuthorizeUrl(String tenantId, String codeChallenge, String state, String provider) {
         String base = String.format(
                 "%s/%s/oauth2/authorize?response_type=code&client_id=%s&code_challenge=%s&code_challenge_method=S256&redirect_uri=%s&scope=openid%%20profile%%20email%%20offline_access&state=%s",
