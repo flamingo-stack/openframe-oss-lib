@@ -8,7 +8,7 @@ export interface Globe02IconProps
 export function Globe02Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Globe02IconProps) {
   return (

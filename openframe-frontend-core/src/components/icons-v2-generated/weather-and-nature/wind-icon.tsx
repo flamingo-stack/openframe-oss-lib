@@ -8,7 +8,7 @@ export interface WindIconProps
 export function WindIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: WindIconProps) {
   return (

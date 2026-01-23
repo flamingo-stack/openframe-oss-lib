@@ -8,7 +8,7 @@ export interface TransferHrIconProps
 export function TransferHrIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TransferHrIconProps) {
   return (

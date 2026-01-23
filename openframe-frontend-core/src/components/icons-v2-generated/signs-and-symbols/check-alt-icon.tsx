@@ -8,7 +8,7 @@ export interface CheckAltIconProps
 export function CheckAltIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CheckAltIconProps) {
   return (

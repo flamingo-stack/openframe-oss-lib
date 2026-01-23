@@ -8,7 +8,7 @@ export interface TextAreaDraggerIconProps
 export function TextAreaDraggerIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TextAreaDraggerIconProps) {
   return (

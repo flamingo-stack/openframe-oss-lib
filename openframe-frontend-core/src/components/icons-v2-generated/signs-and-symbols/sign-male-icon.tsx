@@ -8,7 +8,7 @@ export interface SignMaleIconProps
 export function SignMaleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SignMaleIconProps) {
   return (

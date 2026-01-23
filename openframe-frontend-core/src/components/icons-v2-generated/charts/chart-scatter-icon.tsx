@@ -8,7 +8,7 @@ export interface ChartScatterIconProps
 export function ChartScatterIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ChartScatterIconProps) {
   return (

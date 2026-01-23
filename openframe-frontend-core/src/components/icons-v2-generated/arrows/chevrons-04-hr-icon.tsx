@@ -8,7 +8,7 @@ export interface Chevrons04HrIconProps
 export function Chevrons04HrIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Chevrons04HrIconProps) {
   return (

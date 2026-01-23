@@ -8,7 +8,7 @@ export interface AcornIconProps
 export function AcornIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AcornIconProps) {
   return (

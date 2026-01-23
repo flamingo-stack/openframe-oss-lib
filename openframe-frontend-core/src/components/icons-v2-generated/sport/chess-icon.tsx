@@ -8,7 +8,7 @@ export interface ChessIconProps
 export function ChessIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ChessIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface MobilePhoneOffIconProps
 export function MobilePhoneOffIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MobilePhoneOffIconProps) {
   return (

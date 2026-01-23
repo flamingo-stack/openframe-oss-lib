@@ -8,7 +8,7 @@ export interface GraphMixSquareIconProps
 export function GraphMixSquareIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: GraphMixSquareIconProps) {
   return (

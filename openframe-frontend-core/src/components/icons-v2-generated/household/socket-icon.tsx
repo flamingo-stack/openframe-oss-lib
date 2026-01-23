@@ -8,7 +8,7 @@ export interface SocketIconProps
 export function SocketIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SocketIconProps) {
   return (

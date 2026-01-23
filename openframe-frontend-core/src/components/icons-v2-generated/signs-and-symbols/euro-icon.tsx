@@ -8,7 +8,7 @@ export interface EuroIconProps
 export function EuroIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: EuroIconProps) {
   return (

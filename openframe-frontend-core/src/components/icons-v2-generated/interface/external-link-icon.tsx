@@ -8,7 +8,7 @@ export interface ExternalLinkIconProps
 export function ExternalLinkIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ExternalLinkIconProps) {
   return (

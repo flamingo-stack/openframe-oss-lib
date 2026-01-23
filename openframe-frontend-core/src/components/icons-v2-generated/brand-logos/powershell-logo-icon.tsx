@@ -8,7 +8,7 @@ export interface PowershellLogoIconProps
 export function PowershellLogoIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PowershellLogoIconProps) {
   return (

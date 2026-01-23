@@ -8,7 +8,7 @@ export interface DatabaseLockIconProps
 export function DatabaseLockIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: DatabaseLockIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface SandwichIconProps
 export function SandwichIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SandwichIconProps) {
   return (

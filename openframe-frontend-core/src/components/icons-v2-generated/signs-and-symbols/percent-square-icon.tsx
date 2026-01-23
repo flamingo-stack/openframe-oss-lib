@@ -8,7 +8,7 @@ export interface PercentSquareIconProps
 export function PercentSquareIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PercentSquareIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface PlaylistMusicIconProps
 export function PlaylistMusicIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PlaylistMusicIconProps) {
   return (

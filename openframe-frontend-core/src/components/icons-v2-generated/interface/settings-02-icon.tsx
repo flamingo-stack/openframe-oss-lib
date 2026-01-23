@@ -8,7 +8,7 @@ export interface Settings02IconProps
 export function Settings02Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Settings02IconProps) {
   return (

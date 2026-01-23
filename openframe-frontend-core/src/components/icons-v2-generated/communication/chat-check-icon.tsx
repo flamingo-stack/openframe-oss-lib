@@ -8,7 +8,7 @@ export interface ChatCheckIconProps
 export function ChatCheckIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ChatCheckIconProps) {
   return (

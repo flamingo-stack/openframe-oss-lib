@@ -8,7 +8,7 @@ export interface ChevronCircleRightIconProps
 export function ChevronCircleRightIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ChevronCircleRightIconProps) {
   return (

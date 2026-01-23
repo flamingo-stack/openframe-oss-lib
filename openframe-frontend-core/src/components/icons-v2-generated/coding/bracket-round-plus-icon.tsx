@@ -8,7 +8,7 @@ export interface BracketRoundPlusIconProps
 export function BracketRoundPlusIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BracketRoundPlusIconProps) {
   return (

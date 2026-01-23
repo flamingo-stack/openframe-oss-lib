@@ -8,7 +8,7 @@ export interface Bridge02IconProps
 export function Bridge02Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Bridge02IconProps) {
   return (

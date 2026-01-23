@@ -8,7 +8,7 @@ export interface HeadMedicalIconProps
 export function HeadMedicalIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HeadMedicalIconProps) {
   return (

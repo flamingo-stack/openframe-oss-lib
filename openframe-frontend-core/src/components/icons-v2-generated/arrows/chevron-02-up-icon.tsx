@@ -8,7 +8,7 @@ export interface Chevron02UpIconProps
 export function Chevron02UpIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Chevron02UpIconProps) {
   return (

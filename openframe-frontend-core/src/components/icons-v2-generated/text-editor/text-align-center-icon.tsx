@@ -8,7 +8,7 @@ export interface TextAlignCenterIconProps
 export function TextAlignCenterIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TextAlignCenterIconProps) {
   return (

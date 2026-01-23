@@ -8,7 +8,7 @@ export interface KiwiIconProps
 export function KiwiIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: KiwiIconProps) {
   return (

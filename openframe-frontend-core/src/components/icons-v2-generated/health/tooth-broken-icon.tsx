@@ -8,7 +8,7 @@ export interface ToothBrokenIconProps
 export function ToothBrokenIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ToothBrokenIconProps) {
   return (

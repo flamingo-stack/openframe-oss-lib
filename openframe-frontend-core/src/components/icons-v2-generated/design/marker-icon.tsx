@@ -8,7 +8,7 @@ export interface MarkerIconProps
 export function MarkerIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MarkerIconProps) {
   return (

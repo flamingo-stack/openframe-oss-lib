@@ -8,7 +8,7 @@ export interface MoneyBillDollarIconProps
 export function MoneyBillDollarIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MoneyBillDollarIconProps) {
   return (

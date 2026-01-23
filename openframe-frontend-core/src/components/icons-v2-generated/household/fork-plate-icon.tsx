@@ -8,7 +8,7 @@ export interface ForkPlateIconProps
 export function ForkPlateIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ForkPlateIconProps) {
   return (

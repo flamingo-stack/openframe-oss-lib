@@ -8,7 +8,7 @@ export interface AtomIconProps
 export function AtomIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AtomIconProps) {
   return (

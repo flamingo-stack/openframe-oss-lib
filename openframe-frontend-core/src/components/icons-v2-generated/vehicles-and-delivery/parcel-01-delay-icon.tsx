@@ -8,7 +8,7 @@ export interface Parcel01DelayIconProps
 export function Parcel01DelayIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Parcel01DelayIconProps) {
   return (

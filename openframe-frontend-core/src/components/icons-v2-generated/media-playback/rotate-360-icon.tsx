@@ -8,7 +8,7 @@ export interface Rotate360IconProps
 export function Rotate360Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Rotate360IconProps) {
   return (

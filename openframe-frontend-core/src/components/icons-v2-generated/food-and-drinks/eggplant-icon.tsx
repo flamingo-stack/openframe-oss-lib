@@ -8,7 +8,7 @@ export interface EggplantIconProps
 export function EggplantIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: EggplantIconProps) {
   return (

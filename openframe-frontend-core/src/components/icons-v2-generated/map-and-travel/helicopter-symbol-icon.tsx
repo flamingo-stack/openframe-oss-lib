@@ -8,7 +8,7 @@ export interface HelicopterSymbolIconProps
 export function HelicopterSymbolIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HelicopterSymbolIconProps) {
   return (

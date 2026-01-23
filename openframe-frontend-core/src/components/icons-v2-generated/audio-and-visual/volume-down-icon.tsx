@@ -8,7 +8,7 @@ export interface VolumeDownIconProps
 export function VolumeDownIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: VolumeDownIconProps) {
   return (

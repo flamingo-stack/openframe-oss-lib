@@ -8,7 +8,7 @@ export interface TShirtIconProps
 export function TShirtIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TShirtIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface QuoteLeftIconProps
 export function QuoteLeftIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: QuoteLeftIconProps) {
   return (

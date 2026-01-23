@@ -8,7 +8,7 @@ export interface OsqueryLogoIconProps
 export function OsqueryLogoIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: OsqueryLogoIconProps) {
   return (

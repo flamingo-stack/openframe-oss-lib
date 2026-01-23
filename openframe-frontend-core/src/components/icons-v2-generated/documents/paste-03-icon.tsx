@@ -8,7 +8,7 @@ export interface Paste03IconProps
 export function Paste03Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Paste03IconProps) {
   return (

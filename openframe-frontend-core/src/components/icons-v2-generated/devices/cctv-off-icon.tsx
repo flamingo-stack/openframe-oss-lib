@@ -8,7 +8,7 @@ export interface CctvOffIconProps
 export function CctvOffIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CctvOffIconProps) {
   return (

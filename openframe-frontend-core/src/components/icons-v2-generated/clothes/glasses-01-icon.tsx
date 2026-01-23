@@ -8,7 +8,7 @@ export interface Glasses01IconProps
 export function Glasses01Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Glasses01IconProps) {
   return (

@@ -8,7 +8,7 @@ export interface FolderBannedIconProps
 export function FolderBannedIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FolderBannedIconProps) {
   return (

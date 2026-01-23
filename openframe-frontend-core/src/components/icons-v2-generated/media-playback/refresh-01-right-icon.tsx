@@ -8,7 +8,7 @@ export interface Refresh01RightIconProps
 export function Refresh01RightIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Refresh01RightIconProps) {
   return (

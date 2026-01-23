@@ -8,7 +8,7 @@ export interface FileQuestionIconProps
 export function FileQuestionIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FileQuestionIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface MessageRobotIconProps
 export function MessageRobotIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MessageRobotIconProps) {
   return (

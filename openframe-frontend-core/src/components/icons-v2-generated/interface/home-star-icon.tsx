@@ -8,7 +8,7 @@ export interface HomeStarIconProps
 export function HomeStarIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HomeStarIconProps) {
   return (

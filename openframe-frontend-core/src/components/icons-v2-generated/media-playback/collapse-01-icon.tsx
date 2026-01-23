@@ -8,7 +8,7 @@ export interface Collapse01IconProps
 export function Collapse01Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Collapse01IconProps) {
   return (

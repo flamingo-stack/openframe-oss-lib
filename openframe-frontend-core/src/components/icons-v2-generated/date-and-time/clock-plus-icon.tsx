@@ -8,7 +8,7 @@ export interface ClockPlusIconProps
 export function ClockPlusIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ClockPlusIconProps) {
   return (

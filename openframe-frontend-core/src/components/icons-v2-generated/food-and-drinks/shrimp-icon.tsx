@@ -8,7 +8,7 @@ export interface ShrimpIconProps
 export function ShrimpIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ShrimpIconProps) {
   return (

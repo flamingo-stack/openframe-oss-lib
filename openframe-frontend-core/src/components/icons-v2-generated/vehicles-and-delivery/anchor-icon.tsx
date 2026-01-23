@@ -8,7 +8,7 @@ export interface AnchorIconProps
 export function AnchorIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AnchorIconProps) {
   return (

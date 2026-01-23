@@ -8,7 +8,7 @@ export interface VolleyballIconProps
 export function VolleyballIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: VolleyballIconProps) {
   return (

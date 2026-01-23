@@ -8,7 +8,7 @@ export interface MessageFaceIconProps
 export function MessageFaceIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MessageFaceIconProps) {
   return (

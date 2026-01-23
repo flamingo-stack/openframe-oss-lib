@@ -8,7 +8,7 @@ export interface BellSnoozeIconProps
 export function BellSnoozeIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BellSnoozeIconProps) {
   return (

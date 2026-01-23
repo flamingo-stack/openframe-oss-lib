@@ -8,7 +8,7 @@ export interface BasketExclamationIconProps
 export function BasketExclamationIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BasketExclamationIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface ApronIconProps
 export function ApronIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ApronIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface RssIconProps
 export function RssIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: RssIconProps) {
   return (

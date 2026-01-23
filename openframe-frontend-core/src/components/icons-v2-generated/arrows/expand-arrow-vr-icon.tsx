@@ -8,7 +8,7 @@ export interface ExpandArrowVrIconProps
 export function ExpandArrowVrIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ExpandArrowVrIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface ReflectVrIconProps
 export function ReflectVrIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ReflectVrIconProps) {
   return (

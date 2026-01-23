@@ -8,7 +8,7 @@ export interface MugTeaIconProps
 export function MugTeaIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MugTeaIconProps) {
   return (

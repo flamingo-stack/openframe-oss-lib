@@ -8,7 +8,7 @@ export interface SidebarFlipIconProps
 export function SidebarFlipIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SidebarFlipIconProps) {
   return (

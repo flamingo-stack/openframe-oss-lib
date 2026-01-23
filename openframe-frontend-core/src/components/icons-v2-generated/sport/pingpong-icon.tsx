@@ -8,7 +8,7 @@ export interface PingpongIconProps
 export function PingpongIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PingpongIconProps) {
   return (

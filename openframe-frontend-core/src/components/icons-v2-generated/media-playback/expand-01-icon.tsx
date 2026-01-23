@@ -8,7 +8,7 @@ export interface Expand01IconProps
 export function Expand01Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Expand01IconProps) {
   return (

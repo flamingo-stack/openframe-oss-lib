@@ -8,7 +8,7 @@ export interface GameControllerIconProps
 export function GameControllerIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: GameControllerIconProps) {
   return (

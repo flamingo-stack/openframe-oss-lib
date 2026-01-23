@@ -8,7 +8,7 @@ export interface Refresh02VrIconProps
 export function Refresh02VrIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Refresh02VrIconProps) {
   return (

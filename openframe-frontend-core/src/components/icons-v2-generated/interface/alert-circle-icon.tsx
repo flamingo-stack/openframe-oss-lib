@@ -8,7 +8,7 @@ export interface AlertCircleIconProps
 export function AlertCircleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AlertCircleIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface BasketXmarkIconProps
 export function BasketXmarkIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BasketXmarkIconProps) {
   return (

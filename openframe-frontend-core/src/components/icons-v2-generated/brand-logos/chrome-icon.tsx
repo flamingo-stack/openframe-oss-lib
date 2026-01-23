@@ -8,7 +8,7 @@ export interface ChromeIconProps
 export function ChromeIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ChromeIconProps) {
   return (

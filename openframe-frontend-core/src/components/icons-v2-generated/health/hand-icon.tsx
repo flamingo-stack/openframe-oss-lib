@@ -8,7 +8,7 @@ export interface HandIconProps
 export function HandIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HandIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface DogIconProps
 export function DogIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: DogIconProps) {
   return (

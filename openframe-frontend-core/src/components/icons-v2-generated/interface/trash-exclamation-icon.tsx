@@ -8,7 +8,7 @@ export interface TrashExclamationIconProps
 export function TrashExclamationIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TrashExclamationIconProps) {
   return (

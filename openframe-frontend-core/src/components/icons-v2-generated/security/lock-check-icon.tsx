@@ -8,7 +8,7 @@ export interface LockCheckIconProps
 export function LockCheckIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: LockCheckIconProps) {
   return (

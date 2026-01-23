@@ -8,7 +8,7 @@ export interface QuestionCircleIconProps
 export function QuestionCircleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: QuestionCircleIconProps) {
   return (

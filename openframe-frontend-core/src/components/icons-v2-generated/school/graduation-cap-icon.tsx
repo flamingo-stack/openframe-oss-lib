@@ -8,7 +8,7 @@ export interface GraduationCapIconProps
 export function GraduationCapIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: GraduationCapIconProps) {
   return (

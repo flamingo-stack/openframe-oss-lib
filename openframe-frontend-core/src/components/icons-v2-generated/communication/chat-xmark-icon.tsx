@@ -8,7 +8,7 @@ export interface ChatXmarkIconProps
 export function ChatXmarkIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ChatXmarkIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface StickerEmojiIconProps
 export function StickerEmojiIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: StickerEmojiIconProps) {
   return (

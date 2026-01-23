@@ -8,7 +8,7 @@ export interface ForkKnifeIconProps
 export function ForkKnifeIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ForkKnifeIconProps) {
   return (

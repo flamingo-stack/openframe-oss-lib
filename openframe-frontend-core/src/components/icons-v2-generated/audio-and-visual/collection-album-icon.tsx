@@ -8,7 +8,7 @@ export interface CollectionAlbumIconProps
 export function CollectionAlbumIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CollectionAlbumIconProps) {
   return (

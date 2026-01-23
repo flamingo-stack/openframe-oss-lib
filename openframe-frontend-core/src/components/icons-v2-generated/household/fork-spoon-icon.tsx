@@ -8,7 +8,7 @@ export interface ForkSpoonIconProps
 export function ForkSpoonIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ForkSpoonIconProps) {
   return (

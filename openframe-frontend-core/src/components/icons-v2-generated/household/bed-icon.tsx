@@ -8,7 +8,7 @@ export interface BedIconProps
 export function BedIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BedIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface ShapeCircleDashIconProps
 export function ShapeCircleDashIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ShapeCircleDashIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface TicketAirlineIconProps
 export function TicketAirlineIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TicketAirlineIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface DotsIconProps
 export function DotsIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: DotsIconProps) {
   return (

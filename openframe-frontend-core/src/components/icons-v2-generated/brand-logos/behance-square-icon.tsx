@@ -8,7 +8,7 @@ export interface BehanceSquareIconProps
 export function BehanceSquareIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BehanceSquareIconProps) {
   return (

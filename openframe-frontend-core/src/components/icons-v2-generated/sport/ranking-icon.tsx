@@ -8,7 +8,7 @@ export interface RankingIconProps
 export function RankingIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: RankingIconProps) {
   return (

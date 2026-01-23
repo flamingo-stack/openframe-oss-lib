@@ -8,7 +8,7 @@ export interface HotWaterIconProps
 export function HotWaterIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HotWaterIconProps) {
   return (

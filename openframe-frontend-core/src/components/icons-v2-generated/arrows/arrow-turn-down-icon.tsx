@@ -8,7 +8,7 @@ export interface ArrowTurnDownIconProps
 export function ArrowTurnDownIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ArrowTurnDownIconProps) {
   return (

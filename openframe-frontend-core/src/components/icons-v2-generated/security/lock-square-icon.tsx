@@ -8,7 +8,7 @@ export interface LockSquareIconProps
 export function LockSquareIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: LockSquareIconProps) {
   return (

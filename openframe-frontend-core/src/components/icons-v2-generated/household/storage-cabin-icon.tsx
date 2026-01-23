@@ -8,7 +8,7 @@ export interface StorageCabinIconProps
 export function StorageCabinIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: StorageCabinIconProps) {
   return (

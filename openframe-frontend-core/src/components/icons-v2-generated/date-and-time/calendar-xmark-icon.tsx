@@ -8,7 +8,7 @@ export interface CalendarXmarkIconProps
 export function CalendarXmarkIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CalendarXmarkIconProps) {
   return (

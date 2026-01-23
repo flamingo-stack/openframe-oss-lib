@@ -8,7 +8,7 @@ export interface FlowerPlantIconProps
 export function FlowerPlantIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FlowerPlantIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface XmarkAltIconProps
 export function XmarkAltIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: XmarkAltIconProps) {
   return (

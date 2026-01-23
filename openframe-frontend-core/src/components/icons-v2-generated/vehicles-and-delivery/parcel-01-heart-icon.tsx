@@ -8,7 +8,7 @@ export interface Parcel01HeartIconProps
 export function Parcel01HeartIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Parcel01HeartIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface UnderpantsIconProps
 export function UnderpantsIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: UnderpantsIconProps) {
   return (

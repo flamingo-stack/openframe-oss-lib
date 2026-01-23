@@ -8,7 +8,7 @@ export interface StethoscopeIconProps
 export function StethoscopeIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: StethoscopeIconProps) {
   return (

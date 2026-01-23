@@ -8,7 +8,7 @@ export interface Receipt02IconProps
 export function Receipt02Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Receipt02IconProps) {
   return (

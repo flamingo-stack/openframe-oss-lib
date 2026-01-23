@@ -8,7 +8,7 @@ export interface MessageLanguageIconProps
 export function MessageLanguageIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MessageLanguageIconProps) {
   return (

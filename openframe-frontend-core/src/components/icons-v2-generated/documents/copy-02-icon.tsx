@@ -8,7 +8,7 @@ export interface Copy02IconProps
 export function Copy02Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Copy02IconProps) {
   return (

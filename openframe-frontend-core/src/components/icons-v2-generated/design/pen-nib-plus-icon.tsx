@@ -8,7 +8,7 @@ export interface PenNibPlusIconProps
 export function PenNibPlusIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PenNibPlusIconProps) {
   return (

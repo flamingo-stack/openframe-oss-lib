@@ -8,7 +8,7 @@ export interface CampgroundIconProps
 export function CampgroundIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CampgroundIconProps) {
   return (

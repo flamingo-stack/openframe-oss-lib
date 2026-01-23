@@ -8,7 +8,7 @@ export interface InstagramIconProps
 export function InstagramIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: InstagramIconProps) {
   return (

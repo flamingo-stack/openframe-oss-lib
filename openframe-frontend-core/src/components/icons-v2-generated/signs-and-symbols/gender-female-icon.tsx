@@ -8,7 +8,7 @@ export interface GenderFemaleIconProps
 export function GenderFemaleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: GenderFemaleIconProps) {
   return (

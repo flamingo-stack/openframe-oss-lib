@@ -8,7 +8,7 @@ export interface BatteryLowIconProps
 export function BatteryLowIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BatteryLowIconProps) {
   return (

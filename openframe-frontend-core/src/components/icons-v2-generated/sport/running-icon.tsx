@@ -8,7 +8,7 @@ export interface RunningIconProps
 export function RunningIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: RunningIconProps) {
   return (

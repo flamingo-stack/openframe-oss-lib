@@ -8,7 +8,7 @@ export interface CupWaterIconProps
 export function CupWaterIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CupWaterIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface HillAvalancheIconProps
 export function HillAvalancheIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HillAvalancheIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface LifeBuoyIconProps
 export function LifeBuoyIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: LifeBuoyIconProps) {
   return (

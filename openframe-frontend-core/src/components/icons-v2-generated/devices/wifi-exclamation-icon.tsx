@@ -8,7 +8,7 @@ export interface WifiExclamationIconProps
 export function WifiExclamationIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: WifiExclamationIconProps) {
   return (

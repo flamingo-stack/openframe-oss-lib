@@ -8,7 +8,7 @@ export interface MicrosoftLogoIconProps
 export function MicrosoftLogoIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MicrosoftLogoIconProps) {
   return (

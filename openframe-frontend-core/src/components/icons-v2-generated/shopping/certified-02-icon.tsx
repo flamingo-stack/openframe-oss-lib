@@ -8,7 +8,7 @@ export interface Certified02IconProps
 export function Certified02Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Certified02IconProps) {
   return (

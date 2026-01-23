@@ -8,7 +8,7 @@ export interface CloudArrowUpIconProps
 export function CloudArrowUpIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CloudArrowUpIconProps) {
   return (

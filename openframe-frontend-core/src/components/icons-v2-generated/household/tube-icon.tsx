@@ -8,7 +8,7 @@ export interface TubeIconProps
 export function TubeIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TubeIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface VectorCircleIconProps
 export function VectorCircleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: VectorCircleIconProps) {
   return (

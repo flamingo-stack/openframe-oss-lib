@@ -8,7 +8,7 @@ export interface HeadingAltIconProps
 export function HeadingAltIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HeadingAltIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface MicrophoneIconProps
 export function MicrophoneIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MicrophoneIconProps) {
   return (

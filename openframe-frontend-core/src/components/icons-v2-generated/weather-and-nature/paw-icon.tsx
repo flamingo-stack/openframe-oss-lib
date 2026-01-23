@@ -8,7 +8,7 @@ export interface PawIconProps
 export function PawIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PawIconProps) {
   return (

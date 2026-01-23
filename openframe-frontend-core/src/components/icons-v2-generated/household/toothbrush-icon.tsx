@@ -8,7 +8,7 @@ export interface ToothbrushIconProps
 export function ToothbrushIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ToothbrushIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface ClipboardMedicalIconProps
 export function ClipboardMedicalIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ClipboardMedicalIconProps) {
   return (

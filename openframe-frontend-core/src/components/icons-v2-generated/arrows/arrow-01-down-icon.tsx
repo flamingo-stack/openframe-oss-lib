@@ -8,7 +8,7 @@ export interface Arrow01DownIconProps
 export function Arrow01DownIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Arrow01DownIconProps) {
   return (

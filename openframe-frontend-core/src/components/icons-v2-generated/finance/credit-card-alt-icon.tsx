@@ -8,7 +8,7 @@ export interface CreditCardAltIconProps
 export function CreditCardAltIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CreditCardAltIconProps) {
   return (

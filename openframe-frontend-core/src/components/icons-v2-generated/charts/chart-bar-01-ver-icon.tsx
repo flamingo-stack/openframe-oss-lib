@@ -8,7 +8,7 @@ export interface ChartBar01VerIconProps
 export function ChartBar01VerIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ChartBar01VerIconProps) {
   return (

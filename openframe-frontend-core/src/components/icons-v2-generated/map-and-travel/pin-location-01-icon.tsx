@@ -8,7 +8,7 @@ export interface PinLocation01IconProps
 export function PinLocation01Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PinLocation01IconProps) {
   return (

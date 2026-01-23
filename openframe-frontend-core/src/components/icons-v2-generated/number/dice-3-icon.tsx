@@ -8,7 +8,7 @@ export interface Dice3IconProps
 export function Dice3Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Dice3IconProps) {
   return (

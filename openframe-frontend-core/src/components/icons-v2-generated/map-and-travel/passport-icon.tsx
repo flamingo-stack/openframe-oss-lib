@@ -8,7 +8,7 @@ export interface PassportIconProps
 export function PassportIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PassportIconProps) {
   return (

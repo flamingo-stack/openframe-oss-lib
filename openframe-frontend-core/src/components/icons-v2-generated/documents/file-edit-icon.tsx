@@ -8,7 +8,7 @@ export interface FileEditIconProps
 export function FileEditIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FileEditIconProps) {
   return (

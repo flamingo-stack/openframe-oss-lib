@@ -8,7 +8,7 @@ export interface PlayIconProps
 export function PlayIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PlayIconProps) {
   return (

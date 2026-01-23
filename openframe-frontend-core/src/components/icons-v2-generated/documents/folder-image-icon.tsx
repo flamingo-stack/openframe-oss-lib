@@ -8,7 +8,7 @@ export interface FolderImageIconProps
 export function FolderImageIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FolderImageIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface MeshcentralLogoIconProps
 export function MeshcentralLogoIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MeshcentralLogoIconProps) {
   return (

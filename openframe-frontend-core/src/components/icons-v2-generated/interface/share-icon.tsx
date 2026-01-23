@@ -8,7 +8,7 @@ export interface ShareIconProps
 export function ShareIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ShareIconProps) {
   return (

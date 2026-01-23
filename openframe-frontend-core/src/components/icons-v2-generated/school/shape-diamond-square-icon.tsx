@@ -8,7 +8,7 @@ export interface ShapeDiamondSquareIconProps
 export function ShapeDiamondSquareIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ShapeDiamondSquareIconProps) {
   return (

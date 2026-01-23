@@ -8,7 +8,7 @@ export interface GridAltIconProps
 export function GridAltIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: GridAltIconProps) {
   return (

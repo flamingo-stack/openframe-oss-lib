@@ -8,7 +8,7 @@ export interface AlignBottomIconProps
 export function AlignBottomIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AlignBottomIconProps) {
   return (

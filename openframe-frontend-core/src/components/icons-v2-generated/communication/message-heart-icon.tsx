@@ -8,7 +8,7 @@ export interface MessageHeartIconProps
 export function MessageHeartIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MessageHeartIconProps) {
   return (

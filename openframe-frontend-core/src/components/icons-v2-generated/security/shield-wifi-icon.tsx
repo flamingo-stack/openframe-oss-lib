@@ -8,7 +8,7 @@ export interface ShieldWifiIconProps
 export function ShieldWifiIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ShieldWifiIconProps) {
   return (

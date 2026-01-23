@@ -8,7 +8,7 @@ export interface PoundIconProps
 export function PoundIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PoundIconProps) {
   return (

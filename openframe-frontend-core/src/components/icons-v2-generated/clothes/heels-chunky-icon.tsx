@@ -8,7 +8,7 @@ export interface HeelsChunkyIconProps
 export function HeelsChunkyIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HeelsChunkyIconProps) {
   return (

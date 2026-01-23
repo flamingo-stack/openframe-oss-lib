@@ -8,7 +8,7 @@ export interface Refresh02HrIconProps
 export function Refresh02HrIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Refresh02HrIconProps) {
   return (

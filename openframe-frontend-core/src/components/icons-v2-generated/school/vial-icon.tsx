@@ -8,7 +8,7 @@ export interface VialIconProps
 export function VialIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: VialIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface MoneyBillWavyIconProps
 export function MoneyBillWavyIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MoneyBillWavyIconProps) {
   return (

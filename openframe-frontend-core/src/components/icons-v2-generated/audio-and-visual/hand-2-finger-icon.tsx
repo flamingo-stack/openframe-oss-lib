@@ -8,7 +8,7 @@ export interface Hand2FingerIconProps
 export function Hand2FingerIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Hand2FingerIconProps) {
   return (

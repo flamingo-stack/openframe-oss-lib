@@ -8,7 +8,7 @@ export interface MirrorIconProps
 export function MirrorIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MirrorIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface InfoIconProps
 export function InfoIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: InfoIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface RewardBadgeCheckIconProps
 export function RewardBadgeCheckIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: RewardBadgeCheckIconProps) {
   return (

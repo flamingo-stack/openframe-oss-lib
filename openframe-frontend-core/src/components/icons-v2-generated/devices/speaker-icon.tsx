@@ -8,7 +8,7 @@ export interface SpeakerIconProps
 export function SpeakerIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SpeakerIconProps) {
   return (

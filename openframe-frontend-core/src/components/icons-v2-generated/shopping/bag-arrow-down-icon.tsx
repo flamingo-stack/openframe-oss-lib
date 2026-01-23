@@ -8,7 +8,7 @@ export interface BagArrowDownIconProps
 export function BagArrowDownIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BagArrowDownIconProps) {
   return (

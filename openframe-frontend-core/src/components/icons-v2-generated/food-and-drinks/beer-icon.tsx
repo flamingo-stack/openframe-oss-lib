@@ -8,7 +8,7 @@ export interface BeerIconProps
 export function BeerIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BeerIconProps) {
   return (

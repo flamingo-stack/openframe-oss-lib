@@ -8,7 +8,7 @@ export interface ClipboardExclamationIconProps
 export function ClipboardExclamationIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ClipboardExclamationIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface SlidersSquareHrIconProps
 export function SlidersSquareHrIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SlidersSquareHrIconProps) {
   return (

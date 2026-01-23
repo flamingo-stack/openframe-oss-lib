@@ -8,7 +8,7 @@ export interface EarIconProps
 export function EarIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: EarIconProps) {
   return (

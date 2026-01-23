@@ -8,7 +8,7 @@ export interface GarlicIconProps
 export function GarlicIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: GarlicIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface BracketSquareEllipsisHrIconProps
 export function BracketSquareEllipsisHrIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BracketSquareEllipsisHrIconProps) {
   return (

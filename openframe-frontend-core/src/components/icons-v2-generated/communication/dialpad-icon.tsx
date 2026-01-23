@@ -8,7 +8,7 @@ export interface DialpadIconProps
 export function DialpadIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: DialpadIconProps) {
   return (

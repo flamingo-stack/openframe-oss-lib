@@ -8,7 +8,7 @@ export interface FlashOffIconProps
 export function FlashOffIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FlashOffIconProps) {
   return (

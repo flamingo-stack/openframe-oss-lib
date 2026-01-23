@@ -8,7 +8,7 @@ export interface CarBattery01IconProps
 export function CarBattery01Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CarBattery01IconProps) {
   return (

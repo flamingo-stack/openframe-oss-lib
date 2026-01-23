@@ -8,7 +8,7 @@ export interface CalendarHeartIconProps
 export function CalendarHeartIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CalendarHeartIconProps) {
   return (

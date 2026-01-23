@@ -8,7 +8,7 @@ export interface GloveSmittenIconProps
 export function GloveSmittenIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: GloveSmittenIconProps) {
   return (

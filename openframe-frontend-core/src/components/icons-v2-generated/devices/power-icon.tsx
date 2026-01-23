@@ -8,7 +8,7 @@ export interface PowerIconProps
 export function PowerIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PowerIconProps) {
   return (

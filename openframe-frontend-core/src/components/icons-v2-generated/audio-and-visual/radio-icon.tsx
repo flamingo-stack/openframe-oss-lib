@@ -8,7 +8,7 @@ export interface RadioIconProps
 export function RadioIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: RadioIconProps) {
   return (

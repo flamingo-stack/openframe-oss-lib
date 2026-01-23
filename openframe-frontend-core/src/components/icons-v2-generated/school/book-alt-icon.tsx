@@ -8,7 +8,7 @@ export interface BookAltIconProps
 export function BookAltIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BookAltIconProps) {
   return (

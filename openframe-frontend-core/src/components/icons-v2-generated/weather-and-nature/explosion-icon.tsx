@@ -8,7 +8,7 @@ export interface ExplosionIconProps
 export function ExplosionIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ExplosionIconProps) {
   return (

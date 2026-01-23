@@ -8,7 +8,7 @@ export interface HamburgerVeggieIconProps
 export function HamburgerVeggieIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HamburgerVeggieIconProps) {
   return (

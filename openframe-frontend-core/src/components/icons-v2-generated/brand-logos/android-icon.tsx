@@ -8,7 +8,7 @@ export interface AndroidIconProps
 export function AndroidIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AndroidIconProps) {
   return (

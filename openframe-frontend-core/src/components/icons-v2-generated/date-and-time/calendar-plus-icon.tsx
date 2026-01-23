@@ -8,7 +8,7 @@ export interface CalendarPlusIconProps
 export function CalendarPlusIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CalendarPlusIconProps) {
   return (

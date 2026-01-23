@@ -8,7 +8,7 @@ export interface AvatarCircleIconProps
 export function AvatarCircleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AvatarCircleIconProps) {
   return (

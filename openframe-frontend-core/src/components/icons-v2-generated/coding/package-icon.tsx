@@ -8,7 +8,7 @@ export interface PackageIconProps
 export function PackageIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PackageIconProps) {
   return (

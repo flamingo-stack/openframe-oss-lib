@@ -8,7 +8,7 @@ export interface AlertTriangleIconProps
 export function AlertTriangleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AlertTriangleIconProps) {
   return (

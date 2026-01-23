@@ -8,7 +8,7 @@ export interface HeelsHighIconProps
 export function HeelsHighIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HeelsHighIconProps) {
   return (

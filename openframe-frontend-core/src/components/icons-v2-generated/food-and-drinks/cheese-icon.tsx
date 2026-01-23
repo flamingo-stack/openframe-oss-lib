@@ -8,7 +8,7 @@ export interface CheeseIconProps
 export function CheeseIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CheeseIconProps) {
   return (

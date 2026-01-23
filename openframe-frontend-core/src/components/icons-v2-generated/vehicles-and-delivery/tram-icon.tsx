@@ -8,7 +8,7 @@ export interface TramIconProps
 export function TramIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TramIconProps) {
   return (

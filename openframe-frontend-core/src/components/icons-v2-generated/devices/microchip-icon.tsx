@@ -8,7 +8,7 @@ export interface MicrochipIconProps
 export function MicrochipIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MicrochipIconProps) {
   return (

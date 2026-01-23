@@ -8,7 +8,7 @@ export interface LemonIconProps
 export function LemonIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: LemonIconProps) {
   return (

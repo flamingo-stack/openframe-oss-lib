@@ -8,7 +8,7 @@ export interface CodeLaptopIconProps
 export function CodeLaptopIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CodeLaptopIconProps) {
   return (

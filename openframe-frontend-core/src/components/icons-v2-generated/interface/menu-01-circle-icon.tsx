@@ -8,7 +8,7 @@ export interface Menu01CircleIconProps
 export function Menu01CircleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Menu01CircleIconProps) {
   return (

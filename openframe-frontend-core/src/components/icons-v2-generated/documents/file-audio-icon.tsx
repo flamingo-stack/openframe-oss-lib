@@ -8,7 +8,7 @@ export interface FileAudioIconProps
 export function FileAudioIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FileAudioIconProps) {
   return (

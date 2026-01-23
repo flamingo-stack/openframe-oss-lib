@@ -8,7 +8,7 @@ export interface FilmHrIconProps
 export function FilmHrIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FilmHrIconProps) {
   return (

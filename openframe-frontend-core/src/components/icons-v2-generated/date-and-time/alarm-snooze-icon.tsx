@@ -8,7 +8,7 @@ export interface AlarmSnoozeIconProps
 export function AlarmSnoozeIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AlarmSnoozeIconProps) {
   return (

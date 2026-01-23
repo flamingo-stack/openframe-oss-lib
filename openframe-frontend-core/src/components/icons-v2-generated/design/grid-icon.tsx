@@ -8,7 +8,7 @@ export interface GridIconProps
 export function GridIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: GridIconProps) {
   return (

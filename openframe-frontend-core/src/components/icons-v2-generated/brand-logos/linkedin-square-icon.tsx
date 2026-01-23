@@ -8,7 +8,7 @@ export interface LinkedinSquareIconProps
 export function LinkedinSquareIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: LinkedinSquareIconProps) {
   return (

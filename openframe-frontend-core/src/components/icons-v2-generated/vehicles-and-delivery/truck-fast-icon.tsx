@@ -8,7 +8,7 @@ export interface TruckFastIconProps
 export function TruckFastIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TruckFastIconProps) {
   return (

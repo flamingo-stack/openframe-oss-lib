@@ -8,7 +8,7 @@ export interface AlphabetOCircleIconProps
 export function AlphabetOCircleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AlphabetOCircleIconProps) {
   return (

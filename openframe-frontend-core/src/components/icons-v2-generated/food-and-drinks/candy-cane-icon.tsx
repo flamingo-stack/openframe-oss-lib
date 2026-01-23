@@ -8,7 +8,7 @@ export interface CandyCaneIconProps
 export function CandyCaneIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CandyCaneIconProps) {
   return (

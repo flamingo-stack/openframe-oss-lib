@@ -8,7 +8,7 @@ export interface Sun02IconProps
 export function Sun02Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Sun02IconProps) {
   return (

@@ -8,7 +8,7 @@ export interface PianoKeyIconProps
 export function PianoKeyIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PianoKeyIconProps) {
   return (

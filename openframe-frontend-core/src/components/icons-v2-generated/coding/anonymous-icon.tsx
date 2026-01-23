@@ -8,7 +8,7 @@ export interface AnonymousIconProps
 export function AnonymousIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AnonymousIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface GridDotsBlankIconProps
 export function GridDotsBlankIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: GridDotsBlankIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface AlarmPlusIconProps
 export function AlarmPlusIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AlarmPlusIconProps) {
   return (

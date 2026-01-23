@@ -8,7 +8,7 @@ export interface CarouselVrIconProps
 export function CarouselVrIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CarouselVrIconProps) {
   return (

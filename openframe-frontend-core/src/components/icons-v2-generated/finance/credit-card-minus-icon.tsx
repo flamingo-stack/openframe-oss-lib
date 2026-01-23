@@ -8,7 +8,7 @@ export interface CreditCardMinusIconProps
 export function CreditCardMinusIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CreditCardMinusIconProps) {
   return (

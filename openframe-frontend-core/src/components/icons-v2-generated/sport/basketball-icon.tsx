@@ -8,7 +8,7 @@ export interface BasketballIconProps
 export function BasketballIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BasketballIconProps) {
   return (

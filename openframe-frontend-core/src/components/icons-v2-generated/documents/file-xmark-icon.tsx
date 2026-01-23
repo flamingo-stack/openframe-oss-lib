@@ -8,7 +8,7 @@ export interface FileXmarkIconProps
 export function FileXmarkIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FileXmarkIconProps) {
   return (

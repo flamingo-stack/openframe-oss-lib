@@ -8,7 +8,7 @@ export interface TrafficSignalIconProps
 export function TrafficSignalIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TrafficSignalIconProps) {
   return (

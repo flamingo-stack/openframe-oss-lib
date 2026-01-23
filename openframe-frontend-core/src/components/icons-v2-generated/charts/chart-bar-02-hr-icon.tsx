@@ -8,7 +8,7 @@ export interface ChartBar02HrIconProps
 export function ChartBar02HrIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ChartBar02HrIconProps) {
   return (

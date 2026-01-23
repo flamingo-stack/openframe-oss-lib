@@ -8,7 +8,7 @@ export interface DnaIconProps
 export function DnaIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: DnaIconProps) {
   return (

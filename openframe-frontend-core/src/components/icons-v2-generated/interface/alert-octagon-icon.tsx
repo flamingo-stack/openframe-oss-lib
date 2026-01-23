@@ -8,7 +8,7 @@ export interface AlertOctagonIconProps
 export function AlertOctagonIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AlertOctagonIconProps) {
   return (

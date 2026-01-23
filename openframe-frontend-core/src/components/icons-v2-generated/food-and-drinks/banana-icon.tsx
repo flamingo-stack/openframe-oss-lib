@@ -8,7 +8,7 @@ export interface BananaIconProps
 export function BananaIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BananaIconProps) {
   return (

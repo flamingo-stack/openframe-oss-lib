@@ -8,7 +8,7 @@ export interface VrGlassesIconProps
 export function VrGlassesIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: VrGlassesIconProps) {
   return (

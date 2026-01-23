@@ -8,7 +8,7 @@ export interface Download01IconProps
 export function Download01Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Download01IconProps) {
   return (

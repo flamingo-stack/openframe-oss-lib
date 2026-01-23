@@ -8,7 +8,7 @@ export interface TrolleyIconProps
 export function TrolleyIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TrolleyIconProps) {
   return (

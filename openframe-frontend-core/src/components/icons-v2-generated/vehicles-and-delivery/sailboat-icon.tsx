@@ -8,7 +8,7 @@ export interface SailboatIconProps
 export function SailboatIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SailboatIconProps) {
   return (

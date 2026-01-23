@@ -8,7 +8,7 @@ export interface TacticalRmmLogoIconProps
 export function TacticalRmmLogoIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TacticalRmmLogoIconProps) {
   return (

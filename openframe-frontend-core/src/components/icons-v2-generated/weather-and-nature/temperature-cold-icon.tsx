@@ -8,7 +8,7 @@ export interface TemperatureColdIconProps
 export function TemperatureColdIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TemperatureColdIconProps) {
   return (

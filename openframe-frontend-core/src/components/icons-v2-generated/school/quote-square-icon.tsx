@@ -8,7 +8,7 @@ export interface QuoteSquareIconProps
 export function QuoteSquareIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: QuoteSquareIconProps) {
   return (

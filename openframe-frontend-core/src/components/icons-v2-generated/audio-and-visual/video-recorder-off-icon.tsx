@@ -8,7 +8,7 @@ export interface VideoRecorderOffIconProps
 export function VideoRecorderOffIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: VideoRecorderOffIconProps) {
   return (

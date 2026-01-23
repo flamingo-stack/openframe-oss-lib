@@ -8,7 +8,7 @@ export interface TrendUpIconProps
 export function TrendUpIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TrendUpIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface LightningFastIconProps
 export function LightningFastIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: LightningFastIconProps) {
   return (

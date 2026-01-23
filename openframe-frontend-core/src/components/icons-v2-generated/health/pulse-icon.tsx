@@ -8,7 +8,7 @@ export interface PulseIconProps
 export function PulseIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PulseIconProps) {
   return (

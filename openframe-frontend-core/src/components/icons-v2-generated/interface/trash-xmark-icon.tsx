@@ -8,7 +8,7 @@ export interface TrashXmarkIconProps
 export function TrashXmarkIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TrashXmarkIconProps) {
   return (

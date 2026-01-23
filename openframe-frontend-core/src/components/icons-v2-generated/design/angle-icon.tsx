@@ -8,7 +8,7 @@ export interface AngleIconProps
 export function AngleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AngleIconProps) {
   return (

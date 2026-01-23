@@ -8,7 +8,7 @@ export interface Parcel01LockIconProps
 export function Parcel01LockIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Parcel01LockIconProps) {
   return (

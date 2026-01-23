@@ -8,7 +8,7 @@ export interface CarIconProps
 export function CarIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CarIconProps) {
   return (

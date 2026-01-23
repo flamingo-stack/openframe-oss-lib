@@ -8,7 +8,7 @@ export interface DumbellIconProps
 export function DumbellIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: DumbellIconProps) {
   return (

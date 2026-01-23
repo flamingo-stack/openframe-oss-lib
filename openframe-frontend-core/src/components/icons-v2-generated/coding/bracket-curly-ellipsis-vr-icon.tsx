@@ -8,7 +8,7 @@ export interface BracketCurlyEllipsisVrIconProps
 export function BracketCurlyEllipsisVrIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BracketCurlyEllipsisVrIconProps) {
   return (

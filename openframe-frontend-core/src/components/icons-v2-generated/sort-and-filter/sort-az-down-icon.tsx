@@ -8,7 +8,7 @@ export interface SortAzDownIconProps
 export function SortAzDownIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SortAzDownIconProps) {
   return (

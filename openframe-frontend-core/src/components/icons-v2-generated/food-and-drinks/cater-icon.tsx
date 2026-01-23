@@ -8,7 +8,7 @@ export interface CaterIconProps
 export function CaterIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CaterIconProps) {
   return (

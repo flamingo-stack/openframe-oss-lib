@@ -8,7 +8,7 @@ export interface MagnetIconProps
 export function MagnetIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MagnetIconProps) {
   return (

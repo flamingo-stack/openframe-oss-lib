@@ -8,7 +8,7 @@ export interface RvIconProps
 export function RvIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: RvIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface RouteIconProps
 export function RouteIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: RouteIconProps) {
   return (

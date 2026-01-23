@@ -8,7 +8,7 @@ export interface Puzzle01IconProps
 export function Puzzle01Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Puzzle01IconProps) {
   return (

@@ -8,7 +8,7 @@ export interface MessengerIconProps
 export function MessengerIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MessengerIconProps) {
   return (

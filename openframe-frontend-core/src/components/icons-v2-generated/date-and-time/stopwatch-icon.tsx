@@ -8,7 +8,7 @@ export interface StopwatchIconProps
 export function StopwatchIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: StopwatchIconProps) {
   return (

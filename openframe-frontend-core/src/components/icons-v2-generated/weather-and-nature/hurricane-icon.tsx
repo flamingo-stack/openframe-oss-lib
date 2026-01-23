@@ -8,7 +8,7 @@ export interface HurricaneIconProps
 export function HurricaneIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HurricaneIconProps) {
   return (

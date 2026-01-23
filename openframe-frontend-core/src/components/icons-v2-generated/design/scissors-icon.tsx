@@ -8,7 +8,7 @@ export interface ScissorsIconProps
 export function ScissorsIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ScissorsIconProps) {
   return (

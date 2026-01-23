@@ -8,7 +8,7 @@ export interface ListCheckIconProps
 export function ListCheckIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ListCheckIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface UserSearchIconProps
 export function UserSearchIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: UserSearchIconProps) {
   return (

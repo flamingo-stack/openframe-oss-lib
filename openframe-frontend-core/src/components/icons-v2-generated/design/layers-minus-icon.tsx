@@ -8,7 +8,7 @@ export interface LayersMinusIconProps
 export function LayersMinusIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: LayersMinusIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface HelmetIconProps
 export function HelmetIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HelmetIconProps) {
   return (

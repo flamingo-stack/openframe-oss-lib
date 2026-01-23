@@ -8,7 +8,7 @@ export interface EmailShieldIconProps
 export function EmailShieldIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: EmailShieldIconProps) {
   return (

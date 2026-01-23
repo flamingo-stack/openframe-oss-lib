@@ -8,7 +8,7 @@ export interface BagelIconProps
 export function BagelIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BagelIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface ClipboardCheckIconProps
 export function ClipboardCheckIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ClipboardCheckIconProps) {
   return (

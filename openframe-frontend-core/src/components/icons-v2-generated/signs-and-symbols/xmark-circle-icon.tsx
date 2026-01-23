@@ -8,7 +8,7 @@ export interface XmarkCircleIconProps
 export function XmarkCircleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: XmarkCircleIconProps) {
   return (

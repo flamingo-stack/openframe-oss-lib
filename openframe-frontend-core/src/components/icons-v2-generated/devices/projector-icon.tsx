@@ -8,7 +8,7 @@ export interface ProjectorIconProps
 export function ProjectorIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ProjectorIconProps) {
   return (

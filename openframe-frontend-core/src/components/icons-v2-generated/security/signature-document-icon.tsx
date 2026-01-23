@@ -8,7 +8,7 @@ export interface SignatureDocumentIconProps
 export function SignatureDocumentIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SignatureDocumentIconProps) {
   return (

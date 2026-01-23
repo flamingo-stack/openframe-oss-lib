@@ -8,7 +8,7 @@ export interface CloudWeatherBoltIconProps
 export function CloudWeatherBoltIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CloudWeatherBoltIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface FloodIconProps
 export function FloodIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FloodIconProps) {
   return (

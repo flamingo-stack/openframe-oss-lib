@@ -8,7 +8,7 @@ export interface HouseIconProps
 export function HouseIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HouseIconProps) {
   return (

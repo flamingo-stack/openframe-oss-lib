@@ -8,7 +8,7 @@ export interface SwimmingIconProps
 export function SwimmingIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SwimmingIconProps) {
   return (

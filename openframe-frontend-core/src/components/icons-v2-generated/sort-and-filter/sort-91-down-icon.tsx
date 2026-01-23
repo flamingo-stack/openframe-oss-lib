@@ -8,7 +8,7 @@ export interface Sort91DownIconProps
 export function Sort91DownIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Sort91DownIconProps) {
   return (

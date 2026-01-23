@@ -8,7 +8,7 @@ export interface FenceIconProps
 export function FenceIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FenceIconProps) {
   return (

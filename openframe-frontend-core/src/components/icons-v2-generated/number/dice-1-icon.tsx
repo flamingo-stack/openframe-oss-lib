@@ -8,7 +8,7 @@ export interface Dice1IconProps
 export function Dice1Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Dice1IconProps) {
   return (

@@ -8,7 +8,7 @@ export interface CameraRetro01IconProps
 export function CameraRetro01Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CameraRetro01IconProps) {
   return (

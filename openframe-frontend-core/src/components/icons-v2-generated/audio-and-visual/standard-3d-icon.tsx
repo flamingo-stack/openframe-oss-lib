@@ -8,7 +8,7 @@ export interface Standard3dIconProps
 export function Standard3dIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Standard3dIconProps) {
   return (

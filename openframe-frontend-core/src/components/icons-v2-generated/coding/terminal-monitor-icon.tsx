@@ -8,7 +8,7 @@ export interface TerminalMonitorIconProps
 export function TerminalMonitorIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TerminalMonitorIconProps) {
   return (

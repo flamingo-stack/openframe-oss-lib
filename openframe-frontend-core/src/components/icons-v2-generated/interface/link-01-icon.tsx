@@ -8,7 +8,7 @@ export interface Link01IconProps
 export function Link01Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Link01IconProps) {
   return (

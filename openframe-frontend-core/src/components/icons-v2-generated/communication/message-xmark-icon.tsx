@@ -8,7 +8,7 @@ export interface MessageXmarkIconProps
 export function MessageXmarkIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MessageXmarkIconProps) {
   return (

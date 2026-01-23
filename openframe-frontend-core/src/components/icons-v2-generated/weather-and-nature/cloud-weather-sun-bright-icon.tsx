@@ -8,7 +8,7 @@ export interface CloudWeatherSunBrightIconProps
 export function CloudWeatherSunBrightIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CloudWeatherSunBrightIconProps) {
   return (

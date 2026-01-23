@@ -8,7 +8,7 @@ export interface PumpElectricIconProps
 export function PumpElectricIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PumpElectricIconProps) {
   return (

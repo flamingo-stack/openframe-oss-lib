@@ -8,7 +8,7 @@ export interface StopCircleIconProps
 export function StopCircleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: StopCircleIconProps) {
   return (

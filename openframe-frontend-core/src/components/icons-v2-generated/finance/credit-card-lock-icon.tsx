@@ -8,7 +8,7 @@ export interface CreditCardLockIconProps
 export function CreditCardLockIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CreditCardLockIconProps) {
   return (

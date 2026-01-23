@@ -8,7 +8,7 @@ export interface FootballIconProps
 export function FootballIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FootballIconProps) {
   return (

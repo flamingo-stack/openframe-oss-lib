@@ -8,7 +8,7 @@ export interface ClipboardMinusIconProps
 export function ClipboardMinusIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ClipboardMinusIconProps) {
   return (

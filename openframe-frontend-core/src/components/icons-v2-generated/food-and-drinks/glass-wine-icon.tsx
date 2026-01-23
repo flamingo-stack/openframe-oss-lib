@@ -8,7 +8,7 @@ export interface GlassWineIconProps
 export function GlassWineIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: GlassWineIconProps) {
   return (

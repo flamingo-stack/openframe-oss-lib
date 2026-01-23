@@ -8,7 +8,7 @@ export interface SimCardIconProps
 export function SimCardIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SimCardIconProps) {
   return (

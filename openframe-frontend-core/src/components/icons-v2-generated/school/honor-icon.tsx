@@ -8,7 +8,7 @@ export interface HonorIconProps
 export function HonorIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HonorIconProps) {
   return (

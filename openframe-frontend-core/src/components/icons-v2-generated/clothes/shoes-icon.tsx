@@ -8,7 +8,7 @@ export interface ShoesIconProps
 export function ShoesIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ShoesIconProps) {
   return (

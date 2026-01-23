@@ -8,7 +8,7 @@ export interface BracketSquarePlusIconProps
 export function BracketSquarePlusIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BracketSquarePlusIconProps) {
   return (

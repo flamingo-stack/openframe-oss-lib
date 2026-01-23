@@ -8,7 +8,7 @@ export interface PanHotIconProps
 export function PanHotIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PanHotIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface SyringeIconProps
 export function SyringeIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SyringeIconProps) {
   return (

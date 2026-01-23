@@ -8,7 +8,7 @@ export interface HomeCircleIconProps
 export function HomeCircleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HomeCircleIconProps) {
   return (

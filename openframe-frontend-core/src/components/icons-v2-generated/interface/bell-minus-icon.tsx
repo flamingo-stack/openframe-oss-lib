@@ -8,7 +8,7 @@ export interface BellMinusIconProps
 export function BellMinusIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BellMinusIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface MusicNote01IconProps
 export function MusicNote01Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MusicNote01IconProps) {
   return (

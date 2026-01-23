@@ -8,7 +8,7 @@ export interface ColorPaletteIconProps
 export function ColorPaletteIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ColorPaletteIconProps) {
   return (

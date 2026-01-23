@@ -8,7 +8,7 @@ export interface PenEditIconProps
 export function PenEditIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PenEditIconProps) {
   return (

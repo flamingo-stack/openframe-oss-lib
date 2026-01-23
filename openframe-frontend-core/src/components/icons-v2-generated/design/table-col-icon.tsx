@@ -8,7 +8,7 @@ export interface TableColIconProps
 export function TableColIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TableColIconProps) {
   return (

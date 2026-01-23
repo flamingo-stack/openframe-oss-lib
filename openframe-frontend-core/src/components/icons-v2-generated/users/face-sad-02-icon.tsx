@@ -8,7 +8,7 @@ export interface FaceSad02IconProps
 export function FaceSad02Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FaceSad02IconProps) {
   return (

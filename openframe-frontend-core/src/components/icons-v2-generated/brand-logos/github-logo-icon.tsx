@@ -8,7 +8,7 @@ export interface GithubLogoIconProps
 export function GithubLogoIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: GithubLogoIconProps) {
   return (

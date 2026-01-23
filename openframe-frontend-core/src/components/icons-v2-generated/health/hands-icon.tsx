@@ -8,7 +8,7 @@ export interface HandsIconProps
 export function HandsIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HandsIconProps) {
   return (

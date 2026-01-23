@@ -8,7 +8,7 @@ export interface LocationIconProps
 export function LocationIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: LocationIconProps) {
   return (

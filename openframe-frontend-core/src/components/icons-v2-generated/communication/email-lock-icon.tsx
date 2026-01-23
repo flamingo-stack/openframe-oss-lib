@@ -8,7 +8,7 @@ export interface EmailLockIconProps
 export function EmailLockIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: EmailLockIconProps) {
   return (

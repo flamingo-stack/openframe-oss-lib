@@ -1,8 +1,8 @@
-import React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
-import Link from "next/link"
 import { ExternalLink } from "lucide-react"
+import Link from "next/link"
+import React from "react"
 
 import { cn } from "../../utils/cn"
 
@@ -66,9 +66,9 @@ const buttonVariants = cva(
         // Large size for prominent CTAs (ButtonFull lg) - adjusted for better text/icon fit
         lg: "min-h-[48px] px-2 sm:px-8 py-3 text-base",
         // Icon-only buttons - fixed square size on all breakpoints
-        icon: "!w-10 sm:!w-10 h-10 p-0",
+        icon: "!w-10 !h-10 sm:!w-12 sm:!h-12 p-0 shrink-0",
         // Icon-only large buttons (like hamburger menu) - fixed square size on all breakpoints
-        iconLg: "!w-12 sm:!w-12 h-12 p-0",
+        iconLg: "!w-12 !h-12 p-0 shrink-0",
         // Touch-friendly mobile sizing
         touch: "min-h-[44px] px-6 py-3 text-base",
         // Search button specific sizing

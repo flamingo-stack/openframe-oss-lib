@@ -8,7 +8,7 @@ export interface Ellipsis02IconProps
 export function Ellipsis02Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Ellipsis02IconProps) {
   return (

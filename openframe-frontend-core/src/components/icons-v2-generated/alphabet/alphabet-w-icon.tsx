@@ -8,7 +8,7 @@ export interface AlphabetWIconProps
 export function AlphabetWIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AlphabetWIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface CallHangupIconProps
 export function CallHangupIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CallHangupIconProps) {
   return (

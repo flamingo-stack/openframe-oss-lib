@@ -8,7 +8,7 @@ export interface KeyholeCircleIconProps
 export function KeyholeCircleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: KeyholeCircleIconProps) {
   return (

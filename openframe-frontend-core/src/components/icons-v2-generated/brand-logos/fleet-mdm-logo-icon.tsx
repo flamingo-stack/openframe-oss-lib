@@ -8,7 +8,7 @@ export interface FleetMdmLogoIconProps
 export function FleetMdmLogoIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FleetMdmLogoIconProps) {
   return (

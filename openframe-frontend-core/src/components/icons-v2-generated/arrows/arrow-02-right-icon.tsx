@@ -8,7 +8,7 @@ export interface Arrow02RightIconProps
 export function Arrow02RightIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Arrow02RightIconProps) {
   return (

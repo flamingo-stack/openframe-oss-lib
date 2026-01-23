@@ -8,7 +8,7 @@ export interface MugHotIconProps
 export function MugHotIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MugHotIconProps) {
   return (

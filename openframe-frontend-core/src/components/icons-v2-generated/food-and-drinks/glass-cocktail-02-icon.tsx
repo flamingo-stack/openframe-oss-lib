@@ -8,7 +8,7 @@ export interface GlassCocktail02IconProps
 export function GlassCocktail02Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: GlassCocktail02IconProps) {
   return (

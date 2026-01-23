@@ -8,7 +8,7 @@ export interface BedBunkIconProps
 export function BedBunkIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BedBunkIconProps) {
   return (

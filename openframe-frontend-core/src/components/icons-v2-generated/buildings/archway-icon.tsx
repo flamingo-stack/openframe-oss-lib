@@ -8,7 +8,7 @@ export interface ArchwayIconProps
 export function ArchwayIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ArchwayIconProps) {
   return (

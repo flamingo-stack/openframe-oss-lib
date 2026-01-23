@@ -8,7 +8,7 @@ export interface StreetViewIconProps
 export function StreetViewIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: StreetViewIconProps) {
   return (

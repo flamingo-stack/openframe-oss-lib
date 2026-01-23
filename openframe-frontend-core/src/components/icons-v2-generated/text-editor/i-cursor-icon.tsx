@@ -8,7 +8,7 @@ export interface ICursorIconProps
 export function ICursorIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ICursorIconProps) {
   return (

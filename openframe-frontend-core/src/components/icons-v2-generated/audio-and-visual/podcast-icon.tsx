@@ -8,7 +8,7 @@ export interface PodcastIconProps
 export function PodcastIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PodcastIconProps) {
   return (

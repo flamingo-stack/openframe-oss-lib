@@ -8,7 +8,7 @@ export interface QuestionAltIconProps
 export function QuestionAltIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: QuestionAltIconProps) {
   return (

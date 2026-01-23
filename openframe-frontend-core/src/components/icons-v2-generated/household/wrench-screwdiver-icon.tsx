@@ -8,7 +8,7 @@ export interface WrenchScrewdiverIconProps
 export function WrenchScrewdiverIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: WrenchScrewdiverIconProps) {
   return (

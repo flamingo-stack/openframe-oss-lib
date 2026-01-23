@@ -8,7 +8,7 @@ export interface MoonIconProps
 export function MoonIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MoonIconProps) {
   return (

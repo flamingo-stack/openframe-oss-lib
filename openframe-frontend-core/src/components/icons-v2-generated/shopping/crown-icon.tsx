@@ -8,7 +8,7 @@ export interface CrownIconProps
 export function CrownIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CrownIconProps) {
   return (

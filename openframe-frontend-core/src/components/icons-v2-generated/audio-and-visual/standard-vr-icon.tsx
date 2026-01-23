@@ -8,7 +8,7 @@ export interface StandardVrIconProps
 export function StandardVrIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: StandardVrIconProps) {
   return (

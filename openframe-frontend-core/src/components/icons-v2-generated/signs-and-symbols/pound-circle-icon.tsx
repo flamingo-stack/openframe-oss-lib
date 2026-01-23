@@ -8,7 +8,7 @@ export interface PoundCircleIconProps
 export function PoundCircleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PoundCircleIconProps) {
   return (

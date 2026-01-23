@@ -8,7 +8,7 @@ export interface ShieldExclamationIconProps
 export function ShieldExclamationIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ShieldExclamationIconProps) {
   return (

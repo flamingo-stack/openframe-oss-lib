@@ -8,7 +8,7 @@ export interface AgeLimit16IconProps
 export function AgeLimit16Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AgeLimit16IconProps) {
   return (

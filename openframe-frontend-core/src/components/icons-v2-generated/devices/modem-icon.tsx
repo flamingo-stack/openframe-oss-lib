@@ -8,7 +8,7 @@ export interface ModemIconProps
 export function ModemIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ModemIconProps) {
   return (

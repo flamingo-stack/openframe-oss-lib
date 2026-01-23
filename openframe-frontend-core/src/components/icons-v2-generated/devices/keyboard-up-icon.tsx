@@ -8,7 +8,7 @@ export interface KeyboardUpIconProps
 export function KeyboardUpIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: KeyboardUpIconProps) {
   return (

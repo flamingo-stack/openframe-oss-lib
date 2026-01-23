@@ -8,7 +8,7 @@ export interface Flag02IconProps
 export function Flag02Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Flag02IconProps) {
   return (

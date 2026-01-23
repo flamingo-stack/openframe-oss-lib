@@ -8,7 +8,7 @@ export interface FaceSurpriseIconProps
 export function FaceSurpriseIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FaceSurpriseIconProps) {
   return (

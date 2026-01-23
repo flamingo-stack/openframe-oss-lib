@@ -8,7 +8,7 @@ export interface ZoomOutIconProps
 export function ZoomOutIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ZoomOutIconProps) {
   return (

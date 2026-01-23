@@ -8,7 +8,7 @@ export interface DrawingCompassIconProps
 export function DrawingCompassIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: DrawingCompassIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface ClapperboardPlayIconProps
 export function ClapperboardPlayIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ClapperboardPlayIconProps) {
   return (

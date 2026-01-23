@@ -8,7 +8,7 @@ export interface PearIconProps
 export function PearIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PearIconProps) {
   return (

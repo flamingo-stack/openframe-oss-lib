@@ -8,7 +8,7 @@ export interface BluetoothOffIconProps
 export function BluetoothOffIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BluetoothOffIconProps) {
   return (

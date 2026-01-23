@@ -8,7 +8,7 @@ export interface FramerIconProps
 export function FramerIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FramerIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface Sparkle01IconProps
 export function Sparkle01Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Sparkle01IconProps) {
   return (

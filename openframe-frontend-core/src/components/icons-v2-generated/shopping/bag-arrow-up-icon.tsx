@@ -8,7 +8,7 @@ export interface BagArrowUpIconProps
 export function BagArrowUpIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BagArrowUpIconProps) {
   return (

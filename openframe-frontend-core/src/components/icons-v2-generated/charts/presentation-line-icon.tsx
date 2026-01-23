@@ -8,7 +8,7 @@ export interface PresentationLineIconProps
 export function PresentationLineIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PresentationLineIconProps) {
   return (

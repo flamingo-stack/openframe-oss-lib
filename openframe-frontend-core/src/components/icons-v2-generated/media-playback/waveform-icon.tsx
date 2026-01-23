@@ -8,7 +8,7 @@ export interface WaveformIconProps
 export function WaveformIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: WaveformIconProps) {
   return (

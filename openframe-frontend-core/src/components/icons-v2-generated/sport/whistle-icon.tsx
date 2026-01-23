@@ -8,7 +8,7 @@ export interface WhistleIconProps
 export function WhistleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: WhistleIconProps) {
   return (

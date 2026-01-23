@@ -8,7 +8,7 @@ export interface BowlingIconProps
 export function BowlingIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BowlingIconProps) {
   return (

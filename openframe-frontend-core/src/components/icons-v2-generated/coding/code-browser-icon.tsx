@@ -8,7 +8,7 @@ export interface CodeBrowserIconProps
 export function CodeBrowserIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CodeBrowserIconProps) {
   return (

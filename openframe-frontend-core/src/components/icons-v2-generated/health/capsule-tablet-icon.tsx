@@ -8,7 +8,7 @@ export interface CapsuleTabletIconProps
 export function CapsuleTabletIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CapsuleTabletIconProps) {
   return (

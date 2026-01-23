@@ -8,7 +8,7 @@ export interface PosMachineIconProps
 export function PosMachineIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PosMachineIconProps) {
   return (

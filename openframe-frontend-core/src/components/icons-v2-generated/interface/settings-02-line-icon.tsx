@@ -8,7 +8,7 @@ export interface Settings02LineIconProps
 export function Settings02LineIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Settings02LineIconProps) {
   return (

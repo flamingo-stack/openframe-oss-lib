@@ -8,7 +8,7 @@ export interface ShapeOctagonIconProps
 export function ShapeOctagonIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ShapeOctagonIconProps) {
   return (

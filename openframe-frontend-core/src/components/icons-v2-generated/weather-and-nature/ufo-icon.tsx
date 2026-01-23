@@ -8,7 +8,7 @@ export interface UfoIconProps
 export function UfoIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: UfoIconProps) {
   return (

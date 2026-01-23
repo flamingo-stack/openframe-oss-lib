@@ -8,7 +8,7 @@ export interface ArrowCornerBlIconProps
 export function ArrowCornerBlIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ArrowCornerBlIconProps) {
   return (

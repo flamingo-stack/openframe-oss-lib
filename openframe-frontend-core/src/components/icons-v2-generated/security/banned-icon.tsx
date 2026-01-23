@@ -8,7 +8,7 @@ export interface BannedIconProps
 export function BannedIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BannedIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface JarIconProps
 export function JarIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: JarIconProps) {
   return (

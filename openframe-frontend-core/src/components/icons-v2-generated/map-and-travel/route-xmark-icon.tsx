@@ -8,7 +8,7 @@ export interface RouteXmarkIconProps
 export function RouteXmarkIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: RouteXmarkIconProps) {
   return (

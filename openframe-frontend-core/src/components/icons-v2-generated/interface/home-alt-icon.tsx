@@ -8,7 +8,7 @@ export interface HomeAltIconProps
 export function HomeAltIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HomeAltIconProps) {
   return (

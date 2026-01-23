@@ -8,7 +8,7 @@ export interface RetweetIconProps
 export function RetweetIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: RetweetIconProps) {
   return (

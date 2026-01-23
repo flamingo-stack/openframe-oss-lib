@@ -8,7 +8,7 @@ export interface SocksIconProps
 export function SocksIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SocksIconProps) {
   return (

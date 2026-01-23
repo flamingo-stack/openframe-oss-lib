@@ -8,7 +8,7 @@ export interface AxeIconProps
 export function AxeIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AxeIconProps) {
   return (

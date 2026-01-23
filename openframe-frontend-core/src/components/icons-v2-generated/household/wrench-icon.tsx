@@ -8,7 +8,7 @@ export interface WrenchIconProps
 export function WrenchIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: WrenchIconProps) {
   return (

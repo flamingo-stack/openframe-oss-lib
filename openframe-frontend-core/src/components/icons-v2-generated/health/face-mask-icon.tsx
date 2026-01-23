@@ -8,7 +8,7 @@ export interface FaceMaskIconProps
 export function FaceMaskIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FaceMaskIconProps) {
   return (

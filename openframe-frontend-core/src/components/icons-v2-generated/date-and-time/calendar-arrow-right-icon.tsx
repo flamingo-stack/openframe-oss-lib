@@ -8,7 +8,7 @@ export interface CalendarArrowRightIconProps
 export function CalendarArrowRightIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CalendarArrowRightIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface SwitchHrIconProps
 export function SwitchHrIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SwitchHrIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface TransferAltSquareIconProps
 export function TransferAltSquareIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TransferAltSquareIconProps) {
   return (

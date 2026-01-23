@@ -8,7 +8,7 @@ export interface CodingCommitIconProps
 export function CodingCommitIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CodingCommitIconProps) {
   return (

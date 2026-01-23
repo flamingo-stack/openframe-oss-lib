@@ -8,7 +8,7 @@ export interface CarouselHrIconProps
 export function CarouselHrIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CarouselHrIconProps) {
   return (

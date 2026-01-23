@@ -8,7 +8,7 @@ export interface BluetoothBannedIconProps
 export function BluetoothBannedIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BluetoothBannedIconProps) {
   return (

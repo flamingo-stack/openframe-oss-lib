@@ -8,7 +8,7 @@ export interface GridDotsOuterIconProps
 export function GridDotsOuterIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: GridDotsOuterIconProps) {
   return (

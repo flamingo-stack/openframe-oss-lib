@@ -8,7 +8,7 @@ export interface AsteriskIconProps
 export function AsteriskIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AsteriskIconProps) {
   return (

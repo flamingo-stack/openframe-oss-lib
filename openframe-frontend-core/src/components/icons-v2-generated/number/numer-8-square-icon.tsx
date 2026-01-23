@@ -8,7 +8,7 @@ export interface Numer8SquareIconProps
 export function Numer8SquareIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Numer8SquareIconProps) {
   return (

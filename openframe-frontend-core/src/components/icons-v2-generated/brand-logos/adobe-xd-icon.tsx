@@ -8,7 +8,7 @@ export interface AdobeXdIconProps
 export function AdobeXdIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AdobeXdIconProps) {
   return (

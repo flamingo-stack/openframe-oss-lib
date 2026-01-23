@@ -8,7 +8,7 @@ export interface LockAltIconProps
 export function LockAltIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: LockAltIconProps) {
   return (

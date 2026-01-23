@@ -8,7 +8,7 @@ export interface MobilePhoneBannedIconProps
 export function MobilePhoneBannedIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MobilePhoneBannedIconProps) {
   return (

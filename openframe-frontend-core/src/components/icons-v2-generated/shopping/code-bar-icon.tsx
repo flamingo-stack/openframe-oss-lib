@@ -8,7 +8,7 @@ export interface CodeBarIconProps
 export function CodeBarIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CodeBarIconProps) {
   return (

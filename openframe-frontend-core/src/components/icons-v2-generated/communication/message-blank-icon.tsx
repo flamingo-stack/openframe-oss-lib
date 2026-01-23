@@ -8,7 +8,7 @@ export interface MessageBlankIconProps
 export function MessageBlankIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MessageBlankIconProps) {
   return (

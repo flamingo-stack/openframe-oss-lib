@@ -8,7 +8,7 @@ export interface BabyMilkIconProps
 export function BabyMilkIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BabyMilkIconProps) {
   return (

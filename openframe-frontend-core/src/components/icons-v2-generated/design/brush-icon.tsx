@@ -8,7 +8,7 @@ export interface BrushIconProps
 export function BrushIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BrushIconProps) {
   return (

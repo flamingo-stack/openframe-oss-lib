@@ -8,7 +8,7 @@ export interface CallPlusIconProps
 export function CallPlusIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CallPlusIconProps) {
   return (

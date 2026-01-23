@@ -8,7 +8,7 @@ export interface AtmMoneyIconProps
 export function AtmMoneyIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AtmMoneyIconProps) {
   return (

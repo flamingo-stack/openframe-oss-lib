@@ -8,7 +8,7 @@ export interface Megaphone02IconProps
 export function Megaphone02Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Megaphone02IconProps) {
   return (
