@@ -1,3 +1,5 @@
+'use client'
+
 import { useCallback, useRef, useEffect } from 'react'
 import {
   type ChunkData,

@@ -1,3 +1,5 @@
+'use client'
+
 // Chat components exports
 export * from './approval-request-message'
 export * from './chat-container'

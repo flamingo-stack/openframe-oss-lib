@@ -1,3 +1,5 @@
+'use client'
+
 /**
  * Hook for processing real-time NATS chunks
  * Provides a consistent interface for handling streaming messages
