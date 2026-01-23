@@ -1,7 +1,9 @@
 'use client'
 
-import { Arrow01DownIcon, Arrow01UpIcon, SwitchVrIcon } from '@/components/icons-v2-generated'
-import { useDesktop, useTablet } from '@/hooks'
+import { Arrow01DownIcon } from '../../icons-v2-generated/arrows/arrow-01-down-icon'
+import { Arrow01UpIcon } from '../../icons-v2-generated/arrows/arrow-01-up-icon'
+import { SwitchVrIcon } from '../../icons-v2-generated/arrows/switch-vr-icon'
+import { useDesktop, useTablet } from '../../../hooks/ui/use-media-query'
 import { cn } from '../../../utils/cn'
 import { FiltersDropdown, type FilterSection } from '../../features'
 import { FilterIcon } from '../../icons'

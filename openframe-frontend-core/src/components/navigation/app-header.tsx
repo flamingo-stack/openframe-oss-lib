@@ -1,6 +1,6 @@
 'use client'
 
-import { useMobile } from '@/hooks'
+import { useMobile } from '../../hooks/ui/use-media-query'
 import { Bell } from 'lucide-react'
 import { cn } from '../../utils/cn'
 import { LogOutIcon, OpenFrameLogo, OpenFrameText, UserIcon } from '../icons'

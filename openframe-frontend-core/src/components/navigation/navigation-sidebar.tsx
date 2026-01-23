@@ -1,6 +1,6 @@
 "use client"
 
-import { useTablet } from '@/hooks'
+import { useTablet } from '../../hooks/ui/use-media-query'
 import { cloneElement, useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocalStorage } from '../../hooks/ui/use-local-storage'
 import { NavigationSidebarConfig, NavigationSidebarItem } from '../../types/navigation'
