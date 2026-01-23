@@ -8,7 +8,7 @@ export interface StickersIconProps
 export function StickersIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: StickersIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface AtmCardIconProps
 export function AtmCardIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AtmCardIconProps) {
   return (

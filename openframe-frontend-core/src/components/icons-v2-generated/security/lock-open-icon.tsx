@@ -8,7 +8,7 @@ export interface LockOpenIconProps
 export function LockOpenIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: LockOpenIconProps) {
   return (

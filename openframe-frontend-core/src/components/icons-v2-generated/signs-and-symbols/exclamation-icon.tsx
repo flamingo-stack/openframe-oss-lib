@@ -8,7 +8,7 @@ export interface ExclamationIconProps
 export function ExclamationIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ExclamationIconProps) {
   return (

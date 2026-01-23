@@ -8,7 +8,7 @@ export interface ShopLocationIconProps
 export function ShopLocationIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ShopLocationIconProps) {
   return (

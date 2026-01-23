@@ -8,7 +8,7 @@ export interface FileCheckIconProps
 export function FileCheckIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FileCheckIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface CookieIconProps
 export function CookieIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CookieIconProps) {
   return (

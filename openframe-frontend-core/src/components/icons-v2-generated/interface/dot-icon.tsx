@@ -8,7 +8,7 @@ export interface DotIconProps
 export function DotIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: DotIconProps) {
   return (

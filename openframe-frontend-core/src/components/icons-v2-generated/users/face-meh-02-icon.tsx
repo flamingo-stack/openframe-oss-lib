@@ -8,7 +8,7 @@ export interface FaceMeh02IconProps
 export function FaceMeh02Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FaceMeh02IconProps) {
   return (

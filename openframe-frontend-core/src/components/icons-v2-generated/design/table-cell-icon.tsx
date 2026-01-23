@@ -8,7 +8,7 @@ export interface TableCellIconProps
 export function TableCellIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TableCellIconProps) {
   return (

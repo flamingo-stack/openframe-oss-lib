@@ -8,7 +8,7 @@ export interface GripVrIconProps
 export function GripVrIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: GripVrIconProps) {
   return (

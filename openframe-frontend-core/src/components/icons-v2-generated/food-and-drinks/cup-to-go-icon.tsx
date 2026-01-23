@@ -8,7 +8,7 @@ export interface CupToGoIconProps
 export function CupToGoIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CupToGoIconProps) {
   return (

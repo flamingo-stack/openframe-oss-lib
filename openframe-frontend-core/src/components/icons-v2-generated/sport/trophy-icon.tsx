@@ -8,7 +8,7 @@ export interface TrophyIconProps
 export function TrophyIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TrophyIconProps) {
   return (

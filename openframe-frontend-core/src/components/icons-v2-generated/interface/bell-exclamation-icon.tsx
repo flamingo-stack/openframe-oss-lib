@@ -8,7 +8,7 @@ export interface BellExclamationIconProps
 export function BellExclamationIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BellExclamationIconProps) {
   return (

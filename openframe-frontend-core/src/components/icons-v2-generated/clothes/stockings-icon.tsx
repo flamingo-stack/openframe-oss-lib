@@ -8,7 +8,7 @@ export interface StockingsIconProps
 export function StockingsIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: StockingsIconProps) {
   return (

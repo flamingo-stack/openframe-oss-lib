@@ -8,7 +8,7 @@ export interface FeedbackIconProps
 export function FeedbackIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FeedbackIconProps) {
   return (

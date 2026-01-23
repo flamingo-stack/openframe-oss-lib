@@ -8,7 +8,7 @@ export interface AppStoreIconProps
 export function AppStoreIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AppStoreIconProps) {
   return (

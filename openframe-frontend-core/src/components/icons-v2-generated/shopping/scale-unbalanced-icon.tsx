@@ -8,7 +8,7 @@ export interface ScaleUnbalancedIconProps
 export function ScaleUnbalancedIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ScaleUnbalancedIconProps) {
   return (

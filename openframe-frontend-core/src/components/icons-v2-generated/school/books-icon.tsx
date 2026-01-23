@@ -8,7 +8,7 @@ export interface BooksIconProps
 export function BooksIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BooksIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface CallInboundIconProps
 export function CallInboundIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CallInboundIconProps) {
   return (

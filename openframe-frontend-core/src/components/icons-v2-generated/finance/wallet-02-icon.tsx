@@ -8,7 +8,7 @@ export interface Wallet02IconProps
 export function Wallet02Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Wallet02IconProps) {
   return (

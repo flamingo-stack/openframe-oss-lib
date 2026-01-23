@@ -8,7 +8,7 @@ export interface FlashAutoIconProps
 export function FlashAutoIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FlashAutoIconProps) {
   return (

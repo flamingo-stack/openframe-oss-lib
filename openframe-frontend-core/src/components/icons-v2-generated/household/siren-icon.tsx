@@ -8,7 +8,7 @@ export interface SirenIconProps
 export function SirenIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SirenIconProps) {
   return (

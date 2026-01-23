@@ -8,7 +8,7 @@ export interface Crosshair02IconProps
 export function Crosshair02Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Crosshair02IconProps) {
   return (

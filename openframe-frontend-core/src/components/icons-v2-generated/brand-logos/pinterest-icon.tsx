@@ -8,7 +8,7 @@ export interface PinterestIconProps
 export function PinterestIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PinterestIconProps) {
   return (

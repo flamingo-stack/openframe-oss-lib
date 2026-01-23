@@ -8,7 +8,7 @@ export interface DoorIconProps
 export function DoorIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: DoorIconProps) {
   return (

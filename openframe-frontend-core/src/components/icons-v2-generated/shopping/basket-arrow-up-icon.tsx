@@ -8,7 +8,7 @@ export interface BasketArrowUpIconProps
 export function BasketArrowUpIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BasketArrowUpIconProps) {
   return (

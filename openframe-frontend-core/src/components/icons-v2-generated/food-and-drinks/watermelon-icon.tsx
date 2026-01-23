@@ -8,7 +8,7 @@ export interface WatermelonIconProps
 export function WatermelonIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: WatermelonIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface HotdogIconProps
 export function HotdogIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HotdogIconProps) {
   return (

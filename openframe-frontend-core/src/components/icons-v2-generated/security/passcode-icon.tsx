@@ -8,7 +8,7 @@ export interface PasscodeIconProps
 export function PasscodeIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PasscodeIconProps) {
   return (

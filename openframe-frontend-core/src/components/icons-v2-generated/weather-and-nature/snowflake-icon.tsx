@@ -8,7 +8,7 @@ export interface SnowflakeIconProps
 export function SnowflakeIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SnowflakeIconProps) {
   return (

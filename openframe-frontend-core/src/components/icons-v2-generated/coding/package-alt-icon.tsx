@@ -8,7 +8,7 @@ export interface PackageAltIconProps
 export function PackageAltIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PackageAltIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface Parcel02FastIconProps
 export function Parcel02FastIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Parcel02FastIconProps) {
   return (

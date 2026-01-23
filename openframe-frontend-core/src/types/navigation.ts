@@ -101,3 +101,13 @@ export interface NavigationSidebarItem {
   children?: NavigationSidebarItem[]
   section?: 'primary' | 'secondary' // To separate top and bottom sections
 }
+
+/**
+ * User information for the unified sidebar
+ */
+export interface UnifiedSidebarUser {
+  name?: string
+  email?: string
+  avatarUrl?: string | null
+  role?: string
+}

@@ -8,7 +8,7 @@ export interface UserEditIconProps
 export function UserEditIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: UserEditIconProps) {
   return (

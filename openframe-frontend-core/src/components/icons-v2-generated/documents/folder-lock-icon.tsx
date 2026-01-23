@@ -8,7 +8,7 @@ export interface FolderLockIconProps
 export function FolderLockIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FolderLockIconProps) {
   return (

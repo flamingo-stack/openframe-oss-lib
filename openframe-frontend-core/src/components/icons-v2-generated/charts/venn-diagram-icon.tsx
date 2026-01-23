@@ -8,7 +8,7 @@ export interface VennDiagramIconProps
 export function VennDiagramIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: VennDiagramIconProps) {
   return (

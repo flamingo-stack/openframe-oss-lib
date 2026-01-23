@@ -8,7 +8,7 @@ export interface PlusSquareIconProps
 export function PlusSquareIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PlusSquareIconProps) {
   return (

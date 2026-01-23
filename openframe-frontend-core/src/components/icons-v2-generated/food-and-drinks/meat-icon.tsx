@@ -8,7 +8,7 @@ export interface MeatIconProps
 export function MeatIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MeatIconProps) {
   return (

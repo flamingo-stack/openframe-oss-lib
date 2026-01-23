@@ -8,7 +8,7 @@ export interface TransferAltIconProps
 export function TransferAltIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TransferAltIconProps) {
   return (

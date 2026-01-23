@@ -8,7 +8,7 @@ export interface TankTopNumberIconProps
 export function TankTopNumberIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TankTopNumberIconProps) {
   return (

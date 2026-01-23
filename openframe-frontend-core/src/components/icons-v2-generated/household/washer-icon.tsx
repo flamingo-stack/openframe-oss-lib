@@ -8,7 +8,7 @@ export interface WasherIconProps
 export function WasherIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: WasherIconProps) {
   return (

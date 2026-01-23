@@ -8,7 +8,7 @@ export interface Chevrons05VrIconProps
 export function Chevrons05VrIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Chevrons05VrIconProps) {
   return (

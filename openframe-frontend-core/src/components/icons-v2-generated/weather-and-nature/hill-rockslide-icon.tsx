@@ -8,7 +8,7 @@ export interface HillRockslideIconProps
 export function HillRockslideIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HillRockslideIconProps) {
   return (

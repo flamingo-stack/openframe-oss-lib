@@ -8,7 +8,7 @@ export interface CloudMusicIconProps
 export function CloudMusicIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CloudMusicIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface BracketRoundXmarkIconProps
 export function BracketRoundXmarkIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BracketRoundXmarkIconProps) {
   return (

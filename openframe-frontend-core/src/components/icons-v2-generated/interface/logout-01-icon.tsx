@@ -8,7 +8,7 @@ export interface Logout01IconProps
 export function Logout01Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Logout01IconProps) {
   return (

@@ -8,7 +8,7 @@ export interface Chevrons03DownIconProps
 export function Chevrons03DownIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Chevrons03DownIconProps) {
   return (

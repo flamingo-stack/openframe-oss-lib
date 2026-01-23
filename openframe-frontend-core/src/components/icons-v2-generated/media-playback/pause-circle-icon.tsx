@@ -8,7 +8,7 @@ export interface PauseCircleIconProps
 export function PauseCircleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PauseCircleIconProps) {
   return (

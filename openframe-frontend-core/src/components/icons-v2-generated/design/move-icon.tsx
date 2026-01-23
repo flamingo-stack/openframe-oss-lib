@@ -8,7 +8,7 @@ export interface MoveIconProps
 export function MoveIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MoveIconProps) {
   return (

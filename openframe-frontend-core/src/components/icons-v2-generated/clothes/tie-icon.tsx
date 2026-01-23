@@ -8,7 +8,7 @@ export interface TieIconProps
 export function TieIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TieIconProps) {
   return (

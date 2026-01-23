@@ -8,7 +8,7 @@ export interface Send02IconProps
 export function Send02Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Send02IconProps) {
   return (

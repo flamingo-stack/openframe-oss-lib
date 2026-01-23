@@ -8,7 +8,7 @@ export interface CodeQrIconProps
 export function CodeQrIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CodeQrIconProps) {
   return (

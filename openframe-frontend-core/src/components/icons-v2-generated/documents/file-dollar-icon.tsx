@@ -8,7 +8,7 @@ export interface FileDollarIconProps
 export function FileDollarIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FileDollarIconProps) {
   return (

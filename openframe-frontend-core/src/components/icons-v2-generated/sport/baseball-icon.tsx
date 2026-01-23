@@ -8,7 +8,7 @@ export interface BaseballIconProps
 export function BaseballIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BaseballIconProps) {
   return (

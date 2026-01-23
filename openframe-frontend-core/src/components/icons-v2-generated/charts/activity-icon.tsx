@@ -8,7 +8,7 @@ export interface ActivityIconProps
 export function ActivityIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ActivityIconProps) {
   return (

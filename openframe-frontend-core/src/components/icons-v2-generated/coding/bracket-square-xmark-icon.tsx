@@ -8,7 +8,7 @@ export interface BracketSquareXmarkIconProps
 export function BracketSquareXmarkIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BracketSquareXmarkIconProps) {
   return (

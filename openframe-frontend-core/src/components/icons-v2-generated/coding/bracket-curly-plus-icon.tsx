@@ -8,7 +8,7 @@ export interface BracketCurlyPlusIconProps
 export function BracketCurlyPlusIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BracketCurlyPlusIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface HandParcelIconProps
 export function HandParcelIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HandParcelIconProps) {
   return (

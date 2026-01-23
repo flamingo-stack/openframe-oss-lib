@@ -8,7 +8,7 @@ export interface BellIconProps
 export function BellIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BellIconProps) {
   return (

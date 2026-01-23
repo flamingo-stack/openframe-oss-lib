@@ -8,7 +8,7 @@ export interface BellCheckIconProps
 export function BellCheckIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BellCheckIconProps) {
   return (

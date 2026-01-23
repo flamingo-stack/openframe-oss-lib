@@ -8,7 +8,7 @@ export interface CallMinusIconProps
 export function CallMinusIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CallMinusIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface ReflectHrIconProps
 export function ReflectHrIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ReflectHrIconProps) {
   return (

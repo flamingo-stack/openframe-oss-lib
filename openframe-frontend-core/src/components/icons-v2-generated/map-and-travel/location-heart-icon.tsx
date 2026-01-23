@@ -8,7 +8,7 @@ export interface LocationHeartIconProps
 export function LocationHeartIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: LocationHeartIconProps) {
   return (

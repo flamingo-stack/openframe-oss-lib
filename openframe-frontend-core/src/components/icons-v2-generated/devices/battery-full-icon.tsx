@@ -8,7 +8,7 @@ export interface BatteryFullIconProps
 export function BatteryFullIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BatteryFullIconProps) {
   return (

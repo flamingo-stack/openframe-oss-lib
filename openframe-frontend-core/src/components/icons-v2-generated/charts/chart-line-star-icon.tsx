@@ -8,7 +8,7 @@ export interface ChartLineStarIconProps
 export function ChartLineStarIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ChartLineStarIconProps) {
   return (

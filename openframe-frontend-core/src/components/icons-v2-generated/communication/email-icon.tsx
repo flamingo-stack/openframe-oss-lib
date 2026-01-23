@@ -8,7 +8,7 @@ export interface EmailIconProps
 export function EmailIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: EmailIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface Expand04DotsIconProps
 export function Expand04DotsIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Expand04DotsIconProps) {
   return (

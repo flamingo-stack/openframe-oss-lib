@@ -8,7 +8,7 @@ export interface PaintRollerIconProps
 export function PaintRollerIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PaintRollerIconProps) {
   return (

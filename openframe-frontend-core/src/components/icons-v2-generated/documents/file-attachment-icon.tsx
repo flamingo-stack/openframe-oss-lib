@@ -8,7 +8,7 @@ export interface FileAttachmentIconProps
 export function FileAttachmentIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FileAttachmentIconProps) {
   return (

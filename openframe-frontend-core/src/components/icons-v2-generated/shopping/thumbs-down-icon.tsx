@@ -8,7 +8,7 @@ export interface ThumbsDownIconProps
 export function ThumbsDownIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ThumbsDownIconProps) {
   return (

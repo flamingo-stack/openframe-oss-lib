@@ -8,7 +8,7 @@ export interface SodaCanIconProps
 export function SodaCanIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SodaCanIconProps) {
   return (

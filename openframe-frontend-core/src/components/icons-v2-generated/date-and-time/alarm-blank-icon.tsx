@@ -8,7 +8,7 @@ export interface AlarmBlankIconProps
 export function AlarmBlankIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AlarmBlankIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface BrightnessUpIconProps
 export function BrightnessUpIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BrightnessUpIconProps) {
   return (

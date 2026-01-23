@@ -8,7 +8,7 @@ export interface AvatarSquareIconProps
 export function AvatarSquareIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AvatarSquareIconProps) {
   return (

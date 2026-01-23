@@ -8,7 +8,7 @@ export interface MessageExclamationIconProps
 export function MessageExclamationIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MessageExclamationIconProps) {
   return (

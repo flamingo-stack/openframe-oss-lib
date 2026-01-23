@@ -8,7 +8,7 @@ export interface MicrochipAIIconProps
 export function MicrochipAIIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MicrochipAIIconProps) {
   return (

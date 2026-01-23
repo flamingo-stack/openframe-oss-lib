@@ -8,7 +8,7 @@ export interface DispenserMedicalIconProps
 export function DispenserMedicalIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: DispenserMedicalIconProps) {
   return (

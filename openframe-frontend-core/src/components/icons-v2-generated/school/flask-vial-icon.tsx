@@ -8,7 +8,7 @@ export interface FlaskVialIconProps
 export function FlaskVialIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FlaskVialIconProps) {
   return (

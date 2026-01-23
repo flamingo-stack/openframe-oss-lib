@@ -8,7 +8,7 @@ export interface Scale01IconProps
 export function Scale01Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Scale01IconProps) {
   return (

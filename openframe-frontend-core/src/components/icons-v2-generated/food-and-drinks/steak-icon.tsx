@@ -8,7 +8,7 @@ export interface SteakIconProps
 export function SteakIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SteakIconProps) {
   return (

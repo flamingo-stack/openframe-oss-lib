@@ -8,7 +8,7 @@ export interface LocationExclamationIconProps
 export function LocationExclamationIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: LocationExclamationIconProps) {
   return (

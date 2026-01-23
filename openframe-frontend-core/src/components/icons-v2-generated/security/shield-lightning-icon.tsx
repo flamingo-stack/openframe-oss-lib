@@ -8,7 +8,7 @@ export interface ShieldLightningIconProps
 export function ShieldLightningIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ShieldLightningIconProps) {
   return (

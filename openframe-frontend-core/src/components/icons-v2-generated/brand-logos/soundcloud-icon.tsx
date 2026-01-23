@@ -8,7 +8,7 @@ export interface SoundcloudIconProps
 export function SoundcloudIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SoundcloudIconProps) {
   return (

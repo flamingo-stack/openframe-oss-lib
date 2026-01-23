@@ -8,7 +8,7 @@ export interface MapLocationIconProps
 export function MapLocationIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MapLocationIconProps) {
   return (

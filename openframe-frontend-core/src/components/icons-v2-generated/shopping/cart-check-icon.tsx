@@ -8,7 +8,7 @@ export interface CartCheckIconProps
 export function CartCheckIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CartCheckIconProps) {
   return (

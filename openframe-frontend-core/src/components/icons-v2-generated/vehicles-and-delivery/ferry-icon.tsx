@@ -8,7 +8,7 @@ export interface FerryIconProps
 export function FerryIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FerryIconProps) {
   return (

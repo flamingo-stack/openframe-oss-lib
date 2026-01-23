@@ -8,7 +8,7 @@ export interface Number1IconProps
 export function Number1Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Number1IconProps) {
   return (

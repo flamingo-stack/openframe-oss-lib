@@ -8,7 +8,7 @@ export interface TextAlignLeftIconProps
 export function TextAlignLeftIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TextAlignLeftIconProps) {
   return (

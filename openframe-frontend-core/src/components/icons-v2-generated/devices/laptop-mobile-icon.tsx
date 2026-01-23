@@ -8,7 +8,7 @@ export interface LaptopMobileIconProps
 export function LaptopMobileIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: LaptopMobileIconProps) {
   return (

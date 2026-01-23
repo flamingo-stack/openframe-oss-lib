@@ -8,7 +8,7 @@ export interface BugIconProps
 export function BugIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BugIconProps) {
   return (

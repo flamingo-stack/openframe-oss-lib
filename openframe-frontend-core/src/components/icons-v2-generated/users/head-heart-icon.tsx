@@ -8,7 +8,7 @@ export interface HeadHeartIconProps
 export function HeadHeartIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HeadHeartIconProps) {
   return (

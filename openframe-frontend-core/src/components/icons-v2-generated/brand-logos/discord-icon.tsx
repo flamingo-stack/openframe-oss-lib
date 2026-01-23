@@ -8,7 +8,7 @@ export interface DiscordIconProps
 export function DiscordIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: DiscordIconProps) {
   return (

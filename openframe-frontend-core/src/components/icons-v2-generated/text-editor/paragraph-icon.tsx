@@ -8,7 +8,7 @@ export interface ParagraphIconProps
 export function ParagraphIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ParagraphIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface FontIconProps
 export function FontIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FontIconProps) {
   return (

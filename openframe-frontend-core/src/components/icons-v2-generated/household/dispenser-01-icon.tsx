@@ -8,7 +8,7 @@ export interface Dispenser01IconProps
 export function Dispenser01Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Dispenser01IconProps) {
   return (

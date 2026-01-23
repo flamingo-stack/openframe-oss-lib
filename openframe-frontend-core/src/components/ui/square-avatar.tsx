@@ -1,5 +1,5 @@
-import * as React from "react"
-import { cn } from "../../utils/cn"
+import * as React from "react";
+import { cn } from "../../utils/cn";
 
 // Extract initials from a name (first letter of first and last word)
 const getInitials = (name?: string): string => {
@@ -36,7 +36,7 @@ const SquareAvatar = React.forwardRef<HTMLDivElement, SquareAvatarProps>(
     return (
       <div
         className={cn(
-          "relative flex shrink-0 overflow-hidden",
+          "relative flex shrink-0 overflow-hidden border border-ods-border",
           sizeClasses[size],
           variantClasses[variant],
           className
@@ -51,8 +51,8 @@ const SquareAvatar = React.forwardRef<HTMLDivElement, SquareAvatarProps>(
             alt={alt}
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-muted">
-            <span className="text-xs font-medium">
+          <div className="flex h-full w-full items-center justify-center bg-ods-bg">
+            <span className="text-xs font-medium text-ods-text-secondary">
               {getInitials(fallback || alt) || '?'}
             </span>
           </div>
@@ -63,4 +63,4 @@ const SquareAvatar = React.forwardRef<HTMLDivElement, SquareAvatarProps>(
 )
 SquareAvatar.displayName = "SquareAvatar"
 
-export { SquareAvatar }
+export { SquareAvatar };

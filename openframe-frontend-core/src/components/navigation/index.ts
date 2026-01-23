@@ -1,6 +1,6 @@
 // Navigation component exports
 export { Header } from './header'
-export type { HeaderProps, HeaderConfig } from './header'
+export type { HeaderConfig, HeaderProps } from './header'
 
 export { ClientOnlyHeader } from './client-only-header'
 export type { ClientOnlyHeaderProps } from './client-only-header'
@@ -23,11 +23,23 @@ export type { NavigationSidebarProps } from './navigation-sidebar'
 export { AppHeader } from './app-header'
 export type { AppHeaderProps } from './app-header'
 
+export { AppLayout } from './app-layout'
+export type { AppLayoutProps } from './app-layout'
+
+export { MobileBurgerMenu } from './mobile-burger-menu'
+export type { MobileBurgerMenuProps } from './mobile-burger-menu'
+
+export { HeaderButton } from './header-button'
+export type { HeaderButtonProps } from './header-button'
+
+export { HeaderGlobalSearch } from './header-global-search'
+export type { HeaderGlobalSearchProps } from './header-global-search'
+
+export { HeaderOrganizationFilter } from './header-organization-filter'
+export type { HeaderOrganizationFilterOrganization, HeaderOrganizationFilterProps } from './header-organization-filter'
+
 // Re-export types from navigation types
-export type { 
-  NavigationItem, 
-  MobileNavConfig, 
-  SlidingSidebarConfig,
-  NavigationSidebarConfig,
-  NavigationSidebarItem 
+export type {
+  MobileNavConfig, NavigationItem, NavigationSidebarConfig,
+  NavigationSidebarItem, SlidingSidebarConfig, UnifiedSidebarUser
 } from '../../types/navigation'

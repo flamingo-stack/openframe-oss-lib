@@ -8,7 +8,7 @@ export interface BagMinusIconProps
 export function BagMinusIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BagMinusIconProps) {
   return (

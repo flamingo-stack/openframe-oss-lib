@@ -8,7 +8,7 @@ export interface Standard4kIconProps
 export function Standard4kIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Standard4kIconProps) {
   return (

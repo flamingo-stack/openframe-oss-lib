@@ -8,7 +8,7 @@ export interface BracketRoundEllipsisVrIconProps
 export function BracketRoundEllipsisVrIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BracketRoundEllipsisVrIconProps) {
   return (

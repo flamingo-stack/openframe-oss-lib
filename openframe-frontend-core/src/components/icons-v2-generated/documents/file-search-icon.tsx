@@ -8,7 +8,7 @@ export interface FileSearchIconProps
 export function FileSearchIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FileSearchIconProps) {
   return (

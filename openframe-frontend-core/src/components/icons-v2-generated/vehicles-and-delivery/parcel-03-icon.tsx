@@ -8,7 +8,7 @@ export interface Parcel03IconProps
 export function Parcel03Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Parcel03IconProps) {
   return (

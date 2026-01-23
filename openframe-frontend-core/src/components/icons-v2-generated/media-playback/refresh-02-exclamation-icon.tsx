@@ -8,7 +8,7 @@ export interface Refresh02ExclamationIconProps
 export function Refresh02ExclamationIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Refresh02ExclamationIconProps) {
   return (

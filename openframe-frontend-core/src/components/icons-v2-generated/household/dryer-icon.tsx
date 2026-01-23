@@ -8,7 +8,7 @@ export interface DryerIconProps
 export function DryerIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: DryerIconProps) {
   return (

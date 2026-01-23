@@ -8,7 +8,7 @@ export interface AppleIconProps
 export function AppleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AppleIconProps) {
   return (

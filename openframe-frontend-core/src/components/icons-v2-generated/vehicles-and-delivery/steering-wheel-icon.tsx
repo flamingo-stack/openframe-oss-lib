@@ -8,7 +8,7 @@ export interface SteeringWheelIconProps
 export function SteeringWheelIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SteeringWheelIconProps) {
   return (

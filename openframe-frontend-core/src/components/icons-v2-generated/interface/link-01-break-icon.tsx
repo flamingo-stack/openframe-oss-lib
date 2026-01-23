@@ -8,7 +8,7 @@ export interface Link01BreakIconProps
 export function Link01BreakIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Link01BreakIconProps) {
   return (

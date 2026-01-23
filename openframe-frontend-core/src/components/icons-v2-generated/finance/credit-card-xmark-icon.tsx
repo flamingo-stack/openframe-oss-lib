@@ -8,7 +8,7 @@ export interface CreditCardXmarkIconProps
 export function CreditCardXmarkIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CreditCardXmarkIconProps) {
   return (

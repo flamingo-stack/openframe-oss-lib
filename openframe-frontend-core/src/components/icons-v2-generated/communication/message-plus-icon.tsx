@@ -8,7 +8,7 @@ export interface MessagePlusIconProps
 export function MessagePlusIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MessagePlusIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface MustacheIconProps
 export function MustacheIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MustacheIconProps) {
   return (

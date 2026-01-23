@@ -8,7 +8,7 @@ export interface LinkedinIconProps
 export function LinkedinIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: LinkedinIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface MushroomIconProps
 export function MushroomIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MushroomIconProps) {
   return (

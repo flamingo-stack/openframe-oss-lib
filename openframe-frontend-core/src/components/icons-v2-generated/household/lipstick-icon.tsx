@@ -8,7 +8,7 @@ export interface LipstickIconProps
 export function LipstickIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: LipstickIconProps) {
   return (

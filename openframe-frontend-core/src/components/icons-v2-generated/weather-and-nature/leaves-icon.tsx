@@ -8,7 +8,7 @@ export interface LeavesIconProps
 export function LeavesIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: LeavesIconProps) {
   return (

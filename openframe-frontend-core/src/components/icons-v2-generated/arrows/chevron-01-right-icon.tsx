@@ -8,7 +8,7 @@ export interface Chevron01RightIconProps
 export function Chevron01RightIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Chevron01RightIconProps) {
   return (

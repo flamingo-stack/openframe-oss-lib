@@ -8,7 +8,7 @@ export interface CouchIconProps
 export function CouchIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CouchIconProps) {
   return (

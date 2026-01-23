@@ -8,7 +8,7 @@ export interface LinuxLogoIconProps
 export function LinuxLogoIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: LinuxLogoIconProps) {
   return (

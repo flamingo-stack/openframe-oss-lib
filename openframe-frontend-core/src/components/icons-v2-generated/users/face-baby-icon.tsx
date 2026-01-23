@@ -8,7 +8,7 @@ export interface FaceBabyIconProps
 export function FaceBabyIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FaceBabyIconProps) {
   return (

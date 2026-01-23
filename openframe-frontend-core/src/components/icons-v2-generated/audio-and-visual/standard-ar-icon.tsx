@@ -8,7 +8,7 @@ export interface StandardArIconProps
 export function StandardArIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: StandardArIconProps) {
   return (

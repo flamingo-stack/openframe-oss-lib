@@ -8,7 +8,7 @@ export interface ChairSwivelIconProps
 export function ChairSwivelIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ChairSwivelIconProps) {
   return (

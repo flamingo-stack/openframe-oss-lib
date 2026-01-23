@@ -8,7 +8,7 @@ export interface BusIconProps
 export function BusIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BusIconProps) {
   return (

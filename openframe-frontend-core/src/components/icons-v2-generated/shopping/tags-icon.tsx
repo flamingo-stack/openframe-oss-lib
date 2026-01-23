@@ -8,7 +8,7 @@ export interface TagsIconProps
 export function TagsIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TagsIconProps) {
   return (

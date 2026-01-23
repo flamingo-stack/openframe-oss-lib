@@ -8,7 +8,7 @@ export interface HammerIconProps
 export function HammerIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HammerIconProps) {
   return (

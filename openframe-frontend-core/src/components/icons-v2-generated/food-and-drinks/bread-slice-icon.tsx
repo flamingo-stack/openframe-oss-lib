@@ -8,7 +8,7 @@ export interface BreadSliceIconProps
 export function BreadSliceIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BreadSliceIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface CleaverIconProps
 export function CleaverIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CleaverIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface RecordingCircleIconProps
 export function RecordingCircleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: RecordingCircleIconProps) {
   return (

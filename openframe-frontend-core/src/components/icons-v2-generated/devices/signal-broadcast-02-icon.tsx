@@ -8,7 +8,7 @@ export interface SignalBroadcast02IconProps
 export function SignalBroadcast02Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SignalBroadcast02IconProps) {
   return (

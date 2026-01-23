@@ -8,7 +8,7 @@ export interface PackageLockIconProps
 export function PackageLockIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PackageLockIconProps) {
   return (

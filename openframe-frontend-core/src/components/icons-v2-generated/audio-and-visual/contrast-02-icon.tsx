@@ -8,7 +8,7 @@ export interface Contrast02IconProps
 export function Contrast02Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Contrast02IconProps) {
   return (

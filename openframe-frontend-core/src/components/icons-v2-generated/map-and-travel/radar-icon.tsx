@@ -8,7 +8,7 @@ export interface RadarIconProps
 export function RadarIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: RadarIconProps) {
   return (

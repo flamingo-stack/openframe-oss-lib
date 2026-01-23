@@ -8,7 +8,7 @@ export interface TwitterXSquareIconProps
 export function TwitterXSquareIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TwitterXSquareIconProps) {
   return (

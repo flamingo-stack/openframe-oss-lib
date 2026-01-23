@@ -8,7 +8,7 @@ export interface BrainAIIconProps
 export function BrainAIIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BrainAIIconProps) {
   return (

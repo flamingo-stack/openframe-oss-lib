@@ -8,7 +8,7 @@ export interface ChartLineDownIconProps
 export function ChartLineDownIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ChartLineDownIconProps) {
   return (

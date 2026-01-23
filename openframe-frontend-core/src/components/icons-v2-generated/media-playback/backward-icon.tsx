@@ -8,7 +8,7 @@ export interface BackwardIconProps
 export function BackwardIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BackwardIconProps) {
   return (

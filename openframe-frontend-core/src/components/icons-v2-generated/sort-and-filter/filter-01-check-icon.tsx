@@ -8,7 +8,7 @@ export interface Filter01CheckIconProps
 export function Filter01CheckIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Filter01CheckIconProps) {
   return (

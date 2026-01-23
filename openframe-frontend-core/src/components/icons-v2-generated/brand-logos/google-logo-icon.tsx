@@ -8,7 +8,7 @@ export interface GoogleLogoIconProps
 export function GoogleLogoIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: GoogleLogoIconProps) {
   return (

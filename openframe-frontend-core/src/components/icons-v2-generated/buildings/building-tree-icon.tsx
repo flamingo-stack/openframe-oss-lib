@@ -8,7 +8,7 @@ export interface BuildingTreeIconProps
 export function BuildingTreeIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BuildingTreeIconProps) {
   return (

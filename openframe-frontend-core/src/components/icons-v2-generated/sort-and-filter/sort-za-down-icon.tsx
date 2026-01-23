@@ -8,7 +8,7 @@ export interface SortZaDownIconProps
 export function SortZaDownIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SortZaDownIconProps) {
   return (

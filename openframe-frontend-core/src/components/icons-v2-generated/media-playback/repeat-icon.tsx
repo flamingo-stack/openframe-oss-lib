@@ -8,7 +8,7 @@ export interface RepeatIconProps
 export function RepeatIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: RepeatIconProps) {
   return (

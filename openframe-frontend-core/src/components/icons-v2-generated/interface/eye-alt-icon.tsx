@@ -8,7 +8,7 @@ export interface EyeAltIconProps
 export function EyeAltIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: EyeAltIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface PantsIconProps
 export function PantsIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PantsIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface HeartPulseIconProps
 export function HeartPulseIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HeartPulseIconProps) {
   return (

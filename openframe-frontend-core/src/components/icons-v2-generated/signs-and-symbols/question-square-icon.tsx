@@ -8,7 +8,7 @@ export interface QuestionSquareIconProps
 export function QuestionSquareIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: QuestionSquareIconProps) {
   return (

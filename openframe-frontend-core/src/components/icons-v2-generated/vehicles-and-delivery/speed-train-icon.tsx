@@ -8,7 +8,7 @@ export interface SpeedTrainIconProps
 export function SpeedTrainIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SpeedTrainIconProps) {
   return (

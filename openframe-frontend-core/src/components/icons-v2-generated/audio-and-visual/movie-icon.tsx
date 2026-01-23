@@ -8,7 +8,7 @@ export interface MovieIconProps
 export function MovieIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MovieIconProps) {
   return (

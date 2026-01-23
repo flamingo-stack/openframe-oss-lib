@@ -8,7 +8,7 @@ export interface Loading03IconProps
 export function Loading03Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Loading03IconProps) {
   return (

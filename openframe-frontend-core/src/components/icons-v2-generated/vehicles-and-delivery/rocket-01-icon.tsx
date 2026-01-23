@@ -8,7 +8,7 @@ export interface Rocket01IconProps
 export function Rocket01Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Rocket01IconProps) {
   return (

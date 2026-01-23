@@ -8,7 +8,7 @@ export interface BasketMinusIconProps
 export function BasketMinusIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BasketMinusIconProps) {
   return (

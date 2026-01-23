@@ -8,7 +8,7 @@ export interface PinIconProps
 export function PinIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PinIconProps) {
   return (

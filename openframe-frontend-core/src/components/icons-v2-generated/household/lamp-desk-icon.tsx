@@ -8,7 +8,7 @@ export interface LampDeskIconProps
 export function LampDeskIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: LampDeskIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface UnlockKeyholeIconProps
 export function UnlockKeyholeIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: UnlockKeyholeIconProps) {
   return (

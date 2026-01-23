@@ -8,7 +8,7 @@ export interface MinusIconProps
 export function MinusIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MinusIconProps) {
   return (

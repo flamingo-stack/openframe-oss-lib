@@ -8,7 +8,7 @@ export interface PageBlankIconProps
 export function PageBlankIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PageBlankIconProps) {
   return (

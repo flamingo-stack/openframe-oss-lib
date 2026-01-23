@@ -8,7 +8,7 @@ export interface AlarmXmarkIconProps
 export function AlarmXmarkIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AlarmXmarkIconProps) {
   return (

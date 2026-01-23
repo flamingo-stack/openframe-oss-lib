@@ -8,7 +8,7 @@ export interface PlaneArrivalIconProps
 export function PlaneArrivalIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PlaneArrivalIconProps) {
   return (

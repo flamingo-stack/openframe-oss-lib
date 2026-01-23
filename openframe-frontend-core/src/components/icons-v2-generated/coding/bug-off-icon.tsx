@@ -8,7 +8,7 @@ export interface BugOffIconProps
 export function BugOffIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BugOffIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface Calculator01IconProps
 export function Calculator01Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Calculator01IconProps) {
   return (

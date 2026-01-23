@@ -8,7 +8,7 @@ export interface MapSquareIconProps
 export function MapSquareIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MapSquareIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface DrowningIconProps
 export function DrowningIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: DrowningIconProps) {
   return (

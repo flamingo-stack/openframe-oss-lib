@@ -8,7 +8,7 @@ export interface SignalLevelIconProps
 export function SignalLevelIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SignalLevelIconProps) {
   return (

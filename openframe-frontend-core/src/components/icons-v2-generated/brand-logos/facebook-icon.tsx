@@ -8,7 +8,7 @@ export interface FacebookIconProps
 export function FacebookIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FacebookIconProps) {
   return (

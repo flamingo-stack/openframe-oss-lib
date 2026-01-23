@@ -8,7 +8,7 @@ export interface Chevrons03UpIconProps
 export function Chevrons03UpIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Chevrons03UpIconProps) {
   return (

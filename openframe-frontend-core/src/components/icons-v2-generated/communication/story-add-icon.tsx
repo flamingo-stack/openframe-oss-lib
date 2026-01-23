@@ -8,7 +8,7 @@ export interface StoryAddIconProps
 export function StoryAddIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: StoryAddIconProps) {
   return (

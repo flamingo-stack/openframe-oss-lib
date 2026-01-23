@@ -8,7 +8,7 @@ export interface LightbulbIconProps
 export function LightbulbIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: LightbulbIconProps) {
   return (

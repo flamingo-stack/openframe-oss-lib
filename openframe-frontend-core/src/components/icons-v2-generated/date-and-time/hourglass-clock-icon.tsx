@@ -8,7 +8,7 @@ export interface HourglassClockIconProps
 export function HourglassClockIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HourglassClockIconProps) {
   return (

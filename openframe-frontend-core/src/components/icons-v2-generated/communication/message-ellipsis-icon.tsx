@@ -8,7 +8,7 @@ export interface MessageEllipsisIconProps
 export function MessageEllipsisIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MessageEllipsisIconProps) {
   return (

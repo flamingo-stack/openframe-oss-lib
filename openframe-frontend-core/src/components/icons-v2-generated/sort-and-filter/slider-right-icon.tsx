@@ -8,7 +8,7 @@ export interface SliderRightIconProps
 export function SliderRightIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SliderRightIconProps) {
   return (

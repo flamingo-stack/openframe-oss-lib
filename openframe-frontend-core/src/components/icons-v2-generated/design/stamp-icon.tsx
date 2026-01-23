@@ -8,7 +8,7 @@ export interface StampIconProps
 export function StampIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: StampIconProps) {
   return (

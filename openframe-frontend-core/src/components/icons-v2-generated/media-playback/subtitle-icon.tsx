@@ -8,7 +8,7 @@ export interface SubtitleIconProps
 export function SubtitleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SubtitleIconProps) {
   return (

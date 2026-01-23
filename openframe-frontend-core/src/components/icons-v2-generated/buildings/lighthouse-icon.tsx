@@ -8,7 +8,7 @@ export interface LighthouseIconProps
 export function LighthouseIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: LighthouseIconProps) {
   return (

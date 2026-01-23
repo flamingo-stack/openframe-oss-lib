@@ -8,7 +8,7 @@ export interface GithubCircleIconProps
 export function GithubCircleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: GithubCircleIconProps) {
   return (

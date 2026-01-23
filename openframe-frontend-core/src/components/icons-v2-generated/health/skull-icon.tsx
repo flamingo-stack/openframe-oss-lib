@@ -8,7 +8,7 @@ export interface SkullIconProps
 export function SkullIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SkullIconProps) {
   return (

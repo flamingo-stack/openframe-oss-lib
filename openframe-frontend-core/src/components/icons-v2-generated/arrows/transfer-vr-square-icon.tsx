@@ -8,7 +8,7 @@ export interface TransferVrSquareIconProps
 export function TransferVrSquareIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TransferVrSquareIconProps) {
   return (

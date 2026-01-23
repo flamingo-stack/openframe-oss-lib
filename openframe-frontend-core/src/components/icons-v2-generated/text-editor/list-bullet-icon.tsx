@@ -8,7 +8,7 @@ export interface ListBulletIconProps
 export function ListBulletIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ListBulletIconProps) {
   return (

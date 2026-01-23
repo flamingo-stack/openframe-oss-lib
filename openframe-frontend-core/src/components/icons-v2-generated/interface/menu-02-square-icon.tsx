@@ -8,7 +8,7 @@ export interface Menu02SquareIconProps
 export function Menu02SquareIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Menu02SquareIconProps) {
   return (

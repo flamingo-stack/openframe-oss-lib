@@ -8,7 +8,7 @@ export interface SunriseSeaIconProps
 export function SunriseSeaIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SunriseSeaIconProps) {
   return (

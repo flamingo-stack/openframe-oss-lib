@@ -1,13 +1,14 @@
 'use client'
 
 import React from 'react'
-import { MoreHorizontal } from 'lucide-react'
+import { cn } from '../../utils/cn'
+import { Ellipsis01Icon } from '../icons-v2-generated'
 import { Button } from './button'
 import {
   DropdownMenu,
-  DropdownMenuTrigger,
   DropdownMenuContent,
-  DropdownMenuItem
+  DropdownMenuItem,
+  DropdownMenuTrigger
 } from './dropdown-menu'
 
 export type MoreActionsItem = {
@@ -45,25 +46,19 @@ export function MoreActionsMenu({
         <Button
           variant="outline"
           size="icon"
-          className={className || 'bg-[#212121] border-[#3a3a3a] hover:bg-[#2a2a2a] h-12 w-12'}
+          className={className || 'bg-ods-card border-ods-border hover:bg-ods-bg-hover flex items-center justify-center'}
           aria-label={ariaLabel}
         >
-          <MoreHorizontal className="h-6 w-6 text-[#fafafa]" />
+          <Ellipsis01Icon size={24} className="text-text-primary" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align={align}
         side={side}
         sideOffset={sideOffset}
-        className="bg-ods-card border border-ods-border p-0"
+        className="bg-ods-card border border-ods-border p-0 rounded-[4px] min-w-[200px]"
       >
         {items.map((item, idx) => {
-          const content = (
-            <div className="flex items-center justify-start gap-2 w-full">
-              {item.icon}
-              <span className={`font-['DM_Sans'] text-[18px] ${item.danger ? 'text-error' : ''}`}>{item.label}</span>
-            </div>
-          )
           return (
             <DropdownMenuItem
               key={`${item.label}-${idx}`}
@@ -72,9 +67,14 @@ export function MoreActionsMenu({
                 if (!item.disabled) item.onClick()
               }}
               disabled={item.disabled}
-              className="focus:bg-ods-bg-hover justify-start text-left px-4 py-3 rounded-none"
+              className="flex items-center gap-2 px-4 py-3 bg-ods-bg hover:bg-ods-bg-hover focus:bg-ods-bg-hover border-b border-ods-border last:border-b-0 rounded-none cursor-pointer data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed"
             >
-              {content}
+              {item.icon && 
+                <div className={cn(item.danger ? 'text-ods-error' : 'text-ods-text-secondary', '[&_svg]:size-6 [&_svg]:shrink-0')}>{item.icon}</div>
+              }
+              <span className={`font-medium text-[18px] leading-6 ${item.danger ? 'text-ods-text-primary' : 'text-ods-text-primary'}`}>
+                {item.label}
+              </span>
             </DropdownMenuItem>
           )
         })}

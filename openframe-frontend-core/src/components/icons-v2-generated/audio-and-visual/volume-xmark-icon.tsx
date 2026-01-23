@@ -8,7 +8,7 @@ export interface VolumeXmarkIconProps
 export function VolumeXmarkIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: VolumeXmarkIconProps) {
   return (

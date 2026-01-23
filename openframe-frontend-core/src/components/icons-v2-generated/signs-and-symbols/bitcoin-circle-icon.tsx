@@ -8,7 +8,7 @@ export interface BitcoinCircleIconProps
 export function BitcoinCircleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BitcoinCircleIconProps) {
   return (

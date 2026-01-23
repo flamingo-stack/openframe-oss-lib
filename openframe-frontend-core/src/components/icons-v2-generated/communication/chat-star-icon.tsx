@@ -8,7 +8,7 @@ export interface ChatStarIconProps
 export function ChatStarIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ChatStarIconProps) {
   return (

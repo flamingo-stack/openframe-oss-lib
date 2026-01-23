@@ -8,7 +8,7 @@ export interface PrinterIconProps
 export function PrinterIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PrinterIconProps) {
   return (

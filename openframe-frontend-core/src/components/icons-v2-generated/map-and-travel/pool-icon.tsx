@@ -8,7 +8,7 @@ export interface PoolIconProps
 export function PoolIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PoolIconProps) {
   return (

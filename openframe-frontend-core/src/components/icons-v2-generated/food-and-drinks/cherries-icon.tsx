@@ -8,7 +8,7 @@ export interface CherriesIconProps
 export function CherriesIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CherriesIconProps) {
   return (

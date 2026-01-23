@@ -8,7 +8,7 @@ export interface ChromecastIconProps
 export function ChromecastIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ChromecastIconProps) {
   return (

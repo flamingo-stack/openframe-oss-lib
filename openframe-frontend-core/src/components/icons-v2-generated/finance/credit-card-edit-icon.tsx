@@ -8,7 +8,7 @@ export interface CreditCardEditIconProps
 export function CreditCardEditIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CreditCardEditIconProps) {
   return (

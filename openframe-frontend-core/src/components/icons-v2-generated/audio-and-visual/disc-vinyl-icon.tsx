@@ -8,7 +8,7 @@ export interface DiscVinylIconProps
 export function DiscVinylIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: DiscVinylIconProps) {
   return (

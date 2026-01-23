@@ -8,7 +8,7 @@ export interface ChartPyramidIconProps
 export function ChartPyramidIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ChartPyramidIconProps) {
   return (

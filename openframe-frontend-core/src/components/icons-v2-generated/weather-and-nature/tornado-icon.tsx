@@ -8,7 +8,7 @@ export interface TornadoIconProps
 export function TornadoIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TornadoIconProps) {
   return (

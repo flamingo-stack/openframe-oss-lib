@@ -8,7 +8,7 @@ export interface TwitterXIconProps
 export function TwitterXIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TwitterXIconProps) {
   return (

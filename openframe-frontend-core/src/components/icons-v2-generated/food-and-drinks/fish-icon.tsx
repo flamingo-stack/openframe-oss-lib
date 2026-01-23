@@ -8,7 +8,7 @@ export interface FishIconProps
 export function FishIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FishIconProps) {
   return (

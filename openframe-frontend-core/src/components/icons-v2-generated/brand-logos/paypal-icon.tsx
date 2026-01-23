@@ -8,7 +8,7 @@ export interface PaypalIconProps
 export function PaypalIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PaypalIconProps) {
   return (

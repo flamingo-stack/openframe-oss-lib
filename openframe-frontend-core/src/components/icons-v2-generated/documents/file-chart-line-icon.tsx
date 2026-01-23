@@ -8,7 +8,7 @@ export interface FileChartLineIconProps
 export function FileChartLineIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FileChartLineIconProps) {
   return (

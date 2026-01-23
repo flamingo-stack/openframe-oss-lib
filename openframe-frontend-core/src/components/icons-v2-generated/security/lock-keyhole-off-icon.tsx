@@ -8,7 +8,7 @@ export interface LockKeyholeOffIconProps
 export function LockKeyholeOffIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: LockKeyholeOffIconProps) {
   return (

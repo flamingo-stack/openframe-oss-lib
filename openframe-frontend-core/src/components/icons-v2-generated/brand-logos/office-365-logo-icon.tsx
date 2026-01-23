@@ -8,7 +8,7 @@ export interface Office365LogoIconProps
 export function Office365LogoIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Office365LogoIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface TruckMedicalIconProps
 export function TruckMedicalIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TruckMedicalIconProps) {
   return (

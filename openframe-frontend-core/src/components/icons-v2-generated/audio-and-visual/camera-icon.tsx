@@ -8,7 +8,7 @@ export interface CameraIconProps
 export function CameraIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CameraIconProps) {
   return (

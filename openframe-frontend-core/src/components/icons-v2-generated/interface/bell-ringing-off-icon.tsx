@@ -8,7 +8,7 @@ export interface BellRingingOffIconProps
 export function BellRingingOffIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BellRingingOffIconProps) {
   return (

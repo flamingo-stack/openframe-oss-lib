@@ -8,7 +8,7 @@ export interface CallMissed02IconProps
 export function CallMissed02Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CallMissed02IconProps) {
   return (

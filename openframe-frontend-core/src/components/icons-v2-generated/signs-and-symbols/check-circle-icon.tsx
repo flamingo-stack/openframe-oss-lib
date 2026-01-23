@@ -8,7 +8,7 @@ export interface CheckCircleIconProps
 export function CheckCircleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CheckCircleIconProps) {
   return (

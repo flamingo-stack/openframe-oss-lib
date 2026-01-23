@@ -8,7 +8,7 @@ export interface Link02HorizontalIconProps
 export function Link02HorizontalIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Link02HorizontalIconProps) {
   return (

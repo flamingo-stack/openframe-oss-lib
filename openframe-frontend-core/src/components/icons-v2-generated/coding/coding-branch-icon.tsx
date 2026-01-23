@@ -8,7 +8,7 @@ export interface CodingBranchIconProps
 export function CodingBranchIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CodingBranchIconProps) {
   return (

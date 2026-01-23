@@ -8,7 +8,7 @@ export interface FileLockIconProps
 export function FileLockIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FileLockIconProps) {
   return (

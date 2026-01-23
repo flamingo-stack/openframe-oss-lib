@@ -8,7 +8,7 @@ export interface PlusCircleIconProps
 export function PlusCircleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PlusCircleIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface EyeCloseIconProps
 export function EyeCloseIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: EyeCloseIconProps) {
   return (

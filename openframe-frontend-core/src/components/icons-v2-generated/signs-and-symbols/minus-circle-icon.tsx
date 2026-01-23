@@ -8,7 +8,7 @@ export interface MinusCircleIconProps
 export function MinusCircleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MinusCircleIconProps) {
   return (

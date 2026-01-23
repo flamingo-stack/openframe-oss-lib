@@ -8,7 +8,7 @@ export interface MessageCheckIconProps
 export function MessageCheckIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MessageCheckIconProps) {
   return (

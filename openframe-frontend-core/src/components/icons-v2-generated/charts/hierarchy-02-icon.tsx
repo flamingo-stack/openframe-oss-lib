@@ -8,7 +8,7 @@ export interface Hierarchy02IconProps
 export function Hierarchy02Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Hierarchy02IconProps) {
   return (

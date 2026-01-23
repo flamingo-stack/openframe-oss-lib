@@ -8,7 +8,7 @@ export interface BasketBlankIconProps
 export function BasketBlankIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BasketBlankIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface TvIconProps
 export function TvIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TvIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface BookmarkOffIconProps
 export function BookmarkOffIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BookmarkOffIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface EmailArrowDownIconProps
 export function EmailArrowDownIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: EmailArrowDownIconProps) {
   return (

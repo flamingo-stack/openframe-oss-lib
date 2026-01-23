@@ -8,7 +8,7 @@ export interface OpenaiLogoIconProps
 export function OpenaiLogoIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: OpenaiLogoIconProps) {
   return (

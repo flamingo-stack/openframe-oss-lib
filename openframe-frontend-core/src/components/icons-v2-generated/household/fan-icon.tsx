@@ -8,7 +8,7 @@ export interface FanIconProps
 export function FanIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FanIconProps) {
   return (

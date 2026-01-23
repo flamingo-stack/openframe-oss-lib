@@ -8,7 +8,7 @@ export interface WatchHeartIconProps
 export function WatchHeartIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: WatchHeartIconProps) {
   return (

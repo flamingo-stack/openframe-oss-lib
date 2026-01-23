@@ -8,7 +8,7 @@ export interface StarsIconProps
 export function StarsIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: StarsIconProps) {
   return (

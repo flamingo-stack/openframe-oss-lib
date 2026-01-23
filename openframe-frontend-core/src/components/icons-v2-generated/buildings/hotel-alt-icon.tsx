@@ -8,7 +8,7 @@ export interface HotelAltIconProps
 export function HotelAltIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HotelAltIconProps) {
   return (

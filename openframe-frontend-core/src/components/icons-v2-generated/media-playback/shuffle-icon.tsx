@@ -8,7 +8,7 @@ export interface ShuffleIconProps
 export function ShuffleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ShuffleIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface HatIconProps
 export function HatIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HatIconProps) {
   return (

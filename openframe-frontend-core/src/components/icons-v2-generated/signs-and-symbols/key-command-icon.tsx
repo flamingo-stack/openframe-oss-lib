@@ -8,7 +8,7 @@ export interface KeyCommandIconProps
 export function KeyCommandIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: KeyCommandIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface PaperclipVrIconProps
 export function PaperclipVrIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PaperclipVrIconProps) {
   return (

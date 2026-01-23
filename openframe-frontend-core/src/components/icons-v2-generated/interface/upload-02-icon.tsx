@@ -8,7 +8,7 @@ export interface Upload02IconProps
 export function Upload02Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Upload02IconProps) {
   return (

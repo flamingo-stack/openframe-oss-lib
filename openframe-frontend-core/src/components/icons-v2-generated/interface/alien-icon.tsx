@@ -8,7 +8,7 @@ export interface AlienIconProps
 export function AlienIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AlienIconProps) {
   return (

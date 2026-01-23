@@ -8,7 +8,7 @@ export interface ScaleBalancedIconProps
 export function ScaleBalancedIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ScaleBalancedIconProps) {
   return (

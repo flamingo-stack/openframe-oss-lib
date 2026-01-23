@@ -8,7 +8,7 @@ export interface CreditCardArrowDownIconProps
 export function CreditCardArrowDownIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CreditCardArrowDownIconProps) {
   return (

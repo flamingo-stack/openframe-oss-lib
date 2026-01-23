@@ -8,7 +8,7 @@ export interface CreditCardShieldIconProps
 export function CreditCardShieldIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CreditCardShieldIconProps) {
   return (

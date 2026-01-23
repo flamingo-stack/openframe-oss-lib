@@ -8,7 +8,7 @@ export interface HairdryerIconProps
 export function HairdryerIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HairdryerIconProps) {
   return (

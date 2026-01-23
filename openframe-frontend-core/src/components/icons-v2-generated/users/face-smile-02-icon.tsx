@@ -8,7 +8,7 @@ export interface FaceSmile02IconProps
 export function FaceSmile02Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FaceSmile02IconProps) {
   return (

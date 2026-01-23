@@ -8,7 +8,7 @@ export interface AlertHexagonIconProps
 export function AlertHexagonIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AlertHexagonIconProps) {
   return (

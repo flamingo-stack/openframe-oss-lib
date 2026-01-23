@@ -8,7 +8,7 @@ export interface CableCarIconProps
 export function CableCarIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CableCarIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface ChevronSquareLeftIconProps
 export function ChevronSquareLeftIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ChevronSquareLeftIconProps) {
   return (

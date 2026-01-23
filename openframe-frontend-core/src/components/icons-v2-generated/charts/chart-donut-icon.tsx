@@ -8,7 +8,7 @@ export interface ChartDonutIconProps
 export function ChartDonutIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ChartDonutIconProps) {
   return (

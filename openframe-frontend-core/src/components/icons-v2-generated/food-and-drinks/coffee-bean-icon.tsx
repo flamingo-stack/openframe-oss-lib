@@ -8,7 +8,7 @@ export interface CoffeeBeanIconProps
 export function CoffeeBeanIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CoffeeBeanIconProps) {
   return (

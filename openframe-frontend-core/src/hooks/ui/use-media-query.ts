@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useLayoutEffect, useState } from "react"
 
 /**
  * Hook to check if a media query matches
@@ -11,7 +11,7 @@ export function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = useState(false)
   const [isClient, setIsClient] = useState(false)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setIsClient(true)
     if (!isClient) return
 
@@ -44,7 +44,7 @@ export function useWindowSize() {
   })
   const [isClient, setIsClient] = useState(false)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setIsClient(true)
     if (!isClient) return
 
@@ -84,6 +84,14 @@ export const breakpoints = {
  * @param breakpoint - Breakpoint to consider as mobile
  * @returns Whether the screen is mobile
  */
-export function useMobile(breakpoint: string = breakpoints.md): boolean {
-  return !useMediaQuery(breakpoint)
+export function useMobile(): boolean {
+  return !useMediaQuery(breakpoints.md)
+}
+
+export function useDesktop(): boolean {
+  return useMediaQuery(breakpoints.lg)
+}
+
+export function useTablet(): boolean {
+  return !useMediaQuery(breakpoints.lg)
 }

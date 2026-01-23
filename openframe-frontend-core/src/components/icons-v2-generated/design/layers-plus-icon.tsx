@@ -8,7 +8,7 @@ export interface LayersPlusIconProps
 export function LayersPlusIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: LayersPlusIconProps) {
   return (

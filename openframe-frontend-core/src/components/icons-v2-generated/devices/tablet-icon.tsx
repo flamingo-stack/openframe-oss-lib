@@ -8,7 +8,7 @@ export interface TabletIconProps
 export function TabletIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TabletIconProps) {
   return (

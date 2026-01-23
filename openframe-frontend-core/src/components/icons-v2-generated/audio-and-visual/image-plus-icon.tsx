@@ -8,7 +8,7 @@ export interface ImagePlusIconProps
 export function ImagePlusIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ImagePlusIconProps) {
   return (

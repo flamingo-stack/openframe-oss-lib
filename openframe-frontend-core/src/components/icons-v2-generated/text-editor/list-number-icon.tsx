@@ -8,7 +8,7 @@ export interface ListNumberIconProps
 export function ListNumberIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ListNumberIconProps) {
   return (

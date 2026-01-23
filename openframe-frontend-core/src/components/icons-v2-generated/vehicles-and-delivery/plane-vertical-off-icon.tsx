@@ -8,7 +8,7 @@ export interface PlaneVerticalOffIconProps
 export function PlaneVerticalOffIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PlaneVerticalOffIconProps) {
   return (

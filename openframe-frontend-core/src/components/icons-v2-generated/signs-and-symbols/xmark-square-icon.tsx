@@ -8,7 +8,7 @@ export interface XmarkSquareIconProps
 export function XmarkSquareIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: XmarkSquareIconProps) {
   return (

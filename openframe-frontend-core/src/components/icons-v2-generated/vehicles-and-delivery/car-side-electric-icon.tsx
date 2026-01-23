@@ -8,7 +8,7 @@ export interface CarSideElectricIconProps
 export function CarSideElectricIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CarSideElectricIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface RadiationCircleIconProps
 export function RadiationCircleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: RadiationCircleIconProps) {
   return (

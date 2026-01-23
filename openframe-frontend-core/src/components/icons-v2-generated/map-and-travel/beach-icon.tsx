@@ -8,7 +8,7 @@ export interface BeachIconProps
 export function BeachIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BeachIconProps) {
   return (

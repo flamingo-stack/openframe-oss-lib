@@ -8,7 +8,7 @@ export interface SlackLogoIconProps
 export function SlackLogoIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SlackLogoIconProps) {
   return (

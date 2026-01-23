@@ -8,7 +8,7 @@ export interface YinYangIconProps
 export function YinYangIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: YinYangIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface VoicemailIconProps
 export function VoicemailIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: VoicemailIconProps) {
   return (

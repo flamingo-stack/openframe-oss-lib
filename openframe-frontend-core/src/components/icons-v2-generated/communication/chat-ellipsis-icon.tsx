@@ -8,7 +8,7 @@ export interface ChatEllipsisIconProps
 export function ChatEllipsisIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ChatEllipsisIconProps) {
   return (

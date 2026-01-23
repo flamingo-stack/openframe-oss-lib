@@ -8,7 +8,7 @@ export interface GraphLineUpIconProps
 export function GraphLineUpIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: GraphLineUpIconProps) {
   return (

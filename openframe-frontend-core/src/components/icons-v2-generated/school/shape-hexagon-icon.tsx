@@ -8,7 +8,7 @@ export interface ShapeHexagonIconProps
 export function ShapeHexagonIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ShapeHexagonIconProps) {
   return (

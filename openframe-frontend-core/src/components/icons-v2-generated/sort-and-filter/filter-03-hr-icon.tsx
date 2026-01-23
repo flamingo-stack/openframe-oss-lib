@@ -8,7 +8,7 @@ export interface Filter03HrIconProps
 export function Filter03HrIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Filter03HrIconProps) {
   return (

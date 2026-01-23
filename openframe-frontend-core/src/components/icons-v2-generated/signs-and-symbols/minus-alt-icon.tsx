@@ -8,7 +8,7 @@ export interface MinusAltIconProps
 export function MinusAltIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MinusAltIconProps) {
   return (

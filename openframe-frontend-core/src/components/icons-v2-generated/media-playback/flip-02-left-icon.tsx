@@ -8,7 +8,7 @@ export interface Flip02LeftIconProps
 export function Flip02LeftIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Flip02LeftIconProps) {
   return (

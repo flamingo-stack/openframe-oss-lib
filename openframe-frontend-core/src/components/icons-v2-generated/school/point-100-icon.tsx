@@ -8,7 +8,7 @@ export interface Point100IconProps
 export function Point100Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Point100IconProps) {
   return (

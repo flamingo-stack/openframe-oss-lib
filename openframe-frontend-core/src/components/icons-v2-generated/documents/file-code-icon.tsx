@@ -8,7 +8,7 @@ export interface FileCodeIconProps
 export function FileCodeIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FileCodeIconProps) {
   return (

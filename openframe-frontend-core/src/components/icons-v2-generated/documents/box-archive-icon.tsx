@@ -8,7 +8,7 @@ export interface BoxArchiveIconProps
 export function BoxArchiveIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BoxArchiveIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface CassetteTapeIconProps
 export function CassetteTapeIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CassetteTapeIconProps) {
   return (

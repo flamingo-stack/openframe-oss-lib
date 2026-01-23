@@ -8,7 +8,7 @@ export interface ShieldPlusIconProps
 export function ShieldPlusIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ShieldPlusIconProps) {
   return (

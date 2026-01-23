@@ -8,7 +8,7 @@ export interface BrowserWindowIconProps
 export function BrowserWindowIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BrowserWindowIconProps) {
   return (

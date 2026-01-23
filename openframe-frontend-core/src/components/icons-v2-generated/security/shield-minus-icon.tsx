@@ -8,7 +8,7 @@ export interface ShieldMinusIconProps
 export function ShieldMinusIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ShieldMinusIconProps) {
   return (

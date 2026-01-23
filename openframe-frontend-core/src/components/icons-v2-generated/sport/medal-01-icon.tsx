@@ -8,7 +8,7 @@ export interface Medal01IconProps
 export function Medal01Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Medal01IconProps) {
   return (

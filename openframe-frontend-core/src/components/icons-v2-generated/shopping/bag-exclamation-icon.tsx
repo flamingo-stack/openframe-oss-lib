@@ -8,7 +8,7 @@ export interface BagExclamationIconProps
 export function BagExclamationIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BagExclamationIconProps) {
   return (

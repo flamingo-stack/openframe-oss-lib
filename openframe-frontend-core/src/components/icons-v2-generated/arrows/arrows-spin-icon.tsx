@@ -8,7 +8,7 @@ export interface ArrowsSpinIconProps
 export function ArrowsSpinIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ArrowsSpinIconProps) {
   return (

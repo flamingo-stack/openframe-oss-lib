@@ -8,7 +8,7 @@ export interface GooglePlayIconProps
 export function GooglePlayIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: GooglePlayIconProps) {
   return (

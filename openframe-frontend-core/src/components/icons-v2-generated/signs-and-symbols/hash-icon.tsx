@@ -8,7 +8,7 @@ export interface HashIconProps
 export function HashIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HashIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface ChatFaceIconProps
 export function ChatFaceIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ChatFaceIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface Login02IconProps
 export function Login02Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Login02IconProps) {
   return (

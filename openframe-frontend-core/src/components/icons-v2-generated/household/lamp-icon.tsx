@@ -8,7 +8,7 @@ export interface LampIconProps
 export function LampIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: LampIconProps) {
   return (

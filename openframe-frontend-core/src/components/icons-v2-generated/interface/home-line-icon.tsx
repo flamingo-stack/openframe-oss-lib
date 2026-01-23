@@ -8,7 +8,7 @@ export interface HomeLineIconProps
 export function HomeLineIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HomeLineIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface EggIconProps
 export function EggIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: EggIconProps) {
   return (

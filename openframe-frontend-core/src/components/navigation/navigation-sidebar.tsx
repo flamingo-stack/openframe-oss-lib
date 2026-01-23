@@ -1,279 +1,277 @@
 "use client"
 
-import React, { useState, useCallback, useEffect } from 'react'
-import { cn } from '../../utils'
-import { NavigationSidebarConfig, NavigationSidebarItem } from '../../types/navigation'
-import { DoubleChevronIcon, OpenFrameLogo, OpenFrameText } from '../icons'
+import { useTablet } from '@/hooks'
+import { cloneElement, useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocalStorage } from '../../hooks/ui/use-local-storage'
+import { NavigationSidebarConfig, NavigationSidebarItem } from '../../types/navigation'
+import { cn } from '../../utils'
+import { DoubleChevronIcon, OpenFrameLogo, OpenFrameText } from '../icons'
+
+// Constants
+const MINIMIZED_WIDTH = 56 // 3.5rem = 56px
+const EXPANDED_WIDTH = 224 // 14rem = 224px
+const STORAGE_KEY = 'of.navigationSidebar.minimized'
 
 export interface NavigationSidebarProps {
   config: NavigationSidebarConfig
 }
 
 export function NavigationSidebar({ config }: NavigationSidebarProps) {
-  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false)
 
-  const getInitialMinimizedValue = () => {
-    if (typeof window === 'undefined') return config.minimized ?? false
-    
-    const isMobileView = window.innerWidth < 768
-    const hasStoredValue = localStorage.getItem('of.navigationSidebar.minimized') !== null
-    
-    if (hasStoredValue) {
-      return config.minimized ?? false
-    } else if (isMobileView) {
-      return true
-    } else {
-      return config.minimized ?? false
-    }
-  }
+  const isTablet = useTablet()
 
-  const [minimized, setMinimized] = useLocalStorage<boolean>('of.navigationSidebar.minimized', getInitialMinimizedValue())
-  const [showText, setShowText] = useState(!minimized)
+  // Initialize minimized state based on tablet mode or config
+  // useLocalStorage will read from localStorage first, then fall back to this value
+  const [minimized, setMinimized] = useLocalStorage<boolean>(
+    STORAGE_KEY,
+    isTablet || (config.minimized ?? false)
+  )
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
-  // Detect mobile on mount and window resize
   useEffect(() => {
-    const checkMobile = () => {
-      const mobile = window.innerWidth < 768 // md breakpoint
-      setIsMobile(mobile)
-    }
-
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
+    setMounted(true)
   }, [])
 
-  // Handle text visibility with delay to prevent flickering
-  useEffect(() => {
-    if (isMobile) {
-      if (mobileMenuOpen) {
-        const timer = setTimeout(() => {
-          setShowText(true)
-        }, 50)
-        
-        return () => clearTimeout(timer)
-      } else {
-        setShowText(false)
-      }
-    } else {
-      if (minimized && !mobileMenuOpen) {
-        setShowText(false)
-      } else if (!minimized || mobileMenuOpen) {
-        const timer = setTimeout(() => {
-          setShowText(true)
-        }, 150)
-        
-        return () => clearTimeout(timer)
-      }
-    }
-  }, [minimized, mobileMenuOpen, isMobile])
-
   const handleToggleMinimized = useCallback(() => {
-    if (isMobile) {
-      setMobileMenuOpen(!mobileMenuOpen)
+    if (isTablet) {
+      setMobileMenuOpen(prev => !prev)
     } else {
-      const newMinimized = !minimized
-      setMinimized(newMinimized)
+      setMinimized(prev => !prev)
       config.onToggleMinimized?.()
     }
-  }, [minimized, mobileMenuOpen, isMobile, config])
+  }, [isTablet, setMinimized, config])
 
   const handleItemClick = useCallback((item: NavigationSidebarItem, event?: React.MouseEvent) => {
-    if (event) {
-      event.stopPropagation()
-    }
+    event?.stopPropagation()
 
-    if (isMobile && mobileMenuOpen) {
+    // Close mobile menu on navigation
+    if (isTablet && mobileMenuOpen) {
       setMobileMenuOpen(false)
     }
-    
+
     if (item.onClick) {
       item.onClick()
     } else if (item.path) {
       config.onNavigate?.(item.path)
     }
-  }, [config, isMobile, mobileMenuOpen])
+  }, [config, isTablet, mobileMenuOpen])
 
-  const renderNavigationItem = (item: NavigationSidebarItem, inOverlay = false) => {
+  const renderNavigationItem = useCallback((
+    item: NavigationSidebarItem,
+    inOverlay: boolean
+  ) => {
     const isActive = item.isActive ?? false
-    const isMinimized = isMobile && !inOverlay ? true : minimized
-    const showLabels = isMobile ? (inOverlay && showText) : (inOverlay || showText)
-    
+    const isMinimized = isTablet && !inOverlay ? true : minimized
+    const shouldShowLabel = isTablet ? inOverlay : (inOverlay || !minimized)
+
     return (
       <button
         key={item.id}
         onClick={(event) => handleItemClick(item, event)}
         className={cn(
-          "w-full flex items-center gap-2 p-4 transition-all duration-200 relative",
-          // Default state
-          !isActive && "hover:bg-[#2a2a2a] text-white",
-          // Active state with yellow background and text
-          isActive && "bg-[rgba(255,192,8,0.1)] text-[#ffc008] hover:bg-[rgba(255,192,8,0.15)] [&_svg]:text-[#ffc008] [&_svg]:fill-[#ffc008]",
-          isMinimized && !inOverlay ? "justify-center" : "justify-start"
+          "w-full flex items-center transition-all duration-200 relative",
+          "p-4",
+          // Hover and default states
+          !isActive && "hover:bg-bg-hover text-text-primary [&_svg]:fill-text-secondary",
+          // Active state
+          isActive && [
+            "bg-[var(--ods-open-yellow-light)] text-accent-primary",
+            "[&_svg]:fill-accent-primary"
+          ],
+          // Layout - proper centering in minimized mode
+          isMinimized && !inOverlay
+            ? "justify-center"
+            : "justify-start gap-2"
         )}
         title={isMinimized && !inOverlay ? item.label : undefined}
+        aria-label={item.label}
+        aria-current={isActive ? 'page' : undefined}
       >
-        {/* Active indicator - yellow left border */}
+        {/* Active indicator */}
         {isActive && (
-          <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#ffc008]" />
+          <div
+            className="absolute left-0 top-0 bottom-0 w-1 bg-accent-primary"
+            aria-hidden="true"
+          />
         )}
-        
-        {/* Icon - with explicit color prop */}
-        <div className={cn(
-          "flex-shrink-0 w-6 h-6",
-          "transition-colors duration-200"
-        )}>
-          {React.cloneElement(item.icon as React.ReactElement<any>, {
-            color: isActive ? "#ffc008" : "#888888"
+
+        {/* Icon container - fixed size for consistent centering */}
+        <div
+          className={cn(
+            "flex items-center justify-center",
+            "flex-shrink-0",
+            "transition-colors duration-200"
+          )}
+        >
+          {cloneElement(item.icon as React.ReactElement<any>, {
+            color: isActive ? "text-accent-primary" : "text-text-secondary"
           })}
         </div>
-        
-        {/* Label with smooth opacity transition */}
-        <span className={cn(
-          "font-['DM_Sans'] font-medium text-[18px] leading-[24px] flex-1 text-left",
-          "transition-all duration-200 truncate"
-        )}>
-          {item.label}
-        </span>
 
-        {/* Badge with smooth opacity transition */}
-        {item.badge && showLabels && (
-          <span className={cn(
-            "text-sm transition-all duration-200",
-            isActive ? "text-[#ffc008]" : "text-[#888888]"
-          )}>
+        {/* Label - only render when needed */}
+        {shouldShowLabel && (
+          <span
+            className={cn(
+              "font-['DM_Sans'] font-medium text-[18px] leading-[24px]",
+              "flex-1 text-left truncate"
+            )}
+          >
+            {item.label}
+          </span>
+        )}
+
+        {/* Badge - only show with label */}
+        {item.badge && shouldShowLabel && (
+          <span
+            className={cn(
+              "text-sm flex-shrink-0",
+              "transition-colors duration-200",
+              isActive ? "text-[#ffc008]" : "text-[#888888]"
+            )}
+          >
             {item.badge}
           </span>
         )}
       </button>
     )
-  }
+  }, [minimized, isTablet, handleItemClick])
 
-  // Separate items by section
-  const primaryItems = config.items.filter(item => item.section !== 'secondary')
-  const secondaryItems = config.items.filter(item => item.section === 'secondary')
+  // Memoize items separation
+  const { primaryItems, secondaryItems } = useMemo(() => ({
+    primaryItems: config.items.filter(item => item.section !== 'secondary'),
+    secondaryItems: config.items.filter(item => item.section === 'secondary')
+  }), [config.items])
 
-  const sidebarContent = (inOverlay = false) => (
+  const renderSidebarContent = useCallback((inOverlay: boolean) => (
     <>
-      {/* Header with logo */}
-      <div className="flex items-center gap-2 p-4 h-14 border-b border-[#3a3a3a]">
+      {/* Header */}
+      <div className="flex items-center gap-2 p-4 h-14 border-b border-border-primary">
         <div className="flex-shrink-0">
-          <OpenFrameLogo className="w-6 h-6" upperPathColor='#FAFAFA' lowerPathColor='#FFC008'/>
+          <OpenFrameLogo
+            className="w-6 h-6"
+            upperPathColor="var(--color-text-primary)"
+            lowerPathColor="var(--color-accent-primary)"
+          />
         </div>
-        {(inOverlay || showText) && (
-          <div className="flex-1 transition-all duration-200">
-            <OpenFrameText textColor='#FAFAFA'/>
+
+        {(inOverlay || !minimized) && (
+          <div className="flex-1 overflow-hidden">
+            <OpenFrameText textColor="var(--color-text-primary)" />
           </div>
         )}
-        {/* Close button for mobile overlay */}
+
+        {/* Mobile close button */}
         {inOverlay && (
           <button
             onClick={() => setMobileMenuOpen(false)}
-            className="md:hidden p-2 hover:bg-[#2a2a2a] rounded-md transition-colors"
+            className="md:hidden p-2 hover:bg-bg-hover rounded-md transition-colors"
             aria-label="Close menu"
           >
-            <svg className="w-5 h-5 text-white" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-              <path d="M6 18L18 6M6 6l12 12"></path>
+            <svg
+              className="w-5 h-5 text-text-primary"
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         )}
       </div>
 
-      {/* Main content area */}
+      {/* Navigation items */}
       <div className="flex-1 flex flex-col justify-between py-4">
-        {/* Primary navigation items */}
-        <div className="flex flex-col">
+        {/* Primary section */}
+        <nav className="flex flex-col" aria-label="Primary navigation">
           {primaryItems.map(item => renderNavigationItem(item, inOverlay))}
-        </div>
+        </nav>
 
-        {/* Secondary navigation items */}
+        {/* Secondary section */}
         {secondaryItems.length > 0 && (
-          <div className="flex flex-col">
+          <nav className="flex flex-col" aria-label="Secondary navigation">
             {secondaryItems.map(item => renderNavigationItem(item, inOverlay))}
-          </div>
+          </nav>
         )}
       </div>
 
-      {/* Footer with minimize/expand toggle - only show on desktop or in overlay */}
-      {(!isMobile || inOverlay) && (
-        <div className="border-t border-[#3a3a3a]">
+      {/* Toggle button footer */}
+      {(!isTablet || inOverlay) && (
+        <div className="border-t border-border-primary">
           <button
             onClick={inOverlay ? () => setMobileMenuOpen(false) : handleToggleMinimized}
             className={cn(
-              "w-full flex items-center gap-2 p-4 transition-colors",
-              "hover:bg-[#2a2a2a] text-white",
+              "w-full flex items-center gap-2 p-4",
+              "hover:bg-bg-hover text-text-primary",
+              "transition-colors duration-200",
               (!inOverlay && minimized) ? "justify-center" : "justify-start"
             )}
             title={inOverlay ? "Close Menu" : (minimized ? "Expand Menu" : "Hide Menu")}
+            aria-label={inOverlay ? "Close Menu" : (minimized ? "Expand Menu" : "Hide Menu")}
           >
             {inOverlay ? (
               <>
-                <DoubleChevronIcon direction='left' className="w-6 h-6" />
+                <DoubleChevronIcon direction="left" className="w-6 h-6" />
                 <span className="font-['DM_Sans'] font-medium text-[18px] leading-[24px]">
                   Close Menu
                 </span>
               </>
             ) : minimized ? (
-              <DoubleChevronIcon direction='right' className="w-6 h-6" />
+              <DoubleChevronIcon direction="right" className="w-6 h-6" />
             ) : (
               <>
-                <DoubleChevronIcon direction='left' className="w-6 h-6" />
-                {showText && (
-                  <span className="font-['DM_Sans'] font-medium text-[18px] leading-[24px] transition-all duration-200">
-                    Hide Menu
-                  </span>
-                )}
+                <DoubleChevronIcon direction="left" className="w-6 h-6" />
+                <span className="font-['DM_Sans'] font-medium text-[18px] leading-[24px]">
+                  Hide Menu
+                </span>
               </>
             )}
           </button>
         </div>
       )}
-      
-      {/* Custom footer content */}
+
+      {/* Custom footer */}
       {config.footer && (
-        <div className="border-t border-[#3a3a3a] p-4">
+        <div className="border-t border-border-primary p-4">
           {config.footer}
         </div>
       )}
     </>
-  )
+  ), [
+    minimized,
+    primaryItems,
+    secondaryItems,
+    renderNavigationItem,
+    isTablet,
+    handleToggleMinimized,
+    config.footer
+  ])
+
+  console.log('minimized', minimized)
+  console.log('isTablet', isTablet)
 
   return (
-    <>
-      {/* Main sidebar - always visible, minimized on mobile */}
-      <aside
-        className={cn(
-          "flex flex-col h-full bg-[#212121] border-r border-[#3a3a3a] transition-all duration-300",
-          isMobile ? "w-14" : (minimized ? "w-14" : "w-56"),
-          config.className
-        )}
-        style={isMobile ? { width: '3.5rem' } : undefined}
-      >
-        {sidebarContent(false)}
-      </aside>
-
-      {/* Mobile overlay menu */}
-      {isMobile && mobileMenuOpen && (
-        <>
-          {/* Backdrop */}
-          <div 
-            className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
-            onClick={() => setMobileMenuOpen(false)}
-          />
-          
-          {/* Overlay sidebar */}
-          <aside
-            className={cn(
-              "fixed left-0 top-0 h-full w-64 bg-[#212121] border-r border-[#3a3a3a] z-50 md:hidden",
-              "flex flex-col",
-              "animate-in slide-in-from-left duration-300"
-            )}
-          >
-            {sidebarContent(true)}
-          </aside>
-        </>
+    <aside
+      className={cn(
+        "flex-col h-full hidden md:flex",
+        "bg-bg-card border-r border-border-primary",
+        "transition-[width] duration-300",
+        config.className
       )}
-    </>
+      style={{
+        width: isTablet && mounted
+          ? `${MINIMIZED_WIDTH}px`
+          : minimized
+            ? `${MINIMIZED_WIDTH}px`
+            : `${EXPANDED_WIDTH}px`
+      }}
+      aria-label="Main navigation sidebar"
+    >
+      {renderSidebarContent(false)}
+    </aside>
   )
 }

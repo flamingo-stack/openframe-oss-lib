@@ -8,7 +8,7 @@ export interface WaterDropletIconProps
 export function WaterDropletIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: WaterDropletIconProps) {
   return (

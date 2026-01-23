@@ -8,7 +8,7 @@ export interface TrashCheckIconProps
 export function TrashCheckIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TrashCheckIconProps) {
   return (

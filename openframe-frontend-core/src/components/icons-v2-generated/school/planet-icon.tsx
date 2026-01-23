@@ -8,7 +8,7 @@ export interface PlanetIconProps
 export function PlanetIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PlanetIconProps) {
   return (

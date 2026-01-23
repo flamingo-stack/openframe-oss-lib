@@ -8,7 +8,7 @@ export interface ShapesIconProps
 export function ShapesIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ShapesIconProps) {
   return (

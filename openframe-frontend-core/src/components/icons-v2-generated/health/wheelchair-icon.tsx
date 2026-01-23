@@ -8,7 +8,7 @@ export interface WheelchairIconProps
 export function WheelchairIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: WheelchairIconProps) {
   return (

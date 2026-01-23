@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { useEffect } from "react"
-import { X } from "lucide-react"
 import { cn } from "../../utils/cn"
 
 interface ModalProps {
@@ -128,8 +127,6 @@ ModalFooter.displayName = "ModalFooter"
 
 export {
   Modal,
-  ModalContent,
-  ModalHeader,
-  ModalTitle,
-  ModalFooter,
+  ModalContent, ModalFooter, ModalHeader,
+  ModalTitle
 }

@@ -8,7 +8,7 @@ export interface NoseIconProps
 export function NoseIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: NoseIconProps) {
   return (

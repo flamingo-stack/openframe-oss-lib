@@ -8,7 +8,7 @@ export interface WatchPulseIconProps
 export function WatchPulseIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: WatchPulseIconProps) {
   return (

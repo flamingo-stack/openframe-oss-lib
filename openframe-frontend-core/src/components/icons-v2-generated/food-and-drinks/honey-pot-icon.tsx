@@ -8,7 +8,7 @@ export interface HoneyPotIconProps
 export function HoneyPotIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HoneyPotIconProps) {
   return (

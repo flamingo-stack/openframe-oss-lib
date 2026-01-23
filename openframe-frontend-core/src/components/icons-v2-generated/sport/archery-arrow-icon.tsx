@@ -8,7 +8,7 @@ export interface ArcheryArrowIconProps
 export function ArcheryArrowIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ArcheryArrowIconProps) {
   return (

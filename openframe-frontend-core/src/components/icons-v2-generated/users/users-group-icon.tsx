@@ -8,7 +8,7 @@ export interface UsersGroupIconProps
 export function UsersGroupIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: UsersGroupIconProps) {
   return (

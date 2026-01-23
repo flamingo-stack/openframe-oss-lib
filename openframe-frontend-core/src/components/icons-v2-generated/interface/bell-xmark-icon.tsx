@@ -8,7 +8,7 @@ export interface BellXmarkIconProps
 export function BellXmarkIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BellXmarkIconProps) {
   return (

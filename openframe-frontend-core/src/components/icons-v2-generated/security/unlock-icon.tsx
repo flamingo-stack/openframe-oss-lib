@@ -8,7 +8,7 @@ export interface UnlockIconProps
 export function UnlockIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: UnlockIconProps) {
   return (

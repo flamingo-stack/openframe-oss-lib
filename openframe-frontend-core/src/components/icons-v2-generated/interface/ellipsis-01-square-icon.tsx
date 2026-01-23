@@ -8,7 +8,7 @@ export interface Ellipsis01SquareIconProps
 export function Ellipsis01SquareIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Ellipsis01SquareIconProps) {
   return (

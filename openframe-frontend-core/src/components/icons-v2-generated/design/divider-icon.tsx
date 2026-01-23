@@ -8,7 +8,7 @@ export interface DividerIconProps
 export function DividerIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: DividerIconProps) {
   return (

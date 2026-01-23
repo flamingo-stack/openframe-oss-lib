@@ -8,7 +8,7 @@ export interface CloudWeatherSnow02IconProps
 export function CloudWeatherSnow02Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CloudWeatherSnow02IconProps) {
   return (

@@ -8,7 +8,7 @@ export interface PackageXmarkIconProps
 export function PackageXmarkIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PackageXmarkIconProps) {
   return (

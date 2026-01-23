@@ -8,7 +8,7 @@ export interface Ellipsis02CircleIconProps
 export function Ellipsis02CircleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Ellipsis02CircleIconProps) {
   return (

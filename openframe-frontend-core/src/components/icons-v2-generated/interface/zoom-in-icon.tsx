@@ -8,7 +8,7 @@ export interface ZoomInIconProps
 export function ZoomInIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ZoomInIconProps) {
   return (

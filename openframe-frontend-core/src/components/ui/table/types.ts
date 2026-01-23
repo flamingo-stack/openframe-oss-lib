@@ -1,5 +1,7 @@
 import { ReactNode } from 'react'
 
+export type TailwindBreakpoint = 'sm' | 'md' | 'lg' | 'xl' | '2xl'
+
 export interface TableColumn<T = any> {
   key: string
   label: string
@@ -7,7 +9,7 @@ export interface TableColumn<T = any> {
   align?: 'left' | 'center' | 'right'
   sortable?: boolean
   filterable?: boolean
-  hideOnMobile?: boolean
+  hideAt?: TailwindBreakpoint | TailwindBreakpoint[]
   renderCell?: (item: T, column: TableColumn<T>) => ReactNode
   renderHeader?: () => ReactNode
   className?: string
@@ -112,10 +114,6 @@ export interface TableProps<T = any> {
   bulkActions?: BulkAction<T>[]
   showToolbar?: boolean
   
-  // Mobile
-  mobileColumns?: string[]
-  renderMobileRow?: (item: T) => ReactNode
-  
   // Pagination - supports both cursor and page-based
   cursorPagination?: CursorPagination
   pagePagination?: PagePagination
@@ -150,27 +148,21 @@ export interface TableHeaderProps<T = any> {
   // Filtering
   filters?: TableFilters
   onFilterChange?: (filters: TableFilters) => void
-  showFilters?: boolean
   // Selection
   selectable?: boolean
   allSelected?: boolean
   someSelected?: boolean
   onSelectAll?: () => void
+  totalItemsCount: number
 }
 
 export interface TableRowProps<T = any> {
   item: T
   columns: TableColumn<T>[]
-  rowKey: keyof T | ((item: T) => string)
   onClick?: (item: T) => void
   className?: string | ((item: T, index: number) => string)
   index: number
   isMobile?: boolean
-  mobileColumns?: string[]
-  renderMobileRow?: (item: T) => ReactNode
-  // Mobile actions only (desktop uses synthetic column)
-  rowActions?: RowAction<T>[]
-  renderRowActions?: (item: T) => ReactNode
   // Selection
   selectable?: boolean
   selected?: boolean

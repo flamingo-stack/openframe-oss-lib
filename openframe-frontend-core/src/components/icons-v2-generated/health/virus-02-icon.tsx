@@ -8,7 +8,7 @@ export interface Virus02IconProps
 export function Virus02Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Virus02IconProps) {
   return (

@@ -8,7 +8,7 @@ export interface HospitalIconProps
 export function HospitalIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HospitalIconProps) {
   return (

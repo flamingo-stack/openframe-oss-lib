@@ -8,7 +8,7 @@ export interface PostSignIconProps
 export function PostSignIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PostSignIconProps) {
   return (

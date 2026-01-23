@@ -8,7 +8,7 @@ export interface MicIconProps
 export function MicIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MicIconProps) {
   return (

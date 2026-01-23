@@ -8,7 +8,7 @@ export interface EmailSearchIconProps
 export function EmailSearchIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: EmailSearchIconProps) {
   return (

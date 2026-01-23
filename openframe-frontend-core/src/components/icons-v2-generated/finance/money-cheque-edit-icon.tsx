@@ -8,7 +8,7 @@ export interface MoneyChequeEditIconProps
 export function MoneyChequeEditIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MoneyChequeEditIconProps) {
   return (

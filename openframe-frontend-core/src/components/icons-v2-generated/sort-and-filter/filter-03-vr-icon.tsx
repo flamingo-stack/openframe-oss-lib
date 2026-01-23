@@ -8,7 +8,7 @@ export interface Filter03VrIconProps
 export function Filter03VrIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Filter03VrIconProps) {
   return (

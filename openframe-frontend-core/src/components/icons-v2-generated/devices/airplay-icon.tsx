@@ -8,7 +8,7 @@ export interface AirplayIconProps
 export function AirplayIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AirplayIconProps) {
   return (

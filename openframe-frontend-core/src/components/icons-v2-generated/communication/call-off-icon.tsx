@@ -8,7 +8,7 @@ export interface CallOffIconProps
 export function CallOffIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CallOffIconProps) {
   return (

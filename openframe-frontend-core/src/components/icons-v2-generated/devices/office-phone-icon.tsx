@@ -8,7 +8,7 @@ export interface OfficePhoneIconProps
 export function OfficePhoneIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: OfficePhoneIconProps) {
   return (

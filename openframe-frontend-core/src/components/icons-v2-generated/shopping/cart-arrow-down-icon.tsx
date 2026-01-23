@@ -8,7 +8,7 @@ export interface CartArrowDownIconProps
 export function CartArrowDownIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CartArrowDownIconProps) {
   return (

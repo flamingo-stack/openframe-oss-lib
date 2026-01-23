@@ -8,7 +8,7 @@ export interface ShieldXmarkIconProps
 export function ShieldXmarkIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ShieldXmarkIconProps) {
   return (

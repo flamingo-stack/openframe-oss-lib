@@ -8,7 +8,7 @@ export interface TreesIconProps
 export function TreesIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TreesIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface MonitorIconProps
 export function MonitorIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MonitorIconProps) {
   return (

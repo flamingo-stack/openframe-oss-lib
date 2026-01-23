@@ -8,7 +8,7 @@ export interface MugIconProps
 export function MugIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MugIconProps) {
   return (

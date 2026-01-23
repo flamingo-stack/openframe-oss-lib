@@ -8,7 +8,7 @@ export interface TimerIconProps
 export function TimerIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TimerIconProps) {
   return (

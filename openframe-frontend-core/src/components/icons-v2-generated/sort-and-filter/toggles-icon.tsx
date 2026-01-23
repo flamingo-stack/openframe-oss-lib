@@ -8,7 +8,7 @@ export interface TogglesIconProps
 export function TogglesIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TogglesIconProps) {
   return (

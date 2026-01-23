@@ -8,7 +8,7 @@ export interface SuitcaseIconProps
 export function SuitcaseIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SuitcaseIconProps) {
   return (

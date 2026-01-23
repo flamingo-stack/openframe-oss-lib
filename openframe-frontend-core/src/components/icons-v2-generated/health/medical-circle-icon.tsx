@@ -8,7 +8,7 @@ export interface MedicalCircleIconProps
 export function MedicalCircleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MedicalCircleIconProps) {
   return (

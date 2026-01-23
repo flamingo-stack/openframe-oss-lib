@@ -8,7 +8,7 @@ export interface CupcakeIconProps
 export function CupcakeIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CupcakeIconProps) {
   return (

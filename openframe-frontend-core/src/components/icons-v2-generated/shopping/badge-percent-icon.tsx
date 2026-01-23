@@ -8,7 +8,7 @@ export interface BadgePercentIconProps
 export function BadgePercentIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BadgePercentIconProps) {
   return (

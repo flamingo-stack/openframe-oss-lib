@@ -8,7 +8,7 @@ export interface AlertAltIconProps
 export function AlertAltIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AlertAltIconProps) {
   return (

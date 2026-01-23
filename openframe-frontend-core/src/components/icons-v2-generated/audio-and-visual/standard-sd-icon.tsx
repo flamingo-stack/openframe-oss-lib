@@ -8,7 +8,7 @@ export interface StandardSdIconProps
 export function StandardSdIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: StandardSdIconProps) {
   return (

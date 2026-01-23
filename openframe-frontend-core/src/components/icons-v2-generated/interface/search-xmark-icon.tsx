@@ -8,7 +8,7 @@ export interface SearchXmarkIconProps
 export function SearchXmarkIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SearchXmarkIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface MicroscopeIconProps
 export function MicroscopeIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MicroscopeIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface BankInterestIconProps
 export function BankInterestIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BankInterestIconProps) {
   return (

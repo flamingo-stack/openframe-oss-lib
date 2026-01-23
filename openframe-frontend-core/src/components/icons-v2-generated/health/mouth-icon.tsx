@@ -8,7 +8,7 @@ export interface MouthIconProps
 export function MouthIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MouthIconProps) {
   return (

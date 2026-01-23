@@ -8,7 +8,7 @@ export interface Ellipsis02StrokeIconProps
 export function Ellipsis02StrokeIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Ellipsis02StrokeIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface AlphabetIIconProps
 export function AlphabetIIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AlphabetIIconProps) {
   return (

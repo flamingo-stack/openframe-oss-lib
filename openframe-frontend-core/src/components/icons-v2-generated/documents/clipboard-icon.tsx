@@ -8,7 +8,7 @@ export interface ClipboardIconProps
 export function ClipboardIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ClipboardIconProps) {
   return (

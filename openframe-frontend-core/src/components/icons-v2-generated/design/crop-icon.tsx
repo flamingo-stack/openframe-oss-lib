@@ -8,7 +8,7 @@ export interface CropIconProps
 export function CropIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CropIconProps) {
   return (

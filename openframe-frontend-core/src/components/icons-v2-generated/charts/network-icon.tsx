@@ -8,7 +8,7 @@ export interface NetworkIconProps
 export function NetworkIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: NetworkIconProps) {
   return (

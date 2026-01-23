@@ -8,7 +8,7 @@ export interface Gauge01IconProps
 export function Gauge01Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Gauge01IconProps) {
   return (

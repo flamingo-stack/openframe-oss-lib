@@ -1,50 +1,30 @@
 'use client'
 
-import React from 'react'
-import { ListPageContainer } from './page-container'
-import { SearchBar, PageError } from '../ui'
+import React, { useState } from 'react'
+import { Filter02Icon } from '../icons-v2-generated'
+import { Button, PageError, SearchBar } from '../ui'
+import { MobileFilterModal, type FilterGroup, type SortConfig, type SortDirection } from '../ui/mobile-filter-sheet'
+import type { TableFilters } from '../ui/table/types'
+import { ListPageContainer, type PageActionButton } from './page-container'
 
 export interface ListPageLayoutProps {
-  /**
-   * Page title
-   */
   title: string
-  /**
-   * Header actions (buttons, controls, etc.)
-   */
   headerActions?: React.ReactNode
-  /**
-   * Search placeholder text
-   */
+  actions?: PageActionButton[]
   searchPlaceholder: string
-  /**
-   * Search value
-   */
   searchValue: string
-  /**
-   * Search change handler
-   */
   onSearch: (term: string) => void
-  /**
-   * Main content (usually a Table or Grid)
-   */
   children: React.ReactNode
-  /**
-   * Error message to display instead of content
-   */
   error?: string | null
-  /**
-   * Additional CSS classes for the container
-   */
   className?: string
-  /**
-   * Container padding
-   */
   padding?: 'none' | 'sm' | 'md' | 'lg'
-  /**
-   * Container background
-   */
   background?: 'default' | 'card' | 'transparent'
+  mobileFilterGroups?: FilterGroup[]
+  onMobileFilterChange?: (filters: TableFilters) => void
+  currentMobileFilters?: TableFilters
+  mobileSortConfig?: SortConfig
+  onMobileSort?: (column: string, direction: SortDirection) => void
+  mobileFilterTitle?: string
 }
 
 /**
@@ -107,6 +87,7 @@ export interface ListPageLayoutProps {
 export function ListPageLayout({
   title,
   headerActions,
+  actions,
   searchPlaceholder,
   searchValue,
   onSearch,
@@ -114,8 +95,19 @@ export function ListPageLayout({
   error,
   className,
   padding = 'sm',
-  background = 'default'
+  background = 'default',
+  mobileFilterGroups,
+  onMobileFilterChange,
+  currentMobileFilters,
+  mobileSortConfig,
+  onMobileSort,
+  mobileFilterTitle
 }: ListPageLayoutProps) {
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false)
+
+  // Check if mobile filter is enabled (has filter groups or sort config)
+  const hasMobileFilter = (mobileFilterGroups && mobileFilterGroups.length > 0) ||
+    (mobileSortConfig && mobileSortConfig.columns.length > 0)
 
   if (error) {
     return <PageError message={error} />
@@ -125,22 +117,55 @@ export function ListPageLayout({
     <ListPageContainer
       title={title}
       headerActions={headerActions}
+      actions={actions}
       padding={padding}
       background={background}
       className={className}
     >
-      {/* Search Bar - Full Width */}
-      <SearchBar
-        placeholder={searchPlaceholder}
-        onSubmit={onSearch}
-        value={searchValue}
-        className="w-full"
-      />
+      {/* Search Bar with Mobile Filter Button */}
+      <div className="flex gap-4 items-center w-full">
+        <SearchBar
+          placeholder={searchPlaceholder}
+          onSubmit={onSearch}
+          value={searchValue}
+          className="flex-1"
+        />
+
+        {/* Mobile Filter Button - only visible on mobile when filter is enabled */}
+        {hasMobileFilter && (
+          <Button
+            variant="search"
+            size="icon"
+            className="md:hidden"
+            onClick={() => setMobileFilterOpen(true)}
+            aria-label="Open filters"
+          >
+            <Filter02Icon />
+          </Button>
+        )}
+      </div>
+
+      {/* Mobile Filter Sheet */}
+      {hasMobileFilter && (
+        <MobileFilterModal
+          isOpen={mobileFilterOpen}
+          onClose={() => setMobileFilterOpen(false)}
+          title={mobileFilterTitle}
+          filterGroups={mobileFilterGroups || []}
+          onFilterChange={onMobileFilterChange || (() => {})}
+          currentFilters={currentMobileFilters || {}}
+          sortConfig={mobileSortConfig}
+          onSort={onMobileSort}
+        />
+      )}
 
       {/* Main Content - Table/Grid with filters */}
       {children}
     </ListPageContainer>
   )
 }
+
+// Re-export PageActionButton type for convenience
+export type { PageActionButton } from './page-container'
 
 export default ListPageLayout

@@ -8,7 +8,7 @@ export interface MagicWandIconProps
 export function MagicWandIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MagicWandIconProps) {
   return (

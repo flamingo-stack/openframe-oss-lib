@@ -8,7 +8,7 @@ export interface Watch02IconProps
 export function Watch02Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Watch02IconProps) {
   return (

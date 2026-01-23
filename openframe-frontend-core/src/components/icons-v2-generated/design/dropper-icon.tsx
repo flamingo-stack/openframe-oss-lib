@@ -8,7 +8,7 @@ export interface DropperIconProps
 export function DropperIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: DropperIconProps) {
   return (

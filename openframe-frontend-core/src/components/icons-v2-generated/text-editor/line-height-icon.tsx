@@ -8,7 +8,7 @@ export interface LineHeightIconProps
 export function LineHeightIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: LineHeightIconProps) {
   return (

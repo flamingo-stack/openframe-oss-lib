@@ -8,7 +8,7 @@ export interface DistributeVerticalIconProps
 export function DistributeVerticalIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: DistributeVerticalIconProps) {
   return (

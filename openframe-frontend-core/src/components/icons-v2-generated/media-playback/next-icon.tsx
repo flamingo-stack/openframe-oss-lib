@@ -8,7 +8,7 @@ export interface NextIconProps
 export function NextIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: NextIconProps) {
   return (

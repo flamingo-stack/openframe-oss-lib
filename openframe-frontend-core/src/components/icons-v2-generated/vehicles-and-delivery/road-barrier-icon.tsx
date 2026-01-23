@@ -8,7 +8,7 @@ export interface RoadBarrierIconProps
 export function RoadBarrierIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: RoadBarrierIconProps) {
   return (

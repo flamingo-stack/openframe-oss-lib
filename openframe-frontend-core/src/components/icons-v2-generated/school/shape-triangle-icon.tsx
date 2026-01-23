@@ -8,7 +8,7 @@ export interface ShapeTriangleIconProps
 export function ShapeTriangleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ShapeTriangleIconProps) {
   return (

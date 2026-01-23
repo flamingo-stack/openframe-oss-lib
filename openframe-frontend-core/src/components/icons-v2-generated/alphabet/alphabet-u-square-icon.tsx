@@ -8,7 +8,7 @@ export interface AlphabetUSquareIconProps
 export function AlphabetUSquareIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AlphabetUSquareIconProps) {
   return (

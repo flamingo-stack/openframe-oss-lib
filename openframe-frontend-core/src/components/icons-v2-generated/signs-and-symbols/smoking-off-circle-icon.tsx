@@ -8,7 +8,7 @@ export interface SmokingOffCircleIconProps
 export function SmokingOffCircleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SmokingOffCircleIconProps) {
   return (

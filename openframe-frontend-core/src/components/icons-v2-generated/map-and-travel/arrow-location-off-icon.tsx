@@ -8,7 +8,7 @@ export interface ArrowLocationOffIconProps
 export function ArrowLocationOffIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ArrowLocationOffIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface MotorbikeIconProps
 export function MotorbikeIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MotorbikeIconProps) {
   return (

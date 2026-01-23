@@ -8,7 +8,7 @@ export interface PotIconProps
 export function PotIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PotIconProps) {
   return (

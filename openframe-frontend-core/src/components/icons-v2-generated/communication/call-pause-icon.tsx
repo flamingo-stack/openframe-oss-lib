@@ -8,7 +8,7 @@ export interface CallPauseIconProps
 export function CallPauseIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CallPauseIconProps) {
   return (

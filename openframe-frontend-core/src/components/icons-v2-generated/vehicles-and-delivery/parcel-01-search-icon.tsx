@@ -8,7 +8,7 @@ export interface Parcel01SearchIconProps
 export function Parcel01SearchIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Parcel01SearchIconProps) {
   return (

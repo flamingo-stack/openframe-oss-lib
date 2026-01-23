@@ -8,7 +8,7 @@ export interface ArrowCircleLeftIconProps
 export function ArrowCircleLeftIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ArrowCircleLeftIconProps) {
   return (

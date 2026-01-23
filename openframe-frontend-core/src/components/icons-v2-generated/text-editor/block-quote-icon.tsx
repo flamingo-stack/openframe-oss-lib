@@ -8,7 +8,7 @@ export interface BlockQuoteIconProps
 export function BlockQuoteIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BlockQuoteIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface TrafficConeIconProps
 export function TrafficConeIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TrafficConeIconProps) {
   return (

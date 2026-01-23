@@ -8,7 +8,7 @@ export interface Sparkle01BlinkIconProps
 export function Sparkle01BlinkIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: Sparkle01BlinkIconProps) {
   return (

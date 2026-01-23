@@ -8,7 +8,7 @@ export interface SpatulaIconProps
 export function SpatulaIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: SpatulaIconProps) {
   return (

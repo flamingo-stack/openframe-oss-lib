@@ -8,7 +8,7 @@ export interface StandardHdIconProps
 export function StandardHdIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: StandardHdIconProps) {
   return (

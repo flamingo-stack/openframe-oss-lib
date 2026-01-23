@@ -8,7 +8,7 @@ export interface FaceWorryIconProps
 export function FaceWorryIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: FaceWorryIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface TerminalSquareIconProps
 export function TerminalSquareIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TerminalSquareIconProps) {
   return (

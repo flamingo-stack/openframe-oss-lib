@@ -8,7 +8,7 @@ export interface TerminalBrowserIconProps
 export function TerminalBrowserIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TerminalBrowserIconProps) {
   return (

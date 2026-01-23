@@ -8,7 +8,7 @@ export interface MobilePhoneVibrationIconProps
 export function MobilePhoneVibrationIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: MobilePhoneVibrationIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface ArrangeIconProps
 export function ArrangeIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ArrangeIconProps) {
   return (

@@ -8,7 +8,7 @@ export interface BoxingIconProps
 export function BoxingIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BoxingIconProps) {
   return (

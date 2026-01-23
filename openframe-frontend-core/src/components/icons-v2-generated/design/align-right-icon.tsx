@@ -8,7 +8,7 @@ export interface AlignRightIconProps
 export function AlignRightIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: AlignRightIconProps) {
   return (

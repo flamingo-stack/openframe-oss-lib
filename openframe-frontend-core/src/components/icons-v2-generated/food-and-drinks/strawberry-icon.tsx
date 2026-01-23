@@ -8,7 +8,7 @@ export interface StrawberryIconProps
 export function StrawberryIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: StrawberryIconProps) {
   return (

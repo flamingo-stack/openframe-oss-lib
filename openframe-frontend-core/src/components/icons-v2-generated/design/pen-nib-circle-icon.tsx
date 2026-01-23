@@ -8,7 +8,7 @@ export interface PenNibCircleIconProps
 export function PenNibCircleIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: PenNibCircleIconProps) {
   return (

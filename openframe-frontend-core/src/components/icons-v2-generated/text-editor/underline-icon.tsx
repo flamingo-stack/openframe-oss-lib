@@ -8,7 +8,7 @@ export interface UnderlineIconProps
 export function UnderlineIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: UnderlineIconProps) {
   return (

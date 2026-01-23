@@ -8,7 +8,7 @@ export interface HeadingH5IconProps
 export function HeadingH5Icon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HeadingH5IconProps) {
   return (

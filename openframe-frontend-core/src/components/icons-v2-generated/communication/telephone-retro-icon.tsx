@@ -8,7 +8,7 @@ export interface TelephoneRetroIconProps
 export function TelephoneRetroIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: TelephoneRetroIconProps) {
   return (

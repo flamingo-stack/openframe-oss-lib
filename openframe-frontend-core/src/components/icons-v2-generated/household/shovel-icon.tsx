@@ -8,7 +8,7 @@ export interface ShovelIconProps
 export function ShovelIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: ShovelIconProps) {
   return (

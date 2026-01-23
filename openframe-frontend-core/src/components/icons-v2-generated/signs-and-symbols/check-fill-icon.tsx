@@ -8,7 +8,7 @@ export interface CheckFillIconProps
 export function CheckFillIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CheckFillIconProps) {
   return (

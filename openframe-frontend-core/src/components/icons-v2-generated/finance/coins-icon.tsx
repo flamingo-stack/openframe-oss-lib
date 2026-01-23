@@ -8,7 +8,7 @@ export interface CoinsIconProps
 export function CoinsIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: CoinsIconProps) {
   return (

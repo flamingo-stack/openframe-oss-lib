@@ -8,7 +8,7 @@ export interface HardDrivesIconProps
 export function HardDrivesIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: HardDrivesIconProps) {
   return (

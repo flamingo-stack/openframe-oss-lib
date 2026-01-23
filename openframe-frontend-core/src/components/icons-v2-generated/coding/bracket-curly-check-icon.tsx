@@ -8,7 +8,7 @@ export interface BracketCurlyCheckIconProps
 export function BracketCurlyCheckIcon({
   className = "",
   size = 24,
-  color = "#888888",
+  color = "currentColor",
   ...props
 }: BracketCurlyCheckIconProps) {
   return (
