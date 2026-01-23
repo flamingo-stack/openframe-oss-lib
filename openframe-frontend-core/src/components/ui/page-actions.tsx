@@ -15,55 +15,12 @@ export type PageActionButton = {
 }
 
 export interface PageActionsProps {
-  /**
-   * Variant determines the layout and button styles
-   * - 'icon-buttons': Buttons with icons (outline style), collapses to MoreActionsMenu on mobile
-   * - 'primary-buttons': Primary + outline button combo, becomes full-width fixed bottom on mobile
-   */
   variant?: 'icon-buttons' | 'primary-buttons'
-  /**
-   * Action buttons to display
-   * For 'icon-buttons': All buttons rendered as outline with icons
-   * For 'primary-buttons': First button is primary, second is outline
-   */
   actions: PageActionButton[]
-  /**
-   * Additional CSS classes for the container
-   */
   className?: string
-  /**
-   * Gap between buttons (default: 16px)
-   */
   gap?: 'sm' | 'md' | 'lg'
 }
 
-/**
- * PageActions component for displaying action buttons in page headers.
- *
- * Two variants:
- * 1. 'icon-buttons' - Buttons with icons, collapses to dropdown menu on mobile
- * 2. 'primary-buttons' - Primary + outline buttons, fixed to bottom on mobile
- *
- * @example
- * // Icon buttons variant (for list pages)
- * <PageActions
- *   variant="icon-buttons"
- *   actions={[
- *     { label: 'Edit Categories', onClick: () => {}, icon: <ColorsIcon /> },
- *     { label: 'Add Script', onClick: () => {}, icon: <PlusCircleIcon /> }
- *   ]}
- * />
- *
- * @example
- * // Primary buttons variant (for detail/form pages)
- * <PageActions
- *   variant="primary-buttons"
- *   actions={[
- *     { label: 'Save Script', onClick: () => {}, variant: 'primary' },
- *     { label: 'Test Script', onClick: () => {}, variant: 'outline' }
- *   ]}
- * />
- */
 export function PageActions({
   variant = 'icon-buttons',
   actions,
@@ -83,10 +40,6 @@ export function PageActions({
   return <PrimaryButtonsVariant actions={actions} className={className} gapClass={gapClasses[gap]} />
 }
 
-/**
- * Icon buttons variant - shows buttons with icons on desktop,
- * collapses to MoreActionsMenu on mobile (or shows single icon button if only one action)
- */
 function IconButtonsVariant({
   actions,
   className,
@@ -96,7 +49,6 @@ function IconButtonsVariant({
   className?: string
   gapClass: string
 }) {
-  // Convert actions to MoreActionsMenu items for mobile
   const menuItems: MoreActionsItem[] = actions.map(action => ({
     label: action.label,
     onClick: action.onClick,
@@ -104,7 +56,6 @@ function IconButtonsVariant({
     disabled: action.disabled
   }))
 
-  // If only one action, show it as icon button on mobile instead of menu
   const isSingleAction = actions.length === 1
   const singleAction = isSingleAction ? actions[0] : null
 
@@ -120,7 +71,6 @@ function IconButtonsVariant({
             disabled={action.disabled}
             loading={action.loading}
             leftIcon={action.icon}
-            className="bg-ods-card border-ods-border hover:bg-ods-bg-hover"
           >
             {action.label}
           </Button>
@@ -138,7 +88,6 @@ function IconButtonsVariant({
             loading={singleAction.loading}
             centerIcon={singleAction.icon}
             aria-label={singleAction.label}
-            className="bg-ods-card border-ods-border hover:bg-ods-bg-hover"
           />
         ) : (
           <MoreActionsMenu items={menuItems} />
@@ -163,27 +112,23 @@ function PrimaryButtonsVariant({
 }) {
   // Sort actions: primary first, then outline
   const sortedActions = [...actions].sort((a, b) => {
-    if (a.variant === 'primary' && b.variant !== 'primary') return -1
-    if (a.variant !== 'primary' && b.variant === 'primary') return 1
+    if (a.variant === 'primary' && b.variant !== 'primary') return 1
+    if (a.variant !== 'primary' && b.variant === 'primary') return -1
     return 0
   })
-
-  // Reverse for desktop (primary on right)
-  const desktopActions = [...sortedActions].reverse()
 
   return (
     <>
       {/* Desktop: Normal layout (outline left, primary right) */}
       <div className={cn('hidden md:flex items-center', gapClass, className)}>
-        {desktopActions.map((action, idx) => (
+        {sortedActions.map((action, idx) => (
           <Button
             key={`desktop-${action.label}-${idx}`}
-            variant={action.variant === 'primary' ? 'primary' : 'outline'}
+            variant={action.variant}
             onClick={action.onClick}
             disabled={action.disabled}
             loading={action.loading}
             leftIcon={action.icon}
-            className={action.variant !== 'primary' ? 'bg-ods-card border-ods-border hover:bg-ods-bg-hover' : ''}
           >
             {action.label}
           </Button>
@@ -196,9 +141,6 @@ function PrimaryButtonsVariant({
   )
 }
 
-/**
- * Mobile bottom fixed action bar
- */
 function MobileBottomActions({
   actions,
   gapClass
@@ -216,14 +158,12 @@ function MobileBottomActions({
       {actions.map((action, idx) => (
         <Button
           key={`mobile-${action.label}-${idx}`}
-          variant={action.variant === 'primary' ? 'primary' : 'outline'}
+          variant={action.variant}
           onClick={action.onClick}
+          leftIcon={action.icon}
           disabled={action.disabled}
           loading={action.loading}
-          className={cn(
-            'flex-1',
-            action.variant !== 'primary' && 'bg-ods-card border-ods-border'
-          )}
+          className={'flex-1'}
         >
           {action.label}
         </Button>
@@ -232,10 +172,6 @@ function MobileBottomActions({
   )
 }
 
-/**
- * Hook to add bottom padding to page content when using primary-buttons variant
- * This prevents content from being hidden behind the fixed mobile action bar
- */
 export function usePageActionsBottomPadding(variant: PageActionsProps['variant']) {
   return variant === 'primary-buttons' ? 'pb-40 md:pb-0' : ''
 }
