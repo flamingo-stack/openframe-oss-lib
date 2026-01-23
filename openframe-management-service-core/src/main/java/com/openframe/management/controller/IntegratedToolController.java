@@ -2,6 +2,7 @@ package com.openframe.management.controller;
 
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.service.IntegratedToolService;
+import com.openframe.management.hook.IntegratedToolPostSaveHook;
 import com.openframe.management.service.DebeziumService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -9,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
@@ -21,6 +23,7 @@ public class IntegratedToolController {
 
     private final IntegratedToolService toolService;
     private final DebeziumService debeziumService;
+    private final List<IntegratedToolPostSaveHook> postSaveHooks;
 
     @GetMapping
     public Map<String, Object> getTools() {
@@ -54,6 +57,13 @@ public class IntegratedToolController {
             IntegratedTool savedTool = toolService.saveTool(tool);
             log.info("Successfully saved tool configuration for: {}", id);
             debeziumService.createOrUpdateDebeziumConnector(savedTool.getDebeziumConnectors());
+            for (IntegratedToolPostSaveHook hook : postSaveHooks) {
+                try {
+                    hook.onToolSaved(id, savedTool);
+                } catch (Exception hookEx) {
+                    log.warn("Post-save hook failed for toolId={}: {}", id, hookEx.getMessage(), hookEx);
+                }
+            }
             return ResponseEntity.ok(Map.of("status", "success", "tool", savedTool));
         } catch (Exception e) {
             log.error("Failed to save tool: {}", id, e);
