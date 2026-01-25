@@ -94,8 +94,8 @@ export function AnnouncementBar() {
     // Always fetch latest on mount
     fetchActiveAnnouncement();
 
-    // Schedule refresh every 60 seconds
-    const interval = setInterval(fetchActiveAnnouncement, 60_000);
+    // Schedule refresh every 5 minutes
+    const interval = setInterval(fetchActiveAnnouncement, 300_000);
     return () => clearInterval(interval);
   }, []);
 
