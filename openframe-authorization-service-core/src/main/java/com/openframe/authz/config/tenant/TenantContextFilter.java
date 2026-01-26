@@ -12,6 +12,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.Set;
 
+import static com.openframe.authz.security.SsoRegistrationConstants.ONBOARDING_TENANT_ID;
 import static org.springframework.core.Ordered.HIGHEST_PRECEDENCE;
 
 @Slf4j
@@ -61,9 +62,16 @@ public class TenantContextFilter extends OncePerRequestFilter {
                 if (session != null) {
                     Object oldTenantId = session.getAttribute(TENANT_ID);
                     if (oldTenantId != null && !tenantId.equals(oldTenantId)) {
-                        log.debug("Tenant changed from {} to {} - invalidating old session", oldTenantId, tenantId);
-                        session.invalidate();
-                        session = null;
+                        // Allow switching from onboarding pseudo-tenant to the real tenant without losing the auth context.
+                        // This is used after successful SSO onboarding flows where we finalize tenant creation under
+                        // tenant=sso-onboarding, then continue into /sas/{realTenantId}/oauth2/authorize.
+                        if (ONBOARDING_TENANT_ID.equals(oldTenantId)) {
+                            log.debug("Tenant changed from onboarding '{}' to '{}' - preserving session", oldTenantId, tenantId);
+                        } else {
+                            log.debug("Tenant changed from {} to {} - invalidating old session", oldTenantId, tenantId);
+                            session.invalidate();
+                            session = null;
+                        }
                     }
                 }
                 
