@@ -50,6 +50,8 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
 
 export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
   messages: Message[]
+  dialogId?: string
+  isLoading?: boolean
   isTyping?: boolean
   typingMessage?: string
   smoothScroll?: boolean
@@ -140,4 +142,34 @@ export interface ChatQuickActionProps extends HTMLAttributes<HTMLButtonElement> 
   onHintInteraction?: () => void
   disabled?: boolean
   loading?: boolean
+}
+
+// ========== Dialog Item Props ==========
+
+export interface DialogItem {
+  id: string
+  title: string
+  lastMessage?: string
+  timestamp?: Date | string
+  isActive?: boolean
+  unreadMessagesCount?: number
+}
+
+// ========== Chat Sidebar Props ==========
+
+export interface ChatSidebarProps extends HTMLAttributes<HTMLDivElement> {
+  onNewChat?: () => void
+  onDialogSelect?: (dialogId: string) => void
+  dialogs?: DialogItem[]
+  activeDialogId?: string
+  isLoading?: boolean
+  children?: React.ReactNode
+}
+
+// ========== Dialog List Item Props ==========
+
+export interface DialogListItemProps extends HTMLAttributes<HTMLDivElement> {
+  dialog: DialogItem
+  isActive?: boolean
+  onDialogSelect?: (dialogId: string) => void
 }

@@ -56,7 +56,7 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
       >
         {/* Header */}
         <div
-          className="flex flex-col gap-2 px-4 py-3 cursor-pointer hover:bg-ods-bg-secondary/80 transition-colors"
+          className="flex flex-col gap-2 px-4 py-3 cursor-pointer hover:bg-ods-card/80 transition-colors"
           onClick={handleToggle}
         >
           {/* First Row: Expand Icon + Tool Icon + Tool Name + Status */}

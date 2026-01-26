@@ -10,6 +10,7 @@ export * from './chat-quick-action'
 export * from './chat-typing-indicator'
 export * from './tool-execution-display'
 export * from './model-display'
+export * from './chat-sidebar'
 
 // Chat types and constants
 export * from './types'
