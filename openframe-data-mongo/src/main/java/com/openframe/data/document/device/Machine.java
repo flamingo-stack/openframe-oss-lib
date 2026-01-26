@@ -2,7 +2,9 @@ package com.openframe.data.document.device;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
+import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -50,6 +52,8 @@ public class Machine {
     private Instant lastComplianceScan;
     private List<ComplianceRequirement> complianceRequirements;
 
+    @CreatedDate
     private Instant registeredAt;  // When device was first registered (replaces createdAt)
+    @LastModifiedDate
     private Instant updatedAt;     // Last time device info was updated (replaces lastModifiedAt)
 }
