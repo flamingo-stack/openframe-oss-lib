@@ -1,7 +1,7 @@
 'use client'
 
 import { Bell } from 'lucide-react'
-import { useMobile } from '../../hooks/ui/use-media-query'
+import { useMdUp } from '../../hooks/ui/use-media-query'
 import { cn } from '../../utils/cn'
 import { LogOutIcon, OpenFrameLogo, OpenFrameText, UserIcon } from '../icons'
 import { Menu01Icon, SearchIcon, XmarkIcon } from '../icons-v2-generated'
@@ -51,9 +51,8 @@ export function AppHeader({
   className,
   isMobileMenuOpen,
   onToggleMobileMenu
-}: AppHeaderProps) {
-
-  const isMobile = useMobile() ?? false
+}: AppHeaderProps) {  
+  const isMdUp = useMdUp() ?? false
   
   return (
     <header
@@ -63,7 +62,7 @@ export function AppHeader({
       )}
     >
       {/* Mobile: Burger Menu Button */}
-      {isMobile && <HeaderButton
+      {!isMdUp && <HeaderButton
         onClick={onToggleMobileMenu}
         isActive={isMobileMenuOpen}
         icon={isMobileMenuOpen ? <XmarkIcon className="w-4 h-4" /> : <Menu01Icon className="w-4 h-4" />}
@@ -72,7 +71,7 @@ export function AppHeader({
       />}
 
       {/* Mobile: Logo section */}
-      {isMobile && <div className="flex items-center gap-2 px-3 h-full flex-1">
+      {!isMdUp && <div className="flex items-center gap-2 px-3 h-full flex-1">
         <OpenFrameLogo
           className="w-6 h-6 shrink-0"
           upperPathColor="var(--color-text-primary)"
@@ -108,7 +107,7 @@ export function AppHeader({
         />
       )}
 
-      {!isMobile && showUser && (
+      {isMdUp && showUser && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <HeaderButton 

@@ -2,7 +2,7 @@
 
 import { cloneElement, useCallback, useLayoutEffect, useMemo, useState } from 'react'
 import { useLocalStorage } from '../../hooks/ui/use-local-storage'
-import { useTablet } from '../../hooks/ui/use-media-query'
+import { useLgUp } from '../../hooks/ui/use-media-query'
 import { NavigationSidebarConfig, NavigationSidebarItem } from '../../types/navigation'
 import { cn } from '../../utils'
 import { DoubleChevronIcon, OpenFrameLogo, OpenFrameText } from '../icons'
@@ -18,13 +18,13 @@ export interface NavigationSidebarProps {
 
 export function NavigationSidebar({ config }: NavigationSidebarProps) {
 
-  const isTablet = useTablet() ?? false
+  const isLgUp = useLgUp() ?? false
 
   // Initialize minimized state based on tablet mode or config
   // useLocalStorage will read from localStorage first, then fall back to this value
   const [minimized, setMinimized] = useLocalStorage<boolean>(
     STORAGE_KEY,
-    isTablet || (config.minimized ?? false)
+    !isLgUp || (config.minimized ?? false)
   )
 
   // Enable transitions only after the correct width is painted
@@ -33,19 +33,19 @@ export function NavigationSidebar({ config }: NavigationSidebarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const handleToggleMinimized = useCallback(() => {
-    if (isTablet) {
+    if (!isLgUp) {
       setMobileMenuOpen(prev => !prev)
     } else {
       setMinimized(prev => !prev)
       config.onToggleMinimized?.()
     }
-  }, [isTablet, setMinimized, config])
+  }, [isLgUp, setMinimized, config])
 
   const handleItemClick = useCallback((item: NavigationSidebarItem, event?: React.MouseEvent) => {
     event?.stopPropagation()
 
     // Close mobile menu on navigation
-    if (isTablet && mobileMenuOpen) {
+    if (!isLgUp && mobileMenuOpen) {
       setMobileMenuOpen(false)
     }
 
@@ -54,15 +54,15 @@ export function NavigationSidebar({ config }: NavigationSidebarProps) {
     } else if (item.path) {
       config.onNavigate?.(item.path)
     }
-  }, [config, isTablet, mobileMenuOpen])
+  }, [config, isLgUp, mobileMenuOpen])
 
   const renderNavigationItem = useCallback((
     item: NavigationSidebarItem,
     inOverlay: boolean
   ) => {
     const isActive = item.isActive ?? false
-    const isMinimized = isTablet && !inOverlay ? true : minimized
-    const shouldShowLabel = isTablet ? inOverlay : (inOverlay || !minimized)
+    const isMinimized = !isLgUp && !inOverlay ? true : minimized
+    const shouldShowLabel = !isLgUp ? inOverlay : (inOverlay || !minimized)
 
     return (
       <button
@@ -134,7 +134,7 @@ export function NavigationSidebar({ config }: NavigationSidebarProps) {
         )}
       </button>
     )
-  }, [minimized, isTablet, handleItemClick])
+  }, [minimized, isLgUp, handleItemClick])
 
   // Memoize items separation
   const { primaryItems, secondaryItems } = useMemo(() => ({
@@ -198,7 +198,7 @@ export function NavigationSidebar({ config }: NavigationSidebarProps) {
       </div>
 
       {/* Toggle button footer */}
-      {(!isTablet || inOverlay) && (
+      {(isLgUp || inOverlay) && (
         <div className="border-t border-border-primary">
           <button
             onClick={inOverlay ? () => setMobileMenuOpen(false) : handleToggleMinimized}
@@ -244,25 +244,25 @@ export function NavigationSidebar({ config }: NavigationSidebarProps) {
     primaryItems,
     secondaryItems,
     renderNavigationItem,
-    isTablet,
+    isLgUp,
     handleToggleMinimized,
     config.footer
   ])
 
   const sidebarWidth = useMemo(() => {
     // Use minimized width as default during SSR to prevent layout shift
-    if (isTablet === undefined) {
+    if (isLgUp === undefined) {
       return `${MINIMIZED_WIDTH}px`
     }
-    return isTablet
+    return !isLgUp
       ? `${MINIMIZED_WIDTH}px`
       : minimized
         ? `${MINIMIZED_WIDTH}px`
         : `${EXPANDED_WIDTH}px`
-  }, [isTablet, minimized])
+  }, [isLgUp, minimized])
 
   // Don't render content until we know the screen size to prevent flashing
-  const isHydrated = isTablet !== undefined
+  const isHydrated = isLgUp !== undefined
 
   useLayoutEffect(() => {
     if (isHydrated && !transitionsEnabled) {
