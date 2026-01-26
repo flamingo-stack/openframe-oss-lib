@@ -5,32 +5,31 @@ import { useLayoutEffect, useState } from "react"
 /**
  * Hook to check if a media query matches
  * @param query - Media query to check
- * @returns Whether the media query matches
+ * @returns Whether the media query matches, or undefined during SSR/initial render
  */
-export function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(false)
-  const [isClient, setIsClient] = useState(false)
+export function useMediaQuery(
+  query: string,
+): boolean | undefined {
+  const [matches, setMatches] = useState<boolean | undefined>(undefined)
 
   useLayoutEffect(() => {
-    setIsClient(true)
-    if (!isClient) return
+    const matchMedia = window.matchMedia(query)
 
-    const media = window.matchMedia(query)
-    const updateMatches = () => setMatches(media.matches)
+    const handleChange = () => {
+      setMatches(matchMedia.matches)
+    }
 
     // Set initial value
-    updateMatches()
+    handleChange()
 
-    // Listen for changes
-    media.addEventListener("change", updateMatches)
+    matchMedia.addEventListener('change', handleChange)
 
-    // Cleanup
     return () => {
-      media.removeEventListener("change", updateMatches)
+      matchMedia.removeEventListener('change', handleChange)
     }
-  }, [query, isClient])
+  }, [query])
 
-  return isClient ? matches : false
+  return matches
 }
 
 /**
@@ -81,17 +80,26 @@ export const breakpoints = {
 
 /**
  * Hook to check if screen is mobile
- * @param breakpoint - Breakpoint to consider as mobile
- * @returns Whether the screen is mobile
+ * @returns Whether the screen is mobile, or undefined during SSR/initial render
  */
-export function useMobile(): boolean {
-  return !useMediaQuery(breakpoints.md)
+export function useMobile(): boolean | undefined {
+  const matches = useMediaQuery(breakpoints.md)
+  return matches === undefined ? undefined : !matches
 }
 
-export function useDesktop(): boolean {
+/**
+ * Hook to check if screen is desktop (lg+)
+ * @returns Whether the screen is desktop, or undefined during SSR/initial render
+ */
+export function useDesktop(): boolean | undefined {
   return useMediaQuery(breakpoints.lg)
 }
 
-export function useTablet(): boolean {
-  return !useMediaQuery(breakpoints.lg)
+/**
+ * Hook to check if screen is tablet or smaller (below lg)
+ * @returns Whether the screen is tablet, or undefined during SSR/initial render
+ */
+export function useTablet(): boolean | undefined {
+  const matches = useMediaQuery(breakpoints.lg)
+  return matches === undefined ? undefined : !matches
 }
