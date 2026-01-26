@@ -1,11 +1,11 @@
 "use client"
 
-import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
 import { PanelLeft } from "lucide-react"
+import * as React from "react"
 
-import { useMobile } from "../hooks/use-mobile"
+import { useMobile } from "../hooks/ui/use-media-query"
 import { cn } from "../utils/cn"
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
@@ -121,7 +121,7 @@ const SidebarProvider = React.forwardRef<
         state,
         open,
         setOpen,
-        isMobile,
+        isMobile: isMobile ?? false,
         openMobile,
         setOpenMobile,
         toggleSidebar,
@@ -759,5 +759,6 @@ export {
   SidebarRail,
   SidebarSeparator,
   SidebarTrigger,
-  useSidebar,
+  useSidebar
 }
+

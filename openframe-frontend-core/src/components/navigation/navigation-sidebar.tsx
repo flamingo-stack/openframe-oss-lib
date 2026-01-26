@@ -18,7 +18,7 @@ export interface NavigationSidebarProps {
 
 export function NavigationSidebar({ config }: NavigationSidebarProps) {
 
-  const isTablet = useTablet()
+  const isTablet = useTablet() ?? false
 
   // Initialize minimized state based on tablet mode or config
   // useLocalStorage will read from localStorage first, then fall back to this value

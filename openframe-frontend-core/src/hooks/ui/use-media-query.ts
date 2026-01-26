@@ -92,7 +92,8 @@ export function useMobile(): boolean | undefined {
  * @returns Whether the screen is desktop, or undefined during SSR/initial render
  */
 export function useDesktop(): boolean | undefined {
-  return useMediaQuery(breakpoints.lg)
+  const matches = useMediaQuery(breakpoints.lg)
+  return matches === undefined ? undefined : matches
 }
 
 /**

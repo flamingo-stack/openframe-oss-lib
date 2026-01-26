@@ -1,12 +1,12 @@
 'use client'
 
-import { Arrow01DownIcon } from '../../icons-v2-generated/arrows/arrow-01-down-icon'
-import { Arrow01UpIcon } from '../../icons-v2-generated/arrows/arrow-01-up-icon'
-import { SwitchVrIcon } from '../../icons-v2-generated/arrows/switch-vr-icon'
 import { useDesktop, useTablet } from '../../../hooks/ui/use-media-query'
 import { cn } from '../../../utils/cn'
 import { FiltersDropdown, type FilterSection } from '../../features'
 import { FilterIcon } from '../../icons'
+import { Arrow01DownIcon } from '../../icons-v2-generated/arrows/arrow-01-down-icon'
+import { Arrow01UpIcon } from '../../icons-v2-generated/arrows/arrow-01-up-icon'
+import { SwitchVrIcon } from '../../icons-v2-generated/arrows/switch-vr-icon'
 import { Checkbox } from '../checkbox'
 import type { TableColumn, TableHeaderProps } from './types'
 import { getHideClasses } from './utils'
@@ -64,8 +64,8 @@ export function TableHeader<T = any>({
       : <Arrow01DownIcon className="w-4 h-4 text-[#FFD951]" />
   }
 
-  const isDesktop = useDesktop()
-  const isTablet = useTablet()
+  const isDesktop = useDesktop() ?? false
+  const isTablet = useTablet() ?? false
 
   return (
     <div
