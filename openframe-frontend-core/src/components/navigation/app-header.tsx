@@ -1,7 +1,7 @@
 'use client'
 
-import { useMobile } from '../../hooks/ui/use-media-query'
 import { Bell } from 'lucide-react'
+import { useMobile } from '../../hooks/ui/use-media-query'
 import { cn } from '../../utils/cn'
 import { LogOutIcon, OpenFrameLogo, OpenFrameText, UserIcon } from '../icons'
 import { Menu01Icon, SearchIcon, XmarkIcon } from '../icons-v2-generated'
@@ -53,7 +53,8 @@ export function AppHeader({
   onToggleMobileMenu
 }: AppHeaderProps) {
 
-  const isMobile = useMobile()
+  const isMobile = useMobile() ?? false
+  
   return (
     <header
       className={cn(

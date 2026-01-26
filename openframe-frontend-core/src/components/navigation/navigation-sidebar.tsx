@@ -1,8 +1,8 @@
 "use client"
 
-import { useTablet } from '../../hooks/ui/use-media-query'
-import { cloneElement, useCallback, useEffect, useMemo, useState } from 'react'
+import { cloneElement, useCallback, useLayoutEffect, useMemo, useState } from 'react'
 import { useLocalStorage } from '../../hooks/ui/use-local-storage'
+import { useTablet } from '../../hooks/ui/use-media-query'
 import { NavigationSidebarConfig, NavigationSidebarItem } from '../../types/navigation'
 import { cn } from '../../utils'
 import { DoubleChevronIcon, OpenFrameLogo, OpenFrameText } from '../icons'
@@ -18,7 +18,7 @@ export interface NavigationSidebarProps {
 
 export function NavigationSidebar({ config }: NavigationSidebarProps) {
 
-  const isTablet = useTablet()
+  const isTablet = useTablet() ?? false
 
   // Initialize minimized state based on tablet mode or config
   // useLocalStorage will read from localStorage first, then fall back to this value
@@ -27,12 +27,10 @@ export function NavigationSidebar({ config }: NavigationSidebarProps) {
     isTablet || (config.minimized ?? false)
   )
 
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [mounted, setMounted] = useState(false)
+  // Enable transitions only after the correct width is painted
+  const [transitionsEnabled, setTransitionsEnabled] = useState(false)
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const handleToggleMinimized = useCallback(() => {
     if (isTablet) {
@@ -251,27 +249,45 @@ export function NavigationSidebar({ config }: NavigationSidebarProps) {
     config.footer
   ])
 
-  console.log('minimized', minimized)
-  console.log('isTablet', isTablet)
+  const sidebarWidth = useMemo(() => {
+    // Use minimized width as default during SSR to prevent layout shift
+    if (isTablet === undefined) {
+      return `${MINIMIZED_WIDTH}px`
+    }
+    return isTablet
+      ? `${MINIMIZED_WIDTH}px`
+      : minimized
+        ? `${MINIMIZED_WIDTH}px`
+        : `${EXPANDED_WIDTH}px`
+  }, [isTablet, minimized])
+
+  // Don't render content until we know the screen size to prevent flashing
+  const isHydrated = isTablet !== undefined
+
+  useLayoutEffect(() => {
+    if (isHydrated && !transitionsEnabled) {
+      // Wait for next frame to ensure width is painted before enabling transitions
+      const id = requestAnimationFrame(() => {
+        setTransitionsEnabled(true)
+      })
+      return () => cancelAnimationFrame(id)
+    }
+  }, [isHydrated, transitionsEnabled])
 
   return (
     <aside
       className={cn(
         "flex-col h-full hidden md:flex",
         "bg-bg-card border-r border-border-primary",
-        "transition-[width] duration-300",
+        transitionsEnabled && "transition-[width] duration-300",
         config.className
       )}
       style={{
-        width: isTablet && mounted
-          ? `${MINIMIZED_WIDTH}px`
-          : minimized
-            ? `${MINIMIZED_WIDTH}px`
-            : `${EXPANDED_WIDTH}px`
+        width: sidebarWidth
       }}
       aria-label="Main navigation sidebar"
     >
-      {renderSidebarContent(false)}
+      {isHydrated && renderSidebarContent(false)}
     </aside>
   )
 }
