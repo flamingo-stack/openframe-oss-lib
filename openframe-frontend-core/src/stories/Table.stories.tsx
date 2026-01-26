@@ -285,12 +285,13 @@ export const TabletOptimized: Story = {
     data: sampleUsers,
     columns: [
       { key: 'name', label: 'Name', sortable: true, width: 'min-w-[150px]' },
-      { key: 'email', label: 'Email', width: 'min-w-[200px]' },
+      { key: 'email', label: 'Email', width: 'min-w-[200px]', hideAt: 'xl' },
       { key: 'role', label: 'Role', width: 'min-w-[120px]' },
       {
         key: 'status',
         label: 'Status',
         filterable: true,
+        hideAt: 'xl',
         filterOptions: [
           { id: 'active', label: 'Active', value: 'active' },
           { id: 'inactive', label: 'Inactive', value: 'inactive' },

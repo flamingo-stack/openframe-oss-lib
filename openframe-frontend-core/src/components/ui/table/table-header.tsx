@@ -1,6 +1,6 @@
 'use client'
 
-import { useDesktop, useTablet } from '../../../hooks/ui/use-media-query'
+import { useLgUp } from '../../../hooks/ui/use-media-query'
 import { cn } from '../../../utils/cn'
 import { FiltersDropdown, type FilterSection } from '../../features'
 import { FilterIcon } from '../../icons'
@@ -64,8 +64,7 @@ export function TableHeader<T = any>({
       : <Arrow01DownIcon className="w-4 h-4 text-[#FFD951]" />
   }
 
-  const isDesktop = useDesktop() ?? false
-  const isTablet = useTablet() ?? false
+  const isLgUp = useLgUp() ?? false
 
   return (
     <div
@@ -89,7 +88,8 @@ export function TableHeader<T = any>({
           const isActionsColumn = column.key === '__actions__'
           const filterable = column.filterable && column.filterOptions && onFilterChange
 
-          if (isTablet && !isActionsColumn && !filterable) {
+          // Hide columns on mobile if they are not actions or filterable
+          if (!isLgUp && !isActionsColumn && !filterable) {
             return null
           }
 
@@ -98,10 +98,11 @@ export function TableHeader<T = any>({
               key={column.key}
               className={cn(
                 'flex gap-2 items-center',
-                isDesktop && getAlignment(column.align),
-                isDesktop && (column.width || 'flex-1 min-w-0'),
+                isLgUp && getAlignment(column.align),
+                isLgUp && (column.width || 'flex-1 min-w-0'),
                 column.className,
-                !filterable && getHideClasses(column.hideAt),
+                // Only apply hide classes if the column is not filterable or on tablet
+                !(filterable && !isLgUp) && getHideClasses(column.hideAt),
                 isActionsColumn && 'ml-auto',
               )}
             >

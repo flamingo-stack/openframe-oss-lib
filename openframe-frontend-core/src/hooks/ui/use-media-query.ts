@@ -33,41 +33,6 @@ export function useMediaQuery(
 }
 
 /**
- * Hook to get window dimensions
- * @returns Window width and height
- */
-export function useWindowSize() {
-  const [windowSize, setWindowSize] = useState({
-    width: 0,
-    height: 0,
-  })
-  const [isClient, setIsClient] = useState(false)
-
-  useLayoutEffect(() => {
-    setIsClient(true)
-    if (!isClient) return
-
-    const handleResize = () => {
-      setWindowSize({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      })
-    }
-
-    // Set initial size
-    handleResize()
-
-    // Add event listener
-    window.addEventListener("resize", handleResize)
-
-    // Remove event listener on cleanup
-    return () => window.removeEventListener("resize", handleResize)
-  }, [isClient])
-
-  return windowSize
-}
-
-/**
  * Predefined breakpoints for common screen sizes
  */
 export const breakpoints = {
@@ -78,29 +43,27 @@ export const breakpoints = {
   "2xl": "(min-width: 1536px)",
 }
 
-/**
- * Hook to check if screen is mobile
- * @returns Whether the screen is mobile, or undefined during SSR/initial render
- */
-export function useMobile(): boolean | undefined {
-  const matches = useMediaQuery(breakpoints.md)
-  return matches === undefined ? undefined : !matches
+export function useSmUp(): boolean | undefined {
+  const matches = useMediaQuery(breakpoints.sm)
+  return matches === undefined ? undefined : matches
 }
 
-/**
- * Hook to check if screen is desktop (lg+)
- * @returns Whether the screen is desktop, or undefined during SSR/initial render
- */
-export function useDesktop(): boolean | undefined {
+export function useMdUp(): boolean | undefined {
+  const matches = useMediaQuery(breakpoints.md)
+  return matches === undefined ? undefined : matches
+}
+
+export function useLgUp(): boolean | undefined {
   const matches = useMediaQuery(breakpoints.lg)
   return matches === undefined ? undefined : matches
 }
 
-/**
- * Hook to check if screen is tablet or smaller (below lg)
- * @returns Whether the screen is tablet, or undefined during SSR/initial render
- */
-export function useTablet(): boolean | undefined {
-  const matches = useMediaQuery(breakpoints.lg)
-  return matches === undefined ? undefined : !matches
+export function useXlUp(): boolean | undefined {
+  const matches = useMediaQuery(breakpoints.xl)
+  return matches === undefined ? undefined : matches
+}
+
+export function use2xlUp(): boolean | undefined {
+  const matches = useMediaQuery(breakpoints["2xl"])
+  return matches === undefined ? undefined : matches
 }
