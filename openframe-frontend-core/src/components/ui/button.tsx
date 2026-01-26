@@ -165,7 +165,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       if (!isCenterIconOnly) {
         return (
           <>
-            {leftIcon && !loading && <span className="flex items-center justify-center">{leftIcon}</span>}
+            {leftIcon && !loading && <span className="flex items-center justify-center [&_svg]:w-4 [&_svg]:h-4 sm:[&_svg]:w-6 sm:[&_svg]:h-6">{leftIcon}</span>}
             {loading && (
               <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -175,7 +175,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             {children && (
               <span className={cn(loading && "opacity-70")}>{children}</span>
             )}
-            {rightIcon && !loading && <span className="flex items-center justify-center">{rightIcon}</span>}
+            {rightIcon && !loading && <span className="flex items-center justify-center [&_svg]:w-4 [&_svg]:h-4 sm:[&_svg]:w-6 sm:[&_svg]:h-6">{rightIcon}</span>}
           </>
         )
       }
