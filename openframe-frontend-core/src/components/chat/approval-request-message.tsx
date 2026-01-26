@@ -125,7 +125,7 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
             onClick={handleReject}
             disabled={isProcessing}
             className={cn(
-              "bg-ods-bg-secondary border-ods-border",
+              "bg-ods-card border-ods-border",
               "font-['Azeret_Mono'] font-medium sm:!text-sm text-ods-text-primary uppercase tracking-[-0.28px]",
               "hover:bg-ods-bg px-2 py-1 h-auto"
             )}
