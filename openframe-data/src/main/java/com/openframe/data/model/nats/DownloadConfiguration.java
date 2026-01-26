@@ -9,5 +9,6 @@ public class DownloadConfiguration {
     private String fileName;
     private String agentFileName;
     private String link;
+    private String executablePath;
 
 }
