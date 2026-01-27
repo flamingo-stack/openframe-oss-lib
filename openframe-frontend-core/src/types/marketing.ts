@@ -331,7 +331,13 @@ export interface CampaignWithDetails {
 // Content Source Types (NEW)
 // =============================================================================
 
-export type ContentSourceType = 'product_release' | 'blog_post' | 'case_study' | 'from_scratch';
+export type ContentSourceType =
+  | 'product_release'
+  | 'blog_post_seed'      // Generate new blog post (seed blog workflow)
+  | 'blog_post_existing'  // Use existing blog post
+  | 'case_study'
+  | 'from_scratch';
+
 export type URLInjectionPreference = 'none' | 'in_post' | 'as_comment';
 
 export interface ContentSourceOption {
