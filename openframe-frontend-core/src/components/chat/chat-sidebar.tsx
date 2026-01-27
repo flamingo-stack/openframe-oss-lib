@@ -1,12 +1,12 @@
-import * as React from "react"
+import { forwardRef, useRef, useEffect } from "react"
 import { cn } from "../../utils/cn"
 import { Button } from "../ui/button"
 import { ChatPlusIcon, ChatsIcon } from "../icons-v2-generated"
 import { Chevron02RightIcon } from "../icons-v2-generated"
-import { ChatSidebarSkeleton } from "./chat-sidebar-skeleton"
+import { ChatSidebarSkeleton, DialogListItemSkeleton } from "./chat-sidebar-skeleton"
 import type { ChatSidebarProps, DialogListItemProps } from "./types"
 
-const DialogListItem = React.forwardRef<HTMLDivElement, DialogListItemProps>(
+const DialogListItem = forwardRef<HTMLDivElement, DialogListItemProps>(
   ({ className, dialog, isActive, onDialogSelect, onClick, ...props }, ref) => {
     const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
       onDialogSelect?.(dialog.id)
@@ -75,9 +75,40 @@ const DialogListItem = React.forwardRef<HTMLDivElement, DialogListItemProps>(
 
 DialogListItem.displayName = "DialogListItem"
 
-const ChatSidebar = React.forwardRef<HTMLDivElement, ChatSidebarProps>(
-  ({ className, onNewChat, onDialogSelect, dialogs = [], activeDialogId, isLoading, children, ...props }, ref) => {
+const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(
+  ({ className, onNewChat, onDialogSelect, dialogs = [], activeDialogId, isLoading, children, hasNextPage, isFetchingNextPage, onLoadMore, ...props }, ref) => {
     const showEmptyState = dialogs.length === 0 && !children
+    const scrollContainerRef = useRef<HTMLDivElement>(null)
+    const loadMoreRef = useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+      const scrollContainer = scrollContainerRef.current
+      const loadMoreElement = loadMoreRef.current
+
+      if (!scrollContainer || !loadMoreElement || !hasNextPage || isFetchingNextPage) {
+        return
+      }
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          const [entry] = entries
+          if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
+            onLoadMore?.()
+          }
+        },
+        {
+          root: scrollContainer,
+          rootMargin: '100px',
+          threshold: 0.1
+        }
+      )
+
+      observer.observe(loadMoreElement)
+
+      return () => {
+        observer.unobserve(loadMoreElement)
+      }
+    }, [hasNextPage, isFetchingNextPage, onLoadMore])
 
     if (isLoading && dialogs.length === 0 && !children) {
       return (
@@ -135,7 +166,7 @@ const ChatSidebar = React.forwardRef<HTMLDivElement, ChatSidebarProps>(
             </div>
           ) : (
             /* Dialogs List */
-            <div className="flex-1 overflow-y-auto min-h-0">
+            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0">
               <div className="flex flex-col">
                 {dialogs.map((dialog) => (
                   <DialogListItem
@@ -145,6 +176,19 @@ const ChatSidebar = React.forwardRef<HTMLDivElement, ChatSidebarProps>(
                     onDialogSelect={onDialogSelect}
                   />
                 ))}
+                
+                {/* Infinite scroll loading indicator and intersection target */}
+                {hasNextPage && (
+                  <div ref={loadMoreRef}>
+                    {isFetchingNextPage && (
+                      <>
+                        <DialogListItemSkeleton />
+                        <DialogListItemSkeleton />
+                        <DialogListItemSkeleton />
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
