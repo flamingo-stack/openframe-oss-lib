@@ -49,7 +49,7 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
       <div
         ref={ref}
         className={cn(
-          "rounded-lg bg-ods-bg-card overflow-hidden transition-all duration-200",
+          "rounded-lg bg-ods-card border border-ods-border mb-2 overflow-hidden transition-all duration-200",
           className
         )}
         {...props}
@@ -102,8 +102,11 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
         </div>
 
         {/* Expanded Content */}
-        {expanded && (
-          <div className="px-4 pb-3 border-t border-ods-border/50">
+        <div className={cn(
+          "overflow-hidden transition-all duration-300 ease-in-out border-t border-ods-border",
+          expanded ? "min-h-0 opacity-100" : "max-h-0 opacity-0"
+        )}>
+          <div className="px-4 pb-3">
             {/* Parameters Section (for executing) */}
             {isExecuting && message.parameters && Object.keys(message.parameters).length > 0 && (
               <div className="mt-3">
@@ -161,7 +164,7 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
               </div>
             )}
           </div>
-        )}
+        </div>
       </div>
     )
   }

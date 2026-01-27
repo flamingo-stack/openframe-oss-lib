@@ -163,7 +163,12 @@ export interface ChatSidebarProps extends HTMLAttributes<HTMLDivElement> {
   dialogs?: DialogItem[]
   activeDialogId?: string
   isLoading?: boolean
+  isCreatingDialog?: boolean
   children?: React.ReactNode
+  // Infinite scroll props
+  hasNextPage?: boolean
+  isFetchingNextPage?: boolean
+  onLoadMore?: () => void
 }
 
 // ========== Dialog List Item Props ==========

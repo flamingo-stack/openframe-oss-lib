@@ -38,7 +38,7 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
         <div
           ref={ref}
           className={cn(
-            "bg-ods-card border border-ods-border rounded-md p-4 flex flex-col gap-4",
+            "bg-ods-card border border-ods-border rounded-md p-4 mb-2 flex flex-col gap-4",
             className
           )}
           {...props}
@@ -46,7 +46,7 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
           {/* Command and icon section */}
           <div className="flex flex-col gap-1">
             <div className="bg-ods-bg border border-ods-border rounded-md p-3 flex gap-2 items-start">
-              <code className="font-['DM_Sans'] font-medium text-sm text-ods-text-primary flex-1 leading-5">
+              <code className="font-['DM_Sans'] font-medium text-sm text-ods-text-primary flex-1 leading-5 whitespace-pre-wrap break-all">
                 {data.command}
               </code>
               {data.icon && (
@@ -79,7 +79,7 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
       <div
         ref={ref}
         className={cn(
-          "bg-ods-card border border-ods-border rounded-md p-4 flex flex-col gap-4",
+          "bg-ods-card border border-ods-border rounded-md p-4 mb-2 flex flex-col gap-4",
           className
         )}
         {...props}
@@ -87,7 +87,7 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
         {/* Command and icon section */}
         <div className="flex flex-col gap-1">
           <div className="bg-ods-bg border border-ods-border rounded-md p-3 flex gap-2 items-start">
-            <code className="font-['DM_Sans'] font-medium text-sm text-ods-text-primary flex-1 leading-5">
+            <code className="font-['DM_Sans'] font-medium text-sm text-ods-text-primary flex-1 leading-5 whitespace-pre-wrap break-all">
               {data.command}
             </code>
             {data.icon && (
