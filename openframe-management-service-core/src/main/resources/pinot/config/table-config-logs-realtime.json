@@ -7,7 +7,7 @@
     "replication": "${pinot.tables.logs.replication}",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "retentionTimeUnit": "DAYS",
-    "retentionTimeValue": "45"
+    "retentionTimeValue": "60"
   },
   "tableIndexConfig": {
     "loadMode": "MMAP",
@@ -35,6 +35,7 @@
     "rangeIndexColumns": [
       "eventTimestamp"
     ],
+    "sortedColumn": ["eventTimestamp"],
     "streamConfigs": {
       "streamType": "kafka",
       "stream.kafka.topic.name": "${openframe.oss-tenant.kafka.topics.inbound.integrated-tool-events.name}",
@@ -42,8 +43,8 @@
       "stream.kafka.consumer.type": "lowlevel",
       "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
       "stream.kafka.consumer.prop.auto.offset.reset": "smallest",
-      "realtime.segment.flush.threshold.time": "24h",
-      "realtime.segment.flush.threshold.rows": "500000"
+      "realtime.segment.flush.threshold.time": "6h",
+      "realtime.segment.flush.threshold.rows": "1000"
     }
   },
   "fieldConfigList": [
@@ -91,19 +92,11 @@
   "routing": {
     "instanceSelectorType": "strictReplicaGroup"
   },
+  "upsertConfig": {
+    "mode": "FULL"
+  },
   "tenants": {
     "broker": "DefaultTenant",
     "server": "DefaultTenant"
-  },
-  "task": {
-    "taskTypeConfigsMap": {
-      "RealtimeToOfflineSegmentsTask": {
-        "schedule": "0 0 4 * * ?",
-        "bucketTimePeriod": "30d",
-        "bufferTimePeriod": "24h",
-        "mergeType": "rollup",
-        "timeColumnName": "eventTimestamp"
-      }
-    }
   }
 } 
