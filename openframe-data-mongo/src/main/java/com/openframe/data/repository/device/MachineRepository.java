@@ -1,10 +1,12 @@
 package com.openframe.data.repository.device;
 
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,10 +20,7 @@ public interface MachineRepository extends MongoRepository<Machine, String>, Cus
     
     List<Machine> findByType(DeviceType deviceType);
     
-    /**
-     * Check if any machines exist with the given organizationId
-     * @param organizationId organization identifier
-     * @return true if at least one machine exists with this organizationId
-     */
+    List<Machine> findByMachineIdInAndStatus(Collection<String> machineIds, DeviceStatus status);
+    
     boolean existsByOrganizationId(String organizationId);
 } 
