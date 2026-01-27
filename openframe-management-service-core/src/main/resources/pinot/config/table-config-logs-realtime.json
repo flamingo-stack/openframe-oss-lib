@@ -44,7 +44,7 @@
       "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
       "stream.kafka.consumer.prop.auto.offset.reset": "smallest",
       "realtime.segment.flush.threshold.time": "6h",
-      "realtime.segment.flush.threshold.rows": "1000"
+      "realtime.segment.flush.threshold.rows": "100000"
     }
   },
   "fieldConfigList": [
@@ -91,9 +91,6 @@
   ],
   "routing": {
     "instanceSelectorType": "strictReplicaGroup"
-  },
-  "upsertConfig": {
-    "mode": "FULL"
   },
   "tenants": {
     "broker": "DefaultTenant",

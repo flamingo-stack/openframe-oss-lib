@@ -28,8 +28,8 @@
       "stream.kafka.consumer.type": "lowlevel",
       "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
       "stream.kafka.consumer.prop.auto.offset.reset": "smallest",
-      "realtime.segment.flush.threshold.time": "24h",
-      "realtime.segment.flush.threshold.rows": "500000"
+      "realtime.segment.flush.threshold.time": "6h",
+      "realtime.segment.flush.threshold.rows": "100000"
     }
   },
   "fieldConfigList": [
