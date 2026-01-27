@@ -10,6 +10,8 @@ import org.springframework.stereotype.Repository;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.openframe.data.document.device.DeviceStatus.DELETED;
+
 @Slf4j
 @Repository
 public class PinotClientDeviceRepository implements PinotDeviceRepository {
@@ -146,12 +148,20 @@ public class PinotClientDeviceRepository implements PinotDeviceRepository {
     private String buildWhereClause(List<String> statuses, List<String> deviceTypes, 
                                    List<String> osTypes, List<String> organizationIds, List<String> tagNames) {
         List<String> conditions = new ArrayList<>();
+        conditions.add("status != '" + DELETED.name() + "'");
 
         if (statuses != null && !statuses.isEmpty()) {
-            String statusCondition = statuses.stream()
+            List<String> filteredStatuses = statuses.stream()
+                    .filter(status -> status != null && !status.isBlank())
+                    .filter(status -> !DELETED.name().equals(status))
+                    .toList();
+
+            if (!filteredStatuses.isEmpty()) {
+                String statusCondition = filteredStatuses.stream()
                     .map(status -> "status = '" + status + "'")
                     .collect(Collectors.joining(" OR "));
-            conditions.add("(" + statusCondition + ")");
+                conditions.add("(" + statusCondition + ")");
+            }
         }
 
         if (deviceTypes != null && !deviceTypes.isEmpty()) {
@@ -182,10 +192,6 @@ public class PinotClientDeviceRepository implements PinotDeviceRepository {
             conditions.add("(" + tagCondition + ")");
         }
 
-        if (conditions.isEmpty()) {
-            return "";
-        }
-
         return String.join(" AND ", conditions);
     }
 
@@ -193,12 +199,20 @@ public class PinotClientDeviceRepository implements PinotDeviceRepository {
                                             List<String> osTypes, List<String> organizationIds, 
                                             List<String> tagNames, String excludeField) {
         List<String> conditions = new ArrayList<>();
+        conditions.add("status != '" + DELETED.name() + "'");
 
         if (statuses != null && !statuses.isEmpty() && !"status".equals(excludeField)) {
-            String statusCondition = statuses.stream()
+            List<String> filteredStatuses = statuses.stream()
+                    .filter(status -> status != null && !status.isBlank())
+                    .filter(status -> !DELETED.name().equals(status))
+                    .toList();
+
+            if (!filteredStatuses.isEmpty()) {
+                String statusCondition = filteredStatuses.stream()
                     .map(status -> "status = '" + status + "'")
                     .collect(Collectors.joining(" OR "));
-            conditions.add("(" + statusCondition + ")");
+                conditions.add("(" + statusCondition + ")");
+            }
         }
 
         if (deviceTypes != null && !deviceTypes.isEmpty() && !"deviceType".equals(excludeField)) {
@@ -227,10 +241,6 @@ public class PinotClientDeviceRepository implements PinotDeviceRepository {
                     .map(tagName -> "tags = '" + tagName + "'")
                     .collect(Collectors.joining(" OR "));
             conditions.add("(" + tagCondition + ")");
-        }
-
-        if (conditions.isEmpty()) {
-            return "";
         }
 
         return String.join(" AND ", conditions);
