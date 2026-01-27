@@ -76,7 +76,7 @@ const DialogListItem = forwardRef<HTMLDivElement, DialogListItemProps>(
 DialogListItem.displayName = "DialogListItem"
 
 const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(
-  ({ className, onNewChat, onDialogSelect, dialogs = [], activeDialogId, isLoading, children, hasNextPage, isFetchingNextPage, onLoadMore, ...props }, ref) => {
+  ({ className, onNewChat, onDialogSelect, dialogs = [], activeDialogId, isLoading, isCreatingDialog, children, hasNextPage, isFetchingNextPage, onLoadMore, ...props }, ref) => {
     const showEmptyState = dialogs.length === 0 && !children
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const loadMoreRef = useRef<HTMLDivElement>(null)
@@ -136,7 +136,7 @@ const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(
           <Button
             onClick={onNewChat}
             variant="ghost"
-            disabled={isLoading}
+            disabled={isLoading || isCreatingDialog}
             leftIcon={<ChatPlusIcon className="size-6 text-ods-text-secondary" />}
             className="flex-1 justify-center text-lg font-bold text-ods-text-primary hover:bg-ods-bg-hover"
           >
