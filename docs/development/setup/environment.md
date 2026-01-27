@@ -1,593 +1,595 @@
 # Development Environment Setup
 
-Setting up an optimal development environment for OpenFrame OSS Library will significantly improve your productivity and development experience. This guide covers IDE configuration, essential tools, editor extensions, and development workflows.
+Set up your development environment for building applications with OpenFrame OSS Library. This guide covers IDE configuration, development tools, and environment optimization.
 
-## 🎯 Overview
+## IDE Setup & Configuration
 
-A well-configured development environment for OpenFrame should include:
+### IntelliJ IDEA (Recommended)
 
-- **Optimized IDE** with Java development features
-- **Integrated build tools** (Maven, Git)
-- **Code quality tools** (linting, formatting, static analysis)
-- **MongoDB integration** for database development
-- **Debugging capabilities** with remote debugging support
-
-## 💻 IDE Recommendations
-
-### IntelliJ IDEA (Highly Recommended)
-
-IntelliJ IDEA provides the best experience for OpenFrame development with excellent Java support and Spring Boot integration.
+IntelliJ IDEA provides excellent Spring Boot and Java development support.
 
 #### Installation
 
-**Option 1: JetBrains Toolbox (Recommended)**
-```bash
-# Download and install JetBrains Toolbox
-# https://www.jetbrains.com/toolbox-app/
+1. **Download IntelliJ IDEA**
+   - [IntelliJ IDEA Community](https://www.jetbrains.com/idea/download/) (Free)
+   - [IntelliJ IDEA Ultimate](https://www.jetbrains.com/idea/download/) (Paid, enhanced Spring support)
 
-# Then install IntelliJ IDEA Ultimate through Toolbox
-# Ultimate edition includes advanced database tools and Spring Boot support
-```
+2. **Install Required Plugins**
 
-**Option 2: Direct Download**
-```bash
-# Community Edition (Free)
-# Download from: https://www.jetbrains.com/idea/download/
+   Go to `File > Settings > Plugins` and install:
+   
+   | Plugin | Purpose |
+   |--------|---------|
+   | **Spring Boot** | Enhanced Spring Boot support |
+   | **MongoDB Plugin** | MongoDB integration and query support |
+   | **Docker** | Container management |
+   | **SonarLint** | Real-time code quality analysis |
+   | **GitToolBox** | Enhanced Git integration |
 
-# Ultimate Edition (Paid, recommended for professional development)
-# Includes database integration, Spring Boot tools, and advanced features
-```
+#### Configuration
 
-#### Essential Configuration
-
-**1. Configure JDK**
+**Java SDK Configuration:**
 ```text
-File → Project Structure → Project Settings → Project
-- Project SDK: Java 17 or later
-- Project language level: 17 or later
-
-File → Project Structure → Platform Settings → SDKs
-- Add JDK: Point to your Java installation
+File > Project Structure > Project Settings > Project
+- Project SDK: 21 (OpenJDK or Oracle JDK)
+- Project language level: 21 - Pattern matching for switch
 ```
 
-**2. Import Code Style**
+**Maven Configuration:**
 ```text
-File → Settings → Editor → Code Style → Java
-- Import from: .editorconfig (if available in project)
-- Or configure manually:
-  - Indent: 4 spaces
-  - Continuation indent: 8 spaces  
-  - Tab size: 4
-  - Use tab character: No
+File > Settings > Build, Execution, Deployment > Build Tools > Maven
+- Maven home path: /path/to/maven
+- User settings file: ~/.m2/settings.xml
+- Local repository: ~/.m2/repository
+- Import Maven projects automatically: ✓
 ```
 
-**3. Enable Annotation Processing**
+**Code Style Configuration:**
 ```text
-File → Settings → Build → Compiler → Annotation Processors
-✅ Enable annotation processing
-✅ Obtain processors from project classpath
+File > Settings > Editor > Code Style > Java
+- Import Google Java Style Guide
+- Line separator: Unix and macOS (\n)
+- Right margin: 120 characters
 ```
 
-#### Essential Plugins
+### Visual Studio Code
 
-| Plugin | Purpose | Installation |
-|--------|---------|-------------|
-| **Lombok** | Reduces boilerplate code | Settings → Plugins → Install "Lombok" |
-| **Maven Helper** | Enhanced Maven integration | Settings → Plugins → Install "Maven Helper" |
-| **Database Navigator** | Database development | Settings → Plugins → Install "Database Navigator" |
-| **Docker** | Container management | Settings → Plugins → Install "Docker" |
-| **GitToolBox** | Enhanced Git integration | Settings → Plugins → Install "GitToolBox" |
-| **SonarLint** | Code quality analysis | Settings → Plugins → Install "SonarLint" |
+VS Code is a lightweight alternative with excellent Java support.
 
-**Install Plugins Command:**
-```text
-File → Settings → Plugins → Marketplace
-Search and install each plugin above
-Restart IDE when prompted
-```
-
-### VS Code
-
-VS Code is an excellent free alternative with strong Java support through extensions.
-
-#### Essential Extensions
+#### Installation & Extensions
 
 ```bash
 # Install VS Code extensions
 code --install-extension vscjava.vscode-java-pack
-code --install-extension vscjava.vscode-spring-boot-dashboard
-code --install-extension ms-vscode.vscode-java-debug
 code --install-extension redhat.java
+code --install-extension pivotal.vscode-spring-boot
 code --install-extension mongodb.mongodb-vscode
 code --install-extension ms-azuretools.vscode-docker
-code --install-extension gabrielbb.vscode-lombok
+code --install-extension sonarsource.sonarlint-vscode
+```
+
+#### VS Code Settings
+
+Create `.vscode/settings.json`:
+
+```json
+{
+  "java.configuration.detectJdksAtStart": false,
+  "java.jdt.ls.java.home": "/path/to/java-21",
+  "java.compile.nullAnalysis.mode": "automatic",
+  "spring-boot.ls.problem.application-properties.unknown-property": "warning",
+  "mongodb.connectionSaving.hideOptionToChooseWhereToSaveNewConnections": true,
+  "files.exclude": {
+    "**/target": true,
+    "**/.classpath": true,
+    "**/.project": true,
+    "**/.settings": true
+  }
+}
+```
+
+## Development Tools Installation
+
+### Java Development Kit (JDK)
+
+#### Option 1: Using Package Managers
+
+**macOS (Homebrew):**
+```bash
+# Install OpenJDK 21
+brew install openjdk@21
+
+# Add to PATH
+echo 'export PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+
+# Verify installation
+java -version
+```
+
+**Ubuntu/Debian:**
+```bash
+# Install OpenJDK 21
+sudo apt update
+sudo apt install openjdk-21-jdk
+
+# Set JAVA_HOME
+echo 'export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64' >> ~/.bashrc
+source ~/.bashrc
+```
+
+**Windows (Chocolatey):**
+```powershell
+# Install OpenJDK 21
+choco install openjdk21
+
+# Verify installation
+java -version
+```
+
+#### Option 2: Manual Installation
+
+1. Download from [Adoptium](https://adoptium.net/) or [Oracle](https://www.oracle.com/java/technologies/downloads/)
+2. Extract to preferred location
+3. Set `JAVA_HOME` environment variable
+4. Add `$JAVA_HOME/bin` to `PATH`
+
+### Maven Build Tool
+
+#### Installation
+
+**macOS:**
+```bash
+brew install maven
+```
+
+**Ubuntu/Debian:**
+```bash
+sudo apt install maven
+```
+
+**Windows:**
+```powershell
+choco install maven
 ```
 
 #### Configuration
 
-Create `.vscode/settings.json`:
-```json
-{
-    "java.home": "/path/to/java/17",
-    "java.configuration.runtimes": [
-        {
-            "name": "JavaSE-17",
-            "path": "/path/to/java/17"
-        }
-    ],
-    "java.compile.nullAnalysis.mode": "automatic",
-    "java.format.settings.url": "https://raw.githubusercontent.com/google/styleguide/gh-pages/eclipse-java-google-style.xml",
-    "editor.tabSize": 4,
-    "editor.insertSpaces": true,
-    "files.trimTrailingWhitespace": true,
-    "mongodb.connectionSaving": "Workspace"
-}
-```
+Create `~/.m2/settings.xml`:
 
-### Eclipse IDE
-
-Eclipse is a robust, free alternative with excellent Java development features.
-
-#### Installation and Setup
-```bash
-# Download Eclipse IDE for Enterprise Java Developers
-# https://www.eclipse.org/downloads/packages/
-
-# Install Lombok support
-# Download lombok.jar from https://projectlombok.org/
-java -jar lombok.jar
-# Follow installer to configure Eclipse
-```
-
-## 🔧 Required Development Tools
-
-### Git Configuration
-
-Configure Git for OpenFrame development:
-
-```bash
-# Set identity
-git config --global user.name "Your Name"
-git config --global user.email "your.email@example.com"
-
-# Configure line endings (important for cross-platform development)
-git config --global core.autocrlf input  # Linux/macOS
-git config --global core.autocrlf true   # Windows
-
-# Configure default editor
-git config --global core.editor "code --wait"  # VS Code
-# or
-git config --global core.editor "idea --wait"  # IntelliJ
-
-# Configure useful aliases
-git config --global alias.co checkout
-git config --global alias.br branch
-git config --global alias.ci commit
-git config --global alias.st status
-git config --global alias.unstage 'reset HEAD --'
-git config --global alias.last 'log -1 HEAD'
-git config --global alias.visual '!gitk'
-```
-
-### Maven Integration
-
-Configure Maven for optimal development experience:
-
-**1. Maven Settings (`~/.m2/settings.xml`)**
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
           http://maven.apache.org/xsd/settings-1.0.0.xsd">
-  
+
+  <!-- Local repository path -->
+  <localRepository>${user.home}/.m2/repository</localRepository>
+
+  <!-- Profile for OpenFrame development -->
   <profiles>
     <profile>
       <id>openframe-dev</id>
       <properties>
-        <!-- Development profile properties -->
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
       </properties>
     </profile>
   </profiles>
-  
+
+  <!-- Activate development profile -->
   <activeProfiles>
     <activeProfile>openframe-dev</activeProfile>
   </activeProfiles>
-  
+
 </settings>
 ```
 
-**2. Maven Wrapper Configuration**
+## Database Development Environment
+
+### MongoDB Setup
+
+#### Option 1: Docker (Recommended)
+
 ```bash
-# Always use the Maven wrapper provided with the project
-./mvnw clean install  # Linux/macOS
-./mvnw.cmd clean install  # Windows
-
-# This ensures consistent Maven version across development environments
-```
-
-## 🗄️ Database Development Tools
-
-### MongoDB Integration
-
-**IntelliJ IDEA Ultimate (Built-in)**
-```text
-View → Tool Windows → Database
-Add → MongoDB
-Configure connection:
-- Host: localhost
-- Port: 27017
-- Authentication: None (for local development)
-- Database: openframe-dev
-```
-
-**VS Code with MongoDB Extension**
-```bash
-# Extension provides:
-# - Connection management
-# - Query execution
-# - Document viewing and editing
-# - Schema exploration
-
-# Connect using Command Palette:
-Ctrl+Shift+P → "MongoDB: Connect"
-# Or click MongoDB icon in activity bar
-```
-
-**MongoDB Compass (Standalone GUI)**
-```bash
-# Download from: https://www.mongodb.com/products/compass
-# Provides visual database management
-# Connection string for local development:
-mongodb://localhost:27017/openframe-dev
-```
-
-### Database Connection Testing
-
-Create a test connection script:
-
-```java
-// DatabaseConnectionTest.java
-import com.mongodb.client.MongoClient;
-import com.mongodb.client.MongoClients;
-import com.mongodb.client.MongoDatabase;
-
-public class DatabaseConnectionTest {
-    public static void main(String[] args) {
-        try {
-            String connectionString = "mongodb://localhost:27017";
-            MongoClient mongoClient = MongoClients.create(connectionString);
-            MongoDatabase database = mongoClient.getDatabase("openframe-dev");
-            
-            System.out.println("✅ Successfully connected to MongoDB");
-            System.out.println("Database: " + database.getName());
-            
-            mongoClient.close();
-        } catch (Exception e) {
-            System.err.println("❌ Failed to connect to MongoDB: " + e.getMessage());
-        }
-    }
-}
-```
-
-## 🧪 Code Quality Tools
-
-### SonarLint Integration
-
-**IntelliJ IDEA**
-```text
-Settings → Plugins → Install "SonarLint"
-Settings → Tools → SonarLint
-- Automatically trigger analysis: ✅
-- Show verbose logs: ✅
-- Include test files: ✅
-```
-
-**VS Code**
-```bash
-code --install-extension sonarlint.sonarlint-vscode
-
-# Configure in VS Code settings:
-{
-    "sonarlint.analyzerProperties": {
-        "sonar.java.source": "17"
-    }
-}
-```
-
-### Code Formatting
-
-**EditorConfig (Recommended)**
-
-Create `.editorconfig` in project root:
-```ini
-root = true
-
-[*]
-charset = utf-8
-end_of_line = lf
-insert_final_newline = true
-trim_trailing_whitespace = true
-
-[*.java]
-indent_style = space
-indent_size = 4
-max_line_length = 120
-
-[*.{yml,yaml}]
-indent_style = space
-indent_size = 2
-
-[*.xml]
-indent_style = space
-indent_size = 2
-
-[*.json]
-indent_style = space
-indent_size = 2
-```
-
-**Google Java Style (Alternative)**
-```bash
-# Download Google Java Style configuration
-# IntelliJ: https://github.com/google/styleguide/blob/gh-pages/intellij-java-google-style.xml
-# Eclipse: https://github.com/google/styleguide/blob/gh-pages/eclipse-java-google-style.xml
-
-# Import in IDE:
-# IntelliJ: Settings → Editor → Code Style → Java → Import Scheme
-# Eclipse: Preferences → Java → Code Style → Formatter → Import
-```
-
-## 🐳 Docker Integration
-
-### Docker for Development Services
-
-**Docker Compose for Local Services**
-
-Create `docker-compose.dev.yml`:
-```yaml
+# Create docker-compose.yml for development
+cat > docker-compose.dev.yml << EOF
 version: '3.8'
+
 services:
   mongodb:
-    image: mongo:7
-    container_name: openframe-dev-mongo
+    image: mongo:7.0
+    container_name: openframe-mongo-dev
     ports:
       - "27017:27017"
     environment:
-      - MONGO_INITDB_DATABASE=openframe-dev
+      MONGO_INITDB_DATABASE: openframe_dev
     volumes:
       - mongodb_data:/data/db
-    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    command: mongod --auth
 
-  mongo-express:
-    image: mongo-express
-    container_name: openframe-dev-mongo-express
+  redis:
+    image: redis:7.0-alpine
+    container_name: openframe-redis-dev
     ports:
-      - "8081:8081"
-    environment:
-      - ME_CONFIG_MONGODB_URL=mongodb://mongodb:27017/
-      - ME_CONFIG_BASICAUTH_USERNAME=admin
-      - ME_CONFIG_BASICAUTH_PASSWORD=admin
-    depends_on:
-      - mongodb
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
 
 volumes:
   mongodb_data:
-```
+  redis_data:
+EOF
 
-**Start Development Services**
-```bash
-# Start MongoDB and Mongo Express
+# Start development databases
 docker-compose -f docker-compose.dev.yml up -d
-
-# Initialize MongoDB replica set (required for transactions)
-docker exec openframe-dev-mongo mongosh --eval "rs.initiate()"
-
-# Access Mongo Express at http://localhost:8081
-# Username: admin, Password: admin
 ```
 
-## 🔍 Debugging Configuration
+#### Option 2: Local Installation
 
-### Remote Debugging Setup
-
-**Maven Configuration**
-```xml
-<!-- Add to pom.xml for debug profile -->
-<profiles>
-    <profile>
-        <id>debug</id>
-        <properties>
-            <spring-boot.run.jvmArguments>
-                -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5005
-            </spring-boot.run.jvmArguments>
-        </properties>
-    </profile>
-</profiles>
-```
-
-**Run with Debug Profile**
+**macOS:**
 ```bash
-# Start application with remote debugging enabled
-mvn spring-boot:run -Pdebug
+# Install MongoDB
+brew tap mongodb/brew
+brew install mongodb-community@7.0
 
-# Application will accept debugger connections on port 5005
+# Start MongoDB
+brew services start mongodb/brew/mongodb-community@7.0
 ```
 
-**IDE Debug Configuration**
+**Ubuntu:**
+```bash
+# Import MongoDB public key
+wget -qO - https://www.mongodb.org/static/pgp/server-7.0.asc | sudo apt-key add -
 
-**IntelliJ IDEA**
-```text
-Run → Edit Configurations → Add New → Remote JVM Debug
-- Host: localhost
-- Port: 5005
-- Use module classpath: Select your project module
+# Add MongoDB repository
+echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+
+# Install MongoDB
+sudo apt update
+sudo apt install -y mongodb-org
+
+# Start MongoDB
+sudo systemctl start mongod
+sudo systemctl enable mongod
 ```
 
-**VS Code**
+### Database Development Tools
+
+#### MongoDB Compass (GUI)
+
+Download from [MongoDB Compass](https://www.mongodb.com/try/download/compass)
+
+**Connection Settings for Development:**
+- Hostname: `localhost`
+- Port: `27017`
+- Authentication: None (for local development)
+
+#### MongoDB Shell
+
+```bash
+# Install mongosh
+brew install mongosh  # macOS
+sudo apt install mongodb-mongosh  # Ubuntu
+
+# Connect to development database
+mongosh "mongodb://localhost:27017/openframe_dev"
+```
+
+## Environment Variables
+
+### Development Environment File
+
+Create `.env.development`:
+
+```bash
+# Application Environment
+SPRING_PROFILES_ACTIVE=development
+SERVER_PORT=8080
+
+# Database Configuration
+MONGODB_URI=mongodb://localhost:27017/openframe_dev
+MONGODB_DATABASE=openframe_dev
+
+# Redis Configuration (Optional)
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+
+# Security Configuration
+JWT_SECRET=development-jwt-secret-must-be-at-least-32-characters-long
+JWT_EXPIRATION=86400
+JWT_REFRESH_EXPIRATION=604800
+
+# OAuth Configuration (Optional)
+OAUTH_ENABLED=false
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+
+# Logging Configuration  
+LOGGING_LEVEL_ROOT=INFO
+LOGGING_LEVEL_OPENFRAME=DEBUG
+
+# Development Features
+MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,env
+MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always
+```
+
+### Load Environment Variables
+
+**IntelliJ IDEA:**
+1. Go to `Run > Edit Configurations`
+2. Select your application configuration
+3. Add environment variables or load from file
+
+**VS Code:**
+Create `.vscode/launch.json`:
+
 ```json
-// Add to .vscode/launch.json
 {
-    "type": "java",
-    "name": "Attach to OpenFrame",
-    "request": "attach",
-    "hostName": "localhost",
-    "port": 5005
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "OpenFrame Application",
+      "request": "launch",
+      "mainClass": "com.example.openframe.Application",
+      "envFile": "${workspaceFolder}/.env.development",
+      "args": [],
+      "console": "internalConsole"
+    }
+  ]
 }
 ```
 
-## ⚙️ Environment Variables
+## Code Quality Tools
 
-### Development Environment Variables
+### SonarQube (Optional)
 
-Create `.env.development`:
+#### Docker Setup
+
 ```bash
-# Database
-MONGODB_URL=mongodb://localhost:27017/openframe-dev
-MONGODB_DATABASE=openframe-dev
+# Run SonarQube for code analysis
+docker run -d --name sonarqube \
+  -p 9000:9000 \
+  sonarqube:10.3-community
 
-# Logging
-LOGGING_LEVEL_ROOT=INFO
-LOGGING_LEVEL_COM_OPENFRAME=DEBUG
-LOGGING_PATTERN_CONSOLE=%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n
-
-# Development flags
-SPRING_PROFILES_ACTIVE=development
-OPENFRAME_ENV=development
-
-# Debug configuration
-JAVA_TOOL_OPTIONS=-agentlib:jdwp=transport=dt_socket,address=5005,server=y,suspend=n
+# Access SonarQube at http://localhost:9000
+# Default credentials: admin/admin
 ```
 
-**Load Environment Variables**
-```bash
-# In your shell profile (.bashrc, .zshrc, etc.)
-if [ -f .env.development ]; then
-    export $(cat .env.development | xargs)
-fi
+#### Maven Configuration
 
-# Or use direnv for automatic loading
-# https://direnv.net/
+Add to your `pom.xml`:
+
+```xml
+<properties>
+  <sonar.host.url>http://localhost:9000</sonar.host.url>
+  <sonar.login>your-sonar-token</sonar.login>
+</properties>
+
+<plugins>
+  <plugin>
+    <groupId>org.sonarsource.scanner.maven</groupId>
+    <artifactId>sonar-maven-plugin</artifactId>
+    <version>3.10.0.2594</version>
+  </plugin>
+</plugins>
 ```
 
-## ✅ Environment Validation
+### Checkstyle Configuration
 
-### Validation Script
+Create `checkstyle.xml`:
 
-Create `validate-dev-environment.sh`:
-```bash
-#!/bin/bash
-echo "🔍 Validating OpenFrame Development Environment..."
+```xml
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+  "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+  "https://checkstyle.org/dtds/configuration_1_3.dtd">
 
-# Check Java
-echo "Checking Java..."
-if java -version 2>&1 | grep -q "17\|18\|19\|20\|21"; then
-    echo "✅ Java 17+ detected"
-else
-    echo "❌ Java 17+ required"
-fi
+<module name="Checker">
+  <property name="charset" value="UTF-8"/>
+  <property name="severity" value="warning"/>
+  <property name="fileExtensions" value="java, properties, xml"/>
 
-# Check Maven
-echo "Checking Maven..."
-if mvn --version > /dev/null 2>&1; then
-    echo "✅ Maven detected"
-else
-    echo "❌ Maven not found"
-fi
+  <!-- Checks for Size Violations -->
+  <module name="FileLength"/>
+  <module name="LineLength">
+    <property name="max" value="120"/>
+  </module>
 
-# Check Git
-echo "Checking Git..."
-if git --version > /dev/null 2>&1; then
-    echo "✅ Git detected"
-else
-    echo "❌ Git not found"
-fi
+  <!-- Checks for whitespace -->
+  <module name="FileTabCharacter"/>
 
-# Check MongoDB connection
-echo "Checking MongoDB..."
-if mongosh --eval "db.adminCommand('ping')" > /dev/null 2>&1; then
-    echo "✅ MongoDB connection successful"
-else
-    echo "⚠️ MongoDB not accessible (optional for library development)"
-fi
+  <module name="TreeWalker">
+    <!-- Checks for Naming Conventions -->
+    <module name="ConstantName"/>
+    <module name="LocalFinalVariableName"/>
+    <module name="LocalVariableName"/>
+    <module name="MemberName"/>
+    <module name="MethodName"/>
+    <module name="PackageName"/>
+    <module name="ParameterName"/>
+    <module name="StaticVariableName"/>
+    <module name="TypeName"/>
 
-# Check Docker
-echo "Checking Docker..."
-if docker --version > /dev/null 2>&1; then
-    echo "✅ Docker detected"
-else
-    echo "⚠️ Docker not found (recommended for services)"
-fi
+    <!-- Checks for imports -->
+    <module name="AvoidStarImport"/>
+    <module name="IllegalImport"/>
+    <module name="RedundantImport"/>
+    <module name="UnusedImports"/>
 
-echo "🎉 Environment validation complete!"
+    <!-- Checks for Size Violations -->
+    <module name="MethodLength"/>
+    <module name="ParameterNumber"/>
+
+    <!-- Checks for whitespace -->
+    <module name="EmptyForIteratorPad"/>
+    <module name="GenericWhitespace"/>
+    <module name="MethodParamPad"/>
+    <module name="NoWhitespaceAfter"/>
+    <module name="NoWhitespaceBefore"/>
+    <module name="OperatorWrap"/>
+    <module name="ParenPad"/>
+    <module name="TypecastParenPad"/>
+    <module name="WhitespaceAfter"/>
+    <module name="WhitespaceAround"/>
+  </module>
+</module>
 ```
 
-Run validation:
-```bash
-chmod +x validate-dev-environment.sh
-./validate-dev-environment.sh
+## Hot Reload Configuration
+
+### Spring Boot DevTools
+
+Add to your `pom.xml`:
+
+```xml
+<dependency>
+  <groupId>org.springframework.boot</groupId>
+  <artifactId>spring-boot-devtools</artifactId>
+  <scope>runtime</scope>
+  <optional>true</optional>
+</dependency>
 ```
 
-## 🚀 Next Steps
+### IDE Configuration for Hot Reload
 
-Once your development environment is set up:
+**IntelliJ IDEA:**
+1. Go to `File > Settings > Build, Execution, Deployment > Compiler`
+2. Check "Build project automatically"
+3. Go to `File > Settings > Advanced Settings`
+4. Check "Allow auto-make to start even if developed application is currently running"
 
-1. **[Continue to Local Development](local-development.md)** - Clone and build the project
-2. **[Explore Architecture](../architecture/overview.md)** - Understand the system design  
-3. **[Review Contributing Guidelines](../contributing/guidelines.md)** - Learn the contribution process
+**VS Code:**
+Hot reload works automatically with Spring Boot DevTools when files are saved.
 
-## 🆘 Troubleshooting
+## Debug Configuration
 
-### Common Issues
+### Application Debugging
 
-**Lombok Not Working**
-```bash
-# IntelliJ IDEA
-# Settings → Plugins → Ensure Lombok plugin is installed and enabled
-# Settings → Build → Compiler → Annotation Processors → Enable annotation processing
-
-# VS Code  
-# Ensure Extension Pack for Java is installed
-# Check that lombok is in project dependencies
-
-# Eclipse
-# Download lombok.jar and run: java -jar lombok.jar
-# Restart Eclipse after installation
+**IntelliJ IDEA Debug Configuration:**
+```text
+Run > Edit Configurations > Add New Configuration > Application
+- Name: OpenFrame Debug
+- Main class: com.example.openframe.Application
+- VM options: -Xmx1024m -Xms512m
+- Environment variables: Load from .env.development
+- Working directory: $MODULE_WORKING_DIR$
 ```
 
-**Maven Build Issues**
-```bash
-# Clear local repository
-rm -rf ~/.m2/repository/com/openframe
-
-# Update dependencies
-mvn clean install -U
-
-# Skip tests if needed during setup
-mvn clean install -DskipTests
+**VS Code Debug Configuration:**
+```json
+{
+  "type": "java",
+  "name": "Debug OpenFrame",
+  "request": "launch",
+  "mainClass": "com.example.openframe.Application",
+  "envFile": "${workspaceFolder}/.env.development",
+  "vmArgs": "-Xmx1024m -Xms512m"
+}
 ```
 
-**Database Connection Issues**
+### Remote Debugging
+
+For debugging deployed applications:
+
+```bash
+# Start application with debug port
+java -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005 -jar app.jar
+```
+
+**IDE Remote Debug Setup:**
+- Host: localhost (or remote host)
+- Port: 5005
+- Debugger mode: Attach
+
+## Performance Profiling
+
+### JProfiler Integration
+
+1. Install JProfiler
+2. Configure IDE integration
+3. Profile application startup and runtime
+
+### VisualVM (Free Alternative)
+
+```bash
+# Install VisualVM
+brew install visualvm  # macOS
+sudo apt install visualvm  # Ubuntu
+
+# Launch with Java application
+visualvm --jdkhome $JAVA_HOME
+```
+
+## Troubleshooting Common Issues
+
+### Port Conflicts
+
+```bash
+# Find process using port 8080
+lsof -i :8080
+netstat -tulpn | grep :8080
+
+# Kill process if needed
+kill -9 PID
+```
+
+### Java Version Issues
+
+```bash
+# Check active Java version
+java -version
+
+# List available Java versions (macOS)
+/usr/libexec/java_home -V
+
+# Switch Java version
+export JAVA_HOME=$(/usr/libexec/java_home -v 21)
+```
+
+### MongoDB Connection Issues
+
 ```bash
 # Check MongoDB status
-docker ps | grep mongo
+sudo systemctl status mongod  # Linux
+brew services list | grep mongodb  # macOS
 
-# Restart MongoDB
-docker-compose -f docker-compose.dev.yml restart mongodb
-
-# Check connection
-mongosh mongodb://localhost:27017/openframe-dev
+# Check MongoDB logs
+sudo tail -f /var/log/mongodb/mongod.log  # Linux
+tail -f /opt/homebrew/var/log/mongodb/mongo.log  # macOS
 ```
 
-## 🤝 Get Help
+### Maven Build Issues
 
-- **Slack Community**: [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
-- **Development Channel**: `#openframe-dev` on Slack
-- **Documentation**: Continue reading the development guides
+```bash
+# Clean and rebuild
+./mvnw clean compile
 
----
+# Update dependencies
+./mvnw dependency:resolve
 
-**Great job setting up your development environment!** You're now ready to dive into local development.
+# Clear local repository cache
+rm -rf ~/.m2/repository
+```
+
+## Next Steps
+
+Your development environment is now ready! Continue with:
+
+1. **[Local Development](./local-development.md)** - Learn the development workflow
+2. **[Architecture Overview](../architecture/overview.md)** - Understand system architecture
+3. **[Contributing Guidelines](../contributing/guidelines.md)** - Start contributing
+
+## Support & Resources
+
+- 💬 **Community**: [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
+- 📚 **Documentation**: [Development Guide](../README.md)
+- 🚀 **Platform**: [OpenFrame.ai](https://openframe.ai)
+
+Happy coding! 🚀

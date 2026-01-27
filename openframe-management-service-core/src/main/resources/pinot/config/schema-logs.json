@@ -1,5 +1,5 @@
 {
-  "schemaName": "logs",
+  "schemaName": "${pinot.tables.logs.name}",
   "primaryKeyColumns": ["toolEventId"],
   "dimensionFieldSpecs": [
     { "name": "toolEventId",        "dataType": "STRING", "singleValueField": true },

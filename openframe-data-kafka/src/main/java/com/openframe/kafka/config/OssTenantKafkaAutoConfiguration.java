@@ -2,6 +2,9 @@ package com.openframe.kafka.config;
 
 import com.openframe.kafka.producer.OssTenantKafkaProducer;
 import com.openframe.kafka.producer.MessageProducer;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -9,17 +12,24 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
+import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.*;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.kafka.support.serializer.JsonSerializer;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 /**
  * Auto-configuration for main/OSS Kafka cluster using spring.oss-tenant prefix.
  * Creates all necessary beans for Kafka operations: Producer, Consumer, Admin, Streams.
  */
+@Slf4j
 @AutoConfiguration
-@EnableConfigurationProperties(OssTenantKafkaProperties.class)
+@EnableConfigurationProperties({KafkaTopicProperties.class, OssTenantKafkaProperties.class})
 @ConditionalOnProperty(prefix = "spring.oss-tenant.kafka", name = "enabled", havingValue = "true")
 public class OssTenantKafkaAutoConfiguration {
 
@@ -111,5 +121,34 @@ public class OssTenantKafkaAutoConfiguration {
     @Bean("ossTenantKafkaProducer")
     public MessageProducer ossTenantKafkaProducer(KafkaTemplate<String, Object> ossTenantKafkaTemplate) {
         return new OssTenantKafkaProducer(ossTenantKafkaTemplate);
+    }
+
+    @Bean("ossTenantKafkaAdmin")
+    @ConditionalOnProperty(prefix = "spring.oss-tenant.kafka.admin", name = "enabled", havingValue = "true", matchIfMissing = true)
+    public KafkaAdmin ossTenantKafkaAdmin(OssTenantKafkaProperties ossTenantKafkaProperties) {
+        Map<String, Object> configs = new HashMap<>();
+        configs.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG,
+                ossTenantKafkaProperties.getKafka().getBootstrapServers());
+        return new KafkaAdmin(configs);
+    }
+
+    @Bean
+    @ConditionalOnProperty(prefix = "spring.oss-tenant.kafka.admin", name = "enabled", havingValue = "true", matchIfMissing = true)
+    public KafkaAdmin.NewTopics kafkaTopics(KafkaTopicProperties properties) {
+        List<NewTopic> topics = new ArrayList<>();
+
+        properties.getInbound().forEach((key, config) -> {
+            if (config.getName() != null && !config.getName().isBlank()) {
+                NewTopic topic = TopicBuilder.name(config.getName())
+                        .partitions(config.getPartitions())
+                        .replicas(config.getReplicationFactor())
+                        .build();
+                topics.add(topic);
+                log.info("Registered Kafka topic for auto-creation: {} (partitions={}, replicas={})",
+                        config.getName(), config.getPartitions(), config.getReplicationFactor());
+            }
+        });
+
+        return new KafkaAdmin.NewTopics(topics.toArray(new NewTopic[0]));
     }
 }

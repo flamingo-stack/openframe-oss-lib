@@ -1,0 +1,30 @@
+import type { SVGProps } from "react";
+export interface LightningFastIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function LightningFastIcon({
+  className = "",
+  size = 24,
+  color = "currentColor",
+  ...props
+}: LightningFastIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="m8.5 16.375.115.005a1.125 1.125 0 0 1 0 2.239l-.115.006h-5a1.125 1.125 0 0 1 0-2.25zm-3-5.5.115.006a1.125 1.125 0 0 1 0 2.239l-.115.006H2a1.125 1.125 0 0 1 0-2.25h3.5Zm3.5-5.5.115.006a1.126 1.126 0 0 1 0 2.238L9 7.625H4a1.125 1.125 0 0 1 0-2.25zm6.603-2.982c1.002-1.1 2.863-.346 2.817 1.14l-.012.152-.652 5.69h3.739c1.263 0 2.013 1.358 1.425 2.409l-.136.205-7.3 9.5c-1.003 1.307-3.09.463-2.903-1.174l.652-5.69H9.495c-1.348 0-2.11-1.545-1.29-2.614l7.301-9.501zm-4.84 9.983h3.17c.97 0 1.725.846 1.614 1.81l-.476 4.147 5.155-6.709h-3.17c-.97 0-1.725-.846-1.614-1.81l.473-4.147z"
+      />
+    </svg>
+  );
+}

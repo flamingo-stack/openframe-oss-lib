@@ -1,0 +1,30 @@
+import type { SVGProps } from "react";
+export interface SunriseSeaIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function SunriseSeaIcon({
+  className = "",
+  size = 24,
+  color = "currentColor",
+  ...props
+}: SunriseSeaIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M15.876 13a3.876 3.876 0 0 0-7.751 0 1.125 1.125 0 0 1-2.25 0 6.125 6.125 0 0 1 12.25 0 1.125 1.125 0 0 1-2.25 0ZM18 19.875l.115.006a1.125 1.125 0 0 1 0 2.238l-.114.006H6a1.125 1.125 0 0 1 0-2.25zm4-4 .115.005a1.125 1.125 0 0 1 0 2.239l-.115.006H2a1.125 1.125 0 0 1 0-2.25zm-18.5-4 .116.006a1.125 1.125 0 0 1 0 2.239l-.116.006H2a1.125 1.125 0 0 1 0-2.25h1.5Zm18.5 0 .115.006a1.125 1.125 0 0 1 0 2.239l-.115.006h-1.5a1.126 1.126 0 0 1 0-2.25H22ZM4.133 5.134a1.125 1.125 0 0 1 1.506-.076l.086.076 1.06 1.062.077.085A1.125 1.125 0 0 1 5.28 7.862l-.085-.076-1.062-1.06-.076-.087a1.125 1.125 0 0 1 .076-1.506Zm14.143 0a1.126 1.126 0 0 1 1.59 1.592l-1.06 1.06a1.126 1.126 0 0 1-1.59-1.59zm-7.4-.633V3a1.125 1.125 0 0 1 2.25 0v1.5a1.125 1.125 0 0 1-2.25 0Z"
+      />
+    </svg>
+  );
+}

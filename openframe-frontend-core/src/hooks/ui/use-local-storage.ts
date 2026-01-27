@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 
 /**
  * Hook to use localStorage with state
@@ -10,33 +10,24 @@ import { useState, useEffect, useRef } from "react"
  */
 export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val: T) => T)) => void] {
   // State to store our value
-  const [storedValue, setStoredValue] = useState<T>(initialValue)
-
-  // Use a ref to track if we've initialized from localStorage
-  const isInitialized = useRef(false)
-  // Use a ref to track if the current state change came from a storage event
-  const isFromStorageEvent = useRef(false)
-
-  // Initialize from localStorage on mount only
-  useEffect(() => {
-    if (isInitialized.current) return
-
+  // Use lazy initialization to read from localStorage synchronously on first render
+  const [storedValue, setStoredValue] = useState<T>(() => {
     try {
-      // Get from local storage by key
       if (typeof window !== "undefined") {
         const item = window.localStorage.getItem(key)
         // Parse stored json or if none return initialValue
-        if (item) {
-          setStoredValue(JSON.parse(item))
-        }
+        return item ? JSON.parse(item) : initialValue
       }
     } catch (error) {
-      // If error also return initialValue
       console.error(`Error reading localStorage key "${key}":`, error)
-    } finally {
-      isInitialized.current = true
     }
-  }, [key, initialValue])
+    return initialValue
+  })
+
+  // Use a ref to track if we've initialized from localStorage
+  const isInitialized = useRef(true) // Set to true since we initialize in useState
+  // Use a ref to track if the current state change came from a storage event
+  const isFromStorageEvent = useRef(false)
 
   // Listen for storage events to sync with other tabs/components
   useEffect(() => {

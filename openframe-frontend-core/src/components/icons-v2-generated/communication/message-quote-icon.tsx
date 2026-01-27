@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface MessageQuoteIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function MessageQuoteIcon({
+  className = "",
+  size = 24,
+  color = "currentColor",
+  ...props
+}: MessageQuoteIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M20.875 6c0-1.036-.84-1.875-1.875-1.875H5c-1.036 0-1.875.84-1.875 1.875v10c0 1.036.84 1.875 1.875 1.875h2c.62 0 1.125.504 1.125 1.125v1.77l3.534-2.25a4.13 4.13 0 0 1 2.215-.645H19c1.035 0 1.874-.84 1.875-1.875zm2.25 10A4.125 4.125 0 0 1 19 20.125h-5.126c-.268 0-.531.056-.773.166l-.233.128L9.14 22.79c-1.414.9-3.266-.115-3.266-1.791v-.873H5A4.125 4.125 0 0 1 .875 16V6A4.125 4.125 0 0 1 5 1.875h14A4.125 4.125 0 0 1 23.125 6z"
+      />
+      <path
+        fill={color}
+        d="M15.125 9.875h1.25v-1.25h-1.25zm-7.5 0h1.25v-1.25h-1.25zm3.5 1.583a4.716 4.716 0 0 1-3.94 4.652l-.115.014a1.126 1.126 0 0 1-.255-2.234l.22-.046a2.47 2.47 0 0 0 1.749-1.72H7A1.625 1.625 0 0 1 5.375 10.5V8c0-.898.727-1.625 1.625-1.625h2.5c.897 0 1.624.727 1.624 1.625zm7.5 0a4.716 4.716 0 0 1-3.94 4.652l-.115.014a1.126 1.126 0 0 1-.255-2.234l.22-.046a2.47 2.47 0 0 0 1.749-1.72H14.5a1.625 1.625 0 0 1-1.625-1.624V8c0-.898.727-1.625 1.624-1.625H17c.897 0 1.624.727 1.625 1.625z"
+      />
+    </svg>
+  );
+}

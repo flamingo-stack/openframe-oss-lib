@@ -1,16 +1,15 @@
 'use client'
 
-import React from 'react'
+import { type ReactNode } from 'react'
 import { cn } from '../../../utils/cn'
-import { TableHeader } from './table-header'
-import { TableRow } from './table-row'
-import { TableCardSkeleton, ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE } from './table-skeleton'
-import { TableEmptyState } from './table-empty-state'
-import { CursorPagination } from '../cursor-pagination'
 import { Pagination } from '../../pagination'
 import { Button } from '../button'
-import type { TableProps, TableColumn, RowAction } from './types'
-import type { ReactNode } from 'react'
+import { CursorPagination } from '../cursor-pagination'
+import { TableEmptyState } from './table-empty-state'
+import { TableHeader } from './table-header'
+import { TableRow } from './table-row'
+import { ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE, TableCardSkeleton } from './table-skeleton'
+import type { RowAction, TableColumn, TableProps } from './types'
 
 /**
  * Injects a synthetic actions column into the columns array when row actions exist
@@ -18,15 +17,15 @@ import type { ReactNode } from 'react'
 function injectActionsColumn<T>(
   columns: TableColumn<T>[],
   rowActions?: RowAction<T>[],
-  renderRowActions?: (item: T) => ReactNode
+  renderRowActions?: (item: T) => ReactNode,
 ): TableColumn<T>[] {
-  const hasActions = !!rowActions || !!renderRowActions
+  const hasActions = Boolean(rowActions?.length) || Boolean(renderRowActions)
   if (!hasActions) return columns
 
   const actionsColumn: TableColumn<T> = {
     key: '__actions__',
     label: '',
-    width: 'min-w-[200px] w-auto shrink-0 flex-none',
+    width: 'min-w-[100px] w-auto shrink-0 flex-none',
     align: 'right',
     renderCell: (item: T) => (
       <div className="flex gap-2 items-center justify-end" data-no-row-click>
@@ -51,7 +50,6 @@ function injectActionsColumn<T>(
         )}
       </div>
     ),
-    renderHeader: () => <div className="text-right" />
   }
 
   return [...columns, actionsColumn]
@@ -76,14 +74,11 @@ export function Table<T = any>({
   onSort,
   filters,
   onFilterChange,
-  showFilters,
   selectable,
   selectedRows = [],
   onSelectionChange,
   bulkActions,
   showToolbar,
-  mobileColumns,
-  renderMobileRow,
   cursorPagination,
   pagePagination,
   paginationClassName
@@ -174,20 +169,20 @@ export function Table<T = any>({
         onSort={onSort}
         filters={filters}
         onFilterChange={onFilterChange}
-        showFilters={showFilters}
         selectable={selectable}
         allSelected={allSelected}
         someSelected={someSelected}
         onSelectAll={handleSelectAll}
+        totalItemsCount={data.length}
       />
 
       {/* Table Body */}
-      <div className={cn('flex flex-col gap-1 w-full', className)}>
+      <div className={cn('flex flex-col gap-2 w-full', className)}>
         {loading ? (
           <TableCardSkeleton
             columns={columns}
             rows={skeletonRows}
-            hasActions={!!rowActions && rowActions.length > 0}
+            hasActions={Boolean(rowActions) && rowActions!.length > 0}
           />
         ) : data.length === 0 ? (
           <TableEmptyState message={emptyMessage} />
@@ -198,14 +193,9 @@ export function Table<T = any>({
                 key={getRowKey(item, index)}
                 item={item}
                 columns={columnsWithActions}
-                rowKey={rowKey}
                 onClick={onRowClick}
                 className={getRowClassName(item, index)}
                 index={index}
-                mobileColumns={mobileColumns}
-                renderMobileRow={renderMobileRow}
-                rowActions={rowActions}
-                renderRowActions={renderRowActions}
                 selectable={selectable}
                 selected={isRowSelected(item)}
                 onSelect={handleSelectRow}

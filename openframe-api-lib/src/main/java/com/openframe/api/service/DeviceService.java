@@ -13,11 +13,11 @@ import com.openframe.data.document.tool.Tag;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.device.MachineTagRepository;
 import com.openframe.data.repository.tool.TagRepository;
+import com.openframe.api.service.processor.DeviceStatusProcessor;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import java.time.Instant;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
@@ -40,6 +40,7 @@ public class DeviceService {
     private final MachineRepository machineRepository;
     private final TagRepository tagRepository;
     private final MachineTagRepository machineTagRepository;
+    private final DeviceStatusProcessor deviceStatusProcessor;
 
     public Optional<Machine> findByMachineId(@NotBlank String machineId) {
         log.debug("Finding machine by ID: {}", machineId);
@@ -159,6 +160,7 @@ public class DeviceService {
         machine.setStatus(status);
         machine.setUpdatedAt(now());
         machineRepository.save(machine);
+        deviceStatusProcessor.postProcessStatusUpdated(machine);
         log.info("Device {} status updated to {}", machineId, status);
     }
 } 

@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface LightbulbIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function LightbulbIcon({
+  className = "",
+  size = 24,
+  color = "currentColor",
+  ...props
+}: LightbulbIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="m16 16.875.115.006a1.125 1.125 0 0 1 0 2.238l-.115.006H8a1.125 1.125 0 0 1 0-2.25zm-5.124-2.876v-1.438l-1.55-1.162-.09-.073a1.126 1.126 0 0 1 1.344-1.79l.095.065 1.324.993 1.326-.993a1.125 1.125 0 0 1 1.35 1.798l-1.55 1.162v1.438a1.125 1.125 0 0 1-2.25 0Z"
+      />
+      <path
+        fill={color}
+        d="M17.875 9a5.875 5.875 0 1 0-11.75 0c0 1.395.485 2.793 1.292 3.873l.303.42c.712 1.02 1.405 2.308 1.405 3.793V19c0 1.035.84 1.875 1.875 1.875h2c1.035 0 1.874-.84 1.874-1.875v-1.914c0-1.697.907-3.137 1.71-4.212A6.6 6.6 0 0 0 17.874 9Zm2.25 0c0 1.893-.65 3.761-1.74 5.22-.76 1.02-1.26 1.95-1.26 2.866V19a4.125 4.125 0 0 1-4.126 4.125H11A4.125 4.125 0 0 1 6.875 19v-1.914c0-.802-.383-1.615-.989-2.488l-.272-.378A8.83 8.83 0 0 1 3.875 9a8.126 8.126 0 0 1 16.25 0"
+      />
+    </svg>
+  );
+}

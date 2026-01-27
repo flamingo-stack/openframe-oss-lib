@@ -41,8 +41,6 @@ export function AnnouncementBar() {
   // Fetch active announcement from API and update state + LS
   const fetchActiveAnnouncement = async () => {
     try {
-      console.log(`📋 [${platform.toUpperCase()}] Fetching active announcement for current app`);
-
       // Server-side platform injection - no URL parameter needed
       const response = await fetch(`/api/announcements/active`);
       
@@ -59,7 +57,6 @@ export function AnnouncementBar() {
           setIsVisible(!isDismissed);
         } else {
           // No announcement available - clean up localStorage and hide bar
-          console.log(`📭 [${platform.toUpperCase()}] No active announcement available, cleaning up localStorage`);
           setAnnouncement(null);
           setIsVisible(false);
           
@@ -97,8 +94,8 @@ export function AnnouncementBar() {
     // Always fetch latest on mount
     fetchActiveAnnouncement();
 
-    // Schedule refresh every 60 seconds
-    const interval = setInterval(fetchActiveAnnouncement, 60_000);
+    // Schedule refresh every 5 minutes
+    const interval = setInterval(fetchActiveAnnouncement, 300_000);
     return () => clearInterval(interval);
   }, []);
 

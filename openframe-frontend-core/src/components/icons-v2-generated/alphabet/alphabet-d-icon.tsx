@@ -1,0 +1,30 @@
+import type { SVGProps } from "react";
+export interface AlphabetDIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function AlphabetDIcon({
+  className = "",
+  size = 24,
+  color = "currentColor",
+  ...props
+}: AlphabetDIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M15.875 9a3.875 3.875 0 0 0-3.874-3.875H9.125v13.75h2.876A3.876 3.876 0 0 0 15.875 15zm2.25 6a6.126 6.126 0 0 1-6.124 6.125H8.5A1.626 1.626 0 0 1 6.875 19.5v-15c0-.898.727-1.625 1.625-1.625H12A6.125 6.125 0 0 1 18.126 9v6Z"
+      />
+    </svg>
+  );
+}

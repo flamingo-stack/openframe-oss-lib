@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useState, useCallback } from "react"
-import { Search, Loader2 } from "lucide-react"
+import { Loader2 } from "lucide-react"
+import React, { useCallback, useState } from "react"
 import { cn } from "../../utils/cn"
+import { SearchIcon } from "../icons-v2-generated"
 
 export interface SearchBarProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'onSubmit'> {
   /**
@@ -66,20 +67,21 @@ export function SearchBar({
   return (
     <div 
       className={cn(
-        "relative bg-[#212121] border border-[#3a3a3a] rounded-[6px] w-full",
+        "relative bg-[#212121] border border-[#3a3a3a] rounded-[6px] w-full h-10 sm:h-12",
         "focus-within:border-[#555555] transition-colors duration-200",
+        "flex items-center",
         disabled && "opacity-50 cursor-not-allowed",
         className
       )}
     >
       {/* Container for input and icon */}
-      <div className="flex items-center gap-2 px-3 py-3">
+      <div className="flex items-center gap-2 px-3">
         {/* Icon */}
-        <div className="flex-shrink-0 w-6 h-6 text-[#888888]">
+        <div className="flex-shrink-0 w-4 h-4 sm:w-6 sm:h-6 text-[#888888]">
           {loading ? (
             <Loader2 className="w-full h-full animate-spin" />
           ) : (
-            icon || <Search className="w-full h-full" />
+            icon || <SearchIcon className="w-full h-full" />
           )}
         </div>
         
@@ -91,8 +93,8 @@ export function SearchBar({
           placeholder={placeholder}
           disabled={disabled}
           className={cn(
-            "flex-1 bg-transparent border-none outline-none",
-            "font-['DM_Sans'] font-medium text-[14px] leading-[20px]",
+            "flex-1 bg-transparent border-none outline-none h-full",
+            "font-['DM_Sans'] font-medium text-[14px] sm:text-[18px] leading-[20px] sm:leading-[24px]",
             "text-[#fafafa] placeholder:text-[#888888]",
             "disabled:cursor-not-allowed"
           )}

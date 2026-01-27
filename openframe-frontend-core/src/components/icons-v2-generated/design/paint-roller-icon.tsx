@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface PaintRollerIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function PaintRollerIcon({
+  className = "",
+  size = 24,
+  color = "currentColor",
+  ...props
+}: PaintRollerIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M9.875 16v-1.86a3.126 3.126 0 0 1 2.512-3.065l5.981-1.196.161-.04a1.88 1.88 0 0 0 1.346-1.798V7A.876.876 0 0 0 19 6.125h-1a1.125 1.125 0 0 1 0-2.25h1A3.126 3.126 0 0 1 22.125 7v1.04a4.125 4.125 0 0 1-2.961 3.957l-.355.087-5.98 1.197a.875.875 0 0 0-.704.857V16a1.125 1.125 0 0 1-2.25 0"
+      />
+      <path
+        fill={color}
+        d="M10.125 20.875h1.75v-3.75h-1.75zM16.875 4A.875.875 0 0 0 16 3.125H5A.875.875 0 0 0 4.125 4v2c0 .483.392.875.875.875h11A.875.875 0 0 0 16.875 6zm-2.75 17A2.125 2.125 0 0 1 12 23.125h-2A2.125 2.125 0 0 1 7.876 21v-4c0-1.174.952-2.126 2.126-2.126H12c1.174 0 2.126.952 2.126 2.126zm5-15A3.125 3.125 0 0 1 16 9.125H5A3.125 3.125 0 0 1 1.875 6V4A3.125 3.125 0 0 1 5 .875h11A3.125 3.125 0 0 1 19.125 4z"
+      />
+    </svg>
+  );
+}

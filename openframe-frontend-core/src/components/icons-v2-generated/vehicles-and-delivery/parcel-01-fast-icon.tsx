@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface Parcel01FastIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function Parcel01FastIcon({
+  className = "",
+  size = 24,
+  color = "currentColor",
+  ...props
+}: Parcel01FastIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M11.375 2a1.125 1.125 0 0 1 2.25 0v4.875h8.263l.116.006a1.125 1.125 0 0 1 0 2.238l-.116.006H3.112a1.125 1.125 0 0 1 0-2.25h8.263z"
+      />
+      <path
+        fill={color}
+        d="m8 20.875.116.005a1.126 1.126 0 0 1 0 2.239L8 23.125H4a1.125 1.125 0 0 1 0-2.25zM20.875 19V8.812c0-.25-.05-.496-.145-.724l-.11-.221-2.224-3.812a1.88 1.88 0 0 0-1.619-.93H8.223c-.584 0-1.13.271-1.481.725l-.138.205L4.38 7.867a1.9 1.9 0 0 0-.255.945V11a1.125 1.125 0 0 1-2.25 0V8.812c0-.73.194-1.448.562-2.08l2.223-3.81.145-.232A4.13 4.13 0 0 1 8.223.875h8.554c1.467 0 2.824.78 3.563 2.046l2.224 3.812.128.24c.284.57.433 1.2.433 1.839V19A4.125 4.125 0 0 1 19 23.125h-7a1.125 1.125 0 0 1 0-2.25h7c1.035 0 1.875-.84 1.875-1.875M8 17.375l.116.006a1.125 1.125 0 0 1 0 2.238L8 19.625H2a1.125 1.125 0 0 1 0-2.25zm0-3.5.116.006a1.125 1.125 0 0 1 0 2.239L8 16.125H3a1.125 1.125 0 0 1 0-2.25z"
+      />
+    </svg>
+  );
+}

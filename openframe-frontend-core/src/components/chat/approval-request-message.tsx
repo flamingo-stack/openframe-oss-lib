@@ -1,24 +1,11 @@
 "use client"
 
-import { forwardRef, HTMLAttributes, useState } from "react"
+import { forwardRef, useState } from "react"
 import { cn } from "../../utils/cn"
 import { Button } from "../ui/button"
 import { StatusTag } from "../ui/status-tag"
 import { CheckCircle, XCircle } from "lucide-react"
-
-export interface ApprovalRequestData {
-  command: string
-  explanation?: string
-  icon?: React.ReactNode
-  requestId?: string
-}
-
-export interface ApprovalRequestMessageProps extends HTMLAttributes<HTMLDivElement> {
-  data: ApprovalRequestData
-  onApprove?: (requestId?: string) => void
-  onReject?: (requestId?: string) => void
-  status?: 'pending' | 'approved' | 'rejected'
-}
+import type { ApprovalRequestMessageProps } from "./types"
 
 const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessageProps>(
   ({ className, data, onApprove, onReject, status = 'pending', ...props }, ref) => {
@@ -138,7 +125,7 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
             onClick={handleReject}
             disabled={isProcessing}
             className={cn(
-              "bg-ods-bg-secondary border-ods-border",
+              "bg-ods-card border-ods-border",
               "font-['Azeret_Mono'] font-medium sm:!text-sm text-ods-text-primary uppercase tracking-[-0.28px]",
               "hover:bg-ods-bg px-2 py-1 h-auto"
             )}

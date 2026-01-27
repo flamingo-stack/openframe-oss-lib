@@ -1,8 +1,8 @@
-import React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
-import Link from "next/link"
 import { ExternalLink } from "lucide-react"
+import Link from "next/link"
+import React from "react"
 
 import { cn } from "../../utils/cn"
 
@@ -52,7 +52,7 @@ const buttonVariants = cva(
         "filter-active": "w-full justify-start text-[16px] py-3 px-2 font-medium font-['DM_Sans'] rounded-lg h-12 transition-all duration-150 leading-[1.33em] bg-ods-border border border-ods-border text-ods-text-primary text-left relative",
         // Section selector variant - for feature/section selection buttons
         "section": "bg-ods-card border border-ods-border shadow-ods-card !text-left !justify-start !items-start transition-all duration-200 hover:bg-ods-card-hover disabled:opacity-50 disabled:cursor-not-allowed",
-        "section-active": "bg-ods-card border border-[var(--ods-open-yellow-base)] shadow-ods-card !text-left !justify-start !items-start transition-all duration-200 hover:bg-ods-card-hover disabled:opacity-50 disabled:cursor-not-allowed",
+        "section-active": "bg-ods-card border border-ods-accent shadow-ods-card !text-left !justify-start !items-start transition-all duration-200 hover:bg-ods-card-hover disabled:opacity-50 disabled:cursor-not-allowed",
         // Table display variant - for non-interactive display in tables (no hover, no padding)
         "table-display": "bg-transparent text-ods-text-primary cursor-default pointer-events-none font-normal",
         // Device action variant - for device detail page action buttons
@@ -66,9 +66,9 @@ const buttonVariants = cva(
         // Large size for prominent CTAs (ButtonFull lg) - adjusted for better text/icon fit
         lg: "min-h-[48px] px-2 sm:px-8 py-3 text-base",
         // Icon-only buttons - fixed square size on all breakpoints
-        icon: "!w-10 sm:!w-10 h-10 p-0",
+        icon: "!w-10 !h-10 sm:!w-12 sm:!h-12 p-0 shrink-0",
         // Icon-only large buttons (like hamburger menu) - fixed square size on all breakpoints
-        iconLg: "!w-12 sm:!w-12 h-12 p-0",
+        iconLg: "!w-12 !h-12 p-0 shrink-0",
         // Touch-friendly mobile sizing
         touch: "min-h-[44px] px-6 py-3 text-base",
         // Search button specific sizing
@@ -165,7 +165,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       if (!isCenterIconOnly) {
         return (
           <>
-            {leftIcon && !loading && <span className="flex items-center justify-center">{leftIcon}</span>}
+            {leftIcon && !loading && <span className="flex items-center justify-center [&_svg]:w-4 [&_svg]:h-4 sm:[&_svg]:w-6 sm:[&_svg]:h-6">{leftIcon}</span>}
             {loading && (
               <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -175,7 +175,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             {children && (
               <span className={cn(loading && "opacity-70")}>{children}</span>
             )}
-            {rightIcon && !loading && <span className="flex items-center justify-center">{rightIcon}</span>}
+            {rightIcon && !loading && <span className="flex items-center justify-center [&_svg]:w-4 [&_svg]:h-4 sm:[&_svg]:w-6 sm:[&_svg]:h-6">{rightIcon}</span>}
           </>
         )
       }

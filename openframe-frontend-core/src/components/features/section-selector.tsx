@@ -12,6 +12,7 @@ export interface SectionItem {
   description?: string
   number?: string
   disabled?: boolean
+  leftIcon?: React.ReactNode
   badge?: {
     text: string
     variant?: 'card' | 'button'
@@ -64,7 +65,7 @@ const SectionButton: React.FC<{
 }) => {
   const titleClasses = "font-['DM_Sans'] text-ods-text-primary"
   const subtitleClasses = "font-['DM_Sans'] text-ods-text-secondary"
-  const numberClasses = "font-['DM_Sans'] font-bold text-[var(--ods-open-yellow-base)]"
+  const numberClasses = "font-['DM_Sans'] font-bold text-ods-accent"
 
   const isDisabled = section.disabled || disabled;
 
@@ -90,8 +91,13 @@ const SectionButton: React.FC<{
       }}
     >
       {layout === 'vertical' ? (
-        // Vertical layout with optional number prefix
-        <div className="flex gap-2 items-start w-full">
+        // Vertical layout with optional number prefix and leftIcon
+        <div className="flex gap-3 items-start w-full">
+          {section.leftIcon && (
+            <div className="shrink-0 text-ods-text-primary opacity-70 mt-0.5">
+              {section.leftIcon}
+            </div>
+          )}
           {section.number && (
             <span className={cn(numberClasses, 'text-lg tracking-[-0.36px] leading-[24px] shrink-0')}>
               {section.number}
@@ -111,32 +117,39 @@ const SectionButton: React.FC<{
               )}
             </div>
             {section.description && showDescription && (
-              <p className={cn(subtitleClasses, 'text-sm mt-1 hidden xl:block whitespace-normal break-words')}>
+              <p className={cn(subtitleClasses, 'text-sm mt-1 whitespace-normal break-words')}>
                 {section.description}
               </p>
             )}
           </div>
         </div>
       ) : (
-        // Wrap layout with title and subtitle
-        <div className="flex flex-col items-start justify-start w-full h-full gap-1" style={{ textAlign: 'left' }}>
-          <div className="flex items-start gap-2 flex-wrap w-full">
-            <span className={cn(titleClasses, 'font-bold text-[18px] leading-[24px] tracking-[-0.36px]')} style={{ textAlign: 'left' }}>
-              {section.title}
-            </span>
-            {section.badge && (
-              <StatusBadge
-                text={section.badge.text}
-                variant={section.badge.variant || 'button'}
-                colorScheme={section.badge.colorScheme || 'default'}
-              />
-            )}
-          </div>
-          {section.subtitle && (
-            <div className={cn(subtitleClasses, 'font-medium text-[14px] leading-[20px] w-full')} style={{ textAlign: 'left' }}>
-              {section.subtitle}
+        // Wrap layout with title, subtitle, and optional leftIcon
+        <div className="flex gap-3 items-start justify-start w-full h-full" style={{ textAlign: 'left' }}>
+          {section.leftIcon && (
+            <div className="shrink-0 text-ods-text-primary opacity-70 mt-0.5">
+              {section.leftIcon}
             </div>
           )}
+          <div className="flex flex-col items-start justify-start flex-1 gap-1">
+            <div className="flex items-start gap-2 flex-wrap w-full">
+              <span className={cn(titleClasses, 'font-bold text-[18px] leading-[24px] tracking-[-0.36px]')} style={{ textAlign: 'left' }}>
+                {section.title}
+              </span>
+              {section.badge && (
+                <StatusBadge
+                  text={section.badge.text}
+                  variant={section.badge.variant || 'button'}
+                  colorScheme={section.badge.colorScheme || 'default'}
+                />
+              )}
+            </div>
+            {section.subtitle && (
+              <div className={cn(subtitleClasses, 'font-medium text-[14px] leading-[20px] w-full')} style={{ textAlign: 'left' }}>
+                {section.subtitle}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </Button>

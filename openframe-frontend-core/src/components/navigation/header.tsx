@@ -1,11 +1,10 @@
 "use client"
 
-import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { cn } from '../../utils'
+import React, { useEffect, useRef, useState } from 'react'
 import { HeaderConfig, NavigationItem } from '../../types/navigation'
+import { cn } from '../../utils'
 import { Button } from '../ui/button'
-import { useState as useDropdownState, useRef as useDropdownRef, useEffect as useDropdownEffect } from 'react'
 
 export interface HeaderProps {
   config: HeaderConfig

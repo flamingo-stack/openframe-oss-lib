@@ -1,0 +1,109 @@
+{
+  "tableName": "${pinot.tables.logs.name}",
+  "tableType": "REALTIME",
+  "segmentsConfig": {
+    "timeColumnName": "eventTimestamp",
+    "timeType": "MILLISECONDS",
+    "replication": "${pinot.tables.logs.replication}",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "retentionTimeUnit": "DAYS",
+    "retentionTimeValue": "45"
+  },
+  "tableIndexConfig": {
+    "loadMode": "MMAP",
+    "nullHandlingEnabled": true,
+    "optimizeDictionary": true,
+    "noDictionaryColumns": [
+      "summary",
+      "userId",
+      "hostname",
+      "organizationName"
+    ],
+    "invertedIndexColumns": [
+      "ingestDay",
+      "toolType",
+      "eventType",
+      "severity",
+      "organizationId",
+      "deviceId"
+    ],
+    "textIndexColumns": [
+      "summary",
+      "userId",
+      "organizationName"
+    ],
+    "rangeIndexColumns": [
+      "eventTimestamp"
+    ],
+    "streamConfigs": {
+      "streamType": "kafka",
+      "stream.kafka.topic.name": "${openframe.oss-tenant.kafka.topics.inbound.integrated-tool-events.name}",
+      "stream.kafka.broker.list": "${spring.oss-tenant.kafka.bootstrap-servers}",
+      "stream.kafka.consumer.type": "lowlevel",
+      "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
+      "stream.kafka.consumer.prop.auto.offset.reset": "smallest",
+      "realtime.segment.flush.threshold.time": "24h",
+      "realtime.segment.flush.threshold.rows": "500000"
+    }
+  },
+  "fieldConfigList": [
+    {
+      "name": "summary",
+      "encodingType": "RAW",
+      "indexTypes": ["TEXT"],
+      "properties": {
+        "enableQueryCache": "true",
+        "caseSensitive": "false"
+      }
+    },
+    {
+      "name": "userId",
+      "encodingType": "RAW",
+      "indexTypes": ["TEXT"],
+      "properties": {
+        "enableQueryCache": "true",
+        "caseSensitive": "false"
+      }
+    },
+    {
+      "name": "organizationName",
+      "encodingType": "RAW",
+      "indexTypes": [
+        "TEXT"
+      ],
+      "properties": {
+        "enableQueryCache": "true",
+        "caseSensitive": "false"
+      }
+    },
+    {
+      "name": "hostname",
+      "encodingType": "RAW",
+      "indexTypes": [
+        "TEXT"
+      ],
+      "properties": {
+        "enableQueryCache": "true",
+        "caseSensitive": "false"
+      }
+    }
+  ],
+  "routing": {
+    "instanceSelectorType": "strictReplicaGroup"
+  },
+  "tenants": {
+    "broker": "DefaultTenant",
+    "server": "DefaultTenant"
+  },
+  "task": {
+    "taskTypeConfigsMap": {
+      "RealtimeToOfflineSegmentsTask": {
+        "schedule": "0 0 4 * * ?",
+        "bucketTimePeriod": "30d",
+        "bufferTimePeriod": "24h",
+        "mergeType": "rollup",
+        "timeColumnName": "eventTimestamp"
+      }
+    }
+  }
+} 

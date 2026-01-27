@@ -20,7 +20,6 @@ import java.util.Optional;
 
 import static com.openframe.data.document.user.UserRole.OWNER;
 import static com.openframe.data.document.user.UserStatus.DELETED;
-import static java.time.LocalDateTime.now;
 
 @Service
 @RequiredArgsConstructor
@@ -71,6 +70,7 @@ public class UserService {
         }
 
         User savedUser = userRepository.save(user);
+        userProcessor.postProcessUserUpdated(savedUser);
         return userMapper.toResponse(savedUser);
     }
 

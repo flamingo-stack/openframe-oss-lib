@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface GraduationCapIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function GraduationCapIcon({
+  className = "",
+  size = 24,
+  color = "currentColor",
+  ...props
+}: GraduationCapIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M3.872 17.093v-7.087a1.125 1.125 0 1 1 2.25 0v7.087c0 .391.114.642.255.777l.33.295c.884.73 2.57 1.71 5.293 1.71 3.113 0 4.869-1.28 5.622-2.005l.1-.123c.092-.146.157-.36.157-.654v-7.087a1.125 1.125 0 1 1 2.25 0v7.087c0 .743-.205 1.598-.818 2.267l-.128.132c-1.086 1.044-3.377 2.632-7.183 2.632-3.567 0-5.805-1.395-6.965-2.43l-.218-.202c-.713-.687-.945-1.607-.945-2.4Z"
+      />
+      <path
+        fill={color}
+        d="M20.876 13.983v-3.86l-7.494 3.694a3.12 3.12 0 0 1-2.763 0L1.78 9.464c-1.21-.596-1.21-2.32 0-2.915l8.84-4.354a3.13 3.13 0 0 1 2.763.002l8.831 4.352c.505.249.795.695.878 1.173.02.084.035.17.035.26v6a1.126 1.126 0 0 1-2.25 0Zm-8.489-9.768a.88.88 0 0 0-.773-.001L3.912 8.006l7.702 3.793c.243.12.53.12.773 0l7.694-3.793-7.694-3.79Z"
+      />
+    </svg>
+  );
+}

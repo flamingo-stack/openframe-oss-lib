@@ -1,0 +1,30 @@
+import type { SVGProps } from "react";
+export interface AnalysisIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function AnalysisIcon({
+  className = "",
+  size = 24,
+  color = "currentColor",
+  ...props
+}: AnalysisIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M11.125 17.375h1.75V6.625h-1.75zm4 .125a2.123 2.123 0 0 1-2 2.118V22a1.125 1.125 0 0 1-2.25 0v-2.382a2.12 2.12 0 0 1-2-2.118v-11c0-1.131.884-2.055 2-2.12V2a1.125 1.125 0 0 1 2.25 0v2.38a2.124 2.124 0 0 1 2 2.12zm-12-2.126h1.75v-4.748h-1.75zm16-4.5h1.75V6.125h-1.75zm-12 4.627a2.12 2.12 0 0 1-2 2.116V19a1.125 1.125 0 0 1-2.25 0v-1.383a2.12 2.12 0 0 1-2-2.117v-5c0-1.132.885-2.054 2-2.119V7a1.125 1.125 0 0 1 2.25 0v1.381c1.115.065 2 .987 2 2.118zm16-4.5a2.12 2.12 0 0 1-2 2.116V14.5a1.125 1.125 0 0 1-2.25 0v-1.383a2.12 2.12 0 0 1-2-2.117V6c0-1.132.885-2.054 2-2.119V2.5a1.125 1.125 0 0 1 2.25 0v1.381c1.115.065 2 .987 2 2.119z"
+      />
+    </svg>
+  );
+}

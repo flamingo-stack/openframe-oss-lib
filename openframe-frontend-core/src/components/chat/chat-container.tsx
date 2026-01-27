@@ -3,10 +3,7 @@ import { cn } from "../../utils/cn"
 import { SquareAvatar as Avatar } from "../ui/square-avatar"
 import { Button } from "../ui/button"
 import { PlusCircleIcon } from "../plus-circle-icon"
-
-interface ConnectionIndicatorProps {
-  status: 'connected' | 'disconnected' | 'connecting'
-}
+import type { ConnectionIndicatorProps, ChatContainerProps, ChatHeaderProps } from "./types"
 
 const ConnectionIndicator: React.FC<ConnectionIndicatorProps> = ({ status }) => {
   const getStatusStyles = () => {
@@ -36,10 +33,6 @@ const ConnectionIndicator: React.FC<ConnectionIndicatorProps> = ({ status }) => 
   )
 }
 
-export interface ChatContainerProps extends React.HTMLAttributes<HTMLDivElement> {
-  children?: React.ReactNode
-}
-
 const ChatContainer = React.forwardRef<HTMLDivElement, ChatContainerProps>(
   ({ className, children, ...props }, ref) => {
     return (
@@ -60,17 +53,6 @@ const ChatContainer = React.forwardRef<HTMLDivElement, ChatContainerProps>(
 )
 
 ChatContainer.displayName = "ChatContainer"
-
-interface ChatHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
-  userName?: string
-  userTitle?: string
-  userAvatar?: string
-  onSettingsClick?: () => void
-  onNewChat?: () => void
-  showNewChat?: boolean
-  connectionStatus?: 'connected' | 'disconnected' | 'connecting'
-  serverUrl?: string | null
-}
 
 const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
   ({ className, userName = 'Grace "Fae" Meadows', userTitle = "Your Personal Assistant", userAvatar, onSettingsClick, onNewChat, showNewChat = false, connectionStatus = 'disconnected', serverUrl = null, ...props }, ref) => {

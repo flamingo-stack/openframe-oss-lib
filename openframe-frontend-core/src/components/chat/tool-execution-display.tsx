@@ -1,25 +1,11 @@
 "use client"
 
-import { useState, useEffect, forwardRef, HTMLAttributes } from "react"
+import { useState, useEffect, forwardRef } from "react"
 import { cn } from "../../utils/cn"
 import { ToolIcon } from "../tool-icon"
 import { ChevronDown, ChevronRight, Loader2, CheckCircle2, XCircle, ArrowRightIcon } from "lucide-react"
 import { ToolType } from "../platform"
-
-export interface ToolExecutionMessage {
-  type: "EXECUTING_TOOL" | "EXECUTED_TOOL"
-  integratedToolType: string
-  toolFunction: string
-  parameters?: Record<string, any>
-  result?: string
-  success?: boolean
-}
-
-export interface ToolExecutionDisplayProps extends HTMLAttributes<HTMLDivElement> {
-  message: ToolExecutionMessage
-  isExpanded?: boolean
-  onToggleExpand?: () => void
-}
+import type { ToolExecutionDisplayProps } from "./types"
 
 const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProps>(
   ({ className, message, isExpanded = false, onToggleExpand, ...props }, ref) => {
@@ -70,7 +56,7 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
       >
         {/* Header */}
         <div
-          className="flex flex-col gap-2 px-4 py-3 cursor-pointer hover:bg-ods-bg-secondary/80 transition-colors"
+          className="flex flex-col gap-2 px-4 py-3 cursor-pointer hover:bg-ods-card/80 transition-colors"
           onClick={handleToggle}
         >
           {/* First Row: Expand Icon + Tool Icon + Tool Name + Status */}

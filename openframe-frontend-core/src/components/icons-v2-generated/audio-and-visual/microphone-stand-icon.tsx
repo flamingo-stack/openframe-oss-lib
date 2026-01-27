@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface MicrophoneStandIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function MicrophoneStandIcon({
+  className = "",
+  size = 24,
+  color = "currentColor",
+  ...props
+}: MicrophoneStandIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M9.875 22v-3.909l-2.57 2.303a2.62 2.62 0 0 1-2.624.515l-1.886 1.887a1.126 1.126 0 0 1-1.59-1.592l1.885-1.885a2.62 2.62 0 0 1 .514-2.622l7.847-8.768a1.124 1.124 0 1 1 1.676 1.5L5.28 18.197a.37.37 0 0 0 .015.508l.055.045a.37.37 0 0 0 .452-.032l8.762-7.847a1.125 1.125 0 0 1 1.502 1.677l-3.942 3.529V22a1.126 1.126 0 0 1-2.25 0Z"
+      />
+      <path
+        fill={color}
+        d="M20.875 7A3.876 3.876 0 0 0 17 3.125c-.88 0-1.689.296-2.339.79a8.56 8.56 0 0 0 2.064 3.361 8.55 8.55 0 0 0 3.36 2.061c.494-.65.791-1.458.791-2.337Zm-7.75 0a3.876 3.876 0 0 0 4.645 3.796A10.7 10.7 0 0 1 13.2 6.23q-.075.374-.076.77Zm10 0a6.1 6.1 0 0 1-1.924 4.454l-.01.009a6.1 6.1 0 0 1-4.192 1.663 6.126 6.126 0 0 1-4.47-10.312l.032-.032A6.126 6.126 0 0 1 23.125 7"
+      />
+    </svg>
+  );
+}

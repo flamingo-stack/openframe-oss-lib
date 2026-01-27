@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface ChartRadarIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function ChartRadarIcon({
+  className = "",
+  size = 24,
+  color = "currentColor",
+  ...props
+}: ChartRadarIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M10.875 2a1.125 1.125 0 0 1 2.25 0v6.119l2.368 1.87 6.045-1.7a1.125 1.125 0 0 1 .61 2.165l-5.885 1.656-.586 4.442 3.264 4.185.066.094a1.126 1.126 0 0 1-1.765 1.377l-.077-.088-3.333-4.278-3.82-1.174-3.17 5.286-.065.095a1.125 1.125 0 0 1-1.865-1.252l3.343-5.578-.888-2.37-5.666-2.359-.104-.05a1.126 1.126 0 0 1 .86-2.066l.108.04 5.466 2.273 2.844-2.527zM9.573 12.326l.785 2.093 3.2.984.487-3.688-2.004-1.584z"
+      />
+      <path
+        fill={color}
+        d="M9.826 1.505a4.065 4.065 0 0 1 4.627.193l6.998 5.274c1.427 1.075 2.01 2.95 1.477 4.655L20.24 20.2c-.541 1.726-2.118 2.923-3.929 2.924H7.69c-1.81 0-3.39-1.198-3.93-2.924l-2.687-8.574c-.534-1.705.051-3.58 1.478-4.655l6.998-5.274.278-.193Zm3.274 1.99a1.816 1.816 0 0 0-2.199 0L3.904 8.769a2 2 0 0 0-.684 2.187l2.686 8.573c.257.819.987 1.347 1.783 1.347h8.623c.796 0 1.527-.528 1.783-1.347l2.685-8.573a2 2 0 0 0-.683-2.187L13.1 3.496Z"
+      />
+    </svg>
+  );
+}

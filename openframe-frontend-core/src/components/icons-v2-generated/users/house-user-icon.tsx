@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface HouseUserIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function HouseUserIcon({
+  className = "",
+  size = 24,
+  color = "currentColor",
+  ...props
+}: HouseUserIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M2.875 18V8.44a1.125 1.125 0 0 1 2.25 0V18c0 1.035.84 1.875 1.875 1.875h10c1.036 0 1.876-.84 1.876-1.875V8.44a1.125 1.125 0 1 1 2.25 0V18A4.125 4.125 0 0 1 17 22.125H7A4.125 4.125 0 0 1 2.874 18Z"
+      />
+      <path
+        fill={color}
+        d="M14.125 18c0-.759-.615-1.375-1.374-1.375h-1.5c-.76 0-1.376.616-1.376 1.375a1.125 1.125 0 0 1-2.25 0 3.626 3.626 0 0 1 3.626-3.625h1.5A3.625 3.625 0 0 1 16.375 18a1.125 1.125 0 0 1-2.25 0m-1.374-7.125a.75.75 0 1 0-1.501.001.75.75 0 0 0 1.5 0ZM9.749 2.548a4.13 4.13 0 0 1 4.789.205l8.155 6.36a1.126 1.126 0 0 1-1.385 1.774l-8.155-6.36a1.88 1.88 0 0 0-2.176-.094l-.13.094-8.155 6.36-.094.066a1.126 1.126 0 0 1-1.29-1.84l8.156-6.36zm5.252 8.327a3 3 0 1 1-6.002-.001 3 3 0 0 1 6.002.001"
+      />
+    </svg>
+  );
+}

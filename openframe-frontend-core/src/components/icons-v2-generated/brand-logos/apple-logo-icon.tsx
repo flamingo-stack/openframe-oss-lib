@@ -1,0 +1,30 @@
+import type { SVGProps } from "react";
+export interface AppleLogoIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function AppleLogoIcon({
+  className = "",
+  size = 24,
+  color = "currentColor",
+  ...props
+}: AppleLogoIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M17.57 12.628c-.024-2.531 2.062-3.747 2.156-3.805-1.174-1.72-2.999-1.957-3.649-1.983-1.552-.16-3.03.917-3.82.917s-2.005-.895-3.293-.869c-1.694.024-3.257.987-4.13 2.507-1.758 3.054-.448 7.59 1.268 10.073.84 1.213 1.837 2.581 3.151 2.53 1.266-.05 1.743-.82 3.269-.82s1.957.82 3.293.796c1.36-.026 2.222-1.24 3.054-2.458.958-1.411 1.356-2.775 1.38-2.847-.032-.012-2.65-1.018-2.68-4.041Zm-2.51-7.434c.697-.846 1.167-2.021 1.039-3.194-1.004.041-2.22.67-2.94 1.518-.644.748-1.21 1.944-1.056 3.093 1.115.086 2.26-.572 2.956-1.417Z"
+      />
+    </svg>
+  );
+}

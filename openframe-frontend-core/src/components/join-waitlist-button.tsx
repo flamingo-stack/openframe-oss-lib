@@ -21,7 +21,7 @@ export interface JoinWaitlistButtonProps
 export const JoinWaitlistButton = React.forwardRef<
   HTMLButtonElement,
   JoinWaitlistButtonProps
->(({ loading = false, className, children = 'Join Waitlist', lowerPathColor, upperPathColor, buttonBackgroundColor, buttonTextColor, ...props }, ref) => {
+>(({ loading = false, className, children = 'Get Early Access', lowerPathColor, upperPathColor, buttonBackgroundColor, buttonTextColor, ...props }, ref) => {
   return (
     <Button
       ref={ref}

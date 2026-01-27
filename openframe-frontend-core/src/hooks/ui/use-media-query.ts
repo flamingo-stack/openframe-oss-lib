@@ -1,71 +1,35 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useLayoutEffect, useState } from "react"
 
 /**
  * Hook to check if a media query matches
  * @param query - Media query to check
- * @returns Whether the media query matches
+ * @returns Whether the media query matches, or undefined during SSR/initial render
  */
-export function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(false)
-  const [isClient, setIsClient] = useState(false)
+export function useMediaQuery(
+  query: string,
+): boolean | undefined {
+  const [matches, setMatches] = useState<boolean | undefined>(undefined)
 
-  useEffect(() => {
-    setIsClient(true)
-    if (!isClient) return
+  useLayoutEffect(() => {
+    const matchMedia = window.matchMedia(query)
 
-    const media = window.matchMedia(query)
-    const updateMatches = () => setMatches(media.matches)
+    const handleChange = () => {
+      setMatches(matchMedia.matches)
+    }
 
     // Set initial value
-    updateMatches()
+    handleChange()
 
-    // Listen for changes
-    media.addEventListener("change", updateMatches)
+    matchMedia.addEventListener('change', handleChange)
 
-    // Cleanup
     return () => {
-      media.removeEventListener("change", updateMatches)
+      matchMedia.removeEventListener('change', handleChange)
     }
-  }, [query, isClient])
+  }, [query])
 
-  return isClient ? matches : false
-}
-
-/**
- * Hook to get window dimensions
- * @returns Window width and height
- */
-export function useWindowSize() {
-  const [windowSize, setWindowSize] = useState({
-    width: 0,
-    height: 0,
-  })
-  const [isClient, setIsClient] = useState(false)
-
-  useEffect(() => {
-    setIsClient(true)
-    if (!isClient) return
-
-    const handleResize = () => {
-      setWindowSize({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      })
-    }
-
-    // Set initial size
-    handleResize()
-
-    // Add event listener
-    window.addEventListener("resize", handleResize)
-
-    // Remove event listener on cleanup
-    return () => window.removeEventListener("resize", handleResize)
-  }, [isClient])
-
-  return windowSize
+  return matches
 }
 
 /**
@@ -79,11 +43,27 @@ export const breakpoints = {
   "2xl": "(min-width: 1536px)",
 }
 
-/**
- * Hook to check if screen is mobile
- * @param breakpoint - Breakpoint to consider as mobile
- * @returns Whether the screen is mobile
- */
-export function useMobile(breakpoint: string = breakpoints.md): boolean {
-  return !useMediaQuery(breakpoint)
+export function useSmUp(): boolean | undefined {
+  const matches = useMediaQuery(breakpoints.sm)
+  return matches === undefined ? undefined : matches
+}
+
+export function useMdUp(): boolean | undefined {
+  const matches = useMediaQuery(breakpoints.md)
+  return matches === undefined ? undefined : matches
+}
+
+export function useLgUp(): boolean | undefined {
+  const matches = useMediaQuery(breakpoints.lg)
+  return matches === undefined ? undefined : matches
+}
+
+export function useXlUp(): boolean | undefined {
+  const matches = useMediaQuery(breakpoints.xl)
+  return matches === undefined ? undefined : matches
+}
+
+export function use2xlUp(): boolean | undefined {
+  const matches = useMediaQuery(breakpoints["2xl"])
+  return matches === undefined ? undefined : matches
 }

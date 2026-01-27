@@ -1,25 +1,19 @@
 'use client'
 
 import React from 'react'
-import { MoreHorizontal } from 'lucide-react'
 import { cn } from '../../../utils/cn'
-import { Button } from '../button'
 import { Checkbox } from '../checkbox'
 import { TableCell } from './table-cell'
-import { ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE } from './table-skeleton'
+import { ROW_HEIGHT_DESKTOP } from './table-skeleton'
 import type { TableRowProps } from './types'
+import { getHideClasses } from './utils'
 
 export function TableRow<T = any>({
   item,
   columns,
-  rowKey,
   onClick,
   className,
   index,
-  mobileColumns,
-  renderMobileRow,
-  rowActions,
-  renderRowActions,
   selectable,
   selected,
   onSelect
@@ -66,11 +60,6 @@ export function TableRow<T = any>({
     return String(value)
   }
 
-  // Filter columns for mobile display
-  const mobileColumnsToShow = mobileColumns
-    ? columns.filter(col => mobileColumns.includes(col.key))
-    : columns.filter(col => !col.hideOnMobile).slice(0, 3) // Default: show first 3 columns
-
   return (
     <div
       className={cn(
@@ -80,8 +69,7 @@ export function TableRow<T = any>({
       )}
       onClick={handleRowClick}
     >
-      {/* Desktop Layout */}
-      <div className={cn('hidden md:flex items-center gap-4 px-4 py-0', ROW_HEIGHT_DESKTOP)}>
+      <div className={cn('flex items-center gap-4 px-4 py-0', ROW_HEIGHT_DESKTOP)}>
         {/* Selection checkbox */}
         {selectable && (
           <div className="flex items-center justify-center w-10 shrink-0" data-no-row-click>
@@ -97,64 +85,12 @@ export function TableRow<T = any>({
           <TableCell
             key={column.key}
             align={column.align}
-            width={column.width}
-            className={column.className}
+            width={column.width || 'flex-1 min-w-0'}
+            className={cn(column.className, getHideClasses(column.hideAt))}
           >
             {getCellValue(column)}
           </TableCell>
         ))}
-      </div>
-
-      {/* Mobile Layout */}
-      <div className={cn('flex md:hidden gap-3 items-center justify-start px-3 py-0', ROW_HEIGHT_MOBILE)}>
-        {renderMobileRow ? (
-          // Custom mobile renderer
-          renderMobileRow(item)
-        ) : (
-          // Default mobile layout
-          <>
-            <div className="flex-1 flex flex-col justify-center min-w-0 py-3">
-              {mobileColumnsToShow.map((column, colIndex) => (
-                <div key={column.key} className="flex flex-col">
-                  {colIndex === 0 ? (
-                    // First column - primary text
-                    <span className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-[#fafafa] truncate">
-                      {getCellValue(column)}
-                    </span>
-                  ) : (
-                    // Other columns - secondary text
-                    <span className="font-['DM_Sans'] font-medium text-[12px] leading-[16px] text-[#888888] truncate">
-                      {getCellValue(column)}
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Mobile Actions */}
-            {rowActions && rowActions.length > 0 && (
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  if (rowActions.length === 1) {
-                    rowActions[0].onClick(item)
-                  } else {
-                    rowActions[0].onClick(item)
-                  }
-                }}
-              // className="bg-[#212121] border-[#3a3a3a] hover:bg-[#2a2a2a] h-12 w-12 shrink-0"
-              >
-                {rowActions.length === 1 && rowActions[0].icon ? (
-                  rowActions[0].icon
-                ) : (
-                  <MoreHorizontal className="h-6 w-6 text-[#fafafa]" />
-                )}
-              </Button>
-            )}
-          </>
-        )}
       </div>
     </div>
   )

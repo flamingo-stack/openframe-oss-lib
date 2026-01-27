@@ -1,7 +1,7 @@
 // Unified Platform Types
 // Used across announcements, blog posts, and platform configuration
 
-export type PlatformName = 'openmsp' | 'tmcg' | 'flamingo' | 'flamingo-teaser' | 'universal' | 'admin-hub' | 'openframe';
+export type PlatformName = 'openmsp' | 'tmcg' | 'flamingo' | 'flamingo-teaser' | 'universal' | 'marketing-hub' | 'product-hub' | 'revenue-hub' | 'people-hub' | 'openframe';
 
 // Database Platform Model (from platforms table)
 export interface PlatformRecord {
@@ -10,6 +10,7 @@ export interface PlatformRecord {
   display_name: string;
   description?: string;
   is_active: boolean;
+  is_internal: boolean; // Whether this is an internal admin platform vs public-facing
   created_at: string;
   updated_at: string;
 }

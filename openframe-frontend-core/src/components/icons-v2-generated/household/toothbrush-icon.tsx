@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface ToothbrushIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function ToothbrushIcon({
+  className = "",
+  size = 24,
+  color = "currentColor",
+  ...props
+}: ToothbrushIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M17.375 12a.375.375 0 0 0-.375-.375h-1.376v2.374a1.125 1.125 0 0 1-2.25 0v-2.374h-1.748v2.374a1.125 1.125 0 0 1-2.25 0v-2.374H7.624v2.374a1.125 1.125 0 0 1-2.25 0v-2.374H4a.375.375 0 0 0-.375.375v4.898q.184-.022.375-.023h13.375zm2.25 5.234c.276.145.531.332.756.556l.085.085H22l.115.006a1.125 1.125 0 0 1 0 2.239l-.115.005h-1.585a2.13 2.13 0 0 1-1.503-.622l-.122-.122a.87.87 0 0 0-.618-.256H4a.875.875 0 0 0 0 1.75h18l.115.006a1.125 1.125 0 0 1 0 2.239l-.115.005H4a3.126 3.126 0 0 1-2.625-4.817V12A2.625 2.625 0 0 1 4 9.375h13A2.625 2.625 0 0 1 19.625 12z"
+      />
+      <path
+        fill={color}
+        d="M.875 7c0-1.803 1.191-4.782 4.745-6.06a1.125 1.125 0 0 1 1.42 1.49c-.388.936-.174 1.498.097 1.838.337.42.847.607 1.108.607h8.505a3.375 3.375 0 1 1 0 6.75H5.5A4.626 4.626 0 0 1 .875 7m2.25 0A2.376 2.376 0 0 0 5.5 9.374h11.25a1.125 1.125 0 0 0 0-2.25H8.245c-.972 0-2.119-.52-2.864-1.453a3.6 3.6 0 0 1-.738-1.617C3.489 5.048 3.125 6.303 3.125 7"
+      />
+    </svg>
+  );
+}

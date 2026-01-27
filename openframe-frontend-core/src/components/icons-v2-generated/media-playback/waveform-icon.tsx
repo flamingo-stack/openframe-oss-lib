@@ -1,0 +1,30 @@
+import type { SVGProps } from "react";
+export interface WaveformIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function WaveformIcon({
+  className = "",
+  size = 24,
+  color = "currentColor",
+  ...props
+}: WaveformIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M12 2.875c.561 0 1.036.413 1.114.968l1.144 8.14.879-6.142.047-.2a1.126 1.126 0 0 1 2.18.197l.894 6.144.646-2.74.059-.18a1.126 1.126 0 0 1 2.118.13l.768 2.683h.15l.116.006a1.125 1.125 0 0 1 0 2.238l-.115.006h-1c-.33 0-.634-.146-.843-.384l-1.062 4.516a1.125 1.125 0 0 1-2.208-.095l-.627-4.29-.896 6.287a1.126 1.126 0 0 1-2.228-.002l-1.137-8.078-1.135 8.078a1.125 1.125 0 0 1-2.228.002l-.898-6.283-.624 4.286a1.126 1.126 0 0 1-2.21.095L3.842 13.74a1.12 1.12 0 0 1-.84.385H2a1.125 1.125 0 0 1 0-2.25h.15l.768-2.684.068-.177a1.125 1.125 0 0 1 2.11.229l.644 2.742.896-6.147.049-.2a1.126 1.126 0 0 1 2.18.203l.875 6.14 1.146-8.138.047-.2c.15-.452.577-.768 1.068-.768Z"
+      />
+    </svg>
+  );
+}

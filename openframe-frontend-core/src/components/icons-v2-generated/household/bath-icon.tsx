@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface BathIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function BathIcon({
+  className = "",
+  size = 24,
+  color = "currentColor",
+  ...props
+}: BathIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M5.375 22v-1.5a1.126 1.126 0 0 1 2.25 0V22a1.125 1.125 0 0 1-2.25 0m11 0v-1.5a1.126 1.126 0 0 1 2.25 0V22a1.125 1.125 0 0 1-2.25 0m-13.5-10.5V4.4a3.526 3.526 0 0 1 6.593-1.737l.532.94 1.948.833a1.125 1.125 0 0 1 .122 2.008l-2.599 1.5a1.125 1.125 0 0 1-1.679-1.109l.254-2.115-.536-.948a1.275 1.275 0 0 0-2.385.629v7.098a1.125 1.125 0 0 1-2.25 0Z"
+      />
+      <path
+        fill={color}
+        d="m22 10.375.115.006a1.125 1.125 0 0 1 0 2.238l-.115.006h-.047l-.785 4.718a5.126 5.126 0 0 1-5.057 4.282H7.889a5.125 5.125 0 0 1-5.056-4.282l-.786-4.718H2a1.125 1.125 0 0 1 0-2.25zM5.053 16.973a2.875 2.875 0 0 0 2.836 2.402h8.222a2.875 2.875 0 0 0 2.836-2.402l.725-4.348H4.328z"
+      />
+    </svg>
+  );
+}

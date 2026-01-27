@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface PumpElectricIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function PumpElectricIcon({
+  className = "",
+  size = 24,
+  color = "currentColor",
+  ...props
+}: PumpElectricIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M17.875 16.5V13c0-.97-.738-1.769-1.683-1.865l-.192-.01-.115-.006A1.125 1.125 0 0 1 16 8.875l.422.021A4.126 4.126 0 0 1 20.125 13v3.5a.375.375 0 0 0 .75 0V9.44a2.93 2.93 0 0 1-1.5-2.558v-.28l-.998-.666-.093-.069a1.124 1.124 0 0 1 1.24-1.862l.1.059 2.555 1.704.21.16c.464.4.736.986.736 1.608V16.5a2.626 2.626 0 0 1-5.25 0M8.55 6.396a1.126 1.126 0 0 1 1.956 1.107L9.32 9.875h2.18a1.125 1.125 0 0 1 1.006 1.627l-2.001 4-.056.102a1.126 1.126 0 0 1-1.957-1.107l1.187-2.372H7.5a1.125 1.125 0 0 1-1.006-1.627l2-4z"
+      />
+      <path
+        fill={color}
+        d="M14.874 5a1.874 1.874 0 0 0-1.875-1.875H6c-1.035 0-1.875.84-1.875 1.875v15.875h10.75zm2.25 15.88a1.126 1.126 0 0 1-.008 2.239l-.116.006H2a1.125 1.125 0 0 1-.125-2.245V5A4.125 4.125 0 0 1 6 .875h7A4.125 4.125 0 0 1 17.124 5z"
+      />
+    </svg>
+  );
+}

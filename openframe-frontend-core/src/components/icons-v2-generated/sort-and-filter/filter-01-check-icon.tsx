@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface Filter01CheckIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function Filter01CheckIcon({
+  className = "",
+  size = 24,
+  color = "currentColor",
+  ...props
+}: Filter01CheckIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M21.205 12.205a1.125 1.125 0 1 1 1.59 1.59l-6 6c-.439.44-1.151.44-1.59 0l-3-3-.078-.085a1.125 1.125 0 0 1 1.583-1.583l.085.078L16 17.409z"
+      />
+      <path
+        fill={color}
+        d="M16.083 13.509a1.126 1.126 0 0 1-1.592-1.59zm5.042-5.923c0 .494-.172.969-.482 1.347l-.14.155-4.42 4.42-1.592-1.59 4.384-4.384V5A.875.875 0 0 0 18 4.125H4A.875.875 0 0 0 3.125 5v2.534l5.377 5.377.141.157c.31.378.482.853.482 1.346v3.504l4.144 2.073a1.126 1.126 0 0 1-1.006 2.012L8.05 19.897a2.13 2.13 0 0 1-1.175-1.901v-3.53L1.498 9.087a2.13 2.13 0 0 1-.623-1.502V5A3.125 3.125 0 0 1 4 1.875h14A3.125 3.125 0 0 1 21.125 5z"
+      />
+    </svg>
+  );
+}

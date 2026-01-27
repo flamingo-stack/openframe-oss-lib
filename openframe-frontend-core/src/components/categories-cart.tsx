@@ -14,13 +14,6 @@ export function CategoriesCart({
   isLoading = false,
   className = '' 
 }: RealCategoryCardProps) {
-  console.log('🔍 CategoriesCart rendering for category:', category.slug, 'with props:', {
-    vendorsLength: vendors?.length,
-    vendorCount,
-    subcategoryCount,
-    isLoading
-  });
-
   return (
     <Link
       href={`/vendors?category=${category.slug}`}

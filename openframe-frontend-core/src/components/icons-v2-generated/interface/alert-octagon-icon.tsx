@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface AlertOctagonIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function AlertOctagonIcon({
+  className = "",
+  size = 24,
+  color = "currentColor",
+  ...props
+}: AlertOctagonIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M20.875 9.166c0-.472-.164-.927-.46-1.29l-.135-.147-4.008-4.01a2.04 2.04 0 0 0-1.438-.594H9.166c-.539 0-1.056.214-1.437.595l-4.01 4.009c-.38.381-.594.898-.594 1.437v5.668c0 .539.214 1.057.595 1.438l4.009 4.008c.381.38.898.595 1.437.595h5.668c.539 0 1.057-.214 1.438-.595l4.008-4.008c.381-.381.595-.9.595-1.438zm2.25 5.668a4.29 4.29 0 0 1-1.254 3.029l-4.008 4.008a4.28 4.28 0 0 1-3.03 1.254H9.167a4.28 4.28 0 0 1-2.714-.97l-.315-.284-4.008-4.008a4.29 4.29 0 0 1-1.254-3.03V9.167c0-1.136.45-2.226 1.254-3.03L6.137 2.13l.315-.284a4.28 4.28 0 0 1 2.714-.97h5.668c1.135 0 2.226.45 3.029 1.254l4.008 4.008a4.28 4.28 0 0 1 1.254 3.029v5.668Z"
+      />
+      <path
+        fill={color}
+        d="M10.876 12V8a1.125 1.125 0 0 1 2.25 0v4a1.126 1.126 0 0 1-2.25 0m2.498 4a1.375 1.375 0 0 1-2.742.14l-.007-.14.007-.141a1.375 1.375 0 0 1 1.369-1.233l.14.007c.693.07 1.233.655 1.233 1.367"
+      />
+    </svg>
+  );
+}

@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface Parcel01IconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function Parcel01Icon({
+  className = "",
+  size = 24,
+  color = "currentColor",
+  ...props
+}: Parcel01IconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M10.875 2a1.125 1.125 0 0 1 2.25 0v4.875h8.263l.116.006a1.125 1.125 0 0 1 0 2.238l-.116.006H2.612a1.125 1.125 0 0 1 0-2.25h8.263z"
+      />
+      <path
+        fill={color}
+        d="M20.375 8.812c0-.25-.05-.496-.145-.724l-.11-.221-2.223-3.812a1.88 1.88 0 0 0-1.62-.93H7.724c-.667 0-1.284.354-1.62.93L3.88 7.867a1.9 1.9 0 0 0-.255.945V19c0 1.035.84 1.875 1.875 1.875h13c1.036 0 1.875-.84 1.875-1.875zM22.625 19a4.125 4.125 0 0 1-4.125 4.125h-13A4.125 4.125 0 0 1 1.375 19V8.812c0-.73.194-1.448.563-2.08l2.222-3.81A4.13 4.13 0 0 1 7.724.874h8.553c1.467 0 2.823.78 3.562 2.046l2.224 3.812.13.24c.284.57.432 1.2.432 1.839z"
+      />
+    </svg>
+  );
+}

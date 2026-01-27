@@ -1,199 +1,149 @@
 "use client"
 
-import { useRef, useCallback, useLayoutEffect, useEffect, useImperativeHandle, forwardRef, type HTMLAttributes } from "react"
+import { useRef, useCallback, useLayoutEffect, useEffect, useImperativeHandle, forwardRef } from "react"
 import { cn } from "../../utils/cn"
-import { ChatMessage } from "./chat-message"
-import { ChatMessageEnhanced, type MessageContent, type MessageSegment } from "./chat-message-enhanced"
-
-export interface Message {
-  id: string
-  role: 'user' | 'assistant' | 'error'
-  name?: string
-  content: string | MessageContent
-  timestamp: Date
-  avatar?: string | null
-  assistantType?: 'fae' | 'mingo'
-}
-
-export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
-  messages: Message[]
-  isTyping?: boolean
-  autoScroll?: boolean
-  showAvatars?: boolean
-  contentClassName?: string
-  assistantType?: 'fae' | 'mingo'
-  pendingApprovals?: MessageSegment[]
-}
+import { ChatMessageEnhanced } from "./chat-message-enhanced"
+import { ChatMessageListSkeleton } from "./chat-message-skeleton"
+import type { ChatMessageListProps, Message } from "./types"
 
 const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
-  ({ className, messages, isTyping = false, autoScroll = true, showAvatars = true, contentClassName, assistantType, pendingApprovals, ...props }, ref) => {
+  ({ className, messages, dialogId, isLoading = false, isTyping = false, autoScroll = true, showAvatars = true, contentClassName, assistantType, pendingApprovals, ...props }, ref) => {
     const scrollRef = useRef<HTMLDivElement>(null)
-    const isPinnedToBottomRef = useRef(true)
-    const resizeObserverRef = useRef<ResizeObserver | null>(null)
-    const mutationObserverRef = useRef<MutationObserver | null>(null)
-    const lastScrollHeightRef = useRef<number>(0)
+    const lastMessageCountRef = useRef(0)
+    const lastDialogIdRef = useRef<string | undefined>(dialogId)
+    const userScrolledAwayRef = useRef(false)
 
-    const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
-      if (!scrollRef.current) return
+    const isAtBottom = useCallback(() => {
+      if (!scrollRef.current) return false
+      const { scrollTop, scrollHeight, clientHeight } = scrollRef.current
+      return scrollHeight - scrollTop - clientHeight < 5
+    }, [])
+
+    const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+      if (!autoScroll) return
+      
+      const tryScroll = () => {
+        if (!scrollRef.current) {
+          requestAnimationFrame(tryScroll)
+          return
+        }
+        
+        const element = scrollRef.current
+        element.scrollTo({
+          top: element.scrollHeight,
+          behavior
+        })
+      }
+      
+      tryScroll()
+    }, [autoScroll])
+
+    useEffect(() => {
       const element = scrollRef.current
-      element.scrollTop = element.scrollHeight - element.clientHeight
-      element.scrollTo({ top: element.scrollHeight, behavior })
-    }, [])
+      if (!element || !autoScroll) return
 
-    useLayoutEffect(() => {
-      scrollToBottom('auto')
-    }, [scrollToBottom])
-
-    useEffect(() => {
-      const node = scrollRef.current
-      if (!node) return
-
-      const handleScroll = () => {
-        const distanceFromBottom = node.scrollHeight - (node.scrollTop + node.clientHeight)
-        isPinnedToBottomRef.current = distanceFromBottom <= 50
-      }
-
-      handleScroll()
-      node.addEventListener('scroll', handleScroll, { passive: true })
-      return () => node.removeEventListener('scroll', handleScroll)
-    }, [])
-
-    useEffect(() => {
-      if (!autoScroll || !scrollRef.current) return
-      
-      if (resizeObserverRef.current) {
-        resizeObserverRef.current.disconnect()
-      }
-      
-      const scrollContainer = scrollRef.current
-      const contentContainer = scrollContainer.querySelector('.mx-auto.flex.w-full')
-      
-      if (!contentContainer) return
-      
-      resizeObserverRef.current = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-          const newHeight = entry.target.scrollHeight
+      let scrollTimeout: NodeJS.Timeout
+      const handleUserScroll = () => {
+        clearTimeout(scrollTimeout)
+        scrollTimeout = setTimeout(() => {
+          const atBottom = isAtBottom()
           
-          if (newHeight > lastScrollHeightRef.current && isPinnedToBottomRef.current) {
-            scrollContainer.scrollTop = scrollContainer.scrollHeight
-            
+          if (!atBottom) {
+            userScrolledAwayRef.current = true
+          } else {
+            userScrolledAwayRef.current = false
+          }
+        }, 50)
+      }
+
+      element.addEventListener('scroll', handleUserScroll, { passive: true })
+
+      const contentContainer = element.querySelector('.mx-auto.flex.w-full')
+      if (contentContainer) {
+        const mutationObserver = new MutationObserver(() => {
+          if (!userScrolledAwayRef.current) {
             requestAnimationFrame(() => {
-              if (scrollRef.current && isPinnedToBottomRef.current) {
-                scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-              }
+              scrollToBottom('auto')
             })
           }
-          
-          lastScrollHeightRef.current = newHeight
-        }
-      })
-      
-      resizeObserverRef.current.observe(contentContainer)
-      
-      return () => {
-        if (resizeObserverRef.current) {
-          resizeObserverRef.current.disconnect()
-          resizeObserverRef.current = null
-        }
-      }
-    }, [autoScroll, messages])
-    
-    useLayoutEffect(() => {
-      if (!autoScroll) return
-      if (!scrollRef.current) return
-      
-      const lastMessage = messages[messages.length - 1]
-      if (!lastMessage) return
-      
-      if (lastMessage.role !== 'assistant') return
-      
-      if (!isPinnedToBottomRef.current) return
-      
-      const scrollContainer = scrollRef.current
-      const contentContainer = scrollContainer.querySelector('.mx-auto.flex.w-full')
-      
-      if (mutationObserverRef.current) {
-        mutationObserverRef.current.disconnect()
-      }
-      
-      scrollContainer.scrollTop = scrollContainer.scrollHeight
-      
-      if (contentContainer) {
-        mutationObserverRef.current = new MutationObserver(() => {
-          if (isPinnedToBottomRef.current && scrollRef.current) {
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-          }
         })
-        
-        mutationObserverRef.current.observe(contentContainer, {
+
+        mutationObserver.observe(contentContainer, {
           childList: true,
           subtree: true,
-          characterData: true,
-          attributes: true,
-          attributeOldValue: false,
-          characterDataOldValue: false
+          characterData: true
         })
+
+        return () => {
+          element.removeEventListener('scroll', handleUserScroll)
+          mutationObserver.disconnect()
+        }
       }
-      
-      const performRAFScroll = (depth: number = 0) => {
-        if (depth > 2) return
+
+      return () => {
+        element.removeEventListener('scroll', handleUserScroll)
+      }
+    }, [autoScroll, scrollToBottom, isAtBottom])
+
+    useEffect(() => {
+      if (!autoScroll) return
+
+      const currentMessageCount = messages.length
+      const messageCountChanged = currentMessageCount !== lastMessageCountRef.current
+      const dialogChanged = dialogId !== lastDialogIdRef.current
+
+      if (dialogChanged) {
+        lastDialogIdRef.current = dialogId
+        lastMessageCountRef.current = currentMessageCount
+        userScrolledAwayRef.current = false
         
         requestAnimationFrame(() => {
-          if (isPinnedToBottomRef.current && scrollRef.current) {
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-            
-            if (depth < 1) {
-              performRAFScroll(depth + 1)
-            }
-          }
+          requestAnimationFrame(() => {
+            scrollToBottom('auto')
+          })
         })
+        return
       }
-      
-      performRAFScroll()
-      
-      lastScrollHeightRef.current = scrollContainer.scrollHeight
-      
-      return () => {
-        if (mutationObserverRef.current) {
-          mutationObserverRef.current.disconnect()
-          mutationObserverRef.current = null
+
+      if (messageCountChanged) {
+        lastMessageCountRef.current = currentMessageCount
+        const lastMessage = messages[messages.length - 1]
+        
+        if (lastMessage?.role === 'user' || !userScrolledAwayRef.current) {
+          scrollToBottom(lastMessage?.role === 'user' ? 'smooth' : 'auto')
+        }
+        return
+      }
+
+      if (isTyping && !isLoading) {
+        if (!userScrolledAwayRef.current) {
+          scrollToBottom('smooth')
         }
       }
-    }, [autoScroll, messages[messages.length - 1]?.content])
+    }, [autoScroll, messages.length, dialogId, isTyping, isLoading, scrollToBottom, messages])
 
     useLayoutEffect(() => {
-      if (!autoScroll) return
-      if (!scrollRef.current) return
-
-      const lastMessage = messages[messages.length - 1]
-      if (!lastMessage) return
-
-      const shouldScroll = lastMessage.role === 'user' || isPinnedToBottomRef.current
-      if (!shouldScroll) return
-
-      const behavior: ScrollBehavior = lastMessage.role === 'user' ? 'smooth' : 'auto'
-      scrollToBottom(behavior)
-    }, [autoScroll, scrollToBottom, messages[messages.length - 1]?.id])
-
-    useEffect(() => {
-      if (!autoScroll) return
-      if (!isPinnedToBottomRef.current) return
-      scrollToBottom('smooth')
-    }, [isTyping, scrollToBottom, autoScroll])
-
-    useEffect(() => {
-      return () => {
-        if (resizeObserverRef.current) {
-          resizeObserverRef.current.disconnect()
-        }
-        if (mutationObserverRef.current) {
-          mutationObserverRef.current.disconnect()
-        }
+      if (autoScroll && !isLoading) {
+        scrollToBottom('auto')
+        lastMessageCountRef.current = messages.length
+        lastDialogIdRef.current = dialogId
       }
-    }, [])
+    }, [autoScroll, scrollToBottom, isLoading, messages.length, dialogId])
 
     useImperativeHandle(ref, () => scrollRef.current!)
-    
+
+    if (isLoading) {
+      return (
+        <ChatMessageListSkeleton
+          className={className}
+          showAvatars={showAvatars}
+          assistantType={assistantType}
+          contentClassName={contentClassName}
+          messageCount={6}
+        />
+      )
+    }
+
     return (
       <div className="relative flex-1 min-h-0 flex flex-col">
         <div
@@ -208,42 +158,22 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         >
           <div className={cn("mx-auto flex w-full max-w-3xl flex-col pb-2 min-w-0", contentClassName || "px-4")} style={{ minHeight: '100%' }}>
             <div className="flex-1" />
-            {messages.map((message, index) => {
-              const useEnhanced = Array.isArray(message.content) || message.role === 'assistant'
-              
-              if (useEnhanced) {
-                return (
-                  <ChatMessageEnhanced
-                    key={message.id}
-                    role={message.role}
-                    name={message.name}
-                    content={message.content}
-                    timestamp={message.timestamp}
-                    isTyping={index === messages.length - 1 && isTyping && message.role === 'assistant'}
-                    avatar={showAvatars ? message.avatar : null}
-                    showAvatar={showAvatars}
-                    assistantType={message.assistantType || assistantType}
-                  />
-                )
-              } else {
-                return (
-                  <ChatMessage
-                    key={message.id}
-                    role={message.role}
-                    name={message.name}
-                    content={typeof message.content === 'string' ? message.content : ''}
-                    timestamp={message.timestamp}
-                    isTyping={index === messages.length - 1 && isTyping && message.role === 'assistant'}
-                    avatar={showAvatars ? message.avatar : null}
-                    showAvatar={showAvatars}
-                    assistantType={message.assistantType || assistantType}
-                  />
-                )
-              }
-            })}
+            {messages.map((message, index) => (
+              <ChatMessageEnhanced
+                key={message.id}
+                role={message.role}
+                name={message.name}
+                content={message.content}
+                timestamp={message.timestamp}
+                isTyping={index === messages.length - 1 && isTyping && message.role === 'assistant'}
+                avatar={showAvatars ? message.avatar : null}
+                showAvatar={showAvatars}
+                assistantType={message.assistantType || assistantType}
+              />
+            ))}
           </div>
         </div>
-        
+
         {/* Sticky Pending Approvals Section */}
         {pendingApprovals && pendingApprovals.length > 0 && (
           <div className={cn(

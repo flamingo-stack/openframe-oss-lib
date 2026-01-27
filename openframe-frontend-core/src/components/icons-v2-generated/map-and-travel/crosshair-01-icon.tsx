@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface Crosshair01IconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function Crosshair01Icon({
+  className = "",
+  size = 24,
+  color = "currentColor",
+  ...props
+}: Crosshair01IconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M12.572.89C18.45 1.187 23.125 6.048 23.125 12l-.015.572C22.812 18.45 17.953 23.124 12 23.125l-.572-.015C5.738 22.822 1.178 18.26.89 12.572L.875 12l.015-.573C1.187 5.55 6.048.875 12 .875zM10.876 4.5V3.198a8.875 8.875 0 0 0-7.678 7.678H4.5l.115.005a1.126 1.126 0 0 1 0 2.239l-.115.006H3.198a8.875 8.875 0 0 0 7.678 7.675v-1.3a1.125 1.125 0 0 1 2.25 0v1.3a8.874 8.874 0 0 0 7.675-7.675h-1.3a1.125 1.125 0 0 1 0-2.25h1.3a8.875 8.875 0 0 0-7.675-7.678V4.5a1.126 1.126 0 0 1-2.25 0"
+      />
+      <path
+        fill={color}
+        d="M13.875 12a1.875 1.875 0 1 0-3.75 0 1.875 1.875 0 0 0 3.75 0m2.25 0a4.125 4.125 0 1 1-8.25 0 4.125 4.125 0 0 1 8.25 0"
+      />
+    </svg>
+  );
+}

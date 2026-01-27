@@ -5,6 +5,20 @@ const config: Config = {
   content: [
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  safelist: [
+    // Dynamically generated classes for table hide/show functionality
+    'hidden',
+    'sm:hidden',
+    'md:hidden',
+    'lg:hidden',
+    'xl:hidden',
+    '2xl:hidden',
+    'sm:flex',
+    'md:flex',
+    'lg:flex',
+    'xl:flex',
+    '2xl:flex',
+  ],
   theme: {
     container: {
       center: true,

@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface CollectionImageIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function CollectionImageIcon({
+  className = "",
+  size = 24,
+  color = "currentColor",
+  ...props
+}: CollectionImageIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M14.66 13.266a2.125 2.125 0 0 1 2.681 0l.161.145 5.253 5.253.078.086a1.125 1.125 0 0 1-1.583 1.582l-.085-.077L16 15.09l-2.998 2.997c-.83.83-2.174.83-3.004 0L9.5 17.59l-2.665 2.665a1.125 1.125 0 1 1-1.59-1.59l2.752-2.753.161-.147a2.13 2.13 0 0 1 2.684 0l.16.147.497.496 2.999-2.997.161-.145ZM.874 18V9A8.126 8.126 0 0 1 9 .875h9l.115.006a1.125 1.125 0 0 1 0 2.238L18 3.125H9A5.876 5.876 0 0 0 3.124 9v9a1.125 1.125 0 0 1-2.25 0m10.342-9.114a2.125 2.125 0 1 1-2.33 2.33L8.874 11l.011-.217A2.125 2.125 0 0 1 11 8.875l.217.011Z"
+      />
+      <path
+        fill={color}
+        d="M20.875 9c0-1.035-.84-1.875-1.875-1.875H9c-1.036 0-1.875.84-1.875 1.875v10c0 1.036.84 1.875 1.875 1.875h10c1.036 0 1.875-.84 1.875-1.875zm2.25 10A4.126 4.126 0 0 1 19 23.125H9A4.125 4.125 0 0 1 4.875 19V9A4.125 4.125 0 0 1 9 4.875h10A4.125 4.125 0 0 1 23.125 9z"
+      />
+    </svg>
+  );
+}

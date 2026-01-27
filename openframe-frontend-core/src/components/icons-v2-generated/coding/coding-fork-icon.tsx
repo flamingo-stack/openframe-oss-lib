@@ -1,0 +1,34 @@
+import type { SVGProps } from "react";
+export interface CodingForkIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function CodingForkIcon({
+  className = "",
+  size = 24,
+  color = "currentColor",
+  ...props
+}: CodingForkIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M10.874 16v-2.874H8.5A4.125 4.125 0 0 1 4.375 9V8a1.125 1.125 0 0 1 2.25 0v1c0 1.036.84 1.876 1.875 1.876h7c1.036 0 1.875-.84 1.875-1.876V8a1.125 1.125 0 0 1 2.25 0v1a4.126 4.126 0 0 1-4.124 4.126h-2.377v2.873a1.125 1.125 0 0 1-2.25 0Z"
+      />
+      <path
+        fill={color}
+        d="M13.376 18.5a1.375 1.375 0 1 0-2.75.002 1.375 1.375 0 0 0 2.75-.002m-6.501-13a1.375 1.375 0 1 0-2.75 0 1.375 1.375 0 0 0 2.75 0m13 0a1.376 1.376 0 1 0-2.752.001 1.376 1.376 0 0 0 2.752 0Zm-4.25 13a3.626 3.626 0 1 1-7.251-.001 3.626 3.626 0 0 1 7.252 0Zm-6.5-13a3.624 3.624 0 1 1-7.249 0 3.624 3.624 0 0 1 7.249 0m13 0a3.625 3.625 0 1 1-7.25-.001 3.625 3.625 0 0 1 7.25.001"
+      />
+    </svg>
+  );
+}

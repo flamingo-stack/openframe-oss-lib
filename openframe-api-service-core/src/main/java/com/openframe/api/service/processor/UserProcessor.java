@@ -18,4 +18,11 @@ public interface UserProcessor {
     void postProcessUserDeleted(User user);
 
     void postProcessUserGet(UserPageResponse response);
+
+    /**
+     * Process after a user has been updated.
+     *
+     * @param user The updated user
+     */
+    void postProcessUserUpdated(User user);
 }

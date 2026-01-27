@@ -57,7 +57,7 @@ public class PinotQueryBuilder {
 
     private static final String CURSOR_SEPARATOR = "_";
     private static final String CURSOR_TIMESTAMP_LESS_CONDITION = "(%s < %d)";
-    private static final String CURSOR_TIMESTAMP_EQUAL_CONDITION = "(%s = %d AND toolEventId <> %s%s%s)";
+    private static final String CURSOR_TIMESTAMP_EQUAL_CONDITION = "(%s = %d AND toolEventId < %s%s%s)";
     
     private static final LocalTime END_OF_DAY = LocalTime.MAX;
     
@@ -274,7 +274,7 @@ public class PinotQueryBuilder {
     }
     
     private void buildFromClause(StringBuilder query) {
-        query.append(SQL_FROM).append(tableName);
+        query.append(SQL_FROM).append("\"%s\"".formatted(tableName));
     }
     
     private void buildWhereClause(StringBuilder query) {

@@ -1,0 +1,30 @@
+import type { SVGProps } from "react";
+export interface PercentIconProps
+  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+  className?: string;
+  size?: number;
+  color?: string;
+}
+export function PercentIcon({
+  className = "",
+  size = 24,
+  color = "currentColor",
+  ...props
+}: PercentIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill={color}
+        d="M17.205 5.205a1.125 1.125 0 1 1 1.59 1.59l-12 12a1.125 1.125 0 1 1-1.59-1.59zm.013 9.681a2.126 2.126 0 1 1-2.332 2.332l-.01-.218.01-.217A2.125 2.125 0 0 1 17 14.875zm-10-10a2.126 2.126 0 1 1-2.333 2.331L4.875 7l.01-.218A2.126 2.126 0 0 1 7 4.875l.217.01Z"
+      />
+    </svg>
+  );
+}
