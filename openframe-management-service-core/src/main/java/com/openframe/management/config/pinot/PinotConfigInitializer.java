@@ -7,10 +7,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.event.EventListener;
 import org.springframework.core.env.Environment;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
@@ -50,7 +51,7 @@ public class PinotConfigInitializer {
 
     private static final List<PinotConfig> PINOT_CONFIGS = Arrays.asList(
             new PinotConfig("devices", "schema-devices.json", "table-config-devices.json", null),
-            new PinotConfig("logs","schema-logs.json","table-config-logs-realtime.json", "table-config-logs-offline.json")
+            new PinotConfig("logs","schema-logs.json","table-config-logs-realtime.json", null)
     );
 
     public PinotConfigInitializer(ResourceLoader resourceLoader, Environment environment) {
@@ -60,7 +61,7 @@ public class PinotConfigInitializer {
         this.objectMapper = new ObjectMapper();
     }
 
-    @PostConstruct
+    @EventListener(ApplicationReadyEvent.class)
     public void init() {
         if (!pinotConfigEnabled) {
             log.info("Pinot configuration deployment is disabled");
