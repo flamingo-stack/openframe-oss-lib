@@ -92,6 +92,9 @@
   "routing": {
     "instanceSelectorType": "strictReplicaGroup"
   },
+  "upsertConfig": {
+    "mode": "FULL"
+  },
   "tenants": {
     "broker": "DefaultTenant",
     "server": "DefaultTenant"
