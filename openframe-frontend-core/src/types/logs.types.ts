@@ -31,12 +31,6 @@ export interface LogSeverityDotProps {
   className?: string
 }
 
-export interface ToolIconProps {
-  toolType: ToolType
-  size?: number
-  className?: string
-}
-
 export const LOG_SEVERITY_COLORS: Record<LogSeverity, string> = {
   DEBUG: '#888888',
   INFO: '#888888',

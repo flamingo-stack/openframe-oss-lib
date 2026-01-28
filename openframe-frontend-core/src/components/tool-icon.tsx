@@ -1,38 +1,38 @@
 import * as React from 'react'
-import { ToolIconProps } from '../types/logs.types'
+import { ToolType, ToolTypeValues } from '../types/tool.types'
 import { cn } from '../utils/cn'
 import { OpenFrameLogo } from './icons'
-import { TacticalRmmLogoIcon } from './icons-v2-generated'
-import { FleetIcon } from './icons/fleet-icon'
-import { MeshCentralIcon } from './icons/meshcentral-icon'
+import { AuthentikLogoIcon } from './icons-v2-generated/brand-logos/authentik-logo-icon'
+import { FleetMdmLogoIcon } from './icons-v2-generated/brand-logos/fleet-mdm-logo-icon'
+import { MeshcentralLogoIcon } from './icons-v2-generated/brand-logos/meshcentral-logo-icon'
+import { TacticalRmmLogoIcon } from './icons-v2-generated/brand-logos/tactical-rmm-logo-icon'
+export interface ToolIconProps {
+  toolType: ToolType
+  size?: number
+  className?: string
+}
 
 export const ToolIcon = React.forwardRef<
   HTMLDivElement,
   ToolIconProps
 >(({ toolType, size = 16, className }, ref) => {
   const renderIcon = () => {
-    const normalizedType = toolType?.toUpperCase()
-
-    switch (normalizedType) {
-      case 'FLEET':
-      case 'FLEET_MDM':
-      case 'FLEET-MDM':
-        return <FleetIcon size={size} />
-      case 'MESHCENTRAL':
-      case 'MESH':
-        return <MeshCentralIcon size={size} />
-      case 'TACTICAL':
-      case 'TACTICAL_RMM':
-      case 'TACTICAL-RMM':
+    switch (toolType) {
+      case ToolTypeValues.FLEET_MDM:
+        return <FleetMdmLogoIcon size={size} />
+      case ToolTypeValues.MESHCENTRAL:
+        return <MeshcentralLogoIcon size={size} />
+      case ToolTypeValues.TACTICAL_RMM:
         return <TacticalRmmLogoIcon size={size} />
-      case 'OPENFRAME':
+      case ToolTypeValues.OPENFRAME:
+      case ToolTypeValues.OPENFRAME_CHAT:
+      case ToolTypeValues.OPENFRAME_CLIENT:
         return <OpenFrameLogo className="h-4 w-auto" lowerPathColor="var(--color-accent-primary)" upperPathColor="var(--color-text-primary)" />
-      case 'OPENFRAME_CHAT':
-        return <OpenFrameLogo className="h-4 w-auto" lowerPathColor="var(--color-accent-primary)" upperPathColor="var(--color-text-primary)" />
-      case 'OPENFRAME_CLIENT':
-        return <OpenFrameLogo className="h-4 w-auto" lowerPathColor="var(--color-accent-primary)" upperPathColor="var(--color-text-primary)" />
+      case ToolTypeValues.AUTHENTIK:
+        return <AuthentikLogoIcon size={size} />
+      case ToolTypeValues.SYSTEM:
       default:
-        return <></>
+        return null
     }
   }
 

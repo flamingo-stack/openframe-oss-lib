@@ -127,12 +127,3 @@ export const AllTools: Story = {
   ),
 };
 
-/**
- * ToolBadge with custom className.
- */
-export const WithCustomClass: Story = {
-  args: {
-    toolType: 'TACTICAL_RMM',
-    className: 'opacity-50',
-  },
-};
