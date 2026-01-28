@@ -72,6 +72,13 @@ export const WithSearch: Story = {
 }
 
 export const WithSearchInteractive: Story = {
+  args: {
+    organizations: sampleOrganizations,
+    value: '',
+    onValueChange: () => {},
+    label: 'Organization',
+    searchable: true,
+  },
   render: () => {
     const [value, setValue] = useState('')
     return (

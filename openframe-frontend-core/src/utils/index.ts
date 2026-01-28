@@ -17,3 +17,5 @@ export * from './date-formatters'
 export * from './format-relative-time'
 // Dynamic icon registry
 export * from './dynamic-icons'
+// Tool type utilities
+export * from './tool-utils'
