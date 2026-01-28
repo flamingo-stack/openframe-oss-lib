@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, forwardRef } from "react"
+import { useState, forwardRef, memo } from "react"
 import { cn } from "../../utils/cn"
 import { SquareAvatar } from "../ui/square-avatar"
 import { ChatTypingIndicator } from "./chat-typing-indicator"
@@ -152,4 +152,20 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
 
 ChatMessageEnhanced.displayName = "ChatMessageEnhanced"
 
-export { ChatMessageEnhanced }
+const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextProps) => {
+  return (
+    prevProps.role === nextProps.role &&
+    prevProps.content === nextProps.content &&
+    prevProps.name === nextProps.name &&
+    prevProps.avatar === nextProps.avatar &&
+    prevProps.isTyping === nextProps.isTyping &&
+    prevProps.timestamp?.getTime() === nextProps.timestamp?.getTime() &&
+    prevProps.showAvatar === nextProps.showAvatar &&
+    prevProps.assistantType === nextProps.assistantType &&
+    prevProps.className === nextProps.className
+  )
+})
+
+MemoizedChatMessageEnhanced.displayName = "MemoizedChatMessageEnhanced"
+
+export { MemoizedChatMessageEnhanced as ChatMessageEnhanced }
