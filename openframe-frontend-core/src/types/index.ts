@@ -17,6 +17,7 @@ export * from './auth'
 // Content types
 export * from './blog'
 export * from './case-study'
+export * from './customer-interview'
 export * from './product-release'
 export * from './luma'
 export * from './vendor'
