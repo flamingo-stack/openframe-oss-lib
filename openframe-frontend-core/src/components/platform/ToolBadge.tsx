@@ -13,7 +13,8 @@
  */
 
 import React from 'react'
-import { ToolType, getToolLabel } from '../../types/tool.types'
+import { ToolType } from '../../types/tool.types'
+import { getToolLabel } from '../../utils/tool-utils'
 import { cn } from '../../utils/cn'
 import { ToolIcon } from '../tool-icon'
 
@@ -34,8 +35,8 @@ export const ToolBadge: React.FC<ToolBadgeProps> = ({
 
   return (
     <div className={cn("flex items-center gap-1", className)}>
-      <span className="text-ods-text-primary text-[14px] leading-[20px] md:text-[18px] md:leading-[24px]">{label}</span>
       <ToolIcon toolType={toolType} className="[&_svg]:w-4 [&_svg]:h-4" />
+      <span className="text-ods-text-primary text-[14px] leading-[20px] md:text-[18px] md:leading-[24px]">{label}</span>
     </div>
   )
 }

@@ -1,11 +1,10 @@
 'use client'
 
-import React from 'react'
-import { OSTypeBadge } from './os-type-badge'
-import { StatusBadge } from '../ui/status-badge'
-import { cn } from '../../utils/cn'
 import { OS_TYPES } from '../../types/os.types'
+import { cn } from '../../utils/cn'
 import type { OSPlatformId } from '../../utils/os-platforms'
+import { StatusBadge } from '../ui/status-badge'
+import { OSTypeBadge } from './os-type-badge'
 
 export interface PlatformSelectorOption {
   /** Platform ID (windows, darwin, linux) */
@@ -118,10 +117,8 @@ export function OSPlatformSelector({
               <OSTypeBadge
                 osType={osType.value}
                 iconSize={iconSize}
-                iconColor={selected ? 'black' : undefined}
-                rigntIcon={badgeElement}
-                variant="ghost"
-                alignment="center"
+                iconColor={selected ? 'black' : 'white'}
+                rightIcon={badgeElement}
                 className={cn(
                   '!w-full sm:!w-full min-h-[52px] items-center justify-center rounded-[4px] p-2 text-[14px] md:text-[18px] font-medium transition-colors pointer-events-auto',
                   isDisabled

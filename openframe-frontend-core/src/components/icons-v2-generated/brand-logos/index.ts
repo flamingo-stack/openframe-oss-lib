@@ -45,6 +45,7 @@ export { OsqueryLogoIcon } from './osquery-logo-icon';
 export { PaypalIcon } from './paypal-icon';
 export { PinterestIcon } from './pinterest-icon';
 export { PowershellLogoIcon } from './powershell-logo-icon';
+export { PythonLogoIcon } from './python-logo-icon';
 export { RedditLogoIcon } from './reddit-logo-icon';
 export { SlackLogoIcon } from './slack-logo-icon';
 export { SoundcloudIcon } from './soundcloud-icon';

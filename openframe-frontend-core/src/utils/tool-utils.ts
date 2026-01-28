@@ -173,3 +173,10 @@ export function getToolTypeAliases(toolType: ToolType): string[] {
     .filter(([_, value]) => value === toolType)
     .map(([key]) => key)
 }
+
+/**
+ * Get display label for a tool type
+ */
+export function getToolLabel(toolType: ToolType): string {
+  return toolLabels[toolType] || toolType
+}
