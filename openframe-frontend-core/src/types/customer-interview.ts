@@ -9,7 +9,7 @@ import type { CaseStudy } from './case-study'
 export interface VideoTeaser {
   url: string
   title?: string
-  duration?: number // in seconds
+  // Duration auto-detected from video file
 }
 
 export interface CustomerInterview {
