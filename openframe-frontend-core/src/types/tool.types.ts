@@ -22,8 +22,8 @@ export type ToolType = (typeof ToolTypeValues)[keyof typeof ToolTypeValues]
  * Maps tool types to display labels
  */
 export const toolLabels: Record<ToolType, string> = {
-  TACTICAL_RMM: 'TacticalRMM',
-  FLEET_MDM: 'Fleet MDM',
+  TACTICAL_RMM: 'Tactical',
+  FLEET_MDM: 'Fleet',
   MESHCENTRAL: 'MeshCentral',
   AUTHENTIK: 'Authentik',
   OPENFRAME: 'OpenFrame',
