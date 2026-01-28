@@ -19,3 +19,7 @@ export * from './format-relative-time'
 export * from './dynamic-icons'
 // Tool type utilities
 export * from './tool-utils'
+// Shell type utilities
+export * from './shell-utils'
+// OS type utilities
+export * from './os-utils'

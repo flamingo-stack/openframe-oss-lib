@@ -6,6 +6,36 @@ import { AuthentikLogoIcon } from './icons-v2-generated/brand-logos/authentik-lo
 import { FleetMdmLogoIcon } from './icons-v2-generated/brand-logos/fleet-mdm-logo-icon'
 import { MeshcentralLogoIcon } from './icons-v2-generated/brand-logos/meshcentral-logo-icon'
 import { TacticalRmmLogoIcon } from './icons-v2-generated/brand-logos/tactical-rmm-logo-icon'
+
+type ToolIconConfig = {
+  render: (size: number) => React.ReactNode
+} | null
+
+const toolIconMap: Record<ToolType, ToolIconConfig> = {
+  [ToolTypeValues.FLEET_MDM]: {
+    render: (size) => <FleetMdmLogoIcon size={size} />
+  },
+  [ToolTypeValues.MESHCENTRAL]: {
+    render: (size) => <MeshcentralLogoIcon size={size} />
+  },
+  [ToolTypeValues.TACTICAL_RMM]: {
+    render: (size) => <TacticalRmmLogoIcon size={size} />
+  },
+  [ToolTypeValues.OPENFRAME]: {
+    render: () => <OpenFrameLogo className="h-4 w-auto" lowerPathColor="var(--color-accent-primary)" upperPathColor="var(--color-text-primary)" />
+  },
+  [ToolTypeValues.OPENFRAME_CHAT]: {
+    render: () => <OpenFrameLogo className="h-4 w-auto" lowerPathColor="var(--color-accent-primary)" upperPathColor="var(--color-text-primary)" />
+  },
+  [ToolTypeValues.OPENFRAME_CLIENT]: {
+    render: () => <OpenFrameLogo className="h-4 w-auto" lowerPathColor="var(--color-accent-primary)" upperPathColor="var(--color-text-primary)" />
+  },
+  [ToolTypeValues.AUTHENTIK]: {
+    render: (size) => <AuthentikLogoIcon size={size} />
+  },
+  [ToolTypeValues.SYSTEM]: null
+} as const
+
 export interface ToolIconProps {
   toolType: ToolType
   size?: number
@@ -16,25 +46,8 @@ export const ToolIcon = React.forwardRef<
   HTMLDivElement,
   ToolIconProps
 >(({ toolType, size = 16, className }, ref) => {
-  const renderIcon = () => {
-    switch (toolType) {
-      case ToolTypeValues.FLEET_MDM:
-        return <FleetMdmLogoIcon size={size} />
-      case ToolTypeValues.MESHCENTRAL:
-        return <MeshcentralLogoIcon size={size} />
-      case ToolTypeValues.TACTICAL_RMM:
-        return <TacticalRmmLogoIcon size={size} />
-      case ToolTypeValues.OPENFRAME:
-      case ToolTypeValues.OPENFRAME_CHAT:
-      case ToolTypeValues.OPENFRAME_CLIENT:
-        return <OpenFrameLogo className="h-4 w-auto" lowerPathColor="var(--color-accent-primary)" upperPathColor="var(--color-text-primary)" />
-      case ToolTypeValues.AUTHENTIK:
-        return <AuthentikLogoIcon size={size} />
-      case ToolTypeValues.SYSTEM:
-      default:
-        return null
-    }
-  }
+  const iconConfig = toolIconMap[toolType]
+  const icon = iconConfig?.render(size) ?? null
 
   return (
     <div
@@ -46,7 +59,7 @@ export const ToolIcon = React.forwardRef<
       style={{ width: size, height: size, color: '#888888' }}
       aria-label={`${toolType} icon`}
     >
-      {renderIcon()}
+      {icon}
     </div>
   )
 })

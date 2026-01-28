@@ -31,10 +31,3 @@ export const toolLabels: Record<ToolType, string> = {
   OPENFRAME_CLIENT: 'OpenFrame Client',
   SYSTEM: 'System'
 }
-
-/**
- * Get display label for a tool type
- */
-export function getToolLabel(toolType: ToolType): string {
-  return toolLabels[toolType] || toolType
-}

@@ -6,18 +6,67 @@
  */
 
 import React from 'react'
-import { Button } from '../ui/button'
+import { PowershellLogoIcon } from '../icons-v2-generated/brand-logos/powershell-logo-icon'
+import { PythonLogoIcon } from '../icons-v2-generated/brand-logos/python-logo-icon'
+
+import { ShellType, ShellTypeValues } from '../../types/shell.types'
+import { getShellLabel } from '../../utils/shell-utils'
+import { cn } from '../../utils/cn'
 import {
-  PowerShellIcon,
-  CmdIcon,
   BashIcon,
-  PythonIcon,
-  NushellIcon,
+  CmdIcon,
   DenoIcon,
+  NushellIcon,
   ShellIcon
 } from '../icons'
-import { cn } from '../../utils/cn'
-import { ShellType, getShellLabel } from '../../types/shell.types'
+
+/**
+ * Shell icon configuration with typed mapping
+ */
+interface ShellIconConfig {
+  icon: React.ComponentType<{ size?: number; color?: string; className?: string }>
+  props: { size: number } & ({ className: string } | { color: string })
+}
+
+/**
+ * Typed mapping of shell types to their icon configurations
+ * Using Record<ShellType, ...> ensures all shell types are covered
+ */
+const shellIconMap: Record<ShellType, ShellIconConfig> = {
+  [ShellTypeValues.POWERSHELL]: {
+    icon: PowershellLogoIcon,
+    props: { size: 16, className: 'text-ods-text-secondary' }
+  },
+  [ShellTypeValues.CMD]: {
+    icon: CmdIcon,
+    props: { size: 16, color: '#888888' }
+  },
+  [ShellTypeValues.BASH]: {
+    icon: BashIcon,
+    props: { size: 16, color: '#888888' }
+  },
+  [ShellTypeValues.PYTHON]: {
+    icon: PythonLogoIcon,
+    props: { size: 16, className: 'text-ods-text-secondary' }
+  },
+  [ShellTypeValues.NUSHELL]: {
+    icon: NushellIcon,
+    props: { size: 16, color: '#888888' }
+  },
+  [ShellTypeValues.DENO]: {
+    icon: DenoIcon,
+    props: { size: 16, color: '#888888' }
+  },
+  [ShellTypeValues.SHELL]: {
+    icon: ShellIcon,
+    props: { size: 16, color: '#888888' }
+  }
+} as const
+
+const defaultIconConfig: ShellIconConfig = {
+  icon: ShellIcon,
+  props: { size: 16, color: '#888888' }
+}
 
 export interface ShellTypeBadgeProps {
   /** Shell type */
@@ -30,42 +79,15 @@ export const ShellTypeBadge: React.FC<ShellTypeBadgeProps> = ({
   shellType,
   className
 }) => {
-  // Normalize shell type to uppercase
   const normalizedType = shellType?.toUpperCase() as ShellType
   const label = getShellLabel(normalizedType)
-
-  // Get the appropriate icon based on shell type
-  const renderIcon = () => {
-    switch (normalizedType) {
-      case 'POWERSHELL':
-        return <PowerShellIcon size={16} />
-      case 'CMD':
-        return <CmdIcon size={16} />
-      case 'BASH':
-        return <BashIcon size={16} />
-      case 'PYTHON':
-        return <PythonIcon size={16} />
-      case 'NUSHELL':
-        return <NushellIcon size={16} />
-      case 'DENO':
-        return <DenoIcon size={16} />
-      case 'SHELL':
-        return <ShellIcon size={16} />
-      default:
-        return <ShellIcon size={16} />
-    }
-  }
+  const { icon: IconComponent, props: iconProps } = shellIconMap[normalizedType] ?? defaultIconConfig
 
   return (
-    <Button
-      variant="table-display"
-      size="none"
-      leftIcon={renderIcon()}
-      className={cn(className)}
-      alignment='left'
-    >
-      {label}
-    </Button>
+    <div className={cn("flex items-center gap-1", className)}>
+      <IconComponent {...iconProps} />
+      <span className="text-ods-text-primary text-[14px] leading-[20px] md:text-[18px] md:leading-[24px]">{label}</span>
+    </div>
   )
 }
 
