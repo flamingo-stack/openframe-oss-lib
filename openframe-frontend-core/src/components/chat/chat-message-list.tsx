@@ -4,20 +4,13 @@ import { useRef, useCallback, useLayoutEffect, useEffect, useImperativeHandle, f
 import { cn } from "../../utils/cn"
 import { ChatMessageEnhanced } from "./chat-message-enhanced"
 import { ChatMessageListSkeleton } from "./chat-message-skeleton"
-import type { ChatMessageListProps, Message } from "./types"
+import type { ChatMessageListProps } from "./types"
 
 const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
   ({ className, messages, dialogId, isLoading = false, isTyping = false, autoScroll = true, showAvatars = true, contentClassName, assistantType, pendingApprovals, ...props }, ref) => {
     const scrollRef = useRef<HTMLDivElement>(null)
     const lastMessageCountRef = useRef(0)
     const lastDialogIdRef = useRef<string | undefined>(dialogId)
-    const userScrolledAwayRef = useRef(false)
-
-    const isAtBottom = useCallback(() => {
-      if (!scrollRef.current) return false
-      const { scrollTop, scrollHeight, clientHeight } = scrollRef.current
-      return scrollHeight - scrollTop - clientHeight < 5
-    }, [])
 
     const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
       if (!autoScroll) return
@@ -29,10 +22,14 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         }
         
         const element = scrollRef.current
-        element.scrollTo({
-          top: element.scrollHeight,
-          behavior
-        })
+        if (behavior === 'auto') {
+          element.scrollTop = element.scrollHeight
+        } else {
+          element.scrollTo({
+            top: element.scrollHeight,
+            behavior
+          })
+        }
       }
       
       tryScroll()
@@ -42,30 +39,14 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       const element = scrollRef.current
       if (!element || !autoScroll) return
 
-      let scrollTimeout: NodeJS.Timeout
-      const handleUserScroll = () => {
-        clearTimeout(scrollTimeout)
-        scrollTimeout = setTimeout(() => {
-          const atBottom = isAtBottom()
-          
-          if (!atBottom) {
-            userScrolledAwayRef.current = true
-          } else {
-            userScrolledAwayRef.current = false
-          }
-        }, 50)
-      }
-
-      element.addEventListener('scroll', handleUserScroll, { passive: true })
-
       const contentContainer = element.querySelector('.mx-auto.flex.w-full')
       if (contentContainer) {
         const mutationObserver = new MutationObserver(() => {
-          if (!userScrolledAwayRef.current) {
-            requestAnimationFrame(() => {
-              scrollToBottom('auto')
-            })
-          }
+            if (isTyping) {
+              requestAnimationFrame(() => {
+                scrollToBottom('smooth')
+              })
+            }
         })
 
         mutationObserver.observe(contentContainer, {
@@ -75,15 +56,12 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         })
 
         return () => {
-          element.removeEventListener('scroll', handleUserScroll)
           mutationObserver.disconnect()
         }
       }
 
-      return () => {
-        element.removeEventListener('scroll', handleUserScroll)
-      }
-    }, [autoScroll, scrollToBottom, isAtBottom])
+      return () => {}
+    }, [autoScroll, scrollToBottom, isTyping])
 
     useEffect(() => {
       if (!autoScroll) return
@@ -95,13 +73,11 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       if (dialogChanged) {
         lastDialogIdRef.current = dialogId
         lastMessageCountRef.current = currentMessageCount
-        userScrolledAwayRef.current = false
         
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            scrollToBottom('auto')
-          })
-        })
+        const element = scrollRef.current
+        if (element) {
+          element.scrollTop = element.scrollHeight
+        }
         return
       }
 
@@ -109,26 +85,27 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         lastMessageCountRef.current = currentMessageCount
         const lastMessage = messages[messages.length - 1]
         
-        if (lastMessage?.role === 'user' || !userScrolledAwayRef.current) {
+        if (lastMessage?.role === 'user') {
           scrollToBottom(lastMessage?.role === 'user' ? 'smooth' : 'auto')
         }
         return
       }
 
       if (isTyping && !isLoading) {
-        if (!userScrolledAwayRef.current) {
-          scrollToBottom('smooth')
-        }
+        scrollToBottom('smooth')
       }
     }, [autoScroll, messages.length, dialogId, isTyping, isLoading, scrollToBottom, messages])
 
     useLayoutEffect(() => {
       if (autoScroll && !isLoading) {
-        scrollToBottom('auto')
+        const element = scrollRef.current
+        if (element) {
+          element.scrollTop = element.scrollHeight
+        }
         lastMessageCountRef.current = messages.length
         lastDialogIdRef.current = dialogId
       }
-    }, [autoScroll, scrollToBottom, isLoading, messages.length, dialogId])
+    }, [autoScroll, isLoading, messages.length, dialogId])
 
     useImperativeHandle(ref, () => scrollRef.current!)
 

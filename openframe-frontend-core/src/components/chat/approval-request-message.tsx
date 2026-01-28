@@ -45,7 +45,7 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
         >
           {/* Command and icon section */}
           <div className="flex flex-col gap-1">
-            <div className="bg-ods-bg border border-ods-border rounded-md p-3 flex gap-2 items-start">
+            <div className="bg-ods-bg border border-ods-border rounded-md p-3 flex gap-2 items-start max-h-32 overflow-y-auto">
               <code className="font-['DM_Sans'] font-medium text-sm text-ods-text-primary flex-1 leading-5 whitespace-pre-wrap break-all">
                 {data.command}
               </code>
@@ -86,7 +86,7 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
       >
         {/* Command and icon section */}
         <div className="flex flex-col gap-1">
-          <div className="bg-ods-bg border border-ods-border rounded-md p-3 flex gap-2 items-start">
+          <div className="bg-ods-bg border border-ods-border rounded-md p-3 flex gap-2 items-start max-h-32 overflow-y-auto">
             <code className="font-['DM_Sans'] font-medium text-sm text-ods-text-primary flex-1 leading-5 whitespace-pre-wrap break-all">
               {data.command}
             </code>
