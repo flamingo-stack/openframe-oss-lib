@@ -37,7 +37,18 @@ public class Tenant extends CoreTenant{
     @Builder.Default
     private TenantPlan plan = TenantPlan.FREE;
 
-    private String hubspotId;
+    private BillingPlan billingPlan;
+
+    private String timezoneId;
+
+    private String hubspotContactId;
+
+    private String hubspotTenantId;
+
+    /**
+     * Stripe customer ID for billing and payments
+     */
+    private String stripeCustomerId;
 
     @CreatedDate
     private LocalDateTime createdAt;
