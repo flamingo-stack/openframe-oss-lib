@@ -6,7 +6,7 @@
 
 import React from 'react'
 import type { OSPlatformId } from './os-platforms'
-import { OSType, OSTypeDefinition, OS_TYPES, osLabels } from '@/types/os.types'
+import { OSType, OSTypeDefinition, OS_TYPES, osLabels } from '../types/os.types'
 
 /**
  * Normalize OS type string to standard OSType enum

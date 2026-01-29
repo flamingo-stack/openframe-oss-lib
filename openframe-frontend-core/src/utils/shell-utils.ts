@@ -5,7 +5,7 @@
  */
 
 import React from 'react'
-import { ShellType, SHELL_TYPES, shellLabels } from '@/types/shell.types'
+import { ShellType, SHELL_TYPES, shellLabels } from '../types/shell.types'
 
 /**
  * Get display label for a shell type
