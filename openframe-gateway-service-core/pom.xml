@@ -24,6 +24,10 @@
         </dependency>
         <dependency>
             <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-data-redis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-security-core</artifactId>
         </dependency>
         <dependency>

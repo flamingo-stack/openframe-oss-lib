@@ -1,11 +1,11 @@
 package com.openframe.data.repository.redis;
 
-import com.openframe.data.repository.tool.ToolConnectionRepository;
-import com.openframe.data.repository.device.MachineRepository;
-import com.openframe.data.repository.organization.OrganizationRepository;
 import com.openframe.data.document.tool.ToolConnection;
 import com.openframe.data.model.redis.CachedMachineInfo;
 import com.openframe.data.model.redis.CachedOrganizationInfo;
+import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.repository.organization.OrganizationRepository;
+import com.openframe.data.repository.tool.ToolConnectionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -30,7 +30,7 @@ public class MachineIdCacheService {
     /**
      * Get cached machine info from cache or database by agent ID
      * Returns only essential fields (machineId, hostname, organizationId)
-     * 
+     *
      * @param agentId the agent ID
      * @return the CachedMachineInfo object, or null if not found
      */
@@ -57,7 +57,7 @@ public class MachineIdCacheService {
     /**
      * Get cached organization info from cache or database by organization ID
      * Returns only essential fields (organizationId, name)
-     * 
+     *
      * @param organizationId the organization ID
      * @return the CachedOrganizationInfo object, or null if not found
      */
