@@ -1,5 +1,6 @@
 package com.openframe.data.config;
 
+import java.net.InetSocketAddress;
 import java.util.Collections;
 
 import org.slf4j.Logger;
@@ -18,7 +19,7 @@ import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 
 @Configuration
-@ConditionalOnProperty(name = "spring.data.cassandra.enabled", havingValue = "true", matchIfMissing = false)
+@ConditionalOnProperty(name = "spring.data.cassandra.enabled", havingValue = "true")
 @EnableCassandraRepositories(basePackages = "com.openframe.data.repository.cassandra")
 public class CassandraConfig extends AbstractCassandraConfiguration {
 
@@ -35,6 +36,9 @@ public class CassandraConfig extends AbstractCassandraConfiguration {
 
     @Value("${spring.data.cassandra.port:9042}")
     private int port;
+
+    @Value("${spring.data.cassandra.replication-factor:1}")
+    private int replicationFactor;
 
     @Override
     protected String getKeyspaceName() {
@@ -63,9 +67,12 @@ public class CassandraConfig extends AbstractCassandraConfiguration {
 
     @Override
     public CqlSessionFactoryBean cassandraSession() {
-        logger.info("Initializing Cassandra session with contact points: {}, port: {}, datacenter: {}, keyspace: {}", 
+        logger.info("Initializing Cassandra session with contact points: {}, port: {}, datacenter: {}, keyspace: {}",
             contactPoints, port, localDatacenter, keyspaceName);
-            
+
+        // Create keyspace before connecting
+        ensureKeyspaceExists();
+
         CqlSessionFactoryBean bean = super.cassandraSession();
         bean.setKeyspaceName(keyspaceName);
         bean.setLocalDatacenter(localDatacenter);
@@ -74,11 +81,36 @@ public class CassandraConfig extends AbstractCassandraConfiguration {
             return builder.withConfigLoader(DriverConfigLoader.programmaticBuilder()
                 .withString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER, localDatacenter)
                 .withStringList(DefaultDriverOption.CONTACT_POINTS, Collections.singletonList(contactPoints + ":" + port))
-                .withString(DefaultDriverOption.TIMESTAMP_GENERATOR_CLASS, 
+                .withString(DefaultDriverOption.TIMESTAMP_GENERATOR_CLASS,
                     "com.datastax.oss.driver.internal.core.time.ServerSideTimestampGenerator")
                 .build());
         });
         return bean;
+    }
+
+    /**
+     * Creates the keyspace if it doesn't exist.
+     * This runs before CqlSessionFactoryBean connects to the keyspace.
+     */
+    private void ensureKeyspaceExists() {
+        logger.info("Ensuring keyspace '{}' exists with replication factor {}", keyspaceName, replicationFactor);
+
+        try (CqlSession session = CqlSession.builder()
+                .addContactPoint(new InetSocketAddress(contactPoints, port))
+                .withLocalDatacenter(localDatacenter)
+                .build()) {
+
+            String createKeyspaceCql = String.format(
+                "CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': %d}",
+                keyspaceName, replicationFactor);
+
+            session.execute(createKeyspaceCql);
+            logger.info("Keyspace '{}' is ready", keyspaceName);
+
+        } catch (Exception e) {
+            logger.error("Failed to create keyspace '{}': {}", keyspaceName, e.getMessage());
+            throw new RuntimeException("Failed to ensure Cassandra keyspace exists", e);
+        }
     }
 
     @Bean
