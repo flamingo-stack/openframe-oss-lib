@@ -1,11 +1,11 @@
 package com.openframe.data.service;
 
-import com.openframe.data.document.clientconfiguration.DownloadConfiguration;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
 import com.openframe.data.document.toolagent.ToolAgentAsset;
 import com.openframe.data.document.toolagent.ToolAgentAssetSource;
 import com.openframe.data.mapper.DownloadConfigurationMapper;
+import com.openframe.data.mapper.LocalFilenameConfigurationMapper;
 import com.openframe.data.model.nats.ToolInstallationMessage;
 import com.openframe.data.repository.nats.NatsMessagePublisher;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +28,7 @@ public class ToolInstallationNatsPublisher {
 
     private final NatsMessagePublisher natsMessagePublisher;
     private final DownloadConfigurationMapper downloadConfigurationMapper;
+    private final LocalFilenameConfigurationMapper localFilenameConfigurationMapper;
 
     public void publish(String machineId, IntegratedToolAgent toolAgent, IntegratedTool tool) {
         publish(machineId, toolAgent, tool, false);
@@ -78,7 +79,7 @@ public class ToolInstallationNatsPublisher {
     private ToolInstallationMessage.Asset mapAsset(ToolAgentAsset asset) {
         ToolInstallationMessage.Asset messageAsset = new ToolInstallationMessage.Asset();
         messageAsset.setId(asset.getId());
-        messageAsset.setLocalFilename(asset.getLocalFilename());
+        messageAsset.setLocalFilenameConfiguration(localFilenameConfigurationMapper.map(asset.getLocalFilenameConfiguration()));
         messageAsset.setSource(mapAssetSource(asset.getSource()));
         messageAsset.setPath(asset.getPath());
         messageAsset.setExecutable(asset.isExecutable());
