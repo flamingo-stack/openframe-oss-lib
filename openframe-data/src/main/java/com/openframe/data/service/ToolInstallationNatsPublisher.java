@@ -79,7 +79,11 @@ public class ToolInstallationNatsPublisher {
     private ToolInstallationMessage.Asset mapAsset(ToolAgentAsset asset) {
         ToolInstallationMessage.Asset messageAsset = new ToolInstallationMessage.Asset();
         messageAsset.setId(asset.getId());
+        messageAsset.setVersion(asset.getVersion());
         messageAsset.setLocalFilenameConfiguration(localFilenameConfigurationMapper.map(asset.getLocalFilenameConfiguration()));
+        messageAsset.setDownloadConfigurations(
+                downloadConfigurationMapper.map(asset.getDownloadConfigurations(), asset.getVersion())
+        );
         messageAsset.setSource(mapAssetSource(asset.getSource()));
         messageAsset.setPath(asset.getPath());
         messageAsset.setExecutable(asset.isExecutable());
@@ -93,6 +97,7 @@ public class ToolInstallationNatsPublisher {
         return switch (source) {
             case ARTIFACTORY -> ToolInstallationMessage.AssetSource.ARTIFACTORY;
             case TOOL_API -> ToolInstallationMessage.AssetSource.TOOL_API;
+            case GITHUB -> ToolInstallationMessage.AssetSource.GITHUB;
         };
     }
 

@@ -28,6 +28,8 @@ public class ToolInstallationMessage {
     @Setter
     public static class Asset {
         private String id;
+        private String version;
+        private List<DownloadConfiguration> downloadConfigurations;
         private List<LocalFilenameConfiguration> localFilenameConfiguration;
         private AssetSource source;
         private String path;
@@ -42,7 +44,7 @@ public class ToolInstallationMessage {
     }
 
     public enum AssetSource {
-        ARTIFACTORY, TOOL_API
+        ARTIFACTORY, TOOL_API, GITHUB
     }
 
 }
