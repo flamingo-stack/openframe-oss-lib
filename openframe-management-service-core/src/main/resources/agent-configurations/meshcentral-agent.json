@@ -30,7 +30,7 @@
       "os": "macos",
       "linkTemplate": "https://github.com/flamingo-stack/MeshAgent/releases/download/{version}/meshagent-macos-universal.tar.gz",
       "fileName": "meshagent-macos-universal.tar.gz",
-      "agentFileName": "meshagent"
+      "agentFileName": "MeshAgent.app/Contents/MacOS/meshagent"
     }
   ],
   "assets": [
