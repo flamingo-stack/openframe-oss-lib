@@ -1,6 +1,7 @@
 {
   "id": "meshcentral-agent",
   "toolId": "meshcentral-server",
+  "releaseVersion": false,
   "version": "0.0.6",
   "status": "ENABLED",
   "sessionType": "CONSOLE",
@@ -36,7 +37,16 @@
   "assets": [
     {
       "id": "meshcentral-core-module",
-      "localFilename": "CoreModule.js",
+      "localFilenameConfiguration": [
+        {
+          "filename": "CoreModule.js",
+          "os": "windows"
+        },
+        {
+          "filename": "CoreModule.js",
+          "os": "macos"
+        }
+      ],
       "source": "ARTIFACTORY",
       "executable": false
     },
@@ -44,11 +54,11 @@
       "id": "msh-configuration",
       "localFilenameConfiguration": [
         {
-          "localFilename": "agent.msh",
+          "filename": "agent.msh",
           "os": "windows"
         },
         {
-          "localFilename": "meshagent.msh",
+          "filename": "meshagent.msh",
           "os": "macos"
         }
       ],

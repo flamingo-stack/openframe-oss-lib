@@ -36,7 +36,16 @@
   "assets": [
     {
       "id": "osqueryd",
-      "localFilename": "osqueryd",
+      "localFilenameConfiguration": [
+        {
+          "filename": "osqueryd",
+          "os": "windows"
+        },
+        {
+          "filename": "osqueryd",
+          "os": "macos"
+        }
+      ],
       "source": "ARTIFACTORY",
       "executable": true
     }
