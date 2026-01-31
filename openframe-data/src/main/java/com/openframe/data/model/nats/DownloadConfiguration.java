@@ -7,7 +7,7 @@ public class DownloadConfiguration {
 
     private String os;
     private String fileName;
-    private String agentFileName;
+    private String targetFileName;
     private String link;
 
 }
