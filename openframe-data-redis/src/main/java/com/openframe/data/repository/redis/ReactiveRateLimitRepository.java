@@ -1,5 +1,7 @@
 package com.openframe.data.repository.redis;
 
+import com.openframe.data.redis.OpenframeRedisKeyBuilder;
+import com.openframe.data.redis.OpenframeRedisProperties;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -23,8 +25,8 @@ import java.util.Objects;
 public class ReactiveRateLimitRepository {
 
     private final ReactiveStringRedisTemplate redisTemplate;
-
-    private static final String RATE_LIMIT_KEY_PREFIX = "rate_limit:";
+    private final OpenframeRedisProperties redisProperties;
+    private final OpenframeRedisKeyBuilder keyBuilder;
 
     /**
      * Check rate limit and increment counter atomically
@@ -92,7 +94,12 @@ public class ReactiveRateLimitRepository {
      * Build Redis key for rate limiting
      */
     private String buildRedisKey(String keyId, String window, String timestamp) {
-        return String.format("%s%s:%s:%s", RATE_LIMIT_KEY_PREFIX, keyId, window, timestamp);
+        String relativeKey = String.format("%s:%s:%s:%s",
+                redisProperties.getKeys().getRateLimitPrefix(),
+                keyId,
+                window,
+                timestamp);
+        return keyBuilder.tenantKey(relativeKey);
     }
 
     /**
