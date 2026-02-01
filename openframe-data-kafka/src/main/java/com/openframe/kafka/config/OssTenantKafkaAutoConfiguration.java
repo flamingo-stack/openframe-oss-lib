@@ -119,7 +119,7 @@ public class OssTenantKafkaAutoConfiguration {
      * kafka producer for OSS cluster
      */
     @Bean("ossTenantKafkaProducer")
-    public MessageProducer ossTenantKafkaProducer(KafkaTemplate<String, Object> ossTenantKafkaTemplate) {
+    public OssTenantKafkaProducer ossTenantKafkaProducer(KafkaTemplate<String, Object> ossTenantKafkaTemplate) {
         return new OssTenantKafkaProducer(ossTenantKafkaTemplate);
     }
 
