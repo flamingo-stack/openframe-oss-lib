@@ -106,6 +106,68 @@ function getPlatformProductionUrl(platform: string): string {
 }
 
 /**
+ * Get ALL unique base domains from getPlatformProductionUrl
+ *
+ * Extracts domains by calling getPlatformProductionUrl for each platform identifier.
+ * Platform identifiers match the switch cases in getPlatformProductionUrl.
+ *
+ * Handles 3 cases:
+ * 1. LOCALHOST DEBUG - No domain (hostname-specific cookies)
+ * 2. VERCEL PREVIEW (*.vercel.app) - Use vercel.app domain
+ * 3. PRODUCTION - Extract from ALL platform URLs via getPlatformProductionUrl
+ *
+ * @returns Array of all unique base domains (with and without wildcard)
+ */
+export function getAllPlatformBaseDomains(): string[] {
+  if (typeof window === 'undefined') return []
+
+  const hostname = window.location.hostname
+
+  // Case 1: LOCALHOST DEBUG - no domains needed
+  if (hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname.startsWith('127.')) {
+    return []
+  }
+
+  // Case 2: VERCEL PREVIEW - use vercel.app domain
+  const isVercelPreview = process.env.VERCEL_ENV === 'preview' ||
+                         process.env.NEXT_PUBLIC_VERCEL_ENV === 'preview' ||
+                         hostname.includes('.vercel.app')
+
+  if (isVercelPreview) {
+    return ['.vercel.app', 'vercel.app']
+  }
+
+  // Case 3: PRODUCTION - extract from ALL platforms using getPlatformProductionUrl
+  // Platform identifiers match switch cases in getPlatformProductionUrl
+  const platformIdentifiers = [
+    'marketing-hub', 'product-hub', 'revenue-hub', 'people-hub', 'admin-hub',
+    'openmsp', 'flamingo', 'tmcg', 'flamingo-teaser', 'openframe', 'universal'
+  ]
+
+  const baseDomains = new Set<string>()
+
+  platformIdentifiers.forEach(platform => {
+    try {
+      const url = getPlatformProductionUrl(platform)
+      const urlHostname = new URL(url).hostname
+      const parts = urlHostname.split('.')
+
+      if (parts.length >= 2) {
+        const baseDomain = parts.slice(-2).join('.')
+        baseDomains.add(`.${baseDomain}`) // Wildcard
+        baseDomains.add(baseDomain) // Non-wildcard
+      }
+    } catch (error) {
+      console.warn('[Platform Domains] Failed to parse URL for platform:', platform, error)
+    }
+  })
+
+  return Array.from(baseDomains)
+}
+
+/**
  * Get the application base URL for the current environment
  *
  * @param platform - Optional platform name (openmsp, flamingo, tmcg, openframe, etc.)
