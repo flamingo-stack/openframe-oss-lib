@@ -55,8 +55,5 @@ openframe:
       api-key-stats-prefix: stats
       gateway-prefix: gateway
       ai-agent-prefix: ai-agent
-      chat-chunks-key-template: "chunks:%s:%s"
-      chat-last-saved-seq-key-template: "last_saved_seq:%s:%s"
-      chat-sequence-counter-key-template: "seq_counter:%s:%s"
 ```
 
