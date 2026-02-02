@@ -46,9 +46,6 @@ public class OpenframeRedisProperties {
 
         private String gatewayPrefix = "gateway";
         private String aiAgentPrefix = "ai-agent";
-        private String chatChunksKeyTemplate = "chunks:%s:%s";
-        private String chatLastSavedSeqKeyTemplate = "last_saved_seq:%s:%s";
-        private String chatSequenceCounterKeyTemplate = "seq_counter:%s:%s";
     }
 }
 
