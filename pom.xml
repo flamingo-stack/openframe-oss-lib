@@ -21,7 +21,7 @@
     <url>https://github.com/flamingo-stack/openframe-oss-lib</url>
 
     <properties>
-        <revision>5.22.1</revision>
+        <revision>5.26.0</revision>
         <java.version>21</java.version>
         <lombok.version>1.18.30</lombok.version>
         <spring-data-mongodb.version>4.2.0</spring-data-mongodb.version>
@@ -40,6 +40,7 @@
     <modules>
         <module>openframe-core</module>
         <module>openframe-data-mongo</module>
+        <module>openframe-data-redis</module>
         <module>openframe-notification-mail</module>
         <module>openframe-data-kafka</module>
         <module>openframe-api-lib</module>
@@ -84,6 +85,11 @@
             <dependency>
                 <groupId>com.openframe.oss</groupId>
                 <artifactId>openframe-data-mongo</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openframe.oss</groupId>
+                <artifactId>openframe-data-redis</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>

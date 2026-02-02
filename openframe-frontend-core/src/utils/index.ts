@@ -1,5 +1,5 @@
 // Utils exports - client-side only
-export { cn, formatDate, formatNumber, formatPrice, formatBytes } from './cn'
+export { cn, formatDate, formatNumber, formatPrice, formatBytes, getAllPlatformBaseDomains } from './cn'
 export { getPlatformAccentColor, getCurrentPlatform, type ColorCategory } from './ods-color-utils'
 export { delay, generateRandomString, truncateString, deepClone, getSlackCommunityJoinUrl } from './common'
 export { getBaseUrl } from '../utils/cn'

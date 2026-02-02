@@ -141,6 +141,15 @@ public class AuthorizationServerConfig {
                     .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
 
             if ("access_token".equals(context.getTokenType().getValue())) {
+                try {
+                    if (context.getAuthorizationGrantType() != null
+                            && "refresh_token".equals(context.getAuthorizationGrantType().getValue())) {
+                        userService.touchLastLogin(user.getEmail(), tenantId);
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to update lastLogin on refresh token: {}", e.getMessage());
+                }
+
                 context.getClaims().claims(claims -> {
                     claims.put("tenant_id", tenantId);
                     claims.put("userId", user.getId());
