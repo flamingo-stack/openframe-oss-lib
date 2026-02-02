@@ -24,20 +24,44 @@
       "os": "windows",
       "linkTemplate": "https://github.com/flamingo-stack/fleet/releases/download/{version}/fleet-windows-amd64.zip",
       "fileName": "fleet-windows-amd64.zip",
-      "agentFileName": "fleet.exe"
+      "targetFileName": "fleet.exe"
     },
     {
       "os": "macos",
       "linkTemplate": "https://github.com/flamingo-stack/fleet/releases/download/{version}/fleet-macos-universal.tar.gz",
       "fileName": "fleet-macos-universal.tar.gz",
-      "agentFileName": "fleet"
+      "targetFileName": "fleet"
     }
   ],
   "assets": [
     {
       "id": "osqueryd",
-      "localFilename": "osqueryd",
-      "source": "ARTIFACTORY",
+      "version": "0.0.2",
+      "source": "GITHUB",
+      "downloadConfigurations": [
+        {
+          "os": "windows",
+          "linkTemplate": "https://github.com/flamingo-stack/osquery/releases/download/{version}/osquery-windows-amd64.zip",
+          "fileName": "osqueryd-windows-amd64.zip",
+          "targetFileName": "osqueryd.exe"
+        },
+        {
+          "os": "macos",
+          "linkTemplate": "https://github.com/flamingo-stack/osquery/releases/download/{version}/osquery-macos-universal.tar.gz",
+          "fileName": "osqueryd-macos-universal.tar.gz",
+          "targetFileName": "osqueryd"
+        }
+      ],
+      "localFilenameConfiguration": [
+        {
+          "filename": "osqueryd",
+          "os": "windows"
+        },
+        {
+          "filename": "osqueryd",
+          "os": "macos"
+        }
+      ],
       "executable": true
     }
   ]
