@@ -1,9 +1,9 @@
 import React from 'react'
-import { CheckCircle } from 'lucide-react'
 import { cn } from '../../utils/cn'
-import { getDeviceTypeIcon, DeviceType } from '../icons/device-type-icons/get-device-type-icon'
+import { CheckCircleIcon } from '../icons-v2-generated/signs-and-symbols/check-circle-icon'
+import { DeviceType, getDeviceTypeIcon } from '../icons/device-type-icons/get-device-type-icon'
 
-export interface SelectCardProps extends React.HTMLAttributes<HTMLDivElement> {
+export interface SelectableDeviceCardProps extends React.HTMLAttributes<HTMLDivElement> {
   title: string
   type?: DeviceType
   icon?: React.ReactNode
@@ -12,7 +12,7 @@ export interface SelectCardProps extends React.HTMLAttributes<HTMLDivElement> {
   onSelect?: () => void
 }
 
-export function SelectCard({
+export function SelectableDeviceCard({
   title,
   type,
   icon,
@@ -21,7 +21,7 @@ export function SelectCard({
   onSelect,
   className,
   ...props
-}: SelectCardProps) {
+}: SelectableDeviceCardProps) {
   return (
     <div 
       className={cn(
@@ -37,7 +37,7 @@ export function SelectCard({
       {...props}
     >
       {/* Icon */}
-      <div className="relative shrink-0 size-6">
+      <div className="relative shrink-0 size-4 sm:size-6">
         {icon ? (
           <span className={cn(
             "inline-flex",
@@ -48,7 +48,7 @@ export function SelectCard({
         ) : (
           getDeviceTypeIcon(type, { 
             className: cn(
-              "size-6",
+              "size-4 sm:size-6",
               selected ? "text-[#ffc008]" : "text-[#888888]"
             )
           })
@@ -56,21 +56,19 @@ export function SelectCard({
       </div>
 
       {/* Title and subtitle */}
-      <div className="basis-0 content-stretch flex flex-col font-['DM_Sans'] font-medium grow items-start justify-center min-h-px min-w-px relative shrink-0">
-        <p 
-          className="leading-6 overflow-ellipsis overflow-hidden relative shrink-0 text-[18px] text-[#fafafa] w-full"
-          style={{ fontVariationSettings: "'opsz' 14" }}
+      <div className="flex-1 flex flex-col font-['DM_Sans'] font-medium items-start justify-center min-h-px min-w-px relative text-ellipsis whitespace-nowrap">
+        <p
+          className="leading-6 overflow-hidden text-ellipsis relative shrink-0 text-[14px]sm:text-[18px] text-[#fafafa] w-full"
         >
           {title}
         </p>
 
         {subtitle && (
-          <p 
+          <p
             className={cn(
-              "leading-5 overflow-ellipsis overflow-hidden relative shrink-0 text-[14px] w-full",
+              "leading-5 overflow-hidden text-ellipsis relative shrink-0 text-[12px] sm:text-[14px] w-full",
               selected ? "text-[#ffc008]" : "text-[#888888]"
             )}
-            style={{ fontVariationSettings: "'opsz' 14" }}
           >
             {subtitle}
           </p>
@@ -79,9 +77,7 @@ export function SelectCard({
 
       {/* Check icon for selected state */}
       {selected && (
-        <div className="relative shrink-0 size-6">
-          <CheckCircle className="size-6 text-[#ffc008]" />
-        </div>
+        <CheckCircleIcon className="relative shrink-0 size-4 sm:size-6 text-[#ffc008]" />
       )}
     </div>
   )
