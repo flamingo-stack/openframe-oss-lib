@@ -1,6 +1,8 @@
 package com.openframe.authz.service.user;
 
 import com.openframe.data.document.user.User;
+import com.openframe.data.redis.OpenframeRedisKeyBuilder;
+import com.openframe.data.redis.OpenframeRedisProperties;
 import com.openframe.notification.mail.service.EmailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,9 +20,9 @@ import static com.openframe.authz.util.ResetTokenUtil.generateResetToken;
 @Slf4j
 public class PasswordResetService {
 
-    private static final String RESET_KEY_PREFIX = "pwdreset:";
-
     private final RedisTemplate<String, String> redisTemplate;
+    private final OpenframeRedisProperties redisProperties;
+    private final OpenframeRedisKeyBuilder keyBuilder;
     private final UserService userService;
     private final EmailService emailService;
 
@@ -35,14 +37,14 @@ public class PasswordResetService {
         }
 
         String token = generateResetToken();
-        String key = RESET_KEY_PREFIX + token;
+        String key = keyBuilder.tenantKey(redisProperties.getKeys().getPasswordResetPrefix() + ":" + token);
         redisTemplate.opsForValue().set(key, email, Duration.ofMinutes(ttlMinutes));
 
         emailService.sendPasswordResetEmail(email, token);
     }
 
     public void resetPassword(String token, String newPassword) {
-        String key = RESET_KEY_PREFIX + token;
+        String key = keyBuilder.tenantKey(redisProperties.getKeys().getPasswordResetPrefix() + ":" + token);
         String email = redisTemplate.opsForValue().get(key);
         if (email == null) {
             throw new IllegalArgumentException("Invalid or expired reset token");

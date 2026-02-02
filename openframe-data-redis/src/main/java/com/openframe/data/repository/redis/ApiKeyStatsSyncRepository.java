@@ -1,5 +1,7 @@
 package com.openframe.data.repository.redis;
 
+import com.openframe.data.redis.OpenframeRedisKeyBuilder;
+import com.openframe.data.redis.OpenframeRedisProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -17,14 +19,14 @@ import java.util.Set;
 public class ApiKeyStatsSyncRepository {
 
     private final StringRedisTemplate redisTemplate;
-
-    private static final String STATS_KEY_PREFIX = "stats:";
+    private final OpenframeRedisProperties redisProperties;
+    private final OpenframeRedisKeyBuilder keyBuilder;
 
     /**
      * Get all stats keys from Redis
      */
     public Set<String> getAllStatsKeys() {
-        return redisTemplate.keys(STATS_KEY_PREFIX + "*");
+        return redisTemplate.keys(statsKeyPrefix() + ":*");
     }
 
     /**
@@ -45,7 +47,12 @@ public class ApiKeyStatsSyncRepository {
      * Extract key ID from Redis key
      */
     public String extractKeyId(String redisKey) {
-        return redisKey.replace(STATS_KEY_PREFIX, "");
+        String p = statsKeyPrefix() + ":";
+        return redisKey != null && redisKey.startsWith(p) ? redisKey.substring(p.length()) : redisKey;
+    }
+
+    private String statsKeyPrefix() {
+        return keyBuilder.tenantKey(redisProperties.getKeys().getApiKeyStatsPrefix());
     }
 
     /**

@@ -1,5 +1,7 @@
 package com.openframe.data.repository.redis;
 
+import com.openframe.data.redis.OpenframeRedisKeyBuilder;
+import com.openframe.data.redis.OpenframeRedisProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
@@ -20,14 +22,14 @@ import java.time.LocalDateTime;
 public class ReactiveApiKeyStatsRepository {
 
     private final ReactiveStringRedisTemplate redisTemplate;
-
-    private static final String STATS_KEY_PREFIX = "stats:";
+    private final OpenframeRedisProperties redisProperties;
+    private final OpenframeRedisKeyBuilder keyBuilder;
 
     /**
      * Atomically increment successful request counters
      */
     public Mono<Void> incrementSuccessful(String keyId, Duration ttl) {
-        String key = STATS_KEY_PREFIX + keyId;
+        String key = buildStatsKey(keyId);
         String now = LocalDateTime.now().toString();
 
         return redisTemplate.opsForHash().increment(key, "total", 1)
@@ -41,7 +43,7 @@ public class ReactiveApiKeyStatsRepository {
      * Atomically increment failed request counters
      */
     public Mono<Void> incrementFailed(String keyId, Duration ttl) {
-        String key = STATS_KEY_PREFIX + keyId;
+        String key = buildStatsKey(keyId);
         String now = LocalDateTime.now().toString();
 
         return redisTemplate.opsForHash().increment(key, "total", 1)
@@ -49,6 +51,11 @@ public class ReactiveApiKeyStatsRepository {
                 .then(redisTemplate.opsForHash().put(key, "lastUsed", now))
                 .then(redisTemplate.expire(key, ttl))
                 .then();
+    }
+
+    private String buildStatsKey(String keyId) {
+        String relativeKey = redisProperties.getKeys().getApiKeyStatsPrefix() + ":" + keyId;
+        return keyBuilder.tenantKey(relativeKey);
     }
 }
 
