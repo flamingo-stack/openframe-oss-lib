@@ -7,6 +7,7 @@ import { Button } from '../ui/button'
 import { PageActions, type PageActionButton } from '../ui/page-actions'
 
 // Legacy interface for backward compatibility (layout version)
+
 interface LegacyPageContainerProps {
   children: React.ReactNode;
   className?: string;
@@ -131,7 +132,7 @@ function renderLegacyPageContainer({
   fullWidthBackground = true,
   backgroundClassName = 'bg-ods-bg',
   backgroundStyle,
-  contentPadding = 'px-6 md:px-20 py-6 md:py-10',
+  contentPadding,
   maxWidth = 'max-w-[1920px]',
   as: Component = 'section',
   id
@@ -175,7 +176,7 @@ function renderAdvancedPageContainer({
   headerContent,
   actions,
   actionsVariant,
-  padding = 'md',
+  padding = 'none',
   background = 'transparent',
   className,
   contentClassName,
@@ -234,19 +235,18 @@ function renderAdvancedPageContainer({
             {backButton && (
               <Button
                 onClick={backButton.onClick}
-                variant="ghost"
-                className="flex items-center gap-2 p-3 rounded-[6px] hover:bg-ods-bg-hover transition-colors self-start justify-start"
+                variant="transparent"
+                className="flex self-start justify-start text-ods-text-secondary"
                 leftIcon={<ChevronLeft className="h-6 w-6 text-ods-text-secondary" />}
+                noPadding
               >
-                <span className="font-['DM_Sans'] font-medium text-[18px] leading-[24px] text-ods-text-secondary">
-                  {backButton.label || 'Back'}
-                </span>
+                {backButton.label || 'Back'}
               </Button>
             )}
 
             {/* Title */}
             {title && (
-              <h1 className="font-['Azeret_Mono'] font-semibold text-[32px] leading-[40px] tracking-[-0.64px] text-ods-text-primary">
+              <h1 className="font-['Azeret_Mono'] font-semibold text-[24px] sm:text-[32px] leading-[32px] sm:leading-[40px] tracking-[-0.48px] sm:tracking-[-0.64px] text-ods-text-primary">
                 {title}
               </h1>
             )}
@@ -306,11 +306,12 @@ function renderAdvancedPageContainer({
               {backButton && (
                 <Button
                   onClick={backButton.onClick}
-                  variant="ghost"
-                  className="flex items-center gap-2 text-ods-text-secondary hover:text-ods-text-primary transition-colors px-0 py-3 justify-start"
+                  className="flex self-start justify-start text-ods-text-secondary"
+                  variant="transparent"
                   leftIcon={<ChevronLeft className="w-6 h-6" />}
+                  noPadding
                 >
-                  <span className="text-lg font-['DM_Sans:Medium',_sans-serif] font-medium">{backButton.label || 'Back'}</span>
+                  {backButton.label || 'Back'}
                 </Button>
               )}
               
@@ -372,7 +373,7 @@ function renderAdvancedPageContainer({
       case 'list':
         return cn(baseClasses, 'gap-4 md:gap-6', className)
       case 'detail':
-        return cn(baseClasses, 'gap-10', className)
+        return cn(baseClasses, 'gap-6', className)
       case 'form':
         return cn(baseClasses, 'min-h-screen', className)
       case 'content':

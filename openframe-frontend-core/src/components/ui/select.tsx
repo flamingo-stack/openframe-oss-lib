@@ -129,7 +129,7 @@ const SelectItem = React.forwardRef<
     className={cn(
       "relative flex w-full cursor-pointer select-none items-center py-3 pl-8 pr-4",
       // Match trigger typography
-      "text-[14px] md:text-[18px] font-medium",
+      "text-[14px] md:text-[18px] font-medium whitespace-nowrap",
       // Hover state with visible background change
       "outline-none hover:bg-ods-accent/10 focus:bg-ods-accent/10",
       "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",

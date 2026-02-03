@@ -1,9 +1,8 @@
 import React from 'react'
 
-import { DevicesIcon } from '../devices-icon'
-import { DesktopIcon } from './desktop-icon'
-import { LaptopIcon } from './laptop-icon'
-import { ServerIcon } from './server-icon'
+import { HardDriveIcon } from '@/components/icons-v2-generated/devices/hard-drive-icon'
+import { LaptopIcon } from '@/components/icons-v2-generated/devices/laptop-icon'
+import { MonitorIcon } from '@/components/icons-v2-generated/devices/monitor-icon'
 
 export type DeviceType = 'desktop' | 'laptop' | 'mobile' | 'tablet' | 'server'
 
@@ -20,11 +19,10 @@ export function getDeviceTypeIcon(
   switch (type) {
     case 'desktop':
       return (
-        <DesktopIcon
+        <MonitorIcon
           className={props?.className}
           style={{ color: props?.color }}
-          width={props?.size}
-          height={props?.size}
+          size={props?.size}
         />
       )
     case 'laptop':
@@ -32,28 +30,25 @@ export function getDeviceTypeIcon(
         <LaptopIcon
           className={props?.className}
           style={{ color: props?.color }}
-          width={props?.size}
-          height={props?.size}
+          size={props?.size}
         />
       )
     case 'server':
       return (
-        <ServerIcon
+        <HardDriveIcon
           className={props?.className}
           style={{ color: props?.color }}
-          width={props?.size}
-          height={props?.size}
+          size={props?.size}
         />
       )
     case 'mobile':
     case 'tablet':
     default:
       return (
-        <DevicesIcon
+        <MonitorIcon
           className={props?.className}
           style={{ color: props?.color }}
-          width={props?.size}
-          height={props?.size}
+          size={props?.size}
         />
       )
   }

@@ -56,7 +56,7 @@ export function AppLayout({
         />
 
         {/* Main Content */}
-        <main className={cn("flex-1 overflow-y-auto p-6 pt-0", mainClassName)}>
+        <main className={cn("flex-1 overflow-y-auto p-4 sm:p-6", mainClassName)}>
           <Suspense fallback={loadingFallback ?? null}>
             {children}
           </Suspense>
