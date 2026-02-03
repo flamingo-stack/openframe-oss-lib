@@ -7,6 +7,7 @@ import { Button } from '../ui/button'
 import { PageActions, type PageActionButton } from '../ui/page-actions'
 
 // Legacy interface for backward compatibility (layout version)
+
 interface LegacyPageContainerProps {
   children: React.ReactNode;
   className?: string;
