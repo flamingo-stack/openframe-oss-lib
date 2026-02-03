@@ -1,8 +1,8 @@
 import React from 'react'
 
-import { HardDriveIcon } from '@/components/icons-v2-generated/devices/hard-drive-icon'
-import { LaptopIcon } from '@/components/icons-v2-generated/devices/laptop-icon'
-import { MonitorIcon } from '@/components/icons-v2-generated/devices/monitor-icon'
+import { HardDriveIcon } from '../../icons-v2-generated/devices/hard-drive-icon'
+import { LaptopIcon } from '../../icons-v2-generated/devices/laptop-icon'
+import { MonitorIcon } from '../../icons-v2-generated/devices/monitor-icon'
 
 export type DeviceType = 'desktop' | 'laptop' | 'mobile' | 'tablet' | 'server'
 
