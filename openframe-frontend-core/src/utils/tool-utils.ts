@@ -73,6 +73,9 @@ const toolAliasMap: Record<string, ToolType> = {
   'openframe-client': 'OPENFRAME_CLIENT',
   'openframeclient': 'OPENFRAME_CLIENT',
 
+  // OSQUERY
+  'OSQUERY': 'OSQUERY',
+
   // System
   'SYSTEM': 'SYSTEM',
   'system': 'SYSTEM',
