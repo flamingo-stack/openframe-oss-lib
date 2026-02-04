@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { ClockIcon, DollarIcon, SearchIcon } from '../components/icons-v2-generated';
 import { Input } from '../components/ui/input';
 
 const meta = {
@@ -25,7 +24,6 @@ export const Default: Story = {
 export const WithEndAdornmentText: Story = {
   args: {
     placeholder: '90',
-    endAdornment: 'Seconds',
     className: 'w-full',
   },
 };
@@ -36,7 +34,6 @@ export const WithEndAdornmentText: Story = {
 export const WithStartAdornmentIcon: Story = {
   args: {
     placeholder: 'Search...',
-    startAdornment: <SearchIcon className="w-5 h-5" />,
   },
 };
 
@@ -46,8 +43,6 @@ export const WithStartAdornmentIcon: Story = {
 export const WithBothAdornments: Story = {
   args: {
     placeholder: '0.00',
-    startAdornment: <DollarIcon className="w-5 h-5" />,
-    endAdornment: 'USD',
   },
 };
 
@@ -57,7 +52,6 @@ export const WithBothAdornments: Story = {
 export const WithEndAdornmentIcon: Story = {
   args: {
     placeholder: 'Enter timeout...',
-    endAdornment: <ClockIcon className="w-5 h-5" />,
   },
 };
 
@@ -67,7 +61,6 @@ export const WithEndAdornmentIcon: Story = {
 export const DisabledWithAdornments: Story = {
   args: {
     placeholder: '90',
-    endAdornment: 'Seconds',
     disabled: true,
   },
 };
@@ -78,7 +71,6 @@ export const DisabledWithAdornments: Story = {
 export const InvalidWithAdornments: Story = {
   args: {
     placeholder: '0',
-    endAdornment: 'Seconds',
     invalid: true,
   },
 };
@@ -89,7 +81,6 @@ export const InvalidWithAdornments: Story = {
 export const WithValueAndEndAdornment: Story = {
   args: {
     defaultValue: '90',
-    endAdornment: 'Seconds',
     className: 'max-w-[320px]',
   },
 };
@@ -101,7 +92,6 @@ export const NumberWithUnit: Story = {
   args: {
     type: 'number',
     placeholder: '100',
-    endAdornment: 'MB',
   },
 };
 
@@ -111,8 +101,6 @@ export const NumberWithUnit: Story = {
 export const Preview: Story = {
   args: {
     value: '90',
-    endAdornment: 'Seconds',
-    preview: true,
   },
 };
 
@@ -122,9 +110,6 @@ export const Preview: Story = {
 export const PreviewWithBothAdornments: Story = {
   args: {
     value: '150.00',
-    startAdornment: <DollarIcon className="w-5 h-5" />,
-    endAdornment: 'USD',
-    preview: true,
   },
 };
 
@@ -138,12 +123,9 @@ export const AllVariants: Story = {
   render: () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '320px' }}>
       <Input placeholder="Default input" />
-      <Input placeholder="90" endAdornment="Seconds" />
-      <Input placeholder="Search..." startAdornment={<SearchIcon className="w-5 h-5" />} />
-      <Input placeholder="0.00" startAdornment={<DollarIcon className="w-5 h-5" />} endAdornment="USD" />
-      <Input placeholder="Disabled" endAdornment="Unit" disabled />
-      <Input placeholder="Invalid" endAdornment="Unit" invalid />
-      <Input value="90" endAdornment="Seconds" preview />
+      <Input placeholder="Disabled" disabled />
+      <Input placeholder="Invalid" invalid />
+      <Input value="90" />
     </div>
   ),
 };
