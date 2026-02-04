@@ -8,6 +8,7 @@ import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.audit.*;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.CursorPaginationInput;
+import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLLogMapper;
 import com.openframe.api.service.LogService;
 import jakarta.validation.Valid;
@@ -40,15 +41,16 @@ public class LogDataFetcher {
     public GenericConnection<GenericEdge<LogEvent>> logs(
             @InputArgument @Valid LogFilterInput filter,
             @InputArgument @Valid CursorPaginationInput pagination,
-            @InputArgument String search) {
+            @InputArgument String search,
+            @InputArgument @Valid SortInput sort) {
 
-        log.debug("Fetching logs with filter: {}, pagination: {}, search: {}",
-                filter, pagination, search);
+        log.debug("Fetching logs with filter: {}, pagination: {}, search: {}, sort: {}",
+                filter, pagination, search, sort);
 
         LogFilterOptions filterOptions = logMapper.toLogFilterOptions(filter);
         CursorPaginationCriteria paginationCriteria = logMapper.toCursorPaginationCriteria(pagination);
 
-        var result = logService.queryLogs(filterOptions, paginationCriteria, search);
+        var result = logService.queryLogs(filterOptions, paginationCriteria, search, sort);
         GenericConnection<GenericEdge<LogEvent>> connection = logMapper.toLogConnection(result);
         log.debug("Successfully fetched {} logs with cursor-based pagination",
                 connection.getEdges().size());

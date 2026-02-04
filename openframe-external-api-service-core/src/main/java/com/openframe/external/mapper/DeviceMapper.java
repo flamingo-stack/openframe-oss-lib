@@ -5,6 +5,9 @@ import com.openframe.api.dto.device.*;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.tool.Tag;
 import com.openframe.external.dto.device.*;
+import com.openframe.external.dto.shared.SortCriteria;
+import com.openframe.api.dto.shared.SortInput;
+import com.openframe.api.dto.shared.SortDirection;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -139,5 +142,18 @@ public class DeviceMapper extends BaseRestMapper {
                         .count(option.getCount())
                         .build())
                 .collect(Collectors.toList());
+    }
+    
+    public SortInput toSortInput(SortCriteria criteria) {
+        if (criteria == null) {
+            return null;
+        }
+        
+        SortInput sortInput = new SortInput();
+        sortInput.setField(criteria.getField());
+        sortInput.setDirection(SortDirection.ASC.name().equalsIgnoreCase(criteria.getDirection()) ? 
+            SortDirection.ASC : SortDirection.DESC);
+        
+        return sortInput;
     }
 } 

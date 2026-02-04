@@ -5,6 +5,7 @@ import com.openframe.api.dto.audit.*;
 import com.openframe.api.dto.audit.OrganizationFilterOption;
 import com.openframe.api.dto.shared.CursorPageInfo;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.dto.shared.SortInput;
 import com.openframe.data.model.pinot.LogProjection;
 import com.openframe.data.model.pinot.OrganizationOption;
 import com.openframe.data.model.cassandra.UnifiedLogEvent;
@@ -30,11 +31,11 @@ public class LogService {
     private final UnifiedLogEventRepository unifiedLogEventRepository;
 
 
-    public GenericQueryResult<LogEvent> queryLogs(LogFilterOptions filter, CursorPaginationCriteria paginationCriteria, String search) {
+    public GenericQueryResult<LogEvent> queryLogs(LogFilterOptions filter, CursorPaginationCriteria paginationCriteria, String search, SortInput sort) {
         CursorPaginationCriteria normalizedCriteria = paginationCriteria.normalize();
 
-        log.debug("Querying logs with filter: {}, pagination: {}, search: {}",
-                filter, normalizedCriteria, search);
+        log.debug("Querying logs with filter: {}, pagination: {}, search: {}, sort: {}",
+                filter, normalizedCriteria, search, sort);
 
         LocalDate startDate = filter.getStartDate();
         LocalDate endDate = filter.getEndDate();
@@ -48,6 +49,10 @@ public class LogService {
 
         List<String> organizationIds = filter.getOrganizationIds();
         String deviceId = filter.getDeviceId();
+        
+        String sortField = validateSortField(sort != null ? sort.getField() : null);
+        String sortDirection = (sort != null && sort.getDirection() != null) ? 
+            sort.getDirection().name() : "DESC";
 
         if (search != null && !search.trim().isEmpty()) {
             log.debug("Using search functionality with term: {}", search);
@@ -55,14 +60,16 @@ public class LogService {
                     startDate, endDate,
                     toolTypes, eventTypes, severities,
                     organizationIds, deviceId,
-                    search, cursor, limit);
+                    search, cursor, limit,
+                    sortField, sortDirection);
         } else {
             log.debug("Using exact field filtering");
             logs = pinotLogRepository.findLogs(
                     startDate, endDate,
                     toolTypes, eventTypes, severities,
                     organizationIds, deviceId,
-                    cursor, limit);
+                    cursor, limit,
+                    sortField, sortDirection);
         }
 
         log.debug("Retrieved {} logs from Pinot", logs != null ? logs.size() : 0);
@@ -200,5 +207,17 @@ public class LogService {
                 .organizationName(logEvent.getOrganizationName())
                 .summary(logEvent.getMessage())
                 .build();
+    }
+    
+    private String validateSortField(String field) {
+        if (field == null || field.trim().isEmpty()) {
+            return pinotLogRepository.getDefaultSortField();
+        }
+        String trimmedField = field.trim();
+        if (!pinotLogRepository.isSortableField(trimmedField)) {
+            log.warn("Invalid sort field requested for logs: {}, using default", field);
+            return pinotLogRepository.getDefaultSortField();
+        }
+        return trimmedField;
     }
 }

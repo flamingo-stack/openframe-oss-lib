@@ -5,6 +5,8 @@ import com.openframe.api.dto.organization.OrganizationFilterOptions;
 import com.openframe.api.dto.organization.OrganizationList;
 import com.openframe.api.dto.shared.CursorPageInfo;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.dto.shared.SortInput;
+import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.organization.filter.OrganizationQueryFilter;
 import com.openframe.data.repository.organization.OrganizationRepository;
@@ -28,37 +30,26 @@ public class OrganizationQueryService {
     private final OrganizationRepository organizationRepository;
 
     /**
-     * Query organizations with optional filtering and search (backward compatibility).
-     * Returns all organizations without pagination for external REST API.
-     */
-    public OrganizationList queryOrganizations(OrganizationFilterOptions filterOptions, String search) {
-        log.debug("Querying organizations (non-paginated) with filter: {}, search: {}", filterOptions, search);
-
-        OrganizationQueryFilter queryFilter = buildQueryFilter(filterOptions);
-        List<Organization> organizations = organizationRepository.findOrganizationsWithFilters(queryFilter, search);
-
-        return OrganizationList.builder()
-                .organizations(organizations)
-                .build();
-    }
-
-    /**
      * Query organizations with optional filtering, pagination, and search.
      * Filtering happens at MongoDB level for better performance.
      */
     public CountedGenericQueryResult<Organization> queryOrganizations(
             OrganizationFilterOptions filterOptions,
             CursorPaginationCriteria paginationCriteria,
-            String search) {
+            String search,
+            SortInput sort) {
 
-        log.debug("Querying organizations with filter: {}, pagination: {}, search: {}",
-                filterOptions, paginationCriteria, search);
+        log.debug("Querying organizations with filter: {}, pagination: {}, search: {}, sort: {}",
+                filterOptions, paginationCriteria, search, sort);
 
         CursorPaginationCriteria normalizedPagination = paginationCriteria.normalize();
         OrganizationQueryFilter queryFilter = buildQueryFilter(filterOptions);
-        Query query = organizationRepository.buildOrganizationQuery(queryFilter, search, normalizedPagination.getCursor());
-
-        List<Organization> pageItems = fetchPageItems(query, normalizedPagination);
+        Query query = organizationRepository.buildOrganizationQuery(queryFilter, search);
+        String sortField = validateSortField(sort != null ? sort.getField() : null);
+        SortDirection sortDirection = (sort != null && sort.getDirection() != null) ? 
+            sort.getDirection() : SortDirection.DESC;
+        
+        List<Organization> pageItems = fetchPageItems(query, normalizedPagination, sortField, sortDirection);
         boolean hasNextPage = pageItems.size() == normalizedPagination.getLimit();
 
         CursorPageInfo pageInfo = buildPageInfo(pageItems, hasNextPage, normalizedPagination.hasCursor());
@@ -69,11 +60,11 @@ public class OrganizationQueryService {
                 .filteredCount(pageItems.size())
                 .build();
     }
-
-    private List<Organization> fetchPageItems(@NotNull Query query, CursorPaginationCriteria criteria) {
-        // Cursor is already included in the query, so we pass null here
+    
+    private List<Organization> fetchPageItems(@NotNull Query query, CursorPaginationCriteria criteria,
+                                               String sortField, SortDirection sortDirection) {
         List<Organization> organizations = organizationRepository.findOrganizationsWithCursor(
-            query, null, criteria.getLimit() + 1);
+            query, criteria.getCursor(), criteria.getLimit() + 1, sortField, sortDirection.name());
         return organizations.size() > criteria.getLimit()
             ? organizations.subList(0, criteria.getLimit())
             : organizations;
@@ -105,5 +96,17 @@ public class OrganizationQueryService {
                 .maxEmployees(filterOptions.getMaxEmployees())
                 .hasActiveContract(filterOptions.getHasActiveContract())
                 .build();
+    }
+    
+    private String validateSortField(String field) {
+        if (field == null || field.trim().isEmpty()) {
+            return organizationRepository.getDefaultSortField();
+        }
+        String trimmedField = field.trim();
+        if (!organizationRepository.isSortableField(trimmedField)) {
+            log.warn("Invalid sort field requested for organizations: {}, using default", field);
+            return organizationRepository.getDefaultSortField();
+        }
+        return trimmedField;
     }
 }

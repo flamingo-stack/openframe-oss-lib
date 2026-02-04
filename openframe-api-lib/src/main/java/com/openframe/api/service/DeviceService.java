@@ -4,6 +4,8 @@ import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.device.DeviceFilterOptions;
 import com.openframe.api.dto.shared.CursorPageInfo;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.dto.shared.SortInput;
+import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
@@ -35,8 +37,9 @@ import static java.time.Instant.now;
 @Validated
 @RequiredArgsConstructor
 public class DeviceService {
-
-    private static final String SORT_FIELD = "machineId";
+    
+    private static final String ID_FIELD = "_id";
+    
     private final MachineRepository machineRepository;
     private final TagRepository tagRepository;
     private final MachineTagRepository machineTagRepository;
@@ -51,14 +54,19 @@ public class DeviceService {
 
     public CountedGenericQueryResult<Machine> queryDevices(DeviceFilterOptions filterOptions,
                                                   CursorPaginationCriteria paginationCriteria,
-                                                  String search) {
-        log.debug("Querying devices with filter: {}, pagination: {}, search: {}",
-                filterOptions, paginationCriteria, search);
+                                                  String search,
+                                                  SortInput sort) {
+        log.debug("Querying devices with filter: {}, pagination: {}, search: {}, sort: {}",
+                filterOptions, paginationCriteria, search, sort);
 
         CursorPaginationCriteria normalizedPagination = paginationCriteria.normalize();
         Query query = buildDeviceQuery(filterOptions, search);
         
-        List<Machine> pageItems = fetchPageItems(query, normalizedPagination);
+        String sortField = validateSortField(sort != null ? sort.getField() : null);
+        SortDirection sortDirection = (sort != null && sort.getDirection() != null) ? 
+            sort.getDirection() : SortDirection.DESC;
+        
+        List<Machine> pageItems = fetchPageItems(query, normalizedPagination, sortField, sortDirection);
         boolean hasNextPage = pageItems.size() == normalizedPagination.getLimit();
         
         CursorPageInfo pageInfo = buildPageInfo(pageItems, hasNextPage, normalizedPagination.hasCursor());
@@ -70,9 +78,10 @@ public class DeviceService {
                 .build();
     }
     
-    private List<Machine> fetchPageItems(@NotNull Query query, CursorPaginationCriteria criteria) {
+    private List<Machine> fetchPageItems(@NotNull Query query, CursorPaginationCriteria criteria,
+                                          String sortField, SortDirection sortDirection) {
         List<Machine> machines = machineRepository.findMachinesWithCursor(
-            query, criteria.getCursor(), criteria.getLimit() + 1);
+            query, criteria.getCursor(), criteria.getLimit() + 1, sortField, sortDirection.name());
         return machines.size() > criteria.getLimit() 
             ? machines.subList(0, criteria.getLimit())
             : machines;
@@ -97,9 +106,9 @@ public class DeviceService {
         if (filter != null && filter.getTagNames() != null && !filter.getTagNames().isEmpty()) {
             List<String> machineIds = resolveTagNamesToMachineIds(filter.getTagNames());
             if (!machineIds.isEmpty()) {
-                query.addCriteria(Criteria.where(SORT_FIELD).in(machineIds));
+                query.addCriteria(Criteria.where(ID_FIELD).in(machineIds));
             } else {
-                query.addCriteria(Criteria.where(SORT_FIELD).exists(false));
+                query.addCriteria(Criteria.where(ID_FIELD).exists(false));
             }
         }
         return query;
@@ -162,5 +171,17 @@ public class DeviceService {
         machineRepository.save(machine);
         deviceStatusProcessor.postProcessStatusUpdated(machine);
         log.info("Device {} status updated to {}", machineId, status);
+    }
+    
+    private String validateSortField(String field) {
+        if (field == null || field.trim().isEmpty()) {
+            return machineRepository.getDefaultSortField();
+        }
+        String trimmedField = field.trim();
+        if (!machineRepository.isSortableField(trimmedField)) {
+            log.warn("Invalid sort field requested for devices: {}, using default", field);
+            return machineRepository.getDefaultSortField();
+        }
+        return trimmedField;
     }
 } 

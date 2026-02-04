@@ -4,6 +4,7 @@ extend type Query {
         filter: OrganizationFilterInput
         pagination: CursorPaginationInput
         search: String
+        sort: SortInput
     ): OrganizationConnection!
 
     # Get single organization by ID

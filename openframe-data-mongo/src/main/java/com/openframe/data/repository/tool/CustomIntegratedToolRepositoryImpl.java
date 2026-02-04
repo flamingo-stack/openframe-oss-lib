@@ -4,6 +4,7 @@ import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.tool.filter.ToolQueryFilter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -17,6 +18,18 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class CustomIntegratedToolRepositoryImpl implements CustomIntegratedToolRepository {
+
+    private static final String SORT_DESC = "DESC";
+    private static final String ID_FIELD = "_id";
+    
+    private static final List<String> SORTABLE_FIELDS = List.of(
+            "_id",
+            "name",
+            "type",
+            "category",
+            "enabled"
+    );
+    private static final String DEFAULT_SORT_FIELD = "_id";
 
     private final MongoTemplate mongoTemplate;
 
@@ -58,6 +71,26 @@ public class CustomIntegratedToolRepositoryImpl implements CustomIntegratedToolR
         Query query = buildToolQuery(filter, search);
         return mongoTemplate.find(query, IntegratedTool.class);
     }
+    
+    @Override
+    public List<IntegratedTool> findToolsWithFiltersAndSort(ToolQueryFilter filter, String search, 
+                                                              String sortField, String sortDirection) {
+        Query query = buildToolQuery(filter, search);
+        
+        Sort.Direction mongoSortDirection = SORT_DESC.equalsIgnoreCase(sortDirection) ? 
+            Sort.Direction.DESC : Sort.Direction.ASC;
+            
+        if (ID_FIELD.equals(sortField)) {
+            query.with(Sort.by(mongoSortDirection, ID_FIELD));
+        } else {
+            query.with(Sort.by(
+                Sort.Order.by(sortField).with(mongoSortDirection),
+                Sort.Order.by(ID_FIELD).with(mongoSortDirection)
+            ));
+        }
+        
+        return mongoTemplate.find(query, IntegratedTool.class);
+    }
 
     @Override
     public List<String> findDistinctTypes() {
@@ -84,5 +117,15 @@ public class CustomIntegratedToolRepositoryImpl implements CustomIntegratedToolR
                 .filter(Objects::nonNull)
                 .sorted()
                 .collect(Collectors.toList());
+    }
+    
+    @Override
+    public boolean isSortableField(String field) {
+        return field != null && SORTABLE_FIELDS.contains(field.trim());
+    }
+    
+    @Override
+    public String getDefaultSortField() {
+        return DEFAULT_SORT_FIELD;
     }
 }

@@ -32,4 +32,15 @@ enum ToolType {
 input CursorPaginationInput {
     limit: Int
     cursor: String
+}
+
+# Sorting support
+enum SortDirection {
+    ASC
+    DESC
+}
+
+input SortInput {
+    field: String
+    direction: SortDirection
 } 

@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 
 /**
- * Response DTO for organization list in external REST API.
+ * Response DTO for organization list in external REST API with pagination support.
  */
 @Data
 @Builder
@@ -18,4 +18,10 @@ import java.util.List;
 public class OrganizationsResponse {
     private List<OrganizationResponse> organizations;
     private Integer total;
+    
+    // Pagination info
+    private Boolean hasNextPage;
+    private Boolean hasPreviousPage;
+    private String startCursor;
+    private String endCursor;
 }
