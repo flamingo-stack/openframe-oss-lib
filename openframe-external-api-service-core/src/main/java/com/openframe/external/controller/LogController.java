@@ -7,6 +7,7 @@ import com.openframe.external.dto.audit.LogFilterResponse;
 import com.openframe.external.dto.audit.LogDetailsResponse;
 import com.openframe.external.dto.audit.LogFilterCriteria;
 import com.openframe.external.dto.shared.PaginationCriteria;
+import com.openframe.external.dto.shared.SortCriteria;
 import com.openframe.external.mapper.LogMapper;
 import com.openframe.external.exception.LogNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -72,11 +73,15 @@ public class LogController {
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) Integer limit,
             @Parameter(description = "Cursor for pagination")
             @RequestParam(required = false) String cursor,
+            @Parameter(description = "Field to sort by (e.g., eventTimestamp, severity, toolType, eventType)")
+            @RequestParam(required = false) String sortField,
+            @Parameter(description = "Sort direction (ASC or DESC), default: DESC")
+            @RequestParam(required = false, defaultValue = "DESC") String sortDirection,
             @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
             @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
 
-        log.info("Getting logs - startDate: {}, endDate: {}, toolTypes: {}, eventTypes: {}, severities: {}, organizationIds: {}, deviceId: {}, search: {}, limit: {}, cursor: {} - userId: {}, apiKeyId: {}", 
-                startDate, endDate, toolTypes, eventTypes, severities, organizationIds, deviceId, search, limit, cursor, userId, apiKeyId);
+        log.info("Getting logs - startDate: {}, endDate: {}, toolTypes: {}, eventTypes: {}, severities: {}, organizationIds: {}, deviceId: {}, search: {}, limit: {}, cursor: {}, sortField: {}, sortDirection: {} - userId: {}, apiKeyId: {}", 
+                startDate, endDate, toolTypes, eventTypes, severities, organizationIds, deviceId, search, limit, cursor, sortField, sortDirection, userId, apiKeyId);
         
         LogFilterCriteria filterCriteria = LogFilterCriteria.builder()
                 .startDate(startDate)
@@ -93,10 +98,16 @@ public class LogController {
                 .cursor(cursor)
                 .build();
         
+        SortCriteria sortCriteria = SortCriteria.builder()
+                .field(sortField)
+                .direction(sortDirection)
+                .build();
+        
         var result = logService.queryLogs(
                 logMapper.toLogFilterOptions(filterCriteria), 
                 logMapper.toCursorPaginationCriteria(paginationCriteria), 
-                search);
+                search,
+                logMapper.toSortInput(sortCriteria));
         return logMapper.toLogsResponse(result);
     }
 

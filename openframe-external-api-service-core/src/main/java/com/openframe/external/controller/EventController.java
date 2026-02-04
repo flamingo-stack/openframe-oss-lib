@@ -8,6 +8,7 @@ import com.openframe.external.dto.event.EventFilterResponse;
 import com.openframe.external.dto.event.EventResponse;
 import com.openframe.external.dto.event.EventsResponse;
 import com.openframe.external.dto.shared.PaginationCriteria;
+import com.openframe.external.dto.shared.SortCriteria;
 import com.openframe.external.exception.EventNotFoundException;
 import com.openframe.external.mapper.EventMapper;
 import io.swagger.v3.oas.annotations.Operation;
@@ -67,11 +68,15 @@ public class EventController {
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) Integer limit,
             @Parameter(description = "Search term")
             @RequestParam(required = false) String search,
+            @Parameter(description = "Sort field")
+            @RequestParam(required = false) String sortField,
+            @Parameter(description = "Sort direction (ASC or DESC)")
+            @RequestParam(defaultValue = "ASC") String sortDirection,
             @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String requestUserId,
             @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
 
-        log.info("Getting events - userIds: {}, eventTypes: {}, startDate: {}, endDate: {}, cursor: {}, limit: {}, search: {} - requestUserId: {}, apiKeyId: {}", 
-                userIds, eventTypes, startDate, endDate, cursor, limit, search, requestUserId, apiKeyId);
+        log.info("Getting events - userIds: {}, eventTypes: {}, startDate: {}, endDate: {}, cursor: {}, limit: {}, search: {}, sortField: {}, sortDirection: {} - requestUserId: {}, apiKeyId: {}", 
+                userIds, eventTypes, startDate, endDate, cursor, limit, search, sortField, sortDirection, requestUserId, apiKeyId);
 
         EventFilterCriteria filterCriteria = EventFilterCriteria.builder()
                 .userIds(userIds)
@@ -84,11 +89,17 @@ public class EventController {
                 .cursor(cursor)
                 .limit(limit)
                 .build();
+        
+        SortCriteria sortCriteria = SortCriteria.builder()
+                .field(sortField)
+                .direction(sortDirection)
+                .build();
 
         var result = eventService.queryEvents(
                 eventMapper.toEventFilterOptions(filterCriteria), 
                 eventMapper.toCursorPaginationCriteria(paginationCriteria), 
-                search);
+                search,
+                eventMapper.toSortInput(sortCriteria));
         return eventMapper.toEventsResponse(result);
     }
 

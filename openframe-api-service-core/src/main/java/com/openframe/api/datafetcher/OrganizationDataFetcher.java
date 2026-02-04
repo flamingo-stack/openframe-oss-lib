@@ -10,6 +10,7 @@ import com.openframe.api.dto.organization.OrganizationFilterInput;
 import com.openframe.api.dto.organization.OrganizationFilterOptions;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.CursorPaginationInput;
+import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLOrganizationMapper;
 import com.openframe.api.service.OrganizationQueryService;
 import com.openframe.data.document.organization.Organization;
@@ -37,13 +38,16 @@ public class OrganizationDataFetcher {
     public CountedGenericConnection<GenericEdge<Organization>> organizations(
             @InputArgument @Valid OrganizationFilterInput filter,
             @InputArgument @Valid CursorPaginationInput pagination,
-            @InputArgument String search) {
+            @InputArgument String search,
+            @InputArgument @Valid SortInput sort) {
 
-        log.debug("Getting organizations with filter: {}, pagination: {}, search: {}", filter, pagination, search);
+        log.debug("Getting organizations with filter: {}, pagination: {}, search: {}, sort: {}", 
+                filter, pagination, search, sort);
 
         OrganizationFilterOptions filterOptions = mapper.toFilterOptions(filter);
         CursorPaginationCriteria paginationCriteria = mapper.toCursorPaginationCriteria(pagination);
-        CountedGenericQueryResult<Organization> result = organizationQueryService.queryOrganizations(filterOptions, paginationCriteria, search);
+        CountedGenericQueryResult<Organization> result = organizationQueryService.queryOrganizations(
+                filterOptions, paginationCriteria, search, sort);
         return mapper.toOrganizationConnection(result);
     }
 

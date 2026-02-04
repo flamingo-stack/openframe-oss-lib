@@ -1,7 +1,7 @@
 extend type Query {
     # Get all integrated tools with optional filtering
     # Returns a simple list since tools are limited in number (configuration data)
-    integratedTools(filter: ToolFilterInput, search: String): ToolList!
+    integratedTools(filter: ToolFilterInput, search: String, sort: SortInput): ToolList!
     
     # Get available tool filters
     toolFilters: ToolFilters!

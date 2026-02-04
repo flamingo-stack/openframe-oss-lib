@@ -10,6 +10,7 @@ import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.event.*;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.CursorPaginationInput;
+import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLEventMapper;
 import com.openframe.api.service.EventService;
 import com.openframe.data.document.event.Event;
@@ -35,15 +36,16 @@ public class EventDataFetcher {
     public GenericConnection<GenericEdge<Event>> events(
             @InputArgument @Valid EventFilterInput filter,
             @InputArgument @Valid CursorPaginationInput pagination,
-            @InputArgument String search) {
+            @InputArgument String search,
+            @InputArgument @Valid SortInput sort) {
 
-        log.debug("Getting events with filter: {}, pagination: {}, search: {}",
-                filter, pagination, search);
+        log.debug("Getting events with filter: {}, pagination: {}, search: {}, sort: {}",
+                filter, pagination, search, sort);
 
         EventFilterOptions filterOptions = eventMapper.toEventFilterOptions(filter);
         CursorPaginationCriteria paginationCriteria = eventMapper.toCursorPaginationCriteria(pagination);
 
-        GenericQueryResult<Event> result = eventService.queryEvents(filterOptions, paginationCriteria, search);
+        GenericQueryResult<Event> result = eventService.queryEvents(filterOptions, paginationCriteria, search, sort);
         GenericConnection<GenericEdge<Event>> connection = eventMapper.toEventConnection(result);
 
         log.debug("Successfully fetched {} events with cursor-based pagination",

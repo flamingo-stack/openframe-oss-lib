@@ -7,6 +7,7 @@ import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.device.*;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.CursorPaginationInput;
+import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.api.service.DeviceFilterService;
 import com.openframe.api.service.DeviceService;
@@ -47,12 +48,14 @@ public class DeviceDataFetcher {
     public CountedGenericConnection<GenericEdge<Machine>> devices(
             @InputArgument @Valid DeviceFilterInput filter,
             @InputArgument @Valid CursorPaginationInput pagination,
-            @InputArgument String search) {
+            @InputArgument String search,
+            @InputArgument @Valid SortInput sort) {
 
-        log.debug("Fetching devices with filter: {}, pagination: {}, search: {}", filter, pagination, search);
+        log.debug("Fetching devices with filter: {}, pagination: {}, search: {}, sort: {}", 
+            filter, pagination, search, sort);
         DeviceFilterOptions filterOptions = mapper.toDeviceFilterOptions(filter);
         CursorPaginationCriteria paginationCriteria = mapper.toCursorPaginationCriteria(pagination);
-        CountedGenericQueryResult<Machine> result = deviceService.queryDevices(filterOptions, paginationCriteria, search);
+        CountedGenericQueryResult<Machine> result = deviceService.queryDevices(filterOptions, paginationCriteria, search, sort);
         return mapper.toDeviceConnection(result);
     }
 

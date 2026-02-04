@@ -5,6 +5,7 @@ import com.openframe.core.dto.ErrorResponse;
 import com.openframe.external.dto.tool.ToolFilterCriteria;
 import com.openframe.external.dto.tool.ToolFilterResponse;
 import com.openframe.external.dto.tool.ToolsResponse;
+import com.openframe.external.dto.shared.SortCriteria;
 import com.openframe.external.mapper.ToolMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -52,19 +53,29 @@ public class ToolController {
             @RequestParam(required = false) String search,
             @Parameter(description = "Filter by category")
             @RequestParam(required = false) String category,
+            @Parameter(description = "Sort field")
+            @RequestParam(required = false) String sortField,
+            @Parameter(description = "Sort direction (ASC or DESC)")
+            @RequestParam(defaultValue = "ASC") String sortDirection,
             @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
             @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
 
-        log.info("Getting tools - enabled: {}, type: {}, search: {}, category: {} - userId: {}, apiKeyId: {}", 
-                enabled, type, search, category, userId, apiKeyId);
+        log.info("Getting tools - enabled: {}, type: {}, search: {}, category: {}, sortField: {}, sortDirection: {} - userId: {}, apiKeyId: {}", 
+                enabled, type, search, category, sortField, sortDirection, userId, apiKeyId);
 
         ToolFilterCriteria filterCriteria = ToolFilterCriteria.builder()
                 .enabled(enabled)
                 .type(type)
                 .category(category)
                 .build();
+        
+        SortCriteria sortCriteria = SortCriteria.builder()
+                .field(sortField)
+                .direction(sortDirection)
+                .build();
 
-        var result = toolService.queryTools(toolMapper.toToolFilterOptions(filterCriteria), search);
+        var result = toolService.queryTools(toolMapper.toToolFilterOptions(filterCriteria), search, 
+                                           toolMapper.toSortInput(sortCriteria));
         return toolMapper.toToolsResponse(result);
     }
 
