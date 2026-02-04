@@ -101,6 +101,20 @@ export interface UseRealtimeChunkProcessorOptions {
    * Map of existing approval statuses
    */
   approvalStatuses?: Record<string, ChatApprovalStatus>
+  /**
+   * Initialize accumulator with existing state from incomplete historical message
+   * Used to continue building messages across page refreshes or reconnections
+   */
+  initialState?: {
+    /** Existing segments to continue building upon */
+    existingSegments?: MessageSegment[]
+    /** Pending approvals that haven't been resolved */
+    pendingApprovals?: Map<string, { command: string; explanation?: string; approvalType: string }>
+    /** Executing tools waiting for completion */
+    executingTools?: Map<string, { integratedToolType: string; toolFunction: string; parameters?: Record<string, any> }>
+    /** Escalated approvals */
+    escalatedApprovals?: Map<string, { command: string; explanation?: string; approvalType: string }>
+  }
 }
 
 export interface UseRealtimeChunkProcessorReturn {

@@ -5,7 +5,7 @@
  * Provides a consistent interface for handling streaming messages
  */
 
-import { useCallback, useRef } from 'react'
+import { useCallback, useRef, useEffect } from 'react'
 import { parseChunkToAction } from '../utils/chunk-parser'
 import {
   MessageSegmentAccumulator,
@@ -19,7 +19,7 @@ import type { UseRealtimeChunkProcessorReturn, UseRealtimeChunkProcessorOptions,
 export function useRealtimeChunkProcessor(
   options: UseRealtimeChunkProcessorOptions
 ): UseRealtimeChunkProcessorReturn {
-  const { callbacks, displayApprovalTypes = ['CLIENT'], approvalStatuses = {} } = options
+  const { callbacks, displayApprovalTypes = ['CLIENT'], approvalStatuses = {}, initialState } = options
 
   const accumulatorRef = useRef<MessageSegmentAccumulator>(
     createMessageSegmentAccumulator({
@@ -27,6 +27,25 @@ export function useRealtimeChunkProcessor(
       onReject: callbacks.onReject,
     })
   )
+
+  const hasInitializedWithData = useRef(false)
+
+  // Initialize accumulator when we get initial state data
+  useEffect(() => {
+    if (initialState && !hasInitializedWithData.current) {
+      accumulatorRef.current.initializeWithState(initialState)
+
+      if (initialState.escalatedApprovals) {
+        pendingEscalatedRef.current = new Map(initialState.escalatedApprovals)
+
+        initialState.escalatedApprovals.forEach((data, requestId) => {
+          callbacks.onEscalatedApproval?.(requestId, data)
+        })
+      }
+
+      hasInitializedWithData.current = true
+    }
+  }, [initialState, callbacks])
 
   // Track pending escalated approvals
   const pendingEscalatedRef = useRef<Map<string, { command: string; explanation?: string; approvalType: string }>>(
@@ -129,7 +148,7 @@ export function useRealtimeChunkProcessor(
           break
       }
     },
-    [callbacks, displayApprovalTypes, approvalStatuses]
+    [callbacks, displayApprovalTypes, approvalStatuses, initialState]
   )
 
   const getSegments = useCallback(() => {
@@ -139,6 +158,7 @@ export function useRealtimeChunkProcessor(
   const reset = useCallback(() => {
     accumulatorRef.current.reset()
     pendingEscalatedRef.current.clear()
+    hasInitializedWithData.current = false
   }, [])
 
   const updateApprovalStatus = useCallback(
