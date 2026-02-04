@@ -37,8 +37,8 @@ import static java.time.Instant.now;
 @Validated
 @RequiredArgsConstructor
 public class DeviceService {
-    
-    private static final String ID_FIELD = "_id";
+
+    private static final String MACHINE_ID_FIELD = "machineId";
     
     private final MachineRepository machineRepository;
     private final TagRepository tagRepository;
@@ -106,9 +106,9 @@ public class DeviceService {
         if (filter != null && filter.getTagNames() != null && !filter.getTagNames().isEmpty()) {
             List<String> machineIds = resolveTagNamesToMachineIds(filter.getTagNames());
             if (!machineIds.isEmpty()) {
-                query.addCriteria(Criteria.where(ID_FIELD).in(machineIds));
+                query.addCriteria(Criteria.where(MACHINE_ID_FIELD).in(machineIds));
             } else {
-                query.addCriteria(Criteria.where(ID_FIELD).exists(false));
+                query.addCriteria(Criteria.where(MACHINE_ID_FIELD).exists(false));
             }
         }
         return query;
