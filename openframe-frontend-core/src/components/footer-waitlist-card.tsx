@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useCallback } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
-import { JoinWaitlistButton } from './join-waitlist-button';
+import { usePathname, useRouter } from 'next/navigation';
+import { useCallback } from 'react';
+import { OpenFrameLogo } from './openframe-logo';
+import { Button } from './ui/button';
 
 export function FooterWaitlistCard() {
   const router = useRouter();
@@ -31,7 +32,13 @@ export function FooterWaitlistCard() {
       <p className="text-sm text-left">
         Reduce costs and increase revenue with OpenFrame innovative open source solutions. Coming soon…
       </p>
-      <JoinWaitlistButton onClick={handleClick} className="w-full" lowerPathColor="#FFC008" upperPathColor="#ffffff" buttonBackgroundColor="#1A1A1A" buttonTextColor="#FAFAFA" />
+      <Button 
+        onClick={handleClick} 
+        className="w-full" 
+        leftIcon={<OpenFrameLogo lowerPathColor="#FFC008" upperPathColor="#ffffff" />}
+      >
+        Join Waitlist
+      </Button>
     </div>
   );
 } 

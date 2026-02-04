@@ -1,8 +1,9 @@
 'use client';
 
-import { useRouter, usePathname } from 'next/navigation';
-import { JoinWaitlistButton } from './join-waitlist-button';
-import React, { useCallback } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useCallback } from 'react';
+import { OpenFrameLogo } from './icons';
+import { Button } from './ui/button';
 
 export interface FooterWaitlistButtonProps {
   className?: string;
@@ -33,6 +34,12 @@ export function FooterWaitlistButton({ className }: FooterWaitlistButtonProps) {
   }, [pathname, router]);
 
   return (
-    <JoinWaitlistButton onClick={handleClick} className={className} />
+    <Button 
+      onClick={handleClick} 
+      className={className}
+      leftIcon={<OpenFrameLogo />}
+    >
+      Join Waitlist
+    </Button>
   );
 } 
