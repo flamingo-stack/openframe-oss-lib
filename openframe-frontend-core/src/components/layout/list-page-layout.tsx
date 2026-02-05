@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useState } from 'react'
-import { Filter02Icon } from '../icons-v2-generated'
-import { Button, PageError, SearchBar } from '../ui'
+import React, { useEffect, useState } from 'react'
+import { useDebounce } from '../../hooks/ui/use-debounce'
+import { Filter02Icon, SearchIcon } from '../icons-v2-generated'
+import { Button, Input, PageError } from '../ui'
 import { MobileFilterModal, type FilterGroup, type SortConfig, type SortDirection } from '../ui/mobile-filter-sheet'
 import type { TableFilters } from '../ui/table/types'
 import { ListPageContainer, type PageActionButton } from './page-container'
@@ -104,6 +105,20 @@ export function ListPageLayout({
   mobileFilterTitle
 }: ListPageLayoutProps) {
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false)
+  const [localSearchValue, setLocalSearchValue] = useState(searchValue)
+  const debouncedSearchValue = useDebounce(localSearchValue, 500)
+
+  // Sync local value when controlled value changes externally
+  useEffect(() => {
+    setLocalSearchValue(searchValue)
+  }, [searchValue])
+
+  // Call onSearch when debounced value changes
+  useEffect(() => {
+    if (debouncedSearchValue !== searchValue) {
+      onSearch(debouncedSearchValue)
+    }
+  }, [debouncedSearchValue, onSearch, searchValue])
 
   // Check if mobile filter is enabled (has filter groups or sort config)
   const hasMobileFilter = (mobileFilterGroups && mobileFilterGroups.length > 0) ||
@@ -124,11 +139,12 @@ export function ListPageLayout({
     >
       {/* Search Bar with Mobile Filter Button */}
       <div className="flex gap-4 items-center w-full">
-        <SearchBar
+        <Input
           placeholder={searchPlaceholder}
-          onSubmit={onSearch}
-          value={searchValue}
+          onChange={(e) => setLocalSearchValue(e.target.value)}
+          value={localSearchValue}
           className="flex-1"
+          startAdornment={<SearchIcon className="w-4 h-4 sm:w-6 sm:h-6" />}
         />
 
         {/* Mobile Filter Button - only visible on mobile when filter is enabled */}
