@@ -7,17 +7,21 @@ import java.util.Map;
 
 public class AuthHelper {
 
-    private static Map<String, String> cookies;
+    private static final ThreadLocal<Map<String, String>> cookies = new ThreadLocal<>();
 
     public static Map<String, String> getCookies() {
-        if (cookies == null) {
-            cookies = AuthFlow.login(UserConfig.getUser());
+        if (cookies.get() == null) {
+            cookies.set(AuthFlow.login(UserConfig.getUser()));
         }
-        return cookies;
+        return cookies.get();
     }
 
     public static void setCookies(Map<String, String> newCookies) {
-        cookies = newCookies;
+        cookies.set(newCookies);
+    }
+
+    public static void clearCookies() {
+        cookies.remove();
     }
 
 }

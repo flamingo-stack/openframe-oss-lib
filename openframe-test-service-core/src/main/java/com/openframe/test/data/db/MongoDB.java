@@ -18,15 +18,14 @@ import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
 
 public class MongoDB {
 
-    private static ThreadLocal<MongoClient> mongoClient;
-    private static ThreadLocal<MongoDatabase> database;
+    private static final ThreadLocal<MongoClient> mongoClient = new ThreadLocal<>();
+    private static final ThreadLocal<MongoDatabase> database = new ThreadLocal<>();
 
     public static MongoDatabase getDatabase() {
         openConnection();
-        if (database == null) {
+        if (database.get() == null) {
             CodecProvider pojoCodecProvider = PojoCodecProvider.builder().automatic(true).build();
             CodecRegistry pojoCodecRegistry = fromRegistries(getDefaultCodecRegistry(), fromProviders(pojoCodecProvider));
-            database = new ThreadLocal<>();
             database.set(mongoClient.get().getDatabase(getDatabaseName()).withCodecRegistry(pojoCodecRegistry));
         }
         return database.get();
@@ -37,9 +36,7 @@ public class MongoDB {
     }
 
     public static void openConnection() {
-        if (mongoClient == null) {
-            mongoClient = new ThreadLocal<>();
-
+        if (mongoClient.get() == null) {
             MongoCredential credential = MongoCredential.createCredential(
                     getMongoUser(),
                     getAuthDatabase(),
@@ -56,11 +53,11 @@ public class MongoDB {
     }
 
     public static void closeConnection() {
-        if (mongoClient != null && mongoClient.get() != null) {
+        if (mongoClient.get() != null) {
             mongoClient.get().close();
+            mongoClient.remove();
         }
-        mongoClient = null;
-        database = null;
+        database.remove();
     }
 
 }

@@ -8,7 +8,7 @@ public class UserConfig {
 
     public static final String DEFAULT_EMAIL = "auto@flamingo.cx";
     public static final String DEFAULT_PASSWORD = "Password123!";
-    public static final String NEW_PASSWORD = "Password123!";
+    public static final String NEW_PASSWORD = "Password124!";
     private static final String DEFAULT_DOMAIN = "localhost";
 
     private static String email;
