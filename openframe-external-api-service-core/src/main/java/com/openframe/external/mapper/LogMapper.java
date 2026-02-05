@@ -11,6 +11,9 @@ import com.openframe.external.dto.audit.LogFilterResponse;
 import com.openframe.external.dto.audit.LogDetailsResponse;
 import com.openframe.external.dto.audit.LogFilterCriteria;
 import com.openframe.external.dto.audit.OrganizationFilterResponse;
+import com.openframe.external.dto.shared.SortCriteria;
+import com.openframe.api.dto.shared.SortInput;
+import com.openframe.api.dto.shared.SortDirection;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -112,5 +115,18 @@ public class LogMapper extends BaseRestMapper {
                 .content(logDetails.getDetails())
                 .timestamp(logDetails.getTimestamp())
                 .build();
+    }
+    
+    public SortInput toSortInput(SortCriteria criteria) {
+        if (criteria == null) {
+            return null;
+        }
+        
+        SortInput sortInput = new SortInput();
+        sortInput.setField(criteria.getField());
+        sortInput.setDirection(SortDirection.ASC.name().equalsIgnoreCase(criteria.getDirection()) ? 
+            SortDirection.ASC : SortDirection.DESC);
+        
+        return sortInput;
     }
 }

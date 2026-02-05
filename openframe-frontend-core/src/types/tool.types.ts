@@ -13,6 +13,7 @@ export const ToolTypeValues = {
   OPENFRAME: 'OPENFRAME',
   OPENFRAME_CHAT: 'OPENFRAME_CHAT',
   OPENFRAME_CLIENT: 'OPENFRAME_CLIENT',
+  OSQUERY: 'OSQUERY',
   SYSTEM: 'SYSTEM'
 } as const
 
@@ -29,5 +30,6 @@ export const toolLabels: Record<ToolType, string> = {
   OPENFRAME: 'OpenFrame',
   OPENFRAME_CHAT: 'OpenFrame Chat',
   OPENFRAME_CLIENT: 'OpenFrame Client',
+  OSQUERY: 'Osquery',
   SYSTEM: 'System'
 }

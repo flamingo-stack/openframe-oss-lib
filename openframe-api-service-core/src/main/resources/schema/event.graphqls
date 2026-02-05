@@ -1,5 +1,5 @@
 extend type Query {
-    events(filter: EventFilterInput, pagination: CursorPaginationInput, search: String): EventConnection!
+    events(filter: EventFilterInput, pagination: CursorPaginationInput, search: String, sort: SortInput): EventConnection!
     eventById(id: ID!): Event
     eventFilters(filter: EventFilterInput): EventFilters!
 }

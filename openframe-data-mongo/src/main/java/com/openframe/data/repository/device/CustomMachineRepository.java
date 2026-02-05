@@ -9,5 +9,9 @@ import java.util.List;
 public interface CustomMachineRepository {
     Query buildDeviceQuery(MachineQueryFilter filter, String search);
 
-    List<Machine> findMachinesWithCursor(Query query, String cursor, int limit);
+    List<Machine> findMachinesWithCursor(Query query, String cursor, int limit, String sortField, String sortDirection);
+    
+    boolean isSortableField(String field);
+    
+    String getDefaultSortField();
 }

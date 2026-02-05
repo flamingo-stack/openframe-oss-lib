@@ -21,14 +21,14 @@ export function OsqueryLogoIcon({
       className={className}
       {...props}
     >
-      <path fill="#A596FF" d="M21.99 2v5.025l-4.995 5.015V7.004z" />
-      <path fill="#000" d="M12 2v5.025l4.995 5.015V7.004z" />
-      <path fill="#A596FF" d="M22 22.07h-5.005L12 17.055h5.016z" />
-      <path fill="#000" d="M22 12.04h-5.005L12 17.055h5.016z" />
-      <path fill="#A596FF" d="M2.01 22.08v-5.025l4.995-5.015v5.036z" />
-      <path fill="#000" d="M12 22.08v-5.025L7.005 12.04v5.036z" />
-      <path fill="#A596FF" d="M2 2.01h5.005L12 7.025H6.985z" />
-      <path fill="#000" d="M2 12.04h5.005L12 7.025H6.985z" />
+      <path fill="#888888" d="M21.99 2v5.025l-4.995 5.015V7.004z" />
+      <path fill="#3A3A3A" d="M12 2v5.025l4.995 5.015V7.004z" />
+      <path fill="#888888" d="M22 22.07h-5.005L12 17.055h5.016z" />
+      <path fill="#3A3A3A" d="M22 12.04h-5.005L12 17.055h5.016z" />
+      <path fill="#888888" d="M2.01 22.08v-5.025l4.995-5.015v5.036z" />
+      <path fill="#3A3A3A" d="M12 22.08v-5.025L7.005 12.04v5.036z" />
+      <path fill="#888888" d="M2 2.01h5.005L12 7.025H6.985z" />
+      <path fill="#3A3A3A" d="M2 12.04h5.005L12 7.025H6.985z" />
     </svg>
   );
 }

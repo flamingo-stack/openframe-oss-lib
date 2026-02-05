@@ -47,6 +47,35 @@ export class MessageSegmentAccumulator {
   }
 
   /**
+   * Initialize accumulator with existing state from an incomplete historical message
+   * Used to continue building messages across page refreshes or reconnections
+   */
+  initializeWithState(state: {
+    existingSegments?: MessageSegment[]
+    pendingApprovals?: Map<string, PendingApproval>
+    executingTools?: Map<string, { integratedToolType: string; toolFunction: string; parameters?: Record<string, any> }>
+  }): void {
+    if (state.existingSegments) {
+      this.segments = [...state.existingSegments]
+      
+      const lastSegment = this.segments[this.segments.length - 1]
+      if (lastSegment && lastSegment.type === 'text') {
+        this.currentTextBuffer = lastSegment.text
+      } else {
+        this.currentTextBuffer = ''
+      }
+    }
+
+    if (state.pendingApprovals) {
+      this.pendingApprovals = new Map(state.pendingApprovals)
+    }
+
+    if (state.executingTools) {
+      this.executingTools = new Map(state.executingTools)
+    }
+  }
+
+  /**
    * Get current segments
    */
   getSegments(): MessageSegment[] {

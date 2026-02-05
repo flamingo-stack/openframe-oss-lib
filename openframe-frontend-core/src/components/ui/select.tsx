@@ -1,8 +1,8 @@
 "use client"
 
-import * as React from "react"
 import * as SelectPrimitive from "@radix-ui/react-select"
 import { Check, ChevronDown, ChevronUp } from "lucide-react"
+import * as React from "react"
 
 import { cn } from "../../utils/cn"
 
@@ -129,7 +129,7 @@ const SelectItem = React.forwardRef<
     className={cn(
       "relative flex w-full cursor-pointer select-none items-center py-3 pl-8 pr-4",
       // Match trigger typography
-      "text-[14px] md:text-[18px] font-medium",
+      "text-[14px] md:text-[18px] font-medium whitespace-nowrap",
       // Hover state with visible background change
       "outline-none hover:bg-ods-accent/10 focus:bg-ods-accent/10",
       "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
@@ -162,14 +162,5 @@ const SelectSeparator = React.forwardRef<
 SelectSeparator.displayName = SelectPrimitive.Separator.displayName
 
 export {
-  Select,
-  SelectGroup,
-  SelectValue,
-  SelectTrigger,
-  SelectContent,
-  SelectLabel,
-  SelectItem,
-  SelectSeparator,
-  SelectScrollUpButton,
-  SelectScrollDownButton,
+  Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectScrollDownButton, SelectScrollUpButton, SelectSeparator, SelectTrigger, SelectValue
 }

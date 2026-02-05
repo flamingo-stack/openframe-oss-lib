@@ -7,6 +7,7 @@ import com.openframe.api.dto.tool.ToolFilterInput;
 import com.openframe.api.dto.tool.ToolFilterOptions;
 import com.openframe.api.dto.tool.ToolFilters;
 import com.openframe.api.dto.tool.ToolList;
+import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLToolMapper;
 import com.openframe.api.service.ToolService;
 import jakarta.validation.Valid;
@@ -26,12 +27,13 @@ public class ToolsDataFetcher {
     @DgsQuery
     public ToolList integratedTools(
             @InputArgument @Valid ToolFilterInput filter,
-            @InputArgument String search) {
+            @InputArgument String search,
+            @InputArgument @Valid SortInput sort) {
 
-        log.debug("Getting integrated tools with filter: {}, search: {}", filter, search);
+        log.debug("Getting integrated tools with filter: {}, search: {}, sort: {}", filter, search, sort);
 
         ToolFilterOptions filterOptions = toolMapper.toToolFilterOptions(filter);
-        return toolService.queryTools(filterOptions, search);
+        return toolService.queryTools(filterOptions, search, sort);
     }
 
     @DgsQuery

@@ -9,9 +9,13 @@ import java.util.List;
 public interface CustomEventRepository {
     Query buildEventQuery(EventQueryFilter filter, String search);
 
-    List<Event> findEventsWithCursor(Query query, String cursor, int limit);
+    List<Event> findEventsWithCursor(Query query, String cursor, int limit, String sortField, String sortDirection);
 
     List<String> findDistinctUserIds();
 
     List<String> findDistinctEventTypes();
+    
+    boolean isSortableField(String field);
+    
+    String getDefaultSortField();
 }

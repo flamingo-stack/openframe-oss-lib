@@ -38,6 +38,7 @@ public class PinotQueryBuilder {
     private static final String SQL_AS = " as ";
     private static final String SQL_DESC = " DESC";
     private static final String SQL_ASC = " ASC";
+    private static final String SORT_DESC = "DESC";
     
     private static final String TEXT_MATCH_FUNCTION = "TEXT_MATCH";
     private static final String EVENT_TIMESTAMP_FIELD = "eventTimestamp";
@@ -230,6 +231,15 @@ public class PinotQueryBuilder {
     public PinotQueryBuilder orderByCountDesc() {
         orderByColumns.add(SQL_COUNT_ALIAS + SQL_DESC);
         return this;
+    }
+    
+    public PinotQueryBuilder orderBySortInput(String sortField, String sortDirection, String primaryKeyField) {
+        String direction = SORT_DESC.equalsIgnoreCase(sortDirection) ? SQL_DESC : SQL_ASC;
+        if (sortField.equals(primaryKeyField)) {
+            return orderBy(sortField + direction);
+        } else {
+            return orderBy(sortField + direction, primaryKeyField + direction);
+        }
     }
     
     public PinotQueryBuilder limit(int limit) {

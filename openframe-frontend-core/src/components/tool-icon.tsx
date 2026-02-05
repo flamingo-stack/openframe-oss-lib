@@ -6,6 +6,7 @@ import { AuthentikLogoIcon } from './icons-v2-generated/brand-logos/authentik-lo
 import { FleetMdmLogoIcon } from './icons-v2-generated/brand-logos/fleet-mdm-logo-icon'
 import { MeshcentralLogoIcon } from './icons-v2-generated/brand-logos/meshcentral-logo-icon'
 import { TacticalRmmLogoIcon } from './icons-v2-generated/brand-logos/tactical-rmm-logo-icon'
+import { OsqueryLogoIcon } from './icons-v2-generated'
 
 type ToolIconConfig = {
   render: (size: number) => React.ReactNode
@@ -32,6 +33,9 @@ const toolIconMap: Record<ToolType, ToolIconConfig> = {
   },
   [ToolTypeValues.AUTHENTIK]: {
     render: (size) => <AuthentikLogoIcon size={size} />
+  },
+  [ToolTypeValues.OSQUERY]: {
+    render: (size) => <OsqueryLogoIcon size={size} />
   },
   [ToolTypeValues.SYSTEM]: null
 } as const

@@ -15,6 +15,7 @@ import com.openframe.external.dto.device.DeviceResponse;
 import com.openframe.external.dto.device.DevicesResponse;
 import com.openframe.external.dto.device.UpdateDeviceStatusRequest;
 import com.openframe.external.dto.shared.PaginationCriteria;
+import com.openframe.external.dto.shared.SortCriteria;
 import com.openframe.external.mapper.DeviceMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -90,12 +91,18 @@ public class DeviceController {
 
             @Parameter(description = "Cursor for pagination (optional)")
             @RequestParam(required = false) String cursor,
+            
+            @Parameter(description = "Field to sort by (e.g., hostname, displayName, status, lastSeen)")
+            @RequestParam(required = false) String sortField,
+            
+            @Parameter(description = "Sort direction (ASC or DESC), default: DESC")
+            @RequestParam(required = false, defaultValue = "DESC") String sortDirection,
 
             @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
             @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
 
-        log.info("Getting devices - userId: {}, apiKeyId: {}, limit: {}, cursor: {}, search: {}, includeTags: {}",
-                userId, apiKeyId, limit, cursor, search, includeTags);
+        log.info("Getting devices - userId: {}, apiKeyId: {}, limit: {}, cursor: {}, search: {}, includeTags: {}, sortField: {}, sortDirection: {}",
+                userId, apiKeyId, limit, cursor, search, includeTags, sortField, sortDirection);
 
         DeviceFilterCriteria filterCriteria = DeviceFilterCriteria.builder()
                 .statuses(statuses)
@@ -109,11 +116,17 @@ public class DeviceController {
                 .limit(limit)
                 .cursor(cursor)
                 .build();
+        
+        SortCriteria sortCriteria = SortCriteria.builder()
+                .field(sortField)
+                .direction(sortDirection)
+                .build();
 
         var result = deviceService.queryDevices(
                 deviceMapper.toDeviceFilterOptions(filterCriteria), 
                 deviceMapper.toCursorPaginationCriteria(paginationCriteria), 
-                search);
+                search,
+                deviceMapper.toSortInput(sortCriteria));
 
         if (includeTags) {
             List<String> machineIds = result.getItems().stream()

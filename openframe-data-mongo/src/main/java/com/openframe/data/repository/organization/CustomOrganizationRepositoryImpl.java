@@ -24,15 +24,22 @@ import java.util.List;
 @Slf4j
 public class CustomOrganizationRepositoryImpl implements CustomOrganizationRepository {
 
+    private static final String SORT_DESC = "DESC";
+    private static final String ID_FIELD = "_id";
+    
+    private static final List<String> SORTABLE_FIELDS = List.of(
+            "_id",
+            "name",
+            "organizationId",
+            "createdAt",
+            "updatedAt"
+    );
+    private static final String DEFAULT_SORT_FIELD = "_id";
+
     private final MongoTemplate mongoTemplate;
 
     @Override
     public Query buildOrganizationQuery(OrganizationQueryFilter filter, String search) {
-        return buildOrganizationQuery(filter, search, null);
-    }
-    
-    @Override
-    public Query buildOrganizationQuery(OrganizationQueryFilter filter, String search, String cursor) {
         Query query = new Query();
         
         // Collect all criteria to combine them with $and
@@ -85,16 +92,6 @@ public class CustomOrganizationRepositoryImpl implements CustomOrganizationRepos
                     Criteria.where("category").regex(search, "i")
             ));
         }
-        
-        // Cursor filter for pagination
-        if (cursor != null && !cursor.trim().isEmpty()) {
-            try {
-                ObjectId cursorId = new ObjectId(cursor);
-                criteriaList.add(Criteria.where("_id").lt(cursorId));
-            } catch (IllegalArgumentException ex) {
-                log.warn("Invalid ObjectId cursor format: {}", cursor);
-            }
-        }
 
         // Combine all criteria with $and in a single addCriteria call
         if (!criteriaList.isEmpty()) {
@@ -115,14 +112,42 @@ public class CustomOrganizationRepositoryImpl implements CustomOrganizationRepos
     }
 
     @Override
-    public List<Organization> findOrganizationsWithCursor(Query query, String cursor, int limit) {
-        // Note: The cursor is already included in the query via buildOrganizationQuery(filter, search, cursor)
-        // This method just adds limit and sorting
+    public List<Organization> findOrganizationsWithCursor(Query query, String cursor, int limit, 
+                                                          String sortField, String sortDirection) {
+        if (cursor != null && !cursor.trim().isEmpty()) {
+            try {
+                ObjectId cursorId = new ObjectId(cursor);
+                query.addCriteria(Criteria.where(ID_FIELD).lt(cursorId));
+            } catch (IllegalArgumentException ex) {
+                log.warn("Invalid ObjectId cursor format: {}", cursor);
+            }
+        }
         
         query.limit(limit);
-        query.with(Sort.by(Sort.Direction.DESC, "_id"));
+        
+        Sort.Direction mongoSortDirection = SORT_DESC.equalsIgnoreCase(sortDirection) ? 
+            Sort.Direction.DESC : Sort.Direction.ASC;
+            
+        if (ID_FIELD.equals(sortField)) {
+            query.with(Sort.by(mongoSortDirection, ID_FIELD));
+        } else {
+            query.with(Sort.by(
+                Sort.Order.by(sortField).with(mongoSortDirection),
+                Sort.Order.by(ID_FIELD).with(mongoSortDirection)
+            ));
+        }
 
         log.debug("Executing MongoDB query with cursor pagination: {}", query);
         return mongoTemplate.find(query, Organization.class);
+    }
+    
+    @Override
+    public boolean isSortableField(String field) {
+        return field != null && SORTABLE_FIELDS.contains(field.trim());
+    }
+    
+    @Override
+    public String getDefaultSortField() {
+        return DEFAULT_SORT_FIELD;
     }
 }

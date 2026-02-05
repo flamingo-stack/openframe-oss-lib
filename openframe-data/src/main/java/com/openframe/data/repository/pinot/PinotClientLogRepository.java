@@ -25,6 +25,19 @@ import java.util.stream.IntStream;
 @Repository
 public class PinotClientLogRepository implements PinotLogRepository {
 
+    private static final List<String> SORTABLE_COLUMNS = List.of(
+            "eventTimestamp",
+            "severity",
+            "eventType",
+            "toolType",
+            "organizationId",
+            "deviceId",
+            "ingestDay"
+    );
+
+    private static final String DEFAULT_SORT_COLUMN = "eventTimestamp";
+    private static final String PRIMARY_KEY_FIELD = "toolEventId";
+
     private final Connection pinotConnection;
 
     @Value("${pinot.tables.logs.name:logs}")
@@ -36,7 +49,8 @@ public class PinotClientLogRepository implements PinotLogRepository {
 
     @Override
     public List<LogProjection> findLogs(LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes,
-                                        List<String> severities, List<String> organizationIds, String deviceId, String cursor, int limit) {
+                                        List<String> severities, List<String> organizationIds, String deviceId, String cursor, int limit,
+                                        String sortField, String sortDirection) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable)
             .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "organizationId", "organizationName", "summary", "eventTimestamp")
             .whereDateRange("eventTimestamp", startDate, endDate)
@@ -46,7 +60,7 @@ public class PinotClientLogRepository implements PinotLogRepository {
             .whereIn("organizationId", organizationIds)
             .whereEquals("deviceId", deviceId)
             .whereCursor(cursor)
-            .orderByTimestampDesc()
+            .orderBySortInput(sortField, sortDirection, PRIMARY_KEY_FIELD)
             .limit(limit);
 
         return executeLogQuery(queryBuilder.build());
@@ -54,7 +68,8 @@ public class PinotClientLogRepository implements PinotLogRepository {
 
     @Override
     public List<LogProjection> searchLogs(LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes, 
-                                    List<String> severities, List<String> organizationIds, String deviceId, String searchTerm, String cursor, int limit) {
+                                    List<String> severities, List<String> organizationIds, String deviceId, String searchTerm, String cursor, int limit,
+                                    String sortField, String sortDirection) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable)
             .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "organizationId", "organizationName", "summary", "eventTimestamp")
             .whereDateRange("eventTimestamp", startDate, endDate)
@@ -65,7 +80,7 @@ public class PinotClientLogRepository implements PinotLogRepository {
             .whereEquals("deviceId", deviceId)
             .whereRelevanceLogSearch(searchTerm)
             .whereCursor(cursor)
-            .orderByTimestampDesc()
+            .orderBySortInput(sortField, sortDirection, PRIMARY_KEY_FIELD)
             .limit(limit);
 
         return executeLogQuery(queryBuilder.build());
@@ -140,6 +155,19 @@ public class PinotClientLogRepository implements PinotLogRepository {
             .orderBy("organizationName");
 
         return queryPinotForOrganizationOptions(queryBuilder.build());
+    }
+
+    @Override
+    public boolean isSortableField(String field) {
+        if (field == null || field.trim().isEmpty()) {
+            return false;
+        }
+        return SORTABLE_COLUMNS.contains(field.trim());
+    }
+
+    @Override
+    public String getDefaultSortField() {
+        return DEFAULT_SORT_COLUMN;
     }
 
     private List<OrganizationOption> queryPinotForOrganizationOptions(String query) {
