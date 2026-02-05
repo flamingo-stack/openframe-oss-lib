@@ -1,11 +1,11 @@
 "use client";
 
+import { usePathname, useRouter } from 'next/navigation';
 import React, { useCallback } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
-import { OpenFrameLogo } from './openframe-logo';
-import { ResponsiveIconsBlock } from './ui/responsive-icons-block-stub';
-import { JoinWaitlistButton } from './join-waitlist-button';
 import { cn } from "../utils/cn";
+import { OpenFrameLogo } from './openframe-logo';
+import { Button } from './ui/button';
+import { ResponsiveIconsBlock } from './ui/responsive-icons-block-stub';
 
 interface JoinWaitlistCTAProps {
   showBottomText?: boolean;
@@ -78,13 +78,14 @@ const JoinWaitlistCTA: React.FC<JoinWaitlistCTAProps> = ({ showBottomText = true
             </p>
           </div>
 
-          <JoinWaitlistButton
+          <Button
             onClick={handler}
             loading={isLoading}
             className="px-4 py-3 text-lg"
+            leftIcon={<OpenFrameLogo />}
           >
             Get Early Access
-          </JoinWaitlistButton>
+          </Button>
         </div>
 
           {/* Bottom Section: Icon Grid */}

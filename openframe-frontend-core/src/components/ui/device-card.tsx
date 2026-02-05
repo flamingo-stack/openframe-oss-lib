@@ -1,5 +1,5 @@
+import { ExternalLink, Monitor, MoreHorizontal } from 'lucide-react'
 import React from 'react'
-import { MoreHorizontal, Monitor, ExternalLink } from 'lucide-react'
 import { cn } from '../../utils/cn'
 import type { OSPlatformId } from '../../utils/os-platforms'
 import { OSTypeBadge } from '../features/os-type-badge'
@@ -76,7 +76,7 @@ export function DeviceCard({
     <InteractiveCard
       onClick={onDeviceClick ? () => onDeviceClick(device) : undefined}
       className={cn(
-        "bg-ods-card relative rounded-[6px] size-full border border-ods-border",
+        "bg-ods-card relative rounded-sm size-full border border-ods-border",
         className
       )}
       {...props}
@@ -88,7 +88,7 @@ export function DeviceCard({
         </div>
       )}
 
-      <div className="content-stretch flex flex-col items-start justify-start overflow-clip relative size-full">
+      <div className="content-stretch flex flex-col items-start justify-start overflow-clip relative size-full rounded-sm">
         {/* Row 1: Device icon | Device name (clickable with external link) + More button */}
         <div className="bg-ods-card box-border content-stretch flex gap-4 items-center justify-start px-4 py-3 relative shrink-0 w-full">
           {/* Device type icon */}

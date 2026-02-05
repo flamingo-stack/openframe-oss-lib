@@ -28,7 +28,7 @@ const buttonVariants = cva(
         // Ghost navigation variant - left-aligned for navigation menus
         "ghost-nav": "bg-transparent text-ods-text-primary hover:bg-ods-bg-hover active:bg-ods-bg-active focus-visible:ring-2 focus-visible:ring-ods-focus disabled:text-ods-text-disabled justify-start !w-auto whitespace-nowrap !text-base",
         // Link variant for text-like buttons
-        link: "bg-transparent text-ods-link underline-offset-4 hover:underline hover:text-ods-link-hover focus-visible:ring-2 focus-visible:ring-ods-focus disabled:text-ods-text-disabled",
+        link: "bg-transparent text-ods-link underline-offset-4 hover:underline hover:text-ods-link-hover focus-visible:ring-2 focus-visible:ring-ods-focus disabled:text-ods-text-disabled text-[12px] sm:text-[14px]",
         // Search variant for search containers
         search: "bg-ods-card border border-ods-border text-ods-text-primary hover:bg-ods-bg-hover hover:border-ods-border focus-visible:ring-2 focus-visible:ring-ods-focus disabled:bg-ods-disabled disabled:text-ods-text-disabled",
         // Special variant for submit product buttons (header usage)
@@ -57,6 +57,7 @@ const buttonVariants = cva(
         "table-display": "bg-transparent text-ods-text-primary cursor-default pointer-events-none font-normal",
         // Device action variant - for device detail page action buttons
         "device-action": "bg-ods-card border border-ods-border hover:bg-ods-bg-hover text-ods-text-primary px-4 py-3 rounded-[6px] font-['DM_Sans'] font-bold text-[18px] tracking-[-0.36px] disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-ods-card disabled:text-ods-text-secondary",
+        card: "bg-ods-card border border-ods-border hover:bg-ods-bg-hover text-ods-text-primary px-4 py-3 rounded-[6px] font-['DM_Sans'] font-bold text-[18px] tracking-[-0.36px] disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-ods-card disabled:text-ods-text-secondary",
       },
       size: {
         // Small size for secondary actions
@@ -123,10 +124,15 @@ interface ButtonProps
    * clicking elsewhere on the button navigates normally.
    */
   showExternalLinkOnHover?: boolean
+  /**
+   * Remove horizontal padding from the button.
+   * Useful for transparent/ghost buttons that should align with surrounding content.
+   */
+  noPadding?: boolean
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, href, openInNewTab = false, leftIcon, rightIcon, centerIcon, loading, children, disabled, onClick, fullWidthOnMobile, alignment = 'center', showExternalLinkOnHover, ...props }, ref) => {
+  ({ className, variant, size, asChild = false, href, openInNewTab = false, leftIcon, rightIcon, centerIcon, loading, children, disabled, onClick, fullWidthOnMobile, alignment = 'center', showExternalLinkOnHover, noPadding, ...props }, ref) => {
     const isDisabled = disabled || loading
 
     const isCenterIconOnly = !!centerIcon && !children && !leftIcon && !rightIcon
@@ -149,7 +155,9 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       // Handle explicit fullWidthOnMobile prop override
       fullWidthOnMobile === false && "!w-auto",
       // Apply alignment
-      alignment && `!${alignmentClasses[alignment]}`
+      alignment && `!${alignmentClasses[alignment]}`,
+      // Remove horizontal padding when noPadding is true
+      noPadding && "!px-0"
     )
     
     // Content to render inside the button/link

@@ -5,6 +5,7 @@ extend type Query {
         filter: LogFilterInput
         pagination: CursorPaginationInput
         search: String
+        sort: SortInput
     ): LogConnection!
     
     # Get full audit details from Cassandra when user clicks on a audit

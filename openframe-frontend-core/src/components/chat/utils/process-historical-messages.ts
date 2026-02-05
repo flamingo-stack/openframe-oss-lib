@@ -14,12 +14,20 @@ import {
 import { MessageSegmentAccumulator, createMessageSegmentAccumulator } from './message-segment-accumulator'
 
 /**
+ * Result type for historical message processing
+ */
+export interface ProcessHistoricalMessagesResult {
+  messages: ProcessedMessage[]
+  escalatedApprovals: Map<string, { command: string; explanation?: string; approvalType: string }>
+}
+
+/**
  * Process an array of historical messages into display-ready format
  */
 export function processHistoricalMessages(
   messages: HistoricalMessage[],
   options: MessageProcessingOptions = {}
-): ProcessedMessage[] {
+): ProcessHistoricalMessagesResult {
   const {
     assistantName = 'Fae',
     assistantType = 'fae',
@@ -28,10 +36,12 @@ export function processHistoricalMessages(
     onReject,
     chatTypeFilter,
     approvalStatuses = {},
+    displayApprovalTypes,
   } = options
 
   const processedMessages: ProcessedMessage[] = []
   const accumulator = createMessageSegmentAccumulator({ onApprove, onReject })
+  const escalatedApprovals = new Map<string, { command: string; explanation?: string; approvalType: string }>()
   
   let currentAssistantId: string | null = null
   let currentAssistantTimestamp: Date | null = null
@@ -90,7 +100,7 @@ export function processHistoricalMessages(
       }
 
       messageDataArray.forEach((data) => {
-        processMessageData(data, accumulator, approvalStatuses)
+        processMessageData(data, accumulator, approvalStatuses, { displayApprovalTypes }, escalatedApprovals)
       })
 
       // Check if we should flush (next message is from user or last message)
@@ -121,7 +131,10 @@ export function processHistoricalMessages(
     })
   }
 
-  return processedMessages
+  return {
+    messages: processedMessages,
+    escalatedApprovals: escalatedApprovals
+  }
 }
 
 /**
@@ -130,8 +143,11 @@ export function processHistoricalMessages(
 function processMessageData(
   data: MessageData,
   accumulator: MessageSegmentAccumulator,
-  approvalStatuses: Record<string, string>
+  approvalStatuses: Record<string, string>,
+  options: MessageProcessingOptions = {},
+  escalatedApprovals?: Map<string, { command: string; explanation?: string; approvalType: string }>
 ): void {
+  const { displayApprovalTypes } = options
   switch (data.type) {
     case MESSAGE_TYPE.TEXT:
       if ('text' in data && data.text) {
@@ -171,12 +187,21 @@ function processMessageData(
 
     case MESSAGE_TYPE.APPROVAL_REQUEST:
       if ('approvalRequestId' in data && data.approvalRequestId) {
-        // Track for later when we receive APPROVAL_RESULT
-        accumulator.trackApprovalRequest(data.approvalRequestId, {
-          command: data.command || '',
-          explanation: data.explanation,
-          approvalType: data.approvalType || 'USER',
-        })
+        const approvalType = data.approvalType || 'CLIENT'
+
+        if (!displayApprovalTypes || displayApprovalTypes.includes(approvalType)) {
+          accumulator.trackApprovalRequest(data.approvalRequestId, {
+            command: data.command || '',
+            explanation: data.explanation,
+            approvalType,
+          })
+        } else {
+          escalatedApprovals?.set(data.approvalRequestId, {
+            command: data.command || '',
+            explanation: data.explanation,
+            approvalType,
+          })
+        }
       }
       break
 
@@ -184,6 +209,17 @@ function processMessageData(
       if ('approvalRequestId' in data && data.approvalRequestId) {
         const existingStatus = approvalStatuses[data.approvalRequestId]
         const status = existingStatus || (data.approved ? 'approved' : 'rejected')
+        const escalatedData = escalatedApprovals?.get(data.approvalRequestId)
+
+        if (escalatedData) {
+          accumulator.trackApprovalRequest(data.approvalRequestId, {
+            command: escalatedData.command,
+            explanation: escalatedData.explanation,
+            approvalType: escalatedData.approvalType,
+          })
+          escalatedApprovals?.delete(data.approvalRequestId)
+        }
+        
         accumulator.processApprovalResult(
           data.approvalRequestId,
           status === 'approved',
@@ -248,11 +284,12 @@ export function extractErrorMessages(
 export function processHistoricalMessagesWithErrors(
   messages: HistoricalMessage[],
   options: MessageProcessingOptions = {}
-): ProcessedMessage[] {
-  const { chatTypeFilter, assistantName = 'Fae', assistantType = 'fae', assistantAvatar, onApprove, onReject, approvalStatuses = {} } = options
+): ProcessHistoricalMessagesResult {
+  const { chatTypeFilter, assistantName = 'Fae', assistantType = 'fae', assistantAvatar, onApprove, onReject, approvalStatuses = {}, displayApprovalTypes } = options
 
   const processedMessages: ProcessedMessage[] = []
   const accumulator = createMessageSegmentAccumulator({ onApprove, onReject })
+  const escalatedApprovals = new Map<string, { command: string; explanation?: string; approvalType: string }>()
 
   let currentAssistantId: string | null = null
   let currentAssistantTimestamp: Date | null = null
@@ -319,7 +356,7 @@ export function processHistoricalMessagesWithErrors(
             avatar: assistantAvatar,
           })
         } else {
-          processMessageData(data, accumulator, approvalStatuses)
+          processMessageData(data, accumulator, approvalStatuses, { displayApprovalTypes }, escalatedApprovals)
         }
       })
 
@@ -350,5 +387,8 @@ export function processHistoricalMessagesWithErrors(
     })
   }
 
-  return processedMessages
+  return {
+    messages: processedMessages,
+    escalatedApprovals: escalatedApprovals
+  }
 }

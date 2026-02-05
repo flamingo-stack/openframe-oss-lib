@@ -5,6 +5,8 @@ import com.openframe.api.dto.event.EventFilterOptions;
 import com.openframe.api.dto.event.EventFilters;
 import com.openframe.api.dto.shared.CursorPageInfo;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.dto.shared.SortInput;
+import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.data.document.event.Event;
 import com.openframe.data.document.event.filter.EventQueryFilter;
 import com.openframe.data.repository.event.EventRepository;
@@ -27,15 +29,20 @@ public class EventService {
 
     public GenericQueryResult<Event> queryEvents(EventFilterOptions filterOptions,
                                           CursorPaginationCriteria paginationCriteria,
-                                          String search) {
-        log.debug("Querying events with filter: {}, pagination: {}, search: {}",
-                filterOptions, paginationCriteria, search);
+                                          String search,
+                                          SortInput sort) {
+        log.debug("Querying events with filter: {}, pagination: {}, search: {}, sort: {}",
+                filterOptions, paginationCriteria, search, sort);
 
         CursorPaginationCriteria normalizedPagination = paginationCriteria.normalize();
         EventQueryFilter queryFilter = buildQueryFilter(filterOptions);
         Query query = eventRepository.buildEventQuery(queryFilter, search);
         
-        List<Event> pageItems = fetchPageItems(query, normalizedPagination);
+        String sortField = validateSortField(sort != null ? sort.getField() : null);
+        SortDirection sortDirection = (sort != null && sort.getDirection() != null) ? 
+            sort.getDirection() : SortDirection.ASC;
+        
+        List<Event> pageItems = fetchPageItems(query, normalizedPagination, sortField, sortDirection);
         boolean hasNextPage = pageItems.size() == normalizedPagination.getLimit();
         
         CursorPageInfo pageInfo = buildPageInfo(pageItems, hasNextPage, normalizedPagination.hasCursor());
@@ -91,9 +98,10 @@ public class EventService {
                 .build();
     }
     
-    private List<Event> fetchPageItems(Query query, CursorPaginationCriteria criteria) {
+    private List<Event> fetchPageItems(Query query, CursorPaginationCriteria criteria,
+                                        String sortField, SortDirection sortDirection) {
         List<Event> events = eventRepository.findEventsWithCursor(
-                query, criteria.getCursor(), criteria.getLimit() + 1);
+                query, criteria.getCursor(), criteria.getLimit() + 1, sortField, sortDirection.name());
         return events.size() > criteria.getLimit() 
                 ? events.subList(0, criteria.getLimit())
                 : events;
@@ -122,5 +130,17 @@ public class EventService {
                 .startCursor(startCursor)
                 .endCursor(endCursor)
                 .build();
+    }
+    
+    private String validateSortField(String field) {
+        if (field == null || field.trim().isEmpty()) {
+            return eventRepository.getDefaultSortField();
+        }
+        String trimmedField = field.trim();
+        if (!eventRepository.isSortableField(trimmedField)) {
+            log.warn("Invalid sort field requested for events: {}, using default", field);
+            return eventRepository.getDefaultSortField();
+        }
+        return trimmedField;
     }
 }

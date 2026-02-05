@@ -5,6 +5,7 @@ import com.openframe.data.document.event.filter.EventQueryFilter;
 import com.openframe.data.repository.event.CustomEventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.bson.types.ObjectId;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -22,6 +23,17 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class CustomEventRepositoryImpl implements CustomEventRepository {
+
+    private static final String SORT_DESC = "DESC";
+    private static final String ID_FIELD = "_id";
+    
+    private static final List<String> SORTABLE_FIELDS = List.of(
+            "_id",
+            "type",
+            "userId",
+            "timestamp"
+    );
+    private static final String DEFAULT_SORT_FIELD = "_id";
 
     private final MongoTemplate mongoTemplate;
 
@@ -71,13 +83,33 @@ public class CustomEventRepositoryImpl implements CustomEventRepository {
     }
 
     @Override
-    public List<Event> findEventsWithCursor(Query query, String cursor, int limit) {
+    public List<Event> findEventsWithCursor(Query query, String cursor, int limit, 
+                                             String sortField, String sortDirection) {
         if (cursor != null && !cursor.trim().isEmpty()) {
-            query.addCriteria(Criteria.where("_id").gt(cursor));
+            try {
+                ObjectId cursorId = new ObjectId(cursor);
+                if (SORT_DESC.equalsIgnoreCase(sortDirection)) {
+                    query.addCriteria(Criteria.where(ID_FIELD).lt(cursorId));
+                } else {
+                    query.addCriteria(Criteria.where(ID_FIELD).gt(cursorId));
+                }
+            } catch (IllegalArgumentException ex) {
+                log.warn("Invalid ObjectId cursor format: {}", cursor);
+            }
         }
-
-        query.with(Sort.by(Sort.Direction.ASC, "_id"));
         query.limit(limit);
+        
+        Sort.Direction mongoSortDirection = SORT_DESC.equalsIgnoreCase(sortDirection) ? 
+            Sort.Direction.DESC : Sort.Direction.ASC;
+            
+        if (ID_FIELD.equals(sortField)) {
+            query.with(Sort.by(mongoSortDirection, ID_FIELD));
+        } else {
+            query.with(Sort.by(
+                Sort.Order.by(sortField).with(mongoSortDirection),
+                Sort.Order.by(ID_FIELD).with(mongoSortDirection)
+            ));
+        }
 
         return mongoTemplate.find(query, Event.class);
     }
@@ -98,5 +130,15 @@ public class CustomEventRepositoryImpl implements CustomEventRepository {
                 .filter(Objects::nonNull)
                 .sorted()
                 .collect(Collectors.toList());
+    }
+    
+    @Override
+    public boolean isSortableField(String field) {
+        return field != null && SORTABLE_FIELDS.contains(field.trim());
+    }
+    
+    @Override
+    public String getDefaultSortField() {
+        return DEFAULT_SORT_FIELD;
     }
 }
