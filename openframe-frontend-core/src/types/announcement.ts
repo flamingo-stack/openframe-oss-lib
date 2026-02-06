@@ -1,8 +1,7 @@
 // Announcement system TypeScript types
-import type { PlatformName, PlatformRecord, LegacyPlatform, PlatformFilter } from './platform';
+import type { LegacyPlatform, PlatformFilter, PlatformRecord } from './platform';
 
 // For backward compatibility, maintain the old Platform type temporarily
-export type Platform = LegacyPlatform;
 export type IconType = 'svg' | 'png';
 
 // Database Models
@@ -110,7 +109,7 @@ export interface AnnouncementListResponse {
     total_pages: number;
   };
   filters?: {
-    platform?: Platform;
+    platform?: LegacyPlatform;
     is_active?: boolean;
   };
 }
@@ -204,7 +203,7 @@ export interface AnnouncementValidation {
   };
   platform: {
     required: boolean;
-    validOptions: Platform[];
+    validOptions: LegacyPlatform[];
   };
 }
 
@@ -215,7 +214,7 @@ export type { PlatformConfig } from './platform';
 export interface AnnouncementStats {
   total_announcements: number;
   active_announcements: number;
-  announcements_by_platform: Record<Platform, number>;
+  announcements_by_platform: Record<LegacyPlatform, number>;
   recent_announcements: Announcement[];
 }
 
@@ -244,7 +243,7 @@ export interface AnnouncementListProps {
 
 // Database Utility Types
 export interface AnnouncementFilters {
-  platform?: Platform;
+  platform?: LegacyPlatform;
   is_active?: boolean;
   created_by?: string;
   search?: string;

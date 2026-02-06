@@ -2,7 +2,7 @@
 // All platform and application types are available from this single export
 
 // Core platform types
-export type { Announcement, AnnouncementFormData } from './announcement'
+export * from './announcement'
 export type { Category, CategoryCardProps, RealCategoryCardProps } from './categories'
 export * from './category'
 export * from './media'
@@ -25,7 +25,7 @@ export * from './vendor-links'
 
 // User and profile types
 export * from './employee'
-export type { ProfileData, ProfileResponse } from './profile'
+export * from './profile'
 export * from './team'
 export * from './user'
 
@@ -53,5 +53,8 @@ export * from './os.types'
 // Marketing types
 export * from './marketing'
 
+export * from './access-code-cohorts'
 export * from './icons'
 export * from './permissions'
+export * from './tmcg'
+
