@@ -13,7 +13,7 @@ export interface EmployeeResponse {
   data: Employee[];
 }
 
-export interface ProfileData {
+export interface EmployeeProfileData {
   full_name: string;
   department: string;
   avatar_url: string;
