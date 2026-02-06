@@ -1,3 +1,5 @@
+"use client"
+
 /**
  * @deprecated This icon module is deprecated. Use `@flamingo-stack/openframe-frontend-core/components/icons-v2` instead.
  *

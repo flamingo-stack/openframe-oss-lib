@@ -1,3 +1,5 @@
+"use client"
+
 import { CheckCircleIcon as LucideCheckCircleIcon, XCircleIcon } from './ui/custom-icons'
 
 interface YesNoDisplayProps {

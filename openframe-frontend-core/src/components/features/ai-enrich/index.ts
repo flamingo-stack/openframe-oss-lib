@@ -1,3 +1,5 @@
+"use client"
+
 // AI Enrich Components
 export { AIEnrichButton } from './AIEnrichButton'
 export type { AIEnrichButtonProps } from './AIEnrichButton'
