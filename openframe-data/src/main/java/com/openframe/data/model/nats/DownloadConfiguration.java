@@ -1,5 +1,6 @@
 package com.openframe.data.model.nats;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 @Data
@@ -7,9 +8,8 @@ public class DownloadConfiguration {
 
     private String os;
     private String fileName;
+    @JsonProperty("agentFileName")
     private String targetFileName;
-    @Deprecated
-    private String agentFileName;
     private String link;
 
 }
