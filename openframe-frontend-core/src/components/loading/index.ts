@@ -1,4 +1,6 @@
-// Page layout skeletons  
+"use client"
+
+// Page layout skeletons
 export {
   AnnouncementBarSkeleton,
   HeroSkeleton,

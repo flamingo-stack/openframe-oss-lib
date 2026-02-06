@@ -1,3 +1,5 @@
+"use client"
+
 import { Button } from "./ui/button"
 import { VendorDisplayButton } from "./vendor-display-button"
 import { useAuth } from "./auth-stub"

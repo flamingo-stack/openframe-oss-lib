@@ -1,3 +1,5 @@
+"use client"
+
 import { Button } from "./ui/button"
 import { getVendorLogo, VendorWithMedia } from "../utils/vendor-media-stub"
 import Image from "next/image"

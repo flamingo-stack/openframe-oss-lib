@@ -1,3 +1,5 @@
+"use client"
+
 export interface ResultsCountProps {
   currentPage: number
   pageSize: number

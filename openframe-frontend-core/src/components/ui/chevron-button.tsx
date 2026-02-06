@@ -1,3 +1,5 @@
+"use client"
+
 import * as React from "react"
 import { ChevronUp, ChevronDown } from "lucide-react"
 import { cn } from "../../utils/cn"

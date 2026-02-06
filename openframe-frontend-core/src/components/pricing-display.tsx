@@ -1,3 +1,5 @@
+"use client"
+
 import { StructuredPricingSummary as StructuredPricingItem } from '../utils/compare-utils-stub'
 
 // Using StructuredPricingItem from compare-utils instead of local interface
