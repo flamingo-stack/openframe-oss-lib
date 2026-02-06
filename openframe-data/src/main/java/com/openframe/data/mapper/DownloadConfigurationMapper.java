@@ -34,6 +34,7 @@ public class DownloadConfigurationMapper {
         natsDownloadConfig.setOs(downloadConfiguration.getOs());
         natsDownloadConfig.setFileName(downloadConfiguration.getFileName());
         natsDownloadConfig.setTargetFileName(downloadConfiguration.getTargetFileName());
+        natsDownloadConfig.setAgentFileName(downloadConfiguration.getTargetFileName());
         natsDownloadConfig.setLink(downloadConfigurationResolver.resolve(downloadConfiguration, version));
         
         return natsDownloadConfig;
