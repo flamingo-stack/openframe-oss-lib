@@ -13,8 +13,30 @@ import { defineConfig } from 'tsup'
 // line of every output file. Note: `banner` is incompatible with `treeshake`
 // (rollup strips it), so client entries don't use treeshake and server
 // entries don't use banner.
+//
+// The dist/ directory is cleaned by the build script (rm -rf dist) before
+// tsup runs, so neither config needs `clean: true`.
 
 export default defineConfig([
+  // Server/universal entries — pure types, configs, and server-safe utilities.
+  // No "use client" needed; treeshake enabled to reduce bundle size.
+  {
+    entry: {
+      'nats/index': 'src/nats/index.ts',
+      'types/index': 'src/types/index.ts',
+      'types/navigation': 'src/types/navigation.ts',
+      'types/announcement': 'src/types/announcement.ts',
+      'assets/index': 'src/assets/index.ts',
+      'fonts': 'src/fonts.ts',
+      'tailwind.config': './tailwind.config.ts',
+    },
+    format: ['esm', 'cjs'],
+    dts: true,
+    splitting: false,
+    sourcemap: true,
+    external: ['react', 'react-dom', 'next', '@tanstack/react-query'],
+    treeshake: true,
+  },
   // Client-side entries — these contain React components/hooks that require
   // browser APIs. The "use client" banner tells Next.js to treat the entire
   // bundle as a Client Component boundary.
@@ -36,29 +58,9 @@ export default defineConfig([
     dts: true,
     splitting: false,
     sourcemap: true,
-    clean: true,
     external: ['react', 'react-dom', 'next', '@tanstack/react-query'],
     banner: {
       js: '"use client";',
     },
-  },
-  // Server/universal entries — pure types, configs, and server-safe utilities.
-  // No "use client" needed; treeshake enabled to reduce bundle size.
-  {
-    entry: {
-      'nats/index': 'src/nats/index.ts',
-      'types/index': 'src/types/index.ts',
-      'types/navigation': 'src/types/navigation.ts',
-      'types/announcement': 'src/types/announcement.ts',
-      'assets/index': 'src/assets/index.ts',
-      'fonts': 'src/fonts.ts',
-      'tailwind.config': './tailwind.config.ts',
-    },
-    format: ['esm', 'cjs'],
-    dts: true,
-    splitting: false,
-    sourcemap: true,
-    external: ['react', 'react-dom', 'next', '@tanstack/react-query'],
-    treeshake: true,
   },
 ])

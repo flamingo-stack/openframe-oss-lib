@@ -128,7 +128,7 @@
   "scripts": {
     "type-check": "tsc --noEmit",
     "dev": "NODE_OPTIONS='--max-old-space-size=8192' tsup --watch",
-    "build": "NODE_OPTIONS='--max-old-space-size=8192' tsup",
+    "build": "rm -rf dist && NODE_OPTIONS='--max-old-space-size=8192' tsup",
     "build:fast": "NODE_OPTIONS='--max-old-space-size=8192' tsup --no-dts",
     "clean": "rm -rf dist node_modules/.cache",
     "prepack": "NODE_OPTIONS='--max-old-space-size=8192' npm run build",
