@@ -33,6 +33,7 @@ interface VideoPlayerProps {
   loop?: boolean;
   muted?: boolean;
   controls?: boolean;
+  useNativeAspectRatio?: boolean; // If true, video uses native dimensions instead of 16:9
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -45,6 +46,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   loop = false,
   muted = false,
   controls = true,
+  useNativeAspectRatio = false,
 }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
@@ -87,8 +89,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   if (!mounted) {
     return (
       <div className={`video-player-container ${className}`}>
-        <div className="video-wrapper relative w-full" style={{ paddingBottom: '56.25%' }}>
-          <div className="loading-overlay absolute inset-0 bg-ods-card border border-ods-border rounded-md flex items-center justify-center">
+        <div
+          className="video-wrapper relative w-full"
+          style={useNativeAspectRatio ? {} : { paddingBottom: '56.25%' }}
+        >
+          <div className={useNativeAspectRatio ? "loading-overlay bg-ods-card border border-ods-border rounded-md flex items-center justify-center min-h-[200px]" : "loading-overlay absolute inset-0 bg-ods-card border border-ods-border rounded-md flex items-center justify-center"}>
             <div className="loading-content flex flex-col items-center gap-3">
               <Loader className="animate-spin text-ods-accent" size={32} />
               <span className="font-sans text-sm text-ods-text-secondary">Loading video...</span>
@@ -128,11 +133,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         </div>
       )}
 
-      {/* Video Container with 16:9 Aspect Ratio */}
-      <div className="video-wrapper relative w-full" style={{ paddingBottom: '56.25%' }}>
+      {/* Video Container - Conditionally applies 16:9 aspect ratio or native ratio */}
+      <div
+        className="video-wrapper relative w-full"
+        style={useNativeAspectRatio ? {} : { paddingBottom: '56.25%' }}
+      >
         {/* Loading State */}
         {isLoading && (
-          <div className="loading-overlay absolute inset-0 bg-ods-card border border-ods-border rounded-md flex items-center justify-center z-10">
+          <div className={useNativeAspectRatio ? "loading-overlay bg-ods-card border border-ods-border rounded-md flex items-center justify-center z-10 min-h-[200px]" : "loading-overlay absolute inset-0 bg-ods-card border border-ods-border rounded-md flex items-center justify-center z-10"}>
             <div className="loading-content flex flex-col items-center gap-3">
               <Loader className="animate-spin text-ods-accent" size={32} />
               <span className="font-sans text-sm text-ods-text-secondary">Loading video...</span>
@@ -143,13 +151,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         {/* Custom Poster Overlay - Single Click to Play */}
         {showPoster && poster && !hasError && (
           <div
-            className="absolute inset-0 cursor-pointer group z-20"
+            className={useNativeAspectRatio ? "relative cursor-pointer group z-20" : "absolute inset-0 cursor-pointer group z-20"}
             onClick={handlePosterClick}
           >
             <img
               src={poster}
               alt={title || 'Video thumbnail'}
-              className="w-full h-full object-cover rounded-md"
+              className={useNativeAspectRatio ? "w-full h-auto object-contain rounded-md" : "w-full h-full object-cover rounded-md"}
             />
             <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-all flex items-center justify-center">
               <div className="w-16 h-16 rounded-full bg-ods-accent hover:bg-ods-accent/90 transition-all flex items-center justify-center shadow-lg">
@@ -160,11 +168,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         )}
 
         {/* Video Player */}
-        <div className="video-player absolute inset-0 rounded-md overflow-hidden border border-ods-border bg-ods-background">
+        <div className={useNativeAspectRatio ? "video-player rounded-md overflow-hidden border border-ods-border bg-ods-background" : "video-player absolute inset-0 rounded-md overflow-hidden border border-ods-border bg-ods-background"}>
           <ReactPlayer
             url={url}
             width="100%"
-            height="100%"
+            height={useNativeAspectRatio ? "auto" : "100%"}
             controls={controls}
             playing={isPlaying}
             loop={loop}

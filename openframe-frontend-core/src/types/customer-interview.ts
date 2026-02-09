@@ -9,6 +9,9 @@ import type { CaseStudy } from './case-study'
 export interface VideoTeaser {
   url: string
   title?: string
+  thumbnail_url?: string // Optional thumbnail image URL for video preview. If not provided, video player will show first frame automatically.
+  published?: boolean // Controls visibility on public preview page (default: false, admin must select)
+  source?: 'manual' | 'ai_generated' // Track origin of teaser
   // Duration auto-detected from video file
 }
 
