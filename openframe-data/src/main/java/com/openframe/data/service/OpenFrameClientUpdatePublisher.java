@@ -1,6 +1,7 @@
 package com.openframe.data.service;
 
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
+import com.openframe.data.document.clientconfiguration.PublishState;
 import com.openframe.data.mapper.DownloadConfigurationMapper;
 import com.openframe.data.model.nats.OpenFrameClientUpdateMessage;
 import com.openframe.data.repository.nats.NatsMessagePublisher;
@@ -9,8 +10,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
-
-import java.time.Instant;
 
 @Service
 @RequiredArgsConstructor
@@ -33,14 +32,15 @@ public class OpenFrameClientUpdatePublisher {
             return;
         }
 
-        configuration.setUpdateMessagePublished(false);
+        PublishState publishState = configuration.getPublishState();
+        PublishState stateBefore = PublishState.nonPublished(publishState);
+        configuration.setPublishState(stateBefore);
         openFrameClientConfigurationService.save(configuration);
 
         OpenFrameClientUpdateMessage message = buildMessage(configuration);
         natsMessagePublisher.publish(TOPIC_NAME, message);
 
-        configuration.setUpdateMessagePublished(true);
-        configuration.setUpdateMessagePublishedAt(Instant.now());
+        configuration.setPublishState(PublishState.published(stateBefore));
         openFrameClientConfigurationService.save(configuration);
         log.info("Published client update message for all machines with version: {}", configuration.getVersion());
     }

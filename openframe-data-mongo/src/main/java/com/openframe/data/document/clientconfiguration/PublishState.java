@@ -16,4 +16,14 @@ public class PublishState {
     private boolean published;
     private Instant publishedAt;
     private int attempts;
+
+    public static PublishState nonPublished(PublishState current) {
+        int nextAttempts = current == null ? 1 : current.getAttempts() + 1;
+        return new PublishState(false, null, nextAttempts);
+    }
+
+    public static PublishState published(PublishState current) {
+        int attempts = current == null ? 0 : current.getAttempts();
+        return new PublishState(true, Instant.now(), attempts);
+    }
 }

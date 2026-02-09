@@ -1,5 +1,6 @@
 package com.openframe.data.service;
 
+import com.openframe.data.document.clientconfiguration.PublishState;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
 import com.openframe.data.mapper.DownloadConfigurationMapper;
 import com.openframe.data.model.nats.ToolAgentUpdateMessage;
@@ -9,8 +10,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
-
-import java.time.Instant;
 
 import static java.lang.String.format;
 
@@ -35,15 +34,16 @@ public class ToolAgentUpdateUpdatePublisher {
             return;
         }
 
-        toolAgent.setUpdateMessagePublished(false);
+        PublishState publishState = toolAgent.getPublishState();
+        PublishState stateBefore = PublishState.nonPublished(publishState);
+        toolAgent.setPublishState(stateBefore);
         integratedToolAgentService.save(toolAgent);
 
         String topicName = buildTopicName(toolAgent);
         ToolAgentUpdateMessage message = buildMessage(toolAgent);
         natsMessagePublisher.publish(topicName, message);
 
-        toolAgent.setUpdateMessagePublished(true);
-        toolAgent.setUpdateMessagePublishedAt(Instant.now());
+        toolAgent.setPublishState(PublishState.published(stateBefore));
         integratedToolAgentService.save(toolAgent);
         log.info("Published tool update message for tool: {} version: {}", toolAgent.getId(), toolAgent.getVersion());
     }
