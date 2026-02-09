@@ -64,10 +64,10 @@ public class IntegratedToolAgentInitializer {
             String existingVersion = existingAgent.getVersion();
             newAgent.setVersion(existingVersion);
             log.info("Preserving version {} for release agent {}", existingVersion, newAgent.getId());
-
-            newAgent.setPublishState(existingAgent.getPublishState());
         }
-        
+
+        newAgent.setPublishState(existingAgent.getPublishState());
+
         integratedToolAgentService.save(newAgent);
         log.info("Updated agent configuration: {} from {}", newAgent.getId(), filePath);
         
