@@ -52,7 +52,9 @@ public class OpenFrameClientConfigurationInitializer {
         String existingVersion = existingConfiguration.getVersion();
         newConfiguration.setVersion(existingVersion);
         log.info("Preserving existing version: {}", existingVersion);
-        
+
+        newConfiguration.setPublishState(existingConfiguration.getPublishState());
+
         clientConfigurationService.save(newConfiguration);
         log.info("Updated existing OpenFrame client configuration");
     }
