@@ -34,18 +34,27 @@ public class ToolAgentUpdateUpdatePublisher {
             return;
         }
 
-        PublishState publishState = toolAgent.getPublishState();
-        PublishState stateBefore = PublishState.nonPublished(publishState);
-        toolAgent.setPublishState(stateBefore);
-        integratedToolAgentService.save(toolAgent);
+        String toolAgentId = toolAgent.getId();
+        markAsNonPublished(toolAgentId);
 
         String topicName = buildTopicName(toolAgent);
         ToolAgentUpdateMessage message = buildMessage(toolAgent);
         natsMessagePublisher.publishPersistent(topicName, message);
 
-        toolAgent.setPublishState(PublishState.published(stateBefore));
-        integratedToolAgentService.save(toolAgent);
+        markAsPublished(toolAgentId);
+
         log.info("Published tool update message for tool: {} version: {}", toolAgent.getId(), toolAgent.getVersion());
+    }
+
+    private void markAsNonPublished(String toolAgentId) {
+        IntegratedToolAgent toolAgent = integratedToolAgentService.findById(toolAgentId)
+                .orElseThrow();
+
+        PublishState publishState = toolAgent.getPublishState();
+        PublishState stateBefore = PublishState.nonPublished(publishState);
+        toolAgent.setPublishState(stateBefore);
+
+        integratedToolAgentService.save(toolAgent);
     }
 
     private String buildTopicName(IntegratedToolAgent toolAgent) {
@@ -62,6 +71,15 @@ public class ToolAgentUpdateUpdatePublisher {
                 downloadConfigurationMapper.map(toolAgent.getDownloadConfigurations(), toolAgent.getVersion())
         );
         return message;
+    }
+
+    private void markAsPublished(String toolAgentId) {
+        IntegratedToolAgent toolAgent = integratedToolAgentService.findById(toolAgentId)
+                .orElseThrow();
+
+        PublishState publishState = toolAgent.getPublishState();
+        toolAgent.setPublishState(PublishState.published(publishState));
+        integratedToolAgentService.save(toolAgent);
     }
 }
 

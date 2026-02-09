@@ -32,17 +32,24 @@ public class OpenFrameClientUpdatePublisher {
             return;
         }
 
-        PublishState publishState = configuration.getPublishState();
-        PublishState stateBefore = PublishState.nonPublished(publishState);
-        configuration.setPublishState(stateBefore);
-        openFrameClientConfigurationService.save(configuration);
+        markAsNonPublished();
 
         OpenFrameClientUpdateMessage message = buildMessage(configuration);
         natsMessagePublisher.publishPersistent(TOPIC_NAME, message);
 
-        configuration.setPublishState(PublishState.published(stateBefore));
-        openFrameClientConfigurationService.save(configuration);
+        markAsPublished();
+
         log.info("Published client update message for all machines with version: {}", configuration.getVersion());
+    }
+
+    private void markAsNonPublished() {
+        OpenFrameClientConfiguration configuration = openFrameClientConfigurationService.get();
+
+        PublishState publishState = configuration.getPublishState();
+        PublishState stateBefore = PublishState.nonPublished(publishState);
+        configuration.setPublishState(stateBefore);
+
+        openFrameClientConfigurationService.save(configuration);
     }
 
     private OpenFrameClientUpdateMessage buildMessage(OpenFrameClientConfiguration configuration) {
@@ -52,6 +59,15 @@ public class OpenFrameClientUpdatePublisher {
                 downloadConfigurationMapper.map(configuration.getDownloadConfiguration(), configuration.getVersion())
         );
         return message;
+    }
+
+    private void markAsPublished() {
+        OpenFrameClientConfiguration configuration = openFrameClientConfigurationService.get();
+
+        PublishState stateBefore = configuration.getPublishState();
+        configuration.setPublishState(PublishState.published(stateBefore));
+
+        openFrameClientConfigurationService.save(configuration);
     }
 }
 
