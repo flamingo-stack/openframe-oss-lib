@@ -19,7 +19,8 @@ public class PublishState {
 
     public static PublishState nonPublished(PublishState current) {
         int nextAttempts = current == null ? 1 : current.getAttempts() + 1;
-        return new PublishState(false, null, nextAttempts);
+        Instant publishedAt = current.getPublishedAt();
+        return new PublishState(false, publishedAt, nextAttempts);
     }
 
     public static PublishState published(PublishState current) {
