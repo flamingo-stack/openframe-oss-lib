@@ -1,3 +1,5 @@
+"use client"
+
 import React from 'react';
 import { cn } from '../../utils/cn';
 import { FlamingoLogo } from '../flamingo-logo';

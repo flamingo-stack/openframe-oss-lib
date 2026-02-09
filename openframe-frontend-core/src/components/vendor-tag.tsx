@@ -1,3 +1,5 @@
+"use client"
+
 import { OpenSourceIcon, CoinsIcon } from "./icons-stub"
 import { OpenFrameLogo } from "./openframe-logo"
 import { cn } from "../utils/cn"

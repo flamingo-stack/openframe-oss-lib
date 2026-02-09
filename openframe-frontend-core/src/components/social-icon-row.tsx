@@ -1,3 +1,5 @@
+"use client"
+
 import { Button } from './ui/button';
 import { GitHubIcon, RedditIcon, XLogo, LinkedInIcon, LumaIcon, WhatsAppIcon, GlobeIcon, MessageCircleIcon, TelegramIcon, YouTubeIcon, InstagramIcon, FacebookIcon, SlackIcon } from './icons';
 

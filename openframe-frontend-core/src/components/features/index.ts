@@ -1,3 +1,5 @@
+"use client"
+
 // Feature Components exports
 export { DynamicThemeProvider, useDynamicTheme } from '../providers/dynamic-theme-provider'
 export * from './array-entry-manager'
@@ -39,3 +41,4 @@ export * from './youtube-embed'
 // AI Enrich components
 export * from './ai-enrich'
 export * from './policy-configuration-panel'
+

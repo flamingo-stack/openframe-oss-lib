@@ -1,7 +1,10 @@
+"use client"
+
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
 import { ExternalLink } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import React from "react"
 
 import { cn } from "../../utils/cn"
@@ -99,6 +102,11 @@ interface ButtonProps
    * Open the link in a new tab when href is provided
    */
   openInNewTab?: boolean
+  /**
+   * URL for dual-mode navigation without Next.js Link prefetching.
+   * Button content navigates same-tab, external icon (showExternalLinkOnHover) opens new tab.
+   */
+  navigateUrl?: string
   leftIcon?: React.ReactNode
   rightIcon?: React.ReactNode
   /**
@@ -132,7 +140,8 @@ interface ButtonProps
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, href, openInNewTab = false, leftIcon, rightIcon, centerIcon, loading, children, disabled, onClick, fullWidthOnMobile, alignment = 'center', showExternalLinkOnHover, noPadding, ...props }, ref) => {
+  ({ className, variant, size, asChild = false, href, openInNewTab = false, navigateUrl, leftIcon, rightIcon, centerIcon, loading, children, disabled, onClick, fullWidthOnMobile, alignment = 'center', showExternalLinkOnHover, noPadding, ...props }, ref) => {
+    const router = navigateUrl ? useRouter() : null
     const isDisabled = disabled || loading
 
     const isCenterIconOnly = !!centerIcon && !children && !leftIcon && !rightIcon
@@ -202,6 +211,45 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       )
     }
     
+    // When navigateUrl is provided, render dual-navigation button without prefetching
+    if (navigateUrl) {
+      const handleSameTabClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+        if (onClick) {
+          onClick(e)
+        }
+        if (!isDisabled && !e.defaultPrevented && router) {
+          router.push(navigateUrl)
+        }
+      }
+
+      const handleNewTabClick = (e: React.MouseEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        window.open(navigateUrl, '_blank', 'noopener,noreferrer')
+      }
+
+      return (
+        <button
+          className={cn(composedClassName, showExternalLinkOnHover && 'group')}
+          ref={ref}
+          disabled={isDisabled}
+          onClick={handleSameTabClick}
+          role="link"
+          {...props}
+        >
+          {renderContent()}
+          {showExternalLinkOnHover && !isDisabled && (
+            <span
+              className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto hover:text-ods-text-primary"
+              onClick={handleNewTabClick}
+            >
+              <ExternalLink className="w-4 h-4 text-ods-text-secondary transition-colors cursor-pointer pointer-events-auto" />
+            </span>
+          )}
+        </button>
+      )
+    }
+
     // When href is provided, render as Next.js Link for client-side navigation
     if (href) {
       // Handle onClick type conversion for Link component

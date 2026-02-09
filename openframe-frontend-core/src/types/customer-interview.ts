@@ -9,7 +9,26 @@ import type { CaseStudy } from './case-study'
 export interface VideoTeaser {
   url: string
   title?: string
+  thumbnail_url?: string // Optional thumbnail image URL for video preview. If not provided, video player will show first frame automatically.
+  published?: boolean // Controls visibility on public preview page (default: false, admin must select)
+  source?: 'manual' | 'ai_generated' // Track origin of teaser
   // Duration auto-detected from video file
+}
+
+export interface Speaker {
+  label: string
+  name?: string
+  confidence?: number
+}
+
+export interface VideoClip {
+  start_time: number
+  end_time: number
+  description: string
+  query_used: string
+  confidence: number
+  twelve_labs_id?: string
+  thumbnail_url?: string
 }
 
 export interface CustomerInterview {
@@ -40,6 +59,28 @@ export interface CustomerInterview {
   status: 'draft' | 'completed'
   completed_at: string | null
   author_id: string | null
+
+  // AI Processing Status
+  ai_transcript_status?: 'pending' | 'processing' | 'completed' | 'failed'
+  ai_summary_status?: 'pending' | 'processing' | 'completed' | 'failed'
+  ai_clips_status?: 'pending' | 'processing' | 'completed' | 'failed'
+  ai_processing_started_at?: string
+  ai_processing_completed_at?: string
+  ai_processing_error?: string
+
+  // AI Generated Content
+  ai_transcript_raw?: string
+  ai_transcript_formatted?: string
+  ai_confidence_transcript?: number
+  ai_summary_bullets?: string[]
+  ai_summary_gist?: string
+  ai_confidence_summary?: number
+  ai_speakers?: Speaker[]
+  ai_video_clips?: VideoClip[]
+
+  // External API Tracking
+  assemblyai_transcript_id?: string
+  twelvelabs_video_id?: string
 
   // Timestamps
   created_at: string

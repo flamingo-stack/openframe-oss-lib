@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from 'react';
-import { Input, Textarea, Label, Button } from '../ui';
-import { Globe, ExternalLink, Upload, X, Loader2 } from 'lucide-react';
+import { Input, Textarea, Label, Button, Badge } from '../ui';
+import { ConfidenceBadge } from '../features';
+import { Globe, ExternalLink, Upload, X, Loader2, Sparkles } from 'lucide-react';
 import { cn } from '../../utils';
 import Image from 'next/image';
 
@@ -26,6 +27,11 @@ export interface SEOEditorPreviewProps {
 
   // Upload handler (provided by parent since it needs API endpoint)
   onOgImageUpload?: (file: File) => Promise<string>;
+
+  // AI confidence scores
+  aiConfidenceSeoTitle?: number;
+  aiConfidenceSeoDescription?: number;
+  aiConfidenceSeoKeywords?: number;
 
   // Optional
   domain?: string;
@@ -51,6 +57,9 @@ export function SEOEditorPreview({
   onSeoKeywordsChange,
   onOgImageUrlChange,
   onOgImageUpload,
+  aiConfidenceSeoTitle,
+  aiConfidenceSeoDescription,
+  aiConfidenceSeoKeywords,
   domain = 'openmsp.ai',
   disabled = false,
   className = ''
@@ -92,9 +101,25 @@ export function SEOEditorPreview({
       {/* SEO Title & Keywords - Same Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">
-            SEO Title
-          </Label>
+          <div className="flex items-center gap-2">
+            <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">
+              SEO Title
+            </Label>
+            {aiConfidenceSeoTitle !== undefined && (
+              <>
+                <Badge variant="secondary" className="flex items-center gap-1">
+                  <Sparkles className="h-3 w-3" />
+                  AI Generated
+                </Badge>
+                <ConfidenceBadge
+                  confidence={aiConfidenceSeoTitle}
+                  showLabel={true}
+                  showPercentage={true}
+                  size="sm"
+                />
+              </>
+            )}
+          </div>
           <Input
             value={seoTitle || ''}
             onChange={(e) => onSeoTitleChange(e.target.value)}
@@ -110,9 +135,25 @@ export function SEOEditorPreview({
         </div>
 
         <div className="space-y-2">
-          <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">
-            SEO Keywords
-          </Label>
+          <div className="flex items-center gap-2">
+            <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">
+              SEO Keywords
+            </Label>
+            {aiConfidenceSeoKeywords !== undefined && (
+              <>
+                <Badge variant="secondary" className="flex items-center gap-1">
+                  <Sparkles className="h-3 w-3" />
+                  AI Generated
+                </Badge>
+                <ConfidenceBadge
+                  confidence={aiConfidenceSeoKeywords}
+                  showLabel={true}
+                  showPercentage={true}
+                  size="sm"
+                />
+              </>
+            )}
+          </div>
           <Input
             value={seoKeywords || ''}
             onChange={(e) => onSeoKeywordsChange(e.target.value)}
@@ -126,9 +167,25 @@ export function SEOEditorPreview({
       {/* SEO Description & OG Image - Same Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="space-y-2 flex flex-col h-full">
-          <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">
-            SEO Description
-          </Label>
+          <div className="flex items-center gap-2">
+            <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">
+              SEO Description
+            </Label>
+            {aiConfidenceSeoDescription !== undefined && (
+              <>
+                <Badge variant="secondary" className="flex items-center gap-1">
+                  <Sparkles className="h-3 w-3" />
+                  AI Generated
+                </Badge>
+                <ConfidenceBadge
+                  confidence={aiConfidenceSeoDescription}
+                  showLabel={true}
+                  showPercentage={true}
+                  size="sm"
+                />
+              </>
+            )}
+          </div>
           <Textarea
             value={seoDescription || ''}
             onChange={(e) => onSeoDescriptionChange(e.target.value)}

@@ -1,3 +1,5 @@
+"use client"
+
 interface StatusIndicatorProps {
   status: 'success' | 'pending' | 'error' | 'missing';
   label: string;

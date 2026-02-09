@@ -1,3 +1,5 @@
+"use client"
+
 import React from 'react';
 import { Badge } from './badge';
 import type { ChangelogEntry } from '../../types/product-release';

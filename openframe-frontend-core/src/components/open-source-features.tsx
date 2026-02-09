@@ -1,3 +1,5 @@
+"use client"
+
 import React from 'react';
 import { Terminal, DollarSign, Network, Users } from 'lucide-react';
 
