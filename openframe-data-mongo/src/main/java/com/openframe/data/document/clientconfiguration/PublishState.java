@@ -19,7 +19,7 @@ public class PublishState {
 
     public static PublishState nonPublished(PublishState current) {
         if (current == null || current.isPublished()) {
-            return new PublishState(false, Instant.now(), 0);
+            return new PublishState(false, null, 0);
         }
 
         int nextAttempts = current.getAttempts() + 1;

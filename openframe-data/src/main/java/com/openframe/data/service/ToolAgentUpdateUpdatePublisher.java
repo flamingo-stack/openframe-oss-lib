@@ -47,8 +47,7 @@ public class ToolAgentUpdateUpdatePublisher {
     }
 
     private void markAsNonPublished(String toolAgentId) {
-        IntegratedToolAgent toolAgent = integratedToolAgentService.findById(toolAgentId)
-                .orElseThrow();
+        IntegratedToolAgent toolAgent = integratedToolAgentService.getById(toolAgentId);
 
         PublishState publishState = toolAgent.getPublishState();
         PublishState stateBefore = PublishState.nonPublished(publishState);
@@ -74,8 +73,7 @@ public class ToolAgentUpdateUpdatePublisher {
     }
 
     private void markAsPublished(String toolAgentId) {
-        IntegratedToolAgent toolAgent = integratedToolAgentService.findById(toolAgentId)
-                .orElseThrow();
+        IntegratedToolAgent toolAgent = integratedToolAgentService.getById(toolAgentId);
 
         PublishState publishState = toolAgent.getPublishState();
         toolAgent.setPublishState(PublishState.published(publishState));
