@@ -10,6 +10,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
+
 import static java.lang.String.format;
 
 @Service
@@ -25,16 +27,24 @@ public class ToolAgentUpdateUpdatePublisher {
 
     private final NatsMessagePublisher natsMessagePublisher;
     private final DownloadConfigurationMapper downloadConfigurationMapper;
+    private final IntegratedToolAgentService integratedToolAgentService;
 
     public void publish(IntegratedToolAgent toolAgent) {
         if (!toolAgentUpdateFeatureEnabled) {
             log.info("Tool agent update publishing is disabled, skipping publish for tool: {} version: {}", toolAgent.getId(), toolAgent.getVersion());
             return;
         }
-        
+
+        toolAgent.setUpdateMessagePublished(false);
+        integratedToolAgentService.save(toolAgent);
+
         String topicName = buildTopicName(toolAgent);
         ToolAgentUpdateMessage message = buildMessage(toolAgent);
         natsMessagePublisher.publish(topicName, message);
+
+        toolAgent.setUpdateMessagePublished(true);
+        toolAgent.setUpdateMessagePublishedAt(Instant.now());
+        integratedToolAgentService.save(toolAgent);
         log.info("Published tool update message for tool: {} version: {}", toolAgent.getId(), toolAgent.getVersion());
     }
 
