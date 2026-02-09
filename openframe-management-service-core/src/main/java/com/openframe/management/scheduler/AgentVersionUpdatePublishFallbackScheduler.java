@@ -30,7 +30,7 @@ public class AgentVersionUpdatePublishFallbackScheduler {
     @Value("${openframe.nats-publish.max-attempts:5}")
     private int maxPublishAttempts;
 
-    @Scheduled(fixedDelayString = "${openframe.agent-version-update-publish-fallback.interval:600000}")
+    @Scheduled(fixedDelayString = "${openframe.agent-version-update-publish-fallback.interval:30000}")
     public void publishUnpublishedEntities() {
         try {
             OpenFrameClientConfiguration openFrameClientConfiguration = openFrameClientConfigurationService.get();
@@ -66,7 +66,12 @@ public class AgentVersionUpdatePublishFallbackScheduler {
     }
 
     private boolean shouldRetryPublish(PublishState publishState) {
-        int attempts = publishState.getAttempts();
-        return attempts <= maxPublishAttempts;
+        if (publishState == null) {
+            return true;
+        }
+        if (publishState.isPublished()) {
+            return false;
+        }
+        return publishState.getAttempts() < maxPublishAttempts;
     }
 }
