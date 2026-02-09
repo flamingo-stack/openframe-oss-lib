@@ -21,7 +21,7 @@ public class OpenFrameClientUpdatePublisher {
     private final static String TOPIC_NAME = "machine.all.client-update";
 
     @Value("${openframe.client.update.feature.enabled:false}")
-    private boolean clientUpdateFeatureEnabled = false;
+    private boolean clientUpdateFeatureEnabled;
 
     private final NatsMessagePublisher natsMessagePublisher;
     private final DownloadConfigurationMapper downloadConfigurationMapper;
