@@ -38,7 +38,7 @@ public class OpenFrameClientUpdatePublisher {
         openFrameClientConfigurationService.save(configuration);
 
         OpenFrameClientUpdateMessage message = buildMessage(configuration);
-        natsMessagePublisher.publish(TOPIC_NAME, message);
+        natsMessagePublisher.publishPersistent(TOPIC_NAME, message);
 
         configuration.setPublishState(PublishState.published(stateBefore));
         openFrameClientConfigurationService.save(configuration);
