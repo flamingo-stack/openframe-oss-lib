@@ -12,7 +12,6 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
-import java.time.Instant;
 import java.util.List;
 
 @Component
@@ -46,18 +45,12 @@ public class ReleaseVersionPublishScheduler {
     private void processOpenframeClient(OpenFrameClientConfiguration openFrameClientConfiguration) {
         if (!openFrameClientConfiguration.isUpdateMessagePublished()) {
             openFrameClientUpdatePublisher.publish(openFrameClientConfiguration);
-            openFrameClientConfiguration.setUpdateMessagePublished(true);
-            openFrameClientConfiguration.setUpdateMessagePublishedAt(Instant.now());
-            openFrameClientConfigurationService.save(openFrameClientConfiguration);
         }
     }
 
     private void processToolAgent(IntegratedToolAgent toolAgent) {
         if (!toolAgent.isUpdateMessagePublished()) {
             toolAgentUpdateUpdatePublisher.publish(toolAgent);
-            toolAgent.setUpdateMessagePublished(true);
-            toolAgent.setUpdateMessagePublishedAt(Instant.now());
-            integratedToolAgentService.save(toolAgent);
         }
     }
 }
