@@ -41,7 +41,7 @@ public class ToolAgentUpdateUpdatePublisher {
 
         String topicName = buildTopicName(toolAgent);
         ToolAgentUpdateMessage message = buildMessage(toolAgent);
-        natsMessagePublisher.publish(topicName, message);
+        natsMessagePublisher.publishPersistent(topicName, message);
 
         toolAgent.setPublishState(PublishState.published(stateBefore));
         integratedToolAgentService.save(toolAgent);
