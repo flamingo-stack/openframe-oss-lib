@@ -58,6 +58,7 @@
         <module>openframe-external-api-service-core</module>
         <module>openframe-stream-service-core</module>
         <module>openframe-gateway-service-core</module>
+        <module>openframe-test-service-core</module>
     </modules>
 
     <dependencies>
