@@ -5,6 +5,7 @@ extend type Query {
         filter: DeviceFilterInput
         pagination: CursorPaginationInput
         search: String
+        sort: SortInput
     ): DeviceConnection!
 
     device(machineId: String!): Machine

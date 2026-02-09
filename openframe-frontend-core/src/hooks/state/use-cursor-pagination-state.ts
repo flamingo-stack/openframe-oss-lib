@@ -23,7 +23,6 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useDebounce } from '../ui/use-debounce';
 import { useApiParams, type UseApiParamsReturn } from './use-api-params';
 
 export interface UseCursorPaginationStateOptions {
@@ -78,7 +77,6 @@ export function useCursorPaginationState(
   options: UseCursorPaginationStateOptions
 ): CursorPaginationStateReturn {
   const {
-    debounceMs = 300,
     onInitialLoad,
     onSearchChange,
   } = options
@@ -87,7 +85,6 @@ export function useCursorPaginationState(
 
   // Local search input with debounce
   const [searchInput, setSearchInput] = useState(params.search || '')
-  const debouncedSearch = useDebounce(searchInput, debounceMs)
 
   // Pagination tracking
   const [hasLoadedBeyondFirst, setHasLoadedBeyondFirst] = useState(false)
@@ -124,13 +121,13 @@ export function useCursorPaginationState(
     // Skip if we're syncing from URL to prevent loops
     if (isSyncingFromUrl.current) return
 
-    if (debouncedSearch !== params.search) {
+    if (searchInput !== params.search) {
       setParams({
-        search: debouncedSearch,
+        search: searchInput,
         cursor: '' // Reset cursor when search changes
       })
     }
-  }, [debouncedSearch, params.search, setParams, initialLoadCount])
+  }, [searchInput, params.search, setParams, initialLoadCount])
 
   // Initial load effect - runs once and blocks all other effects until complete
   useEffect(() => {

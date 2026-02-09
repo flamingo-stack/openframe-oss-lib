@@ -7,7 +7,7 @@ import { AIEnrichButton } from './AIEnrichButton'
 import { AIWarningsSection } from './AIWarningsSection'
 import { Button } from '../../ui/button'
 import { Badge } from '../../ui/badge'
-import { CheckCircle, AlertCircle } from 'lucide-react'
+import { CheckCircle, AlertCircle, Loader2, X } from 'lucide-react'
 
 export interface ConfidenceField {
   label: string
@@ -55,9 +55,13 @@ export interface AIEnrichSectionProps {
   // Actions
   onClear?: () => void
   showClearButton?: boolean
+  onCancel?: () => void
+  showCancel?: boolean
+  isCancelling?: boolean
 
   // Labels
   title?: string
+  description?: string
   buttonLabel?: string
   loadingLabel?: string
   disabledMessage?: string
@@ -65,6 +69,7 @@ export interface AIEnrichSectionProps {
   // Styling
   variant?: 'default' | 'compact'
   className?: string
+  icon?: React.ReactNode
 }
 
 export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
@@ -81,12 +86,17 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
   children,
   onClear,
   showClearButton = true,
+  onCancel,
+  showCancel = false,
+  isCancelling = false,
   title = 'AI Enrichment',
+  description,
   buttonLabel = 'AI Enrich',
   loadingLabel = 'Enriching...',
   disabledMessage = 'Fill in required fields to enable AI enrichment.',
   variant = 'default',
   className,
+  icon,
 }) => {
   const hasResults = status === 'success' || status === 'error'
   const shouldDisable = disabled || !canEnrich
@@ -102,22 +112,50 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
         className
       )}
     >
-      {/* Header with button */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <SparklesIcon size={20} className="text-ods-text-secondary" />
+      {/* Row 1: Icon + Title + Description */}
+      <div className="flex items-center gap-3">
+        {icon || <SparklesIcon size={20} className="text-ods-text-secondary" />}
+        <div className="flex-1">
           <h3 className="font-['Azeret_Mono'] text-[18px] font-semibold uppercase text-ods-text-primary">
             {title}
           </h3>
+          {description && (
+            <p className="text-ods-text-secondary text-sm font-['DM_Sans'] mt-1">
+              {description}
+            </p>
+          )}
         </div>
+      </div>
+
+      {/* Row 2: Buttons */}
+      <div className="flex flex-col gap-3">
         <AIEnrichButton
-          onClick={onEnrich}
+          onClick={() => {
+            console.log('[AIEnrichSection] 🔘 Button clicked');
+            console.log('[AIEnrichSection] Loading:', loading);
+            console.log('[AIEnrichSection] Disabled:', shouldDisable);
+            console.log('[AIEnrichSection] CanEnrich:', canEnrich);
+            onEnrich();
+          }}
           loading={loading}
           disabled={shouldDisable}
           label={buttonLabel}
           loadingLabel={loadingLabel}
           size="md"
+          className="!w-full"
         />
+        {showCancel && onCancel && loading && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onCancel}
+            disabled={isCancelling}
+            leftIcon={isCancelling ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+            className="!w-full"
+          >
+            {isCancelling ? 'Cancelling...' : 'Cancel Processing'}
+          </Button>
+        )}
       </div>
 
       {/* Disabled message with unfilled fields */}
@@ -139,6 +177,16 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Loading state with status message */}
+      {loading && statusMessage && (
+        <div className="flex items-center gap-3 p-3 rounded-lg bg-ods-card-secondary">
+          <Loader2 className="h-5 w-5 text-ods-accent animate-spin" />
+          <span className="text-sm text-ods-text-primary font-['DM_Sans']">
+            {statusMessage}
+          </span>
         </div>
       )}
 

@@ -1,3 +1,5 @@
+"use client"
+
 /**
  * Platform Components
  *
@@ -21,3 +23,9 @@ export type { ToolType } from '../../types/tool.types'
 export { ShellTypeBadge } from './ShellTypeBadge'
 export type { ShellTypeBadgeProps } from './ShellTypeBadge'
 export type { ShellType } from '../../types/shell.types'
+
+export { ScriptInfoSection } from './ScriptInfoSection'
+export type { ScriptInfoSectionProps, ScriptAuthor } from './ScriptInfoSection'
+
+export { ScriptArguments } from './ScriptArguments'
+export type { ScriptArgumentsProps, ScriptArgument } from './ScriptArguments'

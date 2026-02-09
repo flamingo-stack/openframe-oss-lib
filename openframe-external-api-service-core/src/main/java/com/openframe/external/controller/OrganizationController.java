@@ -1,7 +1,11 @@
 package com.openframe.external.controller;
 
 import com.openframe.api.dto.organization.*;
-import com.openframe.api.mapper.OrganizationMapper;
+import com.openframe.api.dto.shared.SortInput;
+import com.openframe.api.dto.shared.SortDirection;
+import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.external.dto.shared.PaginationCriteria;
+import com.openframe.external.mapper.OrganizationMapper;
 import com.openframe.api.service.OrganizationCommandService;
 import com.openframe.api.service.OrganizationQueryService;
 import com.openframe.core.dto.ErrorResponse;
@@ -17,6 +21,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
@@ -73,11 +79,23 @@ public class OrganizationController {
             @Parameter(description = "Search query for organization name and category")
             @RequestParam(required = false) String search,
 
+            @Parameter(description = "Maximum number of items to return (default: 20, max: 100)")
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) Integer limit,
+
+            @Parameter(description = "Cursor for pagination (optional)")
+            @RequestParam(required = false) String cursor,
+
+            @Parameter(description = "Field to sort by")
+            @RequestParam(required = false) String sortField,
+
+            @Parameter(description = "Sort direction (ASC or DESC)")
+            @RequestParam(required = false) String sortDirection,
+
             @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
             @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
 
-        log.info("Getting organizations - category: {}, minEmployees: {}, maxEmployees: {}, hasActiveContract: {}, search: {} - userId: {}, apiKeyId: {}",
-                category, minEmployees, maxEmployees, hasActiveContract, search, userId, apiKeyId);
+        log.info("Getting organizations - category: {}, minEmployees: {}, maxEmployees: {}, hasActiveContract: {}, search: {}, limit: {}, cursor: {}, sortField: {}, sortDirection: {} - userId: {}, apiKeyId: {}",
+                category, minEmployees, maxEmployees, hasActiveContract, search, limit, cursor, sortField, sortDirection, userId, apiKeyId);
 
         // Build filter options directly from query parameters
         OrganizationFilterOptions filterOptions = OrganizationFilterOptions.builder()
@@ -87,17 +105,30 @@ public class OrganizationController {
                 .hasActiveContract(hasActiveContract)
                 .build();
 
-        OrganizationList result = organizationQueryService.queryOrganizations(filterOptions, search);
-
-        // Convert to external API response format
-        var responses = result.getOrganizations().stream()
-                .map(organizationMapper::toResponse)
-                .toList();
-
-        return OrganizationsResponse.builder()
-                .organizations(responses)
-                .total(responses.size())
+        // Build pagination criteria
+        PaginationCriteria paginationCriteria = PaginationCriteria.builder()
+                .limit(limit)
+                .cursor(cursor)
                 .build();
+
+        // Build sort input if provided
+        SortInput sort = null;
+        if (sortField != null && !sortField.trim().isEmpty()) {
+            SortDirection direction = (sortDirection != null && "ASC".equalsIgnoreCase(sortDirection)) 
+                ? SortDirection.ASC : SortDirection.DESC;
+            sort = SortInput.builder()
+                .field(sortField)
+                .direction(direction)
+                .build();
+        }
+
+        var result = organizationQueryService.queryOrganizations(
+                filterOptions, 
+                organizationMapper.toCursorPaginationCriteria(paginationCriteria), 
+                search, 
+                sort);
+
+        return organizationMapper.toOrganizationsResponse(result);
     }
 
     @Operation(

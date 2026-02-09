@@ -40,6 +40,7 @@
     <modules>
         <module>openframe-core</module>
         <module>openframe-data-mongo</module>
+        <module>openframe-data-redis</module>
         <module>openframe-notification-mail</module>
         <module>openframe-data-kafka</module>
         <module>openframe-api-lib</module>
@@ -57,6 +58,7 @@
         <module>openframe-external-api-service-core</module>
         <module>openframe-stream-service-core</module>
         <module>openframe-gateway-service-core</module>
+        <module>openframe-test-service-core</module>
     </modules>
 
     <dependencies>
@@ -84,6 +86,11 @@
             <dependency>
                 <groupId>com.openframe.oss</groupId>
                 <artifactId>openframe-data-mongo</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openframe.oss</groupId>
+                <artifactId>openframe-data-redis</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>

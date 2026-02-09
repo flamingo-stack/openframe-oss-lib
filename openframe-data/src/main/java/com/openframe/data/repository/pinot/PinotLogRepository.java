@@ -19,7 +19,9 @@ public interface PinotLogRepository {
             List<String> organizationIds,
             String deviceId,
             String cursor,
-            int limit
+            int limit,
+            String sortField,
+            String sortDirection
     );
 
     List<LogProjection> searchLogs(
@@ -32,7 +34,9 @@ public interface PinotLogRepository {
             String deviceId,
             String searchTerm,
             String cursor,
-            int limit
+            int limit,
+            String sortField,
+            String sortDirection
     );
 
     List<String> getToolTypeOptions(
@@ -76,4 +80,17 @@ public interface PinotLogRepository {
             List<String> eventTypes,
             List<String> severities
     );
+    
+    /**
+     * Check if a field is sortable in the underlying data store
+     * @param field the field name to check
+     * @return true if the field can be used for sorting
+     */
+    boolean isSortableField(String field);
+    
+    /**
+     * Get the default field to use for sorting
+     * @return the default sort field name
+     */
+    String getDefaultSortField();
 } 

@@ -14,6 +14,18 @@ import java.util.List;
 @Slf4j
 public class CustomMachineRepositoryImpl implements CustomMachineRepository {
 
+    private static final String SORT_DESC = "DESC";
+    private static final String ID_FIELD = "_id";
+    
+    private static final List<String> SORTABLE_FIELDS = List.of(
+            "_id",
+            "hostname",
+            "displayName",
+            "status",
+            "lastSeen"
+    );
+    private static final String DEFAULT_SORT_FIELD = "_id";
+    
     private final MongoTemplate mongoTemplate;
 
     public CustomMachineRepositoryImpl(MongoTemplate mongoTemplate) {
@@ -21,17 +33,29 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     }
 
     @Override
-    public List<Machine> findMachinesWithCursor(Query query, String cursor, int limit) {
+    public List<Machine> findMachinesWithCursor(Query query, String cursor, int limit, 
+                                                 String sortField, String sortDirection) {
         if (cursor != null && !cursor.trim().isEmpty()) {
             try {
                 ObjectId cursorId = new ObjectId(cursor);
-                query.addCriteria(Criteria.where("_id").lt(cursorId));
+                query.addCriteria(Criteria.where(ID_FIELD).lt(cursorId));
             } catch (IllegalArgumentException ex) {
                 log.warn("Invalid ObjectId cursor format: {}", cursor);
             }
         }
         query.limit(limit);
-        query.with(Sort.by(Sort.Direction.DESC, "_id"));
+        
+        Sort.Direction mongoSortDirection = SORT_DESC.equalsIgnoreCase(sortDirection) ? 
+            Sort.Direction.DESC : Sort.Direction.ASC;
+            
+        if (ID_FIELD.equals(sortField)) {
+            query.with(Sort.by(mongoSortDirection, ID_FIELD));
+        } else {
+            query.with(Sort.by(
+                Sort.Order.by(sortField).with(mongoSortDirection),
+                Sort.Order.by(ID_FIELD).with(mongoSortDirection)
+            ));
+        }
 
         return mongoTemplate.find(query, Machine.class);
     }
@@ -69,5 +93,15 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
             );
             query.addCriteria(searchCriteria);
         }
+    }
+    
+    @Override
+    public boolean isSortableField(String field) {
+        return field != null && SORTABLE_FIELDS.contains(field.trim());
+    }
+    
+    @Override
+    public String getDefaultSortField() {
+        return DEFAULT_SORT_FIELD;
     }
 }

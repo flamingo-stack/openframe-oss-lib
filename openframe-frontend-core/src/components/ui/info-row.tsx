@@ -1,3 +1,5 @@
+"use client"
+
 interface InfoRowProps {
   label: string
   value: string

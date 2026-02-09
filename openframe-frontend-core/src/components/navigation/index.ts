@@ -1,3 +1,5 @@
+"use client"
+
 // Navigation component exports
 export { Header } from './header'
 export type { HeaderConfig, HeaderProps } from './header'

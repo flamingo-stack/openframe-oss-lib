@@ -5,9 +5,9 @@
  * Handles normalization of OS values from various sources (Fleet MDM, Tactical RMM, GraphQL).
  */
 
-import { AppleLogoIcon } from '@/components/icons-v2-generated/brand-logos/apple-logo-icon'
-import { LinuxLogoIcon } from '@/components/icons-v2-generated/brand-logos/linux-logo-icon'
-import { WindowsLogoIcon } from '@/components/icons-v2-generated/brand-logos/windows-logo-icon'
+import { AppleLogoIcon } from '../components/icons-v2-generated/brand-logos/apple-logo-icon'
+import { LinuxLogoIcon } from '../components/icons-v2-generated/brand-logos/linux-logo-icon'
+import { WindowsLogoIcon } from '../components/icons-v2-generated/brand-logos/windows-logo-icon'
 import React from 'react'
 import type { OSPlatformId } from '../utils/os-platforms'
 

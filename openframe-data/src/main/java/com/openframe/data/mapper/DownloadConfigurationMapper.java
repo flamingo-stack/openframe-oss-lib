@@ -33,7 +33,7 @@ public class DownloadConfigurationMapper {
                 new com.openframe.data.model.nats.DownloadConfiguration();
         natsDownloadConfig.setOs(downloadConfiguration.getOs());
         natsDownloadConfig.setFileName(downloadConfiguration.getFileName());
-        natsDownloadConfig.setAgentFileName(downloadConfiguration.getAgentFileName());
+        natsDownloadConfig.setTargetFileName(downloadConfiguration.getTargetFileName());
         natsDownloadConfig.setLink(downloadConfigurationResolver.resolve(downloadConfiguration, version));
         
         return natsDownloadConfig;

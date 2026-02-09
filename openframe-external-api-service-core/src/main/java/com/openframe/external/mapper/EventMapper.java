@@ -8,6 +8,9 @@ import com.openframe.external.dto.event.EventFilterCriteria;
 import com.openframe.external.dto.event.EventFilterResponse;
 import com.openframe.external.dto.event.EventResponse;
 import com.openframe.external.dto.event.EventsResponse;
+import com.openframe.external.dto.shared.SortCriteria;
+import com.openframe.api.dto.shared.SortInput;
+import com.openframe.api.dto.shared.SortDirection;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -76,6 +79,19 @@ public class EventMapper extends BaseRestMapper {
                 .startDate(criteria.getStartDate())
                 .endDate(criteria.getEndDate())
                 .build();
+    }
+    
+    public SortInput toSortInput(SortCriteria criteria) {
+        if (criteria == null) {
+            return null;
+        }
+        
+        SortInput sortInput = new SortInput();
+        sortInput.setField(criteria.getField());
+        sortInput.setDirection(SortDirection.ASC.name().equalsIgnoreCase(criteria.getDirection()) ? 
+            SortDirection.ASC : SortDirection.DESC);
+        
+        return sortInput;
     }
 
 } 

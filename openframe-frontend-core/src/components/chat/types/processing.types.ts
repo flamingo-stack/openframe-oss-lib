@@ -37,6 +37,7 @@ export interface AccumulatorState {
     toolFunction: string
     parameters?: Record<string, any>
   }>
+  escalatedApprovals?: Map<string, { command: string; explanation?: string; approvalType: string }>
 }
 
 // ========== Message Processing Options ==========
@@ -56,6 +57,8 @@ export interface MessageProcessingOptions {
   chatTypeFilter?: string
   /** Map of approval statuses by request ID */
   approvalStatuses?: Record<string, ChatApprovalStatus>
+  /** Approval types to display directly (others get escalated) - defaults to all types */
+  displayApprovalTypes?: string[]
 }
 
 // ========== Chunk Processing Types ==========
