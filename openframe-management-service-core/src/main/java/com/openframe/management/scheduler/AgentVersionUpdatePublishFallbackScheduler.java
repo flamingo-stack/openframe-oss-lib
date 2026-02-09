@@ -12,27 +12,30 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import javax.annotation.PostConstruct;
 import java.util.List;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
 @ConditionalOnProperty(value = "openframe.nats-publish.enabled", havingValue = "true", matchIfMissing = true)
-public class ReleaseVersionPublishScheduler {
+public class AgentVersionUpdatePublishFallbackScheduler {
 
     private final OpenFrameClientConfigurationService openFrameClientConfigurationService;
     private final OpenFrameClientUpdatePublisher openFrameClientUpdatePublisher;
     private final IntegratedToolAgentService integratedToolAgentService;
     private final ToolAgentUpdateUpdatePublisher toolAgentUpdateUpdatePublisher;
 
-    @Scheduled(fixedDelayString = "${openframe.nats-publish.interval:30000}")
+    @Scheduled(fixedDelayString = "${openframe.agent-version-update-publish-fallback.interval:600000}")
     public void publishUnpublishedEntities() {
-        OpenFrameClientConfiguration openFrameClientConfiguration = openFrameClientConfigurationService.get();
-        processOpenframeClient(openFrameClientConfiguration);
+        try {
+            OpenFrameClientConfiguration openFrameClientConfiguration = openFrameClientConfigurationService.get();
+            processOpenframeClient(openFrameClientConfiguration);
 
-        List<IntegratedToolAgent> toolAgents = integratedToolAgentService.getAllEnabled();
-        toolAgents.forEach(this::processToolAgent);
+            List<IntegratedToolAgent> toolAgents = integratedToolAgentService.getAllEnabled();
+            toolAgents.forEach(this::processToolAgent);
+        } catch (Exception e) {
+            log.error("Agent version update publishing failed", e);
+        }
     }
 
     private void processOpenframeClient(OpenFrameClientConfiguration openFrameClientConfiguration) {
