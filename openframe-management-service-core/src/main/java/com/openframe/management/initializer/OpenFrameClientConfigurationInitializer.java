@@ -11,12 +11,13 @@ import org.springframework.stereotype.Component;
 import javax.annotation.PostConstruct;
 import java.io.IOException;
 
+import static com.openframe.data.service.OpenFrameClientConfigurationService.DEFAULT_ID;
+
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class OpenFrameClientConfigurationInitializer {
 
-    private static final String DEFAULT_ID = "default";
     private static final String CONFIG_FILE = "agent-configurations/client-configuration.json";
 
     private final ObjectMapper objectMapper;

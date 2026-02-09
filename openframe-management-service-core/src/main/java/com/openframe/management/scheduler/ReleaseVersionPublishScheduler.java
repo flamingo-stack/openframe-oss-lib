@@ -8,6 +8,7 @@ import com.openframe.data.service.OpenFrameClientUpdatePublisher;
 import com.openframe.data.service.ToolAgentUpdateUpdatePublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -17,7 +18,7 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-//@ConditionalOnProperty(value = "openframe.nats-publish.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(value = "openframe.nats-publish.enabled", havingValue = "true", matchIfMissing = true)
 public class ReleaseVersionPublishScheduler {
 
     private final OpenFrameClientConfigurationService openFrameClientConfigurationService;
@@ -25,20 +26,12 @@ public class ReleaseVersionPublishScheduler {
     private final IntegratedToolAgentService integratedToolAgentService;
     private final ToolAgentUpdateUpdatePublisher toolAgentUpdateUpdatePublisher;
 
-    @PostConstruct
-    public void init() {
-        System.out.println("release scheduler");
-    }
-
     @Scheduled(fixedDelayString = "${openframe.nats-publish.interval:30000}")
     public void publishUnpublishedEntities() {
-        OpenFrameClientConfiguration openFrameClientConfiguration = openFrameClientConfigurationService.findById("default")
-                .orElseThrow(() -> new IllegalStateException("No openframe client configuration"));
-
+        OpenFrameClientConfiguration openFrameClientConfiguration = openFrameClientConfigurationService.get();
         processOpenframeClient(openFrameClientConfiguration);
 
         List<IntegratedToolAgent> toolAgents = integratedToolAgentService.getAllEnabled();
-
         toolAgents.forEach(this::processToolAgent);
     }
 
