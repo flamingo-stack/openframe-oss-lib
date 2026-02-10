@@ -30,4 +30,6 @@ public class OpenFrameClientConfiguration {
     @LastModifiedDate
     private LocalDateTime updatedAt;
 
+    private PublishState publishState;
+
 }

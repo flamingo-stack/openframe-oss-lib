@@ -1,6 +1,7 @@
 package com.openframe.data.service;
 
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
+import com.openframe.data.document.clientconfiguration.PublishState;
 import com.openframe.data.mapper.DownloadConfigurationMapper;
 import com.openframe.data.model.nats.OpenFrameClientUpdateMessage;
 import com.openframe.data.repository.nats.NatsMessagePublisher;
@@ -23,16 +24,32 @@ public class OpenFrameClientUpdatePublisher {
 
     private final NatsMessagePublisher natsMessagePublisher;
     private final DownloadConfigurationMapper downloadConfigurationMapper;
+    private final OpenFrameClientConfigurationService openFrameClientConfigurationService;
 
     public void publish(OpenFrameClientConfiguration configuration) {
         if (!clientUpdateFeatureEnabled) {
             log.info("Client update publishing is disabled, skipping publish for version: {}", configuration.getVersion());
             return;
         }
-        
+
+        markAsNonPublished();
+
         OpenFrameClientUpdateMessage message = buildMessage(configuration);
-        natsMessagePublisher.publish(TOPIC_NAME, message);
+        natsMessagePublisher.publishPersistent(TOPIC_NAME, message);
+
+        markAsPublished();
+
         log.info("Published client update message for all machines with version: {}", configuration.getVersion());
+    }
+
+    private void markAsNonPublished() {
+        OpenFrameClientConfiguration configuration = openFrameClientConfigurationService.get();
+
+        PublishState publishState = configuration.getPublishState();
+        PublishState stateBefore = PublishState.nonPublished(publishState);
+        configuration.setPublishState(stateBefore);
+
+        openFrameClientConfigurationService.save(configuration);
     }
 
     private OpenFrameClientUpdateMessage buildMessage(OpenFrameClientConfiguration configuration) {
@@ -42,6 +59,15 @@ public class OpenFrameClientUpdatePublisher {
                 downloadConfigurationMapper.map(configuration.getDownloadConfiguration(), configuration.getVersion())
         );
         return message;
+    }
+
+    private void markAsPublished() {
+        OpenFrameClientConfiguration configuration = openFrameClientConfigurationService.get();
+
+        PublishState stateBefore = configuration.getPublishState();
+        configuration.setPublishState(PublishState.published(stateBefore));
+
+        openFrameClientConfigurationService.save(configuration);
     }
 }
 
