@@ -19,7 +19,7 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-@ConditionalOnProperty(value = "openframe.nats-publish.enabled", havingValue = "true")
+@ConditionalOnProperty(value = "openframe.agent-version-update-publish-fallback.enabled", havingValue = "true")
 public class AgentVersionUpdatePublishFallbackScheduler {
 
     private final OpenFrameClientConfigurationService openFrameClientConfigurationService;
@@ -27,7 +27,7 @@ public class AgentVersionUpdatePublishFallbackScheduler {
     private final IntegratedToolAgentService integratedToolAgentService;
     private final ToolAgentUpdateUpdatePublisher toolAgentUpdateUpdatePublisher;
 
-    @Value("${openframe.nats-publish.max-attempts:5}")
+    @Value("${openframe.agent-version-update-publish-fallback.max-attempts:5}")
     private int maxPublishAttempts;
 
     @Scheduled(fixedDelayString = "${openframe.agent-version-update-publish-fallback.interval:30000}")
