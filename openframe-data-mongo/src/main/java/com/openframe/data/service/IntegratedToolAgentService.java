@@ -33,6 +33,11 @@ public class IntegratedToolAgentService {
         return agentRepository.findById(id);
     }
 
+    public IntegratedToolAgent getById(String id) {
+        return agentRepository.findById(id)
+                .orElseThrow(() -> new IllegalStateException("No tool agent configuration found by id " + id));
+    }
+
     public List<IntegratedToolAgent> findByReleaseVersionTrue() {
         return agentRepository.findByReleaseVersionTrue();
     }
