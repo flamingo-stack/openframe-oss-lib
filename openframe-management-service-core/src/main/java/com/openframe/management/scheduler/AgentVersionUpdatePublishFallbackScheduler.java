@@ -19,7 +19,7 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-@ConditionalOnProperty(value = "openframe.nats-publish.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(value = "openframe.nats-publish.enabled", havingValue = "true")
 public class AgentVersionUpdatePublishFallbackScheduler {
 
     private final OpenFrameClientConfigurationService openFrameClientConfigurationService;
