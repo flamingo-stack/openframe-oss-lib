@@ -345,89 +345,87 @@ function AutocompleteInner<T = string>(
           </div>
         </PopoverPrimitive.Anchor>
 
-        <PopoverPrimitive.Portal>
-          <PopoverPrimitive.Content
-            className={cn(
-              "z-50 w-[var(--radix-popover-trigger-width)] mt-1",
-              "bg-[#212121] border border-[#3a3a3a] rounded-[6px]",
-              "shadow-lg",
-              "data-[state=open]:animate-in data-[state=closed]:animate-out",
-              "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-              "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-              "data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2",
-              dropdownClassName
-            )}
-            sideOffset={4}
-            align="start"
-            onOpenAutoFocus={(e) => {
+        <PopoverPrimitive.Content
+          className={cn(
+            "z-50 w-[var(--radix-popover-trigger-width)] mt-1",
+            "bg-[#212121] border border-[#3a3a3a] rounded-[6px]",
+            "shadow-lg",
+            "data-[state=open]:animate-in data-[state=closed]:animate-out",
+            "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+            "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+            "data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2",
+            dropdownClassName
+          )}
+          sideOffset={4}
+          align="start"
+          onOpenAutoFocus={(e) => {
+            e.preventDefault()
+            inputRef.current?.focus()
+          }}
+          onInteractOutside={(e) => {
+            // Don't close if clicking inside the anchor/input container
+            if (containerRef.current?.contains(e.target as Node)) {
               e.preventDefault()
-              inputRef.current?.focus()
-            }}
-            onInteractOutside={(e) => {
-              // Don't close if clicking inside the anchor/input container
-              if (containerRef.current?.contains(e.target as Node)) {
-                e.preventDefault()
-              }
-            }}
-          >
-            <ScrollAreaPrimitive.Root className="overflow-hidden">
-              <ScrollAreaPrimitive.Viewport className="max-h-[240px] w-full">
-                <div role="listbox">
-                  {loading ? (
-                    <div className="px-3 py-2 text-[#888] text-[14px]">
-                      {loadingText}
-                    </div>
-                  ) : filteredOptions.length === 0 ? (
-                    <div className="px-3 py-2 text-[#888] text-[14px]">
-                      {freeSolo && inputValue.trim() ? (
-                        <span>Press Enter to add &quot;{inputValue}&quot;</span>
-                      ) : (
-                        noOptionsText
-                      )}
-                    </div>
-                  ) : (
-                    filteredOptions.map((option, index) => {
-                      const isSelected = value.includes(option.value)
-                      const isHighlighted = index === highlightedIndex
+            }
+          }}
+        >
+          <ScrollAreaPrimitive.Root className="overflow-hidden">
+            <ScrollAreaPrimitive.Viewport className="max-h-[240px] w-full">
+              <div role="listbox">
+                {loading ? (
+                  <div className="px-3 py-2 text-[#888] text-[14px]">
+                    {loadingText}
+                  </div>
+                ) : filteredOptions.length === 0 ? (
+                  <div className="px-3 py-2 text-[#888] text-[14px]">
+                    {freeSolo && inputValue.trim() ? (
+                      <span>Press Enter to add &quot;{inputValue}&quot;</span>
+                    ) : (
+                      noOptionsText
+                    )}
+                  </div>
+                ) : (
+                  filteredOptions.map((option, index) => {
+                    const isSelected = value.includes(option.value)
+                    const isHighlighted = index === highlightedIndex
 
-                      return (
-                        <div
-                          key={String(option.value)}
-                          role="option"
-                          aria-selected={isSelected}
-                          className={cn(
-                            "px-3 py-2 cursor-pointer transition-colors",
-                            "font-['DM_Sans'] text-[16px] font-medium",
-                            isHighlighted && "bg-[#3a3a3a]",
-                            isSelected ? "text-ods-accent" : "text-ods-text-primary",
-                            !isHighlighted && "hover:bg-[#2a2a2a]"
-                          )}
-                          onClick={() => handleSelect(option)}
-                          onMouseEnter={() => setHighlightedIndex(index)}
-                        >
-                          {renderOption ? renderOption(option, isSelected) : (
-                            <div className="flex items-center justify-between">
-                              <span>{option.label}</span>
-                              {isSelected && (
-                                <Check className="h-4 w-4 text-ods-accent" />
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })
-                  )}
-                </div>
-              </ScrollAreaPrimitive.Viewport>
-              <ScrollAreaPrimitive.Scrollbar
-                className="flex touch-none select-none p-0.5 bg-transparent transition-colors duration-150 ease-out data-[orientation=vertical]:w-2.5 data-[orientation=horizontal]:flex-col data-[orientation=horizontal]:h-2.5"
-                orientation="vertical"
-              >
-                <ScrollAreaPrimitive.Thumb className="relative flex-1 rounded-full bg-[#3a3a3a] before:absolute before:left-1/2 before:top-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:h-full before:min-h-[44px] before:w-full before:min-w-[44px]" />
-              </ScrollAreaPrimitive.Scrollbar>
-            </ScrollAreaPrimitive.Root>
-          </PopoverPrimitive.Content>
-        </PopoverPrimitive.Portal>
+                    return (
+                      <div
+                        key={String(option.value)}
+                        role="option"
+                        aria-selected={isSelected}
+                        className={cn(
+                          "px-3 py-2 cursor-pointer transition-colors",
+                          "font-['DM_Sans'] text-[16px] font-medium",
+                          isHighlighted && "bg-[#3a3a3a]",
+                          isSelected ? "text-ods-accent" : "text-ods-text-primary",
+                          !isHighlighted && "hover:bg-[#2a2a2a]"
+                        )}
+                        onClick={() => handleSelect(option)}
+                        onMouseEnter={() => setHighlightedIndex(index)}
+                      >
+                        {renderOption ? renderOption(option, isSelected) : (
+                          <div className="flex items-center justify-between">
+                            <span>{option.label}</span>
+                            {isSelected && (
+                              <Check className="h-4 w-4 text-ods-accent" />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </ScrollAreaPrimitive.Viewport>
+            <ScrollAreaPrimitive.Scrollbar
+              className="flex touch-none select-none p-0.5 bg-transparent transition-colors duration-150 ease-out data-[orientation=vertical]:w-2.5 data-[orientation=horizontal]:flex-col data-[orientation=horizontal]:h-2.5"
+              orientation="vertical"
+            >
+              <ScrollAreaPrimitive.Thumb className="relative flex-1 rounded-full bg-[#3a3a3a] before:absolute before:left-1/2 before:top-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:h-full before:min-h-[44px] before:w-full before:min-w-[44px]" />
+            </ScrollAreaPrimitive.Scrollbar>
+          </ScrollAreaPrimitive.Root>
+        </PopoverPrimitive.Content>
       </PopoverPrimitive.Root>
     </div>
   )
