@@ -138,7 +138,7 @@ const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(
             variant="ghost"
             disabled={isLoading || isCreatingDialog}
             leftIcon={<ChatPlusIcon className="size-6 text-ods-text-secondary" />}
-            className="flex-1 justify-center text-lg font-bold text-ods-text-primary hover:bg-ods-bg-hover"
+            className="flex-1 justify-center text-lg font-bold text-ods-text-primary hover:bg-ods-bg-hover focus-visible:ring-0"
           >
             Start New Chat
           </Button>
