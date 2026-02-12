@@ -94,6 +94,10 @@ public class KafkaStreamsConfig {
         // Consumer configuration
         props.put(StreamsConfig.consumerPrefix(org.apache.kafka.clients.consumer.ConsumerConfig.AUTO_OFFSET_RESET_CONFIG), "earliest");
         props.put(StreamsConfig.consumerPrefix(org.apache.kafka.clients.consumer.ConsumerConfig.MAX_POLL_RECORDS_CONFIG), 100);
+
+        // Allow stream-time to advance when some partitions have no data
+        // This ensures leftJoin windows close even when host-activities topic is empty
+        props.put(StreamsConfig.MAX_TASK_IDLE_MS_CONFIG, 5000);
         
         // Producer configuration
         props.put(StreamsConfig.producerPrefix(org.apache.kafka.clients.producer.ProducerConfig.BATCH_SIZE_CONFIG), 16384);
