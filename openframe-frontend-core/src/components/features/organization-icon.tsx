@@ -148,6 +148,7 @@ export function OrganizationIcon({
     <div className={containerClasses}>
       <div className={cn(
         'flex items-center justify-center text-xs font-medium uppercase',
+        imageUrl && 'hidden',
         backgroundStyle === 'white' ? 'text-ods-text-primary' : 'text-ods-text-secondary'
       )}>
         {initials}
@@ -162,7 +163,11 @@ export function OrganizationIcon({
             'absolute object-contain',
             showBackground ? 'p-1' : 'w-full h-full'
           )}
-          onError={(e) => { e.currentTarget.style.display = 'none' }}
+          onError={(e) => {
+            e.currentTarget.style.display = 'none'
+            const el = e.currentTarget.previousElementSibling as HTMLElement
+            if (el) el.classList.remove('hidden')
+          }}
         />
       )}
     </div>
