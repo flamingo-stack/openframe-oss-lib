@@ -298,7 +298,6 @@ export function OrganizationSelector({
                     }
                     organizationName={org.name}
                     size={iconSize}
-                    preFetched={true}
                   />
                   <span>{org.name}</span>
                 </div>
@@ -347,7 +346,6 @@ export function OrganizationSelector({
                   }
                   organizationName={selectedOrg.name}
                   size={iconSize}
-                  preFetched={true}
                 />
                 <span>{selectedOrg.name}</span>
               </span>
@@ -405,7 +403,6 @@ export function OrganizationSelector({
                       }
                       organizationName={org.name}
                       size={iconSize}
-                      preFetched={true}
                     />
                     <span>{org.name}</span>
                   </div>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useImperativeHandle, forwardRef, useCallback, type KeyboardEvent, type ChangeEvent } from "react"
+import { useState, useRef, useImperativeHandle, forwardRef, useCallback, useEffect, type KeyboardEvent, type ChangeEvent } from "react"
 import { cn } from "../../utils/cn"
 import { Send } from "lucide-react"
 import { Textarea } from "../ui/textarea"
@@ -8,11 +8,17 @@ import { ChatTypingIndicator } from "./chat-typing-indicator"
 import type { ChatInputProps } from "./types"
 
 const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
-  ({ className, onSend, sending = false, awaitingResponse = false, placeholder = "Enter your request here...", reserveAvatarOffset = true, disabled = false, ...props }, ref) => {
+  ({ className, onSend, sending = false, awaitingResponse = false, placeholder = "Enter your request here...", reserveAvatarOffset = true, disabled = false, autoFocus = false, ...props }, ref) => {
     const [value, setValue] = useState('')
     const textareaRef = useRef<HTMLTextAreaElement>(null)
 
     useImperativeHandle(ref, () => textareaRef.current!)
+
+    useEffect(() => {
+      if (autoFocus && textareaRef.current) {
+        textareaRef.current.focus()
+      }
+    }, [autoFocus])
 
     const handleSubmit = useCallback(() => {
       const message = value.trim()
