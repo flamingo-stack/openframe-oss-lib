@@ -42,7 +42,7 @@ public class DebeziumService {
                 if (getResponse.getStatusCode().is2xxSuccessful()) {
                     log.info("Connector '{}' already exists — updating config...", name);
                     HttpEntity<Object> requestEntity = new HttpEntity<>(connectorMap.get("config"), headers);
-                    restTemplate.put(connectorUrl + "/config", requestEntity);
+                    restTemplate.put(getDebeziumConnectorConfigUrl(name), requestEntity);
                     log.info("Connector '{}' updated successfully", name);
                     continue;
                 }
@@ -75,7 +75,11 @@ public class DebeziumService {
     }
 
     private String getDebeziumConnectorStatusUrl(String name) {
-        return "%s/%s/status".formatted(getDebeziumConnectorCreateUrl(), name);
+        return "%s/status".formatted(getDebeziumConnectorUrl(name));
+    }
+
+    private String getDebeziumConnectorConfigUrl(String name) {
+        return "%s/config".formatted(getDebeziumConnectorUrl(name));
     }
 
     /**
