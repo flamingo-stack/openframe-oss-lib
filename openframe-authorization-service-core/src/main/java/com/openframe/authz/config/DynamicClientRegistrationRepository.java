@@ -26,7 +26,7 @@ public class DynamicClientRegistrationRepository implements ClientRegistrationRe
     public ClientRegistration findByRegistrationId(String registrationId) {
         String tenantId = resolveTenantId();
         if (tenantId == null) {
-            log.debug("Skipping dynamic client load: tenantId not found in session");
+            log.warn("ClientRegistration not resolved: tenantId not in context/session, provider={}. OAuth2 flow will fail.", registrationId);
             return null;
         }
         try {

@@ -10,6 +10,7 @@ import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.tenant.SSOPerTenantConfig;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -35,6 +36,10 @@ import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.AuthenticationFailureHandler;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.HashSet;
 import java.util.List;
@@ -52,6 +57,7 @@ import static java.util.Locale.ROOT;
  */
 @Configuration
 @EnableWebSecurity
+@Slf4j
 public class SecurityConfig {
 
     public static final String EMAIL = "email";
@@ -93,6 +99,7 @@ public class SecurityConfig {
                         .permitAll())
                 .oauth2Login(o -> o
                         .loginPage("/login")
+                        .failureHandler(oauth2LoginFailureHandler())
                         .authorizationEndpoint(a -> a.authorizationRequestResolver(
                                 new SsoAuthorizationRequestResolver(clientRegistrationRepository, ssoCookieCodec)
                         ))
@@ -107,6 +114,16 @@ public class SecurityConfig {
                         })
                 )
                 .build();
+    }
+
+    @Bean
+    public AuthenticationFailureHandler oauth2LoginFailureHandler() {
+        return (HttpServletRequest request, HttpServletResponse response, org.springframework.security.core.AuthenticationException exception) -> {
+            String tenantId = TenantContext.getTenantId();
+            log.error("OAuth2 login failed. tenantId={}, requestUri={}, error={}",
+                    tenantId, request.getRequestURI(), exception.getMessage(), exception);
+            response.sendRedirect(request.getContextPath() + "/login?error");
+        };
     }
 
     @Bean
@@ -139,6 +156,9 @@ public class SecurityConfig {
             String issuer = clientRegistration.getProviderDetails().getIssuerUri();
             String jwkSetUri = clientRegistration.getProviderDetails().getJwkSetUri();
 
+            log.debug("Building JWT decoder for provider='{}', configuredIssuer='{}', jwkSetUri='{}'",
+                    registrationId, issuer, jwkSetUri);
+
             if (!"microsoft".equals(registrationId)) {
                 if (issuer != null && !issuer.isBlank()) {
                     return JwtDecoders.fromIssuerLocation(issuer);
@@ -151,11 +171,16 @@ public class SecurityConfig {
             OAuth2TokenValidator<Jwt> oidcStandard = new OidcIdTokenValidator(clientRegistration);
             OAuth2TokenValidator<Jwt> microsoftIssuerPatternValidator = token -> {
                 String iss = token.getIssuer() != null ? token.getIssuer().toString() : null;
+                log.info("Microsoft ID token issuer: '{}', expected pattern: '{}'", iss, MS_ISSUER_PATTERN.pattern());
                 if (iss != null && MS_ISSUER_PATTERN.matcher(iss).matches()) {
+                    log.info("Microsoft issuer validation passed for issuer='{}'", iss);
                     return OAuth2TokenValidatorResult.success();
                 }
+                log.error("Microsoft issuer validation FAILED: issuer='{}' does not match pattern='{}'",
+                        iss, MS_ISSUER_PATTERN.pattern());
                 return OAuth2TokenValidatorResult.failure(
-                        new OAuth2Error("invalid_id_token", "Invalid issuer for Microsoft multi-tenant", null));
+                        new OAuth2Error("invalid_id_token",
+                                "Invalid issuer for Microsoft multi-tenant. Received: " + iss, null));
             };
             decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(timestamps, oidcStandard, microsoftIssuerPatternValidator));
             return decoder;
