@@ -199,6 +199,61 @@
             to { transform: rotate(360deg); }
         }
 
+        .forgot-password-link {
+            color: var(--color-text-secondary);
+            font-size: 13px;
+            text-decoration: none;
+            transition: color 200ms ease-out;
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+            font-family: inherit;
+        }
+
+        .forgot-password-link:hover {
+            color: var(--color-accent-primary);
+        }
+
+        .toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .toast {
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-family: inherit;
+            border: 1px solid;
+            box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+            animation: toast-slide-in 300ms ease-out;
+            max-width: 360px;
+            transition: opacity 300ms ease-out, transform 300ms ease-out;
+        }
+
+        .toast-success {
+            background: var(--color-success-bg);
+            border-color: var(--color-success-border);
+            color: var(--color-success);
+        }
+
+        .toast-error {
+            background: var(--color-error-bg);
+            border-color: var(--color-error-border);
+            color: var(--color-error);
+        }
+
+        @keyframes toast-slide-in {
+            from { transform: translateY(16px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
         @media (max-width: 480px) {
             .login-container { padding: 24px; }
             .form-input { height: 44px; }
@@ -258,12 +313,17 @@
                    placeholder="Enter your password" required autocomplete="current-password">
         </div>
 
+        <div th:if="${passwordResetUrl}" style="margin-bottom: 8px; text-align: right;">
+            <button type="button" class="forgot-password-link" id="forgotPasswordBtn">Forgot password?</button>
+        </div>
+
         <button type="submit" id="submitBtn" class="btn btn-primary">
             <span id="btnText">Sign In</span>
             <span id="btnSpinner" class="spinner" style="display: none;"></span>
         </button>
     </form>
 </div>
+<div id="toastContainer" class="toast-container"></div>
 <script>
     (function () {
         var form = document.getElementById('loginForm');
@@ -282,6 +342,43 @@
             alert.textContent = message;
             alert.className = 'alert alert-error';
             alert.style.display = '';
+        }
+
+        function showToast(message, variant) {
+            var container = document.getElementById('toastContainer');
+            var toast = document.createElement('div');
+            toast.className = 'toast toast-' + variant;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(function () {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(16px)';
+                setTimeout(function () { toast.remove(); }, 300);
+            }, 4000);
+        }
+
+        var forgotBtn = document.getElementById('forgotPasswordBtn');
+        if (forgotBtn) {
+            forgotBtn.addEventListener('click', function () {
+                var email = document.getElementById('username').value.trim();
+                if (!email) {
+                    showToast('Please enter your email address first.', 'error');
+                    return;
+                }
+                fetch('/password-reset/request', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: email })
+                }).then(function (res) {
+                    if (res.ok || res.status === 202) {
+                        showToast('Password reset email sent. Check your inbox.', 'success');
+                    } else {
+                        showToast('Could not send password reset email. Please try again.', 'error');
+                    }
+                }).catch(function () {
+                    showToast('Network error. Please try again.', 'error');
+                });
+            });
         }
 
         form.addEventListener('submit', function (e) {
