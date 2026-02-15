@@ -326,7 +326,8 @@
         </div>
 
         <div class="form-actions">
-            <button th:if="${passwordResetUrl}" type="button" class="btn btn-ghost" id="forgotPasswordBtn">Forgot password?</button>
+            <button th:if="${passwordResetUrl}" type="button" class="btn btn-ghost" id="forgotPasswordBtn"
+                    th:data-url="${passwordResetUrl}">Forgot password?</button>
             <button type="submit" id="submitBtn" class="btn btn-primary">
                 <span id="btnText">Sign In</span>
                 <span id="btnSpinner" class="spinner" style="display: none;"></span>
@@ -347,12 +348,6 @@
             btn.disabled = loading;
             text.textContent = loading ? 'Signing in...' : 'Sign In';
             spinner.style.display = loading ? '' : 'none';
-        }
-
-        function showError(message) {
-            alert.textContent = message;
-            alert.className = 'alert alert-error';
-            alert.style.display = '';
         }
 
         function showToast(message, variant) {
@@ -376,7 +371,8 @@
                     showToast('Please enter your email address first.', 'error');
                     return;
                 }
-                fetch('/password-reset/request', {
+                var url = forgotBtn.getAttribute('data-url');
+                fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: email })
@@ -390,6 +386,12 @@
                     showToast('Network error. Please try again.', 'error');
                 });
             });
+        }
+
+        function showError(message) {
+            alert.textContent = message;
+            alert.className = 'alert alert-error';
+            alert.style.display = '';
         }
 
         form.addEventListener('submit', function (e) {
