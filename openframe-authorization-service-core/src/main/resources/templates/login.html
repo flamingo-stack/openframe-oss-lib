@@ -199,20 +199,32 @@
             to { transform: rotate(360deg); }
         }
 
-        .forgot-password-link {
-            color: var(--color-text-secondary);
-            font-size: 13px;
-            text-decoration: none;
-            transition: color 200ms ease-out;
-            cursor: pointer;
-            background: none;
-            border: none;
-            padding: 0;
-            font-family: inherit;
+        .form-actions {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            margin-top: 8px;
         }
 
-        .forgot-password-link:hover {
-            color: var(--color-accent-primary);
+        .form-actions .btn {
+            flex: 1;
+            margin-top: 0;
+        }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--color-text-secondary);
+            border-color: transparent;
+        }
+
+        .btn-ghost:hover {
+            background: var(--color-bg-hover);
+            color: var(--color-text-primary);
+            border-color: transparent;
+        }
+
+        .btn-ghost:active {
+            background: var(--color-bg-active);
         }
 
         .toast-container {
@@ -313,14 +325,13 @@
                    placeholder="Enter your password" required autocomplete="current-password">
         </div>
 
-        <div th:if="${passwordResetUrl}" style="margin-bottom: 8px; text-align: right;">
-            <button type="button" class="forgot-password-link" id="forgotPasswordBtn">Forgot password?</button>
+        <div class="form-actions">
+            <button th:if="${passwordResetUrl}" type="button" class="btn btn-ghost" id="forgotPasswordBtn">Forgot password?</button>
+            <button type="submit" id="submitBtn" class="btn btn-primary">
+                <span id="btnText">Sign In</span>
+                <span id="btnSpinner" class="spinner" style="display: none;"></span>
+            </button>
         </div>
-
-        <button type="submit" id="submitBtn" class="btn btn-primary">
-            <span id="btnText">Sign In</span>
-            <span id="btnSpinner" class="spinner" style="display: none;"></span>
-        </button>
     </form>
 </div>
 <div id="toastContainer" class="toast-container"></div>
