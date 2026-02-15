@@ -1,5 +1,6 @@
 package com.openframe.api.service.processor;
 
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -15,7 +16,7 @@ import org.springframework.stereotype.Component;
 public class DefaultDeviceStatusProcessor implements DeviceStatusProcessor {
 
     @Override
-    public void postProcessStatusUpdated(Machine machine) {
+    public void postProcessStatusUpdated(Machine machine, DeviceStatus previousStatus) {
         log.debug("Device status updated: {}, new status: {}", machine.getMachineId(), machine.getStatus());
     }
 }
