@@ -1,6 +1,7 @@
 package com.openframe.client.service;
 
 import com.openframe.client.exception.MachineNotFoundException;
+import com.openframe.client.service.processor.MachineStatusPostProcessor;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.repository.device.MachineRepository;
@@ -16,6 +17,7 @@ import java.time.Instant;
 public class MachineStatusService {
 
     private final MachineRepository machineRepository;
+    private final MachineStatusPostProcessor machineStatusPostProcessor;
 
     public void updateToOnline(String machineId, Instant eventTimestamp) {
         update(machineId, DeviceStatus.ONLINE, eventTimestamp);
@@ -47,10 +49,17 @@ public class MachineStatusService {
     }
 
     private void applyStatusUpdate(Machine machine, DeviceStatus newStatus, Instant eventTimestamp) {
+        DeviceStatus previousStatus = machine.getStatus();
         machine.setStatus(newStatus);
         machine.setLastSeen(eventTimestamp);
         machineRepository.save(machine);
         log.info("Updated machineId={} to status={} at {}", machine.getMachineId(), newStatus, eventTimestamp);
+
+        try {
+            machineStatusPostProcessor.onStatusUpdated(machine.getMachineId(), previousStatus, newStatus);
+        } catch (Exception e) {
+            log.error("Post-processor failed for machineId={}: {}", machine.getMachineId(), e.getMessage(), e);
+        }
     }
 
     private void logStaleEvent(Machine machine, Instant eventTimestamp) {

@@ -164,14 +164,15 @@ public class DeviceService {
         log.info("Updating device status. machineId={}, newStatus={}", machineId, status);
         Machine machine = machineRepository.findByMachineId(machineId)
                 .orElseThrow(() -> new DeviceNotFoundException("Device not found: " + machineId));
-        if (machine.getStatus() == status) {
+        DeviceStatus previousStatus = machine.getStatus();
+        if (previousStatus == status) {
             log.info("Device {} already has status {}", machineId, status);
             return;
         }
         machine.setStatus(status);
         machine.setUpdatedAt(now());
         machineRepository.save(machine);
-        deviceStatusProcessor.postProcessStatusUpdated(machine);
+        deviceStatusProcessor.postProcessStatusUpdated(machine, previousStatus);
         log.info("Device {} status updated to {}", machineId, status);
     }
     
