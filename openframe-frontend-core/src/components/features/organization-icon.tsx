@@ -44,23 +44,6 @@ export interface OrganizationIconProps {
    * Background style variant (default: 'dark')
    */
   backgroundStyle?: 'dark' | 'light' | 'white'
-
-  /**
-   * Force pre-fetched mode (skip internal fetching even if URL is not a blob)
-   * Useful when you know the URL is already processed
-   */
-  preFetched?: boolean
-
-  /**
-   * Optional refresh key for cache-busting (e.g., timestamp after upload)
-   * Only used when internal fetching is active
-   */
-  refreshKey?: string | number
-
-  /**
-   * Optional configuration override for image fetching
-   */
-  config?: AuthenticatedImageConfig
 }
 
 /**
@@ -146,25 +129,8 @@ export function OrganizationIcon({
   className = '',
   showBackground = true,
   backgroundStyle = 'dark',
-  preFetched = false,
-  refreshKey,
-  config
 }: OrganizationIconProps) {
   const { width, height } = imageSizeMap[size]
-
-  // Auto-detect if URL is a pre-fetched blob
-  const isBlobUrl = imageUrl?.startsWith('blob:')
-  const shouldFetch = imageUrl && !isBlobUrl && !preFetched
-
-  // Use authenticated image hook only if we need to fetch
-  const { imageUrl: fetchedImageUrl, isLoading } = useAuthenticatedImage(
-    shouldFetch ? imageUrl : undefined,
-    refreshKey,
-    config
-  )
-
-  // Determine final image URL to display
-  const displayImageUrl = shouldFetch ? fetchedImageUrl : imageUrl
 
   // Generate fallback initials (first 2 letters, matching VendorIcon)
   const initials = organizationName?.substring(0, 2) || '??'
@@ -172,7 +138,7 @@ export function OrganizationIcon({
   // Container classes matching VendorIcon exactly
   const containerClasses = cn(
     sizeClasses[size],
-    'rounded-lg flex items-center justify-center flex-shrink-0',
+    'rounded-lg flex items-center justify-center flex-shrink-0 relative',
     showBackground && backgroundClasses[backgroundStyle],
     !showBackground && 'overflow-hidden',
     className
@@ -180,33 +146,29 @@ export function OrganizationIcon({
 
   return (
     <div className={containerClasses}>
-      {isLoading ? (
-        // Loading state (simple spinner matching VendorIcon pattern)
-        <div className={cn(
-          "animate-pulse rounded-sm bg-ods-border",
-          width > 40 ? "w-8 h-8" : "w-4 h-4"
-        )} />
-      ) : displayImageUrl ? (
-        // Image loaded - matches VendorIcon exactly
+      <div className={cn(
+        'flex items-center justify-center text-xs font-medium uppercase',
+        imageUrl && 'hidden',
+        backgroundStyle === 'white' ? 'text-ods-text-primary' : 'text-ods-text-secondary'
+      )}>
+        {initials}
+      </div>
+      {imageUrl && (
         <Image
-          src={displayImageUrl}
-          alt={`${organizationName} logo`}
+          src={imageUrl}
+          alt={`${initials}`}
           width={width}
           height={height}
           className={cn(
-            'object-contain',
+            'absolute object-contain',
             showBackground ? 'p-1' : 'w-full h-full'
           )}
-          unoptimized={isBlobUrl} // Don't optimize blob URLs
+          onError={(e) => {
+            e.currentTarget.style.display = 'none'
+            const el = e.currentTarget.previousElementSibling as HTMLElement
+            if (el) el.classList.remove('hidden')
+          }}
         />
-      ) : (
-        // Fallback initials - matches VendorIcon exactly
-        <div className={cn(
-          'flex items-center justify-center text-xs font-medium uppercase',
-          backgroundStyle === 'white' ? 'text-[#333333]' : 'text-ods-text-secondary'
-        )}>
-          {initials}
-        </div>
       )}
     </div>
   )

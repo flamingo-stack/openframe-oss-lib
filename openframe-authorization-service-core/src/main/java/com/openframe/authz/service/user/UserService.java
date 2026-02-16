@@ -16,7 +16,6 @@ import java.util.Optional;
 
 import static com.openframe.data.document.user.UserStatus.ACTIVE;
 import static com.openframe.data.document.user.UserStatus.DELETED;
-import static java.time.LocalDateTime.now;
 import static java.util.UUID.randomUUID;
 
 /**
@@ -109,7 +108,6 @@ public class UserService {
                 .passwordHash(passwordEncoder.encode(rawPassword))
                 .status(ACTIVE)
                 .emailVerified(false)
-                .createdAt(now())
                 .roles(roles)
                 .loginProvider("LOCAL")
                 .build();
@@ -181,7 +179,6 @@ public class UserService {
                 .passwordHash(passwordEncoder.encode(randomPassword))
                 .status(ACTIVE)
                 .emailVerified(true)
-                .createdAt(now())
                 .roles(roles)
                 .loginProvider(providerRegistrationId)
                 .build();

@@ -129,7 +129,7 @@ export function FileManager({
 
   return (
     <div className={cn('flex flex-col h-full bg-ods-bg', className)}>
-      <div className="flex-1 flex flex-col py-6 space-y-6 min-h-0">
+      <div className="flex-1 flex flex-col py-2 space-y-6 min-h-0">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <FileManagerBreadcrumb
             className="flex-1 min-w-0"

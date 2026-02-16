@@ -1,111 +1,100 @@
 "use client"
 
-import { useRef, useCallback, useLayoutEffect, useEffect, useImperativeHandle, forwardRef } from "react"
+import { useRef, useEffect, useImperativeHandle, forwardRef } from "react"
 import { cn } from "../../utils/cn"
 import { ChatMessageEnhanced } from "./chat-message-enhanced"
 import { ChatMessageListSkeleton } from "./chat-message-skeleton"
 import type { ChatMessageListProps } from "./types"
 
+const BOTTOM_THRESHOLD = 30 // px from bottom to be considered "at bottom"
+
 const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
   ({ className, messages, dialogId, isLoading = false, isTyping = false, autoScroll = true, showAvatars = true, contentClassName, assistantType, pendingApprovals, ...props }, ref) => {
     const scrollRef = useRef<HTMLDivElement>(null)
+
+    const isStuckRef = useRef(true)
+    const touchStartYRef = useRef(0)
+    const lastDialogIdRef = useRef<string | undefined>(undefined)
     const lastMessageCountRef = useRef(0)
-    const lastDialogIdRef = useRef<string | undefined>(dialogId)
-
-    const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
-      if (!autoScroll) return
-      
-      const tryScroll = () => {
-        if (!scrollRef.current) {
-          requestAnimationFrame(tryScroll)
-          return
-        }
-        
-        const element = scrollRef.current
-        if (behavior === 'auto') {
-          element.scrollTop = element.scrollHeight
-        } else {
-          element.scrollTo({
-            top: element.scrollHeight,
-            behavior
-          })
-        }
-      }
-      
-      tryScroll()
-    }, [autoScroll])
-
-    useEffect(() => {
-      const element = scrollRef.current
-      if (!element || !autoScroll) return
-
-      const contentContainer = element.querySelector('.mx-auto.flex.w-full')
-      if (contentContainer) {
-        const mutationObserver = new MutationObserver(() => {
-            if (isTyping) {
-              requestAnimationFrame(() => {
-                scrollToBottom('smooth')
-              })
-            }
-        })
-
-        mutationObserver.observe(contentContainer, {
-          childList: true,
-          subtree: true,
-          characterData: true
-        })
-
-        return () => {
-          mutationObserver.disconnect()
-        }
-      }
-
-      return () => {}
-    }, [autoScroll, scrollToBottom, isTyping])
 
     useEffect(() => {
       if (!autoScroll) return
+      const el = scrollRef.current
+      if (!el) return
 
-      const currentMessageCount = messages.length
-      const messageCountChanged = currentMessageCount !== lastMessageCountRef.current
       const dialogChanged = dialogId !== lastDialogIdRef.current
+      const prevCount = lastMessageCountRef.current
+      const newCount = messages.length
+
+      lastDialogIdRef.current = dialogId
+      lastMessageCountRef.current = newCount
 
       if (dialogChanged) {
-        lastDialogIdRef.current = dialogId
-        lastMessageCountRef.current = currentMessageCount
-        
-        const element = scrollRef.current
-        if (element) {
-          element.scrollTop = element.scrollHeight
-        }
+        isStuckRef.current = true
+        el.scrollTop = el.scrollHeight
         return
       }
 
-      if (messageCountChanged) {
-        lastMessageCountRef.current = currentMessageCount
+      if (newCount > prevCount) {
+        if (prevCount === 0) {
+          isStuckRef.current = true
+          el.scrollTop = el.scrollHeight
+          return
+        }
+
         const lastMessage = messages[messages.length - 1]
-        
         if (lastMessage?.role === 'user') {
-          scrollToBottom(lastMessage?.role === 'user' ? 'smooth' : 'auto')
+          isStuckRef.current = true
+          el.scrollTop = el.scrollHeight
         }
-        return
+      }
+    }, [autoScroll, messages.length, dialogId])
+
+    useEffect(() => {
+      const el = scrollRef.current
+      if (!el || !autoScroll) return
+
+      const onWheel = (e: WheelEvent) => {
+        if (e.deltaY < 0) isStuckRef.current = false
       }
 
-      if (isTyping && !isLoading) {
-        scrollToBottom('smooth')
+      const onTouchStart = (e: TouchEvent) => {
+        touchStartYRef.current = e.touches[0].clientY
       }
-    }, [autoScroll, messages.length, dialogId, isTyping, isLoading, scrollToBottom, messages])
 
-    useLayoutEffect(() => {
-      if (autoScroll && !isLoading) {
-        const element = scrollRef.current
-        if (element) {
-          element.scrollTop = element.scrollHeight
+      const onTouchMove = (e: TouchEvent) => {
+        if (e.touches[0].clientY > touchStartYRef.current + 10) {
+          isStuckRef.current = false
         }
-        lastMessageCountRef.current = messages.length
-        lastDialogIdRef.current = dialogId
       }
-    }, [autoScroll, isLoading, messages.length, dialogId])
+
+      const onScroll = () => {
+        const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD
+        if (atBottom) isStuckRef.current = true
+      }
+
+      el.addEventListener('wheel', onWheel, { passive: true })
+      el.addEventListener('touchstart', onTouchStart, { passive: true })
+      el.addEventListener('touchmove', onTouchMove, { passive: true })
+      el.addEventListener('scroll', onScroll, { passive: true })
+
+      return () => {
+        el.removeEventListener('wheel', onWheel)
+        el.removeEventListener('touchstart', onTouchStart)
+        el.removeEventListener('touchmove', onTouchMove)
+        el.removeEventListener('scroll', onScroll)
+      }
+    }, [autoScroll, isLoading])
+
+    useEffect(() => {
+      if (!autoScroll) return
+      const el = scrollRef.current
+      if (!el) return
+
+      if (isStuckRef.current) {
+        el.scrollTop = el.scrollHeight
+      }
+    }, [autoScroll, messages])
 
     useImperativeHandle(ref, () => scrollRef.current!)
 
@@ -127,13 +116,19 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
           ref={scrollRef}
           className={cn(
             "flex h-full w-full flex-col overflow-y-auto overflow-x-hidden flex-1",
-            "[scroll-behavior:smooth]",
             "scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30 hover:scrollbar-thumb-ods-text-secondary/30",
             className
           )}
+          style={{ overflowAnchor: 'none' }}
           {...props}
         >
-          <div className={cn("mx-auto flex w-full max-w-3xl flex-col pb-2 min-w-0", contentClassName || "px-4")} style={{ minHeight: '100%' }}>
+          <div
+            className={cn(
+              "mx-auto flex w-full max-w-3xl flex-col pb-2 min-w-0",
+              contentClassName || "px-4"
+            )}
+            style={{ minHeight: '100%' }}
+          >
             <div className="flex-1" />
             {messages.map((message, index) => (
               <ChatMessageEnhanced
