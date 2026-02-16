@@ -21,7 +21,7 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@ConditionalOnProperty(name = "spring.redis.enabled", havingValue = "true")
+@ConditionalOnProperty(name = "openframe.machine-id.cache.enabled", havingValue = "true")
 public class MachineIdCacheService {
 
     private final ToolConnectionRepository toolConnectionRepository;
