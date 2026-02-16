@@ -9,6 +9,7 @@ import com.openframe.data.repository.tool.ToolConnectionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
@@ -20,7 +21,7 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@ConditionalOnBean({ToolConnectionRepository.class, MachineRepository.class, OrganizationRepository.class})
+@ConditionalOnProperty(name = "spring.redis.enabled", havingValue = "true")
 public class MachineIdCacheService {
 
     private final ToolConnectionRepository toolConnectionRepository;
