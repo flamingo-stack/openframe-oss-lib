@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { fn } from 'storybook/test'
-import { ColorsIcon, PlusCircleIcon, PlayCircleIcon, CheckCircleIcon } from '../components/icons-v2-generated'
+import { ColorsIcon, PlusCircleIcon, PlayCircleIcon, CheckCircleIcon, PenEditIcon, CalendarDaysIcon, VialIcon } from '../components/icons-v2-generated'
 import { PageActions } from '../components/ui/page-actions'
 
 const meta = {
@@ -13,9 +13,10 @@ const meta = {
         component: `
 PageActions component for displaying action buttons in page headers.
 
-**Two variants:**
+**Three variants:**
 1. \`icon-buttons\` - Buttons with icons, collapses to dropdown menu on mobile
 2. \`primary-buttons\` - Primary + outline buttons, fixed to bottom on mobile
+3. \`menu-primary\` - MoreActionsMenu ("...") + primary button on desktop, all actions expand to fixed bottom bar on mobile
 
 Use with \`PageContainer\` headerActions prop for consistent page layouts.
         `,
@@ -26,7 +27,7 @@ Use with \`PageContainer\` headerActions prop for consistent page layouts.
   argTypes: {
     variant: {
       control: 'select',
-      options: ['icon-buttons', 'primary-buttons'],
+      options: ['icon-buttons', 'primary-buttons', 'menu-primary'],
       description: 'Layout variant for the action buttons',
     },
     actions: {
@@ -249,6 +250,94 @@ export const LargeGap: Story = {
         label: 'Cancel',
         onClick: fn(),
         variant: 'outline',
+      },
+    ],
+  },
+}
+
+/**
+ * Menu + primary variant - shows MoreActionsMenu ("...") + primary button on desktop.
+ * On mobile all actions expand into a fixed bottom bar.
+ */
+export const MenuPrimary: Story = {
+  args: {
+    variant: 'menu-primary',
+    actions: [
+      {
+        label: 'Run Script',
+        onClick: fn(),
+        variant: 'primary',
+        icon: <PlayCircleIcon size={24} />,
+      },
+    ],
+    menuActions: [
+      {
+        label: 'Edit Script',
+        onClick: fn(),
+        icon: <PenEditIcon size={24} />,
+      },
+      {
+        label: 'Schedule Script',
+        onClick: fn(),
+        icon: <CalendarDaysIcon size={24} />,
+      },
+      {
+        label: 'Test Script',
+        onClick: fn(),
+        icon: <VialIcon size={24} />,
+      },
+    ],
+  },
+}
+
+/**
+ * Menu + primary with a single menu action
+ */
+export const MenuPrimarySingleAction: Story = {
+  args: {
+    variant: 'menu-primary',
+    actions: [
+      {
+        label: 'Save Changes',
+        onClick: fn(),
+        variant: 'primary',
+        icon: <CheckCircleIcon size={24} />,
+      },
+    ],
+    menuActions: [
+      {
+        label: 'Delete',
+        onClick: fn(),
+        danger: true,
+      },
+    ],
+  },
+}
+
+/**
+ * Menu + primary with loading state on the primary button
+ */
+export const MenuPrimaryLoading: Story = {
+  args: {
+    variant: 'menu-primary',
+    actions: [
+      {
+        label: 'Running...',
+        onClick: fn(),
+        variant: 'primary',
+        loading: true,
+      },
+    ],
+    menuActions: [
+      {
+        label: 'Edit Script',
+        onClick: fn(),
+        icon: <PenEditIcon size={24} />,
+      },
+      {
+        label: 'Schedule Script',
+        onClick: fn(),
+        icon: <CalendarDaysIcon size={24} />,
       },
     ],
   },
