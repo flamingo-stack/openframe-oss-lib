@@ -11,23 +11,19 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
   ({ className, data, onApprove, onReject, status = 'pending', ...props }, ref) => {
     const [isProcessing, setIsProcessing] = useState(false)
     
-    const handleApprove = () => {
+    const handleApprove = async () => {
       setIsProcessing(true)
       try {
-        if (onApprove) {
-          onApprove(data.requestId)
-        }
+        await onApprove?.(data.requestId)
       } finally {
         setIsProcessing(false)
       }
     }
-    
-    const handleReject = () => {
+
+    const handleReject = async () => {
       setIsProcessing(true)
       try {
-        if (onReject) {
-          onReject(data.requestId)
-        }
+        await onReject?.(data.requestId)
       } finally {
         setIsProcessing(false)
       }
