@@ -66,8 +66,8 @@ export type ApprovalRequestSegment = {
   type: 'approval_request'
   data: ApprovalRequestData & { approvalType?: string }
   status?: ChatApprovalStatus
-  onApprove?: (requestId?: string) => void
-  onReject?: (requestId?: string) => void
+  onApprove?: (requestId?: string) => void | Promise<void>
+  onReject?: (requestId?: string) => void | Promise<void>
 }
 
 export type MessageSegment = TextSegment | ToolExecutionSegment | ApprovalRequestSegment
