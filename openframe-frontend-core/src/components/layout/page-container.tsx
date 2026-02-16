@@ -395,6 +395,7 @@ function renderAdvancedPageContainer({
       case 'list':
         return cn('flex flex-col gap-4 md:gap-6', mobilePadding, contentClassName)
       case 'form':
+        return cn('flex flex-col gap-4 md:gap-10', mobilePadding, contentClassName)
       case 'content':
       default:
         return cn('flex-1', mobilePadding, contentClassName)
