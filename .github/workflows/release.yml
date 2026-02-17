@@ -210,6 +210,6 @@ jobs:
       - name: Publish to npm
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
-        run: npm publish --tag latest
+        run: npm publish --tag latest --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
