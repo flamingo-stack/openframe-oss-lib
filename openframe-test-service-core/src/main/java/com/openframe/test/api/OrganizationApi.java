@@ -1,5 +1,6 @@
 package com.openframe.test.api;
 
+import com.openframe.test.api.graphql.OrganizationQueries;
 import com.openframe.test.data.dto.organization.CreateOrganizationRequest;
 import com.openframe.test.data.dto.organization.Organization;
 import com.openframe.test.helpers.RequestSpecHelper;
@@ -8,8 +9,9 @@ import io.restassured.http.ContentType;
 import java.util.List;
 import java.util.Map;
 
-import static com.openframe.test.api.graphql.OrganizationQueries.*;
-import static com.openframe.test.config.ApiConfig.GRAPHQL;
+import static com.openframe.test.api.graphql.OrganizationQueries.FULL_ORGANIZATION;
+import static com.openframe.test.api.graphql.OrganizationQueries.ORGANIZATION_NAMES;
+import static com.openframe.test.config.EnvironmentConfig.GRAPHQL;
 import static io.restassured.RestAssured.given;
 
 public class OrganizationApi {
@@ -23,11 +25,17 @@ public class OrganizationApi {
                 .then().extract().jsonPath().getList("data.organizations.edges.node.name", String.class);
     }
 
-    public static List<String> getOrganizationIds() {
-        Map<String, String> body = Map.of("query", ORGANIZATION_IDS);
+    public static List<Organization> listOrganizations() {
+        Map<String, String> body = Map.of("query", OrganizationQueries.ORGANIZATIONS);
         return given(RequestSpecHelper.getAuthorizedSpec())
                 .body(body).post(GRAPHQL)
-                .then().extract().jsonPath().getList("data.organizations.edges.node.id", String.class);
+                .then().extract().jsonPath().getList("data.organizations.edges.node", Organization.class);
+    }
+
+    public static List<Organization> getOrganizations(boolean isDefault) {
+        return listOrganizations().stream()
+                .filter(org -> Boolean.valueOf(isDefault).equals(org.getIsDefault()))
+                .toList();
     }
 
     public static Organization retrieveOrganization(String id) {

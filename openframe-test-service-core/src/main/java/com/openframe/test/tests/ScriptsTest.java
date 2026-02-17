@@ -3,7 +3,6 @@ package com.openframe.test.tests;
 import com.openframe.test.api.ScriptApi;
 import com.openframe.test.data.dto.script.Script;
 import com.openframe.test.data.generator.ScriptGenerator;
-import com.openframe.test.tests.base.AuthorizedTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -14,9 +13,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @Tag("shared")
 @DisplayName("Scripts")
-public class ScriptsTest extends AuthorizedTest {
+public class ScriptsTest {
 
-    @Tag("monitor")
+    @Tag("read")
     @Test
     @DisplayName("List scripts")
     public void testListScripts() {
@@ -29,7 +28,7 @@ public class ScriptsTest extends AuthorizedTest {
         });
     }
 
-    @Tag("monitor")
+    @Tag("read")
     @Test
     @DisplayName("Get script")
     public void testGetScript() {

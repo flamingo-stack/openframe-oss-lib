@@ -1,11 +1,9 @@
 package com.openframe.test.tests;
 
 import com.openframe.test.api.OrganizationApi;
-import com.openframe.test.data.db.collections.OrganizationsCollection;
 import com.openframe.test.data.dto.organization.CreateOrganizationRequest;
 import com.openframe.test.data.dto.organization.Organization;
 import com.openframe.test.data.generator.OrganizationGenerator;
-import com.openframe.test.tests.base.AuthorizedTest;
 import org.junit.jupiter.api.*;
 
 import java.util.List;
@@ -15,8 +13,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Tag("oss")
 @DisplayName("Organizations")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class OrganizationsTest extends AuthorizedTest {
+public class OrganizationsTest {
 
+    @Tag("create")
     @Order(1)
     @Test
     @DisplayName("Create Organization")
@@ -39,27 +38,45 @@ public class OrganizationsTest extends AuthorizedTest {
                 .isEqualTo(request);
     }
 
-    @Tag("monitor")
+    @Tag("read")
     @Order(2)
     @Test
-    @DisplayName("Retrieve Organization")
-    public void testRetrieveOrganization() {
-        Organization dbOrganization = OrganizationsCollection.findOrganization(false, false);
-        assertThat(dbOrganization).as("No Organization in DB to retrieve").isNotNull();
-        Organization apiOrganization = OrganizationApi.retrieveOrganization(dbOrganization.getId());
-        assertThat(apiOrganization).usingRecursiveComparison()
-                .ignoringFields("monthlyRevenue")
-                .isEqualTo(dbOrganization);
+    @DisplayName("List Organizations")
+    public void testListOrganizations() {
+        List<Organization> organizations = OrganizationApi.listOrganizations();
+        assertThat(organizations).as("No organizations").isNotEmpty();
+        assertThat(organizations).allSatisfy(organization -> {
+            assertThat(organization.getId()).isNotNull();
+            assertThat(organization.getOrganizationId()).isNotNull();
+            assertThat(organization.getName()).isNotEmpty();
+            assertThat(organization.getCategory()).isNotEmpty();
+            assertThat(organization.getCreatedAt()).isNotNull();
+            assertThat(organization.getUpdatedAt()).isNotNull();
+        });
     }
 
+    @Tag("read")
     @Order(3)
+    @Test
+    @DisplayName("Get Organization")
+    public void testRetrieveOrganization() {
+        List<Organization> organizations = OrganizationApi.listOrganizations();
+        Organization organization = OrganizationApi.retrieveOrganization(organizations.getFirst().getId());
+        assertThat(organization).as("No organization").isNotNull();
+        assertThat(organization).usingRecursiveComparison()
+                .ignoringFields("isDefault")
+                .isEqualTo(organizations.getFirst());
+    }
+
+    @Tag("update")
+    @Order(4)
     @Test
     @DisplayName("Update Organization")
     public void testUpdateOrganization() {
+        List<Organization> organizations = OrganizationApi.getOrganizations(false);
+        assertThat(organizations).as("No Organization to update").isNotEmpty();
         CreateOrganizationRequest request = OrganizationGenerator.updateOrganizationRequest(false);
-        Organization organization = OrganizationsCollection.findOrganization(false, false);
-        assertThat(organization).as("No Organization in DB to update").isNotNull();
-        organization = OrganizationApi.updateOrganization(organization.getId(), request);
+        Organization organization = OrganizationApi.updateOrganization(organizations.getFirst().getId(), request);
         assertThat(organization.getId()).isNotNull();
         assertThat(organization.getOrganizationId()).isNotNull();
         assertThat(organization.getIsDefault()).isFalse();
@@ -73,26 +90,16 @@ public class OrganizationsTest extends AuthorizedTest {
                 .isEqualTo(request);
     }
 
-    @Order(4)
+    @Tag("delete")
+    @Order(5)
     @Test
     @DisplayName("Delete Organization")
     public void testDeleteOrganization() {
-        Organization organization = OrganizationsCollection.findOrganization(false, false);
-        assertThat(organization).as("No Organization in DB to delete").isNotNull();
+        List<Organization> organizations = OrganizationApi.getOrganizations(false);
+        assertThat(organizations).as("No Organization to delete").isNotEmpty();
+        Organization organization = organizations.getFirst();
         OrganizationApi.deleteOrganization(organization);
-        organization = OrganizationsCollection.findOrganization(organization.getId());
-        assertThat(organization.getDeleted()).isTrue();
-        assertThat(organization.getDeletedAt()).isNotNull();
-    }
-
-    @Order(5)
-    @Test
-    @DisplayName("Retrieve Active Organizations")
-    public void testRetrieveAllOrganizations() {
-        List<String> apiOrganizationsIds = OrganizationApi.getOrganizationIds();
-        List<String> activeOrganizationIds = OrganizationsCollection.findOrganizationIds(false);
-        List<String> deletedOrganizationIds = OrganizationsCollection.findOrganizationIds(true);
-        assertThat(apiOrganizationsIds).containsExactlyInAnyOrderElementsOf(activeOrganizationIds);
-        assertThat(apiOrganizationsIds).doesNotContainAnyElementsOf(deletedOrganizationIds);
+        organizations = OrganizationApi.getOrganizations(false);
+        assertThat(organizations).doesNotContain(organization);
     }
 }

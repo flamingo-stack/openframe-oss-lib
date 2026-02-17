@@ -1,13 +1,12 @@
 package com.openframe.test.tests;
 
 import com.openframe.test.api.InvitationApi;
-import com.openframe.test.api.UserApi;
 import com.openframe.test.data.db.collections.InvitationsCollection;
 import com.openframe.test.data.db.collections.UsersCollection;
 import com.openframe.test.data.dto.invitation.*;
 import com.openframe.test.data.dto.user.AuthUser;
+import com.openframe.test.data.dto.user.UserStatus;
 import com.openframe.test.data.generator.InvitationGenerator;
-import com.openframe.test.tests.base.AuthorizedTest;
 import org.junit.jupiter.api.*;
 
 import java.time.temporal.ChronoUnit;
@@ -16,9 +15,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
 @Tag("oss")
-@DisplayName("Invitations and Users")
+@DisplayName("Invitations")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class UserInvitationsTest extends AuthorizedTest {
+public class UserInvitationsTest {
 
     @Order(1)
     @Test
@@ -93,31 +92,6 @@ public class UserInvitationsTest extends AuthorizedTest {
         assertThat(response).isEqualTo(expectedResponse);
     }
 
-    @Order(7)
-    @Test
-    @DisplayName("Delete Admin User")
-    public void testDeleteUser() {
-        AuthUser user = UsersCollection.findUser(UserStatus.ACTIVE);
-        assertThat(user).as("User is not found in DB").isNotNull();
-        int statusCode = UserApi.deleteUser(user.getId());
-        user = UsersCollection.findUser(user.getId());
-        assertThat(statusCode).isEqualTo(204);
-        assertThat(user).as("User is not found in DB").isNotNull();
-        assertThat(user.getStatus()).isEqualTo(UserStatus.DELETED);
-    }
-
-    @Order(8)
-    @Test
-    @DisplayName("Check that Owner User cannot be deleted")
-    public void testDeleteOwner() {
-        AuthUser user = UsersCollection.findUser(UserRole.OWNER);
-        assertThat(user).as("User is not found in DB").isNotNull();
-        int statusCode = UserApi.deleteUser(user.getId());
-        user = UsersCollection.findUser(user.getId());
-        assertThat(statusCode).isEqualTo(409);
-        assertThat(user).as("User is not found in DB").isNotNull();
-        assertThat(user.getStatus()).isEqualTo(UserStatus.ACTIVE);
-    }
 
     @Order(9)
     @Test

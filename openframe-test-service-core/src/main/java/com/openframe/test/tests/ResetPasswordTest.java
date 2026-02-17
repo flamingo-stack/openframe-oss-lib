@@ -8,7 +8,6 @@ import com.openframe.test.data.dto.user.ResetConfirmRequest;
 import com.openframe.test.data.dto.user.User;
 import com.openframe.test.data.generator.AuthGenerator;
 import com.openframe.test.data.redis.Redis;
-import com.openframe.test.tests.base.UnauthorizedTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -17,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @Tag("reset")
 @DisplayName("Reset Password")
-public class ResetPasswordTest extends UnauthorizedTest {
+public class ResetPasswordTest {
 
     @Test
     @DisplayName("Verify that user can reset password")

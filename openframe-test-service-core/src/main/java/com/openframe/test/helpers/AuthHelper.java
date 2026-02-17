@@ -1,6 +1,6 @@
 package com.openframe.test.helpers;
 
-import com.openframe.test.api.AuthFlow;
+import com.openframe.test.api.auth.AuthFlow;
 import com.openframe.test.config.UserConfig;
 
 import java.util.Map;

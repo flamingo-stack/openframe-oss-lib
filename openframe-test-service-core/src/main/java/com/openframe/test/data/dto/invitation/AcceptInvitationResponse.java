@@ -1,5 +1,7 @@
 package com.openframe.test.data.dto.invitation;
 
+import com.openframe.test.data.dto.user.UserRole;
+import com.openframe.test.data.dto.user.UserStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

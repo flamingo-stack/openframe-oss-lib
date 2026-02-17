@@ -5,7 +5,6 @@ import com.openframe.test.data.dto.log.LogDetails;
 import com.openframe.test.data.dto.log.LogEvent;
 import com.openframe.test.data.dto.log.LogFilters;
 import com.openframe.test.data.generator.LogGenerator;
-import com.openframe.test.tests.base.AuthorizedTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -16,9 +15,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @Tag("shared")
 @DisplayName("Logs")
-public class LogsTest extends AuthorizedTest {
+public class LogsTest {
 
-    @Tag("monitor")
+    @Tag("read")
     @Test
     @DisplayName("Get log filters")
     public void testGetLogFilters() {
@@ -29,7 +28,7 @@ public class LogsTest extends AuthorizedTest {
         assertThat(filters.getSeverities()).as("Expected at least one severity").isNotEmpty();
     }
 
-    @Tag("monitor")
+    @Tag("read")
     @Test
     @DisplayName("List logs")
     public void testListLogs() {
@@ -45,7 +44,7 @@ public class LogsTest extends AuthorizedTest {
         });
     }
 
-    @Tag("monitor")
+    @Tag("read")
     @Test
     @DisplayName("Get log details")
     public void testGetLogDetails() {
@@ -59,21 +58,21 @@ public class LogsTest extends AuthorizedTest {
         assertThat(details.getToolType()).isEqualTo(logEvent.getToolType());
     }
 
-    @Tag("monitor")
+    @Tag("read")
     @Test
     @DisplayName("Search logs")
     public void testSearchLogs() {
         List<LogEvent> logs = LogsApi.getLogs();
         assertThat(logs).as("Expected at least one log for search test").isNotEmpty();
-        String searchTerm = logs.getFirst().getToolType();
+        String searchTerm = logs.getFirst().getSummary().substring(0, 4);
         List<LogEvent> searchResults = LogsApi.searchLogs(searchTerm);
-        assertThat(searchResults).as("Expected at least one search result").isNotEmpty();
+        assertThat(searchResults).as("Expected at least one search result for: " + searchTerm).isNotEmpty();
         assertThat(searchResults).allSatisfy(log ->
                 assertThat(log.getToolType()).isEqualTo(searchTerm)
         );
     }
 
-    @Tag("monitor")
+    @Tag("read")
     @Test
     @DisplayName("Filter logs by severity and tool")
     public void testFilterLogs() {
