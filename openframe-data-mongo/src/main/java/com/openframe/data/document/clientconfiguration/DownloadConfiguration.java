@@ -9,5 +9,7 @@ public class DownloadConfiguration {
     private String linkTemplate;
     private String fileName;
     private String targetFileName;
+    private InstallationType installationType = InstallationType.STANDARD;
+    private String bundleId;
 
 }
