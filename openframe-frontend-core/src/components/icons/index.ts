@@ -54,6 +54,7 @@ export { SlidersIcon } from './sliders-icon';
 export { CheckCircleIcon } from './check-circle-icon';
 export { PlusCircleIcon } from './plus-circle-icon';
 export { MinusCircleIcon } from './minus-circle-icon';
+export { InfoCircleIcon } from './info-circle-icon';
 export { ThumbsUpIcon } from './thumbs-up-icon';
 export { ThumbsDownIcon } from './thumbs-down-icon';
 export { SunIcon } from './sun-icon';

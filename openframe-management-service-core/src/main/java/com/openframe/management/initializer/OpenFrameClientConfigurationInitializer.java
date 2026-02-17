@@ -11,12 +11,13 @@ import org.springframework.stereotype.Component;
 import javax.annotation.PostConstruct;
 import java.io.IOException;
 
+import static com.openframe.data.service.OpenFrameClientConfigurationService.DEFAULT_ID;
+
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class OpenFrameClientConfigurationInitializer {
 
-    private static final String DEFAULT_ID = "default";
     private static final String CONFIG_FILE = "agent-configurations/client-configuration.json";
 
     private final ObjectMapper objectMapper;
@@ -51,7 +52,9 @@ public class OpenFrameClientConfigurationInitializer {
         String existingVersion = existingConfiguration.getVersion();
         newConfiguration.setVersion(existingVersion);
         log.info("Preserving existing version: {}", existingVersion);
-        
+
+        newConfiguration.setPublishState(existingConfiguration.getPublishState());
+
         clientConfigurationService.save(newConfiguration);
         log.info("Updated existing OpenFrame client configuration");
     }

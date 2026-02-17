@@ -12,6 +12,8 @@ interface CheckboxBlockProps {
   defaultChecked?: boolean
   onCheckedChange?: (checked: boolean) => void
   label: string
+  /** Optional secondary description text below the label */
+  description?: string
   disabled?: boolean
   className?: string
 }
@@ -19,12 +21,13 @@ interface CheckboxBlockProps {
 const CheckboxBlock = React.forwardRef<
   React.ElementRef<typeof CheckboxPrimitive.Root>,
   CheckboxBlockProps
->(({ id, checked, defaultChecked, onCheckedChange, label, disabled, className }, ref) => (
+>(({ id, checked, defaultChecked, onCheckedChange, label, description, disabled, className }, ref) => (
   <label
     htmlFor={id}
     className={cn(
       // Layout & spacing
-      "flex items-center gap-3 rounded-[6px] border px-3 h-11 sm:h-12 w-full",
+      "flex items-center gap-3 rounded-[6px] border px-3 w-full",
+      description ? "h-16" : "h-11 sm:h-12",
       // Theme palette
       "bg-[#212121] border-[#3a3a3a]",
       // Interactive states
@@ -63,16 +66,21 @@ const CheckboxBlock = React.forwardRef<
         <CheckIcon className="h-4 w-4" strokeWidth={3} />
       </CheckboxPrimitive.Indicator>
     </CheckboxPrimitive.Root>
-    <span
-      className={cn(
-        // Typography matching Figma design
-        "font-medium text-[18px] leading-6 text-ods-text-primary",
-        // Prevent text selection when clicking
-        "select-none"
+    <div className="flex flex-1 flex-col justify-center min-w-0">
+      <span
+        className={cn(
+          "font-medium text-[18px] leading-6 text-ods-text-primary",
+          "select-none truncate"
+        )}
+      >
+        {label}
+      </span>
+      {description && (
+        <span className="font-medium text-[14px] leading-5 text-ods-text-secondary select-none truncate">
+          {description}
+        </span>
       )}
-    >
-      {label}
-    </span>
+    </div>
   </label>
 ))
 CheckboxBlock.displayName = "CheckboxBlock"

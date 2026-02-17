@@ -65,7 +65,9 @@ public class IntegratedToolAgentInitializer {
             newAgent.setVersion(existingVersion);
             log.info("Preserving version {} for release agent {}", existingVersion, newAgent.getId());
         }
-        
+
+        newAgent.setPublishState(existingAgent.getPublishState());
+
         integratedToolAgentService.save(newAgent);
         log.info("Updated agent configuration: {} from {}", newAgent.getId(), filePath);
         
