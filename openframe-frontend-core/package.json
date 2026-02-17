@@ -1,6 +1,6 @@
 {
   "name": "@flamingo-stack/openframe-frontend-core",
-  "version": "0.0.39",
+  "version": "0.0.40",
   "description": "Shared design system and components for all Flamingo platforms",
   "type": "module",
   "main": "./dist/index.js",
