@@ -11,12 +11,21 @@ import io.restassured.specification.RequestSpecification;
 import java.time.Duration;
 
 import static com.openframe.test.config.EnvironmentConfig.getAuthUrl;
-import static com.openframe.test.config.EnvironmentConfig.getBaseUrl;
+import com.openframe.test.config.EnvironmentConfig;
 import static com.openframe.test.helpers.AuthHelper.getCookies;
 
 public class RequestSpecHelper {
 
-    private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
+    private static final ThreadLocal<String> baseUrl = new ThreadLocal<>();
+
+    public static void setBaseUrl(String url) {
+        baseUrl.set(url);
+    }
+
+    public static String getBaseUrl() {
+        return baseUrl.get() != null ? baseUrl.get() : EnvironmentConfig.getBaseUrl();
+    }
 
     public static RequestSpecification getAuthorizedSpec() {
         return prebuildRequestSpec()

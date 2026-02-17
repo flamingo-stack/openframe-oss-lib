@@ -1,5 +1,6 @@
 package com.openframe.test.config;
 
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -12,8 +13,11 @@ public class EnvironmentConfig {
     public static final String DEFAULT_BASE_URL = "https://localhost/";
     public static final String GRAPHQL = "api/graphql";
 
+    @Setter
     private static String envMode;
+    @Setter
     private static String baseUrl;
+    @Setter
     private static String authUrl;
 
     public static String getEnvMode() {
