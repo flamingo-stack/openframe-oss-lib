@@ -241,7 +241,7 @@ function renderAdvancedPageContainer({
               <Button
                 onClick={backButton.onClick}
                 variant="ghost-subtle"
-                className="flex self-start justify-start"
+                className="self-start justify-start hidden md:flex"
                 leftIcon={<ChevronLeft className="h-6 w-6 text-ods-text-secondary transition-colors" />}
                 noPadding
               >
@@ -251,14 +251,14 @@ function renderAdvancedPageContainer({
 
             {/* Title */}
             {title && (
-              <h1 className="font-['Azeret_Mono'] font-semibold text-[24px] sm:text-[32px] leading-[32px] sm:leading-[40px] tracking-[-0.48px] sm:tracking-[-0.64px] text-ods-text-primary truncate">
+              <h1 className="font-['Azeret_Mono'] font-semibold text-[24px] sm:text-[32px] leading-[32px] sm:leading-[40px] tracking-[-0.48px] sm:tracking-[-0.64px] text-ods-text-primary">
                 {title}
               </h1>
             )}
 
             {/* Subtitle */}
             {subtitle && (
-              <div className="text-ods-text-secondary font-['DM_Sans'] font-medium text-[16px] truncate">
+              <div className="text-ods-text-secondary font-['DM_Sans'] font-medium text-[16px]">
                 {subtitle}
               </div>
             )}
@@ -280,12 +280,12 @@ function renderAdvancedPageContainer({
         <div className="flex items-center justify-between md:flex-col md:items-start md:justify-start lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="flex flex-col gap-1 flex-1 min-w-0">
             {title && (
-              <h1 className="font-['Azeret_Mono'] font-semibold text-[24px] leading-[32px] tracking-[-0.48px] text-ods-text-primary truncate">
+              <h1 className="font-['Azeret_Mono'] font-semibold text-[24px] leading-[32px] tracking-[-0.48px] text-ods-text-primary">
                 {title}
               </h1>
             )}
             {subtitle && (
-              <div className="text-ods-text-secondary font-['DM_Sans'] font-medium text-[16px] truncate">
+              <div className="text-ods-text-secondary font-['DM_Sans'] font-medium text-[16px]">
                 {subtitle}
               </div>
             )}
@@ -311,7 +311,7 @@ function renderAdvancedPageContainer({
               <Button
                 onClick={backButton.onClick}
                 variant="ghost-subtle"
-                className="flex self-start justify-start"
+                className="self-start justify-start hidden md:flex"
                 leftIcon={<ChevronLeft className="w-6 h-6 text-ods-text-secondary transition-colors" />}
                 noPadding
               >
@@ -320,7 +320,7 @@ function renderAdvancedPageContainer({
             )}
 
             {title && (
-              <h1 className="text-[32px] font-['Azeret_Mono:SemiBold',_sans-serif] font-semibold text-ods-text-primary tracking-[-0.64px] truncate">
+              <h1 className="text-[32px] font-['Azeret_Mono:SemiBold',_sans-serif] font-semibold text-ods-text-primary tracking-[-0.64px]">
                 {title}
               </h1>
             )}
@@ -343,12 +343,12 @@ function renderAdvancedPageContainer({
         {(title || subtitle) && (
           <div className="flex flex-col gap-1 flex-1 min-w-0">
             {title && (
-              <h1 className="font-['Azeret_Mono'] font-semibold text-[24px] leading-[32px] tracking-[-0.48px] text-ods-text-primary truncate">
+              <h1 className="font-['Azeret_Mono'] font-semibold text-[24px] leading-[32px] tracking-[-0.48px] text-ods-text-primary">
                 {title}
               </h1>
             )}
             {subtitle && (
-              <div className="text-ods-text-secondary font-['DM_Sans'] font-medium text-[16px] truncate">
+              <div className="text-ods-text-secondary font-['DM_Sans'] font-medium text-[16px]">
                 {subtitle}
               </div>
             )}
