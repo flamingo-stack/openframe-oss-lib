@@ -229,8 +229,13 @@ function processMessageData(
       break
 
     case MESSAGE_TYPE.ERROR:
-      // Errors are handled separately as error messages
-      // The caller should check for error data and create error messages
+      if ('error' in data) {
+        const message = 'details' in data ? (data?.details && JSON.parse(data.details)?.error?.message) : undefined
+        accumulator.addError(
+          data.error || 'An error occurred',
+          message
+        )
+      }
       break
 
     default:
@@ -344,20 +349,7 @@ export function processHistoricalMessagesWithErrors(
       }
 
       messageDataArray.forEach((data) => {
-        if (data.type === MESSAGE_TYPE.ERROR) {
-          flushAssistantMessage()
-          processedMessages.push({
-            id: `${msg.id}-error`,
-            role: 'error',
-            content: 'error' in data && data.error ? data.error : 'An error occurred',
-            name: assistantName,
-            assistantType,
-            timestamp: new Date(msg.createdAt),
-            avatar: assistantAvatar,
-          })
-        } else {
-          processMessageData(data, accumulator, approvalStatuses, { displayApprovalTypes }, escalatedApprovals)
-        }
+        processMessageData(data, accumulator, approvalStatuses, { displayApprovalTypes }, escalatedApprovals)
       })
 
       const nextMsg = messages[index + 1]
