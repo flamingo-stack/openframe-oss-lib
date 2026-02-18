@@ -1,8 +1,0 @@
-flowchart TD
-    ApiClient["Fleet API Client"] --> JsonPayload["Raw JSON Response"]
-    JsonPayload --> HostModel["Host"]
-    JsonPayload --> SearchWrapper["HostSearchResponse"]
-    JsonPayload --> QueryModel["QueryResult"]
-
-    HostModel --> DeviceNormalization["Device Normalization"]
-    QueryModel --> QueryProcessing["Query Processing"]

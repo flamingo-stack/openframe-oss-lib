@@ -1,5 +1,0 @@
-flowchart TD
-    Tokens["TokenResponse"] --> Create["createTicket()"]
-    Create --> Store["ConcurrentHashMap"]
-    Client --> Consume["consumeTicket()"]
-    Consume --> Store

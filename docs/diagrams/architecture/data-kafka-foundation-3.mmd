@@ -1,4 +1,0 @@
-flowchart LR
-    DeviceService["Device Service"] -->|"MachinePinotMessage"| KafkaTopic[("machine-topic")]
-    KafkaTopic --> StreamCore["Stream Processing Core"]
-    StreamCore --> Pinot[("Apache Pinot")]

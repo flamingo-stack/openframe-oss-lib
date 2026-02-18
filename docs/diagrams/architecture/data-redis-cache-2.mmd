@@ -1,5 +1,0 @@
-flowchart LR
-    Service["Service Method"] -->|"@Cacheable"| CacheAbstraction["Spring Cache"]
-    CacheAbstraction --> CacheManagerNode["RedisCacheManager"]
-    CacheManagerNode --> Prefix["Key Prefix Computation"]
-    Prefix --> Redis[("Redis")]

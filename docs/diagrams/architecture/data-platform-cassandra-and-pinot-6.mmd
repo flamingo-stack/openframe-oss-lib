@@ -1,6 +1,0 @@
-flowchart TD
-    Request["Secret Request"] --> ToolService["IntegratedToolService"]
-    ToolService --> UrlService["ToolUrlService"]
-    UrlService --> BuildReq["Build AgentRegistrationSecretRequest"]
-    BuildReq --> Client["TacticalRmmClient"]
-    Client --> Secret["Installation Secret"]

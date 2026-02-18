@@ -1,7 +1,0 @@
-flowchart TD
-    User["New User"] --> Start["/oauth/register/sso"]
-    Start --> Cookie["Set of_sso_reg Cookie"]
-    Cookie --> IdP["Redirect to IdP"]
-    IdP --> Success["OIDC Success"]
-    Success --> Handler["TenantRegSsoHandler"]
-    Handler --> TenantCreated["Tenant + Admin User Created"]
