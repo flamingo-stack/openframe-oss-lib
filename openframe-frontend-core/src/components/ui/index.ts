@@ -23,6 +23,7 @@ export * from './radio-group'
 export * from './select'
 export * from './switch'
 export * from './tags-input'
+export * from './category-management-modal'
 export * from './textarea'
 // Layout components
 export * from './alert-dialog'
@@ -96,6 +97,19 @@ export {
 
 export type {
   PagePagination, RowAction, TableCardSkeletonProps, TableCellProps, TableColumn, TableDescriptionCellProps, TableEmptyStateProps, TableHeaderProps, TableProps, TableRowProps, TableTimestampCellProps
+} from './table'
+
+// Query Report Table (dynamic columns for osquery results)
+export {
+  QueryReportTable, QueryReportTableHeader,
+  QueryReportTableRow, QueryReportTableSkeleton,
+  deriveColumns, exportToCSV
+} from './table'
+
+export type {
+  QueryReportTableProps, QueryReportTableHeaderProps,
+  QueryReportTableRowProps, QueryReportTableSkeletonProps,
+  QueryResultRow
 } from './table'
 
 // Pagination components
