@@ -1,0 +1,6 @@
+flowchart LR
+    Client["Client Application"] --> Gateway["Gateway Service Core"]
+    Gateway --> Authz["Authorization Service Core"]
+    Authz -->|"issues JWT"| JwtCore["Security And Oauth Core"]
+    JwtCore -->|"verifies JWT"| Gateway
+    JwtCore -->|"verifies JWT"| ApiServices["API Services"]

@@ -1,0 +1,5 @@
+flowchart TD
+    LogFiltersModel["LogFilters"] --> OrgOption["OrganizationFilterOption"]
+    LogOptions["LogFilterOptions"] --> Query["Log Query Execution"]
+    Query --> LogEvent
+    LogEvent --> LogDetails

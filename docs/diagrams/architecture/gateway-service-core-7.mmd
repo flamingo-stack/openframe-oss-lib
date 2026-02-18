@@ -1,0 +1,4 @@
+flowchart LR
+    Request --> CheckOrigin["Origin Header"]
+    CheckOrigin -->|"null"| RemoveOrigin["Remove Header"]
+    CheckOrigin -->|Valid| Continue["Continue"]

@@ -1,0 +1,6 @@
+flowchart LR
+    Tools["Integrated Tools<br/>MeshCentral<br/>Tactical<br/>Fleet"] --> Kafka
+    Kafka --> StreamCore["Stream Processing Core"]
+    StreamCore --> Cassandra["Cassandra (Logs)"]
+    StreamCore --> OutboundKafka["Unified Events Topic"]
+    OutboundKafka --> Downstream["API / Analytics / Monitoring"]

@@ -1,0 +1,8 @@
+flowchart TD
+    Ready["ApplicationReadyEvent"] --> CheckEnabled["Pinot Enabled?"]
+    CheckEnabled -->|"Yes"| LoadFiles["Load Schema and Table JSON"]
+    LoadFiles --> Resolve["Resolve Environment Placeholders"]
+    Resolve --> DeploySchema["POST /schemas"]
+    DeploySchema --> DeployTable["PUT or POST /tables"]
+    DeployTable --> RetryLogic["Retry on Connection Failure"]
+    CheckEnabled -->|"No"| End["Skip Deployment"]

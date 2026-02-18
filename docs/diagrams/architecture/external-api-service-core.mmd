@@ -1,0 +1,17 @@
+flowchart TD
+    Client["External Client"] -->|"X-API-Key"| Gateway["API Gateway"]
+    Gateway --> ExternalApi["External Api Service Core"]
+
+    subgraph rest_layer["REST Controllers"]
+        DeviceController["Device Controller"]
+        EventController["Event Controller"]
+        LogController["Log Controller"]
+        OrganizationController["Organization Controller"]
+        ToolController["Tool Controller"]
+        IntegrationController["Integration Controller"]
+    end
+
+    ExternalApi --> rest_layer
+
+    rest_layer --> DomainServices["Core Domain Services"]
+    DomainServices --> DataLayer["Mongo / Pinot / Kafka / Other Data Modules"]

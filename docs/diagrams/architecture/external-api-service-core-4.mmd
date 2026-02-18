@@ -1,0 +1,7 @@
+flowchart TD
+    Client -->|"GET /api/v1/logs/details"| LogController
+    LogController --> LogService
+    LogService --> LogStorage["Log Storage (Pinot or Mongo)"]
+    LogStorage --> LogService
+    LogService --> LogMapper
+    LogMapper --> LogDetailsResponse

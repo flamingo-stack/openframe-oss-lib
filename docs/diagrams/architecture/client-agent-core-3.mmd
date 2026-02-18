@@ -1,0 +1,5 @@
+flowchart TD
+    Request["AgentRegistrationRequest"] --> Validate["Validation"]
+    Validate --> Service["AgentRegistrationService"]
+    Service --> Processor["AgentRegistrationProcessor"]
+    Processor --> Response["AgentRegistrationResponse"]

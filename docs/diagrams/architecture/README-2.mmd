@@ -1,0 +1,5 @@
+flowchart LR
+    ToolEvents["Integrated Tool Events"] --> Kafka
+    Kafka --> StreamCore["Stream Processing Core"]
+    StreamCore --> UnifiedEvents["Unified Events Topic"]
+    StreamCore --> CassandraLogs["Cassandra Logs"]

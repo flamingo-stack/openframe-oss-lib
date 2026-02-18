@@ -1,0 +1,7 @@
+flowchart LR
+    Client["Client / Admin UI"] --> Gateway["Gateway Service"]
+    Gateway --> ApiService["Api Service Core"]
+    ApiService --> AuthService["Authorization Service"]
+    ApiService --> MongoDB["MongoDB Repositories"]
+    ApiService --> Kafka["Kafka / Stream Processing"]
+    ApiService --> Pinot["Pinot / Analytics"]

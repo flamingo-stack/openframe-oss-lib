@@ -1,0 +1,7 @@
+flowchart TD
+    Request["Incoming Request"] --> OriginFilter["OriginSanitizerFilter"]
+    OriginFilter --> AuthHeader["AddAuthorizationHeaderFilter"]
+    AuthHeader --> ApiKeyFilter["ApiKeyAuthenticationFilter"]
+    ApiKeyFilter --> JwtResolver["JwtIssuerReactiveAuthenticationManagerResolver"]
+    JwtResolver --> SecurityChain["SecurityWebFilterChain"]
+    SecurityChain --> Route["Route to Target Service"]

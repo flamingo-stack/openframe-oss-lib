@@ -1,0 +1,12 @@
+sequenceDiagram
+    participant Client
+    participant Controller
+    participant ValidationEngine as "Jakarta Validation"
+    participant Validator as "ValidEmailValidator"
+
+    Client->>Controller: Submit Request with Email
+    Controller->>ValidationEngine: Trigger Bean Validation
+    ValidationEngine->>Validator: initialize(regex)
+    ValidationEngine->>Validator: isValid(value)
+    Validator-->>ValidationEngine: true or false
+    ValidationEngine-->>Controller: Validation Result

@@ -1,0 +1,28 @@
+flowchart TD
+    AppStart["Application Startup"] --> InitPhase["Initializers"]
+    AppStart --> Schedulers["Schedulers"]
+    AppStart --> Controllers["Management Controllers"]
+
+    InitPhase --> PinotInit["PinotConfigInitializer"]
+    InitPhase --> AgentSecretInit["AgentRegistrationSecretInitializer"]
+    InitPhase --> ToolAgentInit["IntegratedToolAgentInitializer"]
+    InitPhase --> NatsInit["NatsStreamConfigurationInitializer"]
+    InitPhase --> ClientConfigInit["OpenFrameClientConfigurationInitializer"]
+    InitPhase --> DebeziumInit["DebeziumConnectorInitializer"]
+
+    Controllers --> ToolController["IntegratedToolController"]
+    Controllers --> ReleaseController["ReleaseVersionController"]
+
+    Schedulers --> DebeziumHealth["DebeziumHealthCheckScheduler"]
+    Schedulers --> ApiKeySync["ApiKeyStatsSyncScheduler"]
+    Schedulers --> AgentFallback["AgentVersionUpdatePublishFallbackScheduler"]
+
+    ToolController --> DebeziumService["DebeziumService"]
+    DebeziumHealth --> DebeziumService
+    DebeziumInit --> DebeziumService
+
+    ToolAgentInit --> ToolAgentPublisher["ToolAgentUpdatePublisher"]
+    AgentFallback --> ToolAgentPublisher
+
+    ClientConfigInit --> ClientUpdatePublisher["OpenFrameClientUpdatePublisher"]
+    AgentFallback --> ClientUpdatePublisher

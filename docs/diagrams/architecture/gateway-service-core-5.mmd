@@ -1,0 +1,4 @@
+flowchart LR
+    Client["Client"] --> Gateway["IntegrationController"]
+    Gateway --> RestProxy["RestProxyService"]
+    RestProxy --> Tool["Integrated Tool API"]

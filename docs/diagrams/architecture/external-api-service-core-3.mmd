@@ -1,0 +1,8 @@
+flowchart TD
+    Client --> EventController
+    EventController --> EventMapper
+    EventMapper --> EventService
+    EventService --> EventRepository
+    EventRepository --> EventService
+    EventService --> EventMapper
+    EventMapper --> EventsResponse

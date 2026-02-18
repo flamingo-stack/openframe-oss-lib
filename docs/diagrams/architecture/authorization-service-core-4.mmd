@@ -1,0 +1,8 @@
+flowchart TD
+    JWTRequest["JWT Signing Request"] --> KeyService["TenantKeyService"]
+    KeyService -->|"Find active key"| Repo["TenantKeyRepository"]
+
+    Repo -->|"No key"| Generator["RsaAuthenticationKeyPairGenerator"]
+    Generator --> Store["Persist TenantKey"]
+
+    KeyService --> RSAKey["RSAKey (Public + Private)"]

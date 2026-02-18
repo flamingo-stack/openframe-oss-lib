@@ -1,0 +1,4 @@
+flowchart TD
+    DataFetcher["GraphQL DataFetcher"] --> InstalledAgentService
+    InstalledAgentService --> Repo["InstalledAgentRepository"]
+    Repo --> Mongo["MongoDB"]

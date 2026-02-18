@@ -1,0 +1,6 @@
+flowchart TD
+    AuthRequest["Authorization Request"] --> Save["MongoAuthorizationService.save()"]
+    Save --> Entity["MongoOAuth2Authorization"]
+
+    TokenExchange["Token Request"] --> Load["findByToken()"]
+    Load --> Rehydrate["Rebuild OAuth2Authorization with PKCE"]

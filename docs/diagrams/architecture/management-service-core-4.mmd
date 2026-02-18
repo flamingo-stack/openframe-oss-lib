@@ -1,0 +1,5 @@
+flowchart TD
+    Ready["ApplicationReadyEvent"] --> ListConnectors["List Existing Connectors"]
+    ListConnectors -->|"Empty"| LoadTools["Load IntegratedTools"]
+    LoadTools --> CreateConnectors["Create Connectors Per Tool"]
+    ListConnectors -->|"Not Empty"| Skip["Skip Initialization"]

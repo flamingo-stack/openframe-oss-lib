@@ -1,0 +1,5 @@
+flowchart LR
+    Activity["ActivityMessage"] --> Join["Left Join (5s window)"]
+    HostActivity["HostActivityMessage"] --> Join
+    Join --> Header["Add Kafka Headers"]
+    Header --> Output["Enriched Fleet Events Topic"]

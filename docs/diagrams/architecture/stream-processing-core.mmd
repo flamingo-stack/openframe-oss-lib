@@ -1,0 +1,18 @@
+flowchart LR
+    KafkaInbound["Inbound Kafka Topics<br/>MeshCentral<br/>Tactical RMM<br/>Fleet MDM"] --> JsonListener["JsonKafkaListener"]
+    JsonListener --> Processor["GenericJsonMessageProcessor"]
+
+    Processor --> Deserializers["Tool-Specific Deserializers"]
+    Deserializers --> Mapper["EventTypeMapper"]
+    Mapper --> Enrichment["IntegratedToolDataEnrichmentService"]
+
+    Enrichment --> Handler["DebeziumMessageHandler"]
+
+    Handler --> KafkaOut["DebeziumKafkaMessageHandler<br/>Destination: Kafka"]
+    Handler --> CassandraOut["DebeziumCassandraMessageHandler<br/>Destination: Cassandra"]
+
+    subgraph streams_layer["Kafka Streams Layer"]
+        ActivityStream["Activity Topic"] --> Joiner["ActivityEnrichmentService"]
+        HostStream["HostActivity Topic"] --> Joiner
+        Joiner --> EnrichedTopic["Enriched Fleet Events Topic"]
+    end

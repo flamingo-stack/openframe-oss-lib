@@ -1,0 +1,11 @@
+flowchart TD
+    User["End User Browser"] -->|"Login / OAuth2"| AuthServer["Authorization Service Core"]
+
+    AuthServer -->|"OIDC Login"| Google["Google OIDC"]
+    AuthServer -->|"OIDC Login"| Microsoft["Microsoft OIDC"]
+
+    AuthServer -->|"Read/Write"| Mongo["MongoDB"]
+    AuthServer -->|"Sign JWT"| TenantKeys["Per-Tenant RSA Keys"]
+
+    AuthServer -->|"Access Token"| Gateway["Gateway Service Core"]
+    Gateway -->|"JWT Validation"| Platform["OpenFrame Platform Services"]

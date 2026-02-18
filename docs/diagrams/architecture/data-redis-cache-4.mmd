@@ -1,0 +1,4 @@
+flowchart LR
+    ReactiveService["Reactive Service"] --> ReactiveTemplate["ReactiveRedisTemplate"]
+    ReactiveTemplate --> ReactiveConnection["ReactiveRedisConnectionFactory"]
+    ReactiveConnection --> Redis[("Redis")]

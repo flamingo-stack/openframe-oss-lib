@@ -1,0 +1,9 @@
+sequenceDiagram
+    participant Browser
+    participant BFF as Security Oauth Bff
+    participant Auth as Authorization Server
+
+    Browser->>BFF: GET /oauth/login
+    BFF->>Auth: Build authorize URL (PKCE + state)
+    BFF->>Browser: Set state cookie
+    BFF->>Browser: 302 Redirect to Auth

@@ -1,0 +1,7 @@
+flowchart TD
+    Login["User Login"] --> Issue["Authorization Service Issues JWT"]
+    Issue --> Sign["Signed with RSAPrivateKey"]
+    Sign --> ClientStore["Client Stores Token"]
+    ClientStore --> GatewayReq["Request via Gateway"]
+    GatewayReq --> Validate["JwtDecoder Validates RSAPublicKey"]
+    Validate --> Access["Access Granted"]
