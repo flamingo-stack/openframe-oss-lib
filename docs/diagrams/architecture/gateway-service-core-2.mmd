@@ -1,0 +1,4 @@
+flowchart LR
+    Request["Incoming Request"] --> IntegrationService["Integration Service"]
+    IntegrationService --> WebClient["Configured WebClient"]
+    WebClient --> Downstream["Tool / Service Endpoint"]

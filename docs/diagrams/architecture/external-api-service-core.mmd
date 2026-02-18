@@ -1,0 +1,13 @@
+flowchart LR
+    Client["External Client"] -->|"X-API-Key"| Gateway["Gateway Service"]
+    Gateway --> ExternalApi["External Api Service Core"]
+
+    ExternalApi --> DeviceSvc["DeviceService"]
+    ExternalApi --> EventSvc["EventService"]
+    ExternalApi --> LogSvc["LogService"]
+    ExternalApi --> OrgSvc["Organization Services"]
+    ExternalApi --> ToolSvc["ToolService"]
+
+    DeviceSvc --> Mongo[("MongoDB")]
+    LogSvc --> Pinot[("Pinot / Cassandra")]
+    EventSvc --> Mongo

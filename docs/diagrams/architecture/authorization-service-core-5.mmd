@@ -1,0 +1,10 @@
+sequenceDiagram
+    participant Browser
+    participant Auth as Authorization Service Core
+    participant IdP as External IdP (Google/Microsoft)
+
+    Browser->>Auth: GET /oauth2/authorization/{provider}
+    Auth->>IdP: Redirect to IdP
+    IdP->>Auth: Authorization Code
+    Auth->>IdP: Exchange Code for Tokens
+    Auth->>Browser: Authenticated Session + JWT

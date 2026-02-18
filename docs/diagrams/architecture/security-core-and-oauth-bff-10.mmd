@@ -1,0 +1,8 @@
+flowchart TD
+    User["User"] --> Browser["Browser"]
+    Browser --> BFF["OAuth BFF"]
+    BFF --> Auth["Authorization Server"]
+    BFF --> Cookies["HttpOnly Cookies"]
+    Cookies --> Gateway["API Gateway"]
+    Gateway --> JwtDecoder["Jwt Decoder"]
+    JwtDecoder --> Services["Protected Services"]

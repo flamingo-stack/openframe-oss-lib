@@ -1,0 +1,5 @@
+flowchart TD
+    Request["Incoming Request"] --> TenantContext["Tenant Context"]
+    TenantContext --> KeyBuilderNode["OpenframeRedisKeyBuilder"]
+    KeyBuilderNode --> CacheKey["Tenant Prefixed Key"]
+    CacheKey --> Redis[("Redis")]
