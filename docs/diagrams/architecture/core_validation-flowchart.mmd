@@ -1,5 +1,0 @@
-flowchart TD
-    A["User Input (e.g., Registration Form)"] -->|provides email| B["Controller/Service Layer"]
-    B -->|calls| C["ValidEmailValidator"]
-    C -->|returns validation result| B
-    B -->|proceeds with logic| D["Downstream Processing"]

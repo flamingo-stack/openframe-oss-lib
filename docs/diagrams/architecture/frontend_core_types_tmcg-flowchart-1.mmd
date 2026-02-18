@@ -1,6 +1,0 @@
-graph TD
-    TMCGTypes["frontend_core_types_tmcg"] -->|provides types| TMCGComponents["frontend_core_components_features"]
-    TMCGTypes -->|provides types| TMCGUI["frontend_core_components_ui"]
-    TMCGTypes -->|used by| TMCGHooks["frontend_core_hooks_ui"]
-    TMCGHooks -->|fetches data| BackendAPI["Backend API"]
-    BackendAPI -->|returns| TMCGTypes

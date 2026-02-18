@@ -1,8 +1,0 @@
-flowchart TD
-    UserInput["User inputs vendor link"] --> VendorLinkInput
-    VendorLinkInput -->|validated| VendorWithLinks
-    VendorWithLinks -->|passed to| VendorProfileCard
-    VendorProfileCard -->|uses| LinkDisplayConfig
-    LinkDisplayConfig -->|controls| VendorLinkRenderer
-    VendorLinkRenderer -->|renders| VendorLinksUI["Vendor Links UI"]
-    VendorLinkFallback -->|used if missing| VendorLinksUI

@@ -1,7 +1,0 @@
-flowchart TD
-    Client["Client Application"] -->|submits registration/invitation/SSO/password reset| Controller["Authorization Controllers"]
-    Controller -->|uses| DTOs["authorization_service_core_dto"]
-    Controller -->|calls| Service["Authorization Service Layer"]
-    Service -->|persists/queries| DataStore["Database/Repositories"]
-    Service -->|returns response| Controller
-    Controller -->|returns response DTO| Client

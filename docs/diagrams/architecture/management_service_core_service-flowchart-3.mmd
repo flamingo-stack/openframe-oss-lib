@@ -1,9 +1,0 @@
-flowchart TD
-    Start["Start: Version Check Request"] --> Controller["Controller Receives Request"]
-    Controller --> Service["OpenFrameClientVersionUpdateService"]
-    Service -->|fetches config| Config["management_service_core_config"]
-    Service -->|checks version| Model["management_service_core_model"]
-    Service -->|triggers update| Scheduler["management_service_core_scheduler"]
-    Service -->|logs/analytics| Pinot["management_service_core_config_pinot"]
-    Service -->|responds| Controller
-    Controller --> End["Respond to Client"]

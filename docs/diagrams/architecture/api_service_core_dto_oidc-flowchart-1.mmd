@@ -1,7 +1,0 @@
-flowchart TD
-    Client["Client Application"] -->|initiates OIDC flow| Controller["SSOConfigController"]
-    Controller -->|uses| Service["SSOConfigService"]
-    Service -->|returns| OIDC_DTO["api_service_core_dto_oidc"]
-    OIDC_DTO -->|provides| OIDC_Provider["OIDC Provider"]
-    Service -->|may use| OAuth_DTO["api_service_core_dto_oauth"]
-    Service -->|may use| Auth_Config["authorization_service_core_config"]

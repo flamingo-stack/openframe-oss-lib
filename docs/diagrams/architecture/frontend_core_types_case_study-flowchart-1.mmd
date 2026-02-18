@@ -1,7 +1,0 @@
-flowchart TD
-    UI["UI Components"] -->|uses| CaseStudyTypes["frontend_core_types_case_study"]
-    CaseStudyTypes -->|defines| CaseStudyListResponse["CaseStudyListResponse"]
-    CaseStudyTypes -->|defines| CaseStudyFilters["CaseStudyFilters"]
-    CaseStudyTypes -->|integrates| Filters["frontend_core_types_categories, frontend_core_types_category, frontend_core_types_stack"]
-    CaseStudyTypes -->|integrates| Pagination["frontend_core_hooks_ui"]
-    CaseStudyTypes -->|integrates| Media["frontend_core_types_media"]

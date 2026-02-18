@@ -1,8 +1,0 @@
-flowchart TD
-    start["Start Onboarding"] --> define["Define Steps (OnboardingStepCardProps[])"]
-    define --> setup["Setup Walkthrough (OnboardingWalkthroughProps)"]
-    setup --> render["Render Walkthrough Component"]
-    render --> interact["User Interacts (Next/Prev/Complete)"]
-    interact --> update["Update Walkthrough State"]
-    update -->|"If not complete"| render
-    update -->|"If complete"| onboarding_complete["Onboarding Complete"]

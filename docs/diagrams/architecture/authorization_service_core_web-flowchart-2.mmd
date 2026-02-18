@@ -1,9 +1,0 @@
-flowchart TD
-    User["User"] -->|initiates login| LoginController["LoginController"]
-    LoginController -->|generates state| AuthStateUtils
-    LoginController -->|redirects| Redirects
-    Redirects -->|sends| SSOProvider["SSO Provider"]
-    SSOProvider -->|callback| LoginController
-    LoginController -->|validates state| AuthStateUtils
-    LoginController -->|final redirect| Redirects
-    LoginController -->|issues tokens| UserSession["User Session"]

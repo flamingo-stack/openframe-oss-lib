@@ -1,6 +1,0 @@
-flowchart TD
-    A["Kafka Topic"] --> B["JsonKafkaListener"]
-    B --> C["FleetEventDeserializer"]
-    C --> D["DebeziumMessageHandler"]
-    D --> E["ActivityEnrichmentService"]
-    E --> F["Data Store / API"]

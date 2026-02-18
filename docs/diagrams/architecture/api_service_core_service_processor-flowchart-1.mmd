@@ -1,6 +1,0 @@
-flowchart TD
-    Controller["API Controllers"] -->|invoke| Processor["Service Processors\n(api_service_core_service_processor)"]
-    Processor -->|use| Service["Core Services\n(api_service_core_service, api_service_core_service_user)"]
-    Service -->|access| DataLoader["Data Loaders\n(api_service_core_dataloader)"]
-    Service -->|access| Repository["Repositories\n(data_mongo_repository_*)"]
-    Processor -->|transform| DTO["DTOs\n(api_service_core_dto_*, api_lib_dto_*)"]

@@ -1,7 +1,0 @@
-graph TD
-    A["Kafka / Debezium Streams"] --> B["Deserializer\n(stream_service_core_deserializer)"]
-    B --> C["Message Handlers\n(stream_service_core_handler)"]
-    C --> D["Enrichment Services\n(stream_service_core_service)"]
-    C --> E["Event Type Mapping\n(stream_service_core_mapping)"]
-    D --> F["Downstream Consumers\n(e.g., Data Stores, APIs)"]
-    E --> F

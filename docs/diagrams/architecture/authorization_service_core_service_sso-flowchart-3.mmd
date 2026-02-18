@@ -1,9 +1,0 @@
-flowchart TD
-    Start["Tenant initiates SSO onboarding"] --> Discovery["SsoDiscoveryController presents SSO options"]
-    Discovery --> GoogleConfig["GoogleDefaultProviderConfig"]
-    Discovery --> MicrosoftConfig["MicrosoftDefaultProviderConfig"]
-    Discovery --> TenantSelects["Tenant selects provider and submits config"]
-    TenantSelects --> Processor["DefaultRegistrationProcessor validates config"]
-    Processor --> SuccessHandler["SsoTenantRegistrationSuccessHandler finalizes setup"]
-    SuccessHandler --> Store["SSOPerTenantConfig saved per tenant"]
-    Store --> End["Tenant SSO enabled"]

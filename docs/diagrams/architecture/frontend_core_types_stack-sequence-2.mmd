@@ -1,8 +1,0 @@
-sequenceDiagram
-    participant UI as UI Component
-    participant StackTypes as frontend_core_types_stack
-    participant API as api_service_core_dto
-    UI->>API: Request StackDetailResponse
-    API-->>UI: Return StackDetailResponse (uses StackCategory, StackSubcategory, etc.)
-    UI->>StackTypes: Map API data to frontend types
-    UI-->>UI: Render stack detail page

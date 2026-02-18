@@ -1,8 +1,0 @@
-sequenceDiagram
-    participant Service as "Auth Service"
-    participant Repo as "OAuthTokenRepository"
-    participant DB as "MongoDB"
-    Service->>Repo: Store/Retrieve OAuthToken
-    Repo->>DB: MongoDB Query/Write
-    DB-->>Repo: Token Document
-    Repo-->>Service: Token Object

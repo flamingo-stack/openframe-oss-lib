@@ -1,7 +1,0 @@
-flowchart TD
-    User["User"] --> UIComponent["UI Component (from UI/Nav/Onboarding)"]
-    UIComponent -->|uses props| FeatureProps["Feature Props (from Features)"]
-    FeatureProps -->|typed by| Types["Types/Enums (from Features/Types)"]
-    UIComponent -->|fetches data| API["API/Service Layer"]
-    API -->|returns| Data["Data Models"]
-    Data -->|mapped to| FeatureProps

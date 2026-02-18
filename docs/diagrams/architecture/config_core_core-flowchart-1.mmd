@@ -1,5 +1,0 @@
-flowchart TD
-    ConfigServerConfiguration["ConfigServerConfiguration"] -->|provides config beans| ConfigServer["Configuration Server Runtime"]
-    ConfigServer -->|exposes endpoints| LoggingConfigController["LoggingConfigController (Controller)"]
-    ConfigServer -->|integrates with| SecurityConfig["SecurityConfig (api_service_core_config)"]
-    ConfigServer -->|retrieves config from| DataStorage["Data Storage/Service Modules"]

@@ -1,9 +1,0 @@
-sequenceDiagram
-    participant API as Backend API
-    participant FE as Frontend
-    participant UI as UI Components
-
-    API-->>FE: Send EventsResponse
-    FE->>UI: Pass typed event data (EventsResponse, EventMedia, ...)
-    UI->>UI: Render event cards, dashboard, stats
-    FE->>UI: Provide EventFilters for filtering

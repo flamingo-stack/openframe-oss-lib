@@ -1,4 +1,0 @@
-graph TD
-    OpenApiConfig["OpenApiConfig (external_api_service_core_config)"] -->|documents| Controllers["Controllers (external_api_service_core_controller)"]
-    Controllers -->|use| DTOs["DTOs (external_api_service_core_dto_*)"]
-    Controllers -->|invoke| Services["Services (external_api_service_core_service)"]

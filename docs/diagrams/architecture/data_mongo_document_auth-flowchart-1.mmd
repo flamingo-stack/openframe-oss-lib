@@ -1,7 +1,0 @@
-flowchart TD
-    AuthUser["AuthUser (MongoDB Document)"] -->|is persisted by| ReactiveUserRepository["ReactiveUserRepository"]
-    AuthUser -->|is persisted by| BaseUserRepository["BaseUserRepository"]
-    ReactiveUserRepository -->|used by| MongoAuthorizationService["MongoAuthorizationService"]
-    MongoAuthorizationService -->|provides| AuthenticationLogic["Authentication & Authorization Logic"]
-    AuthenticationLogic -->|used by| ApiKeyAuthenticationFilter["ApiKeyAuthenticationFilter"]
-    AuthenticationLogic -->|used by| GatewaySecurityConfig["GatewaySecurityConfig"]

@@ -1,9 +1,0 @@
-graph TD
-    Client["Client Request"] --> API["OrganizationController / DataFetcher"]
-    API --> DTO["OrganizationFilterInput"]
-    DTO -->|map to| OQF["OrganizationQueryFilter"]
-    OQF -->|used by| REPO["CustomOrganizationRepositoryImpl"]
-    REPO -->|queries| MongoDB["MongoDB: Organization Collection"]
-    MongoDB --> REPO
-    REPO --> API
-    API --> Client
