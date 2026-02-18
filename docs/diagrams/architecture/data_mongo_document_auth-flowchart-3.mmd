@@ -1,4 +1,0 @@
-flowchart LR
-    AuthUser["AuthUser"] -->|CRUD| UserRepositories["User Repositories"]
-    UserRepositories -->|service calls| AuthServices["Authentication Services"]
-    AuthServices -->|enforces| SecurityFilters["Security Filters"]

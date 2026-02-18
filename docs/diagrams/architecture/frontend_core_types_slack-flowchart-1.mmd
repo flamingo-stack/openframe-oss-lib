@@ -1,5 +1,0 @@
-flowchart TD
-    ChatUI["Chat UI Components"] -->|uses| SlackTypes["frontend_core_types_slack"]
-    SlackHooks["Slack Hooks"] -->|uses| SlackTypes
-    ApiLayer["API Service Layer"] -->|uses| SlackTypes
-    SlackTypes -->|shared types| OtherTypes["Other Frontend Core Types"]

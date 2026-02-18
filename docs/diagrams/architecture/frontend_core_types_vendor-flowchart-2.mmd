@@ -1,5 +1,0 @@
-flowchart LR
-    A["Backend API"] -->|"returns vendor features"| B["frontend_core_types_vendor\n(DetailedVendorFeature)"]
-    B -->|"used by"| C["UI Components"]
-    C -->|"display features, enable filtering"| D["User"]
-    D -->|"interacts with"| C

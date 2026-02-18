@@ -1,7 +1,0 @@
-flowchart TD
-    JwtSecurityConfig["JwtSecurityConfig"] -->|uses| JwtConfig["[security_core_jwt] JwtConfig"]
-    JwtSecurityConfig -->|uses| SecurityConstants["[security_core_oauth] SecurityConstants"]
-    JwtSecurityConfig -->|integrates with| GatewaySecurityConfig["[gateway_service_core_security] GatewaySecurityConfig"]
-    JwtSecurityConfig -->|integrates with| ApiApplicationConfig["[api_service_core_config] ApiApplicationConfig"]
-    JwtSecurityConfig -->|integrates with| AuthenticationConfig["[api_service_core_config] AuthenticationConfig"]
-    JwtSecurityConfig -->|provides security for| OAuthBffController["[security_oauth_controller] OAuthBffController"]

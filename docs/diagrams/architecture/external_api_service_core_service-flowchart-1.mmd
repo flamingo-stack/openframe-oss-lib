@@ -1,7 +1,0 @@
-flowchart TD
-    Client["External API Client"] -->|sends request| ExtApiController["external_api_service_core_controller (e.g., DeviceController)"]
-    ExtApiController -->|delegates| RestProxyService["RestProxyService"]
-    RestProxyService -->|forwards| DownstreamService["Internal/Third-Party Service"]
-    RestProxyService -->|uses config| OpenApiConfig["external_api_service_core_config: OpenApiConfig"]
-    RestProxyService -->|returns response| ExtApiController
-    ExtApiController -->|returns response| Client

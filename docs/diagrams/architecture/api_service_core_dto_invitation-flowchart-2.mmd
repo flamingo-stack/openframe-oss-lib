@@ -1,7 +1,0 @@
-graph TD
-    A["API Client"] -->|HTTP Request| B["InvitationController"]
-    B -->|uses| C["api_service_core_dto_invitation"]
-    C -->|DTOs| D["DefaultInvitationProcessor"]
-    D -->|invokes| E["Persistence Layer"]
-    D -->|returns| C
-    C -->|HTTP Response| A

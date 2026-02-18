@@ -1,7 +1,0 @@
-flowchart TD
-    CoreEvent["CoreEvent"] -->|stored in| MongoDB["MongoDB"]
-    ExternalApplicationEvent["ExternalApplicationEvent"] -->|stored in| MongoDB
-    EventQueryFilter["EventQueryFilter"] -->|filters| CoreEvent
-    EventQueryFilter -->|filters| ExternalApplicationEvent
-    data_mongo_repository_event["Event Repository"] -->|operates on| CoreEvent
-    data_mongo_repository_event -->|operates on| ExternalApplicationEvent

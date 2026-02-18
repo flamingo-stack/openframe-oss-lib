@@ -1,9 +1,0 @@
-flowchart TD
-    Client["Client Application"] -->|sends request| Controller["api_service_core_controller"]
-    Controller -->|validates input| DTOs["DTO Modules"]
-    Controller -->|delegates| Services["Service Modules"]
-    Services -->|fetches data| DataFetchers["DataFetcher/DataLoader"]
-    DataFetchers -->|queries| Repositories["Repository Layer"]
-    Services -->|returns result| Controller
-    Controller -->|formats response| DTOs
-    Controller -->|sends response| Client

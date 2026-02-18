@@ -1,5 +1,0 @@
-flowchart TD
-    Controller["API Controller"] -->|invokes| DataFetcher["DataFetcher Layer"]
-    DataFetcher -->|uses| DataLoader["DataLoader (api_service_core_dataloader)"]
-    DataLoader -->|fetches| Service["Service Layer"]
-    Service -->|queries| Repository["Repository/Database"]

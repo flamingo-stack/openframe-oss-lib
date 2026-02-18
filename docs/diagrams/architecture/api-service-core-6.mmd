@@ -1,0 +1,11 @@
+sequenceDiagram
+    participant Client
+    participant DGS
+    participant DataLoader
+    participant Repository
+
+    Client->>DGS: Query devices with nested organization
+    DGS->>DataLoader: Load organization IDs (batch)
+    DataLoader->>Repository: findByOrganizationIdIn()
+    Repository-->>DataLoader: Organizations
+    DataLoader-->>DGS: Batched results

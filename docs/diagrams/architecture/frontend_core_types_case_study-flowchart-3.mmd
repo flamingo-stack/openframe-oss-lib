@@ -1,6 +1,0 @@
-flowchart TD
-    User["User selects filters"] --> UI["UI builds CaseStudyFilters"]
-    UI --> API["API request with filters"]
-    API --> Backend["Backend processes filters"]
-    Backend --> API["Returns CaseStudyListResponse"]
-    API --> UI["UI displays case studies"]

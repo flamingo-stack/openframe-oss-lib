@@ -1,5 +1,0 @@
-graph TD
-    api["External API (GitHub Releases)"] -->|JSON| type["frontend_core_types_product_release (GitHubRelease)"]
-    type -->|used by| ui["UI Components"]
-    type -->|used by| hooks["Data Fetching Hooks"]
-    type -->|referenced by| other_types["Other Type Modules"]

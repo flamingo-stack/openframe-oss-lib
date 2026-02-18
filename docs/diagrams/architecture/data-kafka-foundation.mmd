@@ -1,0 +1,5 @@
+flowchart LR
+    AppServices["Application Services"] -->|"publish events"| KafkaFoundation["Data Kafka Foundation"]
+    KafkaFoundation -->|"Kafka topics"| KafkaCluster[("Kafka Cluster")]
+    KafkaCluster -->|"consume"| StreamCore["Stream Processing Core"]
+    StreamCore -->|"persist"| DataPlatform["Cassandra & Pinot"]

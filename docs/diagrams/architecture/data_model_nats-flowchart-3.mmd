@@ -1,6 +1,0 @@
-flowchart TD
-    Start["Agent Installed"] --> CreateMsg["Create InstalledAgentMessage"]
-    CreateMsg --> Publish["Publish to NATS"]
-    Publish --> NATSBus["NATS Message Bus"]
-    NATSBus --> SubscribedService["Subscribed Service Receives Message"]
-    SubscribedService --> Process["Process Installation Event"]

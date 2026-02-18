@@ -1,9 +1,0 @@
-flowchart TD
-    API["API Request (e.g., Get Device)"] --> Controller["DeviceController"]
-    Controller --> Service["DeviceService"]
-    Service --> Repository["DeviceRepository"]
-    Repository --> Device["Device Document"]
-    Device -->|has| Alert["Alert"]
-    Device -->|has| SecurityAlert["SecurityAlert"]
-    Device -->|has| ComplianceRequirement["ComplianceRequirement"]
-    Device -->|references| Organization["Organization Document"]

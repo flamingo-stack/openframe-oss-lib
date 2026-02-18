@@ -1,0 +1,6 @@
+flowchart TD
+    AgentToolId["UUID"] --> FleetClient["FleetMdmClient"]
+    FleetClient --> Hosts["Search Hosts"]
+    Hosts --> Match["Exact UUID + OS data"]
+    Match -->|"found"| HostId["Numeric Host ID"]
+    Match -->|"not found"| Fallback["Use UUID if last attempt"]

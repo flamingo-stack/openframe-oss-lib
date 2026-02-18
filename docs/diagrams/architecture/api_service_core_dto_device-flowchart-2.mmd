@@ -1,5 +1,0 @@
-graph TD
-    DeviceFilterInput -->|uses| DeviceFilterOption["DeviceFilterOption (api_lib_dto_device)"]
-    DeviceFilterInput -->|uses| CursorPaginationInput["CursorPaginationInput (api_lib_dto_shared)"]
-    DeviceController["DeviceController (api_service_core_controller)"] -->|accepts| DeviceFilterInput
-    DeviceDataFetcher["DeviceDataFetcher (api_service_core_datafetcher)"] -->|receives| DeviceFilterInput

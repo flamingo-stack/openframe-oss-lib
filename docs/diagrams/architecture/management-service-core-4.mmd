@@ -1,0 +1,5 @@
+flowchart TD
+    Load["Load JSON Config"] --> Resolve["Resolve Placeholders"]
+    Resolve --> DeploySchema["POST Schema"]
+    DeploySchema --> DeployTable["PUT Table Config"]
+    DeployTable --> Success["Deployment Success"]

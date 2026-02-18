@@ -1,0 +1,4 @@
+flowchart LR
+    Request["HTTP Request"] --> MatchAS{"Authorization<br/>Endpoints?"}
+    MatchAS -->|"Yes"| ASChain["Authorization Server FilterChain"]
+    MatchAS -->|"No"| DefaultChain["Default Security FilterChain"]

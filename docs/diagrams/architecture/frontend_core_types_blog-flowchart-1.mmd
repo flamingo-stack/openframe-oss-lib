@@ -1,8 +1,0 @@
-flowchart TD
-    UIComponents["UI Components"] -->|use| BlogTypes["frontend_core_types_blog"]
-    DataFetching["Data Fetching Hooks"] -->|use| BlogTypes
-    StateManagement["State Management"] -->|use| BlogTypes
-    SEOAnalytics["SEO & Analytics Tools"] -->|use| BlogTypes
-    BlogTypes -->|references| CategoriesTypes["frontend_core_types_categories"]
-    BlogTypes -->|references| MediaTypes["frontend_core_types_media"]
-    BlogTypes -->|references| AuthTypes["frontend_core_types_auth"]

@@ -1,4 +1,0 @@
-flowchart TD
-    AuthService["Authorization Service"] -->|requests policy| PolicyLookup["Global Domain Policy Lookup\n(NoopGlobalDomainPolicyLookup)"]
-    PolicyLookup -->|returns policy| AuthService
-    AuthService -->|enforces| UserAction["User/Client Action"]

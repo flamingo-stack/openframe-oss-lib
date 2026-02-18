@@ -1,6 +1,0 @@
-flowchart TD
-    ProducerApp["Producer Application"] -->|create message| AttachHeaders["Attach KafkaHeaders"]
-    AttachHeaders -->|send| KafkaBroker["Kafka Broker"]
-    KafkaBroker -->|deliver| ConsumerApp["Consumer Application"]
-    ConsumerApp -->|read| ReadHeaders["Read KafkaHeaders"]
-    ReadHeaders -->|process| BusinessLogic["Business Logic"]

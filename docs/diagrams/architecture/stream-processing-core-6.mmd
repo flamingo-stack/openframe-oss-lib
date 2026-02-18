@@ -1,0 +1,4 @@
+flowchart TD
+    DebeziumMessage --> Transform
+    Transform --> UnifiedLogEvent
+    UnifiedLogEvent --> Cassandra[("Cassandra")]

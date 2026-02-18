@@ -1,0 +1,5 @@
+flowchart LR
+    Verifier["Code Verifier"] -->|"SHA-256"| Hash["Hash"]
+    Hash -->|"Base64Url"| Challenge["Code Challenge"]
+    Challenge --> AuthServer["Authorization Server"]
+    Verifier --> TokenExchange["Token Exchange Step"]

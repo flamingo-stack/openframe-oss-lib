@@ -1,0 +1,11 @@
+flowchart TD
+    ServiceLayer["Service Layer"]
+
+    ServiceLayer --> Blocking["RedisTemplate"]
+    ServiceLayer --> Reactive["ReactiveRedisTemplate"]
+
+    Blocking --> SyncConn["RedisConnectionFactory"]
+    Reactive --> ReactiveConn["ReactiveRedisConnectionFactory"]
+
+    SyncConn --> RedisServer[("Redis")]
+    ReactiveConn --> RedisServer

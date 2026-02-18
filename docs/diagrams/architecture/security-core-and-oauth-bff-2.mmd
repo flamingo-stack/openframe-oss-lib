@@ -1,0 +1,4 @@
+flowchart TD
+    Props["application.yml jwt.*"] --> Config["JwtConfig"]
+    Config -->|"loadPublicKey()"| PubKey["RSAPublicKey"]
+    Config -->|"loadPrivateKey()"| PrivKey["RSAPrivateKey"]
