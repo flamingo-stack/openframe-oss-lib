@@ -1,5 +1,0 @@
-flowchart TD
-    A["OssTenantKafkaProperties"] -->|"provides properties to"| B["OssTenantKafkaAutoConfiguration"]
-    B -->|"registers beans in context"| C["OssKafkaConfig"]
-    C -->|"exposes Kafka config beans"| D["Kafka-dependent modules"]
-    D -->|"consume config"| E["Kafka Producers/Consumers"]

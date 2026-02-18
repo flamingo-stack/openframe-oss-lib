@@ -1,6 +1,0 @@
-graph TD
-    User["User enters access code"] --> UI["Frontend UI"]
-    UI -->|sends code| Validation["AccessCodeValidation"]
-    Validation -->|API call| Backend["Backend validation endpoint"]
-    Backend -->|returns result| UI
-    UI -->|updates| User

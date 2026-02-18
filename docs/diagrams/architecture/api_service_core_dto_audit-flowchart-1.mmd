@@ -1,8 +1,0 @@
-flowchart TD
-    Client["API Client"] -->|sends LogFilterInput| Controller["LogController"]
-    Controller -->|validates and forwards| DataFetcher["LogDataFetcher"]
-    DataFetcher -->|maps to domain filters| AuditDTO["LogFilters (api_lib_dto_audit)"]
-    AuditDTO -->|used by| Repository["Log Repository"]
-    Repository -->|returns logs| DataFetcher
-    DataFetcher -->|returns logs| Controller
-    Controller -->|returns logs| Client

@@ -1,8 +1,0 @@
-flowchart TD
-    Config["management_service_core_config"] --> Service["management_service_core_service"]
-    Initializer["management_service_core_initializer"] --> Service
-    Scheduler["management_service_core_scheduler"] --> Service
-    Controller["management_service_core_controller"] --> Service
-    Service -->|uses| Model["management_service_core_model"]
-    Service -->|uses| Dto["management_service_core_dto"]
-    Service -->|coordinates| PinotConfig["management_service_core_config_pinot"]

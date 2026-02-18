@@ -1,9 +1,0 @@
-flowchart TD
-    A["Controller/Service"] --> B["WebClientConfig"]
-    B --> C["WebClient Instance"]
-    C --> D["Outbound HTTP Request"]
-    D --> E["External/Internal Service"]
-    B --> F["Security Filters"]
-    F --> C
-    B --> G["CORS/Proxy Filters"]
-    G --> C

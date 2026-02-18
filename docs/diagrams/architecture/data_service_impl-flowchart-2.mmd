@@ -1,6 +1,0 @@
-flowchart TD
-    UserAction["User/API Action"] --> DataFetcher["Data Fetcher"]
-    DataFetcher --> ServiceImpl["MachineTagEventServiceImpl"]
-    ServiceImpl --> Repo["Repository"]
-    Repo --> DB["Database"]
-    ServiceImpl -->|triggers| OtherService["Notification/Enrichment/Audit"]

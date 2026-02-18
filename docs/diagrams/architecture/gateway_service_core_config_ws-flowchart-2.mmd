@@ -1,5 +1,0 @@
-flowchart TD
-    A["WebSocketGatewayConfig"] -->|registers| B["ToolAgentWebSocketProxyUrlFilter"]
-    A -->|registers| C["ToolApiWebSocketProxyUrlFilter"]
-    B -->|filters| D["WebSocket Requests to Tool Agents"]
-    C -->|filters| E["WebSocket Requests to Tool APIs"]

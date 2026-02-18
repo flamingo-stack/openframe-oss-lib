@@ -1,7 +1,0 @@
-flowchart TD
-    ScriptConfig["ScriptConfig"] -->|used by| IntegratedToolAgentInitializer["IntegratedToolAgentInitializer"]
-    ScriptConfig -->|used by| TacticalRmmScriptsInitializer["TacticalRmmScriptsInitializer"]
-    IntegratedToolAgentInitializer -->|part of| management_service_core_initializer["management_service_core_initializer"]
-    TacticalRmmScriptsInitializer -->|part of| management_service_core_initializer
-    management_service_core_initializer -->|invoked by| management_service_core_controller["management_service_core_controller"]
-    management_service_core_controller -->|exposes| API["API Endpoints"]

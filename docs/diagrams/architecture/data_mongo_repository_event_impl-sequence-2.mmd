@@ -1,8 +1,0 @@
-sequenceDiagram
-    participant Client
-    participant CustomEventRepositoryImpl
-    participant MongoDB
-    Client->>CustomEventRepositoryImpl: Provide EventQueryFilter
-    CustomEventRepositoryImpl->>MongoDB: Build and execute query
-    MongoDB-->>CustomEventRepositoryImpl: Return event documents
-    CustomEventRepositoryImpl-->>Client: Return filtered events

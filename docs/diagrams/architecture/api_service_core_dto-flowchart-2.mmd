@@ -1,6 +1,0 @@
-graph TD
-    A["Client"] -->|API Request| B["Controller"]
-    B -->|uses| C["api_service_core_dto"]
-    C -->|populated by| D["Service"]
-    D -->|fetches from| E["DataLoader/DataFetcher"]
-    C -->|response| A

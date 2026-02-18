@@ -1,8 +1,0 @@
-sequenceDiagram
-    participant Client
-    participant Controller as ReleaseVersionController
-    participant Service as OpenFrameClientVersionUpdateService
-    Client->>Controller: GET /release-version
-    Controller->>Service: getCurrentVersion()
-    Service-->>Controller: ReleaseVersionResponse
-    Controller-->>Client: HTTP 200 ReleaseVersionResponse

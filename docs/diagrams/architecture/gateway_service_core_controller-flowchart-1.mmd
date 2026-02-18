@@ -1,9 +1,0 @@
-flowchart TD
-    Client["Client"] --> GatewayController["gateway_service_core_controller"]
-    GatewayController --> Security["gateway_service_core_security"]
-    GatewayController --> Filter["gateway_service_core_filter"]
-    GatewayController --> Config["gateway_service_core_config"]
-    GatewayController --> IntegrationController["IntegrationController"]
-    GatewayController --> InternalAuthProbeController["InternalAuthProbeController"]
-    IntegrationController --> DownstreamService["Downstream Service(s)"]
-    InternalAuthProbeController --> HealthCheck["Health/Readiness Probes"]

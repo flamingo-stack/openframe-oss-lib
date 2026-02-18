@@ -1,5 +1,0 @@
-flowchart TD
-    CustomEventRepositoryImpl["CustomEventRepositoryImpl"] -->|queries| CoreEvent["CoreEvent"]
-    CustomEventRepositoryImpl -->|queries| ExternalApplicationEvent["ExternalApplicationEvent"]
-    CustomEventRepositoryImpl -->|uses| EventQueryFilter["EventQueryFilter"]
-    CustomEventRepositoryImpl -->|delegates to| ExternalApplicationEventRepository["ExternalApplicationEventRepository"]

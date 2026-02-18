@@ -1,7 +1,0 @@
-flowchart TD
-    A["External Client/API Consumer"] -->|HTTP Requests| B["management_service_core_controller"]
-    B -->|Delegates| C["management_service_core_service"]
-    B -->|Uses| D["management_service_core_dto"]
-    C -->|Persists/Fetches| E["data_mongo_document_tool"]
-    C -->|Coordinates| F["management_service_core_initializer"]
-    B -->|Returns| G["HTTP Responses (DTOs)"]

@@ -1,8 +1,0 @@
-flowchart TD
-    APIClient["API Client"] -->|requests| OrganizationController["OrganizationController"]
-    OrganizationController -->|uses| OrganizationFilterOptions["OrganizationFilterOptions"]
-    OrganizationController -->|returns| OrganizationResponse["OrganizationResponse"]
-    OrganizationController -->|delegates| OrganizationDataFetcher["OrganizationDataFetcher"]
-    OrganizationDataFetcher -->|fetches| OrganizationDataLoader["OrganizationDataLoader"]
-    OrganizationDataFetcher -->|uses| OrganizationFilterOptions
-    OrganizationDataFetcher -->|returns| OrganizationResponse

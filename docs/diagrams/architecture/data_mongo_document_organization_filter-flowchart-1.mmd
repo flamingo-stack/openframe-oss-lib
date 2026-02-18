@@ -1,6 +1,0 @@
-flowchart TD
-    API["API Layer (OrganizationController, DataFetcher)"] -->|maps filter input| DTO["OrganizationFilterInput / OrganizationFilterOptions"]
-    DTO -->|mapped to| OQF["OrganizationQueryFilter"]
-    OQF -->|applies filter| ORG["Organization (MongoDB Document)"]
-    OQF -->|used by| REPO["CustomOrganizationRepositoryImpl"]
-    REPO -->|returns| API

@@ -1,5 +1,0 @@
-flowchart TD
-    A["Backend API"] -->|returns TMCGMembersResponse| B["useTMCGMembers (hook)"]
-    B -->|returns UseTMCGMembersResult| C["TMCGMembersGrid (component)"]
-    C -->|uses TMCGMemberCardProps| D["TMCGMemberCard (component)"]
-    D -->|uses TMCGSocialLinksProps| E["TMCGSocialLinks (component)"]
