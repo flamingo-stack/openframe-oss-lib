@@ -61,6 +61,8 @@ const buttonVariants = cva(
         // Device action variant - for device detail page action buttons
         "device-action": "bg-ods-card border border-ods-border hover:bg-ods-bg-hover text-ods-text-primary px-4 py-3 rounded-[6px] font-['DM_Sans'] font-bold text-[18px] tracking-[-0.36px] disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-ods-card disabled:text-ods-text-secondary",
         card: "bg-ods-card border border-ods-border hover:bg-ods-bg-hover text-ods-text-primary px-4 py-3 rounded-[6px] font-['DM_Sans'] font-bold text-[18px] tracking-[-0.36px] disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-ods-card disabled:text-ods-text-secondary",
+        // Ghost subtle variant - no background change on hover/click, only text/icon turns white
+        "ghost-subtle": "bg-transparent text-ods-text-secondary hover:bg-transparent hover:text-white active:bg-transparent active:text-white [&:hover_svg]:text-white [&:active_svg]:text-white focus-visible:ring-2 focus-visible:ring-ods-focus disabled:text-ods-text-disabled !w-auto whitespace-nowrap !text-base cursor-pointer transition-colors",
       },
       size: {
         // Small size for secondary actions
@@ -70,7 +72,7 @@ const buttonVariants = cva(
         // Large size for prominent CTAs (ButtonFull lg) - adjusted for better text/icon fit
         lg: "min-h-[48px] px-2 sm:px-8 py-3 text-base",
         // Icon-only buttons - fixed square size on all breakpoints
-        icon: "!w-10 !h-10 sm:!w-12 sm:!h-12 p-0 shrink-0",
+        icon: "!w-11 !h-11 sm:!w-12 sm:!h-12 p-0 shrink-0",
         // Icon-only large buttons (like hamburger menu) - fixed square size on all breakpoints
         iconLg: "!w-12 !h-12 p-0 shrink-0",
         // Touch-friendly mobile sizing
