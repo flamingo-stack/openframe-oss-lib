@@ -19,6 +19,8 @@ export type PageActionButton = {
   variant?: 'primary' | 'outline'
   disabled?: boolean
   loading?: boolean
+  /** Show action only on mobile (below md). Default: visible on all screens. */
+  showOnlyMobile?: boolean
 }
 
 export interface PageActionsProps {
@@ -62,6 +64,8 @@ function IconButtonsVariant({
   className?: string
   gapClass: string
 }) {
+  const desktopActions = actions.filter(a => !a.showOnlyMobile)
+
   const menuItems: MoreActionsItem[] = actions.map(action => ({
     label: action.label,
     onClick: action.onClick,
@@ -76,7 +80,7 @@ function IconButtonsVariant({
     <>
       {/* Desktop: Show all buttons with icons */}
       <div className={cn('hidden md:flex items-center', gapClass, className)}>
-        {actions.map((action, idx) => (
+        {desktopActions.map((action, idx) => (
           <Button
             key={`${action.label}-${idx}`}
             variant="outline"
@@ -130,11 +134,13 @@ function PrimaryButtonsVariant({
     return 0
   })
 
+  const desktopActions = sortedActions.filter(a => !a.showOnlyMobile)
+
   return (
     <>
       {/* Desktop: Normal layout (outline left, primary right) */}
       <div className={cn('hidden md:flex items-center', gapClass, className)}>
-        {sortedActions.map((action, idx) => (
+        {desktopActions.map((action, idx) => (
           <Button
             key={`desktop-${action.label}-${idx}`}
             variant={action.variant}
@@ -169,12 +175,14 @@ function MenuPrimaryVariant({
   className?: string
   gapClass: string
 }) {
+  const desktopActions = actions.filter(a => !a.showOnlyMobile)
+
   return (
     <>
       {/* Desktop: MoreActionsMenu + primary buttons */}
       <div className={cn('hidden md:flex items-center', gapClass, className)}>
         {menuActions.length > 0 && <MoreActionsMenu items={menuActions} />}
-        {actions.map((action, idx) => (
+        {desktopActions.map((action, idx) => (
           <Button
             key={`desktop-${action.label}-${idx}`}
             variant={action.variant || 'primary'}
