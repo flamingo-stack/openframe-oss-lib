@@ -1,5 +1,0 @@
-flowchart TD
-    UI["Waitlist UI Component"] -->|uses| Types["frontend_core_types_waitlist"]
-    Types -->|sends CreateWaitlistEntry| API["Backend Waitlist API"]
-    API -->|returns WaitlistResponse| Types
-    Types -->|provides data| UI

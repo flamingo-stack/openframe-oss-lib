@@ -1,0 +1,25 @@
+flowchart TD
+    Agent["Client Agent"] -->|"/oauth/token"| AgentAuthController["AgentAuthController"]
+    Agent -->|"/api/agents/register"| AgentController["AgentController"]
+    Agent -->|"heartbeat"| NATS["NATS"]
+    Agent -->|"tool events"| NATS
+
+    NATS --> ClientConnectionListener["ClientConnectionListener"]
+    NATS --> MachineHeartbeatListener["MachineHeartbeatListener"]
+    NATS --> InstalledAgentListener["InstalledAgentListener"]
+    NATS --> ToolConnectionListener["ToolConnectionListener"]
+
+    ClientConnectionListener --> MachineStatusService["MachineStatusService"]
+    MachineHeartbeatListener --> MachineStatusService
+
+    InstalledAgentListener --> InstalledAgentService["InstalledAgentService"]
+    ToolConnectionListener --> ToolConnectionService["ToolConnectionService"]
+
+    AgentController --> AgentRegistrationService["AgentRegistrationService"]
+    AgentRegistrationService --> AgentRegistrationProcessor["AgentRegistrationProcessor"]
+
+    AgentRegistrationProcessor --> DefaultAgentRegistrationProcessor["DefaultAgentRegistrationProcessor"]
+
+    ToolConnectionService --> ToolAgentIdTransformer["ToolAgentIdTransformer"]
+    ToolAgentIdTransformer --> FleetTransformer["FleetMdmAgentIdTransformer"]
+    ToolAgentIdTransformer --> MeshTransformer["MeshCentralAgentIdTransformer"]

@@ -1,5 +1,0 @@
-flowchart TD
-    Scheduler["IdpConfigurationScheduler"] -->|fetches configs| ConfigRepo["IdP Config Repository"]
-    Scheduler -->|validates| SSOService["SSO/IdP Service Modules"]
-    Scheduler -->|notifies| AuditLog["Audit/Monitoring Modules"]
-    Scheduler -->|triggers| Downstream["Downstream Services"]

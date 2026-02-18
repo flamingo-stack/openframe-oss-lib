@@ -342,3 +342,70 @@ export const MenuPrimaryLoading: Story = {
     ],
   },
 }
+
+/**
+ * Mobile-only actions with `showOnlyMobile` — some actions appear only on mobile.
+ * "Edit Categories" is hidden on desktop and only shows in the mobile menu.
+ */
+export const MobileOnlyActions: Story = {
+  args: {
+    variant: 'icon-buttons',
+    actions: [
+      {
+        label: 'Add Script',
+        onClick: fn(),
+        icon: <PlusCircleIcon size={24} />,
+      },
+      {
+        label: 'Edit Categories',
+        onClick: fn(),
+        icon: <ColorsIcon size={24} />,
+        showOnlyMobile: true,
+      },
+      {
+        label: 'Preview',
+        onClick: fn(),
+        icon: <PlayCircleIcon size={24} />,
+      },
+    ],
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Use the `showOnlyMobile` prop to hide specific actions on desktop. They will still appear in the mobile menu or bottom bar.',
+      },
+    },
+  },
+}
+
+/**
+ * Primary buttons with a mobile-only action.
+ */
+export const PrimaryButtonsMobileOnly: Story = {
+  args: {
+    variant: 'primary-buttons',
+    actions: [
+      {
+        label: 'Save Changes',
+        onClick: fn(),
+        variant: 'primary',
+        icon: <CheckCircleIcon size={24} />,
+      },
+      {
+        label: 'Delete',
+        onClick: fn(),
+        variant: 'outline',
+        showOnlyMobile: true,
+      },
+    ],
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'The "Delete" button only appears in the mobile bottom bar. On desktop only "Save Changes" is shown.',
+      },
+    },
+  },
+}

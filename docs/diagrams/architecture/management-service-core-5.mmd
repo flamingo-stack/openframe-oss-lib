@@ -1,0 +1,5 @@
+flowchart TD
+    Request["Save Tool Request"] --> SaveMongo["Persist Tool"]
+    SaveMongo --> DebeziumUpdate["Create or Update Debezium Connectors"]
+    DebeziumUpdate --> Hooks["Execute Post Save Hooks"]
+    Hooks --> Response["Return Success"]

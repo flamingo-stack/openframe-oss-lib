@@ -1,0 +1,4 @@
+flowchart LR
+    BFF["OAuth BFF"] -->|"Create Ticket"| Store["Dev Ticket Store"]
+    Client["Dev Client"] -->|"/oauth/dev-exchange"| BFF
+    BFF -->|"Return Tokens in Headers"| Client

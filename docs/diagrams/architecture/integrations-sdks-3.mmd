@@ -1,0 +1,8 @@
+flowchart TD
+    InstallCommand["Tactical Install Command"] --> Parser["RegistrationSecretParser"]
+    Parser --> SecretValue["Extracted Secret"]
+
+    TacticalApi["Tactical API"] --> AgentList["AgentListItem"]
+    TacticalApi --> AgentDetail["AgentInfo"]
+
+    AgentDetail --> DeviceMapping["Internal Device Mapping"]

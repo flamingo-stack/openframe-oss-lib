@@ -1,5 +1,0 @@
-flowchart TD
-    API["API/Data Fetchers"] -->|calls| ServiceImpl["MachineTagEventServiceImpl"]
-    ServiceImpl -->|reads/writes| Repo["Data Repositories"]
-    ServiceImpl -->|uses| Model["Data Models"]
-    ServiceImpl -->|notifies| OtherServices["Other Services"]

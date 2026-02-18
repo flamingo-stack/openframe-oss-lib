@@ -1,0 +1,7 @@
+flowchart LR
+    Controller["Controller Layer"] --> Service["Service Layer"]
+    Service --> Repository["Repository Layer"]
+    Repository --> Service
+    Service --> Mapper["DTO Mapping"]
+    Mapper --> PageResponse["PageResponse<T>"]
+    PageResponse --> Controller

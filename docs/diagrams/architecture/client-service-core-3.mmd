@@ -1,0 +1,9 @@
+sequenceDiagram
+    participant Agent
+    participant NATS
+    participant Listener as MachineHeartbeatListener
+    participant Status as MachineStatusService
+
+    Agent->>NATS: Publish machine.{id}.heartbeat
+    NATS->>Listener: Deliver message
+    Listener->>Status: processHeartbeat(machineId, now)

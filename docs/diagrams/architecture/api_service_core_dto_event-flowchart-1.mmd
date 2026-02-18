@@ -1,8 +1,0 @@
-flowchart TD
-    A["API Client"] -->|sends event request| B["Controller (EventController)"]
-    B -->|uses| C["CreateEventInput / EventFilterInput (api_service_core_dto_event)"]
-    C -->|passed to| D["EventDataFetcher"]
-    D -->|maps to| E["EventQueryFilter (data_mongo_document_event_filter)"]
-    E -->|queries| F["CoreEvent (data_mongo_document_event)"]
-    D -->|returns| G["EventResponse DTO (external_api_service_core_dto_event)"]
-    G -->|to| A

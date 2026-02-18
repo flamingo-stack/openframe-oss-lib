@@ -1,3 +1,0 @@
-flowchart TD
-    RawEvent["Raw Event Data"] -->|contains timestamp| Parse["TimestampParser\n(stream_service_core_util)"]
-    Parse -->|normalized| Downstream["Downstream Processing\n(Handlers, Services)"]

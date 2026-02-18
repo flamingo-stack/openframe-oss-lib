@@ -1,6 +1,0 @@
-graph TD
-    A["InvitationRegistrationController"] -->|accepts| B["InvitationRegistrationRequest"]
-    A -->|returns| C["TenantAvailabilityResponse"]
-    D["SsoDiscoveryController"] -->|accepts| E["SsoTenantRegistrationInitRequest"]
-    D -->|returns| F["TenantDiscoveryResponse"]
-    G["PasswordResetController"] -->|accepts| H["PasswordResetDtos"]

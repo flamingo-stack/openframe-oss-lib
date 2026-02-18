@@ -1,0 +1,4 @@
+flowchart TD
+    NATS["JetStream"] --> InstalledAgentListener
+    InstalledAgentListener --> InstalledAgentService
+    InstalledAgentListener -->|"ack"| NATS

@@ -1,8 +1,0 @@
-sequenceDiagram
-    participant Client
-    participant Controller as TenantRegistrationController
-    participant Service as RegistrationService
-    Client->>Controller: POST /register (TenantRegistrationRequest)
-    Controller->>Service: validate and process registration
-    Service-->>Controller: TenantAvailabilityResponse
-    Controller-->>Client: TenantAvailabilityResponse

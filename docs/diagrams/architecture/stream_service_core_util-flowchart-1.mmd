@@ -1,7 +1,0 @@
-flowchart TD
-    A["Kafka/Streaming Source"] --> B["Deserializer\n(stream_service_core_deserializer)"]
-    B --> C["Message Handler\n(stream_service_core_handler)"]
-    C --> D["Enrichment Service\n(stream_service_core_service)"]
-    B --> E["TimestampParser\n(stream_service_core_util)"]
-    C --> E
-    E --> F["Normalized Timestamp"]

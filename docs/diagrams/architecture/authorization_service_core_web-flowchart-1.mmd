@@ -1,6 +1,0 @@
-flowchart TD
-    Controllers["authorization_service_core_controller"] -->|uses| AuthStateUtils["AuthStateUtils"]
-    Controllers -->|uses| Redirects["Redirects"]
-    AuthStateUtils -->|validates| SecurityFlow["authorization_service_core_security_flow"]
-    Redirects -->|constructs| WebResponses["HTTP Redirect Responses"]
-    SecurityFlow -->|invokes| Processors["authorization_service_core_service_processor"]

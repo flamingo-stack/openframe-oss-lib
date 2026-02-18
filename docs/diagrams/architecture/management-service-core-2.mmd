@@ -1,0 +1,8 @@
+flowchart TD
+    AppStart["Application Ready"] --> AgentSecretInit["AgentRegistrationSecretInitializer"]
+    AppStart --> PinotInit["PinotConfigInitializer"]
+    AppStart --> NatsInit["NatsStreamConfigurationInitializer"]
+    AppStart --> ToolAgentInit["IntegratedToolAgentInitializer"]
+    AppStart --> ClientConfigInit["OpenFrameClientConfigurationInitializer"]
+    AppStart --> TacticalInit["TacticalRmmScriptsInitializer"]
+    AppStart --> DebeziumInit["DebeziumConnectorInitializer"]

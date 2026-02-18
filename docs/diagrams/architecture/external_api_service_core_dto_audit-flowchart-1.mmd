@@ -1,8 +1,0 @@
-flowchart TD
-    Client["Client Application"] -->|requests logs| LogController["LogController (external_api_service_core_controller)"]
-    LogController -->|uses| LogFilterCriteria["LogFilterCriteria"]
-    LogController -->|returns| LogsResponse["LogsResponse"]
-    LogsResponse -->|contains| LogResponse["LogResponse"]
-    LogResponse -->|details| LogDetailsResponse["LogDetailsResponse"]
-    LogController -->|provides filters| LogFilterResponse["LogFilterResponse"]
-    LogFilterResponse -->|org filter| OrganizationFilterResponse["OrganizationFilterResponse"]

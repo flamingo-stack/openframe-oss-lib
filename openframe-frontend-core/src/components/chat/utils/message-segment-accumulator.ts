@@ -12,6 +12,7 @@ import type {
   MessageSegment,
   ToolExecutionSegment,
   ApprovalRequestSegment,
+  ErrorSegment,
   PendingApproval,
   AccumulatorState,
   ChatApprovalStatus,
@@ -292,6 +293,14 @@ export class MessageSegmentAccumulator {
     })
     
     return segments
+  }
+
+  /**
+   * Add an error segment
+   */
+  addError(title: string, details?: string): MessageSegment[] {
+    this.segments.push({ type: 'error', title, details })
+    return this.getSegments()
   }
 
   /**

@@ -119,6 +119,13 @@ export interface ApprovalRequestMessageProps extends HTMLAttributes<HTMLDivEleme
   disabled?: boolean
 }
 
+// ========== Error Message Display Props ==========
+
+export interface ErrorMessageDisplayProps extends HTMLAttributes<HTMLDivElement> {
+  title: string
+  details?: string
+}
+
 // ========== Model Display Props ==========
 
 export interface ModelDisplayProps extends HTMLAttributes<HTMLDivElement> {

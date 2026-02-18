@@ -1,7 +1,0 @@
-graph TD
-    User["User"] -->|submits form| Form["AnnouncementFormProps"]
-    Form -->|creates| CreateData["CreateAnnouncementData"]
-    CreateData -->|sent to API| API["Announcement API"]
-    API -->|returns| Response["AnnouncementResponse"]
-    Response -->|displayed in| Bar["AnnouncementBarProps"]
-    Response -->|displayed in| List["AnnouncementListProps"]

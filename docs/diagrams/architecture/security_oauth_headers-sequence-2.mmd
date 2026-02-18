@@ -1,8 +1,0 @@
-sequenceDiagram
-    participant Client
-    participant OAuthController
-    participant NoopForwardedHeadersContributor
-    Client->>OAuthController: Initiate OAuth flow
-    OAuthController->>NoopForwardedHeadersContributor: Request header contribution
-    NoopForwardedHeadersContributor-->>OAuthController: No headers added (noop)
-    OAuthController-->>Client: Continue OAuth process

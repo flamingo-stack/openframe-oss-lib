@@ -1,6 +1,0 @@
-flowchart TD
-    PemUtil["PemUtil"] -->|encodes/decodes| RsaAuthenticationKeyPairGenerator["RsaAuthenticationKeyPairGenerator"]
-    RsaAuthenticationKeyPairGenerator -->|generates keys for| TenantKeyService["TenantKeyService"]
-    TenantKeyService -->|provides keys to| SecurityConfig["SecurityConfig"]
-    TenantKeyService -->|retrieves/rotates| MongoRegisteredClientRepository["MongoRegisteredClientRepository"]
-    SecurityConfig -->|enforces| AuthenticationFlows["Authentication Flows"]

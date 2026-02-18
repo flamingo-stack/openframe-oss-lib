@@ -1,0 +1,6 @@
+flowchart TD
+    Controller["SSOConfigController"] --> Service["SSOConfigService"]
+    Service --> Repo["SSOConfigRepository"]
+    Service --> Encrypt["EncryptionService"]
+    Service --> DomainVal["DomainValidationService"]
+    Service --> Processor["SSOConfigProcessor"]

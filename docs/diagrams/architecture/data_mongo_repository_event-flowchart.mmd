@@ -1,5 +1,0 @@
-flowchart TD
-    ServiceLayer["Service Layer (e.g., EventDataFetcher)"] -->|calls| ExternalApplicationEventRepository["ExternalApplicationEventRepository"]
-    ExternalApplicationEventRepository -->|manages| ExternalApplicationEvent["ExternalApplicationEvent (Mongo Document)"]
-    ExternalApplicationEventRepository -->|uses| EventQueryFilter["EventQueryFilter (Filter)"]
-    ExternalApplicationEventRepository -->|delegates custom queries to| CustomEventRepositoryImpl["CustomEventRepositoryImpl"]
