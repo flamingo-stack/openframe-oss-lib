@@ -78,7 +78,7 @@ export function QueryReportTable({
 
       {/* Table content */}
       {!loading && data.length > 0 && (
-        <div className={cn('overflow-x-auto', tableClassName)}>
+        <div className={cn('overflow-x-scroll', tableClassName)}>
           <div style={{ minWidth: tableMinWidth }}>
             <QueryReportTableHeader
               columns={columns}
