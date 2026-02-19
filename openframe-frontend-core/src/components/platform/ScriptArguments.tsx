@@ -157,6 +157,7 @@ export const ScriptArguments: React.FC<ScriptArgumentsProps> = ({
         <Button
           type="button"
           variant="ghost-subtle"
+          className="text-ods-text-primary"
           onClick={handleAdd}
           disabled={disabled}
           leftIcon={<PlusCircle className="size-6" />}

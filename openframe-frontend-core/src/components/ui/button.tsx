@@ -62,7 +62,7 @@ const buttonVariants = cva(
         "device-action": "bg-ods-card border border-ods-border hover:bg-ods-bg-hover text-ods-text-primary px-4 py-3 rounded-[6px] font-['DM_Sans'] font-bold text-[18px] tracking-[-0.36px] disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-ods-card disabled:text-ods-text-secondary",
         card: "bg-ods-card border border-ods-border hover:bg-ods-bg-hover text-ods-text-primary px-4 py-3 rounded-[6px] font-['DM_Sans'] font-bold text-[18px] tracking-[-0.36px] disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-ods-card disabled:text-ods-text-secondary",
         // Ghost subtle variant - no background change on hover/click, only text/icon turns white
-        "ghost-subtle": "bg-transparent text-ods-text-secondary hover:bg-transparent hover:text-white active:bg-transparent active:text-white [&:hover_svg]:text-white [&:active_svg]:text-white focus-visible:ring-2 focus-visible:ring-ods-focus disabled:text-ods-text-disabled !w-auto whitespace-nowrap !text-base cursor-pointer transition-colors",
+        "ghost-subtle": "bg-transparent text-ods-text-secondary hover:bg-transparent hover:text-white active:bg-transparent active:text-white [&_svg]:transition-colors [&_svg]:text-ods-text-secondary [&:hover_svg]:text-white [&:active_svg]:text-white focus-visible:ring-2 focus-visible:ring-ods-focus disabled:text-ods-text-disabled !w-auto whitespace-nowrap !text-base cursor-pointer transition-colors",
       },
       size: {
         // Small size for secondary actions

@@ -3,6 +3,7 @@
 import React from 'react'
 import { cn } from '../../utils/cn'
 import { CheckCircleIcon } from '../icons-v2-generated/signs-and-symbols/check-circle-icon'
+import { Tag, type TagProps } from '../ui/tag'
 
 export interface SelectButtonProps {
   title: string
@@ -14,12 +15,14 @@ export interface SelectButtonProps {
     src: string
     alt: string
   }
+  tag?: string
+  tagVariant?: TagProps['variant']
   onClick?: () => void
   className?: string
 }
 
 export const SelectButton = React.forwardRef<HTMLButtonElement, SelectButtonProps>(
-  ({ title, description, selected = false, disabled = false, icon, image, onClick, className }, ref) => {
+  ({ title, description, selected = false, disabled = false, icon, image, tag, tagVariant = "outline", onClick, className }, ref) => {
     return (
       <button
         ref={ref}
@@ -70,6 +73,12 @@ export const SelectButton = React.forwardRef<HTMLButtonElement, SelectButtonProp
             </span>
           )}
         </span>
+
+        {tag && (
+          <Tag variant={tagVariant} className="shrink-0">
+            {tag}
+          </Tag>
+        )}
 
         {selected && (
           <CheckCircleIcon
