@@ -5,7 +5,7 @@ import { Search, X } from 'lucide-react';
 import { Button } from '../ui';
 import { cn } from '../../utils';
 
-export interface Tag {
+interface Tag {
   id: number;
   name: string;
   slug: string;

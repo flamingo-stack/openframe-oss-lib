@@ -98,6 +98,32 @@ export const IconWithTitleOnly: Story = {
   },
 }
 
+export const WithTag: Story = {
+  args: {
+    title: 'MacOS',
+    icon: <Monitor size={24} />,
+    tag: 'Coming Soon',
+  },
+}
+
+export const WithTagDisabled: Story = {
+  args: {
+    title: 'MacOS',
+    icon: <Monitor size={24} />,
+    tag: 'Coming Soon',
+    disabled: true,
+  },
+}
+
+export const WithTagSelected: Story = {
+  args: {
+    title: 'MacOS',
+    icon: <Monitor size={24} />,
+    tag: 'Coming Soon',
+    selected: true,
+  },
+}
+
 export const InteractiveGroup = {
   render: () => {
     const [selectedId, setSelectedId] = useState<string | null>('monitor')
