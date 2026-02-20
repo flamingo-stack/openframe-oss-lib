@@ -1,0 +1,9 @@
+flowchart LR
+    KafkaCluster[("Kafka")]
+    StreamCore["Stream Processing Core"]
+    Cassandra[("Cassandra")]
+    Pinot[("Pinot")]
+
+    KafkaCluster --> StreamCore
+    StreamCore --> Cassandra
+    StreamCore --> Pinot

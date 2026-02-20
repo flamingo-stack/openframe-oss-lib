@@ -73,9 +73,6 @@ public class GatewaySecurityConfig {
             ReactiveAuthenticationManagerResolver<ServerWebExchange> issuerResolver,
             AddAuthorizationHeaderFilter addAuthorizationHeaderFilter
     ) {
-        String managementContextPath = isNotBlank(managementBasePath)
-                ? managementBasePath: "/actuator";
-
         return http
                 .csrf(CsrfSpec::disable)
                 .cors(CorsSpec::disable)
@@ -88,28 +85,20 @@ public class GatewaySecurityConfig {
                 .authorizeExchange(exchanges -> exchanges
                         .pathMatchers(HttpMethod.OPTIONS,    "/**").permitAll()
                         .pathMatchers(
-                                "/error/**",
-                                "/health/**",
                                 CLIENTS_PREFIX + "/metrics/**",
                                 CLIENTS_PREFIX + "/api/agents/register",
                                 CLIENTS_PREFIX + "/oauth/token",
-                                managementContextPath + "/**",
                                 // TODO: removxxe after migration artifacts to GitHub
                                 CLIENTS_PREFIX + "/tool-agent/**"
                         ).permitAll()
-                        // Api service
-                        .pathMatchers(DASHBOARD_PREFIX + "/**").hasRole(ADMIN)
-                        // Agent tools
+                        .pathMatchers(API_PREFIX + "/**").hasRole(ADMIN)
                         .pathMatchers(TOOLS_PREFIX + "/agent/**").hasRole(AGENT)
                         .pathMatchers(WS_TOOLS_PREFIX + "/agent/**").hasRole(AGENT)
-                        // Agent nats
                         .pathMatchers(NATS_WS_ENDPOINT_PATH).hasAnyRole(AGENT, ADMIN)
-                        // Client service
+                        .pathMatchers(CHAT_PREFIX).hasAnyRole(AGENT, ADMIN)
                         .pathMatchers(CLIENTS_PREFIX + "/**").hasRole(AGENT)
-                        // Api tools
                         .pathMatchers(TOOLS_PREFIX + "/**").hasRole(ADMIN)
                         .pathMatchers(WS_TOOLS_PREFIX + "/**").hasRole(ADMIN)
-                        // UI
                         .pathMatchers("/**").permitAll()
                 )
                 .build();

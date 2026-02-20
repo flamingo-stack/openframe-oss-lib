@@ -1,6 +1,0 @@
-flowchart TD
-    API["API Layer"] -->|uses DTOs| DTO["api_lib_dto_event"]
-    DTO -->|maps to| DOC["data_mongo_document_event"]
-    DOC -->|CRUD ops| REPO["data_mongo_repository_event"]
-    DOC -->|filtered by| FILTER["data_mongo_document_event_filter"]
-    REPO -->|returns| API

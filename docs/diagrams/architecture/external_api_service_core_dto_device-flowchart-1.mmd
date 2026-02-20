@@ -1,8 +1,0 @@
-flowchart TD
-    APIClient["API Client"] -->|sends request| DeviceController["DeviceController"]
-    DeviceController -->|uses| DeviceDTOs["Device DTOs\n(external_api_service_core_dto_device)"]
-    DeviceDTOs -->|composes with| SharedDTOs["Shared DTOs\n(external_api_service_core_dto_shared)"]
-    DeviceDTOs -->|composes with| TagDTOs["Tag DTOs\n(external_api_service_core_dto_device)"]
-    DeviceController -->|may use| EventDTOs["Event DTOs\n(external_api_service_core_dto_event)"]
-    DeviceController -->|may use| ToolDTOs["Tool DTOs\n(external_api_service_core_dto_tool)"]
-    DeviceController -->|may use| OrganizationDTOs["Organization DTOs\n(external_api_service_core_dto_organization)"]

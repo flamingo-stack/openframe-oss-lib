@@ -1,4 +1,0 @@
-flowchart TD
-    ApiKeyController["ApiKeyController"] -->|uses| BaseApiKeyRepository["BaseApiKeyRepository"]
-    GatewayApiKeyAuthenticationFilter["ApiKeyAuthenticationFilter"] -->|queries| BaseApiKeyRepository
-    BaseApiKeyRepository -->|persists| MongoDB["MongoDB"]

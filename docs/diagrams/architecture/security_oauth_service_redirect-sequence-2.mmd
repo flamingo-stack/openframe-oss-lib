@@ -1,9 +1,0 @@
-sequenceDiagram
-    participant Client
-    participant OAuthBffController
-    participant DefaultRedirectTargetResolver
-    participant Redirects
-    Client->>OAuthBffController: Initiate OAuth2 flow
-    OAuthBffController->>DefaultRedirectTargetResolver: Resolve redirect target
-    DefaultRedirectTargetResolver->>Redirects: Perform redirect
-    Redirects-->>Client: HTTP Redirect to target URI

@@ -1,0 +1,6 @@
+flowchart TD
+    Agent["Agent"] -->|"register"| AgentController
+    AgentController --> AgentRegistrationService
+    AgentRegistrationService --> Machine["Machine Entity"]
+    AgentRegistrationService --> AgentRegistrationProcessor
+    AgentRegistrationProcessor --> DefaultAgentRegistrationProcessor

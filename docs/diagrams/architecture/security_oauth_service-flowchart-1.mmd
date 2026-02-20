@@ -1,6 +1,0 @@
-flowchart TD
-    UserApp["User Application"] -->|initiates OAuth| OAuthBffController["OAuthBffController"]
-    OAuthBffController -->|uses| InMemoryOAuthDevTicketStore["InMemoryOAuthDevTicketStore"]
-    InMemoryOAuthDevTicketStore -->|stores tickets| Memory["In-Memory Storage"]
-    OAuthBffController -->|redirects| DefaultRedirectTargetResolver["DefaultRedirectTargetResolver"]
-    OAuthBffController -->|uses constants| SecurityConstants["SecurityConstants"]

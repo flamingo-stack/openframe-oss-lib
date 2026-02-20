@@ -1,0 +1,7 @@
+flowchart TD
+    Request["Incoming HTTP or WS Request"] --> Origin["Origin Sanitizer"]
+    Origin --> AddAuth["Add Authorization Header Filter"]
+    AddAuth --> JwtAuth["JWT Resource Server"]
+    JwtAuth --> ApiKeyFilter["API Key Filter if external"]
+    ApiKeyFilter --> Authorization["Role-Based Authorization"]
+    Authorization --> Route["Route to Target Service"]

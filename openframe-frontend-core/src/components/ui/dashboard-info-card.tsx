@@ -1,7 +1,6 @@
 'use client'
 
-import React from 'react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { cn } from '../../utils/cn'
 import { CircularProgress } from './circular-progress'
 import { InteractiveCard } from './interactive-card'
@@ -15,14 +14,10 @@ interface DashboardInfoCardProps {
   className?: string
   onClick?: () => void
   /**
-   * Navigation URL (uses Next.js Link for client-side navigation)
+   * Navigation URL (uses router.push for client-side navigation without prefetching)
    * If both href and onClick are provided, href takes precedence
    */
   href?: string
-  /**
-   * Open link in new tab (only applies when href is provided)
-   */
-  openInNewTab?: boolean
 }
 
 export function DashboardInfoCard({
@@ -33,9 +28,9 @@ export function DashboardInfoCard({
   progressColor,
   className,
   onClick,
-  href,
-  openInNewTab = false
+  href
 }: DashboardInfoCardProps) {
+  const router = href ? useRouter() : null
   const formattedValue = typeof value === 'number'
     ? value.toLocaleString()
     : value
@@ -73,13 +68,16 @@ export function DashboardInfoCard({
     </>
   )
 
-  // If href is provided, render as Link with InteractiveCard styling
+  const handleCardClick = () => {
+    if (href && router) {
+      router.push(href)
+    }
+  }
+
   if (href) {
     return (
-      <Link
-        href={href}
-        target={openInNewTab ? '_blank' : undefined}
-        rel={openInNewTab ? 'noopener noreferrer' : undefined}
+      <InteractiveCard
+        onClick={handleCardClick}
         className={cn(
           'bg-ods-card border border-ods-border rounded-[6px] p-4 flex gap-3 items-center',
           'cursor-pointer transition-all group',
@@ -90,7 +88,7 @@ export function DashboardInfoCard({
         )}
       >
         {cardContent}
-      </Link>
+      </InteractiveCard>
     )
   }
 

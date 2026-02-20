@@ -1,6 +1,0 @@
-graph TD
-    Controller["API Controllers"] -->|invoke| DataFetcher["DataFetcher Layer"]
-    DataFetcher -->|fetches| ServiceLayer["Service Layer"]
-    ServiceLayer -->|queries| Repository["Repository Layer"]
-    Repository -->|returns| DataFetcher
-    DataFetcher -->|returns DTOs| Controller

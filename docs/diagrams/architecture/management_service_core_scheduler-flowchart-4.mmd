@@ -1,6 +1,0 @@
-graph TD
-    A["ApiKeyStatsSyncScheduler"] -->|"Triggers"| B["Service Layer"]
-    B -->|"Reads/Writes"| C["Data Repositories"]
-    D["DebeziumHealthCheckScheduler"] -->|"Checks"| E["Service Layer"]
-    E -->|"Fetches status"| F["Debezium Connectors"]
-    D -->|"Alerts"| G["Monitoring System"]

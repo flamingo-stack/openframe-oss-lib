@@ -11,5 +11,7 @@ public class DownloadConfiguration {
     @JsonProperty("agentFileName")
     private String targetFileName;
     private String link;
+    private InstallationType installationType = InstallationType.STANDARD;
+    private String bundleId;
 
 }

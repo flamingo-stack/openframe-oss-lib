@@ -1,0 +1,7 @@
+flowchart TD
+    Request["Incoming Request"] --> Gateway
+    Gateway --> JwtValidation["Validate JWT Issuer"]
+    JwtValidation --> TenantContext["Resolve TenantContext"]
+    TenantContext --> MongoQuery
+    TenantContext --> RedisKey
+    TenantContext --> KafkaProducer

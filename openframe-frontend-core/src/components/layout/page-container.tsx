@@ -4,6 +4,7 @@ import { ChevronLeft } from 'lucide-react'
 import React from 'react'
 import { cn } from '../../utils/cn'
 import { Button } from '../ui/button'
+import { MoreActionsItem } from '../ui/more-actions-menu'
 import { PageActions, type PageActionButton } from '../ui/page-actions'
 
 // Legacy interface for backward compatibility (layout version)
@@ -66,7 +67,11 @@ interface AdvancedPageContainerProps {
   /**
    * Override the automatically determined PageActions variant
    */
-  actionsVariant?: 'icon-buttons' | 'primary-buttons'
+  actionsVariant?: 'icon-buttons' | 'primary-buttons' | 'menu-primary'
+  /**
+   * Page action menu items configuration
+   */
+  menuActions?: MoreActionsItem[]
   /**
    * Custom header content (overrides title/subtitle)
    */
@@ -175,6 +180,7 @@ function renderAdvancedPageContainer({
   headerContent,
   actions,
   actionsVariant,
+  menuActions,
   padding = 'none',
   background = 'transparent',
   className,
@@ -194,7 +200,7 @@ function renderAdvancedPageContainer({
   // Render actions component
   const renderActions = () => {
     if (!actions || actions.length === 0) return null
-    return <PageActions variant={getActionsVariant()} actions={actions} />
+    return <PageActions variant={getActionsVariant()} actions={actions} menuActions={menuActions} />
   }
 
   // Check if we need bottom padding for mobile fixed actions
@@ -228,15 +234,15 @@ function renderAdvancedPageContainer({
 
     if (variant === 'detail') {
       return (
-        <div className="flex items-end justify-between gap-4">
-          <div className="flex flex-col gap-2 flex-1">
+        <div className="flex items-end justify-between md:flex-col md:items-start md:justify-start lg:flex-row lg:items-end lg:justify-between gap-4">
+          <div className="flex flex-col gap-2 flex-1 min-w-0">
             {/* Back Button */}
             {backButton && (
               <Button
                 onClick={backButton.onClick}
-                variant="transparent"
-                className="flex self-start justify-start text-ods-text-secondary"
-                leftIcon={<ChevronLeft className="h-6 w-6 text-ods-text-secondary" />}
+                variant="ghost-subtle"
+                className="self-start justify-start hidden md:flex"
+                leftIcon={<ChevronLeft className="size-6" />}
                 noPadding
               >
                 {backButton.label || 'Back'}
@@ -249,7 +255,7 @@ function renderAdvancedPageContainer({
                 {title}
               </h1>
             )}
-            
+
             {/* Subtitle */}
             {subtitle && (
               <div className="text-ods-text-secondary font-['DM_Sans'] font-medium text-[16px]">
@@ -260,7 +266,7 @@ function renderAdvancedPageContainer({
 
           {/* Header Actions */}
           {(headerActions || actions) && (
-            <div className="flex gap-2 items-center">
+            <div className="flex gap-2 items-center shrink-0">
               {headerActions}
               {renderActions()}
             </div>
@@ -271,8 +277,8 @@ function renderAdvancedPageContainer({
 
     if (variant === 'list') {
       return (
-        <div className="flex items-center justify-between">
-          <div className="flex flex-col gap-1">
+        <div className="flex items-center justify-between md:flex-col md:items-start md:justify-start lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex flex-col gap-1 flex-1 min-w-0">
             {title && (
               <h1 className="font-['Azeret_Mono'] font-semibold text-[24px] leading-[32px] tracking-[-0.48px] text-ods-text-primary">
                 {title}
@@ -287,7 +293,7 @@ function renderAdvancedPageContainer({
 
           {/* Header Actions */}
           {(headerActions || actions) && (
-            <div className="flex gap-3 items-center">
+            <div className="flex gap-3 items-center shrink-0">
               {headerActions}
               {renderActions()}
             </div>
@@ -298,46 +304,44 @@ function renderAdvancedPageContainer({
 
     if (variant === 'form') {
       return (
-        <div className="border-b border-ods-border pb-10 pt-6">
-          <div className="flex items-end justify-between">
-            <div className="flex flex-col gap-2">
-              {/* Back Button */}
-              {backButton && (
-                <Button
-                  onClick={backButton.onClick}
-                  className="flex self-start justify-start text-ods-text-secondary"
-                  variant="transparent"
-                  leftIcon={<ChevronLeft className="w-6 h-6" />}
-                  noPadding
-                >
-                  {backButton.label || 'Back'}
-                </Button>
-              )}
-              
-              {title && (
-                <h1 className="text-[32px] font-['Azeret_Mono:SemiBold',_sans-serif] font-semibold text-ods-text-primary tracking-[-0.64px]">
-                  {title}
-                </h1>
-              )}
-            </div>
-            
-            {/* Header Actions */}
-            {(headerActions || actions) && (
-              <div className="flex gap-4 items-center">
-                {headerActions}
-                {renderActions()}
-              </div>
+        <div className="flex items-end justify-between md:flex-col md:items-start md:justify-start lg:flex-row lg:items-end lg:justify-between gap-4">
+          <div className="flex flex-col gap-2 flex-1 min-w-0">
+            {/* Back Button */}
+            {backButton && (
+              <Button
+                onClick={backButton.onClick}
+                variant="ghost-subtle"
+                className="self-start justify-start hidden md:flex"
+                leftIcon={<ChevronLeft className="size-6" />}
+                noPadding
+              >
+                {backButton.label || 'Back'}
+              </Button>
+            )}
+
+            {title && (
+              <h1 className="text-[32px] font-['Azeret_Mono:SemiBold',_sans-serif] font-semibold text-ods-text-primary tracking-[-0.64px]">
+                {title}
+              </h1>
             )}
           </div>
+
+          {/* Header Actions */}
+          {(headerActions || actions) && (
+            <div className="flex gap-4 items-center shrink-0">
+              {headerActions}
+              {renderActions()}
+            </div>
+          )}
         </div>
       )
     }
 
     // Default content header
     return (
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between md:flex-col md:items-start md:justify-start lg:flex-row lg:items-center lg:justify-between gap-4">
         {(title || subtitle) && (
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1 flex-1 min-w-0">
             {title && (
               <h1 className="font-['Azeret_Mono'] font-semibold text-[24px] leading-[32px] tracking-[-0.48px] text-ods-text-primary">
                 {title}
@@ -352,7 +356,7 @@ function renderAdvancedPageContainer({
         )}
 
         {(headerActions || actions) && (
-          <div className="flex gap-3 items-center">
+          <div className="flex gap-3 items-center shrink-0">
             {headerActions}
             {renderActions()}
           </div>
@@ -372,12 +376,12 @@ function renderAdvancedPageContainer({
       case 'list':
         return cn(baseClasses, 'gap-4 md:gap-6', className)
       case 'detail':
-        return cn(baseClasses, 'gap-6', className)
+        return cn(baseClasses, 'gap-4 md:gap-6', className)
       case 'form':
-        return cn(baseClasses, 'min-h-screen', className)
+        return cn(baseClasses, 'gap-6 md:gap-10', className)
       case 'content':
       default:
-        return cn(baseClasses, 'gap-8', className)
+        return cn(baseClasses, 'gap-4 md:gap-6', className)
     }
   }
 
@@ -388,10 +392,10 @@ function renderAdvancedPageContainer({
     switch (variant) {
       case 'detail':
         return cn('flex-1 overflow-auto', mobilePadding, contentClassName)
-      case 'form':
-        return cn('space-y-10 pt-12', mobilePadding, contentClassName)
       case 'list':
         return cn('flex flex-col gap-4 md:gap-6', mobilePadding, contentClassName)
+      case 'form':
+        return cn('flex flex-col gap-4 md:gap-10', mobilePadding, contentClassName)
       case 'content':
       default:
         return cn('flex-1', mobilePadding, contentClassName)

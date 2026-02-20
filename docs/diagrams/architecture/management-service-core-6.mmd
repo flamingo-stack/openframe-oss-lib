@@ -1,0 +1,6 @@
+flowchart TD
+    Entity["Entity"] --> State["Check PublishState"]
+    State -->|"Published"| Stop["No Action"]
+    State -->|"Not Published"| Attempts["Attempts < Max?"]
+    Attempts -->|"Yes"| Publish["Publish Update"]
+    Attempts -->|"No"| Stop

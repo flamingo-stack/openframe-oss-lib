@@ -27,6 +27,10 @@ const meta = {
       control: 'boolean',
       description: 'Default checked state for uncontrolled usage',
     },
+    description: {
+      control: 'text',
+      description: 'Optional secondary description text below the label',
+    },
     disabled: {
       control: 'boolean',
       description: 'Whether the checkbox is disabled',
@@ -131,6 +135,38 @@ export const LongLabel: Story = {
 };
 
 /**
+ * Checkbox block with description text (taller h-16 variant).
+ */
+export const WithDescription: Story = {
+  args: {
+    label: 'Run as User',
+    description: 'Windows Only',
+  },
+};
+
+/**
+ * Checkbox block with description, checked.
+ */
+export const WithDescriptionChecked: Story = {
+  args: {
+    label: 'Run as User',
+    description: 'Windows Only',
+    defaultChecked: true,
+  },
+};
+
+/**
+ * Checkbox block with description, disabled.
+ */
+export const WithDescriptionDisabled: Story = {
+  args: {
+    label: 'Run as User',
+    description: 'Windows Only',
+    disabled: true,
+  },
+};
+
+/**
  * All variants displayed together for comparison.
  */
 export const AllVariants: Story = {
@@ -144,6 +180,9 @@ export const AllVariants: Story = {
       <CheckboxBlock label="Repeat Script Run" />
       <CheckboxBlock label="Disabled unchecked" disabled />
       <CheckboxBlock label="Disabled checked" disabled defaultChecked />
+      <CheckboxBlock label="Run as User" description="Windows Only" />
+      <CheckboxBlock label="Run as User" description="Windows Only" defaultChecked />
+      <CheckboxBlock label="Run as User" description="Windows Only" disabled />
     </div>
   ),
 };

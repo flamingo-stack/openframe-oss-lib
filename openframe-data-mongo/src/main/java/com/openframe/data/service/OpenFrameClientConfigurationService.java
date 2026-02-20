@@ -11,7 +11,14 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class OpenFrameClientConfigurationService {
 
+    public static final String DEFAULT_ID = "default";
+
     private final OpenFrameClientConfigurationRepository repository;
+
+    public OpenFrameClientConfiguration get() {
+        return repository.findById(DEFAULT_ID)
+                .orElseThrow(() -> new IllegalStateException("No openframe client configuration found"));
+    }
 
     public Optional<OpenFrameClientConfiguration> findById(String id) {
         return repository.findById(id);

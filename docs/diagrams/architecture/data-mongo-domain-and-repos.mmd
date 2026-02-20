@@ -1,0 +1,10 @@
+flowchart TD
+    App["Service Modules<br/>API, AuthZ, Gateway, Management"] --> RepoLayer["Repository Layer"]
+    RepoLayer --> CustomImpl["Custom Repository<br/>Implementations"]
+    RepoLayer --> SpringRepo["Spring Data Mongo<br/>Repositories"]
+    SpringRepo --> Domain["Mongo Domain Documents"]
+    CustomImpl --> MongoTemplate["MongoTemplate"]
+    MongoTemplate --> MongoDB[("MongoDB")]
+    SpringRepo --> MongoDB
+    Config["MongoConfig<br/>MongoIndexConfig"] --> SpringRepo
+    Config --> CustomImpl

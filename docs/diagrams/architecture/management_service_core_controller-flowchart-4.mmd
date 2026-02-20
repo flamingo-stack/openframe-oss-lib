@@ -1,7 +1,0 @@
-flowchart TD
-    A["Client"] -->|POST SaveToolRequest| B["IntegratedToolController"]
-    B -->|validate & delegate| C["OpenFrameClientVersionUpdateService"]
-    C -->|persist| D["data_mongo_document_tool"]
-    D -->|result| C
-    C -->|response| B
-    B -->|HTTP Response| A

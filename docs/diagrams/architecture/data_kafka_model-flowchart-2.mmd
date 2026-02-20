@@ -1,7 +1,0 @@
-flowchart TD
-    A["Machine State Change"] --> B["Create MachinePinotMessage"]
-    B --> C["Serialize to JSON"]
-    C --> D["Publish to Kafka Topic"]
-    D --> E["Kafka Consumer"]
-    E --> F["Deserialize MachinePinotMessage"]
-    F --> G["Process/Store in Analytics (e.g., Pinot)"]

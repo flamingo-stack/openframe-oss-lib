@@ -1,5 +1,0 @@
-flowchart TD
-    LogFilterInput["LogFilterInput (api_service_core_dto_audit)"] -->|maps to| LogFilters["LogFilters (api_lib_dto_audit)"]
-    LogFilterInput -->|used by| LogDataFetcher["LogDataFetcher (api_service_core_datafetcher)"]
-    LogDataFetcher -->|returns logs| Controller["LogController (api_service_core_controller)"]
-    LogFilters -->|used by| LogRepository["Log Repository"]

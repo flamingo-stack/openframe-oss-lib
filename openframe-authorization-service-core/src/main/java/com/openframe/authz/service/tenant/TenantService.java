@@ -12,8 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
-import static java.time.LocalDateTime.now;
-
 /**
  * Service for managing tenants in multi-tenant architecture
  */
@@ -38,7 +36,6 @@ public class TenantService {
                 .id(Tenant.generateTenantId())
                 .name(tenantName)
                 .domain(domain)
-                .createdAt(now())
                 .status(TenantStatus.ACTIVE)
                 .plan(TenantPlan.FREE)
                 .build();

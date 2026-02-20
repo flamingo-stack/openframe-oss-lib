@@ -225,7 +225,6 @@ export function OrganizationCard({
           size="xl"
           backgroundStyle="dark"
           showBackground={true}
-          preFetched={!!fetchedImageUrl}
           className="w-[60px] h-[60px]"
         />
 

@@ -1,8 +1,0 @@
-sequenceDiagram
-    participant Client
-    participant HealthController
-    participant System
-    Client->>HealthController: GET /health
-    HealthController->>System: check health
-    System-->>HealthController: status
-    HealthController-->>Client: health status response

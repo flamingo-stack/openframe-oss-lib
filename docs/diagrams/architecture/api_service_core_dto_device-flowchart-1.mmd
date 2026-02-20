@@ -1,7 +1,0 @@
-flowchart TD
-    APIClient["API Client"] -->|sends filter input| DeviceController["DeviceController"]
-    DeviceController -->|uses| DeviceFilterInput["DeviceFilterInput"]
-    DeviceController -->|delegates| DeviceDataFetcher["DeviceDataFetcher"]
-    DeviceDataFetcher -->|applies filters| DataSource["Device Data Source"]
-    DeviceDataFetcher -->|returns results| DeviceController
-    DeviceController -->|responds| APIClient

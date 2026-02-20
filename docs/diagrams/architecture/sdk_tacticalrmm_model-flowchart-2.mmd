@@ -1,5 +1,0 @@
-flowchart LR
-    ExternalSystem["External TacticalRMM System"] -->|Agent data| SdkTacticalRmm["sdk_tacticalrmm"]
-    SdkTacticalRmm -->|Parses to| SdkTacticalRmmModel["sdk_tacticalrmm_model (AgentInfo, AgentListItem)"]
-    SdkTacticalRmmModel -->|Provides models to| ApiServiceCoreController["api_service_core_controller"]
-    ApiServiceCoreController -->|API responses| ClientApplications["Client Applications"]

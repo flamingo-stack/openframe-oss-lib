@@ -156,7 +156,8 @@ export const ScriptArguments: React.FC<ScriptArgumentsProps> = ({
       <div className="flex justify-start">
         <Button
           type="button"
-          variant="transparent"
+          variant="ghost-subtle"
+          className="text-ods-text-primary"
           onClick={handleAdd}
           disabled={disabled}
           leftIcon={<PlusCircle className="size-6" />}

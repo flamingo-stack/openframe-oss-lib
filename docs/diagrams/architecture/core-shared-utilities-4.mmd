@@ -1,0 +1,6 @@
+flowchart TD
+    Field["DTO Field Annotated With @ValidEmail"] --> Validator["ValidEmailValidator"]
+    Validator --> Pattern["Regex Pattern"]
+    Pattern --> Match{"Matches Regex?"}
+    Match -->|Yes| Valid["Validation Success"]
+    Match -->|No| Invalid["Validation Failure"]

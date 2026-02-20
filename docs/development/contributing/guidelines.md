@@ -1,861 +1,686 @@
 # Contributing Guidelines
 
-Welcome to the OpenFrame OSS Library community! This guide will help you contribute effectively to the project, whether you're fixing bugs, adding features, or improving documentation.
+Welcome to the OpenFrame OSS Lib community! This guide outlines the standards, processes, and best practices for contributing to the project. Whether you're fixing bugs, adding features, or improving documentation, following these guidelines ensures a smooth collaboration experience.
 
 ## Getting Started
 
-### 1. Fork and Clone
+### Before You Begin
 
-```bash
-# Fork the repository on GitHub, then clone your fork
-git clone https://github.com/YOUR_USERNAME/openframe-oss-lib.git
-cd openframe-oss-lib
+1. **Join the Community**: Connect with us on [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) for discussions and support
+2. **Review the Architecture**: Read the [Architecture Overview](../architecture/README.md) to understand the system design
+3. **Set Up Your Environment**: Follow the [Development Environment Setup](../setup/environment.md) guide
+4. **Run the Project Locally**: Complete the [Local Development Guide](../setup/local-development.md)
 
-# Add upstream remote
-git remote add upstream https://github.com/flamingo-stack/openframe-oss-lib.git
+### Types of Contributions
 
-# Verify remotes
-git remote -v
-```
+We welcome various types of contributions:
 
-### 2. Set Up Development Environment
+- 🐛 **Bug fixes** - Resolve issues and improve stability
+- ✨ **New features** - Add functionality that benefits the community
+- 📚 **Documentation** - Improve guides, API docs, and examples
+- 🧪 **Tests** - Add test coverage and improve test reliability
+- 🔧 **Refactoring** - Improve code quality and maintainability
+- 🔐 **Security** - Address security vulnerabilities and improve security posture
 
-Follow our [Environment Setup Guide](../setup/environment.md) to configure your development environment.
-
-### 3. Create Feature Branch
-
-```bash
-# Update main branch
-git checkout main
-git pull upstream main
-
-# Create feature branch with descriptive name
-git checkout -b feature/device-filtering-enhancement
-# or
-git checkout -b bugfix/device-status-update-issue
-# or  
-git checkout -b docs/api-documentation-improvements
-```
-
-## Code Standards and Style Guide
+## Code Standards & Style
 
 ### Java Code Style
 
-We follow **Google Java Style** with minor customizations:
+OpenFrame follows established Java conventions with specific guidelines:
 
-#### 1. **Formatting Rules**
+#### General Principles
 
 ```java
-// ✅ Good: Proper indentation and spacing
-public class DeviceService {
+// ✅ GOOD: Clear, descriptive naming
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class DeviceManagementService {
     
     private final DeviceRepository deviceRepository;
-    private final EventService eventService;
+    private final OrganizationService organizationService;
+    private final ApplicationEventPublisher eventPublisher;
     
-    public DeviceService(DeviceRepository deviceRepository, EventService eventService) {
-        this.deviceRepository = deviceRepository;
-        this.eventService = eventService;
-    }
-    
-    public Device createDevice(CreateDeviceRequest request) {
-        Device device = mapToDevice(request);
+    public Device createDevice(CreateDeviceRequest request, AuthPrincipal principal) {
+        log.debug("Creating device '{}' for tenant '{}'", 
+                 request.getName(), principal.getTenantId());
+        
+        validateDeviceCreation(request, principal);
+        
+        Device device = buildDevice(request, principal);
         Device savedDevice = deviceRepository.save(device);
         
-        eventService.publishEvent(
-            EventType.DEVICE_CREATED,
-            savedDevice.getId(),
-            Map.of("deviceType", savedDevice.getType())
-        );
+        publishDeviceCreatedEvent(savedDevice);
         
         return savedDevice;
     }
 }
+
+// ❌ BAD: Poor naming, no structure
+@Service
+public class DeviceService {
+    @Autowired DeviceRepository repo;
+    
+    public Device create(CreateDeviceRequest req, AuthPrincipal p) {
+        Device d = new Device();
+        d.setName(req.getName());
+        d.setTenantId(p.getTenantId());
+        return repo.save(d);
+    }
+}
 ```
 
-#### 2. **Naming Conventions**
+#### Naming Conventions
 
-| Element | Convention | Examples |
-|---------|------------|----------|
-| **Classes** | PascalCase | `DeviceService`, `OrganizationMapper` |
-| **Methods** | camelCase | `createDevice()`, `findByOrganizationId()` |
-| **Variables** | camelCase | `deviceRepository`, `organizationId` |
-| **Constants** | UPPER_SNAKE_CASE | `DEFAULT_PAGE_SIZE`, `MAX_RETRY_ATTEMPTS` |
-| **Packages** | lowercase | `com.openframe.api.service` |
+| Element | Convention | Example |
+|---------|------------|---------|
+| **Classes** | PascalCase, descriptive | `DeviceManagementService`, `JwtAuthenticationFilter` |
+| **Methods** | camelCase, verb-based | `createDevice()`, `validateUserAccess()` |
+| **Variables** | camelCase, noun-based | `deviceRepository`, `authPrincipal` |
+| **Constants** | UPPER_SNAKE_CASE | `MAX_RETRY_ATTEMPTS`, `DEFAULT_TIMEOUT` |
+| **Packages** | lowercase, domain-based | `com.openframe.api.service` |
 
-#### 3. **Documentation Standards**
+#### Method Organization
+
+```java
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class DeviceService {
+    
+    // Dependencies first
+    private final DeviceRepository deviceRepository;
+    private final OrganizationService organizationService;
+    
+    // Public methods
+    public Device createDevice(CreateDeviceRequest request, AuthPrincipal principal) {
+        // Implementation
+    }
+    
+    public Device updateDevice(String deviceId, UpdateDeviceRequest request, 
+                              AuthPrincipal principal) {
+        // Implementation
+    }
+    
+    // Private helper methods
+    private void validateDeviceCreation(CreateDeviceRequest request, AuthPrincipal principal) {
+        // Validation logic
+    }
+    
+    private Device buildDevice(CreateDeviceRequest request, AuthPrincipal principal) {
+        // Construction logic
+    }
+    
+    private void publishDeviceCreatedEvent(Device device) {
+        // Event publishing
+    }
+}
+```
+
+#### Error Handling
+
+```java
+// ✅ GOOD: Specific exceptions with context
+@Service
+public class DeviceService {
+    
+    public Device findById(String deviceId, AuthPrincipal principal) {
+        Device device = deviceRepository.findById(deviceId)
+            .orElseThrow(() -> new DeviceNotFoundException(
+                "Device not found: " + deviceId));
+        
+        if (!device.getTenantId().equals(principal.getTenantId())) {
+            throw new TenantAccessViolationException(
+                "Device " + deviceId + " not accessible to tenant " + 
+                principal.getTenantId());
+        }
+        
+        return device;
+    }
+}
+
+// ❌ BAD: Generic exceptions, poor error messages
+public Device findById(String deviceId, AuthPrincipal principal) {
+    Device device = deviceRepository.findById(deviceId)
+        .orElseThrow(() -> new RuntimeException("Not found"));
+    
+    if (!device.getTenantId().equals(principal.getTenantId())) {
+        throw new Exception("Access denied");
+    }
+    
+    return device;
+}
+```
+
+### Documentation Standards
+
+#### JavaDoc Requirements
+
+All public APIs must have comprehensive JavaDoc:
 
 ```java
 /**
- * Service for managing device lifecycle and operations.
+ * Creates a new device within the specified organization.
  * 
- * <p>This service provides comprehensive device management capabilities including
- * device registration, status updates, and integration with external tools.
+ * <p>This method performs tenant validation to ensure the requesting user
+ * has access to the target organization. The created device will inherit
+ * the tenant context from the authenticated principal.
  * 
- * @author OpenFrame Team
- * @since 1.0.0
+ * @param request the device creation request containing device details
+ * @param principal the authenticated user making the request
+ * @return the newly created device with generated ID and timestamps
+ * @throws OrganizationNotFoundException if the specified organization doesn't exist
+ * @throws TenantAccessViolationException if the user cannot access the organization
+ * @throws DeviceValidationException if the device data fails validation
+ * @since 5.30.0
  */
-@Service
-@Transactional
-public class DeviceService {
-    
-    /**
-     * Creates a new device in the system.
-     * 
-     * @param request the device creation request containing device details
-     * @return the created device with generated ID and metadata
-     * @throws ValidationException if the request contains invalid data
-     * @throws DuplicateDeviceException if a device with the same machine ID exists
-     */
-    public Device createDevice(CreateDeviceRequest request) {
-        // Implementation
-    }
+public Device createDevice(CreateDeviceRequest request, AuthPrincipal principal) {
+    // Implementation
 }
 ```
 
-### Spring Boot Conventions
-
-#### 1. **Component Annotations**
+#### Code Comments
 
 ```java
-// ✅ Good: Specific component annotations
-@RestController
-@RequestMapping("/api/devices")
-public class DeviceController { }
-
-@Service
-@Transactional
-public class DeviceService { }
-
-@Repository
-public interface DeviceRepository extends MongoRepository<Device, String> { }
-
-@Configuration
-@EnableConfigurationProperties(OpenFrameProperties.class)
-public class OpenFrameConfig { }
-```
-
-#### 2. **Dependency Injection**
-
-```java
-// ✅ Good: Constructor injection
-@Service
-public class DeviceService {
-    
-    private final DeviceRepository deviceRepository;
-    private final EventService eventService;
-    
-    // Constructor injection (preferred)
-    public DeviceService(DeviceRepository deviceRepository, EventService eventService) {
-        this.deviceRepository = deviceRepository;
-        this.eventService = eventService;
+// ✅ GOOD: Explain WHY, not WHAT
+public void rotateEncryptionKeys() {
+    // Rotate keys every 90 days to maintain security compliance
+    // and limit exposure window in case of key compromise
+    if (isKeyRotationDue()) {
+        generateNewEncryptionKey();
     }
 }
 
-// ❌ Avoid: Field injection
-@Service
-public class DeviceService {
-    @Autowired
-    private DeviceRepository deviceRepository; // Not recommended
-}
-```
-
-#### 3. **Error Handling**
-
-```java
-// ✅ Good: Specific exception handling
-@RestControllerAdvice
-public class GlobalExceptionHandler {
-    
-    @ExceptionHandler(DeviceNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleDeviceNotFound(DeviceNotFoundException ex) {
-        ErrorResponse error = ErrorResponse.builder()
-            .code("DEVICE_NOT_FOUND")
-            .message(ex.getMessage())
-            .timestamp(Instant.now())
-            .build();
-        
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
-    }
-    
-    @ExceptionHandler(ValidationException.class)
-    public ResponseEntity<ErrorResponse> handleValidation(ValidationException ex) {
-        ErrorResponse error = ErrorResponse.builder()
-            .code("VALIDATION_ERROR")
-            .message("Request validation failed")
-            .details(ex.getValidationErrors())
-            .timestamp(Instant.now())
-            .build();
-        
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+// ❌ BAD: Comments that state the obvious
+public void rotateEncryptionKeys() {
+    // Check if key rotation is due
+    if (isKeyRotationDue()) {
+        // Generate new encryption key
+        generateNewEncryptionKey();
     }
 }
 ```
-
-### API Design Standards
-
-#### 1. **RESTful Endpoints**
-
-```java
-// ✅ Good: RESTful design
-@RestController
-@RequestMapping("/api/devices")
-public class DeviceController {
-    
-    @GetMapping
-    public ResponseEntity<PageResponse<DeviceResponse>> getDevices(
-        @RequestParam(defaultValue = "20") int limit,
-        @RequestParam(required = false) String cursor,
-        @RequestParam(required = false) String status,
-        @RequestParam(required = false) String type
-    ) {
-        // Implementation
-    }
-    
-    @GetMapping("/{id}")
-    public ResponseEntity<DeviceResponse> getDevice(@PathVariable String id) {
-        // Implementation
-    }
-    
-    @PostMapping
-    public ResponseEntity<DeviceResponse> createDevice(
-        @Valid @RequestBody CreateDeviceRequest request
-    ) {
-        // Implementation
-    }
-    
-    @PatchMapping("/{id}/status")
-    public ResponseEntity<DeviceResponse> updateDeviceStatus(
-        @PathVariable String id,
-        @Valid @RequestBody UpdateDeviceStatusRequest request
-    ) {
-        // Implementation
-    }
-}
-```
-
-#### 2. **DTO Design**
-
-```java
-// ✅ Good: Well-structured DTOs
-@JsonInclude(JsonInclude.Include.NON_NULL)
-public class DeviceResponse {
-    
-    @JsonProperty("id")
-    private String id;
-    
-    @JsonProperty("machineId")
-    private String machineId;
-    
-    @JsonProperty("serialNumber")
-    private String serialNumber;
-    
-    @JsonProperty("status")
-    private String status;
-    
-    @JsonProperty("type")
-    private String type;
-    
-    @JsonProperty("lastCheckin")
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
-    private Instant lastCheckin;
-    
-    @JsonProperty("health")
-    private DeviceHealthResponse health;
-    
-    // Constructors, getters, setters
-}
-```
-
-## Branch Naming and PR Process
-
-### Branch Naming Convention
-
-Use descriptive branch names that indicate the type and scope of work:
-
-```bash
-# Feature branches
-feature/device-filtering-api
-feature/organization-sso-integration
-feature/event-stream-processing
-
-# Bug fix branches
-bugfix/device-status-sync-issue
-bugfix/pagination-cursor-encoding
-bugfix/jwt-token-expiration
-
-# Documentation branches
-docs/api-reference-update
-docs/setup-guide-improvements
-docs/architecture-diagrams
-
-# Maintenance branches
-chore/dependency-updates
-chore/code-style-cleanup
-refactor/service-layer-restructure
-```
-
-### Pull Request Process
-
-#### 1. **Pre-PR Checklist**
-
-Before creating a PR, ensure:
-
-- [ ] **Code compiles** without warnings
-- [ ] **All tests pass** locally
-- [ ] **Code style** follows project conventions
-- [ ] **Documentation** is updated where needed
-- [ ] **CHANGELOG** entry added (if applicable)
-
-```bash
-# Run pre-PR checks
-./mvnw clean compile
-./mvnw test
-./mvnw checkstyle:check
-./mvnw spotbugs:check
-```
-
-#### 2. **PR Template**
-
-Use this template for your pull requests:
-
-```markdown
-## Description
-Brief description of the changes and their purpose.
-
-## Type of Change
-- [ ] Bug fix (non-breaking change that fixes an issue)
-- [ ] New feature (non-breaking change that adds functionality)  
-- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
-- [ ] Documentation update
-
-## Changes Made
-- List specific changes made
-- Include any new endpoints, methods, or classes
-- Mention any configuration changes required
-
-## Testing
-- [ ] Unit tests added/updated
-- [ ] Integration tests added/updated
-- [ ] Manual testing completed
-- [ ] Performance impact assessed
-
-## Documentation
-- [ ] Code comments added/updated
-- [ ] API documentation updated
-- [ ] User guides updated (if applicable)
-
-## Breaking Changes
-List any breaking changes and migration path (if applicable).
-
-## Screenshots
-Include screenshots for UI changes (if applicable).
-
-## Additional Notes
-Any additional information, context, or considerations.
-```
-
-#### 3. **PR Review Process**
-
-```mermaid
-flowchart LR
-    A[Create PR] --> B[Automated Checks]
-    B --> C{Checks Pass?}
-    C -->|No| D[Fix Issues]
-    D --> B
-    C -->|Yes| E[Peer Review]
-    E --> F{Review Approved?}
-    F -->|No| G[Address Feedback]
-    G --> E
-    F -->|Yes| H[Security Review]
-    H --> I{Security OK?}
-    I -->|No| J[Fix Security Issues]
-    J --> H
-    I -->|Yes| K[Merge to Main]
-```
-
-**Review Criteria:**
-- **Functionality** - Does the code work as intended?
-- **Code Quality** - Is the code clean, readable, and maintainable?
-- **Testing** - Are there adequate tests with good coverage?
-- **Security** - Are there any security implications?
-- **Performance** - Will this impact system performance?
-- **Documentation** - Is the documentation clear and complete?
-
-### Commit Message Format
-
-We use [Conventional Commits](https://www.conventionalcommits.org/) specification:
-
-```bash
-# Format: type(scope): description
-# 
-# Types: feat, fix, docs, style, refactor, test, chore
-# Scope: api, service, repository, config, security, etc.
-
-# Examples:
-feat(api): add device filtering endpoint with pagination support
-
-fix(security): resolve JWT token validation issue in multi-tenant context
-
-docs(setup): update environment setup guide with Docker instructions
-
-test(service): add comprehensive unit tests for DeviceService
-
-refactor(repository): optimize device query performance with compound indexes
-
-chore(deps): update Spring Boot to version 3.2.1
-```
-
-**Detailed Format:**
-
-```bash
-feat(api): add comprehensive device filtering capabilities
-
-- Add DeviceFilterOptions with status, type, and date range filters
-- Implement cursor-based pagination for consistent performance  
-- Add search functionality across device name, model, and serial number
-- Include proper validation and error handling for filter parameters
-
-Closes #123
-```
-
-## Code Review Checklist
-
-### For Contributors
-
-Before requesting review:
-
-- [ ] **Self-review** - Review your own code first
-- [ ] **Test coverage** - Ensure adequate test coverage (>80%)
-- [ ] **Documentation** - Update relevant documentation
-- [ ] **Breaking changes** - Document any breaking changes
-- [ ] **Performance** - Consider performance implications
-- [ ] **Security** - Review for security vulnerabilities
-
-### For Reviewers
-
-When reviewing PRs:
-
-#### **Code Quality**
-- [ ] Code follows style guidelines
-- [ ] Naming is clear and descriptive
-- [ ] Methods are focused and single-purpose
-- [ ] Error handling is comprehensive
-- [ ] No code duplication
-
-#### **Architecture & Design**
-- [ ] Changes align with project architecture
-- [ ] Proper separation of concerns
-- [ ] Dependencies are minimal and justified
-- [ ] APIs are consistent with existing patterns
-
-#### **Testing**
-- [ ] Unit tests cover new functionality
-- [ ] Integration tests verify behavior
-- [ ] Edge cases are tested
-- [ ] Tests are clear and maintainable
-
-#### **Security**
-- [ ] Input validation is thorough
-- [ ] No sensitive data exposure
-- [ ] Proper authentication/authorization
-- [ ] SQL injection prevention
-- [ ] XSS protection measures
-
-#### **Performance**
-- [ ] Database queries are optimized
-- [ ] No N+1 query problems
-- [ ] Appropriate caching strategy
-- [ ] Resource usage is reasonable
 
 ## Testing Requirements
 
-### Minimum Coverage Requirements
+### Mandatory Testing Standards
 
-| Test Type | Coverage Target | Required |
-|-----------|-----------------|----------|
-| **Unit Tests** | 80% line coverage | ✅ Mandatory |
-| **Integration Tests** | 70% service paths | ✅ Mandatory |  
-| **API Tests** | 90% endpoints | ✅ Mandatory |
-| **End-to-End** | Critical flows | ⚠️ As needed |
+Every contribution must include appropriate tests:
 
-### Writing Quality Tests
-
-#### 1. **Unit Test Example**
+#### Unit Tests (Required)
 
 ```java
+// ✅ Required for all service methods
 @ExtendWith(MockitoExtension.class)
 class DeviceServiceTest {
     
-    @Mock private DeviceRepository deviceRepository;
-    @Mock private EventService eventService;
-    @InjectMocks private DeviceService deviceService;
-    
     @Test
-    @DisplayName("Should create device and publish creation event")
-    void shouldCreateDeviceAndPublishCreationEvent() {
+    @DisplayName("Should create device with valid organization access")
+    void shouldCreateDeviceWithValidOrganizationAccess() {
         // Given
-        CreateDeviceRequest request = createValidDeviceRequest();
-        Device savedDevice = createTestDevice();
-        savedDevice.setId("device-123");
+        String tenantId = "tenant-123";
+        CreateDeviceRequest request = CreateDeviceRequest.builder()
+            .name("Test Device")
+            .organizationId("org-456")
+            .type(DeviceType.LAPTOP)
+            .build();
+            
+        Organization org = Organization.builder()
+            .id("org-456")
+            .tenantId(tenantId)
+            .build();
+            
+        AuthPrincipal principal = createTestPrincipal(tenantId);
         
-        when(deviceRepository.save(any(Device.class))).thenReturn(savedDevice);
+        when(organizationService.findById("org-456")).thenReturn(org);
+        when(deviceRepository.save(any(Device.class)))
+            .thenAnswer(invocation -> invocation.getArgument(0));
         
         // When
-        Device result = deviceService.createDevice(request);
+        Device result = deviceService.createDevice(request, principal);
         
         // Then
-        assertThat(result).isNotNull();
-        assertThat(result.getId()).isEqualTo("device-123");
+        assertThat(result)
+            .satisfies(device -> {
+                assertThat(device.getName()).isEqualTo("Test Device");
+                assertThat(device.getTenantId()).isEqualTo(tenantId);
+                assertThat(device.getOrganizationId()).isEqualTo("org-456");
+            });
+            
+        verify(eventPublisher).publishEvent(any(DeviceCreatedEvent.class));
+    }
+    
+    @Test
+    @DisplayName("Should reject device creation for inaccessible organization")
+    void shouldRejectDeviceCreationForInaccessibleOrganization() {
+        // Given
+        String userTenantId = "tenant-123";
+        String orgTenantId = "tenant-456"; // Different tenant
         
-        verify(deviceRepository).save(any(Device.class));
-        verify(eventService).publishEvent(
-            eq(EventType.DEVICE_CREATED),
-            eq("device-123"),
-            any(Map.class)
-        );
+        CreateDeviceRequest request = CreateDeviceRequest.builder()
+            .organizationId("org-789")
+            .build();
+            
+        Organization org = Organization.builder()
+            .id("org-789")
+            .tenantId(orgTenantId) // Different tenant
+            .build();
+            
+        AuthPrincipal principal = createTestPrincipal(userTenantId);
+        
+        when(organizationService.findById("org-789")).thenReturn(org);
+        
+        // When/Then
+        assertThatThrownBy(() -> deviceService.createDevice(request, principal))
+            .isInstanceOf(TenantAccessViolationException.class)
+            .hasMessageContaining("org-789")
+            .hasMessageContaining(userTenantId);
+            
+        verifyNoInteractions(deviceRepository, eventPublisher);
     }
 }
 ```
 
-#### 2. **Integration Test Example**
+#### Integration Tests (For Complex Features)
 
 ```java
+// Required for new API endpoints, data layer changes
 @SpringBootTest
+@Tag("integration")
 @Testcontainers
-class DeviceIntegrationTest {
+class DeviceServiceIntegrationTest {
     
     @Container
-    static MongoDBContainer mongodb = new MongoDBContainer("mongo:7.0");
-    
-    @Autowired private DeviceService deviceService;
-    @Autowired private DeviceRepository deviceRepository;
-    
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.data.mongodb.uri", mongodb::getReplicaSetUrl);
-    }
+    static MongoDBContainer mongodb = new MongoDBContainer("mongo:7");
     
     @Test
-    void shouldPersistDeviceToDatabase() {
-        // Given
-        CreateDeviceRequest request = createValidDeviceRequest();
-        
-        // When
-        Device createdDevice = deviceService.createDevice(request);
-        
-        // Then
-        Optional<Device> foundDevice = deviceRepository.findById(createdDevice.getId());
-        assertThat(foundDevice).isPresent();
-        assertThat(foundDevice.get().getMachineId()).isEqualTo(request.getMachineId());
+    @DisplayName("Should enforce tenant isolation in database queries")
+    void shouldEnforceTenantIsolationInDatabaseQueries() {
+        // Implementation with real database
     }
 }
 ```
 
-## Documentation Standards
+### Test Coverage Requirements
 
-### API Documentation
+- **Minimum coverage**: 80% for new code
+- **Critical paths**: 100% coverage for security-related code
+- **Edge cases**: Must include negative test cases
+- **Performance**: Load tests for performance-critical features
 
-All API endpoints must be documented with OpenAPI/Swagger:
+## Commit Message Standards
 
-```java
-@RestController
-@RequestMapping("/api/devices")
-@Tag(name = "Device Management", description = "APIs for managing devices in the system")
-public class DeviceController {
-    
-    @GetMapping
-    @Operation(
-        summary = "List devices",
-        description = "Retrieve a paginated list of devices with optional filtering",
-        responses = {
-            @ApiResponse(responseCode = "200", description = "Devices retrieved successfully"),
-            @ApiResponse(responseCode = "400", description = "Invalid request parameters"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized access")
-        }
-    )
-    public ResponseEntity<PageResponse<DeviceResponse>> getDevices(
-        @Parameter(description = "Maximum number of devices to return", example = "20")
-        @RequestParam(defaultValue = "20") int limit,
-        
-        @Parameter(description = "Cursor for pagination", example = "eyJpZCI6ImRldmljZS0xMjMifQ==")  
-        @RequestParam(required = false) String cursor,
-        
-        @Parameter(description = "Filter by device status", example = "ACTIVE")
-        @RequestParam(required = false) String status
-    ) {
-        // Implementation
-    }
-}
+### Commit Message Format
+
+Use [Conventional Commits](https://www.conventionalcommits.org/) format:
+
+```text
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
 ```
 
-### Code Comments
+### Commit Types
 
-```java
-/**
- * Processes device status updates from external tools.
- * 
- * <p>This method handles status updates received from integrated RMM tools,
- * validates the update against current device state, and publishes appropriate
- * events for downstream processing.
- * 
- * <p><strong>Threading:</strong> This method is thread-safe and can handle
- * concurrent status updates for different devices.
- * 
- * @param deviceId the unique identifier of the device being updated
- * @param newStatus the new status to set for the device
- * @param source the source tool that reported the status change
- * @param metadata additional metadata about the status change
- * @return the updated device with new status
- * @throws DeviceNotFoundException if no device exists with the given ID
- * @throws InvalidStatusTransitionException if the status change is not allowed
- * @throws SecurityException if the source tool lacks permission to update this device
- */
-public Device updateDeviceStatus(String deviceId, DeviceStatus newStatus, 
-                               String source, Map<String, Object> metadata) {
-    // Implementation with detailed comments for complex logic
-}
+| Type | Description | Example |
+|------|-------------|---------|
+| `feat` | New feature | `feat(api): add device filtering by organization` |
+| `fix` | Bug fix | `fix(security): prevent tenant data leakage in device queries` |
+| `docs` | Documentation | `docs(api): add device management tutorial` |
+| `style` | Code style changes | `style(core): apply consistent formatting to util classes` |
+| `refactor` | Code refactoring | `refactor(service): extract device validation logic` |
+| `test` | Test additions/updates | `test(device): add integration tests for device service` |
+| `chore` | Maintenance tasks | `chore(deps): update Spring Boot to 3.3.1` |
+| `security` | Security improvements | `security(auth): implement rate limiting for login attempts` |
+
+### Good Commit Examples
+
+```bash
+# ✅ GOOD: Clear, specific, explains impact
+feat(api): implement device status filtering with tenant isolation
+
+Add new endpoint parameter 'status' to device search API. Includes
+tenant-aware filtering to prevent cross-tenant data access.
+
+- Add DeviceStatus enum to filter criteria
+- Update repository with tenant-scoped queries  
+- Include integration tests for tenant isolation
+- Update API documentation
+
+Closes #123
+
+# ✅ GOOD: Bug fix with context
+fix(security): prevent JWT token leakage in error responses
+
+Remove JWT tokens from exception messages and error responses
+to prevent accidental token exposure in logs or client responses.
+
+- Sanitize AuthenticationException messages
+- Update error response DTOs
+- Add security integration test
+
+Fixes #456
+
+# ✅ GOOD: Documentation improvement  
+docs(development): add security testing guidelines
+
+Expand testing documentation with security-focused test patterns,
+including examples for authentication, authorization, and input validation.
 ```
 
-## Security Guidelines
+### Bad Commit Examples
 
-### Input Validation
+```bash
+# ❌ BAD: Vague, no context
+fix: stuff
 
-```java
-// ✅ Good: Comprehensive validation
-@PostMapping
-public ResponseEntity<DeviceResponse> createDevice(
-    @Valid @RequestBody CreateDeviceRequest request
-) {
-    validateDeviceRequest(request);
-    Device device = deviceService.createDevice(request);
-    return ResponseEntity.status(HttpStatus.CREATED).body(mapToResponse(device));
-}
+# ❌ BAD: No description of what changed
+feat: new feature
 
-private void validateDeviceRequest(CreateDeviceRequest request) {
-    if (StringUtils.isBlank(request.getMachineId())) {
-        throw new ValidationException("Machine ID is required");
-    }
-    
-    if (!isValidMachineId(request.getMachineId())) {
-        throw new ValidationException("Invalid machine ID format");
-    }
-    
-    // Additional validation logic
-}
+# ❌ BAD: Too generic
+update: changes
+
+# ❌ BAD: Multiple unrelated changes
+feat: add device API and fix user bug and update docs
 ```
 
-### Multi-Tenant Security
+## Pull Request Process
 
-```java
-// ✅ Good: Proper tenant isolation
-@PreAuthorize("hasPermission(#organizationId, 'DEVICE_READ')")
-public List<Device> getDevicesByOrganization(String organizationId) {
-    // Method automatically filtered by tenant context
-    return deviceRepository.findByOrganizationId(organizationId);
-}
+### Before Creating a Pull Request
+
+1. **Sync with main branch**:
+   ```bash
+   git checkout main
+   git pull origin main
+   git checkout your-feature-branch
+   git rebase main
+   ```
+
+2. **Run all tests**:
+   ```bash
+   mvn clean test
+   ```
+
+3. **Check code style**:
+   ```bash
+   mvn checkstyle:check
+   ```
+
+4. **Update documentation** if needed
+
+### Pull Request Template
+
+```markdown
+## Description
+
+Brief description of changes and their purpose.
+
+## Type of Change
+
+- [ ] Bug fix (non-breaking change which fixes an issue)
+- [ ] New feature (non-breaking change which adds functionality)
+- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
+- [ ] Documentation update
+- [ ] Security improvement
+
+## Testing
+
+- [ ] Unit tests added/updated and passing
+- [ ] Integration tests added/updated and passing
+- [ ] Security tests added if applicable
+- [ ] Manual testing completed
+
+## Security Checklist
+
+- [ ] No sensitive data exposed in logs or responses
+- [ ] Input validation implemented where applicable
+- [ ] Authentication/authorization properly implemented
+- [ ] SQL injection prevention verified
+- [ ] XSS prevention verified
+
+## Documentation
+
+- [ ] Code is self-documenting with clear naming
+- [ ] JavaDoc added for public APIs
+- [ ] README updated if needed
+- [ ] API documentation updated if needed
+
+## Breaking Changes
+
+List any breaking changes and migration steps required.
+
+## Related Issues
+
+Closes #issue_number
 ```
 
-### Secret Management
+### Pull Request Requirements
 
-```java
-// ✅ Good: Externalized configuration
-@ConfigurationProperties(prefix = "openframe.integration.fleet")
-public class FleetIntegrationConfig {
-    private String apiKey; // Set via environment variable
-    private String baseUrl;
-    
-    // Getters/setters - never log sensitive values
-}
+#### Code Review Checklist
 
-// ❌ Bad: Hardcoded secrets
-public class FleetClient {
-    private static final String API_KEY = "hardcoded-api-key"; // Never do this!
-}
+**Functionality**
+- [ ] Code solves the intended problem
+- [ ] Edge cases are handled appropriately
+- [ ] Error handling is comprehensive
+- [ ] Performance impact is acceptable
+
+**Code Quality**
+- [ ] Code follows project conventions
+- [ ] Methods are focused and single-purpose
+- [ ] Code is readable and well-organized
+- [ ] No code duplication without justification
+
+**Security**
+- [ ] Input validation is present
+- [ ] Authentication/authorization is correct
+- [ ] No sensitive data is exposed
+- [ ] Tenant isolation is maintained
+
+**Testing**
+- [ ] Adequate test coverage (minimum 80%)
+- [ ] Tests are meaningful and not just for coverage
+- [ ] Integration tests for complex features
+- [ ] Security tests for security-sensitive changes
+
+**Documentation**
+- [ ] Public APIs have JavaDoc
+- [ ] Complex logic is documented
+- [ ] README/guides updated if needed
+
+## Branch Strategy
+
+### Branch Naming Convention
+
+```text
+<type>/<short-description>
+
+Examples:
+feat/device-status-filtering
+fix/jwt-token-leakage
+docs/api-authentication-guide
+security/input-validation-enhancement
 ```
 
-## Performance Guidelines
+### Workflow
 
-### Database Optimization
+1. **Create feature branch** from `main`:
+   ```bash
+   git checkout main
+   git pull origin main
+   git checkout -b feat/your-feature-name
+   ```
 
-```java
-// ✅ Good: Optimized queries with proper indexing
-@Repository
-public class DeviceRepositoryImpl implements CustomDeviceRepository {
-    
-    @Override
-    public Page<Device> findDevicesWithFilter(DeviceFilter filter, Pageable pageable) {
-        Criteria criteria = new Criteria();
-        
-        // Always filter by organization first (indexed field)
-        criteria.and("organizationId").is(filter.getOrganizationId());
-        
-        if (filter.getStatus() != null) {
-            criteria.and("status").is(filter.getStatus());
-        }
-        
-        if (filter.getLastCheckinAfter() != null) {
-            criteria.and("lastCheckin").gte(filter.getLastCheckinAfter());
-        }
-        
-        Query query = Query.query(criteria).with(pageable);
-        
-        List<Device> devices = mongoTemplate.find(query, Device.class);
-        long total = mongoTemplate.count(Query.query(criteria), Device.class);
-        
-        return new PageImpl<>(devices, pageable, total);
-    }
-}
+2. **Make commits** following commit message standards
+
+3. **Keep branch updated**:
+   ```bash
+   git fetch origin
+   git rebase origin/main
+   ```
+
+4. **Create Pull Request** when ready
+
+5. **Address review feedback**
+
+6. **Merge after approval** (squash merge preferred)
+
+## Code Review Process
+
+### Review Guidelines
+
+#### For Reviewers
+
+**Focus Areas:**
+1. **Correctness**: Does the code work as intended?
+2. **Security**: Are there any security implications?
+3. **Performance**: Will this impact system performance?
+4. **Maintainability**: Is the code easy to understand and modify?
+5. **Testing**: Is the code adequately tested?
+
+**Review Etiquette:**
+- Be constructive and specific in feedback
+- Ask questions to understand the approach
+- Suggest alternatives when appropriate
+- Approve when code meets standards
+
+**Example Review Comments:**
+```text
+✅ GOOD:
+"Consider extracting this validation logic into a separate method 
+for better readability and testability. Something like 
+`validateDeviceAccess(device, principal)` would make the intent clearer."
+
+❌ BAD:
+"This is wrong."
 ```
 
-### Caching Strategy
+#### For Contributors
 
-```java
-// ✅ Good: Strategic caching
-@Service
-@CacheConfig(cacheNames = "devices")
-public class DeviceService {
-    
-    @Cacheable(key = "#id", unless = "#result == null")
-    public Device getDevice(String id) {
-        return deviceRepository.findById(id)
-            .orElseThrow(() -> new DeviceNotFoundException(id));
-    }
-    
-    @CacheEvict(key = "#device.id")
-    public Device updateDevice(Device device) {
-        return deviceRepository.save(device);
-    }
-    
-    @CacheEvict(allEntries = true)
-    public void clearDeviceCache() {
-        // Clear all cached devices
-    }
-}
+**Responding to Reviews:**
+- Address all feedback promptly
+- Ask for clarification if feedback is unclear
+- Explain your approach when necessary
+- Push updates to the same branch
+
+**Making Changes:**
+```bash
+# Make requested changes
+git add .
+git commit -m "address review feedback: extract validation logic"
+git push origin feat/your-feature-name
 ```
+
+### Review Approval
+
+**Required Approvals:**
+- **1 approval** for documentation and minor fixes
+- **2 approvals** for new features and significant changes
+- **Security team review** for security-related changes
 
 ## Release Process
 
-### Version Numbering
+### Versioning Strategy
 
-We follow [Semantic Versioning](https://semver.org/):
+OpenFrame follows [Semantic Versioning](https://semver.org/):
 
-- **MAJOR** version: Incompatible API changes
-- **MINOR** version: Backward-compatible functionality additions  
-- **PATCH** version: Backward-compatible bug fixes
+- **MAJOR** (5.x.0): Breaking changes
+- **MINOR** (5.30.0): New features, backwards compatible
+- **PATCH** (5.30.1): Bug fixes, backwards compatible
 
-```bash
-# Examples:
-1.0.0 -> 1.0.1  # Bug fix
-1.0.1 -> 1.1.0  # New feature
-1.1.0 -> 2.0.0  # Breaking change
-```
+### Release Checklist
 
-### Changelog Updates
+1. **Update version** in parent POM
+2. **Update CHANGELOG.md** with release notes
+3. **Run full test suite**
+4. **Create release tag**
+5. **Build and publish artifacts**
+6. **Update documentation**
+7. **Announce release**
 
-Update `CHANGELOG.md` with your changes:
+## Getting Help
 
-```markdown
-## [Unreleased]
+### Where to Ask Questions
 
-### Added
-- Device filtering API with status, type, and date range filters
-- Cursor-based pagination for consistent performance across large datasets
+1. **Technical Questions**: [OpenMSP Slack Community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
+2. **Bug Reports**: GitHub Issues (when available)
+3. **Feature Requests**: Community discussion in Slack
+4. **Security Issues**: Private communication through Slack
 
-### Changed  
-- Improved JWT token validation performance by 40%
-- Updated MongoDB connection pooling configuration
+### Resources
 
-### Fixed
-- Device status synchronization issue with Tactical RMM integration
-- Memory leak in event processing pipeline
+- **Architecture Guide**: [Architecture Overview](../architecture/README.md)
+- **Development Setup**: [Local Development](../setup/local-development.md)
+- **Security Guidelines**: [Security Best Practices](../security/README.md)
+- **Testing Guide**: [Testing Overview](../testing/README.md)
 
-### Security
-- Enhanced input validation for device creation endpoints
-- Added rate limiting to authentication endpoints
+## Community Standards
 
-### Deprecated
-- Legacy device search API (will be removed in v2.0.0)
+### Code of Conduct
 
-### Removed
-- Unused device configuration endpoints
+We are committed to providing a welcoming and inclusive environment:
 
-## [1.2.0] - 2024-01-15
-
-### Added
-- Organization SSO integration with OIDC providers
-```
-
-## Community Guidelines
-
-### Communication
-
-- **Be respectful** - Treat all community members with respect
-- **Be constructive** - Provide helpful, actionable feedback
-- **Be patient** - Remember that contributors have varying experience levels
-- **Ask questions** - Don't hesitate to ask for clarification or help
-
-### Getting Help
-
-1. **Read the docs** - Check existing documentation first
-2. **Search issues** - Look for existing discussions on your topic
-3. **Ask in community** - Use [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) for questions
-4. **Create an issue** - For bugs or feature requests (via Slack discussion first)
+- **Be respectful** in all interactions
+- **Be collaborative** and help others learn
+- **Be constructive** in feedback and discussions
+- **Be patient** with newcomers and questions
+- **Report inappropriate behavior** to community moderators
 
 ### Recognition
 
-We recognize contributors through:
+We appreciate all contributions and recognize contributors through:
+- Contributor credits in release notes
+- Community highlights in Slack
+- Collaboration opportunities on advanced features
 
-- **Commit attribution** - All commits are properly attributed
-- **Release notes** - Major contributions highlighted in releases  
-- **Community highlights** - Featured contributors in community updates
-- **Maintainer status** - Active contributors may be invited as maintainers
+## Troubleshooting Common Issues
 
-## Tools and Resources
-
-### Development Tools
-
-- **IDE**: IntelliJ IDEA or VS Code with Java extensions
-- **Code Style**: Google Java Style with project customizations
-- **Testing**: JUnit 5, Mockito, TestContainers
-- **Quality**: SonarQube, Checkstyle, SpotBugs
-- **Documentation**: JavaDoc, OpenAPI/Swagger
-
-### Useful Commands
+### Build Issues
 
 ```bash
-# Development workflow
-./mvnw clean compile                    # Compile code
-./mvnw test                            # Run all tests
-./mvnw test -Dtest=DeviceServiceTest   # Run specific test
-./mvnw spring-boot:run -Dspring-boot.run.profiles=dev  # Run locally
+# Clear Maven cache
+rm -rf ~/.m2/repository/com/openframe
+mvn clean install
 
-# Code quality
-./mvnw checkstyle:check               # Check code style
-./mvnw spotbugs:check                 # Static analysis
-./mvnw jacoco:report                  # Coverage report
+# Skip tests if needed for dependency issues
+mvn clean install -DskipTests
 
-# Documentation  
-./mvnw javadoc:javadoc               # Generate API docs
-./mvnw spring-boot:run -Dspring-boot.run.arguments="--spring.profiles.active=docs"  # API docs server
+# Update IDE project
+# IntelliJ: File → Reload Maven Project
+# Eclipse: Right-click project → Maven → Reload Projects
 ```
 
-## Getting Started Checklist
+### Test Issues
 
-For new contributors:
+```bash
+# Run tests with debug output
+mvn test -X
 
-- [ ] Read this contributing guide completely
-- [ ] Set up [development environment](../setup/environment.md)
-- [ ] Read [architecture overview](../architecture/overview.md)
-- [ ] Join [OpenMSP Slack community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
-- [ ] Look for "good first issue" labels
-- [ ] Introduce yourself in the community
-- [ ] Make your first contribution!
+# Run specific test
+mvn test -Dtest="DeviceServiceTest#shouldCreateDevice"
 
-## Questions?
+# Skip integration tests
+mvn test -Dgroups="!integration"
+```
 
-- 💬 **Community**: [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
-- 📚 **Documentation**: [Development Guide](../README.md)
-- 🚀 **Platform**: [OpenFrame.ai](https://openframe.ai)
-- 🏢 **Company**: [Flamingo.run](https://flamingo.run)
+### Git Issues
 
-Thank you for contributing to OpenFrame OSS Library! 🚀
+```bash
+# Sync with main branch
+git fetch origin
+git rebase origin/main
+
+# Fix merge conflicts
+git add resolved-files
+git rebase --continue
+
+# Reset branch to match main
+git reset --hard origin/main
+```
+
+---
+
+Thank you for contributing to OpenFrame OSS Lib! Your contributions help build better MSP tools for the entire community. 
+
+Questions? Join us in the [OpenMSP Slack Community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) – we're here to help! 🚀

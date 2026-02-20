@@ -133,11 +133,13 @@ export function useRealtimeChunkProcessor(
           break
         }
 
-        case 'error':
-          callbacks.onError?.(action.error, action.details)
-          // Reset accumulator on error
-          accumulator.resetSegments()
+        case 'error': {
+          const message = 'details' in action ? (action?.details && JSON.parse(action.details)?.error?.message) : undefined
+          const segments = accumulator.addError(action.error, message)
+          callbacks.onSegmentsUpdate?.(segments)
+          callbacks.onError?.(action.error, message)
           break
+        }
 
         case 'message_request':
           callbacks.onUserMessage?.(action.text)

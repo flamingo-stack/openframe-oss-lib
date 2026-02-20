@@ -1,8 +1,0 @@
-flowchart TD
-    StackTypes["frontend_core_types_stack"] -->|uses| VendorTypes["frontend_core_types_vendor"]
-    StackTypes -->|uses| CategoryTypes["frontend_core_types_categories"]
-    StackTypes -->|uses| CategoryType["frontend_core_types_category"]
-    StackTypes -->|used by| UIComponents["frontend_core_components_ui"]
-    StackTypes -->|used by| Features["frontend_core_components_features"]
-    StackTypes -->|used by| SharedComponents["frontend_core_components"]
-    StackTypes -->|exchanges data with| ApiDTOs["api_lib_dto, api_service_core_dto"]

@@ -157,8 +157,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          registry-url: 'https://npm.pkg.github.com'
-          scope: '@${{ github.repository_owner }}'
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Install Dependencies
         if: steps.should_run.outputs.run == 'true'
@@ -174,10 +173,10 @@ jobs:
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
         env:
-          NODE_AUTH_TOKEN: ${{ github.token }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           PKG_NAME=$(jq -r '.name' package.json)
-          OLD_VERSION=$(npm view "$PKG_NAME" versions --registry=https://npm.pkg.github.com 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | grep -v snapshot | sort -V | tail -1 || echo "0.0.0")
+          OLD_VERSION=$(npm view "$PKG_NAME" versions 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | grep -v snapshot | sort -V | tail -1 || echo "0.0.0")
           OLD_VERSION=${OLD_VERSION:-0.0.0}
           echo "OLD_VERSION=$OLD_VERSION" >> $GITHUB_ENV
           echo "Found old version: $OLD_VERSION"
@@ -208,17 +207,9 @@ jobs:
           echo "New version validated: ${{ env.OLD_VERSION }} → $NEW_VERSION"
           npm version "$NEW_VERSION" --no-git-tag-version
 
-      - name: Publish to GitHub Packages
+      - name: Publish to npm
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
-        run: npm publish --tag latest
+        run: npm publish --tag latest --access public
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Cleanup Old Versions (keep last 10)
-        if: steps.should_run.outputs.run == 'true'
-        uses: actions/delete-package-versions@v5
-        with:
-          package-name: ${{ matrix.name }}
-          package-type: npm
-          min-versions-to-keep: 20
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

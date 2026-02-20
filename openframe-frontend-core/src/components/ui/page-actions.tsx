@@ -2,7 +2,14 @@
 
 import React from 'react'
 import { cn } from '../../utils/cn'
+import { Ellipsis01Icon } from '../icons-v2-generated'
 import { Button } from './button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from './dropdown-menu'
 import { MoreActionsMenu, type MoreActionsItem } from './more-actions-menu'
 
 export type PageActionButton = {
@@ -12,11 +19,14 @@ export type PageActionButton = {
   variant?: 'primary' | 'outline'
   disabled?: boolean
   loading?: boolean
+  /** Show action only on mobile (below md). Default: visible on all screens. */
+  showOnlyMobile?: boolean
 }
 
 export interface PageActionsProps {
-  variant?: 'icon-buttons' | 'primary-buttons'
+  variant?: 'icon-buttons' | 'primary-buttons' | 'menu-primary'
   actions: PageActionButton[]
+  menuActions?: MoreActionsItem[]
   className?: string
   gap?: 'sm' | 'md' | 'lg'
 }
@@ -24,6 +34,7 @@ export interface PageActionsProps {
 export function PageActions({
   variant = 'icon-buttons',
   actions,
+  menuActions,
   className,
   gap = 'md'
 }: PageActionsProps) {
@@ -35,6 +46,10 @@ export function PageActions({
 
   if (variant === 'icon-buttons') {
     return <IconButtonsVariant actions={actions} className={className} gapClass={gapClasses[gap]} />
+  }
+
+  if (variant === 'menu-primary') {
+    return <MenuPrimaryVariant actions={actions} menuActions={menuActions || []} className={className} gapClass={gapClasses[gap]} />
   }
 
   return <PrimaryButtonsVariant actions={actions} className={className} gapClass={gapClasses[gap]} />
@@ -49,6 +64,8 @@ function IconButtonsVariant({
   className?: string
   gapClass: string
 }) {
+  const desktopActions = actions.filter(a => !a.showOnlyMobile)
+
   const menuItems: MoreActionsItem[] = actions.map(action => ({
     label: action.label,
     onClick: action.onClick,
@@ -63,7 +80,7 @@ function IconButtonsVariant({
     <>
       {/* Desktop: Show all buttons with icons */}
       <div className={cn('hidden md:flex items-center', gapClass, className)}>
-        {actions.map((action, idx) => (
+        {desktopActions.map((action, idx) => (
           <Button
             key={`${action.label}-${idx}`}
             variant="outline"
@@ -117,11 +134,13 @@ function PrimaryButtonsVariant({
     return 0
   })
 
+  const desktopActions = sortedActions.filter(a => !a.showOnlyMobile)
+
   return (
     <>
       {/* Desktop: Normal layout (outline left, primary right) */}
       <div className={cn('hidden md:flex items-center', gapClass, className)}>
-        {sortedActions.map((action, idx) => (
+        {desktopActions.map((action, idx) => (
           <Button
             key={`desktop-${action.label}-${idx}`}
             variant={action.variant}
@@ -137,6 +156,104 @@ function PrimaryButtonsVariant({
 
       {/* Mobile: Fixed bottom bar */}
       <MobileBottomActions actions={sortedActions} gapClass={gapClass} />
+    </>
+  )
+}
+
+/**
+ * Menu + primary variant - shows MoreActionsMenu ("...") + primary button on desktop,
+ * all actions move to a fixed bottom bar on mobile
+ */
+function MenuPrimaryVariant({
+  actions,
+  menuActions,
+  className,
+  gapClass
+}: {
+  actions: PageActionButton[]
+  menuActions: MoreActionsItem[]
+  className?: string
+  gapClass: string
+}) {
+  const desktopActions = actions.filter(a => !a.showOnlyMobile)
+
+  return (
+    <>
+      {/* Desktop: MoreActionsMenu + primary buttons */}
+      <div className={cn('hidden md:flex items-center', gapClass, className)}>
+        {menuActions.length > 0 && <MoreActionsMenu items={menuActions} />}
+        {desktopActions.map((action, idx) => (
+          <Button
+            key={`desktop-${action.label}-${idx}`}
+            variant={action.variant || 'primary'}
+            onClick={action.onClick}
+            disabled={action.disabled}
+            loading={action.loading}
+            leftIcon={action.icon}
+          >
+            {action.label}
+          </Button>
+        ))}
+      </div>
+
+      {/* Mobile: Fixed bottom bar — full-width menu button + primary buttons */}
+      <div className={cn(
+        'fixed md:hidden bottom-0 left-0 right-0 z-50',
+        'bg-ods-card border-t border-ods-border',
+        'flex items-start pt-6 pb-6 px-6',
+        gapClass
+      )}>
+        {menuActions.length > 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                className="flex-1"
+                aria-label="More actions"
+                centerIcon={<Ellipsis01Icon size={24} className="text-text-primary" />}
+              />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="start"
+              side="top"
+              sideOffset={6}
+              className="bg-ods-card border border-ods-border p-0 rounded-[4px] min-w-[200px]"
+            >
+              {menuActions.map((item, idx) => (
+                <DropdownMenuItem
+                  key={`mobile-menu-${item.label}-${idx}`}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (!item.disabled) item.onClick()
+                  }}
+                  disabled={item.disabled}
+                  className="flex items-center gap-2 px-4 py-3 bg-ods-bg hover:bg-ods-bg-hover focus:bg-ods-bg-hover border-b border-ods-border last:border-b-0 rounded-none cursor-pointer data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed"
+                >
+                  {item.icon && (
+                    <div className={cn(item.danger ? 'text-ods-error' : 'text-ods-text-secondary', '[&_svg]:size-6 [&_svg]:shrink-0')}>{item.icon}</div>
+                  )}
+                  <span className={`font-medium text-[18px] leading-6 ${item.danger ? 'text-ods-text-primary' : 'text-ods-text-primary'}`}>
+                    {item.label}
+                  </span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+        {actions.map((action, idx) => (
+          <Button
+            key={`mobile-${action.label}-${idx}`}
+            variant={action.variant || 'primary'}
+            onClick={action.onClick}
+            disabled={action.disabled}
+            loading={action.loading}
+            leftIcon={action.icon}
+            className="flex-1"
+          >
+            {action.label}
+          </Button>
+        ))}
+      </div>
     </>
   )
 }
@@ -173,7 +290,7 @@ function MobileBottomActions({
 }
 
 export function usePageActionsBottomPadding(variant: PageActionsProps['variant']) {
-  return variant === 'primary-buttons' ? 'pb-40 md:pb-0' : ''
+  return variant === 'primary-buttons' || variant === 'menu-primary' ? 'pb-40 md:pb-0' : ''
 }
 
 export default PageActions

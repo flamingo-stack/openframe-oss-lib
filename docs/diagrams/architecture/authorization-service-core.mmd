@@ -1,0 +1,8 @@
+flowchart TD
+    Browser["Browser or SPA Client"] -->|"/oauth2/authorize"| AuthServer["Authorization Service Core"]
+    AuthServer -->|"JWT Access Token"| Browser
+    Browser -->|"Bearer Token"| Gateway["Gateway Service Core"]
+    Gateway --> API["API Service Core"]
+
+    AuthServer --> Mongo["MongoDB (Users, Tenants, OAuth2)"]
+    AuthServer --> JWKS["Per-Tenant JWKS Endpoint"]

@@ -1,6 +1,0 @@
-flowchart TD
-    ToolController["ToolController"] -->|accepts| ToolFilterCriteria["ToolFilterCriteria"]
-    ToolController -->|returns| ToolsResponse["ToolsResponse"]
-    ToolsResponse -->|contains| ToolResponse["ToolResponse"]
-    ToolResponse -->|may include| ToolUrlResponse["ToolUrlResponse"]
-    ToolController -->|provides filter options| ToolFilterResponse["ToolFilterResponse"]

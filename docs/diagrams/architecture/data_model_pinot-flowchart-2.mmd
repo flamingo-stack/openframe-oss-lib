@@ -1,5 +1,0 @@
-flowchart TD
-    A["Service Layer"] -->|queries| B["Pinot Repository\n[data_repository_pinot]"]
-    B -->|maps to| C["PinotEventEntity\n[data_model_pinot]"]
-    B -->|uses| D["OrganizationOption\n[data_model_pinot]"]
-    C -->|represents| E["Pinot Table Row"]

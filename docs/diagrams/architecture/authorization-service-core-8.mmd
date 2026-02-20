@@ -1,0 +1,4 @@
+flowchart TD
+    Authz["Authorization Service Core"] --> Mongo["Data Mongo Domain and Repos"]
+    Authz --> Gateway["Gateway Service Core"]
+    Gateway --> APIs["API Service Core"]

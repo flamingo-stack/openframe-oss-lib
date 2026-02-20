@@ -1,7 +1,0 @@
-flowchart TD
-    KafkaBroker["Kafka Broker"] -->|publishes events| JsonKafkaListener["JsonKafkaListener"]
-    JsonKafkaListener -->|uses| Deserializer["Deserializers\n(stream_service_core_deserializer)"]
-    JsonKafkaListener -->|maps event types| EventTypeMapper["EventTypeMapper\n(stream_service_core_mapping)"]
-    JsonKafkaListener -->|forwards to| MessageHandler["Message Handlers\n(stream_service_core_handler)"]
-    MessageHandler -->|calls| EnrichmentService["Enrichment Services\n(stream_service_core_service)"]
-    JsonKafkaListener -->|configured by| KafkaConfig["KafkaConfig\n(stream_service_core_config)"]

@@ -1,5 +1,0 @@
-flowchart TD
-    DeviceController["DeviceController"] -->|accepts| DeviceFilterCriteria["DeviceFilterCriteria"]
-    DeviceFilterCriteria -->|extends| PaginationCriteria["PaginationCriteria"]
-    DeviceController -->|returns| DevicesResponse["DevicesResponse"]
-    DevicesResponse -->|contains| PaginationCriteria

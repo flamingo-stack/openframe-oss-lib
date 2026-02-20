@@ -1,6 +1,0 @@
-flowchart TD
-    CreateEventInput -->|used by| EventController
-    EventFilterInput -->|used by| EventDataFetcher
-    EventFilterInput -->|maps to| EventQueryFilter
-    EventQueryFilter -->|filters| CoreEvent
-    CoreEvent -->|results mapped to| EventResponse

@@ -1,0 +1,18 @@
+flowchart TD
+    CoreShared["Core Shared Utilities"]
+
+    ApiService["API Service Core"]
+    AuthService["Authorization Service Core"]
+    GatewayService["Gateway Service Core"]
+    ExternalApi["External API Service Core"]
+    ClientService["Client Service Core"]
+    ManagementService["Management Service Core"]
+    StreamProcessing["Stream Processing Core"]
+
+    ApiService --> CoreShared
+    AuthService --> CoreShared
+    GatewayService --> CoreShared
+    ExternalApi --> CoreShared
+    ClientService --> CoreShared
+    ManagementService --> CoreShared
+    StreamProcessing --> CoreShared

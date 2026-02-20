@@ -42,8 +42,8 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
   timestamp?: Date
   showAvatar?: boolean
   isTyping?: boolean
-  onApprove?: (requestId?: string) => void
-  onReject?: (requestId?: string) => void
+  onApprove?: (requestId?: string) => void | Promise<void>
+  onReject?: (requestId?: string) => void | Promise<void>
 }
 
 // ========== Chat Message List Props ==========
@@ -60,8 +60,8 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
   contentClassName?: string
   assistantType?: AssistantType
   pendingApprovals?: MessageSegment[]
-  onApprove?: (requestId?: string) => void
-  onReject?: (requestId?: string) => void
+  onApprove?: (requestId?: string) => void | Promise<void>
+  onReject?: (requestId?: string) => void | Promise<void>
 }
 
 export interface ChatMessageListRef {
@@ -113,10 +113,17 @@ export interface ToolExecutionDisplayProps extends HTMLAttributes<HTMLDivElement
 
 export interface ApprovalRequestMessageProps extends HTMLAttributes<HTMLDivElement> {
   data: ApprovalRequestData
-  onApprove?: (requestId?: string) => void
-  onReject?: (requestId?: string) => void
+  onApprove?: (requestId?: string) => void | Promise<void>
+  onReject?: (requestId?: string) => void | Promise<void>
   status?: ChatApprovalStatus
   disabled?: boolean
+}
+
+// ========== Error Message Display Props ==========
+
+export interface ErrorMessageDisplayProps extends HTMLAttributes<HTMLDivElement> {
+  title: string
+  details?: string
 }
 
 // ========== Model Display Props ==========

@@ -1,8 +1,0 @@
-flowchart TD
-    User["User/Client"] --> Controller["management_service_core_controller"]
-    Controller --> Service["OpenFrameClientVersionUpdateService"]
-    Service --> Initializer["management_service_core_initializer"]
-    Service --> Scheduler["management_service_core_scheduler"]
-    Service --> Model["management_service_core_model"]
-    Service --> PinotConfig["management_service_core_config_pinot"]
-    Service -->|may call| ExternalApi["external_api_service_core_controller"]

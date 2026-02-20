@@ -1,0 +1,9 @@
+flowchart TD
+    KafkaIn["Inbound Kafka (CDC + Tool Events)"]
+    KafkaIn --> Listener
+    Listener --> Deserializer
+    Deserializer --> Mapper
+    Mapper --> Enrichment
+    Enrichment --> Handler
+    Handler --> CassandraOut["Cassandra"]
+    Handler --> KafkaOut["Outbound Kafka"]

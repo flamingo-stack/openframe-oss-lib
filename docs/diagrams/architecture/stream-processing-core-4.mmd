@@ -1,0 +1,5 @@
+flowchart LR
+    Activities["ActivityMessage Stream"] --> Join
+    HostActivities["HostActivityMessage Stream"] --> Join
+    Join["Left Join (5s window)"] --> Enriched["Enriched ActivityMessage"]
+    Enriched --> OutputTopic["Fleet MDM Events Topic"]

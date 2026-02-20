@@ -1,5 +1,0 @@
-flowchart TD
-    A["Application Startup"] --> B["OssTenantKafkaProperties loads config"]
-    B --> C["OssTenantKafkaAutoConfiguration applies tenant logic"]
-    C --> D["OssKafkaConfig registers beans"]
-    D --> E["Kafka Producers/Consumers use beans"]

@@ -35,8 +35,22 @@ public class DownloadConfigurationMapper {
         natsDownloadConfig.setFileName(downloadConfiguration.getFileName());
         natsDownloadConfig.setTargetFileName(downloadConfiguration.getTargetFileName());
         natsDownloadConfig.setLink(downloadConfigurationResolver.resolve(downloadConfiguration, version));
-        
+        natsDownloadConfig.setInstallationType(mapInstallationType(downloadConfiguration.getInstallationType()));
+        natsDownloadConfig.setBundleId(downloadConfiguration.getBundleId());
+
         return natsDownloadConfig;
+    }
+
+    private com.openframe.data.model.nats.InstallationType mapInstallationType(
+            com.openframe.data.document.clientconfiguration.InstallationType installationType
+    ) {
+        if (installationType == null) {
+            return com.openframe.data.model.nats.InstallationType.STANDARD;
+        }
+        return switch (installationType) {
+            case GUI_APP -> com.openframe.data.model.nats.InstallationType.GUI_APP;
+            case STANDARD -> com.openframe.data.model.nats.InstallationType.STANDARD;
+        };
     }
 }
 

@@ -1,7 +1,0 @@
-flowchart TD
-    Host["Host"] -->|is part of| HostSearchResponse["HostSearchResponse"]
-    QueryResult["QueryResult"] -->|references| Host["Host"]
-    HostSearchResponse -->|used by| api_service_core_controller["DeviceController"]
-    QueryResult -->|used by| api_service_core_controller["DeviceController"]
-    Host -->|referenced by| sdk_tacticalrmm_model["AgentInfo"]
-    Host -->|referenced by| data_mongo_document_device["Device"]
