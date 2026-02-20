@@ -33,7 +33,7 @@ export const CveLink: React.FC<CveLinkProps> = ({
       target="_blank"
       rel="noopener noreferrer"
       className={cn(
-        'inline-flex items-center gap-2 font-["DM_Sans"] font-medium text-[18px] leading-[20px] text-ods-text-primary font-mono hover:text-ods-accent transition-colors group',
+        'inline-flex items-center gap-2 font-medium text-[18px] leading-[20px] text-ods-text-primary font-mono hover:text-ods-accent transition-colors group',
         className
       )}
     >
