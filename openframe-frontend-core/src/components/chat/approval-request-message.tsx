@@ -109,7 +109,7 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
             disabled={isProcessing}
             className={cn(
               "bg-ods-accent hover:bg-ods-accent/90",
-              "font-['Azeret_Mono'] font-medium sm:!text-sm text-ods-bg uppercase tracking-[-0.28px]",
+              "font-mono font-medium sm:!text-sm text-ods-bg uppercase tracking-[-0.28px]",
               "px-2 py-1 h-auto"
             )}
           >
@@ -122,7 +122,7 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
             disabled={isProcessing}
             className={cn(
               "bg-ods-card border-ods-border",
-              "font-['Azeret_Mono'] font-medium sm:!text-sm text-ods-text-primary uppercase tracking-[-0.28px]",
+              "font-mono font-medium sm:!text-sm text-ods-text-primary uppercase tracking-[-0.28px]",
               "hover:bg-ods-bg px-2 py-1 h-auto"
             )}
           >

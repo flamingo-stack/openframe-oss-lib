@@ -44,7 +44,7 @@ export function StatusTag({
         </span>
       )}
       <span className={cn(
-        "font-['Azeret_Mono'] font-medium tracking-[-0.28px] uppercase",
+        "font-mono font-medium tracking-[-0.28px] uppercase",
         isMobile ? "text-[12px] leading-[16px] tracking-[-0.24px]" : "text-[14px] leading-[20px]"
       )}>
         {label}
