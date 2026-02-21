@@ -276,7 +276,7 @@ function AutocompleteInner<T = string>(
                 className={cn(
                   "flex items-center gap-2 h-6 px-2 shrink-0",
                   "bg-[#212121] border border-[#3a3a3a] rounded-[6px]",
-                  "font-['Azeret_Mono'] text-[14px] font-medium leading-5 text-ods-text-primary uppercase tracking-[-0.28px]"
+                  "font-mono text-[14px] font-medium leading-5 text-ods-text-primary uppercase tracking-[-0.28px]"
                 )}
               >
                 {renderTag ? renderTag(option) : (
@@ -301,7 +301,7 @@ function AutocompleteInner<T = string>(
                 className={cn(
                   "flex items-center h-8 px-2 shrink-0",
                   "bg-[#212121] border border-[#3a3a3a] rounded-[6px]",
-                  "font-['Azeret_Mono'] text-[14px] font-medium leading-5 text-[#888] uppercase tracking-[-0.28px]"
+                  "font-mono text-[14px] font-medium leading-5 text-[#888] uppercase tracking-[-0.28px]"
                 )}
               >
                 {getLimitTagsText(hiddenTagsCount)}

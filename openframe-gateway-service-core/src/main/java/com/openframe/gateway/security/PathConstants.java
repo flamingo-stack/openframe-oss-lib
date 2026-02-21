@@ -13,7 +13,8 @@ public final class PathConstants {
      * Path prefixes for different types of endpoints
      */
     public static final String CLIENTS_PREFIX = "/clients";
-    public static final String DASHBOARD_PREFIX = "/api";
+    public static final String API_PREFIX = "/api";
     public static final String TOOLS_PREFIX = "/tools";
     public static final String WS_TOOLS_PREFIX = "/ws/tools";
+    public static final String CHAT_PREFIX = "/chat";
 }

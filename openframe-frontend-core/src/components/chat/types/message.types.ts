@@ -70,7 +70,13 @@ export type ApprovalRequestSegment = {
   onReject?: (requestId?: string) => void | Promise<void>
 }
 
-export type MessageSegment = TextSegment | ToolExecutionSegment | ApprovalRequestSegment
+export type ErrorSegment = {
+  type: 'error'
+  title: string
+  details?: string
+}
+
+export type MessageSegment = TextSegment | ToolExecutionSegment | ApprovalRequestSegment | ErrorSegment
 
 export type MessageContent = string | MessageSegment[]
 

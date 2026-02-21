@@ -6,6 +6,7 @@ import { SquareAvatar } from "../ui/square-avatar"
 import { ChatTypingIndicator } from "./chat-typing-indicator"
 import { ToolExecutionDisplay } from "./tool-execution-display"
 import { ApprovalRequestMessage } from "./approval-request-message"
+import { ErrorMessageDisplay } from "./error-message-display"
 import { SimpleMarkdownRenderer } from "../ui/simple-markdown-renderer"
 import type { MessageSegment, MessageContent, ChatMessageEnhancedProps } from "./types"
 
@@ -137,6 +138,14 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                       status={segment.status}
                       onApprove={segment.onApprove}
                       onReject={segment.onReject}
+                    />
+                  )
+                } else if (segment.type === 'error') {
+                  return (
+                    <ErrorMessageDisplay
+                      key={index}
+                      title={segment.title}
+                      details={segment.details}
                     />
                   )
                 }

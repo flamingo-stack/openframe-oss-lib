@@ -64,7 +64,7 @@ public class AddAuthorizationHeaderFilter implements WebFilter {
                         || path.startsWith(CLIENTS_PREFIX + "/tool-agent/")
         );
 
-        return path.startsWith(DASHBOARD_PREFIX + "/")
+        return path.startsWith(API_PREFIX + "/")
                 || path.startsWith(TOOLS_PREFIX + "/")
                 || path.startsWith(WS_TOOLS_PREFIX + "/")
                 || path.startsWith(NATS_WS_ENDPOINT_PATH)

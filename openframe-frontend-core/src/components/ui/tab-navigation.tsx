@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
-import { Button } from './button'
 import { cn } from '../../utils/cn'
 
 export interface TabItem {
@@ -10,8 +9,7 @@ export interface TabItem {
   label: string
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>
   component?: React.ComponentType<any>
-  hasAlert?: boolean
-  alertType?: 'warning' | 'error'
+  indicator?: 'good' | 'warning' | 'error'
 }
 
 export interface TabNavigationUrlSyncOptions {
@@ -111,57 +109,57 @@ export function TabNavigation({
   return (
     <>
       <div className={cn("relative w-full h-14 border-b border-ods-border", className)}>
-        <div className="flex gap-1 items-center justify-start h-full overflow-x-auto">
+        <div className="flex gap-1 items-center justify-start h-full overflow-x-auto overflow-y-hidden">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id
 
             return (
-              <Button
+              <button
                 key={tab.id}
+                type="button"
                 onClick={() => handleTabChange(tab.id)}
-                variant="ghost"
-                leftIcon={
-                  <div className="relative">
-                    <tab.icon 
-                      className="h-6 w-6 transition-colors" 
-                      color={isActive ? '#fafafa' : '#888888'}
-                    />
-                    {tab.hasAlert && (
-                      <div className={`
-                        absolute -top-1 -right-1 w-2 h-2 rounded-full
-                        ${tab.alertType === 'error' ? 'bg-ods-error' : 'bg-ods-accent'}
-                      `} />
-                    )}
-                  </div>
-                }
-                className={`
-                  flex gap-2 items-center justify-center p-4 relative shrink-0 h-14
-                  transition-all duration-200
-                  ${isActive
+                className={cn(
+                  "flex gap-1 items-center justify-center p-4 relative shrink-0 h-14 cursor-pointer",
+                  "transition-all duration-200 bg-transparent border-none outline-none",
+                  isActive
                     ? 'bg-gradient-to-b from-[rgba(255,192,8,0)] to-[rgba(255,192,8,0.1)]'
-                    : 'hover:bg-ods-card/50'
-                  }
-                `}
+                    : 'hover:bg-gradient-to-b hover:from-[rgba(255,255,255,0)] hover:to-[rgba(255,255,255,0.1)]'
+                )}
               >
-                {/* Tab label */}
-                <span className={`
-                  font-['DM_Sans'] font-medium text-[18px] leading-[24px] whitespace-nowrap
-                  ${isActive ? 'text-ods-text-primary' : 'text-ods-text-secondary'} transition-colors
-                `}>
+                <div className="relative flex items-center justify-center">
+                  <tab.icon
+                    className="h-6 w-6 transition-colors"
+                    color={isActive ? '#ffc008' : '#888888'}
+                  />
+                  {tab.indicator && (
+                    <div className={cn(
+                      "absolute right-0 top-[-3px] w-3 h-3 rounded-full border-2 border-ods-bg",
+                      tab.indicator === 'error' && 'bg-ods-error',
+                      tab.indicator === 'warning' && 'bg-ods-accent',
+                      tab.indicator === 'good' && 'bg-green-500'
+                    )} />
+                  )}
+                </div>
+
+                <span className={cn(
+                  "font-['DM_Sans'] font-medium text-[18px] leading-6 whitespace-nowrap transition-colors",
+                  isActive ? 'text-ods-text-primary' : 'text-ods-text-secondary'
+                )}>
                   {tab.label}
                 </span>
 
-                {/* Active tab indicator */}
                 {isActive && (
                   <div className="absolute bottom-0 left-0 right-0 h-1 bg-ods-accent" />
                 )}
-              </Button>
+              </button>
             )
           })}
 
-          {/* Gradient overlay */}
-          <div className="absolute right-0 top-0 w-10 h-14 pointer-events-none" />
         </div>
+
+        {/* Fade shadows */}
+        <div className="absolute left-0 top-0 w-10 h-14 pointer-events-none bg-gradient-to-r from-ods-bg to-transparent" />
+        <div className="absolute right-0 top-0 w-10 h-14 pointer-events-none bg-gradient-to-r from-transparent to-ods-bg" />
       </div>
 
       {/* Render children with active tab if provided */}
