@@ -1,4 +1,5 @@
 flowchart TD
-    LogEvent["LogEvent"] --> CommonFields["Event Metadata"]
-    LogDetails["LogDetails"] --> CommonFields
-    LogDetails --> ExtraFields["message + details"]
+    LogFiltersModel["LogFilters"] --> OrgOption["OrganizationFilterOption"]
+    LogOptions["LogFilterOptions"] --> Query["Log Query Execution"]
+    Query --> LogEvent
+    LogEvent --> LogDetails

@@ -1,0 +1,8 @@
+flowchart TD
+    UserAction["Device or Tag Update"] --> Mongo["MongoDB Save"]
+    Mongo --> Aspect["MachineTagEventAspect"]
+    Aspect --> Service["MachineTagEventServiceImpl"]
+    Service --> Kafka["Kafka Event"]
+    Kafka --> Stream["Stream Processing"]
+    Stream --> Pinot["Pinot Analytical Store"]
+    API["Analytics API"] --> Pinot

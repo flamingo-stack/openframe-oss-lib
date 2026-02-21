@@ -1,14 +1,12 @@
-flowchart TD
-    AppServices["Application Services"] -->|"@Cacheable"| SpringCache["Spring Cache Abstraction"]
-    SpringCache --> CacheManager["RedisCacheManager"]
-    CacheManager --> RedisConnection["RedisConnectionFactory"]
-    RedisConnection --> RedisServer[("Redis Server")]
+flowchart LR
+    Client["Client Application"] --> ApiService["API Service Core"]
+    ApiService --> Mongo["Data Mongo Core"]
+    ApiService --> Redis["Data Redis Cache"]
+    ApiService --> Kafka["Data Kafka Core"]
 
-    AppServices --> RedisTemplate["RedisTemplate"]
-    AppServices --> ReactiveTemplate["ReactiveRedisTemplate"]
+    Gateway["Gateway Service Core"] --> Redis
+    Auth["Authorization Service Core"] --> Redis
 
-    KeyBuilder["OpenframeRedisKeyBuilder"] --> CacheManager
-    KeyConfig["OpenframeRedisKeyConfiguration"] --> KeyBuilder
-    RedisConfigNode["RedisConfig"] --> RedisTemplate
-    RedisConfigNode --> ReactiveTemplate
-    CacheConfigNode["CacheConfig"] --> CacheManager
+    Redis --> RedisServer[("Redis Server")]
+    Mongo --> MongoServer[("MongoDB")]
+    Kafka --> KafkaCluster[("Kafka Cluster")]

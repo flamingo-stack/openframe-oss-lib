@@ -1,7 +1,19 @@
 flowchart TD
-    Request["Incoming Request"] --> Gateway
-    Gateway --> JwtValidation["Validate JWT Issuer"]
-    JwtValidation --> TenantContext["Resolve TenantContext"]
-    TenantContext --> MongoQuery
-    TenantContext --> RedisKey
-    TenantContext --> KafkaProducer
+    Gateway --> ApiService
+    Gateway --> ExternalApi
+    Gateway --> Auth
+
+    Auth --> Mongo
+    ApiService --> Mongo
+    ExternalApi --> Mongo
+
+    ApiService --> Kafka
+    ClientCore --> Kafka
+
+    Kafka --> StreamCore
+    StreamCore --> Cassandra
+    StreamCore --> UnifiedTopic["Unified Events Topic"]
+
+    Management --> Kafka
+    Management --> Mongo
+    Management --> Redis

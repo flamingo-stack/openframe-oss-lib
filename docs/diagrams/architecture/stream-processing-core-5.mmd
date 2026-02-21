@@ -1,6 +1,5 @@
-flowchart TD
-    Deserialized["DeserializedDebeziumMessage"] --> CacheLookup["MachineIdCacheService"]
-    CacheLookup --> MachineInfo["CachedMachineInfo"]
-    CacheLookup --> OrgInfo["CachedOrganizationInfo"]
-    MachineInfo --> EnrichedData["IntegratedToolEnrichedData"]
-    OrgInfo --> EnrichedData
+flowchart LR
+    UnifiedEvent["Unified Event"] --> KafkaHandler["Kafka Handler"]
+    UnifiedEvent --> CassandraHandler["Cassandra Handler"]
+    KafkaHandler --> KafkaTopic["Outbound Kafka Topic"]
+    CassandraHandler --> CassandraDB["Cassandra"]

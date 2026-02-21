@@ -1,268 +1,290 @@
 # Prerequisites
 
-Before diving into OpenFrame OSS Lib development, ensure your system meets the following requirements.
+Before diving into OpenFrame OSS Lib development, ensure your system meets the following requirements and has the necessary tools installed.
 
 ## System Requirements
 
-| Component | Minimum Version | Recommended | Notes |
-|-----------|----------------|-------------|-------|
-| **Java** | 21 | 21+ | OpenJDK or Oracle JDK |
-| **Maven** | 3.8.0 | 3.9+ | Build tool |
-| **Memory** | 8GB RAM | 16GB+ | For development with all services |
-| **Storage** | 10GB free | 20GB+ | Includes dependencies and databases |
-| **OS** | Any Java-supported | Linux/macOS | Windows supported via WSL |
+| Component | Minimum | Recommended |
+|-----------|---------|-------------|
+| **Operating System** | Linux, macOS, or Windows 10+ | Linux or macOS |
+| **Memory (RAM)** | 8 GB | 16 GB or more |
+| **Storage** | 10 GB free space | 50 GB SSD |
+| **CPU** | 4 cores | 8 cores or more |
 
 ## Required Software
 
-### 1. Java Development Kit (JDK) 21
+### Java Development Kit (JDK)
 
-OpenFrame OSS Lib requires Java 21 as specified in the parent POM.
-
-**Install OpenJDK 21:**
+OpenFrame OSS Lib requires **Java 21** as specified in the parent POM.
 
 ```bash
-# macOS (using Homebrew)
-brew install openjdk@21
-
-# Ubuntu/Debian
-sudo apt update
-sudo apt install openjdk-21-jdk
-
-# CentOS/RHEL
-sudo dnf install java-21-openjdk-devel
-
-# Windows
-# Download from https://adoptium.net/temurin/releases/
-```
-
-**Verify installation:**
-
-```bash
+# Verify Java version
 java -version
-# Should show: openjdk version "21.x.x"
+
+# Should output something like:
+# openjdk version "21.0.x" ...
 ```
 
-### 2. Apache Maven 3.8+
+**Installation Options:**
 
-The project uses Maven for dependency management and builds.
+| Platform | Installation Method |
+|----------|-------------------|
+| **Linux** | `apt install openjdk-21-jdk` (Ubuntu) or `yum install java-21-openjdk-devel` (RHEL) |
+| **macOS** | `brew install openjdk@21` |
+| **Windows** | Download from [Eclipse Temurin](https://adoptium.net/) or [Oracle JDK](https://www.oracle.com/java/technologies/javase/jdk21-archive-downloads.html) |
 
-**Install Maven:**
+### Apache Maven
+
+The project uses **Maven 3.8+** for build management.
 
 ```bash
-# macOS (using Homebrew) 
-brew install maven
+# Verify Maven version
+mvn -version
 
-# Ubuntu/Debian
-sudo apt install maven
-
-# CentOS/RHEL
-sudo dnf install maven
-
-# Windows (using Chocolatey)
-choco install maven
+# Should output Maven 3.8.x or higher
 ```
 
-**Verify installation:**
+**Installation:**
 
-```bash
-mvn --version
-# Should show Maven 3.8+ and Java 21
-```
+| Platform | Installation Method |
+|----------|-------------------|
+| **Linux** | `apt install maven` (Ubuntu) or `yum install maven` (RHEL) |
+| **macOS** | `brew install maven` |
+| **Windows** | Download from [Apache Maven](https://maven.apache.org/download.cgi) |
 
-### 3. Git
+### Git
 
 Required for cloning the repository and version control.
 
 ```bash
-# Verify Git is installed
+# Verify Git installation
 git --version
 ```
 
-## Development Environment Setup
+**Installation:**
 
-### IDE Recommendations
+| Platform | Installation Method |
+|----------|-------------------|
+| **Linux** | `apt install git` (Ubuntu) or `yum install git` (RHEL) |
+| **macOS** | `brew install git` or Xcode Command Line Tools |
+| **Windows** | [Git for Windows](https://gitforwindows.org/) |
 
-**IntelliJ IDEA (Recommended)**
-- Ultimate or Community Edition
-- Spring Boot plugin (bundled)
-- Lombok plugin (bundled in newer versions)
-- GraphQL plugin for DGS support
+## Development Dependencies
 
-**Eclipse**  
-- Spring Tools 4 (STS4)
-- Lombok plugin
-- M2E Maven integration
+### Database Systems
 
-**VS Code**
-- Extension Pack for Java
-- Spring Boot Extension Pack
-- Lombok Annotations Support
+While not required for basic library development, you'll need these for full integration testing:
 
-### Environment Variables
-
-Set the following environment variables for development:
+#### MongoDB (Required for Data Layer Testing)
 
 ```bash
-# Java 21 (if multiple versions installed)
-export JAVA_HOME=/path/to/jdk-21
-
-# Maven heap size for large builds
-export MAVEN_OPTS="-Xmx2048m -XX:MaxPermSize=256m"
-
-# Optional: Maven local repository location  
-export M2_HOME=/path/to/maven
+# Verify MongoDB is running
+mongo --version
+# or for newer versions
+mongosh --version
 ```
 
-**For Windows:**
+**Installation Options:**
+- **Docker**: `docker run -d -p 27017:27017 --name mongodb mongo:7`
+- **Local**: Follow [MongoDB Installation Guide](https://docs.mongodb.com/manual/installation/)
+- **Cloud**: [MongoDB Atlas](https://www.mongodb.com/cloud/atlas)
 
-```cmd
-set JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-21.x.x
-set MAVEN_OPTS=-Xmx2048m
+#### Redis (Required for Caching Layer)
+
+```bash
+# Verify Redis is running
+redis-cli ping
+# Should return: PONG
 ```
+
+**Installation Options:**
+- **Docker**: `docker run -d -p 6379:6379 --name redis redis:7-alpine`
+- **Local**: Follow [Redis Installation Guide](https://redis.io/download)
+
+#### Apache Kafka (Required for Event Processing)
+
+For stream processing testing, you'll need Kafka:
+
+```bash
+# Verify Kafka is running (if installed)
+kafka-topics.sh --version
+```
+
+**Installation Options:**
+- **Docker Compose**: Use [Confluent Platform](https://docs.confluent.io/platform/current/quickstart/ce-docker-quickstart.html)
+- **Local**: Follow [Apache Kafka Quickstart](https://kafka.apache.org/quickstart)
 
 ## Optional Dependencies
 
-While not strictly required for building the core libraries, these services enhance the development experience:
+### IDE Recommendations
 
-### Database Services (for integration testing)
+| IDE | Plugins/Extensions |
+|-----|-------------------|
+| **IntelliJ IDEA** | Lombok Plugin, Spring Boot Plugin |
+| **VS Code** | Extension Pack for Java, Spring Boot Extension Pack |
+| **Eclipse** | Spring Tool Suite, Lombok Plugin |
 
-**MongoDB** - Primary data store
+### Docker & Docker Compose
+
+For containerized development and testing:
+
 ```bash
-# Docker (recommended for development)
-docker run -d --name mongodb -p 27017:27017 mongo:7
-
-# macOS
-brew install mongodb-community
-
-# Ubuntu/Debian
-sudo apt install mongodb-org
+# Verify Docker installation
+docker --version
+docker-compose --version
 ```
 
-**Redis** - Caching layer
+**Installation:**
+- **Linux**: Follow [Docker Engine Installation](https://docs.docker.com/engine/install/)
+- **macOS/Windows**: [Docker Desktop](https://www.docker.com/products/docker-desktop)
+
+### Node.js & npm (For Frontend Components)
+
+Some development tools require Node.js:
+
 ```bash
-# Docker
-docker run -d --name redis -p 6379:6379 redis:7
-
-# macOS  
-brew install redis
-
-# Ubuntu/Debian
-sudo apt install redis-server
+# Verify Node.js version
+node --version
+npm --version
 ```
 
-### Messaging & Streaming (for full platform testing)
+**Recommended Version**: Node.js 18+ LTS
 
-**Apache Kafka** - Event streaming
+## Environment Variables
+
+Set these environment variables for development:
+
+### Required
+
 ```bash
-# Docker Compose (recommended)
-# Creates Kafka + Zookeeper
-docker-compose up kafka zookeeper
+# Database connections
+export MONGODB_URI="mongodb://localhost:27017/openframe-dev"
+export REDIS_URL="redis://localhost:6379"
+
+# Security
+export JWT_SECRET_KEY="your-jwt-secret-key-here"
+export ENCRYPTION_SECRET_KEY="your-encryption-secret-here"
+
+# Kafka (if using event processing)
+export KAFKA_BOOTSTRAP_SERVERS="localhost:9092"
 ```
 
-**NATS** - Client messaging
-```bash
-# Docker
-docker run -d --name nats -p 4222:4222 nats:latest
+### Optional
 
-# Binary install
-# Download from https://nats.io/download/
+```bash
+# External service integrations
+export FLEET_MDM_API_URL="https://your-fleet-instance.com"
+export TACTICAL_RMM_API_URL="https://your-tactical-instance.com"
+
+# Email notifications (if testing notification features)
+export SMTP_HOST="smtp.gmail.com"
+export SMTP_PORT="587"
+export SMTP_USERNAME="your-email@gmail.com"
+export SMTP_PASSWORD="your-app-password"
 ```
 
-## Verification Checklist
+## Network Requirements
 
-Run these commands to verify your development environment:
+### Ports
 
+Ensure these ports are available for local development:
+
+| Port | Service | Purpose |
+|------|---------|---------|
+| **8080** | API Service | Main application server |
+| **8081** | Gateway Service | API Gateway |
+| **8082** | Authorization Service | OAuth2/OIDC server |
+| **27017** | MongoDB | Database |
+| **6379** | Redis | Cache |
+| **9092** | Kafka | Message streaming |
+| **2181** | Zookeeper | Kafka coordination |
+
+### Internet Access
+
+Required for:
+- Maven dependency downloads
+- Docker image pulls
+- External API integrations (optional)
+
+## Verification Commands
+
+Run these commands to verify your environment is ready:
+
+### Java & Maven
 ```bash
-# 1. Java version
+# Check Java version
 java -version
-# ✅ Should show Java 21
 
-# 2. Maven version  
-mvn --version
-# ✅ Should show Maven 3.8+ with Java 21
+# Check Maven version
+mvn -version
 
-# 3. Git access
-git --version
-# ✅ Should show Git version
-
-# 4. Memory check
-free -h  # Linux/macOS
-# ✅ Should show 8GB+ available RAM
-
-# 5. Disk space
-df -h
-# ✅ Should show 10GB+ free space
+# Test Maven compilation
+mvn clean compile
 ```
 
-## Network & Access Requirements
-
-### GitHub Access
-
-Ensure you can access the repository:
-
+### Database Connectivity
 ```bash
-# Test GitHub connectivity
-curl -I https://github.com
+# Test MongoDB connection
+mongosh --eval "db.adminCommand('ping')"
 
-# Clone test (if you have access)
+# Test Redis connection
+redis-cli ping
+```
+
+### Build System
+```bash
+# Clone the repository (if not done already)
 git clone https://github.com/flamingo-stack/openframe-oss-lib.git
+cd openframe-oss-lib
+
+# Run tests to verify environment
+mvn clean test -Dtest=*Test
 ```
-
-### Maven Dependencies
-
-The project uses GitHub Packages for artifact distribution. No special configuration is needed for public access, but verify your network allows Maven Central and GitHub Packages:
-
-```bash
-# Test Maven Central access
-curl -I https://repo1.maven.org/maven2/
-
-# Test GitHub Packages access  
-curl -I https://maven.pkg.github.com/
-```
-
-## IDE-Specific Configuration
-
-### IntelliJ IDEA
-
-1. **Project Import**:
-   - File → Open → Select root `pom.xml`
-   - Import as Maven project
-   - Enable auto-import for Maven changes
-
-2. **Lombok Setup**:
-   - Install Lombok plugin (if not bundled)
-   - Enable annotation processing: Settings → Build → Compiler → Annotation Processors
-
-3. **Code Style**:
-   - Import Spring Java code style (optional)
-   - Configure line length to 120 characters
-
-### Eclipse/STS
-
-1. **Project Import**:
-   - File → Import → Existing Maven Projects
-   - Select root directory
-
-2. **Lombok Setup**:
-   - Download lombok.jar from projectlombok.org
-   - Run: `java -jar lombok.jar`
-   - Install in Eclipse installation
-
-## Next Steps
-
-With your environment set up, you're ready to:
-
-1. **[Quick Start](quick-start.md)** - Build and run the project
-2. **[First Steps](first-steps.md)** - Explore the architecture
-3. **[Development Guide](../development/setup/local-development.md)** - Dive deeper into development
 
 ## Troubleshooting
 
-**Common Issues:**
+### Common Issues
 
-- **OutOfMemoryError during build**: Increase `MAVEN_OPTS="-Xmx4096m"`
-- **Java version conflicts**: Ensure `JAVA_HOME` points to JDK 21
-- **Lombok not working**: Install IDE plugin and enable annotation processing
-- **Maven download failures**: Check network connectivity and proxy settings
+#### Java Version Mismatch
+```bash
+# If multiple Java versions are installed, set JAVA_HOME explicitly
+export JAVA_HOME=/path/to/java-21
+export PATH=$JAVA_HOME/bin:$PATH
+```
 
-For more help, join our [OpenMSP Community Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA).
+#### MongoDB Connection Issues
+```bash
+# Check if MongoDB is running
+sudo systemctl status mongod
+
+# Start MongoDB if not running
+sudo systemctl start mongod
+```
+
+#### Maven Dependency Issues
+```bash
+# Clear Maven cache and reinstall dependencies
+rm -rf ~/.m2/repository
+mvn clean install -U
+```
+
+#### Port Conflicts
+```bash
+# Find what's using a port
+lsof -i :8080
+
+# Kill process using port (replace PID)
+kill -9 <PID>
+```
+
+## Getting Help
+
+If you encounter issues during setup:
+
+1. **Join the Community**: [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
+2. **Check Documentation**: Review the [development setup guide](../development/setup/local-development.md)
+3. **Verify Dependencies**: Ensure all required software versions match the specifications above
+
+---
+
+**Environment Ready?** Continue with the [Quick Start Guide](quick-start.md) to get OpenFrame OSS Lib running locally.

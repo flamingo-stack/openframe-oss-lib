@@ -1,5 +1,12 @@
-flowchart LR
-    Service["Service Method"] -->|"@Cacheable"| CacheAbstraction["Spring Cache"]
-    CacheAbstraction --> CacheManagerNode["RedisCacheManager"]
-    CacheManagerNode --> Prefix["Key Prefix Computation"]
-    Prefix --> Redis[("Redis")]
+flowchart TD
+    RedisConfig["RedisConfig"] --> RedisTemplate["RedisTemplate<String,String>"]
+    RedisConfig --> ReactiveTemplate["ReactiveRedisTemplate<String,String>"]
+
+    CacheConfig["CacheConfig"] --> CacheManager["RedisCacheManager"]
+    CacheConfig --> KeyBuilder["OpenframeRedisKeyBuilder"]
+
+    KeyConfig["OpenframeRedisKeyConfiguration"] --> KeyBuilder
+
+    CacheManager --> RedisConnection["RedisConnectionFactory"]
+    RedisTemplate --> RedisConnection
+    ReactiveTemplate --> ReactiveConnection["ReactiveRedisConnectionFactory"]

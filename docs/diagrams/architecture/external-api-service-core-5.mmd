@@ -1,5 +1,9 @@
 flowchart TD
-    QueryParams --> FilterCriteria
-    FilterCriteria --> Mapper
-    Mapper --> InternalFilterOptions
-    InternalFilterOptions --> ServiceLayer
+    Client -->|"/tools/{toolId}/..."| IntegrationController
+    IntegrationController --> RestProxyService
+    RestProxyService --> IntegratedToolRepository
+    RestProxyService --> ToolUrlService
+    RestProxyService --> ProxyUrlResolver
+    RestProxyService --> ExternalTool["External Tool API"]
+    ExternalTool --> RestProxyService
+    RestProxyService --> Client

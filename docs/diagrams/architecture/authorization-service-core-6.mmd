@@ -1,7 +1,11 @@
-flowchart TD
-    User["New User"] --> Start["/oauth/register/sso"]
-    Start --> Cookie["Set of_sso_reg Cookie"]
-    Cookie --> IdP["Redirect to IdP"]
-    IdP --> Success["OIDC Success"]
-    Success --> Handler["TenantRegSsoHandler"]
-    Handler --> TenantCreated["Tenant + Admin User Created"]
+sequenceDiagram
+    participant User
+    participant AuthServer as Authorization Service
+    participant IdP as OIDC Provider
+
+    User->>AuthServer: GET /oauth2/authorization/google
+    AuthServer->>IdP: Redirect to Provider
+    IdP->>AuthServer: ID Token + Code
+    AuthServer->>AuthServer: Validate JWT
+    AuthServer->>AuthServer: Auto-provision if enabled
+    AuthServer->>User: Authenticated Session

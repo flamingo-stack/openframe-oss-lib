@@ -1,4 +1,8 @@
 flowchart TD
-    StreamsConfig["KafkaStreamsConfig"] --> ActivitySerde["ActivityMessage Serde"]
-    StreamsConfig --> HostSerde["HostActivityMessage Serde"]
-    StreamsConfig --> AppId["Application ID Builder"]
+    A["Kafka Message"] --> B["JsonKafkaListener"]
+    B --> C["GenericJsonMessageProcessor"]
+    C --> D["IntegratedToolEventDeserializer"]
+    D --> E["DeserializedDebeziumMessage"]
+    E --> F["EventTypeMapper"]
+    F --> G["IntegratedToolDataEnrichmentService"]
+    G --> H["DebeziumMessageHandler"]

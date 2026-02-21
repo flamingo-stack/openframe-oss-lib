@@ -1,13 +1,5 @@
-flowchart TD
-    MongoSave["Mongo Repository Save"] --> Aspect["MachineTagEventAspect"]
-    Aspect --> KafkaPublish["Publish MachinePinotMessage"]
-    KafkaPublish --> KafkaCluster["Kafka"]
-
-    KafkaCluster --> StreamCore["Stream Processing Core"]
-    StreamCore --> UnifiedEvent["UnifiedLogEvent"]
-    UnifiedEvent --> CassandraStore["Cassandra"]
-
-    StreamCore --> OutboundKafka["Outbound IntegratedToolEvent"]
-
-    ApiQuery["API Query"] --> PinotRepo["PinotClientLogRepository"]
-    PinotRepo --> PinotDB["Pinot"]
+flowchart LR
+    ToolEvents["Integrated Tool Events"] --> Kafka
+    Kafka --> StreamCore["Stream Processing Core"]
+    StreamCore --> UnifiedEvents["Unified Events Topic"]
+    StreamCore --> CassandraLogs["Cassandra Logs"]

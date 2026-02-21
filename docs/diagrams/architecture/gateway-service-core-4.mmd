@@ -1,10 +1,9 @@
 flowchart TD
-    ClientWS["WebSocket Client"] --> GatewayWS["Gateway WebSocket Route"]
-
-    GatewayWS --> ApiFilter["ToolApiWebSocketProxyUrlFilter"]
-    GatewayWS --> AgentFilter["ToolAgentWebSocketProxyUrlFilter"]
-
-    ApiFilter --> ToolApi["Tool API WS Endpoint"]
-    AgentFilter --> ToolAgent["Tool Agent WS Endpoint"]
-
-    GatewayWS --> NatsRoute["NATS WS Route"]
+    ExtReq["/external-api/** Request"] --> CheckKey{{"API Key Present?"}}
+    CheckKey -->|No| Unauthorized["401 Response"]
+    CheckKey -->|Yes| Validate["Validate API Key"]
+    Validate -->|Invalid| Unauthorized
+    Validate -->|Valid| RateCheck["RateLimitService.isAllowed()"]
+    RateCheck -->|No| TooMany["429 Too Many Requests"]
+    RateCheck -->|Yes| AddHeaders["Add User Context & Rate Headers"]
+    AddHeaders --> Forward["Forward to External API Service"]

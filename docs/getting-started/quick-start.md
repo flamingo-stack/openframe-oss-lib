@@ -1,292 +1,301 @@
 # Quick Start
 
-Get OpenFrame OSS Lib up and running in 5 minutes! This guide covers the essentials to build and explore the libraries.
+Get OpenFrame OSS Lib running locally in 5 minutes with this streamlined setup guide.
 
-[![OpenFrame v0.3.7 - Enhanced Developer Experience](https://img.youtube.com/vi/O8hbBO5Mym8/maxresdefault.jpg)](https://www.youtube.com/watch?v=O8hbBO5Mym8)
+## Prerequisites Check
 
-## TL;DR - 5-Minute Setup
+Before starting, ensure you have:
+- ✅ Java 21 installed
+- ✅ Maven 3.8+ installed
+- ✅ Git installed
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/flamingo-stack/openframe-oss-lib.git
-cd openframe-oss-lib
-
-# 2. Build all modules
-mvn clean install
-
-# 3. Explore the modules
-ls -la */
-
-# 4. Run tests (optional)
-mvn test
+# Quick verification
+java -version && mvn -version && git --version
 ```
 
-That's it! You now have all OpenFrame OSS Lib modules built and available in your local Maven repository.
+If any command fails, see the [Prerequisites Guide](prerequisites.md) for installation instructions.
 
-## Step-by-Step Guide
-
-### 1. Clone the Repository
+## 1. Clone the Repository
 
 ```bash
+# Clone the OpenFrame OSS Lib repository
 git clone https://github.com/flamingo-stack/openframe-oss-lib.git
 cd openframe-oss-lib
 ```
 
-**What you'll see:**
+## 2. Build the Project
+
+```bash
+# Clean and build all modules
+mvn clean install -DskipTests
+
+# This will:
+# - Download all Maven dependencies
+# - Compile all 15 core modules
+# - Create JAR artifacts
+# - Skip tests for faster initial setup
+```
+
+**Expected Output:**
+```text
+[INFO] Reactor Summary for OpenFrame OSS Libraries 5.30.0:
+[INFO] 
+[INFO] OpenFrame OSS Libraries ........................ SUCCESS
+[INFO] openframe-core ................................. SUCCESS
+[INFO] openframe-data-mongo ........................... SUCCESS
+[INFO] openframe-data-redis ........................... SUCCESS
+[INFO] openframe-notification-mail .................... SUCCESS
+[INFO] openframe-data-kafka ........................... SUCCESS
+[INFO] openframe-api-lib .............................. SUCCESS
+[INFO] openframe-data ................................. SUCCESS
+[INFO] openframe-security-core ........................ SUCCESS
+[INFO] openframe-authorization-service-core ........... SUCCESS
+[INFO] openframe-client-core .......................... SUCCESS
+[INFO] openframe-api-service-core ..................... SUCCESS
+[INFO] openframe-management-service-core .............. SUCCESS
+[INFO] sdk : fleetmdm ................................. SUCCESS
+[INFO] sdk : tacticalrmm .............................. SUCCESS
+[INFO] openframe-security-oauth ....................... SUCCESS
+[INFO] openframe-idp-configuration .................... SUCCESS
+[INFO] openframe-config-core .......................... SUCCESS
+[INFO] openframe-external-api-service-core ............ SUCCESS
+[INFO] openframe-stream-service-core .................. SUCCESS
+[INFO] openframe-gateway-service-core ................. SUCCESS
+[INFO] openframe-test-service-core .................... SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+```
+
+## 3. Set Up Basic Dependencies (Docker)
+
+For a quick start, use Docker to run required services:
+
+```bash
+# Create a docker-compose.yml for development
+cat > docker-compose.yml << EOF
+version: '3.8'
+services:
+  mongodb:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=openframe-dev
+    volumes:
+      - mongodb_data:/data/db
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  mongodb_data:
+  redis_data:
+EOF
+
+# Start the services
+docker-compose up -d
+
+# Verify services are running
+docker-compose ps
+```
+
+## 4. Run Basic Tests
+
+```bash
+# Run unit tests to verify the build
+mvn test -Dtest=*Test -DfailIfNoTests=false
+
+# Run specific core module tests
+mvn test -pl openframe-core -Dtest=*Test
+```
+
+## 5. Explore the Module Structure
+
+```bash
+# List all modules
+ls -la
+
+# Explore a core module structure
+tree openframe-core/src/main/java/com/openframe/core -I '*.class'
+```
+
+**Module Overview:**
 
 ```text
 openframe-oss-lib/
-├── openframe-api-lib/                    # API contracts & DTOs
-├── openframe-api-service-core/           # Internal REST & GraphQL APIs  
+├── openframe-core/                 # Core utilities and validation
+├── openframe-data-mongo/           # MongoDB data layer
+├── openframe-data-redis/           # Redis caching layer
+├── openframe-security-core/        # Security and JWT utilities
+├── openframe-api-lib/              # Shared API contracts and DTOs
+├── openframe-api-service-core/     # GraphQL and REST API server
 ├── openframe-authorization-service-core/ # OAuth2 authorization server
-├── openframe-client-core/                # Agent lifecycle management
-├── openframe-core/                       # Shared utilities
-├── openframe-data/                       # Analytics & streaming data
-├── openframe-data-kafka/                 # Kafka event foundation
-├── openframe-data-mongo/                 # MongoDB domain & repos
-├── openframe-data-redis/                 # Redis caching layer
-├── openframe-external-api-service-core/  # Public REST APIs
-├── openframe-gateway-service-core/       # API gateway & routing
-├── openframe-management-service-core/    # Platform operations
-├── openframe-security-core/              # JWT & security utilities
-├── openframe-security-oauth/             # OAuth BFF
-├── openframe-stream-service-core/        # Real-time event processing
-├── openframe-test-service-core/          # Integration testing
-├── sdk/                                  # External tool integrations
-├── pom.xml                              # Parent POM
-└── README.md
+├── openframe-client-core/          # Agent lifecycle management
+├── openframe-gateway-service-core/ # API Gateway (Spring Cloud)
+└── ... (additional specialized modules)
 ```
 
-### 2. Build the Project
+## 6. Verify Integration Points
 
-Build all modules with a single command:
+### Test Database Connectivity
 
 ```bash
-mvn clean install
+# Test MongoDB connection
+docker exec -it $(docker-compose ps -q mongodb) mongosh openframe-dev --eval "db.adminCommand('ping')"
+
+# Test Redis connection  
+docker exec -it $(docker-compose ps -q redis) redis-cli ping
 ```
 
-**Expected output:**
-
-```text
-[INFO] Scanning for projects...
-[INFO] ------------------------------------------------------------------------
-[INFO] Reactor Build Order:
-[INFO] 
-[INFO] OpenFrame OSS Libraries                                            [pom]
-[INFO] openframe-core                                                     [jar]
-[INFO] openframe-data-mongo                                               [jar]
-[INFO] openframe-data-redis                                               [jar]
-[INFO] ... (more modules)
-[INFO] 
-[INFO] ------------------------------------------------------------------------
-[INFO] BUILD SUCCESS
-[INFO] ------------------------------------------------------------------------
-[INFO] Total time: 2-4 minutes (depending on your machine)
-```
-
-> **Note**: The first build will take longer as Maven downloads all dependencies. Subsequent builds are much faster.
-
-### 3. Verify the Build
-
-Check that all modules compiled successfully:
+### Inspect Generated JARs
 
 ```bash
-# Check build artifacts
-find . -name "*.jar" -path "*/target/*" | head -10
-
-# Verify main modules exist
-ls */target/*.jar
+# List generated artifacts
+find . -name "*.jar" -type f | grep -E "(openframe|fleetmdm|tacticalrmm)" | head -10
 ```
 
-**Expected output:**
-
-```text
-./openframe-core/target/openframe-core-5.30.0.jar
-./openframe-data-mongo/target/openframe-data-mongo-5.30.0.jar
-./openframe-api-lib/target/openframe-api-lib-5.30.0.jar
-... (more JARs)
-```
-
-### 4. Run Tests (Optional)
-
-Execute the test suite to ensure everything works:
+## 7. Run a Simple Integration Test
 
 ```bash
-# Run all tests
-mvn test
-
-# Or run tests for a specific module
+# Test the core module functionality
 cd openframe-core
-mvn test
+mvn test -Dtest=*ValidationTest
+
+# Test MongoDB integration
+cd ../openframe-data-mongo
+mvn test -Dtest=*RepositoryTest -DfailIfNoTests=false
 ```
 
-## Exploring the Modules
+## Hello World Example
 
-### Core Library Structure
-
-The project follows a layered architecture. Here are the key modules to explore:
-
-```mermaid
-flowchart TD
-    Core["`**openframe-core**
-    Shared utilities`"]
-    
-    Data["`**openframe-data-mongo**  
-    Domain models`"]
-    
-    API["`**openframe-api-lib**
-    API contracts`"] 
-    
-    Security["`**openframe-security-core**
-    JWT & auth utilities`"]
-    
-    Gateway["`**openframe-gateway-service-core**
-    API gateway`"]
-    
-    Core --> Data
-    Core --> Security
-    Data --> API
-    Security --> Gateway
-    API --> Gateway
-```
-
-### Examine Module Contents
+Create a simple test to verify the libraries are working:
 
 ```bash
-# Core utilities and shared components
-ls openframe-core/src/main/java/com/openframe/core/
+# Create a test directory
+mkdir -p hello-openframe/src/main/java/com/example
+cd hello-openframe
 
-# MongoDB domain models and repositories  
-ls openframe-data-mongo/src/main/java/com/openframe/data/document/
+# Create a simple Maven project
+cat > pom.xml << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    
+    <groupId>com.example</groupId>
+    <artifactId>hello-openframe</artifactId>
+    <version>1.0.0</version>
+    
+    <properties>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+    </properties>
+    
+    <dependencies>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-core</artifactId>
+            <version>5.30.0</version>
+        </dependency>
+    </dependencies>
+</project>
+EOF
 
-# API contracts and DTOs
-ls openframe-api-lib/src/main/java/com/openframe/api/dto/
+# Create a simple Java class
+cat > src/main/java/com/example/HelloOpenFrame.java << EOF
+package com.example;
 
-# Security configuration
-ls openframe-security-core/src/main/java/com/openframe/security/
+import com.openframe.core.util.SlugUtil;
+
+public class HelloOpenFrame {
+    public static void main(String[] args) {
+        System.out.println("Hello OpenFrame OSS Lib!");
+        
+        // Use a core utility
+        String slug = SlugUtil.createSlug("Hello OpenFrame World!");
+        System.out.println("Generated slug: " + slug);
+        
+        System.out.println("🎉 OpenFrame OSS Lib is working correctly!");
+    }
+}
+EOF
+
+# Build and run
+mvn clean compile exec:java -Dexec.mainClass="com.example.HelloOpenFrame"
 ```
 
-## Understanding the Build
-
-### Maven Reactor
-
-OpenFrame OSS Lib uses Maven's multi-module reactor build. The parent POM (`pom.xml`) defines:
-
-- **Shared properties**: Java 21, Spring Boot 3.3.0, library versions
-- **Module ordering**: Ensures dependencies build before dependents  
-- **Common dependencies**: Lombok, Spring Boot, testing frameworks
-- **Build plugins**: Source generation, flattening for CI/CD
-
-### Key Dependencies
-
-The project uses these major dependencies:
-
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| **Spring Boot** | 3.3.0 | Application framework |
-| **Java** | 21 | Runtime platform |
-| **Spring Cloud** | 2023.0.3 | Gateway and service discovery |
-| **Spring Data MongoDB** | 4.2.0 | Database integration |
-| **JJWT** | 0.11.5 | JWT processing |
-| **Apache Pinot** | 1.2.0 | Analytics database |
-| **NATS** | 0.6.2+3.5 | Messaging system |
-
-## Quick Architecture Tour
-
-### 1. Core Utilities (`openframe-core`)
-
-```bash
-# Explore shared utilities
-find openframe-core/src -name "*.java" | head -5
+**Expected Output:**
+```text
+Hello OpenFrame OSS Lib!
+Generated slug: hello-openframe-world
+🎉 OpenFrame OSS Lib is working correctly!
 ```
-
-**Purpose**: Validation, error handling, encryption, pagination utilities used across all modules.
-
-### 2. Data Layer (`openframe-data-mongo`)
-
-```bash  
-# Check domain documents
-ls openframe-data-mongo/src/main/java/com/openframe/data/document/
-```
-
-**Purpose**: MongoDB entities like User, Organization, Device, OAuth clients with repositories.
-
-### 3. API Contracts (`openframe-api-lib`)
-
-```bash
-# Browse API DTOs  
-ls openframe-api-lib/src/main/java/com/openframe/api/dto/
-```
-
-**Purpose**: Request/response DTOs, filters, and mappers that define API contracts.
-
-### 4. Security (`openframe-security-core`)
-
-```bash
-# Security components
-ls openframe-security-core/src/main/java/com/openframe/security/
-```
-
-**Purpose**: JWT handling, authentication utilities, PKCE support for OAuth2.
 
 ## Next Steps
 
-Congratulations! You've successfully built OpenFrame OSS Lib. Here's what to explore next:
+Congratulations! You've successfully:
 
-### Immediate Next Steps
+✅ Built all 15 OpenFrame OSS Lib modules  
+✅ Set up development dependencies  
+✅ Verified the integration works  
+✅ Created a simple "Hello World" example  
 
-1. **[First Steps Guide](first-steps.md)** - Learn key concepts and explore features
-2. **[Local Development Setup](../development/setup/local-development.md)** - Set up a full development environment
+### Explore Further
+
+1. **[First Steps Guide](first-steps.md)** - Learn about key features and capabilities
+2. **[Development Setup](../development/setup/local-development.md)** - Set up for advanced development
 3. **[Architecture Overview](../development/architecture/README.md)** - Understand the system design
 
-### Deep Dives
+### Watch the Platform Demo
 
-- **API Development**: Start with `openframe-api-service-core` REST controllers
-- **Security**: Explore OAuth2 flows in `openframe-authorization-service-core`  
-- **Data Integration**: Study MongoDB repositories in `openframe-data-mongo`
-- **Gateway Configuration**: Review routing in `openframe-gateway-service-core`
-
-### Sample Integration
-
-Try building a simple application using the libraries:
-
-```bash
-# Create a new Spring Boot project
-# Add openframe-api-lib as a dependency  
-# Explore the DTOs and services available
-```
+[![OpenFrame: 5-Minute MSP Platform Walkthrough - Cut Vendor Costs & Automate Ops](https://img.youtube.com/vi/er-z6IUnAps/maxresdefault.jpg)](https://www.youtube.com/watch?v=er-z6IUnAps)
 
 ## Troubleshooting
 
 ### Build Failures
 
-**OutOfMemoryError:**
 ```bash
-export MAVEN_OPTS="-Xmx4096m -XX:MaxPermSize=512m"
-mvn clean install
+# Clear Maven cache and rebuild
+rm -rf ~/.m2/repository/com/openframe
+mvn clean install -U
 ```
 
-**Compilation Errors:**
-- Ensure Java 21 is active: `java -version`
-- Clear Maven cache: `rm -rf ~/.m2/repository`
-- Rebuild: `mvn clean install`
+### Docker Issues
 
-**Test Failures:**
-```bash  
-# Skip tests if needed for initial exploration
-mvn clean install -DskipTests
+```bash
+# Reset Docker environment
+docker-compose down -v
+docker-compose up -d
+
+# Check container logs
+docker-compose logs mongodb
+docker-compose logs redis
 ```
 
-### Common Issues
+### Java Version Issues
 
-- **Lombok not working**: Install IDE plugin and enable annotation processing
-- **Module not found**: Check module names match directory structure
-- **Version conflicts**: The parent POM manages all versions centrally
+```bash
+# Ensure Java 21 is active
+export JAVA_HOME=/path/to/java-21
+export PATH=$JAVA_HOME/bin:$PATH
+
+# Verify
+java -version
+```
 
 ## Getting Help
 
-- **OpenMSP Community**: [Join our Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
-- **Documentation Issues**: Check the generated documentation in each module
-- **Build Problems**: Review Maven output for specific error details
+- **Community**: [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
+- **Documentation**: Continue with [First Steps](first-steps.md)
+- **Full Setup**: See [Development Environment Setup](../development/setup/environment.md)
 
-You're now ready to dive deeper into OpenFrame OSS Lib development!
+---
+
+**Ready to dive deeper?** Continue with the [First Steps Guide](first-steps.md) to explore OpenFrame OSS Lib's key features!

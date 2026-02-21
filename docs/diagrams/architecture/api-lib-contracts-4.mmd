@@ -1,4 +1,5 @@
-flowchart LR
-    ClientFilters["Client Filter Request"] --> LogFilterOptions
-    LogFilterOptions --> QueryLayer["Repository Query"]
-    QueryLayer --> LogFilters
+flowchart TD
+    DeviceFiltersModel["DeviceFilters"] --> DeviceOption["DeviceFilterOption"]
+    DeviceFiltersModel --> TagOption["TagFilterOption"]
+    DeviceFilterOptionsModel["DeviceFilterOptions"] --> DeviceStatus
+    DeviceFilterOptionsModel --> DeviceType

@@ -1,345 +1,380 @@
 # First Steps
 
-Now that you've built OpenFrame OSS Lib, let's explore the key concepts and features that make this library suite powerful for MSP platform development.
+Now that you have OpenFrame OSS Lib built and running, let's explore its key features and understand how to work with this powerful platform foundation.
 
-## Your First 5 Actions
+## 1. Understanding the Module Architecture
 
-### 1. Understand the Module Architecture
+OpenFrame OSS Lib is designed around 15 specialized modules. Let's explore the most important ones:
 
-OpenFrame OSS Lib organizes functionality into focused, single-responsibility modules:
-
-```mermaid
-flowchart LR
-    subgraph "Entry Points"
-        Gateway["Gateway Service"]
-        Auth["Authorization Service"] 
-    end
-    
-    subgraph "API Layer"
-        Internal["API Service Core"]
-        External["External API Service"]
-        Contracts["API Lib Contracts"]
-    end
-    
-    subgraph "Core Services"
-        Client["Client Service"]
-        Management["Management Service"]
-        Stream["Stream Service"]
-    end
-    
-    subgraph "Foundation"
-        DataMongo["Data Mongo"]
-        DataRedis["Data Redis"] 
-        DataKafka["Data Kafka"]
-        Security["Security Core"]
-        Core["Core Utils"]
-    end
-    
-    Gateway --> Internal
-    Gateway --> External
-    Auth --> Internal
-    Internal --> Contracts
-    External --> Contracts
-    Client --> DataMongo
-    Internal --> DataMongo
-    Internal --> DataRedis
-    Stream --> DataKafka
-```
-
-**Key Insight**: Each module has a specific purpose and clean interfaces. You can use individual modules or the complete stack.
-
-### 2. Explore the Core Domain Models
-
-The heart of the platform lies in its domain models. Let's examine the key entities:
+### Core Infrastructure Modules
 
 ```bash
-# Navigate to the data models
-cd openframe-data-mongo/src/main/java/com/openframe/data/document/
+# Explore the core utilities
+ls openframe-core/src/main/java/com/openframe/core/
 
-# Check available domain entities
-ls -la
+# Key utilities you'll find:
+# - SlugUtil: URL-safe string generation
+# - EncryptionService: Data encryption/decryption
+# - TenantDomainValidator: Multi-tenant validation
+# - ErrorResponse: Standardized error handling
 ```
 
-**Core Domain Concepts:**
-
-| Entity | Purpose | Location |
-|--------|---------|----------|
-| **Tenant** | Multi-tenant organization isolation | `tenant/` |
-| **User** | Authentication and user management | `user/` |
-| **Device/Machine** | Managed endpoints and assets | `device/` |
-| **Organization** | Client/customer entities | `organization/` |
-| **Tool Connection** | Integration with external MSP tools | `tool/` |
-| **Event/Log** | Audit trail and monitoring data | `event/` |
-
-**Example: Understanding the Device Model**
+### Data Layer Modules
 
 ```bash
-# Look at the Device document structure
-cat openframe-data-mongo/src/main/java/com/openframe/data/document/device/Device.java
+# MongoDB data models and repositories
+find openframe-data-mongo/src/main/java -name "*.java" | grep -E "(document|repository)" | head -5
+
+# Redis caching infrastructure
+ls openframe-data-redis/src/main/java/com/openframe/data/
+
+# Kafka event streaming
+ls openframe-data-kafka/src/main/java/com/openframe/kafka/
 ```
 
-### 3. Discover API Contracts
-
-The API contracts define how services communicate. This is crucial for understanding integration patterns:
+### API and Security Modules
 
 ```bash
-# Explore API DTOs
-cd openframe-api-lib/src/main/java/com/openframe/api/dto/
+# API contracts and DTOs
+ls openframe-api-lib/src/main/java/com/openframe/api/dto/
 
-# Check device-related APIs
-ls device/
-
-# Look at filter patterns  
-ls */filter/
-```
-
-**API Design Patterns:**
-
-- **Request/Response DTOs**: Clean separation between internal domain and API contracts
-- **Filter Objects**: Sophisticated querying capabilities for each domain
-- **Pagination Support**: Cursor-based pagination for scalability
-- **Mapper Interfaces**: Automated conversion between domain and API models
-
-**Example: Device API Pattern**
-
-```bash
-# See how device filtering works
-find . -name "*Device*" -type f | head -5
-```
-
-### 4. Examine Security Architecture
-
-OpenFrame implements a comprehensive security model. Let's understand the key components:
-
-```bash
-# Security core components
+# Security and JWT handling  
 ls openframe-security-core/src/main/java/com/openframe/security/
 
 # OAuth2 authorization server
 ls openframe-authorization-service-core/src/main/java/com/openframe/authz/
 ```
 
-**Security Concepts:**
+## 2. Explore Multi-Tenant Data Models
 
-1. **Multi-tenant OAuth2**: Each tenant has isolated authentication
-2. **JWT-based sessions**: Stateless authentication across services  
-3. **API Key support**: For external service integrations
-4. **Role-based access**: Fine-grained permission model
-5. **SSO Integration**: Google, Microsoft, and custom OIDC providers
+OpenFrame is built for multi-tenancy from the ground up. Let's examine some key data models:
 
-**Key Files to Explore:**
+### Organization Model
 
 ```bash
-# JWT configuration
-find . -name "*Jwt*" -type f
-
-# OAuth2 flows  
-find . -name "*OAuth*" -type f
-
-# Authentication principals
-find . -name "*Auth*Principal*" -type f
+# View the Organization document structure
+cat openframe-data-mongo/src/main/java/com/openframe/data/document/organization/Organization.java | head -30
 ```
 
-### 5. Run Your First Integration Test
+Organizations represent **tenants** in the system. Each organization has:
+- Contact information and addresses
+- Associated users and devices  
+- Tool integrations and configurations
+- Isolated data and security context
 
-Let's see the platform in action with the included test suite:
+### Device/Machine Model
 
 ```bash
-# Navigate to test module
-cd openframe-test-service-core/
-
-# Look at available test scenarios
-ls src/main/java/com/openframe/test/tests/
-
-# Run a specific test category
-mvn test -Dtest="*Device*"
+# Explore device management
+cat openframe-data-mongo/src/main/java/com/openframe/data/document/device/Machine.java | head -30
 ```
 
-**Test Categories Available:**
+Machines represent **managed endpoints** like:
+- Servers, workstations, and mobile devices
+- Associated with organizations (tenants)
+- Tracked via multiple tool integrations
+- Status, health, and compliance monitoring
 
-- **Authentication Tests**: OAuth2 flows and JWT validation
-- **Device Tests**: Device management and agent lifecycle
-- **Organization Tests**: Multi-tenant organization management  
-- **User Tests**: User registration and invitation flows
-- **Integration Tests**: End-to-end API workflows
+### Tool Integration Model
 
-## Key Concepts Deep Dive
-
-### Multi-Tenancy
-
-OpenFrame is built for multi-tenant SaaS from the ground up:
-
-```mermaid
-flowchart TD
-    Request["`**Incoming Request**`"]
-    
-    subgraph Tenant_Resolution["Tenant Resolution"]
-        Domain["`**Domain/Subdomain**
-        tenant1.app.com`"]
-        JWT["`**JWT Claims**  
-        tenant_id claim`"]
-        APIKey["`**API Key**
-        tenant-scoped`"]
-    end
-    
-    subgraph Data_Isolation["Data Isolation"]
-        MongoDB["`**MongoDB**
-        tenant_id field`"]
-        Redis["`**Redis**  
-        tenant: prefix`"]
-        Kafka["`**Kafka**
-        tenant-topics`"]
-    end
-    
-    Request --> Domain
-    Request --> JWT  
-    Request --> APIKey
-    
-    Domain --> MongoDB
-    JWT --> Redis
-    APIKey --> Kafka
+```bash
+# View integrated tool structure
+cat openframe-data-mongo/src/main/java/com/openframe/data/document/tool/IntegratedTool.java | head -20
 ```
 
-### Event-Driven Architecture
+Tools represent **external MSP platforms** like:
+- FleetDM for device management
+- TacticalRMM for remote monitoring
+- Custom integrations via SDK framework
 
-The platform processes massive amounts of device and log data through event streams:
+## 3. Working with the API Layer
+
+### Understanding GraphQL API Structure
+
+```bash
+# Explore GraphQL data fetchers
+ls openframe-api-service-core/src/main/java/com/openframe/api/datafetcher/
+
+# Key fetchers handle:
+# - DeviceDataFetcher: Device queries and filtering
+# - LogDataFetcher: Audit log retrieval  
+# - OrganizationDataFetcher: Tenant management
+# - EventDataFetcher: Event stream queries
+```
+
+### REST API Controllers
+
+```bash
+# Check REST controllers
+ls openframe-api-service-core/src/main/java/com/openframe/api/controller/
+
+# Controllers for:
+# - UserController: User management
+# - OrganizationController: Tenant operations
+# - ApiKeyController: Programmatic access
+# - SSOConfigController: Identity provider setup
+```
+
+### External API Integration
+
+```bash
+# Public-facing REST API
+ls openframe-external-api-service-core/src/main/java/com/openframe/external/controller/
+
+# External endpoints:
+# - DeviceController: /api/v1/devices
+# - EventController: /api/v1/events  
+# - LogController: /api/v1/logs
+# - OrganizationController: /api/v1/organizations
+```
+
+## 4. Security and Authentication Flow
+
+### Understanding JWT and OAuth2
+
+OpenFrame uses **asymmetric JWT (RS256)** for security:
+
+```bash
+# Explore JWT utilities
+ls openframe-security-core/src/main/java/com/openframe/security/jwt/
+
+# OAuth2 BFF (Backend for Frontend)
+ls openframe-security-oauth/src/main/java/com/openframe/security/oauth/
+
+# Authorization server
+ls openframe-authorization-service-core/src/main/java/com/openframe/authz/security/
+```
+
+### Key Security Concepts
+
+1. **Multi-tenant JWT validation** - Each tenant has separate RSA keys
+2. **API key rate limiting** - Programmatic access with usage tracking  
+3. **SSO integration** - Google, Microsoft OAuth2 providers
+4. **PKCE flow** - Secure authorization code exchange
+
+## 5. Event-Driven Architecture
+
+### Kafka Integration
+
+```bash
+# Kafka producers and consumers
+ls openframe-data-kafka/src/main/java/com/openframe/kafka/producer/
+
+# Event models
+ls openframe-data-kafka/src/main/java/com/openframe/kafka/model/
+```
+
+### Stream Processing
+
+```bash
+# Real-time event processing
+ls openframe-stream-service-core/src/main/java/com/openframe/stream/
+
+# Key components:
+# - Event deserializers for different tool formats
+# - Data enrichment services
+# - Unified event normalization
+# - Cassandra log persistence
+```
+
+### Event Flow Example
 
 ```mermaid
 sequenceDiagram
-    participant Agent as Device Agent
-    participant Client as Client Service  
+    participant Tool as External Tool
     participant Kafka as Kafka Stream
     participant Stream as Stream Processor
-    participant Analytics as Analytics DB
-    
-    Agent->>Client: Heartbeat/Logs
-    Client->>Kafka: Publish Event
-    Kafka->>Stream: Stream Processing
-    Stream->>Analytics: Store Aggregated Data
-    Analytics-->>Client: Query Results
+    participant Enrich as Enrichment Service
+    participant Store as Data Store
+
+    Tool->>Kafka: Tool-specific event
+    Kafka->>Stream: Raw event data
+    Stream->>Enrich: Normalize event format
+    Enrich->>Stream: Enriched unified event
+    Stream->>Store: Persist to Cassandra/Pinot
+    Stream->>Kafka: Publish unified event
 ```
 
-### Integration Patterns
+## 6. Agent Management System
 
-OpenFrame connects with existing MSP tools through standardized patterns:
+### Client Agent Core
 
 ```bash
-# Check available integrations
-ls sdk/
-# fleetmdm/  tacticalrmm/
-
-# Look at integration interfaces
+# Agent lifecycle management
 ls openframe-client-core/src/main/java/com/openframe/client/service/
+
+# Key capabilities:
+# - Agent registration and authentication
+# - Tool installation orchestration
+# - Heartbeat processing
+# - ID transformation between tools
 ```
 
-## Common Configuration Patterns
+### Agent Registration Flow
 
-### 1. Database Configuration
+```mermaid
+flowchart TD
+    Agent[Client Agent] --> Register[Agent Registration]
+    Register --> Validate[Validate Secret]
+    Validate --> Transform[Transform Tool IDs]
+    Transform --> OAuth[Issue OAuth Token]
+    OAuth --> Track[Track Installation]
+    Track --> Heartbeat[Start Heartbeat]
+```
 
-OpenFrame uses multiple databases optimally:
+## 7. Real-Time Analytics
 
-- **MongoDB**: Operational data (users, devices, configurations)
-- **Redis**: Caching and session storage  
-- **Cassandra**: Long-term log and event storage
-- **Pinot**: Real-time analytics and reporting
-
-### 2. Messaging Configuration  
-
-- **Kafka**: Event streaming between services
-- **NATS**: Agent communication and real-time updates
-
-### 3. Security Configuration
-
-- **JWT**: Stateless authentication
-- **OAuth2**: Authorization code flow with PKCE
-- **API Keys**: Service-to-service authentication
-
-## Development Workflows
-
-### Adding a New Domain Entity
-
-1. **Create MongoDB Document** in `openframe-data-mongo`
-2. **Add Repository Interface** with custom queries
-3. **Define API DTOs** in `openframe-api-lib`  
-4. **Create REST Endpoints** in `openframe-api-service-core`
-5. **Add GraphQL DataFetchers** for complex queries
-6. **Write Integration Tests** in `openframe-test-service-core`
-
-### Extending Tool Integrations
-
-1. **Create SDK Module** under `sdk/new-tool`
-2. **Define Client Interface** with tool-specific operations
-3. **Add Authentication Logic** for tool API access
-4. **Implement Data Mapping** between tool and OpenFrame models
-5. **Create Agent Transformer** in `openframe-client-core`
-
-### Building Custom Services
-
-1. **Extend Base Configuration** from `openframe-core`
-2. **Use Security Utilities** from `openframe-security-core`
-3. **Leverage Data Repositories** from `openframe-data-mongo`
-4. **Follow API Patterns** from existing service cores
-
-## Exploring Further
-
-### Documentation Resources
-
-Each module contains comprehensive documentation:
+### Apache Pinot Integration
 
 ```bash
-# Browse generated documentation for each module
-find . -name "*.md" -path "*/docs/*" | head -10
+# Pinot query builders and repositories
+ls openframe-data/src/main/java/com/openframe/data/repository/pinot/
 
-# Check inline code documentation
-find . -name "*.java" -exec grep -l "@Api\|@Service\|@Component" {} \; | head -5
+# Analytics capabilities:
+# - Real-time device metrics
+# - Log aggregation and search
+# - Event correlation analysis
+# - Multi-tenant data isolation
 ```
 
-### Sample Code Patterns
-
-Look for these patterns throughout the codebase:
-
-- **Service Layer**: `@Service` classes with business logic
-- **Repository Layer**: Spring Data repositories with custom queries
-- **Controller Layer**: `@RestController` with DTO mapping
-- **Security Layer**: Method-level security with `@PreAuthorize`
-- **Configuration Layer**: `@Configuration` with property binding
-
-### Interactive Exploration
+### Cassandra Time-Series Storage
 
 ```bash
-# Find all REST endpoints
-grep -r "@GetMapping\|@PostMapping\|@PutMapping\|@DeleteMapping" --include="*.java" . | head -10
+# Time-series data models
+ls openframe-data/src/main/java/com/openframe/data/model/cassandra/
 
-# Discover GraphQL schemas  
-find . -name "*.graphqls" -o -name "*DataFetcher.java"
-
-# Locate configuration classes
-find . -name "*Config*.java" | head -10
+# Unified log events for:
+# - Audit trails
+# - Performance metrics  
+# - Security events
+# - Operational insights
 ```
 
-## Next Steps
+## 8. Extending with SDKs
 
-You're now ready to dive deeper into specific areas:
+OpenFrame includes SDKs for popular MSP tools:
 
-### For API Development
-- **[Architecture Overview](../development/architecture/README.md)** - System design patterns
-- **[Local Development](../development/setup/local-development.md)** - Full development environment
+### FleetDM SDK
 
-### For Security Implementation
+```bash
+# FleetDM client implementation
+ls sdk/fleetmdm/src/main/java/com/openframe/sdk/fleetmdm/
+
+# Features:
+# - Host search and management
+# - Query execution
+# - Agent information retrieval
+```
+
+### TacticalRMM SDK
+
+```bash
+# TacticalRMM client implementation
+ls sdk/tacticalrmm/src/main/java/com/openframe/sdk/tacticalrmm/
+
+# Features:
+# - Agent lifecycle management
+# - Script execution
+# - Registration secret parsing
+```
+
+### Building Custom SDKs
+
+Follow the SDK patterns to integrate additional tools:
+
+1. **Create client interface** following existing patterns
+2. **Implement authentication** (API keys, OAuth, etc.)
+3. **Add event deserialization** for tool-specific formats
+4. **Register with data enrichment** services
+5. **Test integration** with stream processing
+
+## 9. Development Workflow
+
+### Running Individual Modules
+
+```bash
+# Test specific functionality
+cd openframe-api-service-core
+mvn spring-boot:run -Dspring-boot.run.profiles=dev
+
+# Test security modules
+cd ../openframe-authorization-service-core  
+mvn spring-boot:run -Dspring-boot.run.profiles=dev
+```
+
+### Integration Testing
+
+```bash
+# Run module integration tests
+mvn test -Dtest=*IntegrationTest -DfailIfNoTests=false
+
+# Test specific flows
+mvn test -pl openframe-client-core -Dtest=AgentRegistrationServiceTest
+```
+
+### Working with Test Data
+
+```bash
+# Explore test generators
+ls openframe-test-service-core/src/main/java/com/openframe/test/data/generator/
+
+# Test data includes:
+# - AuthGenerator: Authentication tokens
+# - DeviceGenerator: Mock device data
+# - OrganizationGenerator: Tenant data
+# - InvitationGenerator: User invitation flows
+```
+
+## 10. Common Development Tasks
+
+### Adding a New Data Model
+
+1. **Create document class** in `openframe-data-mongo/src/main/java/com/openframe/data/document/`
+2. **Add repository interface** extending `MongoRepository`
+3. **Create service layer** in relevant core module
+4. **Add API endpoints** in `api-service-core` or `external-api-service-core`
+5. **Write integration tests** using test generators
+
+### Integrating a New Tool
+
+1. **Create SDK module** following `sdk/fleetmdm` pattern
+2. **Add event deserializers** in `stream-processing-core`
+3. **Update enrichment services** for data normalization
+4. **Register tool type** in `data-platform-core`
+5. **Add configuration** properties and validation
+
+### Extending Authentication
+
+1. **Add provider config** in `authorization-service-core`
+2. **Implement strategy pattern** for new OAuth providers
+3. **Update security filters** in `gateway-service-core`
+4. **Add client registration** handling
+5. **Test SSO flow** end-to-end
+
+## What's Next?
+
+You now understand OpenFrame OSS Lib's architecture and key features. Here are your next steps:
+
+### For Application Developers
+- **[Development Environment Setup](../development/setup/local-development.md)** - Full development environment
 - **[Security Best Practices](../development/security/README.md)** - Authentication and authorization patterns
 
-### For Testing
-- **[Testing Guide](../development/testing/README.md)** - Test structure and best practices
+### For Contributors
+- **[Contributing Guidelines](../development/contributing/guidelines.md)** - Code standards and submission process
+- **[Testing Guide](../development/testing/README.md)** - Testing strategies and tools
 
-### For Contributing
-- **[Contributing Guidelines](../development/contributing/guidelines.md)** - Code style and submission process
+### For Platform Engineers
+- **[Architecture Deep Dive](../development/architecture/README.md)** - Detailed system design
+- **[Deployment Patterns](../development/setup/environment.md)** - Production deployment strategies
 
-## Community Support
+[![OpenFrame v0.3.7 - Enhanced Developer Experience](https://img.youtube.com/vi/O8hbBO5Mym8/maxresdefault.jpg)](https://www.youtube.com/watch?v=O8hbBO5Mym8)
 
-Questions or need guidance? The OpenFrame community is here to help:
+## Getting Help
 
-- **Technical Discussions**: [OpenMSP Slack Community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
-- **Platform Information**: [OpenMSP Website](https://www.openmsp.ai/)
-- **OpenFrame Product**: [https://flamingo.run](https://flamingo.run)
+- **Community**: [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
+- **Platform Demo**: [OpenFrame Walkthrough](https://www.youtube.com/watch?v=awc-yAnkhIo)
+- **Website**: [flamingo.run](https://flamingo.run) | [openframe.ai](https://openframe.ai)
 
-Start exploring and building with OpenFrame OSS Lib – the foundation for next-generation MSP platforms!
+---
+
+**Ready to build with OpenFrame OSS Lib?** Continue with the [Development Environment Setup](../development/setup/local-development.md) to configure your workspace for contribution and extension.

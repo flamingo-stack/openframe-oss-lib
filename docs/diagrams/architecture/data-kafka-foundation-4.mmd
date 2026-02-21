@@ -1,4 +1,0 @@
-flowchart TD
-    Producer["Kafka Producer"] -->|"publish"| KafkaCluster
-    KafkaCluster -->|"exception"| RecoveryHandler["KafkaRecoveryHandlerImpl"]
-    RecoveryHandler --> Logs["Structured Error Log"]

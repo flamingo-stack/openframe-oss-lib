@@ -2,390 +2,396 @@
 
 ## Overview
 
-The **Api Lib Contracts** module defines the shared API contracts, data transfer objects (DTOs), filter models, and mapping utilities used across the OpenFrame backend services.
+**Api Lib Contracts** is the shared contract and domain-support module for the OpenFrame platform. It defines:
 
-It acts as a **contract boundary layer** between:
+- Cross-service DTOs (Data Transfer Objects)
+- Filtering and pagination models
+- Shared mappers between entities and API models
+- Lightweight service abstractions reused across API layers
 
-- API-facing modules such as [Api Service Core](../api-service-core/api-service-core.md) and [External Api Service Core](../external-api-service-core/external-api-service-core.md)
-- Data and domain modules such as [Data Mongo Domain And Repos](../data-mongo-domain-and-repos/data-mongo-domain-and-repos.md)
-- Supporting services such as [Authorization Service Core](../authorization-service-core/authorization-service-core.md)
+This module acts as the **contract boundary** between:
 
-This module ensures:
+- GraphQL APIs in Api Service Core
+- REST APIs in External Api Service Core
+- Persistence layers in Data Mongo Core and Data Platform Core
+- Client-facing components such as Gateway Service Core
 
-- A consistent and reusable contract model across REST and GraphQL APIs
-- Centralized filtering models for devices, events, logs, tools, and organizations
-- Shared pagination abstractions
-- Reusable mappers for translating between persistence entities and API DTOs
+By centralizing shared DTOs and mapping logic, Api Lib Contracts ensures:
+
+- Consistent API responses across GraphQL and REST
+- Stable contracts between services
+- Reduced duplication in API layers
+- Clear separation between domain entities and external representations
 
 ---
 
-## Architectural Role
+## Architectural Position
 
-Api Lib Contracts sits between domain persistence and API layers.
+Api Lib Contracts sits between the persistence layer and API delivery layers.
 
 ```mermaid
-flowchart LR
-    Client["Client Applications"] --> ApiService["Api Service Core"]
-    Client --> ExternalApi["External Api Service Core"]
+flowchart TD
+    Client["Client Applications"] --> Gateway["Gateway Service Core"]
+    Gateway --> ApiService["Api Service Core (GraphQL)"]
+    Gateway --> ExternalApi["External Api Service Core (REST)"]
 
     ApiService --> Contracts["Api Lib Contracts"]
     ExternalApi --> Contracts
 
-    Contracts --> DataLayer["Data Mongo Domain And Repos"]
-    Contracts --> StreamLayer["Stream Processing Core"]
+    Contracts --> DataMongo["Data Mongo Core"]
+    Contracts --> DataPlatform["Data Platform Core"]
 ```
 
-### Responsibilities
+### Responsibilities by Layer
 
-1. Define API-safe DTOs
-2. Define filtering and query option models
-3. Provide reusable mapping logic
-4. Provide shared service abstractions used by GraphQL DataLoaders
-5. Provide generic pagination and result wrappers
+- **Api Service Core**: Controllers, GraphQL data fetchers, orchestration
+- **External Api Service Core**: REST controllers and OpenAPI exposure
+- **Api Lib Contracts**: Shared DTOs, filters, mappers, reusable service logic
+- **Data Modules**: MongoDB, Kafka, Cassandra, Pinot, Redis, etc.
 
 ---
 
 ## Module Structure
 
-The Api Lib Contracts module is organized into the following logical areas:
+Api Lib Contracts is organized into the following logical areas:
 
-- Audit DTOs
-- Device DTOs
-- Event DTOs
-- Organization DTOs
-- Tool DTOs
-- Shared DTOs
+- Audit (Logs)
+- Devices
+- Events
+- Organizations
+- Tools
+- Shared (Pagination, generic results)
+- Services
 - Mappers
-- Supporting Services
-- Processors
+
+```mermaid
+flowchart LR
+    Contracts["Api Lib Contracts"] --> Audit["Audit DTOs"]
+    Contracts --> Device["Device DTOs"]
+    Contracts --> Event["Event DTOs"]
+    Contracts --> Org["Organization DTOs"]
+    Contracts --> Tool["Tool DTOs"]
+    Contracts --> Shared["Shared Models"]
+    Contracts --> Services["Shared Services"]
+    Contracts --> Mappers["Mappers"]
+```
 
 ---
 
-# 1. Generic Query and Pagination Contracts
+# Shared Models
 
 ## CountedGenericQueryResult
 
-`CountedGenericQueryResult<T>` extends a base `GenericQueryResult<T>` and adds:
+Extends a generic query result with a `filteredCount` field.
 
-- `filteredCount` – total number of items after filters are applied
+**Purpose:**
+- Support filtered queries with total count metadata
+- Enable UI components to display result count after filtering
 
-This is typically used when:
-
-- Returning paginated GraphQL results
-- Providing filtered counts for dashboards
-
-```mermaid
-flowchart TD
-    GenericResult["GenericQueryResult<T>"] --> CountedResult["CountedGenericQueryResult<T>"]
-    CountedResult --> FilteredCount["filteredCount"]
+```java
+public class CountedGenericQueryResult<T> extends GenericQueryResult<T> {
+    private int filteredCount;
+}
 ```
+
+This is typically used in combination with filtering DTOs for devices, tools, logs, or events.
 
 ---
 
 ## CursorPaginationInput
 
-`CursorPaginationInput` defines a cursor-based pagination model:
+Provides cursor-based pagination input with validation constraints.
 
-- `limit` (validated between 1 and 100)
-- `cursor`
+Key characteristics:
 
-This abstraction is shared across GraphQL queries and REST endpoints where cursor pagination is used.
+- `limit` must be between 1 and 100
+- `cursor` represents the position token
+
+```java
+public class CursorPaginationInput {
+    @Min(1)
+    @Max(100)
+    private Integer limit;
+    private String cursor;
+}
+```
+
+Used by both GraphQL and REST endpoints to standardize pagination behavior.
 
 ---
 
-# 2. Audit and Log Contracts
+# Audit (Logs)
 
-The audit package defines models used for querying and returning log data.
+The audit package defines DTOs for log retrieval, filtering, and display.
 
-## LogEvent vs LogDetails
+## Core DTOs
 
-- `LogEvent` → Lightweight summary model
-- `LogDetails` → Extended version including `message` and `details`
+- `LogEvent` – Lightweight log summary
+- `LogDetails` – Full log with message and details
+- `LogFilterOptions` – Filter criteria input
+- `LogFilters` – Available filter values for UI
+- `OrganizationFilterOption` – Dropdown-friendly org option
 
 ```mermaid
 flowchart TD
-    LogEvent["LogEvent"] --> CommonFields["Event Metadata"]
-    LogDetails["LogDetails"] --> CommonFields
-    LogDetails --> ExtraFields["message + details"]
+    LogFiltersModel["LogFilters"] --> OrgOption["OrganizationFilterOption"]
+    LogOptions["LogFilterOptions"] --> Query["Log Query Execution"]
+    Query --> LogEvent
+    LogEvent --> LogDetails
 ```
 
-Common fields include:
+### Design Intent
 
-- toolEventId
-- eventType
-- toolType
-- severity
-- organization metadata
-- timestamp
+- Separate **filter input** (`LogFilterOptions`) from **available filter values** (`LogFilters`).
+- Allow frontend applications to dynamically render filter dropdowns.
+- Keep summary (`LogEvent`) and detailed (`LogDetails`) views distinct.
 
----
+These models are consumed by:
 
-## Log Filtering
-
-### LogFilterOptions
-
-Represents input constraints for filtering logs:
-
-- Date range
-- Event types
-- Tool types
-- Severities
-- Organization IDs
-- Device ID
-
-### LogFilters
-
-Represents aggregated filter values returned to the client (e.g., dropdown options):
-
-- toolTypes
-- eventTypes
-- severities
-- organizations (via `OrganizationFilterOption`)
-
-```mermaid
-flowchart LR
-    ClientFilters["Client Filter Request"] --> LogFilterOptions
-    LogFilterOptions --> QueryLayer["Repository Query"]
-    QueryLayer --> LogFilters
-```
-
----
-
-# 3. Device Contracts
-
-The device DTOs define filtering and aggregation structures used by the API layer.
-
-## DeviceFilterOptions
-
-Defines filter inputs:
-
-- statuses
-- deviceTypes
-- osTypes
-- organizationIds
-- tagNames
-
-These correlate directly to fields in the `Machine` domain model from the data layer.
-
----
-
-## DeviceFilters
-
-Represents aggregated filter metadata returned to clients:
-
-- statuses
-- deviceTypes
-- osTypes
-- organizationIds
-- tags
-- filteredCount
-
-Each filter option includes:
-
-- value
-- label
-- count
-
-```mermaid
-flowchart TD
-    DeviceQuery["Device Query"] --> Aggregation["Aggregate Filter Values"]
-    Aggregation --> DeviceFilters
-    DeviceFilters --> DeviceFilterOption
-    DeviceFilters --> TagFilterOption
-```
-
----
-
-# 4. Event Contracts
-
-## EventFilterOptions
-
-Defines filtering inputs:
-
-- userIds
-- eventTypes
-- startDate
-- endDate
-
-## EventFilters
-
-Defines filter aggregations returned to clients.
-
-These DTOs are used by:
-
-- Api Service Core GraphQL DataFetchers
+- Api Service Core data fetchers
 - External Api Service Core REST controllers
 
 ---
 
-# 5. Organization Contracts
+# Devices
 
-Organization DTOs are shared across GraphQL and REST APIs.
+Device-related DTOs define filtering and metadata structures for machine inventory.
+
+## Core Components
+
+- `DeviceFilterOptions`
+- `DeviceFilters`
+- `DeviceFilterOption`
+- `TagFilterOption`
+
+```mermaid
+flowchart TD
+    DeviceFiltersModel["DeviceFilters"] --> DeviceOption["DeviceFilterOption"]
+    DeviceFiltersModel --> TagOption["TagFilterOption"]
+    DeviceFilterOptionsModel["DeviceFilterOptions"] --> DeviceStatus
+    DeviceFilterOptionsModel --> DeviceType
+```
+
+### Separation of Concerns
+
+- `DeviceFilterOptions` → Raw filter inputs (status, type, OS, org IDs)
+- `DeviceFilters` → UI-enriched options with counts
+- `DeviceFilterOption` → Individual selectable filter item
+- `TagFilterOption` → Tag-based filtering with count metadata
+
+This enables:
+
+- Efficient backend filtering
+- Rich UI filtering with precomputed counts
+
+---
+
+# Events
+
+Event filtering is simplified compared to logs.
+
+## Components
+
+- `EventFilterOptions`
+- `EventFilters`
+
+```mermaid
+flowchart LR
+    EventFilterOptionsModel["EventFilterOptions"] --> EventQuery
+    EventQuery --> EventFiltersModel["EventFilters"]
+```
+
+These models support time-bound and user-bound filtering.
+
+---
+
+# Organizations
+
+The organization package is one of the most important contract areas.
 
 ## OrganizationResponse
 
-This is the central API-facing representation of an organization.
+Shared response model used by:
 
-Fields include:
+- Api Service Core (GraphQL)
+- External Api Service Core (REST)
 
-- id
-- organizationId (immutable UUID)
-- category
-- employee counts
-- contract dates
-- financial data
-- soft delete metadata
+It includes:
+
+- Business metadata (category, employees, revenue)
+- Contract lifecycle dates
+- Contact information
+- Soft-delete fields
+
+---
+
+## OrganizationList
+
+Simple wrapper DTO for returning multiple organizations.
+
+---
+
+## OrganizationFilterOptions
+
+Internal filtering model supporting:
+
+- Category-based filtering
+- Employee size range
+- Active contract flag
 
 ---
 
 ## OrganizationMapper
 
-`OrganizationMapper` is a shared Spring component responsible for:
+A shared Spring component responsible for:
 
-- Mapping CreateOrganizationRequest → Organization entity
-- Mapping UpdateOrganizationRequest → partial entity updates
-- Mapping Organization entity → OrganizationResponse
-- Handling nested mapping for:
-  - ContactInformation
-  - Address
-  - ContactPerson
+- Converting create/update requests into `Organization` entities
+- Mapping entities into `OrganizationResponse`
+- Handling nested contact and address mapping
+- Enforcing immutability of `organizationId`
 
 ```mermaid
 flowchart TD
-    CreateRequest["CreateOrganizationRequest"] --> Mapper
-    UpdateRequest["UpdateOrganizationRequest"] --> Mapper
-    Mapper --> OrganizationEntity["Organization Entity"]
-    OrganizationEntity --> Mapper
-    Mapper --> OrganizationResponse
+    CreateReq["CreateOrganizationRequest"] --> Mapper["OrganizationMapper"]
+    Mapper --> Entity["Organization Entity"]
+    Entity --> Mapper
+    Mapper --> Response["OrganizationResponse"]
 ```
 
 ### Key Design Decisions
 
-- organizationId is generated as UUID and immutable
-- Partial updates only modify non-null fields
-- Mailing address can mirror physical address via copy logic
+- `organizationId` is generated as a UUID and is immutable.
+- Update operations are partial (only non-null fields applied).
+- Mailing address may mirror physical address if flagged.
+
+This centralization guarantees consistent mapping across GraphQL and REST layers.
 
 ---
 
-# 6. Tool Contracts
+# Tools
 
-## ToolFilterOptions
+Tool-related DTOs provide filtering and list response structures.
 
-Defines tool filtering inputs:
+## Components
 
-- enabled
-- type
-- category
-- platformCategory
-
-## ToolFilters
-
-Aggregated filter values:
-
-- types
-- categories
-- platformCategories
-
-## ToolList
-
-Wraps a list of `IntegratedTool` domain entities for API responses.
-
----
-
-# 7. Supporting Services
-
-Although primarily a contract module, Api Lib Contracts also provides reusable service logic for API layers.
-
-## InstalledAgentService
-
-Provides batch-friendly retrieval methods:
-
-- getInstalledAgentsForMachines(List<String>)
-- getInstalledAgentsForMachine(String)
-- getInstalledAgentByMachineIdAndType(String, String)
-
-This service is optimized for GraphQL DataLoader usage.
+- `ToolFilterOptions`
+- `ToolFilters`
+- `ToolList`
 
 ```mermaid
 flowchart LR
-    DataLoader["GraphQL DataLoader"] --> InstalledAgentService
-    InstalledAgentService --> InstalledAgentRepository
+    ToolFilterOptionsModel["ToolFilterOptions"] --> ToolQuery
+    ToolQuery --> ToolListModel["ToolList"]
+    ToolFiltersModel["ToolFilters"] --> ToolQuery
 ```
+
+`ToolList` wraps `IntegratedTool` domain entities from Data Mongo Core.
+
+---
+
+# Shared Services
+
+Api Lib Contracts includes reusable service components that abstract repository access patterns.
+
+## InstalledAgentService
+
+Provides machine-to-agent resolution logic.
+
+Responsibilities:
+
+- Batch lookup for multiple machine IDs (optimized for DataLoader usage)
+- Single machine agent lookup
+- Agent lookup by machine and type
+
+```mermaid
+flowchart TD
+    DataFetcher["GraphQL DataFetcher"] --> InstalledAgentService
+    InstalledAgentService --> Repo["InstalledAgentRepository"]
+    Repo --> Mongo["MongoDB"]
+```
+
+The batch method returns a list aligned to the input order of machine IDs, supporting efficient GraphQL DataLoader behavior.
 
 ---
 
 ## ToolConnectionService
 
-Provides batched retrieval of tool connections per machine.
+Similar pattern to InstalledAgentService.
 
-Used in similar fashion to avoid N+1 query issues.
+Responsibilities:
+
+- Batch machine-to-tool connection lookup
+- Single machine lookup
+
+Optimized for minimizing N+1 query problems in GraphQL environments.
 
 ---
 
-# 8. Device Status Processor Extension Point
-
 ## DefaultDeviceStatusProcessor
 
-Provides a default implementation of `DeviceStatusProcessor`.
+Default implementation of `DeviceStatusProcessor`.
 
-- Logs status updates
-- Marked with `@ConditionalOnMissingBean`
-
-This allows downstream services to override behavior without modifying the core contract module.
+- Annotated with `@ConditionalOnMissingBean`
+- Allows platform override with custom processor
+- Logs status updates for observability
 
 ```mermaid
-flowchart TD
-    MachineStatusUpdate["Machine Status Updated"] --> Processor
-    Processor["DeviceStatusProcessor"] --> DefaultProcessor
-    DefaultProcessor --> LogOnly["Log Debug Message"]
+flowchart LR
+    DeviceUpdate["Device Status Updated"] --> Processor["DeviceStatusProcessor"]
+    Processor --> DefaultImpl["DefaultDeviceStatusProcessor"]
 ```
+
+This design enables pluggable status handling without coupling API logic to specific infrastructure behaviors.
 
 ---
 
 # Cross-Module Relationships
 
-Api Lib Contracts is consumed by:
+Api Lib Contracts interacts heavily with:
 
-- Api Service Core (GraphQL controllers and DataFetchers)
+- Api Service Core (GraphQL controllers, data fetchers)
 - External Api Service Core (REST controllers)
-- Gateway Service Core (via DTO alignment)
-- Authorization Service Core (shared organization and user models)
-
-It depends on:
-
-- Data Mongo Domain And Repos for entities
-- Core Shared Utilities for pagination and validation utilities
+- Data Mongo Core (entities and repositories)
+- Data Platform Core (event and tool models)
 
 ```mermaid
 flowchart TD
-    Contracts["Api Lib Contracts"] --> ApiServiceCore
-    Contracts --> ExternalApiCore
-    Contracts --> DataMongo
-    Contracts --> CoreShared
+    ApiService["Api Service Core"] --> Contracts
+    ExternalApi["External Api Service Core"] --> Contracts
+    Contracts --> MongoEntities["Mongo Entities"]
+    Contracts --> ToolModels["Integrated Tool Models"]
 ```
+
+The module does not contain:
+
+- Controller logic
+- Security configuration
+- Infrastructure configuration
+
+It strictly defines contracts and shared mapping/service utilities.
 
 ---
 
 # Design Principles
 
-1. Single Source of Truth for API DTOs
-2. Separation of Persistence and API Models
-3. Batch-Friendly Service Abstractions
-4. Filter-Aware Response Modeling
-5. Extensible via Conditional Beans
+1. **Contract Stability** – DTOs are designed to be stable across services.
+2. **Separation of Entity and API Models** – Mappers isolate persistence from API representation.
+3. **UI-Aware Filtering** – Filter DTOs include metadata for dynamic UI rendering.
+4. **Batch-Friendly Services** – Services support GraphQL DataLoader patterns.
+5. **Extensibility** – Default processors can be overridden by custom implementations.
 
 ---
 
 # Summary
 
-The **Api Lib Contracts** module is the shared contract backbone of the OpenFrame API ecosystem.
+Api Lib Contracts is the **contract backbone** of the OpenFrame API layer.
 
-It provides:
+It:
 
-- Consistent DTOs for devices, events, logs, organizations, and tools
-- Shared filtering abstractions
-- Pagination models
-- Mapping logic between domain entities and API contracts
-- Batch-friendly services used by higher-level API modules
+- Standardizes DTOs across GraphQL and REST
+- Centralizes organization mapping logic
+- Defines filtering structures for devices, tools, events, and logs
+- Provides reusable service logic for agent and tool resolution
+- Enables consistent and extensible API behavior across the platform
 
-By centralizing these contracts, OpenFrame ensures consistency across REST and GraphQL APIs while maintaining clean separation from persistence and infrastructure layers.
+By keeping contracts isolated from controllers and infrastructure, the platform maintains clarity, reusability, and long-term maintainability.

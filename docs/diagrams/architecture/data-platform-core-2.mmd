@@ -1,0 +1,6 @@
+flowchart TD
+    Save["Repository Save"] --> Aspect["MachineTagEventAspect"]
+    Aspect --> Processor["MachineTagEventServiceImpl"]
+    Processor --> Fetch["Fetch Machine and Tags"]
+    Fetch --> Build["Build MachinePinotMessage"]
+    Build --> Publish["Publish to Kafka Topic"]

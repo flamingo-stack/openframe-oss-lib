@@ -1,4 +1,4 @@
 flowchart TD
-    MachineStatusUpdate["Machine Status Updated"] --> Processor
-    Processor["DeviceStatusProcessor"] --> DefaultProcessor
-    DefaultProcessor --> LogOnly["Log Debug Message"]
+    DataFetcher["GraphQL DataFetcher"] --> InstalledAgentService
+    InstalledAgentService --> Repo["InstalledAgentRepository"]
+    Repo --> Mongo["MongoDB"]

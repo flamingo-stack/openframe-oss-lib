@@ -1,0 +1,11 @@
+sequenceDiagram
+    participant Client as Client Agent
+    participant API as API Service
+    participant Kafka
+    participant Stream as Stream Processor
+    participant Pinot
+
+    Client->>API: Device status update
+    API->>Kafka: Publish MachinePinotMessage
+    Kafka->>Stream: Consume message
+    Stream->>Pinot: Persist analytic projection

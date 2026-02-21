@@ -1,0 +1,10 @@
+flowchart LR
+    Nats["NATS"] --> Heartbeat["MachineHeartbeatListener"]
+    Nats --> Installed["InstalledAgentListener"]
+    Nats --> ToolConn["ToolConnectionListener"]
+    Nats --> ClientConn["ClientConnectionListener"]
+
+    Heartbeat --> MachineStatusService
+    Installed --> InstalledAgentService
+    ToolConn --> ToolConnectionService
+    ClientConn --> MachineStatusService

@@ -1,18 +1,28 @@
 flowchart TD
-    ManagementService["Management Service Core"]
+    AppStart["Application Startup"] --> InitPhase["Initializers"]
+    AppStart --> Schedulers["Schedulers"]
+    AppStart --> Controllers["Management Controllers"]
 
-    Mongo["MongoDB Domain & Repositories"]
-    Redis["Redis Cache"]
-    Kafka["Kafka Foundation"]
-    Pinot["Pinot Analytics"]
-    Nats["NATS Streams"]
-    Debezium["Debezium Connect"]
-    Tools["Integrated Tools"]
+    InitPhase --> PinotInit["PinotConfigInitializer"]
+    InitPhase --> AgentSecretInit["AgentRegistrationSecretInitializer"]
+    InitPhase --> ToolAgentInit["IntegratedToolAgentInitializer"]
+    InitPhase --> NatsInit["NatsStreamConfigurationInitializer"]
+    InitPhase --> ClientConfigInit["OpenFrameClientConfigurationInitializer"]
+    InitPhase --> DebeziumInit["DebeziumConnectorInitializer"]
 
-    ManagementService --> Mongo
-    ManagementService --> Redis
-    ManagementService --> Kafka
-    ManagementService --> Pinot
-    ManagementService --> Nats
-    ManagementService --> Debezium
-    ManagementService --> Tools
+    Controllers --> ToolController["IntegratedToolController"]
+    Controllers --> ReleaseController["ReleaseVersionController"]
+
+    Schedulers --> DebeziumHealth["DebeziumHealthCheckScheduler"]
+    Schedulers --> ApiKeySync["ApiKeyStatsSyncScheduler"]
+    Schedulers --> AgentFallback["AgentVersionUpdatePublishFallbackScheduler"]
+
+    ToolController --> DebeziumService["DebeziumService"]
+    DebeziumHealth --> DebeziumService
+    DebeziumInit --> DebeziumService
+
+    ToolAgentInit --> ToolAgentPublisher["ToolAgentUpdatePublisher"]
+    AgentFallback --> ToolAgentPublisher
+
+    ClientConfigInit --> ClientUpdatePublisher["OpenFrameClientUpdatePublisher"]
+    AgentFallback --> ClientUpdatePublisher

@@ -1,0 +1,5 @@
+flowchart TD
+    ApiService["Api Service Core"] --> Contracts
+    ExternalApi["External Api Service Core"] --> Contracts
+    Contracts --> MongoEntities["Mongo Entities"]
+    Contracts --> ToolModels["Integrated Tool Models"]

@@ -1,6 +1,8 @@
 flowchart TD
-    TokenRequest["Token Encoding"] --> JwkSource["JWKSource"]
-    JwkSource --> TenantId["TenantContext.getTenantId()"]
-    TenantId --> KeyService["TenantKeyService"]
-    KeyService --> Repo["TenantKeyRepository (Mongo)"]
-    KeyService --> Encoder["NimbusJwtEncoder"]
+    JWTRequest["JWT Signing Request"] --> KeyService["TenantKeyService"]
+    KeyService -->|"Find active key"| Repo["TenantKeyRepository"]
+
+    Repo -->|"No key"| Generator["RsaAuthenticationKeyPairGenerator"]
+    Generator --> Store["Persist TenantKey"]
+
+    KeyService --> RSAKey["RSAKey (Public + Private)"]

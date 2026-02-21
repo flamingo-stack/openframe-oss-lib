@@ -1,0 +1,8 @@
+flowchart LR
+    Client -->|"cursor + limit"| Controller
+    Controller --> Service
+    Service --> Repository
+    Repository --> Service
+    Service --> PageInfo
+    PageInfo --> Controller
+    Controller --> Client

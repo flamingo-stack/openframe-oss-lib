@@ -1,0 +1,7 @@
+flowchart TD
+    Input["Raw Input String"] -->|"null?"| CheckNull{"Is Null?"}
+    CheckNull -->|"Yes"| DefaultValue["Use 'org'"]
+    CheckNull -->|"No"| UseInput["Use Input"]
+    DefaultValue --> Slugify["Slugify Engine"]
+    UseInput --> Slugify
+    Slugify --> Output["Lowercase Hyphenated Slug"]

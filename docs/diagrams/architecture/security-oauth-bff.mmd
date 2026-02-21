@@ -1,0 +1,7 @@
+flowchart LR
+    Browser["Browser Client"] -->|"/oauth/login"| BFF["Security Oauth Bff"]
+    BFF -->|"authorize redirect"| AuthServer["Authorization Service Core"]
+    AuthServer -->|"code + state"| BFF
+    BFF -->|"token exchange"| AuthServer
+    BFF -->|"Set-Cookie: access + refresh"| Browser
+    Browser -->|"API calls with cookies"| Gateway["Gateway Service Core"]

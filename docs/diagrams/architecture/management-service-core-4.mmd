@@ -1,5 +1,5 @@
 flowchart TD
-    Load["Load JSON Config"] --> Resolve["Resolve Placeholders"]
-    Resolve --> DeploySchema["POST Schema"]
-    DeploySchema --> DeployTable["PUT Table Config"]
-    DeployTable --> Success["Deployment Success"]
+    Ready["ApplicationReadyEvent"] --> ListConnectors["List Existing Connectors"]
+    ListConnectors -->|"Empty"| LoadTools["Load IntegratedTools"]
+    LoadTools --> CreateConnectors["Create Connectors Per Tool"]
+    ListConnectors -->|"Not Empty"| Skip["Skip Initialization"]

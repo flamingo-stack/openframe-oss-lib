@@ -1,6 +1,4 @@
-flowchart TD
-    Controller["SSOConfigController"] --> Service["SSOConfigService"]
-    Service --> Repo["SSOConfigRepository"]
-    Service --> Encrypt["EncryptionService"]
-    Service --> DomainVal["DomainValidationService"]
-    Service --> Processor["SSOConfigProcessor"]
+flowchart LR
+    GraphQL["GraphQL Field Resolution"] --> DataLoader["Batch DataLoader"]
+    DataLoader --> Service["Domain Service"]
+    Service --> Repository["Mongo Repository"]

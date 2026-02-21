@@ -1,5 +1,7 @@
-flowchart LR
-    Request["Incoming Request"] --> JWTResolver["JwtIssuerAuthenticationManagerResolver"]
-    JWTResolver --> Cache["Caffeine JWT Provider Cache"]
-    Cache --> Decoder["JwtDecoder (per issuer)"]
-    Decoder --> Principal["AuthPrincipal"]
+flowchart TD
+    Query["GraphQL Query"] --> Filter["FilterInput"]
+    Filter --> Mapper["GraphQL Mapper"]
+    Mapper --> Service["Domain Service"]
+    Service --> QueryResult["GenericQueryResult"]
+    QueryResult --> Connection["GenericConnection"]
+    Connection --> Response["GraphQL Response"]

@@ -1,7 +1,5 @@
-sequenceDiagram
-    participant Kafka
-    participant Listener as JsonKafkaListener
-    participant Processor
-
-    Kafka->>Listener: CommonDebeziumMessage + MESSAGE_TYPE_HEADER
-    Listener->>Processor: process(message, messageType)
+flowchart LR
+    ToolType["IntegratedToolType"] --> KeyBuilder["toolName:sourceEventType"]
+    SourceType["Source Event Type"] --> KeyBuilder
+    KeyBuilder --> Lookup["EventTypeMapper.mappings"]
+    Lookup --> Unified["UnifiedEventType"]

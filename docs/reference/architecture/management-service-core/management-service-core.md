@@ -1,208 +1,208 @@
 # Management Service Core
 
+## Overview
+
 The **Management Service Core** module is the operational backbone of the OpenFrame platform. It is responsible for:
 
-- Platform bootstrap and environment initialization
-- Integrated tool lifecycle management
-- Agent and client configuration provisioning
+- Cluster-level and tool-level configuration management
 - Debezium connector orchestration
-- Distributed scheduled jobs with cluster safety
-- Release version coordination
-- NATS stream provisioning
+- NATS stream initialization
+- Agent and client configuration bootstrapping
+- Distributed scheduled jobs with tenant-aware locking
+- Release version propagation
 
-This module acts as the control plane for infrastructure-level concerns that sit above domain services such as devices, users, organizations, and events.
+While other modules focus on API exposure, authorization, data persistence, or stream processing, the Management Service Core ensures that the platform is correctly initialized, synchronized, and maintained over time.
+
+This module primarily acts as a **control plane layer** across:
+
+- MongoDB (via data-mongo-core)
+- Redis (via data-redis-cache)
+- Debezium (CDC connectors)
+- Apache Pinot (analytics tables and schemas)
+- NATS (event streaming)
+- Agent update pipelines
 
 ---
 
-## 1. Architectural Position in the Platform
-
-The Management Service Core coordinates multiple foundational modules:
-
-- Data persistence: MongoDB, Cassandra, Pinot
-- Streaming: Kafka, NATS
-- Change Data Capture: Debezium
-- Redis-based distributed locking
-- Integrated third-party tools (e.g., Tactical RMM)
-
-### High-Level Architecture
+## High-Level Architecture
 
 ```mermaid
 flowchart TD
-    ManagementService["Management Service Core"]
+    AppStart["Application Startup"] --> InitPhase["Initializers"]
+    AppStart --> Schedulers["Schedulers"]
+    AppStart --> Controllers["Management Controllers"]
 
-    Mongo["MongoDB Domain & Repositories"]
-    Redis["Redis Cache"]
-    Kafka["Kafka Foundation"]
-    Pinot["Pinot Analytics"]
-    Nats["NATS Streams"]
-    Debezium["Debezium Connect"]
-    Tools["Integrated Tools"]
+    InitPhase --> PinotInit["PinotConfigInitializer"]
+    InitPhase --> AgentSecretInit["AgentRegistrationSecretInitializer"]
+    InitPhase --> ToolAgentInit["IntegratedToolAgentInitializer"]
+    InitPhase --> NatsInit["NatsStreamConfigurationInitializer"]
+    InitPhase --> ClientConfigInit["OpenFrameClientConfigurationInitializer"]
+    InitPhase --> DebeziumInit["DebeziumConnectorInitializer"]
 
-    ManagementService --> Mongo
-    ManagementService --> Redis
-    ManagementService --> Kafka
-    ManagementService --> Pinot
-    ManagementService --> Nats
-    ManagementService --> Debezium
-    ManagementService --> Tools
+    Controllers --> ToolController["IntegratedToolController"]
+    Controllers --> ReleaseController["ReleaseVersionController"]
+
+    Schedulers --> DebeziumHealth["DebeziumHealthCheckScheduler"]
+    Schedulers --> ApiKeySync["ApiKeyStatsSyncScheduler"]
+    Schedulers --> AgentFallback["AgentVersionUpdatePublishFallbackScheduler"]
+
+    ToolController --> DebeziumService["DebeziumService"]
+    DebeziumHealth --> DebeziumService
+    DebeziumInit --> DebeziumService
+
+    ToolAgentInit --> ToolAgentPublisher["ToolAgentUpdatePublisher"]
+    AgentFallback --> ToolAgentPublisher
+
+    ClientConfigInit --> ClientUpdatePublisher["OpenFrameClientUpdatePublisher"]
+    AgentFallback --> ClientUpdatePublisher
 ```
 
-This module is primarily responsible for **platform consistency, orchestration, and automation**, rather than direct end-user business workflows.
+The module is organized around three major responsibilities:
+
+1. **Startup Initialization** – One-time setup of infrastructure resources.
+2. **Runtime Orchestration** – Scheduled jobs and connector health management.
+3. **Administrative Control APIs** – Cluster and tool configuration endpoints.
 
 ---
 
-## 2. Core Responsibilities
+# Core Configuration Layer
 
-### 2.1 Application Configuration
+## ManagementConfiguration
 
-#### `ManagementConfiguration`
+This is the root Spring configuration class.
 
-- Enables component scanning across `com.openframe`
-- Explicitly excludes `CassandraHealthIndicator`
-- Provides a `BCryptPasswordEncoder` bean for secure password hashing
+Key responsibilities:
 
-This configuration ensures:
+- Component scanning across the `com.openframe` namespace
+- Explicit exclusion of `CassandraHealthIndicator`
+- Provision of a `BCryptPasswordEncoder` bean
 
-- Secure password handling
-- Clean management-specific bootstrapping
-- Isolation from non-relevant health components
+This ensures:
+
+- Secure password hashing
+- Clean separation from Cassandra health checks (which are handled in the data layer)
 
 ---
 
-### 2.2 Distributed Scheduling with Redis (ShedLock)
+## ShedLockConfig – Distributed Scheduling Safety
 
-#### `ShedLockConfig`
+The module enables:
 
-This configuration enables:
+- `@EnableScheduling`
+- `@EnableSchedulerLock`
 
-- Spring scheduling
-- Distributed locks via Redis
-- Tenant-scoped lock keys
-
-Lock keys follow a structured prefix pattern:
+It configures a **Redis-based LockProvider** using tenant-scoped keys:
 
 ```text
 of:{tenantId}:job-lock:{environment}:{lockName}
 ```
 
-This ensures:
+This guarantees:
 
-- No duplicate job execution across cluster nodes
+- No duplicate job execution in clustered deployments
+- Environment-aware locking
 - Tenant isolation
-- Safe horizontal scaling
+
+This configuration directly supports:
+
+- Debezium health checks
+- API key statistics sync
+- Agent version publish fallback jobs
 
 ---
 
-## 3. Platform Bootstrapping & Initializers
+# Startup Initializers
 
-The Management Service Core performs critical startup initialization tasks.
+Initializers run either at:
 
-### Startup Flow
+- `@PostConstruct`
+- `ApplicationRunner`
+- `ApplicationReadyEvent`
+
+They bootstrap system state in external systems.
+
+---
+
+## PinotConfigInitializer
+
+Deploys Pinot:
+
+- Schemas
+- Real-time table configs
+- Optional offline table configs
+
+### Deployment Flow
 
 ```mermaid
 flowchart TD
-    AppStart["Application Ready"] --> AgentSecretInit["AgentRegistrationSecretInitializer"]
-    AppStart --> PinotInit["PinotConfigInitializer"]
-    AppStart --> NatsInit["NatsStreamConfigurationInitializer"]
-    AppStart --> ToolAgentInit["IntegratedToolAgentInitializer"]
-    AppStart --> ClientConfigInit["OpenFrameClientConfigurationInitializer"]
-    AppStart --> TacticalInit["TacticalRmmScriptsInitializer"]
-    AppStart --> DebeziumInit["DebeziumConnectorInitializer"]
+    Ready["ApplicationReadyEvent"] --> CheckEnabled["Pinot Enabled?"]
+    CheckEnabled -->|"Yes"| LoadFiles["Load Schema and Table JSON"]
+    LoadFiles --> Resolve["Resolve Environment Placeholders"]
+    Resolve --> DeploySchema["POST /schemas"]
+    DeploySchema --> DeployTable["PUT or POST /tables"]
+    DeployTable --> RetryLogic["Retry on Connection Failure"]
+    CheckEnabled -->|"No"| End["Skip Deployment"]
 ```
 
----
+Features:
 
-### 3.1 Agent Registration Secret Initialization
+- Retry logic with configurable attempts and delay
+- Automatic create-or-update logic
+- Environment placeholder resolution
+- Strict JSON validation before deployment
 
-#### `AgentRegistrationSecretInitializer`
-
-- Runs at application startup
-- Delegates to `AgentRegistrationSecretManagementService`
-- Ensures an initial secret exists for agent onboarding
-
-This guarantees that device agents can securely register even on fresh deployments.
+This ensures analytics tables are always provisioned correctly.
 
 ---
 
-### 3.2 Integrated Tool Agent Initialization
+## AgentRegistrationSecretInitializer
 
-#### `IntegratedToolAgentInitializer`
+Executed at startup via `ApplicationRunner`.
 
-Responsibilities:
+Purpose:
 
-- Loads agent configurations from classpath JSON
-- Creates or updates `IntegratedToolAgent` entities
-- Preserves release-version agents
-- Publishes version updates if required
+- Ensures an initial agent registration secret exists
+- Prevents platform bootstrap failures
 
-Version update detection logic:
+This is critical for first-time deployments.
+
+---
+
+## IntegratedToolAgentInitializer
+
+Bootstraps `IntegratedToolAgent` definitions from classpath JSON resources.
+
+### Behavior
+
+- Loads agent configuration files
+- Creates new entries if absent
+- Updates existing entries while:
+  - Preserving release versions
+  - Preserving publish state
+- Detects version changes
+- Publishes update events when necessary
+
+### Version Update Logic
 
 ```mermaid
 flowchart TD
-    Existing["Existing Agent"] --> Compare["Compare Versions"]
-    Compare -->|"Same"| Skip["No Publish"]
-    Compare -->|"Different"| Publish["Publish Version Update"]
+    LoadConfig["Load Agent JSON"] --> ExistsCheck["Agent Exists?"]
+    ExistsCheck -->|"No"| Create["Create Agent"]
+    ExistsCheck -->|"Yes"| PreserveVersion["Preserve Release Version"]
+    PreserveVersion --> Compare["Version Changed?"]
+    Compare -->|"Yes"| Publish["Publish Tool Agent Update"]
+    Compare -->|"No"| SaveOnly["Save Without Publish"]
 ```
 
-Publishing is delegated to:
-
-- `ToolAgentUpdateUpdatePublisher`
-
-This ensures agents across the fleet receive updated tool configurations.
+This initializer connects configuration state with event-driven update propagation.
 
 ---
 
-### 3.3 OpenFrame Client Configuration Initialization
+## NatsStreamConfigurationInitializer
 
-#### `OpenFrameClientConfigurationInitializer`
+Creates predefined NATS streams at startup.
 
-- Loads default client configuration from classpath
-- Ensures a single default configuration (constant ID)
-- Preserves existing version and publish state
-
-This prevents accidental rollback of production client versions.
-
----
-
-### 3.4 Pinot Schema & Table Deployment
-
-#### `PinotConfigInitializer`
-
-Executed on `ApplicationReadyEvent`.
-
-Responsibilities:
-
-- Loads schema and table JSON from classpath
-- Resolves environment placeholders
-- Deploys via REST to Pinot controller
-- Supports retries with backoff
-- Updates or creates tables (PUT or POST fallback)
-
-### Pinot Deployment Flow
-
-```mermaid
-flowchart TD
-    Load["Load JSON Config"] --> Resolve["Resolve Placeholders"]
-    Resolve --> DeploySchema["POST Schema"]
-    DeploySchema --> DeployTable["PUT Table Config"]
-    DeployTable --> Success["Deployment Success"]
-```
-
-Resilience features:
-
-- Configurable retry attempts
-- Retry delay control
-- Clear logging for operational visibility
-
-This guarantees analytics infrastructure is correctly provisioned on startup.
-
----
-
-### 3.5 NATS Stream Provisioning
-
-#### `NatsStreamConfigurationInitializer`
-
-Creates streams such as:
+Streams include:
 
 - TOOL_INSTALLATION
 - CLIENT_UPDATE
@@ -212,224 +212,204 @@ Creates streams such as:
 
 Each stream defines:
 
-- Subject patterns
+- Subjects
 - Storage type
 - Retention policy
 
-This ensures real-time messaging pipelines exist before agents begin publishing events.
+This guarantees that required messaging infrastructure exists before agents start publishing.
 
 ---
 
-### 3.6 Tactical RMM Script Initialization
+## OpenFrameClientConfigurationInitializer
 
-#### `TacticalRmmScriptsInitializer`
+Initializes default client configuration from JSON.
 
-Integrates with Tactical RMM via SDK.
+Behavior:
 
-Responsibilities:
+- Loads configuration file
+- Forces default ID
+- Preserves version on update
+- Preserves publish state
 
-- Fetch existing scripts
-- Load script content from resources
-- Create or update scripts
-- Ensure OpenFrame update script exists
-
-This module bridges external tool ecosystems into OpenFrame's management layer.
+Ensures cluster-wide client configuration consistency.
 
 ---
 
-### 3.7 Debezium Connector Initialization
+## DebeziumConnectorInitializer
 
-#### `DebeziumConnectorInitializer`
+Executed on `ApplicationReadyEvent` when health checks are enabled.
 
-- Triggered on `ApplicationReadyEvent`
-- Checks if connectors exist
-- If empty, reads Debezium configurations from all `IntegratedTool` entities
-- Creates connectors automatically
+### Behavior
 
-This ensures Change Data Capture pipelines are restored after restarts.
+- Queries existing Debezium connectors
+- If none exist:
+  - Loads all `IntegratedTool` entries
+  - Creates connectors defined in each tool
+
+```mermaid
+flowchart TD
+    Ready["ApplicationReadyEvent"] --> ListConnectors["List Existing Connectors"]
+    ListConnectors -->|"Empty"| LoadTools["Load IntegratedTools"]
+    LoadTools --> CreateConnectors["Create Connectors Per Tool"]
+    ListConnectors -->|"Not Empty"| Skip["Skip Initialization"]
+```
+
+This prevents missing CDC pipelines in fresh clusters.
 
 ---
 
-## 4. Integrated Tool Management
+# Controllers
 
-### `IntegratedToolController`
+## IntegratedToolController
 
 Base path: `/v1/tools`
 
 Endpoints:
 
-- `GET /v1/tools` → list tools
-- `GET /v1/tools/{id}` → get tool
-- `POST /v1/tools/{id}` → save or update tool
+- `GET /v1/tools` – List tools
+- `GET /v1/tools/{id}` – Fetch tool
+- `POST /v1/tools/{id}` – Create or update tool
 
-Save workflow:
+### Save Flow
 
 ```mermaid
 flowchart TD
-    Request["Save Tool Request"] --> SaveMongo["Persist Tool"]
-    SaveMongo --> DebeziumUpdate["Create or Update Debezium Connectors"]
-    DebeziumUpdate --> Hooks["Execute Post Save Hooks"]
+    Request["SaveToolRequest"] --> Save["IntegratedToolService.save"]
+    Save --> CreateDebezium["DebeziumService.createOrUpdate"]
+    CreateDebezium --> Hooks["Run PostSave Hooks"]
     Hooks --> Response["Return Success"]
 ```
 
-### Extension Mechanism
-
-`IntegratedToolPostSaveHook` provides a lightweight extension point:
-
-- Avoids heavy Spring event wiring
-- Allows service-specific side effects
-- Encourages modular tool-specific logic
-
-This design keeps the controller lean while enabling extensibility.
+Post-save hooks allow modular side-effects without Spring events.
 
 ---
 
-## 5. Release Version Management
-
-### `ReleaseVersionController`
+## ReleaseVersionController
 
 Base path: `/v1/cluster-registrations`
 
 Accepts:
 
-```text
-{
-  "imageTagVersion": "x.y.z"
-}
-```
+- `ReleaseVersionRequest`
 
-Delegates to:
+Delegates to `ReleaseVersionService` to process new image tag versions.
 
-- `ReleaseVersionService`
-
-The goal is to coordinate cluster-level release propagation.
-
-Additionally:
-
-- `OpenFrameClientVersionUpdateService` is designed to publish new client versions to the fleet.
+This is used for cluster-level version propagation workflows.
 
 ---
 
-## 6. Scheduled Operations
+# Scheduled Jobs
 
-All scheduled jobs use **Redis-backed distributed locks**.
+All schedulers are protected with ShedLock to ensure distributed safety.
 
-### 6.1 Agent Version Publish Fallback
+---
 
-#### `AgentVersionUpdatePublishFallbackScheduler`
+## DebeziumHealthCheckScheduler
 
-Purpose:
+- Periodically checks connector health
+- Restarts failed tasks
+- Fully distributed lock protected
 
-- Detect unpublished entities
-- Retry publish up to configurable attempts
+Ensures CDC stability.
 
-Entities checked:
+---
 
-- `OpenFrameClientConfiguration`
-- `IntegratedToolAgent`
+## ApiKeyStatsSyncScheduler
 
-Logic:
+- Syncs Redis API key usage stats into MongoDB
+- Configurable intervals
+- Lock protected
+
+Prevents stat divergence in clustered environments.
+
+---
+
+## AgentVersionUpdatePublishFallbackScheduler
+
+Fallback mechanism to guarantee update propagation.
+
+### Logic
+
+- Fetch client configuration
+- Fetch enabled tool agents
+- Check publish state
+- Retry publish if:
+  - Not published
+  - Attempts below threshold
 
 ```mermaid
 flowchart TD
-    Entity["Entity"] --> State["Check PublishState"]
-    State -->|"Published"| Stop["No Action"]
-    State -->|"Not Published"| Attempts["Attempts < Max?"]
-    Attempts -->|"Yes"| Publish["Publish Update"]
-    Attempts -->|"No"| Stop
+    Tick["Scheduled Interval"] --> LoadClient["Load Client Config"]
+    LoadClient --> CheckClient["Should Retry?"]
+    CheckClient -->|"Yes"| PublishClient["Publish Client Update"]
+
+    Tick --> LoadAgents["Load Tool Agents"]
+    LoadAgents --> CheckAgent["Should Retry?"]
+    CheckAgent -->|"Yes"| PublishAgent["Publish Tool Agent Update"]
 ```
 
----
-
-### 6.2 API Key Stats Sync
-
-#### `ApiKeyStatsSyncScheduler`
-
-- Synchronizes Redis API key usage stats into MongoDB
-- Uses `@SchedulerLock`
-- Configurable interval and lock duration
-
-Ensures accurate usage metrics persistence.
+This guarantees eventual consistency in distributed update pipelines.
 
 ---
 
-### 6.3 Debezium Health Check
+# Debezium Integration Model
 
-#### `DebeziumHealthCheckScheduler`
+The Management Service Core orchestrates Debezium connectors through:
 
-- Periodically checks connector state
-- Restarts failed tasks
-- Distributed locking enabled
+- Tool configuration changes
+- Startup initialization
+- Health checks
 
-This ensures CDC stability across deployments.
+Connector state is mapped using `ConnectorStatus` DTOs.
 
----
-
-## 7. Debezium Connector Status Model
-
-### `ConnectorStatus`
-
-DTO representing:
-
-- Connector state
-- Worker ID
-- Individual task states
-- Failure traces
-
-Used for:
+This enables:
 
 - Monitoring
-- Health checks
-- Automated restarts
+- Automated restart
+- Safe bootstrap
 
 ---
 
-## 8. Interaction with Other Modules
+# Release and Version Propagation
 
-The Management Service Core builds on several foundational modules:
+The module supports version management via:
 
-- Data Mongo Domain and Repositories
-- Data Redis Cache
-- Data Kafka Foundation
-- Data Platform Cassandra and Pinot
-- Stream Processing Core
-- Integrations SDKs
+- `ReleaseVersionController`
+- `OpenFrameClientVersionUpdateService`
+- Tool agent update publishers
+- Fallback scheduler
 
-It does not duplicate their logic. Instead, it:
-
-- Orchestrates
-- Initializes
-- Coordinates
-- Monitors
-
-This separation keeps domain logic clean while centralizing operational concerns.
+Together they form a **resilient version distribution pipeline**.
 
 ---
 
-## 9. Design Principles
+# External Dependencies Managed
 
-1. Idempotent initialization
-2. Safe cluster-wide scheduling
-3. External system automation
-4. Extension via lightweight hooks
-5. Version-aware agent management
-6. Self-healing infrastructure components
+The module directly interacts with:
+
+- MongoDB
+- Redis
+- Debezium
+- Apache Pinot
+- NATS
+- Event publishing services
+
+It does not expose business APIs; instead, it maintains infrastructure state.
 
 ---
 
-## 10. Summary
+# Summary
 
-The **Management Service Core** acts as the operational brain of OpenFrame.
+The **Management Service Core** acts as the operational control plane of OpenFrame.
 
 It ensures that:
 
-- Tools are properly configured
-- Agents are version-synchronized
-- CDC pipelines are active
-- Streams are provisioned
-- Analytics infrastructure is deployed
-- Scheduled jobs run safely in distributed environments
+- Infrastructure is bootstrapped correctly
+- External systems are synchronized
+- Connectors remain healthy
+- Agent and client versions propagate reliably
+- Distributed jobs execute safely
 
-Without this module, the platform would lack coordinated infrastructure automation and resilient lifecycle management.
+Without this module, the platform would lack automated initialization, health management, and update coordination.
 
-It is the layer that turns distributed services into a cohesive, self-managing platform.
+It is the glue that binds configuration, infrastructure, and distributed runtime behavior together.

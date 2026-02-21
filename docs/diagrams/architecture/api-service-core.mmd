@@ -1,13 +1,7 @@
 flowchart LR
-    Client["Frontend / Admin UI"] --> Gateway["Gateway Service Core"]
-    Gateway --> ApiCore["Api Service Core"]
-
-    ApiCore --> Authz["Authorization Service Core"]
-    ApiCore --> Mongo["Mongo Domain & Repos"]
-    ApiCore --> Redis["Redis Cache"]
-    ApiCore --> Kafka["Kafka Foundation"]
-    ApiCore --> Stream["Stream Processing Core"]
-    ApiCore --> Mgmt["Management Service Core"]
-
-    ApiCore --> GraphQL["GraphQL (DGS)"]
-    ApiCore --> REST["REST Controllers"]
+    Client["Client / Admin UI"] --> Gateway["Gateway Service"]
+    Gateway --> ApiService["Api Service Core"]
+    ApiService --> AuthService["Authorization Service"]
+    ApiService --> MongoDB["MongoDB Repositories"]
+    ApiService --> Kafka["Kafka / Stream Processing"]
+    ApiService --> Pinot["Pinot / Analytics"]

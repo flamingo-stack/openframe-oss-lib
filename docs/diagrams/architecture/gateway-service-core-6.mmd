@@ -1,9 +1,5 @@
 flowchart TD
-    Client["External Client"] --> Gateway["Gateway Filter"]
-    Gateway --> ApiKeyCheck{{"API Key Present?"}}
-    ApiKeyCheck -->|"No"| Reject["401 Unauthorized"]
-    ApiKeyCheck -->|"Yes"| Validate["Validate API Key"]
-    Validate --> RateCheck{{"Within Rate Limit?"}}
-    RateCheck -->|"No"| TooMany["429 Too Many Requests"]
-    RateCheck -->|"Yes"| Inject["Inject User Context Headers"]
-    Inject --> ExternalService["External API Service"]
+    WSRequest["WebSocket Request"] --> RouteLocator["RouteLocator"]
+    RouteLocator --> ToolApiFilter["ToolApiWebSocketProxyUrlFilter"]
+    RouteLocator --> ToolAgentFilter["ToolAgentWebSocketProxyUrlFilter"]
+    RouteLocator --> NatsRoute["Direct NATS Route"]

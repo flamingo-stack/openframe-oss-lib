@@ -1,0 +1,37 @@
+flowchart LR
+    subgraph Agents["Machine Agents"]
+        Agent["Installed Agent"]
+        ToolAgent["Tool Agent"]
+    end
+
+    subgraph ClientCore["Client Agent Core"]
+        AuthController["AgentAuthController"]
+        AgentController["AgentController"]
+        FileController["ToolAgentFileController"]
+        Listeners["NATS Listeners"]
+        Transformers["Tool Agent ID Transformers"]
+    end
+
+    subgraph Messaging["NATS / JetStream"]
+        Nats["Event Streams"]
+    end
+
+    subgraph DataLayer["Data & Services Layer"]
+        MachineService["MachineStatusService"]
+        InstalledService["InstalledAgentService"]
+        ToolConnService["ToolConnectionService"]
+        IntegratedToolService["IntegratedToolService"]
+    end
+
+    Agent -->|"Register / Token"| AuthController
+    Agent -->|"Register"| AgentController
+    ToolAgent -->|"Download Binary"| FileController
+
+    Agent -->|"Events"| Nats
+    Nats -->|"machine.* topics"| Listeners
+
+    Listeners --> MachineService
+    Listeners --> InstalledService
+    Listeners --> ToolConnService
+
+    Transformers --> IntegratedToolService

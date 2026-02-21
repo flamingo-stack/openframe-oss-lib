@@ -1,5 +1,6 @@
-flowchart LR
-    Activities["ActivityMessage Stream"] --> Join
-    HostActivities["HostActivityMessage Stream"] --> Join
-    Join["Left Join (5s window)"] --> Enriched["Enriched ActivityMessage"]
-    Enriched --> OutputTopic["Fleet MDM Events Topic"]
+flowchart TD
+    Message["DeserializedDebeziumMessage"] --> Agent["AgentId"]
+    Agent --> Cache["MachineIdCacheService"]
+    Cache --> Machine["CachedMachineInfo"]
+    Machine --> Org["CachedOrganizationInfo"]
+    Org --> Enriched["IntegratedToolEnrichedData"]

@@ -1,137 +1,206 @@
-# OpenFrame OSS Lib Introduction
+# OpenFrame OSS Lib – Introduction
 
-Welcome to **OpenFrame OSS Lib** – the foundational backend library collection that powers the OpenFrame AI-driven MSP platform.
+Welcome to **OpenFrame OSS Lib**, the modular, open-source foundation powering the OpenFrame platform. This library collection provides enterprise-grade infrastructure for building AI-powered MSP (Managed Service Provider) platforms and modern IT automation systems.
 
 [![OpenFrame Product Walkthrough (Beta Access)](https://img.youtube.com/vi/awc-yAnkhIo/maxresdefault.jpg)](https://www.youtube.com/watch?v=awc-yAnkhIo)
 
 ## What is OpenFrame OSS Lib?
 
-OpenFrame OSS Lib is a comprehensive, modular Spring Boot library suite designed to provide the core building blocks for modern MSP (Managed Service Provider) platforms. It serves as the backbone of the OpenFrame platform, delivering enterprise-grade functionality through a clean, extensible architecture.
+OpenFrame OSS Lib is a **full-stack, multi-tenant, event-driven backend foundation** that replaces expensive proprietary software with open-source alternatives enhanced by intelligent automation. It serves as the core infrastructure layer that powers:
 
-## Key Features
+- **Flamingo** - AI-powered MSP platform with Mingo AI for technicians and Fae for clients
+- **OpenFrame** - Unified platform integrating multiple MSP tools into a single AI-driven interface
+- Custom MSP platforms and IT automation solutions
 
-### 🔐 Identity & Security
-- **Multi-tenant OAuth2 Authorization Server** with per-tenant RSA keys
-- **SSO Integration** (Google, Microsoft) with invitation-based onboarding
-- **JWT-based authentication** with secure HttpOnly cookie handling
-- **PKCE utilities** and Backend-for-Frontend (BFF) OAuth flows
+## Key Features & Benefits
 
-### 🌐 API & Gateway
-- **Reactive Spring Cloud Gateway** with multi-issuer JWT validation
-- **REST + GraphQL APIs** powered by Netflix DGS
-- **API key enforcement** with rate limiting
-- **WebSocket routing** for real-time communication
+### 🏗️ **Microservice-Ready Architecture**
+- 15 modular core libraries
+- Independent deployment capability
+- Clear separation of concerns
+- Event-driven communication patterns
 
-### 📊 Data & Analytics  
-- **Multi-database support**: MongoDB, Cassandra, Redis, Apache Pinot
-- **Event-driven architecture** with Kafka streaming
-- **Real-time analytics** and device monitoring
-- **Tenant-aware data isolation**
+### 🔐 **Enterprise Security**
+- Multi-tenant JWT authentication (RS256)
+- OAuth2 Authorization Server with OIDC support
+- SSO integration (Google, Microsoft)
+- API key management with rate limiting
+- Per-tenant RSA key management
 
-### 🔧 Tool Integration
-- **Universal MSP tool connector** (Fleet MDM, Tactical RMM, MeshCentral)
-- **Agent lifecycle management** with NATS messaging
-- **Tool-agnostic integration hub** for existing MSP stacks
+### 📊 **Real-Time Data Processing**
+- Apache Kafka event streaming
+- Apache Pinot analytics
+- Cassandra time-series storage
+- Redis distributed caching
+- Real-time event enrichment and normalization
 
-### 🚀 Platform Features
-- **Multi-tenant SaaS-ready** architecture
-- **Microservice foundation** with clean separation of concerns
-- **Scalable streaming pipelines** for device and log data
-- **Operational orchestration** and bootstrapping
+### 🤖 **Agent Management**
+- Machine agent lifecycle management
+- Tool installation orchestration
+- Heartbeat processing and monitoring
+- Integration with FleetDM and TacticalRMM
+
+### 🌐 **API-First Design**
+- GraphQL API with cursor-based pagination
+- REST API for external integrations
+- Reactive Spring Cloud Gateway
+- WebSocket support for real-time communication
 
 ## Architecture Overview
 
-OpenFrame OSS Lib implements a layered, event-driven architecture:
+OpenFrame OSS Lib implements a layered, event-driven system optimized for scale:
 
 ```mermaid
 flowchart TD
-    subgraph "Security Layer"
-        Auth["Authorization Service"]
-        OAuth["OAuth BFF"]
+    subgraph "Edge Layer"
+        Gateway["Gateway Service Core"]
+        BFF["Security OAuth BFF"]
     end
-    
+
+    subgraph "Identity Layer"
+        Auth["Authorization Service Core"]
+        SecurityCore["Security And OAuth Core"]
+    end
+
     subgraph "API Layer"
-        Gateway["Gateway Service"]
-        API["API Service Core"]
-        External["External API"]
+        ApiService["API Service Core"]
+        ExternalApi["External API Service Core"]
+        Contracts["API Lib Contracts"]
     end
-    
+
+    subgraph "Agent Layer"
+        ClientCore["Client Agent Core"]
+    end
+
     subgraph "Data Layer"
-        Mongo["MongoDB Domain"]
-        Redis["Redis Cache"]
-        Kafka["Kafka Streaming"]
+        Mongo["Data Mongo Core"]
+        Redis["Data Redis Cache"]
+        Kafka["Data Kafka Core"]
+        PlatformData["Data Platform Core"]
     end
-    
-    subgraph "Integration Layer"
-        Client["Client Service"]
-        Tools["Tool Integrations"]
-        NATS["NATS Messaging"]
+
+    subgraph "Stream Layer"
+        StreamCore["Stream Processing Core"]
     end
-    
-    Auth --> API
-    OAuth --> Gateway
-    Gateway --> API
-    Gateway --> External
-    API --> Mongo
-    API --> Redis
-    API --> Kafka
-    Client --> Tools
-    Client --> NATS
+
+    subgraph "Operations Layer"
+        Management["Management Service Core"]
+    end
+
+    BFF --> Gateway
+    Gateway --> ApiService
+    Gateway --> ExternalApi
+    Gateway --> Auth
+
+    Auth --> SecurityCore
+
+    ApiService --> Contracts
+    ExternalApi --> Contracts
+
+    ApiService --> Mongo
+    ApiService --> Redis
+    ApiService --> Kafka
+
+    ClientCore --> Kafka
+    ClientCore --> ApiService
+
+    Kafka --> StreamCore
+    StreamCore --> PlatformData
+
+    Management --> Kafka
+    Management --> Mongo
+    Management --> Redis
 ```
 
 ## Target Audience
 
-This library suite is designed for:
+This library is designed for:
 
-- **MSP Platform Developers** building comprehensive service management solutions
-- **Enterprise IT Teams** needing secure, scalable backend infrastructure  
-- **Integration Partners** connecting existing tools to modern platforms
-- **DevOps Engineers** implementing multi-tenant SaaS architectures
+### **MSP Developers & Platform Engineers**
+- Building next-generation MSP platforms
+- Integrating multiple tools into unified interfaces
+- Scaling IT automation workflows
+
+### **Enterprise Development Teams**
+- Creating multi-tenant SaaS applications
+- Implementing event-driven architectures
+- Building real-time analytics platforms
+
+### **Open Source Contributors**
+- Contributing to the OpenFrame ecosystem
+- Extending MSP platform capabilities
+- Building community-driven integrations
 
 ## Technology Stack
 
-- **Framework**: Spring Boot 3.3.0 with Java 21
-- **Security**: Spring Security OAuth2, JWT, PKCE
-- **Data**: MongoDB, Redis, Cassandra, Apache Pinot
-- **Messaging**: Kafka, NATS JetStream
-- **API**: REST, GraphQL (Netflix DGS)
-- **Gateway**: Spring Cloud Gateway (Reactive)
+| Layer | Technologies |
+|-------|-------------|
+| **Framework** | Spring Boot 3.3.0, Java 21 |
+| **Security** | OAuth2, JWT (RS256), Spring Security |
+| **Data Storage** | MongoDB, Apache Cassandra, Redis |
+| **Streaming** | Apache Kafka, NATS, Debezium |
+| **Analytics** | Apache Pinot |
+| **API** | GraphQL (Netflix DGS), REST |
+| **Gateway** | Spring Cloud Gateway (Reactive) |
+| **Testing** | Spring Boot Test, RestAssured |
+| **AI Integration** | Anthropic Claude, VoltAgent |
 
-## Module Structure
+## Core Design Principles
 
-OpenFrame OSS Lib consists of 20+ specialized modules organized into logical layers:
+✅ **Multi-tenant by design** - Built for SaaS-scale isolation  
+✅ **Event-driven architecture** - Real-time processing and integration  
+✅ **Cursor-based pagination** - Efficient data access patterns  
+✅ **Asymmetric JWT cryptography** - Secure token validation  
+✅ **Tool-agnostic normalization** - Universal event and data models  
+✅ **Infrastructure auto-bootstrap** - Zero-configuration deployments  
+✅ **Reactive edge gateway** - High-performance API routing  
+✅ **Clear separation of concerns** - Maintainable modular design  
 
-| Module Category | Purpose | Key Modules |
-|----------------|---------|-------------|
-| **Security** | Authentication & Authorization | `authorization-service-core`, `security-core` |
-| **API** | REST & GraphQL Endpoints | `api-service-core`, `external-api-service-core` |
-| **Gateway** | Edge Routing & Security | `gateway-service-core` |
-| **Data** | Persistence & Caching | `data-mongo`, `data-redis`, `data-kafka` |
-| **Client** | Agent Management | `client-service-core` |
-| **Streaming** | Real-time Processing | `stream-service-core` |
-| **Management** | Platform Operations | `management-service-core` |
-| **Integrations** | External Tool SDKs | `sdk/fleetmdm`, `sdk/tacticalrmm` |
+## Getting Started Path
 
-## Getting Started
-
-Ready to dive in? Here's your next steps:
+Ready to dive in? Follow this learning path:
 
 1. **[Prerequisites](prerequisites.md)** - Set up your development environment
-2. **[Quick Start](quick-start.md)** - Build and run in 5 minutes  
-3. **[First Steps](first-steps.md)** - Explore key features and concepts
+2. **[Quick Start](quick-start.md)** - Get a basic setup running in 5 minutes  
+3. **[First Steps](first-steps.md)** - Explore key features and capabilities
+4. **[Development Setup](../development/setup/local-development.md)** - Set up for contribution and extension
 
-## OpenFrame Platform Context
+## Repository Structure
 
-OpenFrame OSS Lib powers [OpenFrame](https://openframe.ai) – the unified AI-powered MSP platform that integrates multiple tools into a single interface. While you can use these libraries independently, they're designed to work seamlessly as part of the broader OpenFrame ecosystem.
+The library is organized into 15 modular cores:
 
-For more about the complete OpenFrame platform and its AI capabilities (Mingo AI for technicians, Fae for clients), visit [https://flamingo.run](https://flamingo.run).
+```text
+openframe-oss-lib/
+├── api-lib-contracts/          # Shared DTOs and contracts
+├── api-service-core/           # Internal GraphQL + REST API
+├── authorization-service-core/ # OAuth2 Authorization Server
+├── client-agent-core/          # Machine agent management
+├── core-utilities/             # Shared utilities
+├── data-kafka-core/           # Kafka infrastructure
+├── data-mongo-core/           # MongoDB persistence
+├── data-redis-cache/          # Redis caching
+├── data-platform-core/        # Pinot + Cassandra orchestration
+├── external-api-service-core/ # Public REST API
+├── gateway-service-core/      # Reactive API Gateway
+├── management-service-core/   # Infrastructure control plane
+├── security-and-oauth-core/   # JWT + PKCE utilities
+├── security-oauth-bff/        # OAuth BFF layer
+└── stream-processing-core/    # Event processing engine
+```
+
+Each module is independently reusable but designed to interoperate within a unified OpenFrame deployment.
 
 ## Community & Support
 
-- **OpenMSP Community**: [Join our Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
-- **Platform Website**: [https://www.openmsp.ai/](https://www.openmsp.ai/)
-- **Source Code**: Available on GitHub (link in repository)
+Join the OpenFrame community:
+
+- **Slack Community**: [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
+- **Website**: [flamingo.run](https://flamingo.run)
+- **OpenFrame Platform**: [openframe.ai](https://openframe.ai)
+- **GitHub**: [flamingo-stack/openframe-oss-lib](https://github.com/flamingo-stack/openframe-oss-lib)
+
+> **Note**: We use the OpenMSP Slack community for all discussions, issues, and collaboration. GitHub Issues and Discussions are not actively monitored.
 
 ---
 
-*Built with ❤️ by the Flamingo Stack team for the open source MSP community.*
+**Ready to build the future of MSP platforms?** Continue with the [Prerequisites Guide](prerequisites.md) to set up your development environment.

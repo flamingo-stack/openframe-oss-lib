@@ -2,51 +2,229 @@
 
 ## Overview
 
-The **Data Redis Cache** module provides Redis-based caching and key management infrastructure for the OpenFrame platform. It integrates Spring Cache, Redis templates (imperative and reactive), and tenant-aware key generation to deliver:
+The **Data Redis Cache** module provides Redis-based caching and key management infrastructure for the OpenFrame platform. It integrates Spring Cache, Redis (blocking and reactive), and tenant-aware key generation to deliver:
 
 - Centralized cache configuration
-- Multi-tenant safe key prefixes
-- JSON and string serialization strategies
-- Reactive and blocking Redis access patterns
+- Tenant-aware cache key prefixes
+- Reactive and imperative Redis templates
+- Conditional auto-configuration via properties
 
-This module acts as the caching foundation for higher-level services such as API Service Core, Authorization Service Core, Gateway Service Core, and data access modules.
-
-Redis is enabled conditionally via the `spring.redis.enabled` property, allowing deployments to toggle caching without code changes.
+This module is designed to be reusable across API services, authorization services, gateway services, and management services that require high-performance distributed caching.
 
 ---
 
-## Architecture Overview
+## Purpose in the Overall Architecture
+
+Within the OpenFrame ecosystem, Redis serves as:
+
+- ✅ A distributed cache layer
+- ✅ A short-lived data store (tokens, session data, rate limits)
+- ✅ A reactive messaging/state component
+- ✅ A performance optimization layer for MongoDB and other persistent stores
+
+High-level system positioning:
+
+```mermaid
+flowchart LR
+    Client["Client Application"] --> ApiService["API Service Core"]
+    ApiService --> Mongo["Data Mongo Core"]
+    ApiService --> Redis["Data Redis Cache"]
+    ApiService --> Kafka["Data Kafka Core"]
+
+    Gateway["Gateway Service Core"] --> Redis
+    Auth["Authorization Service Core"] --> Redis
+
+    Redis --> RedisServer[("Redis Server")]
+    Mongo --> MongoServer[("MongoDB")]
+    Kafka --> KafkaCluster[("Kafka Cluster")]
+```
+
+The **Data Redis Cache** module abstracts Redis configuration and enforces consistent key formatting across all services.
+
+---
+
+## Core Components
+
+The module contains three main configuration classes:
+
+1. **CacheConfig** – Spring Cache + Redis CacheManager configuration
+2. **RedisConfig** – RedisTemplate and ReactiveRedisTemplate configuration
+3. **OpenframeRedisKeyConfiguration** – Tenant-aware key builder configuration
+
+Component relationship overview:
 
 ```mermaid
 flowchart TD
-    AppServices["Application Services"] -->|"@Cacheable"| SpringCache["Spring Cache Abstraction"]
-    SpringCache --> CacheManager["RedisCacheManager"]
-    CacheManager --> RedisConnection["RedisConnectionFactory"]
-    RedisConnection --> RedisServer[("Redis Server")]
+    RedisConfig["RedisConfig"] --> RedisTemplate["RedisTemplate<String,String>"]
+    RedisConfig --> ReactiveTemplate["ReactiveRedisTemplate<String,String>"]
 
-    AppServices --> RedisTemplate["RedisTemplate"]
-    AppServices --> ReactiveTemplate["ReactiveRedisTemplate"]
+    CacheConfig["CacheConfig"] --> CacheManager["RedisCacheManager"]
+    CacheConfig --> KeyBuilder["OpenframeRedisKeyBuilder"]
 
-    KeyBuilder["OpenframeRedisKeyBuilder"] --> CacheManager
     KeyConfig["OpenframeRedisKeyConfiguration"] --> KeyBuilder
-    RedisConfigNode["RedisConfig"] --> RedisTemplate
-    RedisConfigNode --> ReactiveTemplate
-    CacheConfigNode["CacheConfig"] --> CacheManager
+
+    CacheManager --> RedisConnection["RedisConnectionFactory"]
+    RedisTemplate --> RedisConnection
+    ReactiveTemplate --> ReactiveConnection["ReactiveRedisConnectionFactory"]
 ```
-
-### Responsibilities by Component
-
-| Component | Responsibility |
-|------------|----------------|
-| CacheConfig | Configures Spring Cache with Redis and tenant-aware key prefixing |
-| RedisConfig | Defines RedisTemplate and ReactiveRedisTemplate beans |
-| OpenframeRedisKeyConfiguration | Registers OpenframeRedisKeyBuilder for consistent key construction |
 
 ---
 
-## Conditional Activation
+# 1. Cache Configuration
 
-Both caching and Redis infrastructure are enabled only when:
+## Class: CacheConfig
+
+**Responsibility:**
+Configures Spring’s caching abstraction backed by Redis.
+
+### Key Characteristics
+
+- Enabled via `@EnableCaching`
+- Conditional on property: `spring.redis.enabled=true`
+- Provides a `CacheManager` bean if none exists
+- Enforces tenant-aware key prefixes
+
+### Default Cache Behavior
+
+```text
+TTL: 6 hours
+Null values: Disabled
+Key serializer: StringRedisSerializer
+Value serializer: GenericJackson2JsonRedisSerializer
+Prefix format: <prefix>:<cacheName>::<key>
+```
+
+### Tenant-Aware Cache Prefixing
+
+A critical design decision in this module is the use of a custom key prefix strategy:
+
+```text
+<prefix>:<cacheName>::<key>
+```
+
+This prefix is computed using:
+
+- `OpenframeRedisKeyBuilder`
+- `computePrefixWith(...)` in `RedisCacheConfiguration`
+
+This ensures:
+
+- Logical tenant isolation
+- Reduced risk of cross-tenant key collision
+- Environment-based prefixing support (dev/stage/prod)
+
+### Cache Flow
+
+```mermaid
+flowchart LR
+    Service["Service Method @Cacheable"] --> CacheAbstraction["Spring Cache"]
+    CacheAbstraction --> CacheManager["RedisCacheManager"]
+    CacheManager --> KeyBuilder["OpenframeRedisKeyBuilder"]
+    CacheManager --> RedisServer[("Redis")]
+```
+
+---
+
+# 2. Redis Template Configuration
+
+## Class: RedisConfig
+
+**Responsibility:**
+Provides both blocking and reactive Redis clients.
+
+Activated only when:
+
+```text
+spring.redis.enabled=true
+```
+
+## Beans Provided
+
+### 1️⃣ RedisTemplate<String, String>
+
+Used for imperative (blocking) Redis operations.
+
+Serialization strategy:
+
+```text
+Keys: StringRedisSerializer
+Values: StringRedisSerializer
+Hash Keys: StringRedisSerializer
+Hash Values: StringRedisSerializer
+```
+
+### 2️⃣ ReactiveStringRedisTemplate
+
+High-level reactive template for string-based operations.
+
+### 3️⃣ ReactiveRedisTemplate<String, String>
+
+Custom reactive template with explicitly defined serialization context.
+
+Reactive flow example:
+
+```mermaid
+flowchart LR
+    ReactiveService["Reactive Service"] --> ReactiveTemplate["ReactiveRedisTemplate"]
+    ReactiveTemplate --> ReactiveConnection["ReactiveRedisConnectionFactory"]
+    ReactiveConnection --> Redis[("Redis")]
+```
+
+### Why Both Blocking and Reactive?
+
+The OpenFrame platform includes:
+
+- Traditional Spring MVC services
+- Reactive WebFlux services
+- Asynchronous event-driven processing
+
+Providing both templates ensures consistent Redis access across architectural styles.
+
+---
+
+# 3. Redis Key Builder Configuration
+
+## Class: OpenframeRedisKeyConfiguration
+
+**Responsibility:**
+Registers a singleton `OpenframeRedisKeyBuilder` if not already defined.
+
+### Configuration Properties
+
+The configuration enables:
+
+```text
+OpenframeRedisProperties
+```
+
+These properties define:
+
+- Key prefix
+- Tenant behavior
+- Environment scoping
+
+### Design Goals
+
+- Centralized key formatting
+- Avoid hardcoded key naming patterns
+- Ensure consistent multi-tenant boundaries
+
+### Key Generation Concept
+
+```mermaid
+flowchart TD
+    TenantContext["Tenant Context"] --> KeyBuilder
+    CacheName["Cache Name"] --> KeyBuilder
+    BusinessKey["Business Key"] --> KeyBuilder
+    KeyBuilder --> FinalKey["prefix:tenant:cache::key"]
+    FinalKey --> Redis[("Redis")]
+```
+
+---
+
+## Conditional Activation Strategy
+
+All Redis-related configuration is guarded by:
 
 ```text
 spring.redis.enabled=true
@@ -54,235 +232,128 @@ spring.redis.enabled=true
 
 This allows:
 
-- Local development without Redis
-- Feature toggling in test environments
-- Controlled rollout of caching
+- Running services without Redis (local development)
+- Feature toggling caching
+- Easier integration testing
 
-If the property is disabled or missing, none of the Redis beans are registered.
+If Redis is disabled:
 
----
-
-## Core Components
-
-### 1. CacheConfig
-
-**Class:** `CacheConfig`
-
-Enables and configures Spring Cache backed by Redis.
-
-### Key Characteristics
-
-- Enables caching via `@EnableCaching`
-- Provides a default `CacheManager` if none exists
-- Uses `RedisCacheManager`
-- Applies:
-  - Default TTL: 6 hours
-  - JSON value serialization
-  - String key serialization
-  - Null value caching disabled
-  - Tenant-aware key prefixing
-
-### Cache Key Strategy
-
-All cache entries use a computed prefix:
-
-```text
-<prefix>:<cacheName>::<key>
-```
-
-The prefix is generated using `OpenframeRedisKeyBuilder`, ensuring:
-
-- Tenant isolation
-- Consistent naming across services
-- Safe multi-tenant deployments
-
-### Cache Flow
-
-```mermaid
-flowchart LR
-    Service["Service Method"] -->|"@Cacheable"| CacheAbstraction["Spring Cache"]
-    CacheAbstraction --> CacheManagerNode["RedisCacheManager"]
-    CacheManagerNode --> Prefix["Key Prefix Computation"]
-    Prefix --> Redis[("Redis")]
-```
+- CacheManager is not created
+- RedisTemplate beans are not registered
+- Services must fall back to non-cached behavior
 
 ---
 
-### 2. RedisConfig
+## Multi-Tenancy Considerations
 
-**Class:** `RedisConfig`
+Redis is a shared infrastructure component. This module enforces isolation through:
 
-Provides Redis infrastructure beans for both blocking and reactive access.
+- Key prefix computation
+- Cache name scoping
+- Centralized key builder logic
 
-### Beans Provided
+Without this layer, services might:
 
-#### RedisTemplate<String, String>
+- Overwrite keys across tenants
+- Leak cached data
+- Cause inconsistent invalidation behavior
 
-- Blocking Redis access
-- String serialization for keys and values
-- Hash operations supported
-
-#### ReactiveStringRedisTemplate
-
-- Reactive string-based operations
-- Built on ReactiveRedisConnectionFactory
-
-#### ReactiveRedisTemplate<String, String>
-
-- Fully reactive template
-- Custom serialization context
-- Explicit key, value, hashKey, hashValue serializers
-
-### Reactive vs Blocking Architecture
-
-```mermaid
-flowchart TD
-    ServiceLayer["Service Layer"]
-
-    ServiceLayer --> Blocking["RedisTemplate"]
-    ServiceLayer --> Reactive["ReactiveRedisTemplate"]
-
-    Blocking --> SyncConn["RedisConnectionFactory"]
-    Reactive --> ReactiveConn["ReactiveRedisConnectionFactory"]
-
-    SyncConn --> RedisServer[("Redis")]
-    ReactiveConn --> RedisServer
-```
-
-This dual-template strategy allows:
-
-- Traditional synchronous service implementations
-- Fully reactive WebFlux-based pipelines
+The **Data Redis Cache** module prevents these risks by standardizing key structure.
 
 ---
 
-### 3. OpenframeRedisKeyConfiguration
+## Integration with Other Modules
 
-**Class:** `OpenframeRedisKeyConfiguration`
+Although this module is infrastructure-focused, it supports:
 
-Registers the `OpenframeRedisKeyBuilder` bean.
+- API Service Core (DTO caching, query result caching)
+- Authorization Service Core (token/session caching)
+- Gateway Service Core (rate limiting and request metadata)
+- Management Service Core (scheduled job locks, temporary state)
 
-### Purpose
-
-- Centralizes Redis key construction logic
-- Binds configuration properties via `OpenframeRedisProperties`
-- Ensures consistent prefixing rules
-- Allows customization without modifying business logic
-
-### Key Builder Role
-
-The key builder abstracts:
-
-- Environment prefixing
-- Tenant scoping
-- Cache namespace generation
-- Key normalization
-
-This prevents:
-
-- Key collisions across tenants
-- Cross-environment pollution
-- Inconsistent naming conventions
-
----
-
-## Multi-Tenant Isolation Strategy
-
-Multi-tenancy is enforced at the key level.
-
-```mermaid
-flowchart TD
-    Request["Incoming Request"] --> TenantContext["Tenant Context"]
-    TenantContext --> KeyBuilderNode["OpenframeRedisKeyBuilder"]
-    KeyBuilderNode --> CacheKey["Tenant Prefixed Key"]
-    CacheKey --> Redis[("Redis")]
-```
-
-Example conceptual key:
-
-```text
-tenantA:deviceCache::deviceId_123
-```
-
-This ensures:
-
-- Strong isolation between organizations
-- Safe shared Redis clusters
-- Clear observability in Redis CLI
+It does not implement business logic itself — it provides the caching backbone for other modules.
 
 ---
 
 ## Serialization Strategy
 
-### Cache Values
+Two serialization approaches are used:
 
-- `GenericJackson2JsonRedisSerializer`
-- JSON-based serialization
-- Allows storing complex DTOs and domain objects
-
-### Templates
-
-- `StringRedisSerializer` for keys
-- String values for template usage
-
-This combination provides:
-
-- Human-readable keys
-- Efficient value encoding
-- Compatibility across services
-
----
-
-## Integration Within the Platform
-
-The Data Redis Cache module is consumed by higher-level modules such as:
-
-- API Service Core (for query and response caching)
-- Authorization Service Core (for token/session optimizations)
-- Gateway Service Core (for rate limiting and metadata caching)
-- Data access modules (for frequently accessed aggregates)
-
-It acts as a horizontal infrastructure layer beneath business modules.
-
----
-
-## Design Principles
-
-1. Conditional Infrastructure Activation
-2. Tenant-Safe by Default
-3. Reactive and Blocking Support
-4. Standardized Serialization
-5. Replaceable CacheManager (via ConditionalOnMissingBean)
-
----
-
-## Deployment Considerations
-
-### Required Configuration
+### Cache Layer
 
 ```text
-spring.redis.enabled=true
-spring.redis.host=localhost
-spring.redis.port=6379
+Value Serializer: GenericJackson2JsonRedisSerializer
 ```
 
-### Production Recommendations
+Advantages:
 
-- Use dedicated Redis clusters
-- Enable authentication and TLS
-- Configure eviction policies carefully
-- Monitor memory usage
-- Consider Redis Sentinel or Cluster for HA
+- JSON-based storage
+- Flexible object mapping
+- Backward-compatible evolution
+
+### Template Layer
+
+```text
+Value Serializer: StringRedisSerializer
+```
+
+Advantages:
+
+- Lightweight
+- Ideal for tokens, counters, and simple flags
+- Minimal overhead
+
+---
+
+## Operational Characteristics
+
+### Default TTL
+
+```text
+6 hours
+```
+
+This balances:
+
+- Reduced database load
+- Acceptable staleness window
+- Memory control
+
+### Null Caching Disabled
+
+```text
+.disableCachingNullValues()
+```
+
+Prevents:
+
+- Cache pollution
+- Memory waste
+- Ambiguous null semantics
+
+---
+
+## Extensibility
+
+This module is intentionally designed to be extensible:
+
+- Custom `CacheManager` can override default
+- Custom `OpenframeRedisKeyBuilder` can replace default
+- TTL policies can be customized per cache
+- Additional Redis templates can be registered
+
+Because beans are guarded with `@ConditionalOnMissingBean`, downstream services can override behavior safely.
 
 ---
 
 ## Summary
 
-The **Data Redis Cache** module provides the foundational Redis infrastructure for OpenFrame. It standardizes:
+The **Data Redis Cache** module provides:
 
-- Cache management
-- Key generation
-- Multi-tenant isolation
-- Reactive and synchronous access patterns
+- ✅ Standardized Redis configuration
+- ✅ Distributed Spring Cache integration
+- ✅ Reactive and blocking Redis support
+- ✅ Tenant-aware key prefixing
+- ✅ Safe conditional activation
 
-By centralizing Redis configuration and key semantics, the module ensures consistent, safe, and scalable caching behavior across the entire platform.
+It forms the distributed caching foundation for the OpenFrame platform, ensuring consistency, isolation, and performance across services.

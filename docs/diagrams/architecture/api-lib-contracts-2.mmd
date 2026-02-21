@@ -1,3 +1,9 @@
-flowchart TD
-    GenericResult["GenericQueryResult<T>"] --> CountedResult["CountedGenericQueryResult<T>"]
-    CountedResult --> FilteredCount["filteredCount"]
+flowchart LR
+    Contracts["Api Lib Contracts"] --> Audit["Audit DTOs"]
+    Contracts --> Device["Device DTOs"]
+    Contracts --> Event["Event DTOs"]
+    Contracts --> Org["Organization DTOs"]
+    Contracts --> Tool["Tool DTOs"]
+    Contracts --> Shared["Shared Models"]
+    Contracts --> Services["Shared Services"]
+    Contracts --> Mappers["Mappers"]

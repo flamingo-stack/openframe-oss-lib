@@ -1,4 +1,7 @@
 flowchart TD
-    Existing["Existing Agent"] --> Compare["Compare Versions"]
-    Compare -->|"Same"| Skip["No Publish"]
-    Compare -->|"Different"| Publish["Publish Version Update"]
+    LoadConfig["Load Agent JSON"] --> ExistsCheck["Agent Exists?"]
+    ExistsCheck -->|"No"| Create["Create Agent"]
+    ExistsCheck -->|"Yes"| PreserveVersion["Preserve Release Version"]
+    PreserveVersion --> Compare["Version Changed?"]
+    Compare -->|"Yes"| Publish["Publish Tool Agent Update"]
+    Compare -->|"No"| SaveOnly["Save Without Publish"]
