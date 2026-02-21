@@ -1,0 +1,5 @@
+flowchart TD
+    MongoLayer["Mongo Persistence Layer"] --> AuthService["Authorization Service Core"]
+    MongoLayer --> ApiService["API Service Core"]
+    MongoLayer --> ManagementService["Management Service Core"]
+    MongoLayer --> GatewayService["Gateway Service Core"]

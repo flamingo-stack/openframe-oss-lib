@@ -1,0 +1,6 @@
+flowchart TD
+    Start["Application Start"] --> Normalize["CassandraKeyspaceNormalizer"]
+    Normalize --> Config["CassandraConfig"]
+    Config --> Ensure["Ensure Keyspace Exists"]
+    Ensure --> Session["Create CqlSessionFactoryBean"]
+    Session --> Health["CassandraHealthIndicator Active"]

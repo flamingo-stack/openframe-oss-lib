@@ -1,0 +1,6 @@
+flowchart TD
+    Event["Debezium Event"] --> Payload["Payload"]
+    Payload --> Before["before"]
+    Payload --> After["after"]
+    Payload --> Op["operation"]
+    Payload --> Source["source metadata"]

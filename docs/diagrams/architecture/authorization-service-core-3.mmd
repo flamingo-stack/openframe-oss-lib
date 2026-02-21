@@ -1,0 +1,7 @@
+flowchart LR
+    TokenReq["Token Request"] --> JWKSource["JWKSource"]
+    JWKSource --> TenantCtx["TenantContext.getTenantId()"]
+    TenantCtx --> KeySvc["TenantKeyService"]
+    KeySvc --> Repo["TenantKeyRepository (Mongo)"]
+    KeySvc --> RSA["RSAKey (pub+priv)"]
+    RSA --> Sign["JWT Signing"]

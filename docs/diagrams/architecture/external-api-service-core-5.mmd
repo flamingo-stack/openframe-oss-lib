@@ -1,0 +1,5 @@
+flowchart LR
+    Client -->|"cursor, limit"| Controller
+    Controller --> Service
+    Service --> Result["Items + PageInfo"]
+    Result --> Client

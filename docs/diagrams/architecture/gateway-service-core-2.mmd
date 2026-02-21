@@ -1,0 +1,7 @@
+flowchart TD
+    Request["Incoming Request"] --> Resolver["JwtIssuerAuthenticationManagerResolver"]
+    Resolver --> Cache["Issuer Managers Cache"]
+    Cache --> Manager["ReactiveAuthenticationManager"]
+    Manager --> Decoder["NimbusReactiveJwtDecoder"]
+    Decoder --> Validator["Issuer Validator"]
+    Validator --> Authenticated["Authenticated Principal"]

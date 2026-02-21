@@ -1,0 +1,4 @@
+flowchart LR
+    Existing["Existing Agent"] --> Compare["Compare Version"]
+    Compare -->|"Changed"| Publish["Publish Update Event"]
+    Compare -->|"Same"| Skip["No Action"]

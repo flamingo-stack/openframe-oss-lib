@@ -1,0 +1,7 @@
+flowchart TD
+    Request["HTTP GET /devices"] --> Criteria["DeviceFilterCriteria"]
+    Criteria --> Mapper["DeviceMapper"]
+    Mapper --> Options["DeviceFilterOptions"]
+    Options --> Service["DeviceService"]
+    Service --> Result["Cursor Result"]
+    Result --> Response["DevicesResponse"]

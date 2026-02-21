@@ -1,0 +1,10 @@
+flowchart LR
+    Api["API Layer"] --> Mongo
+    Api --> Redis
+    Api --> Pinot
+
+    Stream --> Cassandra
+    Stream --> Kafka
+
+    Management --> Pinot
+    Management --> Kafka

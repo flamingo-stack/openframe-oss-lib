@@ -1,0 +1,27 @@
+flowchart TD
+    Management["Management Service Core"]
+
+    subgraph storage["Persistence & Data"]
+        Mongo["MongoDB"]
+        Redis["Redis"]
+        Pinot["Apache Pinot"]
+    end
+
+    subgraph messaging["Messaging & CDC"]
+        Kafka["Kafka / Debezium"]
+        NATS["NATS Streams"]
+    end
+
+    subgraph runtime["Runtime Services"]
+        ClientAgent["Client Agent Service"]
+        StreamService["Stream Processing Service"]
+    end
+
+    Management -->|"configures"| Pinot
+    Management -->|"initializes"| NATS
+    Management -->|"creates connectors"| Kafka
+    Management -->|"locks"| Redis
+    Management -->|"persists config"| Mongo
+    Management -->|"publishes updates"| ClientAgent
+    Kafka --> StreamService
+    NATS --> ClientAgent

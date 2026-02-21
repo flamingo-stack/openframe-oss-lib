@@ -1,0 +1,5 @@
+flowchart TD
+    Request["Request"] --> AddAuth["AddAuthorizationHeaderFilter"]
+    AddAuth --> JwtAuth["JWT Authentication"]
+    JwtAuth --> RoleCheck["Role Authorization"]
+    RoleCheck --> Controller["Controller or Route"]

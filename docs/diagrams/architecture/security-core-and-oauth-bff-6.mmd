@@ -1,0 +1,7 @@
+flowchart TD
+    Browser["Browser"] -->|"Auth Request"| BFF["Security Core And Oauth Bff"]
+    BFF -->|"Code Exchange"| AuthServer["Authorization Service"]
+    AuthServer -->|"JWT Issued"| BFF
+    BFF -->|"HTTP Only Cookies"| Browser
+    Browser -->|"Requests with Cookies"| Gateway["Gateway Service"]
+    Gateway -->|"Validate JWT"| Resource["API Services"]

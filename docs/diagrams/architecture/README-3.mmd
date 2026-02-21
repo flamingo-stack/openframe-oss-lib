@@ -1,0 +1,7 @@
+flowchart TD
+    ToolDB["Integrated Tool Database"] --> Debezium
+    Debezium --> KafkaInbound["Kafka Inbound Topic"]
+    KafkaInbound --> Stream["Stream Processing Core"]
+    Stream --> Enrichment["Metadata Enrichment"]
+    Enrichment --> Cassandra["Cassandra Audit Storage"]
+    Enrichment --> KafkaOut["Normalized Kafka Topic"]

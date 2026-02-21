@@ -1,0 +1,9 @@
+flowchart TD
+    AppLayer["Service Layer<br/>Authorization, API, Management"] --> RepoLayer["Mongo Repositories"]
+    RepoLayer --> CustomLayer["Custom Repository Implementations"]
+    RepoLayer --> ReactiveLayer["Reactive Repositories"]
+    CustomLayer --> Template["MongoTemplate"]
+    ReactiveLayer --> ReactiveDriver["Reactive Mongo Driver"]
+    Template --> MongoDB[("MongoDB")]
+    ReactiveDriver --> MongoDB
+    ConfigLayer["MongoConfig<br/>MongoIndexConfig"] --> RepoLayer

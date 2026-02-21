@@ -1,0 +1,22 @@
+flowchart TD
+    Agent["Endpoint Agent"] -->|"POST /api/agents/register"| AgentController["Agent Controller"]
+    Agent -->|"POST /oauth/token"| AgentAuthController["Agent Auth Controller"]
+    Agent -->|"GET /tool-agent/{assetId}"| ToolAgentFileController["Tool Agent File Controller"]
+
+    AgentController --> AgentRegistrationService["Agent Registration Service"]
+    AgentRegistrationService --> DefaultProcessor["Agent Registration Processor"]
+
+    Nats[("NATS / JetStream")] --> InstalledAgentListener["Installed Agent Listener"]
+    Nats --> ToolConnectionListener["Tool Connection Listener"]
+    Nats --> MachineHeartbeatListener["Machine Heartbeat Listener"]
+    Nats --> ClientConnectionListener["Client Connection Listener"]
+
+    InstalledAgentListener --> InstalledAgentService["Installed Agent Service"]
+    ToolConnectionListener --> ToolConnectionService["Tool Connection Service"]
+    MachineHeartbeatListener --> MachineStatusService["Machine Status Service"]
+    ClientConnectionListener --> MachineStatusService
+
+    AgentRegistrationService --> DataLayer[("Mongo / Data Platform")]
+    InstalledAgentService --> DataLayer
+    ToolConnectionService --> DataLayer
+    MachineStatusService --> DataLayer

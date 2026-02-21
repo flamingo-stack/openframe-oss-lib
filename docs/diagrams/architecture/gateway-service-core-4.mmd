@@ -1,0 +1,11 @@
+flowchart TD
+    Req["/external-api Request"] --> HasKey{{"X-API-Key Present?"}}
+    HasKey -->|No| Unauthorized["401 Unauthorized"]
+    HasKey -->|Yes| Validate["ApiKeyValidationService"]
+    Validate --> Valid{{"Valid?"}}
+    Valid -->|No| Unauthorized
+    Valid -->|Yes| RateCheck["RateLimitService"]
+    RateCheck --> Allowed{{"Within Limits?"}}
+    Allowed -->|No| TooMany["429 Too Many Requests"]
+    Allowed -->|Yes| Enrich["Add User Context Headers"]
+    Enrich --> Forward["Forward to External API"]

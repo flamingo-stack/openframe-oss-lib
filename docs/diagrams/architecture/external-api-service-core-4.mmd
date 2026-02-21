@@ -1,0 +1,7 @@
+flowchart TD
+    Client["External Client"] --> IntegrationCtrl
+    IntegrationCtrl --> RestProxy
+    RestProxy --> ToolRepo["IntegratedToolRepository"]
+    RestProxy --> UrlService["ToolUrlService"]
+    RestProxy --> Resolver["ProxyUrlResolver"]
+    Resolver --> Target["Tool API Endpoint"]

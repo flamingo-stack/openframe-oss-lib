@@ -1,0 +1,12 @@
+flowchart TD
+    Agent["Endpoint Agent"] --> Auth["AgentAuthController"]
+    Agent --> Register["AgentController"]
+    Agent --> NATS["NATS Events"]
+
+    NATS --> Installed["InstalledAgentListener"]
+    NATS --> ToolConn["ToolConnectionListener"]
+    NATS --> Heartbeat["MachineHeartbeatListener"]
+
+    Installed --> Mongo
+    ToolConn --> Mongo
+    Heartbeat --> Mongo

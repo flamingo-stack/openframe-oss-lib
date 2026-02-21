@@ -1,0 +1,20 @@
+flowchart TD
+    Browser["User Browser"] --> Login["Login Page /oauth2/authorize"]
+    Login --> AuthServer["Authorization Service Core"]
+
+    subgraph authz["Authorization Service Core"]
+        TenantFilter["TenantContextFilter"]
+        AuthzConfig["AuthorizationServerConfig"]
+        SecurityCfg["SecurityConfig"]
+        KeyService["TenantKeyService"]
+        MongoAuthSvc["MongoAuthorizationService"]
+        ClientRepo["MongoRegisteredClientRepository"]
+    end
+
+    AuthServer --> Mongo[("MongoDB")]
+    AuthServer --> KeyService
+    KeyService --> Mongo
+
+    AuthServer --> JWT["Signed JWT (per-tenant key)"]
+    JWT --> Gateway["Gateway Service Core"]
+    Gateway --> ApiSvc["API Service Core"]

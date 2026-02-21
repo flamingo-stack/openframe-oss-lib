@@ -1,0 +1,7 @@
+flowchart TD
+    LogReq["GET /logs"] --> LogCriteria["LogFilterCriteria"]
+    LogCriteria --> LogMapper
+    LogMapper --> LogOptions["LogFilterOptions"]
+    LogOptions --> LogService
+    LogService --> Page["Paginated Result"]
+    Page --> LogsResponse
