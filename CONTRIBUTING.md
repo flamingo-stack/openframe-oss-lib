@@ -1,465 +1,570 @@
-# Contributing to OpenFrame OSS Lib
+# Contributing to OpenFrame OSS Libraries
 
-Welcome to the OpenFrame OSS Lib contributor community! This guide provides comprehensive information about contributing to the project, from code standards to submission processes.
+Welcome to OpenFrame OSS Libraries! We're excited to have you contribute to the future of open-source MSP tooling and AI-driven automation. This guide covers everything you need to know to make meaningful contributions to the project.
 
-## 🤝 Community Guidelines
+## 🚀 Quick Start for Contributors
 
-OpenFrame OSS Lib follows the [Contributor Covenant Code of Conduct](https://www.contributor-covenant.org/). By participating, you agree to uphold this code.
-
-**Key Principles:**
-- 🤝 **Be respectful** and inclusive in all interactions
-- 🔍 **Be thorough** in code reviews and testing
-- 📚 **Document your changes** clearly and comprehensively
-- 🛡️ **Prioritize security** in all contributions
-- 🧪 **Test everything** - no untested code gets merged
-
-## 🚀 Getting Started
-
-### Prerequisites for Contributors
-
-Before contributing, ensure you have:
-
-- ✅ **Development environment** set up ([Environment Setup](./docs/development/setup/environment.md))
-- ✅ **Local development stack** running ([Local Development](./docs/development/setup/local-development.md))
-- ✅ **Architecture understanding** ([Architecture Overview](./docs/development/architecture/README.md))
-- ✅ **Testing knowledge** ([Testing Guide](./docs/development/testing/README.md))
-- ✅ **Security awareness** ([Security Best Practices](./docs/development/security/README.md))
-
-### Setting Up Your Contribution
+### 1. Fork and Clone
 
 ```bash
-# Fork the repository on GitHub
-# Clone your fork locally
+# Fork the repository on GitHub, then clone your fork
 git clone https://github.com/YOUR_USERNAME/openframe-oss-lib.git
 cd openframe-oss-lib
 
-# Add upstream remote
+# Add upstream remote for staying in sync
 git remote add upstream https://github.com/flamingo-stack/openframe-oss-lib.git
+```
 
-# Create a feature branch
+### 2. Set Up Development Environment
+
+```bash
+# Install dependencies and build all modules
+mvn clean install
+
+# Start development services with Docker
+docker-compose -f docker-compose.dev.yml up -d
+
+# Run the main API service
+cd openframe-api-service-core
+mvn spring-boot:run -Dspring-boot.run.profiles=development
+```
+
+### 3. Create Feature Branch
+
+```bash
+# Always create a new branch for your work
 git checkout -b feature/your-feature-name
 
-# Verify build works
-mvn clean install -DskipTests
+# Keep your branch up to date
+git fetch upstream
+git rebase upstream/main
 ```
 
-## 🌳 Branch Naming Convention
+## 🎯 Ways to Contribute
 
-Use descriptive branch names following this pattern:
+### 🐛 Bug Reports and Fixes
+- Report bugs using [GitHub Issues](https://github.com/flamingo-stack/openframe-oss-lib/issues)
+- Fix bugs with clear, focused pull requests
+- Include reproduction steps and test cases
 
-```text
-<type>/<short-description>
+### ✨ New Features  
+- Propose new features in [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) first
+- Implement features that align with the OpenFrame roadmap
+- Ensure backward compatibility and proper documentation
 
-Types:
-- feature/    - New features or enhancements
-- fix/        - Bug fixes
-- security/   - Security improvements
-- refactor/   - Code refactoring without functional changes
-- docs/       - Documentation updates
-- test/       - Test additions or improvements
-- chore/      - Maintenance tasks (dependencies, build, etc.)
+### 📚 Documentation
+- Improve existing documentation
+- Add code examples and tutorials
+- Update API documentation for changes
+- Translate documentation to other languages
 
-Examples:
-- feature/multi-tenant-api-keys
-- fix/cursor-pagination-edge-case
-- security/improve-jwt-validation
-- refactor/service-layer-cleanup
-- docs/update-security-guide
+### 🧪 Testing and Quality
+- Add or improve unit tests (target 80% coverage)
+- Write integration tests for new features
+- Improve error handling and edge cases
+- Performance testing and optimization
+
+## 📋 Development Standards
+
+### Code Style and Conventions
+
+**Follow Google Java Style Guide** with these OpenFrame-specific standards:
+
+```java
+// ✅ GOOD: Proper class structure with OpenFrame patterns
+@RestController
+@RequestMapping("/api/organizations")
+@RequiredArgsConstructor
+@Validated
+@Slf4j
+public class OrganizationController {
+    
+    private final OrganizationService organizationService;
+    private final OrganizationMapper organizationMapper;
+    
+    @GetMapping
+    public ResponseEntity<Page<OrganizationResponse>> list(
+        @AuthenticationPrincipal AuthPrincipal principal,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "20") int size
+    ) {
+        log.debug("Listing organizations for tenant: {}", principal.getTenantId());
+        
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Organization> organizations = organizationService.findByTenant(
+            principal.getTenantId(), 
+            pageable
+        );
+        
+        Page<OrganizationResponse> response = organizations.map(organizationMapper::toResponse);
+        return ResponseEntity.ok(response);
+    }
+}
 ```
 
-## 📝 Commit Standards
+### Naming Conventions
+
+| Type | Convention | Example |
+|------|------------|---------|
+| **Classes** | PascalCase | `OrganizationService`, `UserController` |
+| **Methods** | camelCase | `findByTenant()`, `createOrganization()` |
+| **Variables** | camelCase | `organizationId`, `tenantContext` |
+| **Constants** | UPPER_SNAKE_CASE | `MAX_PAGE_SIZE`, `DEFAULT_TIMEOUT` |
+| **Packages** | lowercase | `com.openframe.api.service` |
+
+### Critical Security Requirements
+
+**⚠️ CRITICAL: All endpoints MUST enforce tenant isolation**
+
+```java
+// ✅ CORRECT: Enforces tenant isolation
+@GetMapping("/{id}")
+public Organization get(
+    @PathVariable String id,
+    @AuthenticationPrincipal AuthPrincipal principal
+) {
+    return repository.findByTenantIdAndId(principal.getTenantId(), id)
+        .orElseThrow(() -> new OrganizationNotFoundException(id));
+}
+
+// ❌ WRONG: Can access any tenant's data
+@GetMapping("/{id}")
+public Organization get(@PathVariable String id) {
+    return repository.findById(id).orElseThrow();  // SECURITY VIOLATION
+}
+```
+
+**Security Checklist for All Contributions:**
+- [ ] Tenant isolation enforced in all database queries
+- [ ] Input validation implemented using `@Valid` and custom validators
+- [ ] Authentication required for all protected endpoints
+- [ ] Sensitive data not logged or exposed in error messages
+- [ ] SQL injection prevention (use parameterized queries)
+
+## 📝 Git Workflow
+
+### Branch Naming Convention
+
+```bash
+# Feature branches
+git checkout -b feature/add-organization-search
+git checkout -b feature/implement-google-sso
+
+# Bug fix branches  
+git checkout -b bugfix/fix-tenant-isolation-issue
+git checkout -b bugfix/resolve-jwt-validation-error
+
+# Documentation branches
+git checkout -b docs/update-api-documentation
+git checkout -b docs/add-deployment-guide
+
+# Refactoring branches
+git checkout -b refactor/extract-security-service
+git checkout -b refactor/optimize-database-queries
+```
 
 ### Commit Message Format
 
-Follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
-
-```text
-<type>[optional scope]: <description>
-
-[optional body]
-
-[optional footer(s)]
-```
-
-**Types:**
-- `feat`: New features
-- `fix`: Bug fixes
-- `docs`: Documentation changes
-- `style`: Code formatting (no logic changes)
-- `refactor`: Code refactoring
-- `perf`: Performance improvements
-- `test`: Test additions or modifications
-- `chore`: Maintenance tasks
-- `security`: Security improvements
-
-**Examples:**
+Follow **Conventional Commits** specification:
 
 ```bash
-# Feature addition
-git commit -m "feat(api-service): add cursor-based pagination for devices
+# Format: type(scope): description
+# 
+# Types: feat, fix, docs, style, refactor, test, chore
+# Scope: module or area (optional)
+# Description: imperative, present tense
 
-- Implement CursorPaginationInput and CursorPageInfo DTOs
-- Add pagination logic to DeviceRepository
-- Update GraphQL schema with cursor pagination
-- Include comprehensive test coverage
-
-Closes #123"
-
-# Security fix
-git commit -m "fix(security): prevent JWT token replay attacks
-
-- Add jti (JWT ID) claim to all tokens
-- Implement token blacklist using Redis
-- Update validation logic to check blacklist
-- Add security tests for token replay scenarios
-
-Security impact: Prevents token reuse after logout
-Fixes #456"
-```
-
-## 🏗️ Code Quality Standards
-
-### Java Code Style
-
-Follow the established patterns in the codebase:
-
-```java
-// ✅ Good: Proper class structure with validation
-@RestController
-@RequestMapping("/api/devices")
-@RequiredArgsConstructor
-@Slf4j
-@Validated
-public class DeviceController {
-    
-    private final DeviceService deviceService;
-    
-    @PostMapping
-    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'USER')")
-    public ResponseEntity<DeviceResponse> createDevice(
-        @Valid @RequestBody CreateDeviceRequest request,
-        @AuthenticationPrincipal AuthPrincipal principal
-    ) {
-        log.info("Creating device for tenant: {}", principal.getTenantId());
-        
-        DeviceResponse device = deviceService.create(request, principal.getTenantId());
-        
-        return ResponseEntity
-            .status(HttpStatus.CREATED)
-            .body(device);
-    }
-}
-```
-
-### Security Implementation
-
-All new endpoints must implement proper security:
-
-```java
-// ✅ Good: Comprehensive security implementation
-@RestController
-@RequestMapping("/api/organizations")
-@PreAuthorize("isAuthenticated()")
-@RequiredArgsConstructor
-public class OrganizationController {
-    
-    @GetMapping("/{id}")
-    @PreAuthorize("hasPermission(#id, 'Organization', 'READ')")
-    public ResponseEntity<OrganizationResponse> getOrganization(
-        @PathVariable String id,
-        @AuthenticationPrincipal AuthPrincipal principal
-    ) {
-        // Service layer enforces tenant isolation
-        OrganizationResponse org = organizationService.findById(id, principal.getTenantId());
-        return ResponseEntity.ok(org);
-    }
-}
-```
-
-### Repository Patterns
-
-Always implement tenant isolation at the repository level:
-
-```java
-// ✅ Good: Tenant-scoped repository methods
-@Repository
-public interface DeviceRepository extends MongoRepository<Device, String> {
-    
-    @Query("{ 'tenantId': ?0, 'status': ?1 }")
-    Page<Device> findByTenantIdAndStatus(
-        String tenantId, 
-        DeviceStatus status, 
-        Pageable pageable
-    );
-    
-    @Query("{ 'tenantId': ?0, '_id': { '$gt': ?1 } }")
-    List<Device> findByTenantIdAfterCursor(
-        String tenantId,
-        String cursor,
-        Pageable pageable
-    );
-    
-    boolean existsByNameAndTenantId(String name, String tenantId);
-}
+# Examples:
+git commit -m "feat(auth): add support for Google SSO integration"
+git commit -m "fix(security): resolve tenant isolation vulnerability in organization API"
+git commit -m "docs(api): update GraphQL schema documentation"
+git commit -m "refactor(service): extract common pagination logic"  
+git commit -m "test(integration): add comprehensive organization controller tests"
+git commit -m "chore(deps): upgrade Spring Boot to 3.3.1"
 ```
 
 ## 🧪 Testing Requirements
 
-### Test Coverage Requirements
+### Test Coverage Standards
 
-All contributions must maintain or improve test coverage:
+**Minimum Requirements:**
+- **Unit Tests**: 80% line coverage, 75% branch coverage
+- **Integration Tests**: Cover all API endpoints and critical business flows  
+- **Security Tests**: Verify tenant isolation, authentication, and authorization
 
-- **Unit tests**: 85%+ line coverage for new code
-- **Integration tests**: Cover all new API endpoints
-- **Security tests**: Test all authentication and authorization paths
-- **Performance tests**: For performance-critical changes
-
-### Test Implementation Example
+### Required Tests for New Features
 
 ```java
+// 1. Unit Tests - Test business logic in isolation
 @ExtendWith(MockitoExtension.class)
-class DeviceServiceTest {
-    
-    @Mock
-    private DeviceRepository deviceRepository;
-    
-    @Mock
-    private EventPublisher eventPublisher;
-    
-    @InjectMocks
-    private DeviceService deviceService;
+class OrganizationServiceTest {
     
     @Test
-    @DisplayName("Should create device with valid request")
-    void shouldCreateDeviceWithValidRequest() {
+    @DisplayName("Should create organization with valid data")
+    void shouldCreateOrganizationWithValidData() {
         // Given
+        CreateOrganizationRequest request = CreateOrganizationRequest.builder()
+            .name("Test Organization")
+            .build();
         String tenantId = "tenant-123";
-        CreateDeviceRequest request = CreateDeviceRequest.builder()
-            .name("Test Device")
-            .type(DeviceType.LAPTOP)
-            .build();
-            
-        Device savedDevice = Device.builder()
-            .id("device-123")
-            .tenantId(tenantId)
-            .name("Test Device")
-            .type(DeviceType.LAPTOP)
-            .status(DeviceStatus.ACTIVE)
-            .build();
-            
-        when(deviceRepository.save(any(Device.class))).thenReturn(savedDevice);
-        when(deviceRepository.existsByNameAndTenantId("Test Device", tenantId)).thenReturn(false);
         
-        // When
-        DeviceResponse result = deviceService.create(request, tenantId);
-        
-        // Then
-        assertThat(result.getId()).isEqualTo("device-123");
-        assertThat(result.getName()).isEqualTo("Test Device");
-        assertThat(result.getType()).isEqualTo(DeviceType.LAPTOP);
-        
-        verify(deviceRepository).save(argThat(device ->
-            device.getTenantId().equals(tenantId) &&
-            device.getName().equals("Test Device")
-        ));
-        
-        verify(eventPublisher).publishEvent(any(DeviceCreatedEvent.class));
+        // When & Then - test implementation
+    }
+    
+    @Test
+    @DisplayName("Should throw exception when organization name already exists")
+    void shouldThrowExceptionWhenNameExists() {
+        // Test duplicate name handling
     }
 }
+
+// 2. Integration Tests - Full request/response cycle
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class OrganizationControllerIntegrationTest {
+    
+    @Test
+    @DisplayName("Should create organization via REST API")
+    void shouldCreateOrganizationViaRestApi() {
+        // Test complete API workflow
+    }
+}
+
+// 3. Security Tests - Critical for multi-tenant applications
+@SpringBootTest
+class OrganizationSecurityTest {
+    
+    @Test
+    @DisplayName("Should enforce tenant isolation")
+    void shouldEnforceTenantIsolation() {
+        // Verify tenant A cannot access tenant B's data
+    }
+}
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+mvn clean verify
+
+# Run specific test categories
+mvn test -Dgroups=unit                    # Unit tests only
+mvn test -Dgroups=integration             # Integration tests only
+mvn test -Dgroups=security                # Security tests only
+
+# Run tests with coverage
+mvn clean verify -Pcoverage
+open target/site/jacoco/index.html       # View coverage report
 ```
 
 ## 📖 Documentation Requirements
 
 ### Code Documentation
 
-All public APIs must be thoroughly documented:
+**JavaDoc is required for:**
+- All public classes and interfaces
+- All public methods with parameters and return values  
+- Complex business logic and algorithms
+- Security-related code
 
 ```java
 /**
- * Creates a new device for the specified tenant.
+ * Service for managing organizations within a multi-tenant environment.
  * 
- * <p>This method validates the device creation request, ensures the device name
- * is unique within the tenant scope, and publishes a domain event upon successful
- * creation.</p>
- * 
- * @param request the device creation request containing device details
- * @param tenantId the ID of the tenant creating the device (must not be null)
- * @return DeviceResponse containing the created device details
- * @throws DuplicateDeviceNameException if a device with the same name already exists
- * @throws IllegalArgumentException if the request is invalid
- * @throws TenantNotFoundException if the specified tenant does not exist
- * 
- * @since 5.30.0
+ * <p>This service provides CRUD operations for organizations while ensuring
+ * proper tenant isolation and security constraints.
+ *
+ * @author OpenFrame Team
+ * @since 5.32.0
  */
-@Transactional
-public DeviceResponse create(CreateDeviceRequest request, String tenantId) {
-    // Implementation...
+@Service
+@RequiredArgsConstructor
+public class OrganizationService {
+    
+    /**
+     * Creates a new organization for the specified tenant.
+     *
+     * @param request the organization creation request containing name and contact info
+     * @param tenantId the tenant ID to associate with the organization
+     * @return the created organization with generated ID and timestamps
+     * @throws OrganizationNameConflictException if an organization with the same name 
+     *         already exists for the tenant
+     * @throws IllegalArgumentException if request or tenantId is null or invalid
+     */
+    public Organization create(CreateOrganizationRequest request, String tenantId) {
+        // Implementation
+    }
 }
 ```
 
-## 📋 Pull Request Process
+### API Documentation
 
-### Pre-Submission Checklist
+Update API documentation for:
+- New REST endpoints and GraphQL queries/mutations
+- Changes to existing API contracts
+- New DTOs, data models, and error responses  
+- Authentication and authorization requirements
 
-Before submitting a pull request, ensure:
+## 🔄 Pull Request Process
 
-- [ ] **All tests pass** locally and in CI
-- [ ] **Code coverage** meets minimum requirements (85% for new code)
-- [ ] **Security tests** are included for security-related changes
-- [ ] **Documentation** is updated for API changes
-- [ ] **Commit messages** follow conventional format
-- [ ] **Branch** is up-to-date with main/develop
-- [ ] **No merge conflicts** exist
+### Before Creating PR
 
-### Pull Request Template
+```bash
+# Ensure your branch is up to date
+git fetch upstream
+git rebase upstream/main
 
-Use this template for all pull requests:
+# Run full test suite
+mvn clean verify
 
+# Check code style
+mvn checkstyle:check  
+
+# Run security analysis
+mvn spotbugs:check
+```
+
+### PR Title and Description
+
+**Title Format:**
+```
+feat(auth): implement Google SSO integration
+fix(security): resolve tenant data leakage in API endpoints  
+docs(development): add testing guidelines and best practices
+```
+
+**Description Template:**
 ```markdown
 ## Description
+Brief description of what this PR accomplishes.
 
-Brief description of the changes and their purpose.
-
-## Type of Change
-
+## Type of Change  
 - [ ] Bug fix (non-breaking change which fixes an issue)
 - [ ] New feature (non-breaking change which adds functionality)
 - [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
-- [ ] Security improvement
 - [ ] Documentation update
-- [ ] Performance improvement
-- [ ] Refactoring (no functional changes)
-
-## Related Issues
-
-Closes #(issue_number)
-Fixes #(issue_number)
-Refs #(issue_number)
 
 ## Testing
-
-### Test Coverage
-
 - [ ] Unit tests added/updated
 - [ ] Integration tests added/updated
-- [ ] Security tests added/updated
-- [ ] Performance tests added/updated (if applicable)
+- [ ] Security tests added/updated (for multi-tenant changes)
+- [ ] Manual testing completed
+- [ ] All existing tests pass
 
-## Security Impact (if applicable)
+## Security Considerations
+- [ ] Changes reviewed for security implications
+- [ ] Tenant isolation maintained  
+- [ ] Input validation implemented
+- [ ] Authentication/authorization properly handled
+- [ ] No sensitive data exposed in logs or errors
 
-- **Authentication changes**: Describe authentication modifications
-- **Authorization changes**: Describe permission modifications
-- **Data access changes**: Describe data isolation modifications
-- **Security vulnerability fixes**: Reference CVE or security issue
+## Performance Considerations
+- [ ] Database queries optimized (no N+1 issues)
+- [ ] Caching strategy considered
+- [ ] Memory usage reviewed for large datasets
+- [ ] API response times tested
 
-## Reviewer Notes
+## Checklist
+- [ ] Code follows project style guidelines
+- [ ] Self-review completed
+- [ ] Documentation updated (API docs, README, etc.)
+- [ ] No breaking changes without proper migration path
+- [ ] Backward compatibility maintained
 
-Additional context for reviewers, including:
-- Areas that need special attention
-- Potential concerns or trade-offs
-- Design decisions and their rationale
+## Related Issues
+Fixes #123
+Relates to #456
 ```
 
 ### Review Process
 
-All PRs undergo automated validation:
+**For Contributors:**
+- Address all review comments promptly and professionally
+- Keep discussions focused on the technical implementation
+- Update documentation and tests based on feedback
+- Ensure CI passes before requesting re-review
 
-- ✅ Build success (`mvn clean install`)
-- ✅ Test success (unit + integration tests)
-- ✅ Code quality (Checkstyle, SpotBugs)
-- ✅ Security scan (dependency vulnerabilities)
-- ✅ Documentation build (if docs changed)
+**For Reviewers:**
+- Focus on code quality, security, and maintainability
+- Verify tenant isolation and security requirements
+- Test changes locally for complex features
+- Provide constructive, actionable feedback
 
-Reviewers will evaluate:
+## 🚫 Common Pitfalls to Avoid
 
-1. **Code Quality** - Follows established patterns and conventions
-2. **Security** - Proper authentication, authorization, and tenant isolation
-3. **Testing** - Adequate test coverage with meaningful tests
-4. **Documentation** - Code is properly documented with updated specs
-5. **Performance** - No regressions with efficient implementation
+### 1. Tenant Data Leakage (Critical Security Issue)
 
-## 🔒 Special Contribution Types
+```java
+// ❌ WRONG: Can access any tenant's data
+@GetMapping("/{id}")
+public Organization get(@PathVariable String id) {
+    return repository.findById(id).orElseThrow();
+}
 
-### Security Contributions
+// ✅ CORRECT: Enforces tenant isolation
+@GetMapping("/{id}")  
+public Organization get(
+    @PathVariable String id,
+    @AuthenticationPrincipal AuthPrincipal principal
+) {
+    return repository.findByTenantIdAndId(principal.getTenantId(), id)
+        .orElseThrow(() -> new OrganizationNotFoundException(id));
+}
+```
 
-Security-related contributions require:
+### 2. N+1 Query Problems
 
-1. **Private disclosure** for security vulnerabilities
-2. **Security impact assessment** in PR description
-3. **Security test requirements** - comprehensive test coverage
-4. **Security review** by designated security maintainers
+```java
+// ❌ WRONG: Causes N+1 queries
+public List<OrganizationWithDevices> getOrganizationsWithDevices(String tenantId) {
+    List<Organization> orgs = repository.findByTenantId(tenantId);
+    return orgs.stream()
+        .map(org -> new OrganizationWithDevices(org, 
+            deviceRepository.findByOrganizationId(org.getId())))
+        .collect(Collectors.toList());
+}
 
-### Performance Contributions
+// ✅ CORRECT: Single query with join or batch loading
+public List<OrganizationWithDevices> getOrganizationsWithDevices(String tenantId) {
+    return repository.findByTenantIdWithDevices(tenantId);
+}
+```
 
-Performance improvements require:
+### 3. Missing Input Validation
 
-1. **Benchmark results** showing improvement
-2. **Performance tests** to prevent regression
-3. **Memory usage analysis** for significant changes
-4. **Load testing results** for critical path changes
+```java
+// ❌ WRONG: No validation
+@PostMapping
+public Organization create(@RequestBody CreateOrganizationRequest request) {
+    return service.create(request);
+}
 
-### Breaking Changes
+// ✅ CORRECT: Proper validation and security
+@PostMapping
+public ResponseEntity<Organization> create(
+    @Valid @RequestBody CreateOrganizationRequest request,
+    @AuthenticationPrincipal AuthPrincipal principal
+) {
+    Organization org = service.create(request, principal.getTenantId());
+    return ResponseEntity.status(HttpStatus.CREATED).body(org);
+}
+```
 
-Breaking changes require:
+### 4. Information Leakage in Error Handling
 
-1. **Version bump** consideration (semantic versioning)
-2. **Migration guide** for users
-3. **Deprecation notices** in previous versions (if possible)
-4. **Extended documentation** explaining the change
+```java
+// ❌ WRONG: Could reveal information about other tenants
+@ExceptionHandler(OrganizationNotFoundException.class)
+public ResponseEntity<ErrorResponse> handleNotFound(OrganizationNotFoundException ex) {
+    return ResponseEntity.status(HttpStatus.NOT_FOUND)
+        .body(new ErrorResponse("Organization " + ex.getId() + " not found"));
+}
 
-## 💬 Community Interaction
+// ✅ CORRECT: Generic message, no information leakage  
+@ExceptionHandler(OrganizationNotFoundException.class)
+public ResponseEntity<ErrorResponse> handleNotFound(OrganizationNotFoundException ex) {
+    ErrorResponse error = ErrorResponse.builder()
+        .code("ORGANIZATION_NOT_FOUND")
+        .message("Organization not found")
+        .timestamp(Instant.now())
+        .build();
+    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+}
+```
 
-### Getting Help
+## 🌍 Community Guidelines
 
-- **Community Slack**: [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
-- **Documentation**: [Complete Documentation](./docs/README.md)
-- **Architecture Guide**: [System Design and Patterns](./docs/development/architecture/README.md)
+### Communication Standards
+- **Be Respectful**: Treat all community members with kindness and respect
+- **Be Constructive**: Provide helpful feedback and actionable suggestions
+- **Be Patient**: Remember that everyone is learning and contributing in their spare time
+- **Ask Questions**: Don't hesitate to ask for help or clarification
 
-> **Note**: We use the OpenMSP Slack community for all discussions, issues, and collaboration. GitHub Issues and Discussions are not actively monitored.
+### Where to Get Help
 
-### Code Review Etiquette
+1. **[OpenMSP Slack Community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)** - Primary support channel
+   - `#general` - General discussions and announcements
+   - `#development` - Development questions and technical discussions  
+   - `#help` - Getting help with setup and issues
 
-**As a reviewer:**
-- ✅ Be constructive and respectful
-- ✅ Explain the "why" behind your suggestions
-- ✅ Recognize good work and improvements
-- ✅ Focus on code, not the person
+2. **GitHub Issues** - Bug reports and feature requests with templates
+3. **GitHub Discussions** - Longer-form discussions, RFCs, and architectural decisions
 
-**As a contributor:**
-- ✅ Be open to feedback
-- ✅ Ask for clarification when needed
-- ✅ Respond promptly to review comments
-- ✅ Thank reviewers for their time
+### Reporting Issues
 
-## 🏆 Recognition
+**Bug Report Template:**
+```markdown
+## Bug Report
 
+**Description**  
+Clear description of the issue.
+
+**Steps to Reproduce**
+1. Step 1
+2. Step 2  
+3. Step 3
+
+**Expected Behavior**
+What should have happened.
+
+**Actual Behavior**
+What actually happened.
+
+**Environment**
+- OS: [e.g. Ubuntu 22.04]
+- Java Version: [e.g. OpenJDK 21.0.1]
+- Application Version: [e.g. 5.32.0]
+- Database Versions: [MongoDB, Redis, etc.]
+
+**Security Impact**  
+Does this affect tenant isolation or data security?
+
+**Additional Context**
+Logs, screenshots, or other relevant information.
+```
+
+## 🏆 Recognition and Growth
+
+### Recognition
 Contributors are recognized through:
+- **Contributors List**: Maintained in README.md
+- **Release Notes**: Contributors credited for their changes
+- **Community Spotlights**: Featured in Slack and social media
+- **Conference Speaking**: Opportunities to present work at events
 
-- **Contributor list** in project README
-- **Release notes** mentioning significant contributions
-- **Community highlights** in project communications
-- **Maintainer opportunities** for consistent contributors
+### Path to Maintainer
+Regular contributors can become maintainers by:
+1. Demonstrating consistent, high-quality contributions
+2. Showing deep understanding of the codebase and architecture  
+3. Helping other contributors and community members
+4. Participating in architectural discussions and decisions
 
-## 📚 Resources
+## 🎯 Getting Started Checklist
 
-### Essential Reading
-- **[Architecture Overview](./docs/development/architecture/README.md)** - System design and patterns
-- **[Security Best Practices](./docs/development/security/README.md)** - Security implementation
-- **[Testing Guide](./docs/development/testing/README.md)** - Testing strategies and tools
+Before making your first contribution:
 
-### Development Tools
-- **IntelliJ IDEA** with Spring Boot and Lombok plugins
-- **Docker** for development environment
-- **MongoDB Compass** for database management
-- **Redis CLI** for cache inspection
+- [ ] Read this contributing guide thoroughly
+- [ ] Set up your development environment following the prerequisites  
+- [ ] Join the [OpenMSP Slack community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
+- [ ] Look for issues labeled `good first issue` or `help wanted`
+- [ ] Fork the repository and create a feature branch
+- [ ] Make a small test contribution (documentation fix, small bug fix)
+- [ ] Submit your first pull request and engage with reviewers
 
-### Community
-- **Slack**: [OpenMSP Community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
-- **GitHub**: [OpenFrame OSS Lib Repository](https://github.com/flamingo-stack/openframe-oss-lib)
-- **Website**: [flamingo.run](https://flamingo.run) | [openframe.ai](https://openframe.ai)
+## 📚 Additional Resources
+
+- **[Development Setup Guide](./docs/development/setup/local-development.md)** - Detailed environment configuration
+- **[Architecture Overview](./docs/reference/architecture/README.md)** - Understanding the system design
+- **[API Documentation](./docs/api/README.md)** - REST and GraphQL API references
+- **[Security Guidelines](./docs/development/security/README.md)** - Security best practices
+
+## 🚀 Ready to Contribute?
+
+1. **Join the Community**: [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
+2. **Find an Issue**: Browse [GitHub Issues](https://github.com/flamingo-stack/openframe-oss-lib/issues) 
+3. **Start Small**: Look for `good first issue` labels
+4. **Ask Questions**: Don't hesitate to ask for help in `#development` channel
 
 ---
 
-Thank you for contributing to OpenFrame OSS Lib! Your contributions help build the future of open-source MSP platforms and intelligent IT automation systems.
-
-**Ready to get started?** Join the [OpenMSP Slack community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) and introduce yourself!
+*Thank you for contributing to OpenFrame OSS Libraries! Your contributions help build the future of open-source MSP tooling and AI-driven automation.* 🙏
