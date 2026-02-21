@@ -1,8 +1,0 @@
-flowchart LR
-    ClientAgent["Client Agent Core"] -->|"Machine Events"| KafkaCluster["Kafka Cluster"]
-    DataPlatform["Data Platform Core"] -->|"Domain Events"| KafkaCluster
-    Management["Management Service Core"] -->|"System Events"| KafkaCluster
-
-    KafkaCluster -->|"Debezium CDC"| StreamCore["Stream Processing Core"]
-    KafkaCluster -->|"Pinot Updates"| Analytics["Pinot / Analytics"]
-    KafkaCluster -->|"Consumer APIs"| ApiServices["API Service Core"]

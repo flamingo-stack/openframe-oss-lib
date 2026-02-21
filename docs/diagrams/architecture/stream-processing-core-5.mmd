@@ -1,5 +1,0 @@
-flowchart LR
-    UnifiedEvent["Unified Event"] --> KafkaHandler["Kafka Handler"]
-    UnifiedEvent --> CassandraHandler["Cassandra Handler"]
-    KafkaHandler --> KafkaTopic["Outbound Kafka Topic"]
-    CassandraHandler --> CassandraDB["Cassandra"]

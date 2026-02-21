@@ -1,5 +1,0 @@
-flowchart TD
-    WSRequest["WebSocket Request"] --> RouteLocator["RouteLocator"]
-    RouteLocator --> ToolApiFilter["ToolApiWebSocketProxyUrlFilter"]
-    RouteLocator --> ToolAgentFilter["ToolAgentWebSocketProxyUrlFilter"]
-    RouteLocator --> NatsRoute["Direct NATS Route"]

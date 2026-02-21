@@ -1,6 +1,0 @@
-flowchart LR
-    Controller["Controller"] -->|"calls"| Service["Service Layer"]
-    Service -->|"queries"| Repository["Repository"]
-    Repository -->|"returns Page<T>"| Service
-    Service -->|"maps to"| PageResponse
-    PageResponse -->|"returned to"| Controller

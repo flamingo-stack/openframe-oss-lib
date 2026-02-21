@@ -1,9 +1,0 @@
-flowchart TD
-    ExtReq["/external-api/** Request"] --> CheckKey{{"API Key Present?"}}
-    CheckKey -->|No| Unauthorized["401 Response"]
-    CheckKey -->|Yes| Validate["Validate API Key"]
-    Validate -->|Invalid| Unauthorized
-    Validate -->|Valid| RateCheck["RateLimitService.isAllowed()"]
-    RateCheck -->|No| TooMany["429 Too Many Requests"]
-    RateCheck -->|Yes| AddHeaders["Add User Context & Rate Headers"]
-    AddHeaders --> Forward["Forward to External API Service"]

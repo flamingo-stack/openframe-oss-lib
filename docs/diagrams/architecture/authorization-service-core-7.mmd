@@ -1,7 +1,0 @@
-flowchart TD
-    Start["User Starts SSO Registration"] --> Cookie["Set SSO Registration Cookie"]
-    Cookie --> OIDC["Redirect to OIDC Provider"]
-    OIDC --> Callback["OIDC Callback"]
-    Callback --> Handler["TenantRegSsoHandler"]
-    Handler --> CreateTenant["Create Tenant + User"]
-    CreateTenant --> Redirect["Redirect to Tenant Context"]

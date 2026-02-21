@@ -1,7 +1,0 @@
-flowchart TD
-    Client -->|"GET /api/v1/devices"| DeviceController
-    DeviceController --> Mapper["Device Mapper"]
-    Mapper --> DeviceService["Device Service"]
-    DeviceService --> Result["Query Result"]
-    Result --> Mapper
-    Mapper --> DevicesResponse["Devices Response DTO"]

@@ -1,7 +1,0 @@
-flowchart TD
-    LoadConfig["Load Agent JSON"] --> ExistsCheck["Agent Exists?"]
-    ExistsCheck -->|"No"| Create["Create Agent"]
-    ExistsCheck -->|"Yes"| PreserveVersion["Preserve Release Version"]
-    PreserveVersion --> Compare["Version Changed?"]
-    Compare -->|"Yes"| Publish["Publish Tool Agent Update"]
-    Compare -->|"No"| SaveOnly["Save Without Publish"]

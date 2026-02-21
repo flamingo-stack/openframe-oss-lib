@@ -1,5 +1,0 @@
-flowchart TD
-    Request["SaveToolRequest"] --> Save["IntegratedToolService.save"]
-    Save --> CreateDebezium["DebeziumService.createOrUpdate"]
-    CreateDebezium --> Hooks["Run PostSave Hooks"]
-    Hooks --> Response["Return Success"]

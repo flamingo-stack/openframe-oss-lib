@@ -1,5 +1,0 @@
-flowchart LR
-    APIQuery["Log Query Request"] --> QueryBuilder["PinotQueryBuilder"]
-    QueryBuilder --> PinotExec["Pinot Broker Execution"]
-    PinotExec --> Mapping["Result Mapping"]
-    Mapping --> Response["LogProjection List"]

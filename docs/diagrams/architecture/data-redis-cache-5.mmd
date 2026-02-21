@@ -1,6 +1,0 @@
-flowchart TD
-    TenantContext["Tenant Context"] --> KeyBuilder
-    CacheName["Cache Name"] --> KeyBuilder
-    BusinessKey["Business Key"] --> KeyBuilder
-    KeyBuilder --> FinalKey["prefix:tenant:cache::key"]
-    FinalKey --> Redis[("Redis")]
