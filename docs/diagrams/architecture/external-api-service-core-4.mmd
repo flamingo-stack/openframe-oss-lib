@@ -1,5 +1,0 @@
-flowchart LR
-    Client["External Client"] -->|"/tools/{toolId}/..."| IntegrationController
-    IntegrationController --> RestProxyService
-    RestProxyService --> ToolRepo["IntegratedToolRepository"]
-    RestProxyService --> Target["External Tool API"]
