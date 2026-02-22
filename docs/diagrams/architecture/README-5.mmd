@@ -1,0 +1,6 @@
+flowchart TD
+    Startup["Application Ready"] --> PinotInit["Deploy Pinot Schemas"]
+    Startup --> NatsInit["Create NATS Streams"]
+    Startup --> DebeziumInit["Initialize Connectors"]
+    Startup --> AgentInit["Initialize Agents"]
+    Startup --> Schedulers["Start Scheduled Jobs"]

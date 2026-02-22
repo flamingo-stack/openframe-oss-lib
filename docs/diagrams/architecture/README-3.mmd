@@ -1,19 +1,7 @@
 flowchart TD
-    Gateway --> ApiService
-    Gateway --> ExternalApi
-    Gateway --> Auth
-
-    Auth --> Mongo
-    ApiService --> Mongo
-    ExternalApi --> Mongo
-
-    ApiService --> Kafka
-    ClientCore --> Kafka
-
-    Kafka --> StreamCore
-    StreamCore --> Cassandra
-    StreamCore --> UnifiedTopic["Unified Events Topic"]
-
-    Management --> Kafka
-    Management --> Mongo
-    Management --> Redis
+    ToolDB["Integrated Tool Database"] --> Debezium
+    Debezium --> KafkaInbound["Kafka Inbound Topic"]
+    KafkaInbound --> Stream["Stream Processing Core"]
+    Stream --> Enrichment["Metadata Enrichment"]
+    Enrichment --> Cassandra["Cassandra Audit Storage"]
+    Enrichment --> KafkaOut["Normalized Kafka Topic"]

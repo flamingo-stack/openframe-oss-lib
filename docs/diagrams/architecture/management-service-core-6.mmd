@@ -1,8 +1,0 @@
-flowchart TD
-    Tick["Scheduled Interval"] --> LoadClient["Load Client Config"]
-    LoadClient --> CheckClient["Should Retry?"]
-    CheckClient -->|"Yes"| PublishClient["Publish Client Update"]
-
-    Tick --> LoadAgents["Load Tool Agents"]
-    LoadAgents --> CheckAgent["Should Retry?"]
-    CheckAgent -->|"Yes"| PublishAgent["Publish Tool Agent Update"]

@@ -1,8 +1,6 @@
-flowchart LR
-    Client -->|"cursor + limit"| Controller
-    Controller --> Service
-    Service --> Repository
-    Repository --> Service
-    Service --> PageInfo
-    PageInfo --> Controller
-    Controller --> Client
+flowchart TD
+    Client --> Gateway
+    Gateway --> ExternalApi["External Api Service Core"]
+    ExternalApi --> CoreServices["Core Service Layer"]
+    CoreServices --> DataLayer["Mongo, Cassandra, Pinot"]
+    CoreServices --> Kafka["Kafka Messaging"]

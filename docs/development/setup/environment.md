@@ -1,109 +1,123 @@
 # Development Environment Setup
 
-This guide walks you through setting up a comprehensive development environment for OpenFrame OSS Lib, including IDE configuration, development tools, and local services.
+This guide helps you configure the optimal development environment for working with OpenFrame OSS Libraries. We'll cover IDE setup, development tools, extensions, and productivity enhancements.
 
-## IDE Configuration
+## IDE Recommendations
 
-### IntelliJ IDEA (Recommended)
+### IntelliJ IDEA Ultimate (Recommended)
 
-IntelliJ IDEA provides the best development experience for Spring Boot and multi-module Maven projects.
+**Why IntelliJ IDEA?**
+- Excellent Spring Boot integration
+- Superior Maven support
+- Built-in database tools
+- Advanced debugging capabilities
+- Great GraphQL support
 
-#### Required Plugins
+#### Installation
+
+**Option 1: Direct Download**
+- Download from [JetBrains website](https://www.jetbrains.com/idea/)
+- Choose Ultimate edition for full Spring Boot support
+
+**Option 2: JetBrains Toolbox (Recommended)**
+```bash
+# Download and install JetBrains Toolbox
+# Manage all JetBrains tools from one place
+```
+
+#### Essential IntelliJ Plugins
 
 Install these plugins via **File → Settings → Plugins**:
 
 | Plugin | Purpose |
 |--------|---------|
-| **Lombok Plugin** | Reduces boilerplate code generation |
-| **Spring Boot Plugin** | Spring Boot application support |
-| **Database Tools and SQL** | Database integration |
+| **Spring Boot** | Spring Boot application support (usually pre-installed) |
+| **Lombok** | Code generation and annotations |
+| **GraphQL** | GraphQL schema and query support |
+| **Database Tools and SQL** | MongoDB, Redis, and SQL support |
 | **Docker** | Container management |
-| **GraphQL** | GraphQL schema support |
+| **Maven Helper** | Advanced Maven operations |
+| **SonarLint** | Code quality analysis |
+| **GitToolBox** | Enhanced Git integration |
+| **Rainbow Brackets** | Code readability |
+| **Key Promoter X** | Learn keyboard shortcuts |
 
-#### Project Configuration
+#### IntelliJ Configuration
 
-```bash
-# Open OpenFrame OSS Lib in IntelliJ
-File → Open → select openframe-oss-lib directory
+**Java SDK Setup:**
+1. **File → Project Structure → SDKs**
+2. Add JDK 21 if not detected
+3. Set project SDK to Java 21
 
-# Configure Project SDK
-File → Project Structure → Project → Project SDK: Java 21
+**Maven Configuration:**
+1. **File → Settings → Build → Build Tools → Maven**
+2. Set Maven home directory (if custom installation)
+3. Enable "Import Maven projects automatically"
+4. Set JVM options: `-Xmx4g -XX:MaxMetaspaceSize=512m`
 
-# Configure Maven
-File → Settings → Build, Execution, Deployment → Build Tools → Maven
-- Maven home directory: /path/to/maven
-- User settings file: ~/.m2/settings.xml
-- Use plugin registry: true
-```
+**Spring Boot Run Configuration:**
+1. **Run → Edit Configurations → Add New → Spring Boot**
+2. Main class: `com.openframe.api.ApiServiceApplication`
+3. Working directory: `$MODULE_WORKING_DIR$`
+4. VM options: `-Xmx2g -Dspring.profiles.active=development`
 
-#### Code Style Configuration
+### Visual Studio Code (Alternative)
 
-```bash
-# Import code style settings
-File → Settings → Editor → Code Style → Java
-- Import Scheme → IntelliJ IDEA code style XML
-- Use Google Java Style Guide or create custom rules
-```
-
-#### Run Configurations
-
-Create run configurations for key modules:
-
-1. **API Service Core**
-   - Main class: `com.openframe.api.ApiServiceApplication`
-   - VM options: `-Dspring.profiles.active=dev -Xmx2G`
-   - Program arguments: `--server.port=8080`
-
-2. **Authorization Service Core**  
-   - Main class: `com.openframe.authz.AuthorizationServiceApplication`
-   - VM options: `-Dspring.profiles.active=dev -Xmx1G`
-   - Program arguments: `--server.port=8082`
-
-3. **Gateway Service Core**
-   - Main class: `com.openframe.gateway.GatewayServiceApplication`
-   - VM options: `-Dspring.profiles.active=dev -Xmx1G`
-   - Program arguments: `--server.port=8081`
-
-### Visual Studio Code
-
-For developers preferring VS Code:
+For developers who prefer VS Code:
 
 #### Required Extensions
 
-```json
-{
-  "recommendations": [
-    "vscjava.vscode-java-pack",
-    "vmware.vscode-spring-boot",
-    "gabrielbb.vscode-lombok",
-    "ms-vscode.vscode-json",
-    "redhat.vscode-yaml",
-    "ms-azuretools.vscode-docker"
-  ]
-}
+```bash
+# Install via VS Code Extensions marketplace
 ```
 
-#### Settings Configuration
+| Extension | Purpose |
+|-----------|---------|
+| **Extension Pack for Java** | Complete Java development |
+| **Spring Boot Extension Pack** | Spring Boot support |
+| **GraphQL** | GraphQL syntax highlighting |
+| **Docker** | Container support |
+| **REST Client** | API testing |
+| **Lombok Annotations Support** | Lombok integration |
+
+#### VS Code Settings
 
 Create `.vscode/settings.json`:
 
 ```json
 {
-  "java.home": "/path/to/java-21",
-  "java.configuration.maven.userSettings": "~/.m2/settings.xml",
-  "java.compile.nullAnalysis.mode": "automatic",
-  "spring-boot.ls.problem.application-properties.enabled": true,
-  "files.exclude": {
-    "**/target": true,
-    "**/.classpath": true,
-    "**/.project": true,
-    "**/.settings": true,
-    "**/.factorypath": true
-  }
+    "java.home": "/path/to/java-21",
+    "java.configuration.runtimes": [
+        {
+            "name": "JavaSE-21",
+            "path": "/path/to/java-21"
+        }
+    ],
+    "spring-boot.ls.java.home": "/path/to/java-21",
+    "java.compile.nullAnalysis.mode": "automatic",
+    "java.configuration.maven.userSettings": "~/.m2/settings.xml",
+    "files.exclude": {
+        "**/target": true,
+        "**/.mvn": true
+    }
 }
 ```
 
-## Development Tools
+### Eclipse with Spring Tools
+
+For Eclipse users:
+
+#### Installation
+1. Download Eclipse IDE for Enterprise Java Developers
+2. Install Spring Tools 4 from Eclipse Marketplace
+
+#### Essential Eclipse Plugins
+- Spring Tools 4
+- Lombok
+- Maven Integration (m2e)
+- MongoDB support
+
+## Required Development Tools
 
 ### Maven Configuration
 
@@ -113,103 +127,223 @@ Create or update `~/.m2/settings.xml`:
 <?xml version="1.0" encoding="UTF-8"?>
 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
-          http://maven.apache.org/xsd/settings-1.0.0.xsd">
-
-  <localRepository>~/.m2/repository</localRepository>
-
-  <profiles>
-    <profile>
-      <id>openframe-dev</id>
-      <properties>
-        <spring.profiles.active>dev</spring.profiles.active>
-        <maven.compiler.source>21</maven.compiler.source>
-        <maven.compiler.target>21</maven.compiler.target>
-      </properties>
-    </profile>
-  </profiles>
-
-  <activeProfiles>
-    <activeProfile>openframe-dev</activeProfile>
-  </activeProfiles>
-
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 
+                             http://maven.apache.org/xsd/settings-1.0.0.xsd">
+    
+    <localRepository>~/.m2/repository</localRepository>
+    
+    <profiles>
+        <profile>
+            <id>openframe-dev</id>
+            <properties>
+                <maven.compiler.source>21</maven.compiler.source>
+                <maven.compiler.target>21</maven.compiler.target>
+                <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+            </properties>
+        </profile>
+    </profiles>
+    
+    <activeProfiles>
+        <activeProfile>openframe-dev</activeProfile>
+    </activeProfiles>
 </settings>
 ```
 
-### Database Tools
+### Git Configuration
 
-#### MongoDB Compass (GUI)
-
-```bash
-# Install MongoDB Compass for visual database management
-# Download from: https://www.mongodb.com/products/compass
-
-# Connect to local development instance
-mongodb://localhost:27017/openframe-dev
-```
-
-#### Redis CLI and GUI
+Configure Git for the project:
 
 ```bash
-# Install redis-cli for command-line access
-brew install redis  # macOS
-apt install redis-tools  # Ubuntu
+# Set up Git user (if not already done)
+git config --global user.name "Your Name"
+git config --global user.email "your.email@company.com"
 
-# Optional: Install Redis GUI
-# - RedisInsight: https://redislabs.com/redis-enterprise/redis-insight/
-# - Another Redis Desktop Manager: https://github.com/qishibo/AnotherRedisDesktopManager
+# Configure line endings (important for cross-platform)
+git config --global core.autocrlf input
+
+# Set up useful aliases
+git config --global alias.st status
+git config --global alias.co checkout
+git config --global alias.br branch
+git config --global alias.lg "log --oneline --graph --decorate"
 ```
 
-### Docker Development Stack
+## Database Tools
 
-Create `docker-compose.dev.yml` for comprehensive development environment:
+### MongoDB Management
+
+**Option 1: MongoDB Compass (Recommended)**
+```bash
+# Download from MongoDB website
+# Provides GUI for MongoDB operations
+```
+
+**Option 2: Command Line Tools**
+```bash
+# MongoDB Shell
+mongosh
+
+# Sample connection test
+mongosh "mongodb://localhost:27017/openframe"
+```
+
+**IntelliJ Database Plugin:**
+1. **View → Tool Windows → Database**
+2. Add MongoDB data source
+3. Connection URL: `mongodb://localhost:27017/openframe`
+
+### Redis Management
+
+**Option 1: RedisInsight**
+```bash
+# Download from Redis website
+# Free GUI tool for Redis
+```
+
+**Option 2: Command Line**
+```bash
+# Redis CLI
+redis-cli
+
+# Test connection
+redis-cli ping
+```
+
+### Kafka Management
+
+**Option 1: Kafka UI (Docker)**
+```yaml
+# docker-compose.kafka-ui.yml
+version: '3.8'
+services:
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: localhost:9092
+```
+
+**Option 2: Command Line Tools**
+```bash
+# List topics
+kafka-topics.sh --bootstrap-server localhost:9092 --list
+
+# Consume messages
+kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic your-topic
+```
+
+## Development Environment Variables
+
+Create a `.env` file in your project root:
+
+```bash
+# Database Configuration
+MONGODB_URI=mongodb://localhost:27017/openframe
+REDIS_URL=redis://localhost:6379
+KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+
+# Optional Analytics Databases
+CASSANDRA_CONTACT_POINTS=localhost:9042
+PINOT_BROKER_URL=http://localhost:8099
+
+# Security Configuration (Development Only)
+JWT_SECRET=development-secret-key-32-chars-min
+OAUTH_ENCRYPTION_KEY=dev-encryption-key-32-chars-long!
+
+# External Services
+NATS_URL=nats://localhost:4222
+
+# Logging Configuration
+LOG_LEVEL=DEBUG
+SQL_LOGGING=true
+
+# Development Flags
+SPRING_PROFILES_ACTIVE=development
+MAVEN_OPTS=-Xmx4g -XX:MaxMetaspaceSize=512m
+```
+
+Load environment variables:
+
+```bash
+# For bash/zsh
+source .env
+
+# Or use direnv for automatic loading
+echo "source .env" > .envrc
+direnv allow
+```
+
+## Code Quality Tools
+
+### SonarLint Integration
+
+**IntelliJ:**
+1. Install SonarLint plugin
+2. **File → Settings → Tools → SonarLint**
+3. Connect to SonarQube server (if available)
+
+**VS Code:**
+```bash
+# Install SonarLint extension
+# Configure via VS Code settings
+```
+
+### Checkstyle Configuration
+
+The project includes Checkstyle rules. Configure your IDE:
+
+**IntelliJ:**
+1. Install CheckStyle-IDEA plugin
+2. **File → Settings → Tools → Checkstyle**
+3. Add configuration file: `config/checkstyle/checkstyle.xml`
+
+### SpotBugs Integration
+
+**Maven Plugin (already configured):**
+```bash
+# Run SpotBugs analysis
+mvn spotbugs:check
+```
+
+**IDE Integration:**
+- IntelliJ: SpotBugs plugin
+- Eclipse: SpotBugs plugin from marketplace
+
+## Docker Development Environment
+
+### Docker Compose for Dependencies
+
+Create `docker-compose.dev.yml`:
 
 ```yaml
 version: '3.8'
-
 services:
-  # Core Data Services
   mongodb:
-    image: mongo:7
-    container_name: openframe-mongodb
+    image: mongo:7-jammy
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password
-      MONGO_INITDB_DATABASE: openframe-dev
+      MONGO_INITDB_DATABASE: openframe
     volumes:
-      - mongodb_data:/data/db
-      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js
-    networks:
-      - openframe-net
+      - mongo_dev_data:/data/db
 
   redis:
     image: redis:7-alpine
-    container_name: openframe-redis
     ports:
       - "6379:6379"
-    command: redis-server --appendonly yes --requirepass password
+    command: redis-server --appendonly yes
     volumes:
-      - redis_data:/data
-    networks:
-      - openframe-net
+      - redis_dev_data:/data
 
-  # Message Streaming
   zookeeper:
-    image: confluentinc/cp-zookeeper:7.4.0
-    container_name: openframe-zookeeper
+    image: confluentinc/cp-zookeeper:latest
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    volumes:
-      - zookeeper_data:/var/lib/zookeeper/data
-    networks:
-      - openframe-net
 
   kafka:
-    image: confluentinc/cp-kafka:7.4.0
-    container_name: openframe-kafka
+    image: confluentinc/cp-kafka:latest
     depends_on:
       - zookeeper
     ports:
@@ -217,292 +351,70 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-    volumes:
-      - kafka_data:/var/lib/kafka/data
-    networks:
-      - openframe-net
 
-  # Analytics (Optional - for full stack development)
-  cassandra:
-    image: cassandra:4.1
-    container_name: openframe-cassandra
+  nats:
+    image: nats:latest
     ports:
-      - "9042:9042"
-    environment:
-      CASSANDRA_CLUSTER_NAME: openframe-cluster
-      CASSANDRA_ENDPOINT_SNITCH: GossipingPropertyFileSnitch
-      CASSANDRA_DC: datacenter1
+      - "4222:4222"
+      - "8222:8222"
+    command: "--jetstream --store_dir=/data"
     volumes:
-      - cassandra_data:/var/lib/cassandra
-    networks:
-      - openframe-net
-    healthcheck:
-      test: ["CMD", "cqlsh", "-e", "describe keyspaces"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-
-  # Development Utilities
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    container_name: openframe-kafka-ui
-    depends_on:
-      - kafka
-    ports:
-      - "8090:8080"
-    environment:
-      KAFKA_CLUSTERS_0_NAME: local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
-    networks:
-      - openframe-net
+      - nats_dev_data:/data
 
 volumes:
-  mongodb_data:
-  redis_data:
-  zookeeper_data:
-  kafka_data:
-  cassandra_data:
-
-networks:
-  openframe-net:
-    driver: bridge
+  mongo_dev_data:
+  redis_dev_data:
+  nats_dev_data:
 ```
 
-#### Start Development Stack
+### Development Scripts
 
+Create helper scripts in `scripts/` directory:
+
+**`scripts/start-dev-env.sh`:**
 ```bash
-# Start all development services
+#!/bin/bash
+echo "Starting development environment..."
 docker-compose -f docker-compose.dev.yml up -d
+echo "Development services started!"
+echo "MongoDB: localhost:27017"
+echo "Redis: localhost:6379"
+echo "Kafka: localhost:9092"
+echo "NATS: localhost:4222"
+```
 
-# Check service status
-docker-compose -f docker-compose.dev.yml ps
-
-# View logs
-docker-compose -f docker-compose.dev.yml logs -f mongodb redis kafka
-
-# Stop services
+**`scripts/stop-dev-env.sh`:**
+```bash
+#!/bin/bash
+echo "Stopping development environment..."
 docker-compose -f docker-compose.dev.yml down
+echo "Development services stopped!"
 ```
 
-## Environment Configuration
-
-### Development Environment Variables
-
-Create `.env.dev` file:
-
-```bash
-# Database Configuration
-MONGODB_URI=mongodb://admin:password@localhost:27017/openframe-dev?authSource=admin
-REDIS_URL=redis://:password@localhost:6379
-CASSANDRA_CONTACT_POINTS=localhost:9042
-CASSANDRA_KEYSPACE=openframe_dev
-
-# Kafka Configuration  
-KAFKA_BOOTSTRAP_SERVERS=localhost:9092
-KAFKA_CLIENT_ID=openframe-dev
-KAFKA_GROUP_ID=openframe-dev-group
-
-# Security Configuration
-JWT_SECRET_KEY=dev-jwt-secret-key-change-in-production
-ENCRYPTION_SECRET_KEY=dev-encryption-key-32-characters-long
-RSA_KEY_SIZE=2048
-
-# OAuth2 Configuration
-OAUTH2_CLIENT_ID=openframe-dev-client
-OAUTH2_CLIENT_SECRET=dev-client-secret
-OAUTH2_ISSUER_URI=http://localhost:8082
-
-# External Service Configuration (Optional)
-FLEET_MDM_API_URL=https://demo.fleetdm.com
-TACTICAL_RMM_API_URL=https://demo.tacticalrmm.com
-FLEET_MDM_API_TOKEN=demo-token
-TACTICAL_RMM_API_TOKEN=demo-token
-
-# Email Configuration (for invitation testing)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USERNAME=dev@example.com
-SMTP_PASSWORD=app-password
-
-# Logging Configuration
-LOGGING_LEVEL_ROOT=INFO
-LOGGING_LEVEL_OPENFRAME=DEBUG
-LOGGING_LEVEL_SPRING_SECURITY=DEBUG
-
-# Application Ports
-API_SERVICE_PORT=8080
-GATEWAY_SERVICE_PORT=8081
-AUTHORIZATION_SERVICE_PORT=8082
-EXTERNAL_API_SERVICE_PORT=8083
-```
-
-### Spring Boot Profiles
-
-Create `application-dev.yml` in each module's `src/main/resources/`:
-
-```yaml
-spring:
-  profiles:
-    active: dev
-  
-  datasource:
-    mongodb:
-      uri: ${MONGODB_URI}
-    
-  redis:
-    url: ${REDIS_URL}
-    timeout: 2000ms
-    
-  kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
-    client-id: ${KAFKA_CLIENT_ID}
-    consumer:
-      group-id: ${KAFKA_GROUP_ID}
-      auto-offset-reset: earliest
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: ${OAUTH2_ISSUER_URI}
-
-logging:
-  level:
-    root: ${LOGGING_LEVEL_ROOT:INFO}
-    com.openframe: ${LOGGING_LEVEL_OPENFRAME:DEBUG}
-    org.springframework.security: ${LOGGING_LEVEL_SPRING_SECURITY:INFO}
-    org.springframework.web: DEBUG
-  pattern:
-    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics,env
-  endpoint:
-    health:
-      show-details: always
-
-openframe:
-  security:
-    jwt:
-      secret-key: ${JWT_SECRET_KEY}
-    encryption:
-      secret-key: ${ENCRYPTION_SECRET_KEY}
-  
-  database:
-    mongodb:
-      database: openframe-dev
-    
-  external:
-    fleet-mdm:
-      api-url: ${FLEET_MDM_API_URL:}
-      api-token: ${FLEET_MDM_API_TOKEN:}
-    tactical-rmm:
-      api-url: ${TACTICAL_RMM_API_URL:}
-      api-token: ${TACTICAL_RMM_API_TOKEN:}
-```
-
-### Load Environment Variables
-
-Create helper scripts:
-
-#### `scripts/dev-env.sh`
-
+**`scripts/reset-dev-data.sh`:**
 ```bash
 #!/bin/bash
-
-# Load development environment variables
-if [ -f .env.dev ]; then
-  export $(cat .env.dev | grep -v '#' | awk '/=/ {print $1}')
-  echo "✅ Development environment variables loaded"
-else
-  echo "❌ .env.dev file not found"
-  exit 1
-fi
-
-# Verify critical variables
-if [ -z "$MONGODB_URI" ]; then
-  echo "❌ MONGODB_URI not set"
-  exit 1
-fi
-
-if [ -z "$REDIS_URL" ]; then
-  echo "❌ REDIS_URL not set"  
-  exit 1
-fi
-
-echo "🚀 Environment ready for development"
-```
-
-#### `scripts/start-dev.sh`
-
-```bash
-#!/bin/bash
-
-# Start development environment
-echo "🚀 Starting OpenFrame OSS Lib development environment..."
-
-# Load environment variables
-source scripts/dev-env.sh
-
-# Start development services
+echo "Resetting development data..."
+docker-compose -f docker-compose.dev.yml down -v
 docker-compose -f docker-compose.dev.yml up -d
-
-# Wait for services to be ready
-echo "⏳ Waiting for services to start..."
-sleep 30
-
-# Verify service connectivity
-echo "🔍 Verifying service connectivity..."
-mongosh "$MONGODB_URI" --eval "db.adminCommand('ping')" >/dev/null 2>&1 && echo "✅ MongoDB connected" || echo "❌ MongoDB connection failed"
-redis-cli -u "$REDIS_URL" ping >/dev/null 2>&1 && echo "✅ Redis connected" || echo "❌ Redis connection failed"
-
-echo "🎉 Development environment ready!"
-echo "📊 Kafka UI: http://localhost:8090"
-echo "🗄️  MongoDB: $MONGODB_URI"
-echo "🔴 Redis: $REDIS_URL"
+echo "Development data reset complete!"
 ```
 
 Make scripts executable:
-
 ```bash
-chmod +x scripts/dev-env.sh scripts/start-dev.sh
+chmod +x scripts/*.sh
 ```
 
-## Development Workflow
+## Productivity Enhancements
 
-### Daily Development Routine
+### Hot Reloading Setup
 
-```bash
-# 1. Start development environment
-./scripts/start-dev.sh
-
-# 2. Build all modules
-mvn clean install -DskipTests
-
-# 3. Run specific services as needed
-cd openframe-api-service-core
-mvn spring-boot:run -Dspring-boot.run.profiles=dev
-
-# 4. Run tests
-mvn test -Dtest=*Test -Dspring.profiles.active=dev
-```
-
-### Hot Reloading
-
-Enable Spring Boot DevTools for automatic restarts:
+Add Spring Boot DevTools to your development profile:
 
 ```xml
-<!-- Add to module pom.xml dependencies -->
+<!-- In relevant module pom.xml -->
 <dependency>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-devtools</artifactId>
@@ -511,90 +423,144 @@ Enable Spring Boot DevTools for automatic restarts:
 </dependency>
 ```
 
-### Debug Configuration
+**IntelliJ Configuration:**
+1. **File → Settings → Build → Compiler**
+2. Enable "Build project automatically"
+3. **Help → Find Action → Registry**
+4. Enable `compiler.automake.allow.when.app.running`
 
-#### Remote Debugging
+### Debug Configurations
 
-```bash
-# Start service with debug port
-mvn spring-boot:run -Dspring-boot.run.jvmArguments="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5005"
+**IntelliJ Remote Debug:**
+1. **Run → Edit Configurations → Add → Remote JVM Debug**
+2. Host: `localhost`, Port: `5005`
+3. Command line args: `-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005`
 
-# Connect debugger to localhost:5005
+**Spring Boot Debug Run Configuration:**
+```
+VM options: -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5005
 ```
 
-#### Database Debugging
+### API Testing Tools
 
-```bash
-# Enable SQL logging in application-dev.yml
-logging:
-  level:
-    org.springframework.data.mongodb.core: DEBUG
-    org.springframework.data.redis.core: DEBUG
+**IntelliJ HTTP Client:**
+Create `api-tests.http`:
+
+```http
+### Test Health Endpoint
+GET http://localhost:8080/health
+
+### GraphQL Query
+POST http://localhost:8080/graphql
+Content-Type: application/json
+
+{
+  "query": "query { __schema { types { name } } }"
+}
+
+### REST API Test
+GET http://localhost:8080/api/organizations
+Authorization: Bearer {{token}}
 ```
 
-## Troubleshooting
+**Alternative Tools:**
+- **Postman** - Feature-rich API testing
+- **Insomnia** - Simple REST/GraphQL client
+- **curl** - Command-line testing
 
-### Common Environment Issues
+## Performance Monitoring
 
-#### Port Conflicts
+### JVM Monitoring
 
-```bash
-# Check what's using a port
-lsof -i :8080
+**IntelliJ Profiler:**
+1. **Run → Profile** instead of Run
+2. Monitor memory, CPU, and thread usage
 
-# Kill process using port
-kill -9 $(lsof -t -i :8080)
+**External Tools:**
+- **VisualVM** - Free JVM profiler
+- **JProfiler** - Commercial profiler
+- **async-profiler** - Low-overhead profiler
+
+### Application Monitoring
+
+Enable Spring Boot Actuator endpoints:
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
 ```
 
-#### Database Connection Issues
+Access monitoring endpoints:
+- Health: `http://localhost:8080/actuator/health`
+- Metrics: `http://localhost:8080/actuator/metrics`
+- Info: `http://localhost:8080/actuator/info`
 
-```bash
-# Test MongoDB connection
-mongosh "$MONGODB_URI" --eval "db.adminCommand('ping')"
+## Troubleshooting Common Issues
 
-# Test Redis connection
-redis-cli -u "$REDIS_URL" ping
+### IDE Performance Issues
 
-# Check Docker container logs
-docker-compose -f docker-compose.dev.yml logs mongodb redis
+**IntelliJ Memory Settings:**
+1. **Help → Edit Custom VM Options**
+2. Add/modify:
 ```
-
-#### Maven/Java Issues
-
-```bash
-# Clear Maven cache
-rm -rf ~/.m2/repository/com/openframe
-
-# Verify Java version
-java -version
-javac -version
-
-# Check JAVA_HOME
-echo $JAVA_HOME
-```
-
-### Performance Optimization
-
-#### JVM Tuning for Development
-
-```bash
-# Add to IDE VM options or environment
--Xmx4G -Xms1G
+-Xmx4g
+-XX:MaxMetaspaceSize=1g
 -XX:+UseG1GC
--XX:+UseStringDeduplication
--Djava.awt.headless=true
 ```
 
-#### Maven Build Optimization
+**Large Project Indexing:**
+1. **File → Invalidate Caches and Restart**
+2. Exclude build directories: **File → Settings → Directories**
 
+### Build Issues
+
+**Maven Dependency Problems:**
 ```bash
-# Parallel builds
-mvn clean install -T 4C -DskipTests
-
-# Skip unnecessary plugins during development
-mvn compile -Dmaven.javadoc.skip=true
+# Clear local repository
+rm -rf ~/.m2/repository
+mvn clean install
 ```
+
+**OutOfMemoryError:**
+```bash
+export MAVEN_OPTS="-Xmx4g -XX:MaxMetaspaceSize=1g"
+mvn clean install
+```
+
+### Database Connection Issues
+
+**MongoDB Connection:**
+```bash
+# Check if MongoDB is running
+docker ps | grep mongo
+mongosh --eval "db.adminCommand('ping')"
+```
+
+**Redis Connection:**
+```bash
+# Check Redis status
+redis-cli ping
+```
+
+## Next Steps
+
+With your development environment configured:
+
+1. **[Local Development Guide](local-development.md)** - Learn to run and debug the application
+2. **[Architecture Overview](../architecture/README.md)** - Understand the system design
+3. **[Contributing Guidelines](../contributing/guidelines.md)** - Follow project conventions
+
+## Getting Help
+
+- **OpenMSP Slack**: [Join the community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) `#development` channel
+- **GitHub Issues**: Report environment setup problems
 
 ---
 
-**Environment configured?** Continue with [Local Development Setup](local-development.md) to run the full OpenFrame stack locally.
+*Your development environment is now ready for OpenFrame OSS Libraries development. Happy coding!*

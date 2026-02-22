@@ -1,17 +1,12 @@
 flowchart LR
-    Client["Client / UI / Agent"] --> Gateway["Gateway Service Core"]
+    Client["Client / Browser"] --> Gateway["Gateway Service Core"]
+    Agent["Tool Agent"] --> Gateway
+
     Gateway --> ApiService["API Service Core"]
     Gateway --> ExternalApi["External API Service Core"]
     Gateway --> AuthService["Authorization Service Core"]
     Gateway --> Tools["Integrated Tools"]
-    Gateway --> Nats["NATS WebSocket"]
+    Gateway --> Nats["NATS WebSocket Endpoint"]
 
-    subgraph security_layer["Security & Filters"]
-        Jwt["JWT Validation"]
-        ApiKey["API Key Filter"]
-        Cors["CORS / Origin Sanitizer"]
-    end
-
-    Gateway --> Jwt
-    Gateway --> ApiKey
-    Gateway --> Cors
+    Gateway --> Mongo["Mongo Persistence Layer"]
+    Gateway --> Redis["Redis Caching Layer"]

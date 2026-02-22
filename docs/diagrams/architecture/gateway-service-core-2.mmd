@@ -1,7 +1,7 @@
 flowchart TD
-    Request["Incoming Request"] --> OriginFilter["OriginSanitizerFilter"]
-    OriginFilter --> AuthHeader["AddAuthorizationHeaderFilter"]
-    AuthHeader --> ApiKeyFilter["ApiKeyAuthenticationFilter"]
-    ApiKeyFilter --> JwtResolver["JwtIssuerReactiveAuthenticationManagerResolver"]
-    JwtResolver --> SecurityChain["SecurityWebFilterChain"]
-    SecurityChain --> Route["Route to Target Service"]
+    Request["Incoming Request"] --> Resolver["JwtIssuerAuthenticationManagerResolver"]
+    Resolver --> Cache["Issuer Managers Cache"]
+    Cache --> Manager["ReactiveAuthenticationManager"]
+    Manager --> Decoder["NimbusReactiveJwtDecoder"]
+    Decoder --> Validator["Issuer Validator"]
+    Validator --> Authenticated["Authenticated Principal"]

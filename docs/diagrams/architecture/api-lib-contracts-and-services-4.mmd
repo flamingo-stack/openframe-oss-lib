@@ -1,0 +1,5 @@
+flowchart TD
+    MachineIds["List&lt;machineId&gt;"] --> Service["InstalledAgentService"]
+    Service --> Repo["InstalledAgentRepository"]
+    Repo --> Service
+    Service --> Grouped["Grouped By MachineId"]

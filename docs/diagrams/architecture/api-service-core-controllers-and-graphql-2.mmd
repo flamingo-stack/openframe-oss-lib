@@ -1,0 +1,6 @@
+flowchart LR
+    Request["Incoming Request"] --> ResourceServer["OAuth2 Resource Server"]
+    ResourceServer --> IssuerResolver["JwtIssuerAuthenticationManagerResolver"]
+    IssuerResolver --> Cache["Caffeine JWT Provider Cache"]
+    Cache --> Decoder["JwtDecoder per Issuer"]
+    Decoder --> Principal["AuthPrincipal"]

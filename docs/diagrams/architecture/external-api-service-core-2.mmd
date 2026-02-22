@@ -1,7 +1,7 @@
 flowchart TD
-    Client -->|"GET /api/v1/devices"| DeviceController
-    DeviceController --> Mapper["Device Mapper"]
-    Mapper --> DeviceService["Device Service"]
-    DeviceService --> Result["Query Result"]
-    Result --> Mapper
-    Mapper --> DevicesResponse["Devices Response DTO"]
+    Request["HTTP GET /devices"] --> Criteria["DeviceFilterCriteria"]
+    Criteria --> Mapper["DeviceMapper"]
+    Mapper --> Options["DeviceFilterOptions"]
+    Options --> Service["DeviceService"]
+    Service --> Result["Cursor Result"]
+    Result --> Response["DevicesResponse"]

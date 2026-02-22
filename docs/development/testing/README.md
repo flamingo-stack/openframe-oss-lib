@@ -1,85 +1,113 @@
-# Testing Guide
+# Testing Overview
 
-OpenFrame OSS Lib employs a comprehensive testing strategy that includes unit tests, integration tests, security tests, and end-to-end API testing. This guide covers testing patterns, tools, and best practices for ensuring code quality and system reliability.
+OpenFrame OSS Libraries employs comprehensive testing strategies to ensure reliability, security, and maintainability. This guide covers testing approaches, tools, best practices, and how to write effective tests for the platform.
 
-## Testing Strategy Overview
+## Testing Philosophy
 
-OpenFrame uses a **multi-layered testing approach** that validates functionality at different levels of the architecture:
+### Testing Pyramid
+
+OpenFrame follows the testing pyramid principle with emphasis on fast, reliable tests:
 
 ```mermaid
-flowchart TD
-    subgraph "Test Pyramid"
-        E2E["🔺 End-to-End Tests<br/>(API Integration)"]
-        Integration["🔷 Integration Tests<br/>(Service + Database)"]
-        Unit["🔻 Unit Tests<br/>(Individual Components)"]
+graph TD
+    subgraph "Testing Pyramid"
+        E2E[End-to-End Tests<br/>5-10%]
+        Integration[Integration Tests<br/>20-30%]
+        Unit[Unit Tests<br/>60-70%]
+        Static[Static Analysis<br/>Continuous]
     end
-
-    subgraph "Test Types"
-        Security["🔒 Security Tests"]
-        Performance["⚡ Performance Tests"]
-        Contract["📋 Contract Tests"]
-        Mutation["🧬 Mutation Tests"]
-    end
-
-    subgraph "Test Infrastructure"
-        TestContainers["🐳 TestContainers"]
-        MockServices["🎭 Mock Services"]
-        TestData["📊 Test Data Generators"]
-        Fixtures["🗂️ Test Fixtures"]
-    end
-
-    Unit --> Integration
-    Integration --> E2E
     
-    Security --> Unit
-    Performance --> Integration
-    Contract --> E2E
+    E2E --> Integration
+    Integration --> Unit
+    Unit --> Static
     
-    TestContainers --> Integration
-    MockServices --> Unit
-    TestData --> Integration
-    Fixtures --> E2E
+    subgraph "Characteristics"
+        E2E_Char[Slow, Expensive, High Confidence]
+        Int_Char[Medium Speed, Medium Cost, Good Coverage]
+        Unit_Char[Fast, Cheap, High Volume]
+        Static_Char[Instant, No Runtime, Early Detection]
+    end
+    
+    E2E -.-> E2E_Char
+    Integration -.-> Int_Char
+    Unit -.-> Unit_Char
+    Static -.-> Static_Char
 ```
 
-## Testing Architecture
+### Testing Principles
 
-### Test Module Structure
+1. **Fast Feedback Loop** - Tests should run quickly in development
+2. **Reliable and Deterministic** - Tests produce consistent results
+3. **Independent** - Tests don't depend on each other or external state
+4. **Comprehensive Coverage** - Critical paths and edge cases covered
+5. **Clear and Maintainable** - Tests serve as documentation
 
-The `openframe-test-service-core` module provides comprehensive testing infrastructure:
+## Testing Stack and Tools
 
-```text
-openframe-test-service-core/
-├── src/main/java/com/openframe/test/
-│   ├── api/                    # API client abstractions
-│   │   ├── AuthApi.java        # Authentication flows
-│   │   ├── DeviceApi.java      # Device management APIs
-│   │   └── OrganizationApi.java # Organization APIs
-│   ├── config/                 # Test configuration
-│   │   ├── ApiConfig.java      # API client configuration
-│   │   └── MongoConfig.java    # Database test config
-│   ├── data/                   # Test data management
-│   │   ├── generator/          # Data generators
-│   │   └── dto/               # Test DTOs
-│   └── tests/                  # Actual test implementations
-│       ├── AuthTokensTest.java
-│       ├── DevicesTest.java
-│       └── OrganizationsTest.java
+### Core Testing Framework
+
+| Tool | Purpose | Version |
+|------|---------|---------|
+| **JUnit 5** | Unit testing framework | 5.9+ |
+| **Spring Boot Test** | Integration testing | 3.3.0 |
+| **Mockito** | Mocking framework | 5.3+ |
+| **TestContainers** | Integration with real databases | 1.19+ |
+| **WireMock** | HTTP service mocking | 3.0+ |
+| **AssertJ** | Fluent assertions | 3.24+ |
+| **RestAssured** | API testing | 5.3+ |
+
+### Test Configuration
+
+**Maven Dependencies:**
+```xml
+<dependencies>
+    <!-- Core testing -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-test</artifactId>
+        <scope>test</scope>
+    </dependency>
+    
+    <!-- TestContainers for integration tests -->
+    <dependency>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>junit-jupiter</artifactId>
+        <scope>test</scope>
+    </dependency>
+    <dependency>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>mongodb</artifactId>
+        <scope>test</scope>
+    </dependency>
+    
+    <!-- API testing -->
+    <dependency>
+        <groupId>io.rest-assured</groupId>
+        <artifactId>rest-assured</artifactId>
+        <scope>test</scope>
+    </dependency>
+    
+    <!-- GraphQL testing -->
+    <dependency>
+        <groupId>com.netflix.graphql.dgs</groupId>
+        <artifactId>graphql-dgs-spring-boot-starter-test</artifactId>
+        <scope>test</scope>
+    </dependency>
+</dependencies>
 ```
 
-### Test Categories
+## Unit Testing
 
-#### 1. Unit Tests
+### Service Layer Testing
 
-**Purpose**: Test individual components in isolation  
-**Scope**: Single classes, methods, or functions  
-**Tools**: JUnit 5, Mockito, AssertJ  
+Test business logic in isolation:
 
 ```java
 @ExtendWith(MockitoExtension.class)
 class OrganizationServiceTest {
     
     @Mock
-    private OrganizationRepository organizationRepository;
+    private OrganizationRepository repository;
     
     @Mock
     private EventPublisher eventPublisher;
@@ -93,270 +121,458 @@ class OrganizationServiceTest {
         // Given
         String tenantId = "tenant-123";
         CreateOrganizationRequest request = CreateOrganizationRequest.builder()
-            .name("Test Organization")
-            .contactEmail("test@example.com")
+            .name("Acme IT Services")
+            .contactInformation(ContactInformationDto.builder()
+                .email("admin@acmeit.com")
+                .phone("+1-555-0123")
+                .build())
             .build();
-            
-        Organization savedOrg = Organization.builder()
-            .id("org-123")
-            .tenantId(tenantId)
-            .name("Test Organization")
-            .build();
-            
-        when(organizationRepository.save(any(Organization.class)))
-            .thenReturn(savedOrg);
-    
-        // When
-        OrganizationResponse response = organizationService.create(request, tenantId);
-    
-        // Then
-        assertThat(response.getId()).isEqualTo("org-123");
-        assertThat(response.getName()).isEqualTo("Test Organization");
         
-        verify(organizationRepository).save(argThat(org -> 
-            org.getTenantId().equals(tenantId) &&
-            org.getName().equals("Test Organization")
+        Organization expectedOrg = Organization.builder()
+            .id("org-456")
+            .tenantId(tenantId)
+            .name("Acme IT Services")
+            .build();
+        
+        when(repository.save(any(Organization.class))).thenReturn(expectedOrg);
+        
+        // When
+        Organization result = organizationService.create(request, tenantId);
+        
+        // Then
+        assertThat(result)
+            .isNotNull()
+            .hasFieldOrPropertyWithValue("name", "Acme IT Services")
+            .hasFieldOrPropertyWithValue("tenantId", tenantId);
+        
+        verify(repository).save(argThat(org -> 
+            org.getName().equals("Acme IT Services") &&
+            org.getTenantId().equals(tenantId)
         ));
         
         verify(eventPublisher).publishEvent(any(OrganizationCreatedEvent.class));
     }
     
     @Test
-    @DisplayName("Should throw exception when organization not found")
-    void shouldThrowExceptionWhenOrganizationNotFound() {
+    @DisplayName("Should throw exception when organization name is taken")
+    void shouldThrowExceptionWhenNameIsTaken() {
         // Given
         String tenantId = "tenant-123";
-        String orgId = "non-existent";
+        CreateOrganizationRequest request = CreateOrganizationRequest.builder()
+            .name("Existing Org")
+            .build();
         
-        when(organizationRepository.findById(orgId))
-            .thenReturn(Optional.empty());
-    
+        when(repository.existsByTenantIdAndName(tenantId, "Existing Org"))
+            .thenReturn(true);
+        
         // When & Then
-        assertThatThrownBy(() -> 
-            organizationService.findById(orgId, tenantId)
-        ).isInstanceOf(OrganizationNotFoundException.class)
-         .hasMessage("Organization not found: " + orgId);
+        assertThatThrownBy(() -> organizationService.create(request, tenantId))
+            .isInstanceOf(OrganizationNameConflictException.class)
+            .hasMessage("Organization name 'Existing Org' already exists");
+        
+        verify(repository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+    
+    @Test
+    @DisplayName("Should enforce tenant isolation when finding organizations")
+    void shouldEnforceTenantIsolationWhenFinding() {
+        // Given
+        String tenantId = "tenant-123";
+        List<Organization> expectedOrgs = List.of(
+            Organization.builder().tenantId(tenantId).name("Org 1").build(),
+            Organization.builder().tenantId(tenantId).name("Org 2").build()
+        );
+        
+        when(repository.findByTenantId(tenantId)).thenReturn(expectedOrgs);
+        
+        // When
+        List<Organization> result = organizationService.findByTenant(tenantId);
+        
+        // Then
+        assertThat(result)
+            .hasSize(2)
+            .allSatisfy(org -> assertThat(org.getTenantId()).isEqualTo(tenantId));
+        
+        verify(repository).findByTenantId(tenantId);
     }
 }
 ```
 
-#### 2. Integration Tests
+### Repository Layer Testing
 
-**Purpose**: Test component interactions with real dependencies  
-**Scope**: Service + Repository + Database layers  
-**Tools**: Spring Boot Test, TestContainers, Embedded Redis  
+Test data access with `@DataMongoTest`:
 
 ```java
-@SpringBootTest
+@DataMongoTest
 @TestPropertySource(properties = {
-    "spring.profiles.active=test",
-    "spring.data.mongodb.database=openframe-test"
+    "spring.data.mongodb.database=test_openframe",
+    "logging.level.org.springframework.data.mongodb.core=DEBUG"
 })
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
-class DeviceIntegrationTest {
+class OrganizationRepositoryTest {
     
     @Autowired
-    private DeviceService deviceService;
+    private TestEntityManager entityManager;
     
     @Autowired
-    private DeviceRepository deviceRepository;
+    private OrganizationRepository repository;
+    
+    @Test
+    @DisplayName("Should find organizations by tenant ID")
+    void shouldFindOrganizationsByTenantId() {
+        // Given
+        String tenantId = "tenant-123";
+        Organization org1 = Organization.builder()
+            .tenantId(tenantId)
+            .name("Org 1")
+            .build();
+        Organization org2 = Organization.builder()
+            .tenantId(tenantId)
+            .name("Org 2")
+            .build();
+        Organization org3 = Organization.builder()
+            .tenantId("other-tenant")
+            .name("Other Org")
+            .build();
+        
+        repository.saveAll(List.of(org1, org2, org3));
+        
+        // When
+        List<Organization> result = repository.findByTenantId(tenantId);
+        
+        // Then
+        assertThat(result)
+            .hasSize(2)
+            .extracting(Organization::getName)
+            .containsExactlyInAnyOrder("Org 1", "Org 2");
+    }
+    
+    @Test
+    @DisplayName("Should check if organization name exists within tenant")
+    void shouldCheckNameExistenceWithinTenant() {
+        // Given
+        String tenantId = "tenant-123";
+        Organization existingOrg = Organization.builder()
+            .tenantId(tenantId)
+            .name("Existing Org")
+            .build();
+        repository.save(existingOrg);
+        
+        // When & Then
+        assertThat(repository.existsByTenantIdAndName(tenantId, "Existing Org"))
+            .isTrue();
+        
+        assertThat(repository.existsByTenantIdAndName("other-tenant", "Existing Org"))
+            .isFalse();
+        
+        assertThat(repository.existsByTenantIdAndName(tenantId, "Non-existing Org"))
+            .isFalse();
+    }
+    
+    @Test
+    @DisplayName("Should find organizations with pagination")
+    void shouldFindOrganizationsWithPagination() {
+        // Given
+        String tenantId = "tenant-123";
+        List<Organization> orgs = IntStream.range(0, 15)
+            .mapToObj(i -> Organization.builder()
+                .tenantId(tenantId)
+                .name("Org " + i)
+                .build())
+            .collect(Collectors.toList());
+        
+        repository.saveAll(orgs);
+        
+        // When
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Organization> result = repository.findByTenantId(tenantId, pageable);
+        
+        // Then
+        assertThat(result)
+            .hasSize(10)
+            .satisfies(page -> {
+                assertThat(page.getTotalElements()).isEqualTo(15);
+                assertThat(page.getTotalPages()).isEqualTo(2);
+                assertThat(page.hasNext()).isTrue();
+            });
+    }
+}
+```
+
+## Integration Testing
+
+### Controller Integration Tests
+
+Test full request/response cycle:
+
+```java
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@TestPropertySource(properties = "spring.profiles.active=test")
+@Testcontainers
+class OrganizationControllerIntegrationTest {
+    
+    @Container
+    static MongoDBContainer mongoDBContainer = new MongoDBContainer("mongo:7-jammy")
+            .withExposedPorts(27017);
+    
+    @Container
+    static GenericContainer<?> redisContainer = new GenericContainer<>("redis:7-alpine")
+            .withExposedPorts(6379);
+    
+    @DynamicPropertySource
+    static void configureProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.data.mongodb.uri", mongoDBContainer::getReplicationSetUrl);
+        registry.add("spring.data.redis.host", redisContainer::getHost);
+        registry.add("spring.data.redis.port", () -> redisContainer.getMappedPort(6379));
+    }
     
     @Autowired
     private TestRestTemplate restTemplate;
     
-    private String tenantId;
-    private String userId;
-    private AuthPrincipal authPrincipal;
+    @Autowired
+    private OrganizationRepository repository;
+    
+    private String authToken;
+    private String tenantId = "test-tenant";
     
     @BeforeEach
-    void setUp() {
-        tenantId = "test-tenant-" + UUID.randomUUID();
-        userId = "test-user-" + UUID.randomUUID();
+    void setup() {
+        // Generate test JWT token
+        authToken = generateTestToken(tenantId, "test-user", List.of("ADMIN"));
         
-        authPrincipal = AuthPrincipal.builder()
-            .userId(userId)
-            .tenantId(tenantId)
-            .email("test@example.com")
-            .roles(Set.of("USER"))
-            .build();
+        // Clean database
+        repository.deleteAll();
     }
     
     @Test
-    @DisplayName("Should create and retrieve device")
-    void shouldCreateAndRetrieveDevice() {
+    @DisplayName("Should create organization via REST API")
+    void shouldCreateOrganizationViaRestApi() {
         // Given
-        CreateDeviceRequest request = CreateDeviceRequest.builder()
-            .name("Test Device")
-            .type(DeviceType.LAPTOP)
-            .machineId("machine-123")
+        CreateOrganizationRequest request = CreateOrganizationRequest.builder()
+            .name("Test Organization")
+            .contactInformation(ContactInformationDto.builder()
+                .email("admin@testorg.com")
+                .phone("+1-555-0123")
+                .build())
             .build();
-    
+        
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(authToken);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        
+        HttpEntity<CreateOrganizationRequest> entity = new HttpEntity<>(request, headers);
+        
         // When
-        DeviceResponse created = deviceService.create(request, tenantId);
-        Optional<Device> retrieved = deviceRepository.findById(created.getId());
-    
+        ResponseEntity<OrganizationResponse> response = restTemplate.exchange(
+            "/api/organizations",
+            HttpMethod.POST,
+            entity,
+            OrganizationResponse.class
+        );
+        
         // Then
-        assertThat(retrieved).isPresent();
-        assertThat(retrieved.get().getName()).isEqualTo("Test Device");
-        assertThat(retrieved.get().getTenantId()).isEqualTo(tenantId);
-        assertThat(retrieved.get().getType()).isEqualTo(DeviceType.LAPTOP);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(response.getBody())
+            .isNotNull()
+            .satisfies(org -> {
+                assertThat(org.getName()).isEqualTo("Test Organization");
+                assertThat(org.getContactInformation().getEmail()).isEqualTo("admin@testorg.com");
+                assertThat(org.getId()).isNotNull();
+            });
+        
+        // Verify in database
+        Optional<Organization> savedOrg = repository.findById(response.getBody().getId());
+        assertThat(savedOrg)
+            .isPresent()
+            .get()
+            .satisfies(org -> {
+                assertThat(org.getTenantId()).isEqualTo(tenantId);
+                assertThat(org.getName()).isEqualTo("Test Organization");
+            });
+    }
+    
+    @Test
+    @DisplayName("Should return 401 for requests without authentication")
+    void shouldReturn401ForUnauthenticatedRequests() {
+        // Given
+        CreateOrganizationRequest request = CreateOrganizationRequest.builder()
+            .name("Test Org")
+            .build();
+        
+        // When
+        ResponseEntity<String> response = restTemplate.postForEntity(
+            "/api/organizations",
+            request,
+            String.class
+        );
+        
+        // Then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
     
     @Test
     @DisplayName("Should enforce tenant isolation")
     void shouldEnforceTenantIsolation() {
-        // Given - Create device for tenant A
-        String tenantA = "tenant-a";
-        String tenantB = "tenant-b";
-        
-        Device deviceForTenantA = Device.builder()
-            .id("device-123")
-            .tenantId(tenantA)
-            .name("Tenant A Device")
+        // Given - Create organization for tenant 1
+        Organization org1 = Organization.builder()
+            .tenantId("tenant-1")
+            .name("Tenant 1 Org")
             .build();
-            
-        deviceRepository.save(deviceForTenantA);
-    
-        // When - Try to access from tenant B context
-        Page<Device> devicesForTenantB = deviceService.getDevices(
-            tenantB, 
-            DeviceFilter.builder().build(), 
-            PageRequest.of(0, 10)
+        repository.save(org1);
+        
+        // Create auth token for tenant 2
+        String tenant2Token = generateTestToken("tenant-2", "user-2", List.of("USER"));
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(tenant2Token);
+        
+        // When - Try to access organization from different tenant
+        ResponseEntity<String> response = restTemplate.exchange(
+            "/api/organizations/" + org1.getId(),
+            HttpMethod.GET,
+            new HttpEntity<>(headers),
+            String.class
         );
+        
+        // Then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
     
-        // Then - Should not see tenant A's device
-        assertThat(devicesForTenantB.getContent()).isEmpty();
-        assertThat(devicesForTenantB.getTotalElements()).isZero();
+    private String generateTestToken(String tenantId, String userId, List<String> roles) {
+        // Implementation would create valid JWT for testing
+        return jwtTestUtils.createToken(tenantId, userId, roles);
     }
 }
 ```
 
-#### 3. API Integration Tests
+### GraphQL Integration Tests
 
-**Purpose**: Test complete API workflows end-to-end  
-**Scope**: Full request/response cycle through all layers  
-**Tools**: RestAssured, Custom API clients  
+Test GraphQL queries and mutations:
 
 ```java
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class DevicesApiIntegrationTest extends BaseAuthorizedTest {
+@SpringBootTest
+@DgsIntegrationTest
+@TestPropertySource(properties = "spring.profiles.active=test")
+class OrganizationGraphQLIntegrationTest {
     
-    private DeviceApi deviceApi;
+    @Autowired
+    private DgsQueryExecutor dgsQueryExecutor;
+    
+    @Autowired
+    private OrganizationRepository repository;
+    
+    @MockBean
+    private AuthPrincipal authPrincipal;
     
     @BeforeEach
-    void setUp() {
-        deviceApi = new DeviceApi(requestSpec);
+    void setup() {
+        when(authPrincipal.getTenantId()).thenReturn("test-tenant");
+        when(authPrincipal.getUserId()).thenReturn("test-user");
+        
+        repository.deleteAll();
     }
     
     @Test
-    @DisplayName("Should create device via REST API")
-    void shouldCreateDeviceViaRestApi() {
+    @DisplayName("Should query organizations via GraphQL")
+    void shouldQueryOrganizationsViaGraphQL() {
         // Given
-        CreateOrganizationRequest orgRequest = OrganizationGenerator
-            .generateCreateRequest();
-        Organization organization = organizationApi.create(orgRequest);
-        
-        CreateDeviceRequest deviceRequest = DeviceGenerator
-            .generateCreateRequest()
-            .organizationId(organization.getId());
-    
-        // When
-        DeviceResponse device = deviceApi.create(deviceRequest);
-    
-        // Then
-        assertThat(device.getId()).isNotBlank();
-        assertThat(device.getName()).isEqualTo(deviceRequest.getName());
-        assertThat(device.getOrganizationId()).isEqualTo(organization.getId());
-        
-        // Verify device can be retrieved
-        DeviceResponse retrieved = deviceApi.getById(device.getId());
-        assertThat(retrieved.getId()).isEqualTo(device.getId());
-    }
-    
-    @Test
-    @DisplayName("Should support GraphQL device queries")
-    void shouldSupportGraphQLDeviceQueries() {
-        // Given - Create test devices
-        List<Device> testDevices = DeviceGenerator.generateDevices(5)
-            .stream()
-            .map(deviceApi::create)
-            .collect(toList());
-    
-        // When - Query via GraphQL
-        String query = """
-            query GetDevices($first: Int!) {
-              devices(first: $first) {
-                edges {
-                  node {
-                    id
-                    name
-                    type
-                    status
-                  }
-                }
-                pageInfo {
-                  hasNextPage
-                  endCursor
-                }
-              }
-            }
-            """;
-            
-        Map<String, Object> variables = Map.of("first", 3);
-        GraphQLResponse response = graphQLApi.query(query, variables);
-    
-        // Then
-        assertThat(response.isSuccessful()).isTrue();
-        
-        List<Map<String, Object>> edges = response.get("data.devices.edges");
-        assertThat(edges).hasSize(3);
-        
-        Map<String, Object> pageInfo = response.get("data.devices.pageInfo");
-        assertThat(pageInfo.get("hasNextPage")).isEqualTo(true);
-        assertThat(pageInfo.get("endCursor")).isNotNull();
-    }
-    
-    @Test
-    @DisplayName("Should handle cursor-based pagination")
-    void shouldHandleCursorBasedPagination() {
-        // Given - Create more devices than page size
-        List<Device> allDevices = DeviceGenerator.generateDevices(10)
-            .stream()
-            .map(deviceApi::create)
-            .collect(toList());
-    
-        // When - Get first page
-        DeviceConnection firstPage = deviceApi.getDevices(
-            DeviceFilter.builder().build(),
-            CursorPaginationInput.builder().first(4).build()
-        );
-    
-        // Then - Verify first page structure
-        assertThat(firstPage.getEdges()).hasSize(4);
-        assertThat(firstPage.getPageInfo().getHasNextPage()).isTrue();
-        
-        // When - Get second page using cursor
-        DeviceConnection secondPage = deviceApi.getDevices(
-            DeviceFilter.builder().build(),
-            CursorPaginationInput.builder()
-                .first(4)
-                .after(firstPage.getPageInfo().getEndCursor())
+        String tenantId = "test-tenant";
+        List<Organization> organizations = List.of(
+            Organization.builder()
+                .tenantId(tenantId)
+                .name("Org 1")
+                .contactInformation(ContactInformation.builder()
+                    .email("admin1@org1.com")
+                    .build())
+                .build(),
+            Organization.builder()
+                .tenantId(tenantId)
+                .name("Org 2")
+                .contactInformation(ContactInformation.builder()
+                    .email("admin2@org2.com")
+                    .build())
                 .build()
         );
-    
-        // Then - Verify pagination continuity
-        assertThat(secondPage.getEdges()).hasSize(4);
-        assertThat(secondPage.getPageInfo().getHasPreviousPage()).isTrue();
+        repository.saveAll(organizations);
         
-        // Verify no overlap between pages
-        Set<String> firstPageIds = firstPage.getEdges().stream()
-            .map(edge -> edge.getNode().getId())
-            .collect(toSet());
-        Set<String> secondPageIds = secondPage.getEdges().stream()
-            .map(edge -> edge.getNode().getId())
-            .collect(toSet());
-            
-        assertThat(firstPageIds).doesNotContain(secondPageIds.toArray(String[]::new));
+        // When
+        String query = """
+            query GetOrganizations($first: Int) {
+                organizations(first: $first) {
+                    edges {
+                        node {
+                            id
+                            name
+                            contactInformation {
+                                email
+                            }
+                        }
+                    }
+                    pageInfo {
+                        hasNextPage
+                        hasPreviousPage
+                    }
+                }
+            }
+            """;
+        
+        Map<String, Object> variables = Map.of("first", 10);
+        
+        ExecutionResult result = dgsQueryExecutor.execute(query, variables);
+        
+        // Then
+        assertThat(result.getErrors()).isEmpty();
+        
+        List<Map<String, Object>> edges = JsonPath.read(result.getData(), "$.organizations.edges");
+        assertThat(edges).hasSize(2);
+        
+        List<String> names = JsonPath.read(result.getData(), "$.organizations.edges[*].node.name");
+        assertThat(names).containsExactlyInAnyOrder("Org 1", "Org 2");
+    }
+    
+    @Test
+    @DisplayName("Should create organization via GraphQL mutation")
+    void shouldCreateOrganizationViaGraphQLMutation() {
+        // Given
+        String mutation = """
+            mutation CreateOrganization($input: CreateOrganizationInput!) {
+                createOrganization(input: $input) {
+                    id
+                    name
+                    contactInformation {
+                        email
+                        phone
+                    }
+                }
+            }
+            """;
+        
+        Map<String, Object> variables = Map.of(
+            "input", Map.of(
+                "name", "GraphQL Test Org",
+                "contactInformation", Map.of(
+                    "email", "admin@graphqltest.com",
+                    "phone", "+1-555-0199"
+                )
+            )
+        );
+        
+        // When
+        ExecutionResult result = dgsQueryExecutor.execute(mutation, variables);
+        
+        // Then
+        assertThat(result.getErrors()).isEmpty();
+        
+        String orgId = JsonPath.read(result.getData(), "$.createOrganization.id");
+        String orgName = JsonPath.read(result.getData(), "$.createOrganization.name");
+        String email = JsonPath.read(result.getData(), "$.createOrganization.contactInformation.email");
+        
+        assertThat(orgId).isNotNull();
+        assertThat(orgName).isEqualTo("GraphQL Test Org");
+        assertThat(email).isEqualTo("admin@graphqltest.com");
+        
+        // Verify in database
+        Optional<Organization> savedOrg = repository.findById(orgId);
+        assertThat(savedOrg).isPresent();
     }
 }
 ```
@@ -367,503 +583,411 @@ class DevicesApiIntegrationTest extends BaseAuthorizedTest {
 
 ```java
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@TestPropertySource(properties = "spring.profiles.active=test")
 class SecurityIntegrationTest {
     
     @Autowired
     private TestRestTemplate restTemplate;
     
     @Test
-    @DisplayName("Should reject requests without authentication")
-    void shouldRejectUnauthenticatedRequests() {
-        ResponseEntity<ErrorResponse> response = restTemplate.getForEntity(
-            "/api/devices", ErrorResponse.class);
-            
+    @DisplayName("Should reject requests without valid JWT token")
+    void shouldRejectRequestsWithoutValidJWT() {
+        // When
+        ResponseEntity<String> response = restTemplate.getForEntity(
+            "/api/organizations",
+            String.class
+        );
+        
+        // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-        assertThat(response.getBody().getMessage()).contains("Authentication required");
     }
     
     @Test
-    @DisplayName("Should reject invalid JWT tokens")
-    void shouldRejectInvalidJwtTokens() {
+    @DisplayName("Should reject requests with expired JWT token")
+    void shouldRejectRequestsWithExpiredJWT() {
+        // Given
+        String expiredToken = createExpiredJwtToken();
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth("invalid.jwt.token");
-        HttpEntity<String> entity = new HttpEntity<>(headers);
+        headers.setBearerAuth(expiredToken);
         
-        ResponseEntity<ErrorResponse> response = restTemplate.exchange(
-            "/api/devices", HttpMethod.GET, entity, ErrorResponse.class);
-            
+        // When
+        ResponseEntity<String> response = restTemplate.exchange(
+            "/api/organizations",
+            HttpMethod.GET,
+            new HttpEntity<>(headers),
+            String.class
+        );
+        
+        // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
     
     @Test
     @DisplayName("Should enforce role-based access control")
     void shouldEnforceRoleBasedAccessControl() {
-        // Given - User with READ_ONLY role
-        String readOnlyToken = generateTokenWithRoles(Set.of("READ_ONLY"));
+        // Given
+        String userToken = createJwtToken("tenant-1", "user-1", List.of("USER"));
+        String adminToken = createJwtToken("tenant-1", "admin-1", List.of("ADMIN"));
         
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(readOnlyToken);
-        headers.setContentType(MediaType.APPLICATION_JSON);
+        // User should be able to read
+        HttpHeaders userHeaders = new HttpHeaders();
+        userHeaders.setBearerAuth(userToken);
         
-        CreateDeviceRequest request = DeviceGenerator.generateCreateRequest();
-        HttpEntity<CreateDeviceRequest> entity = new HttpEntity<>(request, headers);
+        ResponseEntity<String> userReadResponse = restTemplate.exchange(
+            "/api/organizations",
+            HttpMethod.GET,
+            new HttpEntity<>(userHeaders),
+            String.class
+        );
+        assertThat(userReadResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         
-        // When - Try to create device (requires WRITE permission)
-        ResponseEntity<ErrorResponse> response = restTemplate.exchange(
-            "/api/devices", HttpMethod.POST, entity, ErrorResponse.class);
+        // User should NOT be able to delete
+        ResponseEntity<String> userDeleteResponse = restTemplate.exchange(
+            "/api/users/some-user-id",
+            HttpMethod.DELETE,
+            new HttpEntity<>(userHeaders),
+            String.class
+        );
+        assertThat(userDeleteResponse.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         
-        // Then - Should be forbidden
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-        assertThat(response.getBody().getMessage()).contains("Insufficient privileges");
-    }
-    
-    @Test
-    @DisplayName("Should prevent cross-tenant data access")
-    void shouldPreventCrossTenantDataAccess() {
-        // Given - Create device for tenant A
-        String tenantA = "tenant-a";
-        String tenantB = "tenant-b";
+        // Admin should be able to delete
+        HttpHeaders adminHeaders = new HttpHeaders();
+        adminHeaders.setBearerAuth(adminToken);
         
-        String tokenA = generateTokenForTenant(tenantA);
-        String tokenB = generateTokenForTenant(tenantB);
-        
-        // Create device with tenant A token
-        HttpHeaders headersA = new HttpHeaders();
-        headersA.setBearerAuth(tokenA);
-        headersA.setContentType(MediaType.APPLICATION_JSON);
-        
-        CreateDeviceRequest request = DeviceGenerator.generateCreateRequest();
-        HttpEntity<CreateDeviceRequest> createEntity = new HttpEntity<>(request, headersA);
-        
-        ResponseEntity<DeviceResponse> createResponse = restTemplate.exchange(
-            "/api/devices", HttpMethod.POST, createEntity, DeviceResponse.class);
-        
-        String deviceId = createResponse.getBody().getId();
-        
-        // When - Try to access device with tenant B token
-        HttpHeaders headersB = new HttpHeaders();
-        headersB.setBearerAuth(tokenB);
-        HttpEntity<String> getEntity = new HttpEntity<>(headersB);
-        
-        ResponseEntity<ErrorResponse> getResponse = restTemplate.exchange(
-            "/api/devices/" + deviceId, HttpMethod.GET, getEntity, ErrorResponse.class);
-        
-        // Then - Should not find device (404, not 403 to avoid information disclosure)
-        assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-    }
-}
-```
-
-### API Rate Limiting Tests
-
-```java
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class RateLimitingTest {
-    
-    @Autowired
-    private TestRestTemplate restTemplate;
-    
-    @Test
-    @DisplayName("Should enforce API key rate limits")
-    void shouldEnforceApiKeyRateLimits() {
-        String apiKey = generateTestApiKey(RateLimitTier.BASIC); // 100 requests/minute
-        
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("X-API-Key", apiKey);
-        HttpEntity<String> entity = new HttpEntity<>(headers);
-        
-        // Make requests up to the limit
-        for (int i = 0; i < 100; i++) {
-            ResponseEntity<String> response = restTemplate.exchange(
-                "/api/v1/devices", HttpMethod.GET, entity, String.class);
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        }
-        
-        // Next request should be rate limited
-        ResponseEntity<ErrorResponse> limitedResponse = restTemplate.exchange(
-            "/api/v1/devices", HttpMethod.GET, entity, ErrorResponse.class);
-            
-        assertThat(limitedResponse.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
-        assertThat(limitedResponse.getHeaders().getFirst("X-RateLimit-Limit")).isEqualTo("100");
-        assertThat(limitedResponse.getHeaders().getFirst("X-RateLimit-Remaining")).isEqualTo("0");
-        assertThat(limitedResponse.getHeaders().getFirst("Retry-After")).isNotBlank();
+        ResponseEntity<String> adminDeleteResponse = restTemplate.exchange(
+            "/api/users/some-user-id",
+            HttpMethod.DELETE,
+            new HttpEntity<>(adminHeaders),
+            String.class
+        );
+        assertThat(adminDeleteResponse.getStatusCode()).isIn(
+            HttpStatus.NO_CONTENT, HttpStatus.NOT_FOUND
+        );
     }
 }
 ```
 
 ## Performance Testing
 
-### Load Testing with JUnit 5
+### Load Testing with JUnit
 
 ```java
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@TestMethodOrder(OrderAnnotation.class)
+@TestPropertySource(properties = {
+    "spring.profiles.active=test",
+    "logging.level.com.openframe=WARN"  // Reduce log noise
+})
 class PerformanceTest {
     
     @Autowired
-    private DeviceApi deviceApi;
+    private TestRestTemplate restTemplate;
     
     @Test
-    @Order(1)
-    @DisplayName("Should handle concurrent device creation")
-    void shouldHandleConcurrentDeviceCreation() throws InterruptedException {
+    @DisplayName("Should handle concurrent requests efficiently")
+    void shouldHandleConcurrentRequestsEfficiently() throws InterruptedException {
+        // Given
         int threadCount = 10;
-        int devicesPerThread = 5;
+        int requestsPerThread = 20;
         CountDownLatch latch = new CountDownLatch(threadCount);
-        List<Future<List<DeviceResponse>>> futures = new ArrayList<>();
-        
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
         
-        // Submit concurrent device creation tasks
+        List<Long> responseTimes = Collections.synchronizedList(new ArrayList<>());
+        AtomicInteger successCount = new AtomicInteger();
+        AtomicInteger errorCount = new AtomicInteger();
+        
+        String authToken = createValidJwtToken();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(authToken);
+        
+        // When
         for (int i = 0; i < threadCount; i++) {
-            Future<List<DeviceResponse>> future = executor.submit(() -> {
-                List<DeviceResponse> createdDevices = new ArrayList<>();
+            executor.submit(() -> {
                 try {
-                    for (int j = 0; j < devicesPerThread; j++) {
-                        CreateDeviceRequest request = DeviceGenerator
-                            .generateCreateRequest()
-                            .name("Concurrent Device " + Thread.currentThread().getId() + "-" + j);
+                    for (int j = 0; j < requestsPerThread; j++) {
+                        long startTime = System.currentTimeMillis();
                         
-                        DeviceResponse device = deviceApi.create(request);
-                        createdDevices.add(device);
+                        ResponseEntity<String> response = restTemplate.exchange(
+                            "/api/organizations",
+                            HttpMethod.GET,
+                            new HttpEntity<>(headers),
+                            String.class
+                        );
                         
-                        // Small delay to simulate real usage
-                        Thread.sleep(100);
+                        long responseTime = System.currentTimeMillis() - startTime;
+                        responseTimes.add(responseTime);
+                        
+                        if (response.getStatusCode().is2xxSuccessful()) {
+                            successCount.incrementAndGet();
+                        } else {
+                            errorCount.incrementAndGet();
+                        }
                     }
                 } finally {
                     latch.countDown();
                 }
-                return createdDevices;
             });
-            futures.add(future);
         }
         
-        // Wait for all threads to complete
-        boolean completed = latch.await(30, TimeUnit.SECONDS);
-        assertThat(completed).isTrue();
-        
-        // Verify all devices were created successfully
-        int totalDevicesCreated = futures.stream()
-            .map(future -> {
-                try {
-                    return future.get().size();
-                } catch (Exception e) {
-                    return 0;
-                }
-            })
-            .mapToInt(Integer::intValue)
-            .sum();
-            
-        assertThat(totalDevicesCreated).isEqualTo(threadCount * devicesPerThread);
-        
+        latch.await(30, TimeUnit.SECONDS);
         executor.shutdown();
-    }
-    
-    @Test
-    @Order(2)
-    @DisplayName("Should maintain response times under load")
-    void shouldMaintainResponseTimesUnderLoad() {
-        int requestCount = 100;
-        List<Long> responseTimes = new ArrayList<>();
         
-        for (int i = 0; i < requestCount; i++) {
-            long startTime = System.currentTimeMillis();
-            
-            deviceApi.getDevices(
-                DeviceFilter.builder().build(),
-                CursorPaginationInput.builder().first(10).build()
-            );
-            
-            long responseTime = System.currentTimeMillis() - startTime;
-            responseTimes.add(responseTime);
-        }
-        
-        // Calculate statistics
+        // Then
+        int totalRequests = threadCount * requestsPerThread;
+        double successRate = (double) successCount.get() / totalRequests * 100;
         double avgResponseTime = responseTimes.stream()
             .mapToLong(Long::longValue)
             .average()
-            .orElse(0.0);
-            
+            .orElse(0);
         long maxResponseTime = responseTimes.stream()
             .mapToLong(Long::longValue)
             .max()
-            .orElse(0L);
-            
-        // Assert performance expectations
-        assertThat(avgResponseTime).isLessThan(500.0); // Average < 500ms
-        assertThat(maxResponseTime).isLessThan(2000L); // Max < 2 seconds
+            .orElse(0);
         
-        // 95th percentile should be reasonable
-        responseTimes.sort(Long::compareTo);
-        long p95ResponseTime = responseTimes.get((int) (requestCount * 0.95));
-        assertThat(p95ResponseTime).isLessThan(1000L); // 95th percentile < 1 second
+        System.out.printf("Performance Results:%n");
+        System.out.printf("  Total Requests: %d%n", totalRequests);
+        System.out.printf("  Success Rate: %.2f%%%n", successRate);
+        System.out.printf("  Average Response Time: %.2f ms%n", avgResponseTime);
+        System.out.printf("  Max Response Time: %d ms%n", maxResponseTime);
+        
+        // Assertions
+        assertThat(successRate).isGreaterThan(95.0);
+        assertThat(avgResponseTime).isLessThan(500.0);  // 500ms average
+        assertThat(maxResponseTime).isLessThan(2000);   // 2s max
     }
 }
 ```
 
 ## Test Data Management
 
-### Test Data Generators
+### Test Data Builders
+
+Use the builder pattern for maintainable test data:
 
 ```java
-public class DeviceGenerator {
-    private static final Random random = new Random();
-    private static final List<String> DEVICE_NAMES = List.of(
-        "MacBook Pro", "Dell Laptop", "HP Workstation", "Surface Pro",
-        "ThinkPad X1", "iMac", "Gaming PC", "Server-01"
-    );
+public class OrganizationTestDataBuilder {
     
-    public static CreateDeviceRequest generateCreateRequest() {
-        return CreateDeviceRequest.builder()
-            .name(randomDeviceName())
-            .type(randomDeviceType())
-            .machineId(generateMachineId())
-            .operatingSystem(randomOperatingSystem())
-            .ipAddress(generateRandomIpAddress())
-            .macAddress(generateRandomMacAddress())
+    private String id;
+    private String tenantId = "default-tenant";
+    private String name = "Test Organization";
+    private ContactInformation contactInformation;
+    private Address address;
+    private Instant createdAt = Instant.now();
+    
+    public static OrganizationTestDataBuilder anOrganization() {
+        return new OrganizationTestDataBuilder();
+    }
+    
+    public OrganizationTestDataBuilder withId(String id) {
+        this.id = id;
+        return this;
+    }
+    
+    public OrganizationTestDataBuilder withTenantId(String tenantId) {
+        this.tenantId = tenantId;
+        return this;
+    }
+    
+    public OrganizationTestDataBuilder withName(String name) {
+        this.name = name;
+        return this;
+    }
+    
+    public OrganizationTestDataBuilder withContactInfo(String email, String phone) {
+        this.contactInformation = ContactInformation.builder()
+            .email(email)
+            .phone(phone)
             .build();
+        return this;
     }
     
-    public static List<CreateDeviceRequest> generateCreateRequests(int count) {
-        return IntStream.range(0, count)
-            .mapToObj(i -> generateCreateRequest())
-            .collect(toList());
-    }
-    
-    public static Device generateDevice() {
-        return Device.builder()
-            .id(UUID.randomUUID().toString())
-            .tenantId("test-tenant-" + random.nextInt(1000))
-            .name(randomDeviceName())
-            .type(randomDeviceType())
-            .status(randomDeviceStatus())
-            .machineId(generateMachineId())
-            .createdAt(Instant.now().minusSeconds(random.nextInt(86400)))
-            .updatedAt(Instant.now())
-            .build();
-    }
-    
-    private static String randomDeviceName() {
-        return DEVICE_NAMES.get(random.nextInt(DEVICE_NAMES.size()));
-    }
-    
-    private static DeviceType randomDeviceType() {
-        DeviceType[] types = DeviceType.values();
-        return types[random.nextInt(types.length)];
-    }
-    
-    private static String generateMachineId() {
-        return "machine-" + UUID.randomUUID().toString().substring(0, 8);
-    }
-    
-    private static String generateRandomIpAddress() {
-        return String.format("%d.%d.%d.%d",
-            random.nextInt(255), random.nextInt(255),
-            random.nextInt(255), random.nextInt(255));
-    }
-    
-    private static String generateRandomMacAddress() {
-        byte[] mac = new byte[6];
-        random.nextBytes(mac);
-        return Arrays.stream(mac)
-            .map(b -> String.format("%02x", b))
-            .collect(Collectors.joining(":"));
-    }
-}
-```
-
-### Test Database Management
-
-```java
-@Component
-@RequiredArgsConstructor
-public class TestDatabaseManager {
-    private final MongoTemplate mongoTemplate;
-    private final RedisTemplate<String, Object> redisTemplate;
-    
-    public void clearAllTestData() {
-        clearMongoTestData();
-        clearRedisTestData();
-    }
-    
-    private void clearMongoTestData() {
-        // Clear test collections
-        mongoTemplate.getCollectionNames().stream()
-            .filter(name -> !name.startsWith("system."))
-            .forEach(collectionName -> {
-                mongoTemplate.getCollection(collectionName).deleteMany(new Document());
-            });
-    }
-    
-    private void clearRedisTestData() {
-        // Clear test keys (preserve system keys)
-        Set<String> keys = redisTemplate.keys("test:*");
-        if (keys != null && !keys.isEmpty()) {
-            redisTemplate.delete(keys);
-        }
-    }
-    
-    public void seedTestData() {
-        seedTenants();
-        seedUsers();
-        seedOrganizations();
-        seedDevices();
-    }
-    
-    private void seedTenants() {
-        List<Tenant> tenants = TenantGenerator.generateTenants(3);
-        tenants.forEach(tenant -> mongoTemplate.save(tenant));
-    }
-    
-    private void seedUsers() {
-        List<User> users = UserGenerator.generateUsers(10);
-        users.forEach(user -> mongoTemplate.save(user));
-    }
-    
-    // Additional seeding methods...
-}
-```
-
-## Test Configuration
-
-### Base Test Classes
-
-```java
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@TestPropertySource(properties = {
-    "spring.profiles.active=test",
-    "spring.data.mongodb.database=openframe-test",
-    "logging.level.org.springframework.web=DEBUG",
-    "openframe.security.jwt.secret-key=test-jwt-secret-key"
-})
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public abstract class BaseIntegrationTest {
-    
-    @Autowired
-    protected TestRestTemplate restTemplate;
-    
-    @Autowired
-    protected TestDatabaseManager testDatabaseManager;
-    
-    @BeforeEach
-    void baseSetUp() {
-        testDatabaseManager.clearAllTestData();
-    }
-    
-    @AfterEach
-    void baseTearDown() {
-        testDatabaseManager.clearAllTestData();
-    }
-    
-    protected String generateValidJwtToken(AuthPrincipal principal) {
-        // JWT generation utility for tests
-        return jwtService.generateToken(principal);
-    }
-    
-    protected ResponseEntity<String> performAuthenticatedRequest(
-            String url, HttpMethod method, Object body, AuthPrincipal principal) {
-        
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(generateValidJwtToken(principal));
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        
-        HttpEntity<Object> entity = new HttpEntity<>(body, headers);
-        return restTemplate.exchange(url, method, entity, String.class);
-    }
-}
-```
-
-```java
-public abstract class BaseAuthorizedTest extends BaseIntegrationTest {
-    
-    protected RequestSpecification requestSpec;
-    protected AuthPrincipal testPrincipal;
-    protected String testTenantId;
-    
-    @BeforeEach
-    void setUpAuthorization() {
-        testTenantId = "test-tenant-" + UUID.randomUUID();
-        testPrincipal = AuthPrincipal.builder()
-            .userId("test-user-" + UUID.randomUUID())
-            .tenantId(testTenantId)
-            .email("test@example.com")
-            .roles(Set.of("USER"))
-            .build();
-            
-        String token = generateValidJwtToken(testPrincipal);
-        
-        requestSpec = new RequestSpecBuilder()
-            .setBaseUri("http://localhost")
-            .setPort(port)
-            .setContentType(ContentType.JSON)
-            .setAccept(ContentType.JSON)
-            .addHeader("Authorization", "Bearer " + token)
+    public Organization build() {
+        return Organization.builder()
+            .id(id)
+            .tenantId(tenantId)
+            .name(name)
+            .contactInformation(contactInformation != null ? 
+                contactInformation : 
+                ContactInformation.builder()
+                    .email("test@example.com")
+                    .phone("+1-555-0123")
+                    .build())
+            .address(address)
+            .createdAt(createdAt)
             .build();
     }
 }
+
+// Usage in tests
+@Test
+void testOrganizationCreation() {
+    Organization org = anOrganization()
+        .withTenantId("tenant-123")
+        .withName("Custom Org Name")
+        .withContactInfo("custom@email.com", "+1-555-9999")
+        .build();
+    
+    // Test with the organization
+}
 ```
 
-### Test Profiles
+### Database Test Configuration
 
-#### `application-test.yml`
+Configure test databases appropriately:
 
 ```yaml
+# application-test.yml
 spring:
   profiles:
     active: test
     
   data:
     mongodb:
-      database: openframe-test-${random.uuid}
+      database: test_openframe_${random.uuid}
       
-  redis:
-    host: localhost
-    port: 6379
-    database: 15  # Use separate Redis DB for tests
-    
+  data:
+    redis:
+      database: 15  # Use dedicated test database
+      
   kafka:
     bootstrap-servers: ${embedded.kafka.brokers:localhost:9092}
-    consumer:
-      group-id: openframe-test-group
-      auto-offset-reset: earliest
-      
+    
+# Disable external services in tests
+openframe:
+  external:
+    enabled: false
+    
 logging:
   level:
     com.openframe: DEBUG
-    org.springframework.data.mongodb.core: DEBUG
-    org.springframework.security: DEBUG
-    
-openframe:
-  security:
-    jwt:
-      secret-key: test-jwt-secret-key-for-testing-only
-    encryption:
-      secret-key: test-encryption-key-32-characters
-      
-  testing:
-    cleanup-after-tests: true
-    generate-test-data: true
-    
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics
+    org.testcontainers: INFO
+    org.springframework.test: INFO
 ```
 
-## Continuous Integration Testing
+## Test Organization and Best Practices
 
-### Test Execution Strategy
+### Test Structure
+
+Organize tests consistently:
+
+```text
+src/test/java/
+├── com/openframe/api/
+│   ├── controller/
+│   │   ├── OrganizationControllerTest.java
+│   │   └── UserControllerIntegrationTest.java
+│   ├── service/
+│   │   ├── OrganizationServiceTest.java
+│   │   └── UserServiceTest.java
+│   ├── repository/
+│   │   └── OrganizationRepositoryTest.java
+│   └── integration/
+│       ├── SecurityIntegrationTest.java
+│       └── GraphQLIntegrationTest.java
+└── testdata/
+    ├── builders/
+    │   ├── OrganizationTestDataBuilder.java
+    │   └── UserTestDataBuilder.java
+    └── fixtures/
+        ├── organizations.json
+        └── users.json
+```
+
+### Test Naming Conventions
+
+Use descriptive test names:
+
+```java
+// ✅ GOOD: Describes what should happen
+@Test
+@DisplayName("Should create organization when valid data is provided")
+void shouldCreateOrganizationWhenValidDataIsProvided() { }
+
+@Test
+@DisplayName("Should throw OrganizationNotFoundException when organization does not exist")
+void shouldThrowOrganizationNotFoundExceptionWhenOrganizationDoesNotExist() { }
+
+// ❌ BAD: Generic or unclear names
+@Test
+void testCreateOrganization() { }
+
+@Test
+void test1() { }
+```
+
+### Assertion Best Practices
+
+Use fluent assertions for clarity:
+
+```java
+// ✅ GOOD: Fluent and descriptive
+assertThat(result)
+    .isNotNull()
+    .hasFieldOrPropertyWithValue("name", "Expected Name")
+    .extracting(Organization::getContactInformation)
+    .satisfies(contact -> {
+        assertThat(contact.getEmail()).isEqualTo("test@example.com");
+        assertThat(contact.getPhone()).isNotBlank();
+    });
+
+// ✅ GOOD: Testing collections
+assertThat(organizations)
+    .hasSize(3)
+    .extracting(Organization::getName)
+    .containsExactlyInAnyOrder("Org 1", "Org 2", "Org 3");
+
+// ❌ BAD: Multiple assertions that can be combined
+assertNotNull(result);
+assertEquals("Expected Name", result.getName());
+assertEquals("test@example.com", result.getContactInformation().getEmail());
+```
+
+## Running Tests
+
+### Maven Test Execution
+
+```bash
+# Run all tests
+mvn test
+
+# Run specific test class
+mvn test -Dtest=OrganizationServiceTest
+
+# Run specific test method
+mvn test -Dtest=OrganizationServiceTest#shouldCreateOrganizationWithValidData
+
+# Run integration tests
+mvn verify -P integration-tests
+
+# Run tests with coverage
+mvn test jacoco:report
+
+# Run tests in parallel
+mvn test -T 4
+
+# Skip tests (for build only)
+mvn install -DskipTests
+```
+
+### IDE Test Execution
+
+**IntelliJ IDEA:**
+- Right-click test class/method → Run
+- Use Ctrl+Shift+F10 (Windows) / Cmd+Shift+R (Mac)
+- View results in dedicated test runner window
+
+**VS Code:**
+- Click play button next to test methods
+- Use Java Test Runner extension
+- View results in integrated terminal
+
+### Continuous Integration
+
+Configure test execution in CI pipeline:
 
 ```yaml
 # .github/workflows/test.yml
-name: Test Suite
-
-on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main ]
+name: Tests
+on: [push, pull_request]
 
 jobs:
   test:
@@ -871,169 +995,134 @@ jobs:
     
     services:
       mongodb:
-        image: mongo:7
+        image: mongo:7-jammy
         ports:
           - 27017:27017
-        env:
-          MONGO_INITDB_DATABASE: openframe-test
-          
       redis:
         image: redis:7-alpine
         ports:
           - 6379:6379
-          
-    steps:
-    - uses: actions/checkout@v3
     
-    - name: Set up JDK 21
-      uses: actions/setup-java@v3
-      with:
-        java-version: '21'
-        distribution: 'temurin'
-        
-    - name: Cache Maven packages
-      uses: actions/cache@v3
-      with:
-        path: ~/.m2
-        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-        
-    - name: Run Unit Tests
-      run: mvn test -Dtest=*Test -DfailIfNoTests=false
+    steps:
+      - uses: actions/checkout@v4
       
-    - name: Run Integration Tests
-      run: mvn test -Dtest=*IntegrationTest -DfailIfNoTests=false
-      env:
-        MONGODB_URI: mongodb://localhost:27017/openframe-test
-        REDIS_URL: redis://localhost:6379
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          
+      - name: Run tests
+        run: mvn clean verify -P integration-tests
         
-    - name: Generate Test Reports
-      run: mvn jacoco:report
-      
-    - name: Upload Coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./target/site/jacoco/jacoco.xml
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./target/site/jacoco/jacoco.xml
 ```
 
-## Test Quality Metrics
+## Test Coverage and Quality
 
 ### Coverage Requirements
 
+Maintain high test coverage:
+
 ```xml
-<!-- pom.xml - JaCoCo configuration -->
+<!-- In pom.xml -->
 <plugin>
     <groupId>org.jacoco</groupId>
     <artifactId>jacoco-maven-plugin</artifactId>
-    <version>0.8.8</version>
-    <executions>
-        <execution>
-            <goals>
-                <goal>prepare-agent</goal>
-            </goals>
-        </execution>
-        <execution>
-            <id>report</id>
-            <phase>test</phase>
-            <goals>
-                <goal>report</goal>
-            </goals>
-        </execution>
-        <execution>
-            <id>check</id>
-            <goals>
-                <goal>check</goal>
-            </goals>
-            <configuration>
-                <rules>
-                    <rule>
-                        <element>BUNDLE</element>
-                        <limits>
-                            <limit>
-                                <counter>LINE</counter>
-                                <value>COVEREDRATIO</value>
-                                <minimum>0.80</minimum>
-                            </limit>
-                        </limits>
-                    </rule>
-                </rules>
-            </configuration>
-        </execution>
-    </executions>
+    <configuration>
+        <rules>
+            <rule>
+                <element>BUNDLE</element>
+                <limits>
+                    <limit>
+                        <counter>LINE</counter>
+                        <value>COVEREDRATIO</value>
+                        <minimum>0.80</minimum> <!-- 80% line coverage -->
+                    </limit>
+                    <limit>
+                        <counter>BRANCH</counter>
+                        <value>COVEREDRATIO</value>
+                        <minimum>0.75</minimum> <!-- 75% branch coverage -->
+                    </limit>
+                </limits>
+            </rule>
+        </rules>
+    </configuration>
 </plugin>
 ```
 
-### Test Categories and Coverage Goals
+### Test Quality Metrics
 
-| Test Type | Coverage Goal | Purpose |
-|-----------|---------------|---------|
-| **Unit Tests** | 85%+ line coverage | Individual component validation |
-| **Integration Tests** | 70%+ service coverage | Component interaction validation |
-| **API Tests** | 90%+ endpoint coverage | End-to-end workflow validation |
-| **Security Tests** | 100% auth/authz paths | Security vulnerability prevention |
-| **Performance Tests** | Critical paths only | Performance regression prevention |
+Monitor these test quality indicators:
 
-## Best Practices
+| Metric | Target | Purpose |
+|--------|--------|---------|
+| **Line Coverage** | 80%+ | Code execution coverage |
+| **Branch Coverage** | 75%+ | Decision path coverage |
+| **Test Success Rate** | 99%+ | Test reliability |
+| **Test Execution Time** | <5 min | Fast feedback |
+| **Test Maintainability** | Subjective | Code quality in tests |
 
-### Testing Guidelines
+## Troubleshooting Common Test Issues
 
-#### ✅ Do's
+### TestContainer Issues
 
-- **Write tests first** (TDD) for complex business logic
-- **Use descriptive test names** that explain the scenario
-- **Follow the AAA pattern** (Arrange, Act, Assert)
-- **Test edge cases** and error conditions
-- **Use test data builders** for consistent test data
-- **Mock external dependencies** in unit tests
-- **Use real dependencies** in integration tests
-- **Clean up test data** after each test
-- **Verify security constraints** in every test scenario
+```bash
+# Docker not running
+sudo systemctl start docker
 
-#### ❌ Don'ts
+# TestContainer image pull failures
+docker pull mongo:7-jammy
+docker pull redis:7-alpine
+```
 
-- Don't write tests that depend on external services
-- Don't hardcode sensitive data in test code
-- Don't skip cleanup of test databases
-- Don't mix unit and integration test concerns
-- Don't ignore flaky tests - fix them immediately
-- Don't test implementation details, test behavior
-- Don't use production data in tests
+### Maven Test Issues
 
-### Common Anti-Patterns to Avoid
+```bash
+# Clean test state
+mvn clean test
+
+# Skip flaky tests temporarily
+mvn test -Dtest='!FlakyTest'
+
+# Increase memory for tests
+export MAVEN_OPTS="-Xmx2g -XX:MaxMetaspaceSize=512m"
+```
+
+### Database State Issues
 
 ```java
-// ❌ DON'T: Test implementation details
-@Test
-void shouldCallRepositorySaveMethod() {
-    service.create(request);
-    verify(repository).save(any());
-}
-
-// ✅ DO: Test behavior and outcomes
-@Test
-void shouldCreateDeviceWithValidData() {
-    DeviceResponse result = service.create(request);
-    assertThat(result.getId()).isNotBlank();
-    assertThat(result.getName()).isEqualTo(request.getName());
-}
-
-// ❌ DON'T: Ignore tenant isolation in tests
-@Test
-void shouldGetAllDevices() {
-    List<Device> devices = deviceService.getAllDevices(); // Wrong!
-}
-
-// ✅ DO: Always test with tenant context
-@Test
-void shouldGetDevicesForTenant() {
-    List<Device> devices = deviceService.getDevicesForTenant(tenantId);
+// Clean database between tests
+@BeforeEach
+void cleanDatabase() {
+    mongoTemplate.getDb().drop();
+    redisTemplate.getConnectionFactory().getConnection().flushAll();
 }
 ```
 
+## Next Steps
+
+With comprehensive testing in place:
+
+1. **[Contributing Guidelines](../contributing/guidelines.md)** - Follow testing standards when contributing
+2. **[Architecture Overview](../architecture/README.md)** - Understand what to test
+3. **[Security Guidelines](../security/README.md)** - Test security implementations
+
+## Getting Help
+
+- **Testing Questions**: Ask in [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) `#testing` channel
+- **Test Failures**: Check CI logs and test reports
+- **Best Practices**: Review existing test implementations in the codebase
+
 ---
 
-**Next Steps:**
-- **[Contributing Guidelines](../contributing/guidelines.md)** - Development workflow and standards
-- **[Security Guide](../security/README.md)** - Security testing patterns
-- **[Architecture Guide](../architecture/README.md)** - Understanding component relationships
-
-This comprehensive testing guide ensures that OpenFrame OSS Lib maintains high quality, security, and reliability standards across all development activities.
+*Good tests are the foundation of reliable software. By following these guidelines, you contribute to the stability and quality of OpenFrame OSS Libraries.*

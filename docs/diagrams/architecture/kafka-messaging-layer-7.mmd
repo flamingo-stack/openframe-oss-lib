@@ -1,0 +1,7 @@
+flowchart LR
+    Client["Client Agent Service"] --> Kafka["Kafka Messaging Layer"]
+    Mgmt["Management Service"] --> Kafka
+    API["API Service"] --> Kafka
+
+    Kafka --> Stream["Stream Processing Service"]
+    Kafka --> Data["Data Platform Core"]

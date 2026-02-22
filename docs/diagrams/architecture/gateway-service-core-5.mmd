@@ -1,4 +1,5 @@
 flowchart LR
-    Client["Client"] --> Gateway["IntegrationController"]
-    Gateway --> RestProxy["RestProxyService"]
-    RestProxy --> Tool["Integrated Tool API"]
+    WSClient["WebSocket Client"] --> Gateway["Gateway"]
+    Gateway --> Filter["Tool WebSocket Filter"]
+    Filter --> ToolUrl["Tool URL Resolver"]
+    ToolUrl --> ToolInstance["Tool Service"]

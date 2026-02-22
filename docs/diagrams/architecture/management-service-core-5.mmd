@@ -1,5 +1,12 @@
-flowchart TD
-    Request["SaveToolRequest"] --> Save["IntegratedToolService.save"]
-    Save --> CreateDebezium["DebeziumService.createOrUpdate"]
-    CreateDebezium --> Hooks["Run PostSave Hooks"]
-    Hooks --> Response["Return Success"]
+sequenceDiagram
+    participant App
+    participant Initializers
+    participant Pinot
+    participant NATS
+    participant Debezium
+
+    App->>Initializers: ApplicationReadyEvent
+    Initializers->>Pinot: Deploy schemas & tables
+    Initializers->>NATS: Create streams
+    Initializers->>Debezium: Initialize connectors
+    Initializers->>Mongo: Persist default configs

@@ -1,0 +1,12 @@
+flowchart TD
+    KafkaInbound["Kafka Inbound Topics"] --> JsonListener["JsonKafkaListener"]
+    JsonListener --> JsonProcessor["GenericJsonMessageProcessor"]
+    JsonProcessor --> Deserializers["Tool Event Deserializers"]
+    Deserializers --> EventMapper["EventTypeMapper"]
+    EventMapper --> Enrichment["IntegratedToolDataEnrichmentService"]
+    Enrichment --> Handler["DebeziumMessageHandler"]
+    Handler --> CassandraHandler["DebeziumCassandraMessageHandler"]
+    Handler --> KafkaHandler["DebeziumKafkaMessageHandler"]
+
+    CassandraHandler --> CassandraDB[("Cassandra")]
+    KafkaHandler --> KafkaOutbound["Kafka Outbound Topics"]

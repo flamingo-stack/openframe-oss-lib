@@ -1,206 +1,151 @@
-# OpenFrame OSS Lib – Introduction
+# OpenFrame OSS Libraries - Introduction
 
-Welcome to **OpenFrame OSS Lib**, the modular, open-source foundation powering the OpenFrame platform. This library collection provides enterprise-grade infrastructure for building AI-powered MSP (Managed Service Provider) platforms and modern IT automation systems.
+Welcome to **OpenFrame OSS Libraries** – the core backend foundation that powers the OpenFrame AI-driven MSP platform. This repository provides all the shared libraries and service cores needed to build and run a scalable, multi-tenant, event-driven IT management infrastructure.
 
 [![OpenFrame Product Walkthrough (Beta Access)](https://img.youtube.com/vi/awc-yAnkhIo/maxresdefault.jpg)](https://www.youtube.com/watch?v=awc-yAnkhIo)
 
-## What is OpenFrame OSS Lib?
+## What is OpenFrame?
 
-OpenFrame OSS Lib is a **full-stack, multi-tenant, event-driven backend foundation** that replaces expensive proprietary software with open-source alternatives enhanced by intelligent automation. It serves as the core infrastructure layer that powers:
+OpenFrame is Flamingo's unified platform that integrates multiple MSP tools into a single AI-driven interface, automating IT support operations across the technology stack. The **OpenFrame OSS Libraries** serve as the foundational backend components that enable:
 
-- **Flamingo** - AI-powered MSP platform with Mingo AI for technicians and Fae for clients
-- **OpenFrame** - Unified platform integrating multiple MSP tools into a single AI-driven interface
-- Custom MSP platforms and IT automation solutions
+- **Multi-tenant architecture** supporting thousands of MSP organizations
+- **Event-driven processing** with real-time data enrichment and normalization
+- **AI-ready infrastructure** for intelligent automation and insights
+- **Modern authentication** with OAuth2 and OIDC compliance
+- **Scalable data platform** combining MongoDB, Cassandra, Redis, and Apache Pinot
 
-## Key Features & Benefits
+## Key Features
 
-### 🏗️ **Microservice-Ready Architecture**
-- 15 modular core libraries
-- Independent deployment capability
-- Clear separation of concerns
-- Event-driven communication patterns
+### 🏗️ **Modular Architecture**
+Built as a collection of service-core modules, each handling specific responsibilities like authentication, data persistence, event processing, and external integrations.
 
 ### 🔐 **Enterprise Security**
-- Multi-tenant JWT authentication (RS256)
-- OAuth2 Authorization Server with OIDC support
-- SSO integration (Google, Microsoft)
-- API key management with rate limiting
-- Per-tenant RSA key management
+- Multi-tenant OAuth2 Authorization Server
+- JWT-based authentication with per-tenant key pairs
+- API key management for external integrations
+- RBAC with fine-grained permissions
 
-### 📊 **Real-Time Data Processing**
-- Apache Kafka event streaming
-- Apache Pinot analytics
-- Cassandra time-series storage
-- Redis distributed caching
-- Real-time event enrichment and normalization
+### 📊 **Data Platform**
+- MongoDB for operational data storage
+- Apache Pinot for real-time analytics
+- Cassandra for audit log storage
+- Redis for caching and session management
 
-### 🤖 **Agent Management**
-- Machine agent lifecycle management
-- Tool installation orchestration
-- Heartbeat processing and monitoring
-- Integration with FleetDM and TacticalRMM
+### ⚡ **Event-Driven Architecture**
+- Kafka messaging backbone for reliable event processing
+- NATS streams for real-time agent communication
+- Debezium CDC for data synchronization
+- Stream processing for data enrichment
 
-### 🌐 **API-First Design**
-- GraphQL API with cursor-based pagination
-- REST API for external integrations
-- Reactive Spring Cloud Gateway
+### 🤖 **Agent Orchestration**
+- Client agent registration and lifecycle management
+- Tool agent integration with popular MSP platforms
+- Real-time heartbeat monitoring
+- Automated deployment and updates
+
+### 🌐 **API Layer**
+- RESTful APIs for administrative operations
+- GraphQL APIs for efficient data querying
+- External APIs for third-party integrations
 - WebSocket support for real-time communication
 
 ## Architecture Overview
 
-OpenFrame OSS Lib implements a layered, event-driven system optimized for scale:
-
 ```mermaid
 flowchart TD
-    subgraph "Edge Layer"
-        Gateway["Gateway Service Core"]
-        BFF["Security OAuth BFF"]
-    end
+    Client["Browser / External System"] --> Gateway["Gateway Service Core"]
+    Agent["Client Agent"] --> Gateway
 
-    subgraph "Identity Layer"
-        Auth["Authorization Service Core"]
-        SecurityCore["Security And OAuth Core"]
-    end
+    Gateway --> Auth["Authorization Service Core"]
+    Gateway --> Api["API Service Core"]
+    Gateway --> External["External API Service Core"]
 
-    subgraph "API Layer"
-        ApiService["API Service Core"]
-        ExternalApi["External API Service Core"]
-        Contracts["API Lib Contracts"]
-    end
+    Api --> Contracts["API Lib Contracts"]
+    External --> Contracts
 
-    subgraph "Agent Layer"
-        ClientCore["Client Agent Core"]
-    end
+    Api --> Mongo["Mongo Persistence Layer"]
+    Api --> DataCore["Data Platform Core"]
 
-    subgraph "Data Layer"
-        Mongo["Data Mongo Core"]
-        Redis["Data Redis Cache"]
-        Kafka["Data Kafka Core"]
-        PlatformData["Data Platform Core"]
-    end
+    DataCore --> Cassandra["Cassandra"]
+    DataCore --> Pinot["Apache Pinot"]
+    DataCore --> Kafka["Kafka Messaging Layer"]
+    DataCore --> Redis["Redis Caching Layer"]
 
-    subgraph "Stream Layer"
-        StreamCore["Stream Processing Core"]
-    end
+    Kafka --> Stream["Stream Processing Service Core"]
+    Stream --> Cassandra
+    Stream --> Kafka
 
-    subgraph "Operations Layer"
-        Management["Management Service Core"]
-    end
-
-    BFF --> Gateway
-    Gateway --> ApiService
-    Gateway --> ExternalApi
-    Gateway --> Auth
-
-    Auth --> SecurityCore
-
-    ApiService --> Contracts
-    ExternalApi --> Contracts
-
-    ApiService --> Mongo
-    ApiService --> Redis
-    ApiService --> Kafka
-
-    ClientCore --> Kafka
-    ClientCore --> ApiService
-
-    Kafka --> StreamCore
-    StreamCore --> PlatformData
-
-    Management --> Kafka
+    Management["Management Service Core"] --> Kafka
+    Management --> Pinot
     Management --> Mongo
-    Management --> Redis
+    Management --> NATS["NATS Streams"]
 ```
 
 ## Target Audience
 
-This library is designed for:
+### **MSP Platform Developers**
+Build and customize OpenFrame-powered MSP solutions with comprehensive backend services and APIs.
 
-### **MSP Developers & Platform Engineers**
-- Building next-generation MSP platforms
-- Integrating multiple tools into unified interfaces
-- Scaling IT automation workflows
+### **Enterprise IT Teams**
+Deploy secure, scalable IT management infrastructure with modern authentication and multi-tenancy.
 
-### **Enterprise Development Teams**
-- Creating multi-tenant SaaS applications
-- Implementing event-driven architectures
-- Building real-time analytics platforms
+### **Integration Partners**
+Connect existing tools and workflows using standardized APIs and event-driven interfaces.
 
 ### **Open Source Contributors**
-- Contributing to the OpenFrame ecosystem
-- Extending MSP platform capabilities
-- Building community-driven integrations
+Contribute to the evolution of open-source MSP tooling and AI-driven automation.
 
 ## Technology Stack
 
-| Layer | Technologies |
-|-------|-------------|
-| **Framework** | Spring Boot 3.3.0, Java 21 |
-| **Security** | OAuth2, JWT (RS256), Spring Security |
-| **Data Storage** | MongoDB, Apache Cassandra, Redis |
-| **Streaming** | Apache Kafka, NATS, Debezium |
-| **Analytics** | Apache Pinot |
-| **API** | GraphQL (Netflix DGS), REST |
-| **Gateway** | Spring Cloud Gateway (Reactive) |
-| **Testing** | Spring Boot Test, RestAssured |
-| **AI Integration** | Anthropic Claude, VoltAgent |
+| Component | Technology | Version |
+|-----------|------------|---------|
+| **Runtime** | Java | 21 |
+| **Framework** | Spring Boot | 3.3.0 |
+| **Security** | Spring Authorization Server | 1.3.1 |
+| **Data** | MongoDB, Cassandra, Redis, Pinot | Latest |
+| **Messaging** | Apache Kafka, NATS | Latest |
+| **API** | Netflix DGS (GraphQL) | 9.0.3 |
+| **Build** | Maven | 3.x |
 
-## Core Design Principles
+## Core Modules
 
-✅ **Multi-tenant by design** - Built for SaaS-scale isolation  
-✅ **Event-driven architecture** - Real-time processing and integration  
-✅ **Cursor-based pagination** - Efficient data access patterns  
-✅ **Asymmetric JWT cryptography** - Secure token validation  
-✅ **Tool-agnostic normalization** - Universal event and data models  
-✅ **Infrastructure auto-bootstrap** - Zero-configuration deployments  
-✅ **Reactive edge gateway** - High-performance API routing  
-✅ **Clear separation of concerns** - Maintainable modular design  
+The repository is organized into focused service-core modules:
 
-## Getting Started Path
+### **API & Contracts**
+- `openframe-api-lib` - Shared DTOs, filters, and reusable services
+- `openframe-api-service-core` - REST + GraphQL API orchestration
 
-Ready to dive in? Follow this learning path:
+### **Security & Identity**
+- `openframe-authorization-service-core` - Multi-tenant OAuth2/OIDC server
+- `openframe-security-core` - JWT infrastructure and authentication
+- `openframe-gateway-service-core` - Reactive edge gateway
 
-1. **[Prerequisites](prerequisites.md)** - Set up your development environment
-2. **[Quick Start](quick-start.md)** - Get a basic setup running in 5 minutes  
-3. **[First Steps](first-steps.md)** - Explore key features and capabilities
-4. **[Development Setup](../development/setup/local-development.md)** - Set up for contribution and extension
+### **Data & Infrastructure**
+- `openframe-data-mongo` - MongoDB models and repositories
+- `openframe-data` - Cassandra + Pinot configuration and analytics
+- `openframe-data-kafka` - Multi-tenant Kafka infrastructure
+- `openframe-data-redis` - Redis caching with tenant-aware keys
 
-## Repository Structure
+### **Processing & Integration**
+- `openframe-stream-service-core` - CDC ingestion and data enrichment
+- `openframe-management-service-core` - Automation and scheduled operations
+- `openframe-client-core` - Agent registration and lifecycle management
+- `openframe-external-api-service-core` - External integration APIs
 
-The library is organized into 15 modular cores:
+## Getting Started
 
-```text
-openframe-oss-lib/
-├── api-lib-contracts/          # Shared DTOs and contracts
-├── api-service-core/           # Internal GraphQL + REST API
-├── authorization-service-core/ # OAuth2 Authorization Server
-├── client-agent-core/          # Machine agent management
-├── core-utilities/             # Shared utilities
-├── data-kafka-core/           # Kafka infrastructure
-├── data-mongo-core/           # MongoDB persistence
-├── data-redis-cache/          # Redis caching
-├── data-platform-core/        # Pinot + Cassandra orchestration
-├── external-api-service-core/ # Public REST API
-├── gateway-service-core/      # Reactive API Gateway
-├── management-service-core/   # Infrastructure control plane
-├── security-and-oauth-core/   # JWT + PKCE utilities
-├── security-oauth-bff/        # OAuth BFF layer
-└── stream-processing-core/    # Event processing engine
-```
+Ready to dive in? Here's your next steps:
 
-Each module is independently reusable but designed to interoperate within a unified OpenFrame deployment.
+1. **[Prerequisites](prerequisites.md)** - Ensure your development environment is ready
+2. **[Quick Start](quick-start.md)** - Get OpenFrame OSS Lib running in 5 minutes
+3. **[First Steps](first-steps.md)** - Explore the key features and capabilities
 
 ## Community & Support
 
-Join the OpenFrame community:
-
-- **Slack Community**: [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
-- **Website**: [flamingo.run](https://flamingo.run)
-- **OpenFrame Platform**: [openframe.ai](https://openframe.ai)
+- **Slack Community**: [OpenMSP Community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
 - **GitHub**: [flamingo-stack/openframe-oss-lib](https://github.com/flamingo-stack/openframe-oss-lib)
-
-> **Note**: We use the OpenMSP Slack community for all discussions, issues, and collaboration. GitHub Issues and Discussions are not actively monitored.
+- **Documentation**: [OpenFrame Documentation](https://www.flamingo.run/openframe)
 
 ---
 
-**Ready to build the future of MSP platforms?** Continue with the [Prerequisites Guide](prerequisites.md) to set up your development environment.
+*OpenFrame OSS Libraries is part of the [Flamingo](https://flamingo.run) ecosystem - replacing expensive proprietary software with open-source alternatives enhanced by intelligent automation.*

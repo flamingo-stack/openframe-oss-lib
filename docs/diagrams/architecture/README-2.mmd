@@ -1,5 +1,12 @@
-flowchart LR
-    ToolEvents["Integrated Tool Events"] --> Kafka
-    Kafka --> StreamCore["Stream Processing Core"]
-    StreamCore --> UnifiedEvents["Unified Events Topic"]
-    StreamCore --> CassandraLogs["Cassandra Logs"]
+sequenceDiagram
+    participant Browser
+    participant Gateway
+    participant Auth as Authorization Service
+    participant Api as API Service
+
+    Browser->>Gateway: Request
+    Gateway->>Auth: Validate JWT (issuer-based)
+    Auth-->>Gateway: Validated
+    Gateway->>Api: Forward request
+    Api-->>Gateway: Response
+    Gateway-->>Browser: Response

@@ -1,420 +1,336 @@
 # Authorization Service Core
 
-The **Authorization Service Core** module is the central identity, authentication, and OAuth2 authorization server for the OpenFrame multi-tenant platform.
+The **Authorization Service Core** module is the multi-tenant OAuth2 and OpenID Connect (OIDC) authorization server for the OpenFrame platform. It is responsible for:
 
-It provides:
+- Issuing and validating OAuth2 access and refresh tokens
+- Acting as an OpenID Connect identity provider (IdP)
+- Managing multi-tenant authentication contexts
+- Supporting local username/password and SSO (Google, Microsoft)
+- Handling tenant onboarding, invitation-based registration, and password reset
+- Persisting authorizations, clients, and signing keys in MongoDB
 
-- Multi-tenant OAuth2 Authorization Server
-- OpenID Connect (OIDC) support
-- Dynamic SSO provider integration (Google, Microsoft)
-- Invitation-based onboarding
-- Tenant registration and discovery
-- JWT issuance with per-tenant signing keys
-- MongoDB-backed OAuth2 authorization persistence
-- Password reset and email verification support
+This module is the identity backbone of OpenFrame and integrates with:
 
-This module is designed to operate as a **multi-issuer, multi-tenant authorization server**, where each tenant has isolated keys, user space, and SSO configuration.
+- Mongo Persistence Layer (users, tenants, OAuth data)
+- Security Core and OAuth BFF (JWT validation and OAuth flows)
+- Gateway Service Core (JWT validation at the edge)
+- API Service Core Controllers and GraphQL (resource server using issued JWTs)
 
 ---
 
 ## 1. High-Level Architecture
 
-At a high level, the Authorization Service Core sits between end users, SSO providers, and the rest of the OpenFrame platform.
-
 ```mermaid
 flowchart TD
-    User["End User Browser"] -->|"Login / OAuth2"| AuthServer["Authorization Service Core"]
+    Browser["User Browser"] --> Login["Login Page /oauth2/authorize"]
+    Login --> AuthServer["Authorization Service Core"]
 
-    AuthServer -->|"OIDC Login"| Google["Google OIDC"]
-    AuthServer -->|"OIDC Login"| Microsoft["Microsoft OIDC"]
+    subgraph authz["Authorization Service Core"]
+        TenantFilter["TenantContextFilter"]
+        AuthzConfig["AuthorizationServerConfig"]
+        SecurityCfg["SecurityConfig"]
+        KeyService["TenantKeyService"]
+        MongoAuthSvc["MongoAuthorizationService"]
+        ClientRepo["MongoRegisteredClientRepository"]
+    end
 
-    AuthServer -->|"Read/Write"| Mongo["MongoDB"]
-    AuthServer -->|"Sign JWT"| TenantKeys["Per-Tenant RSA Keys"]
+    AuthServer --> Mongo[("MongoDB")]
+    AuthServer --> KeyService
+    KeyService --> Mongo
 
-    AuthServer -->|"Access Token"| Gateway["Gateway Service Core"]
-    Gateway -->|"JWT Validation"| Platform["OpenFrame Platform Services"]
+    AuthServer --> JWT["Signed JWT (per-tenant key)"]
+    JWT --> Gateway["Gateway Service Core"]
+    Gateway --> ApiSvc["API Service Core"]
 ```
 
 ### Core Responsibilities
 
-| Area | Responsibility |
-|------|----------------|
-| OAuth2 | Authorization Code, Refresh Token, PKCE |
-| OIDC | ID Token issuance, UserInfo endpoint |
-| Multi-tenancy | Tenant isolation via `TenantContext` |
-| Key Management | Per-tenant RSA signing keys |
-| Persistence | Mongo-backed clients and authorizations |
-| SSO | Google & Microsoft integration |
-| Onboarding | Tenant registration and invitation flows |
+1. **Multi-Tenant Resolution** – Extract tenant ID from path/query/session.
+2. **OAuth2 Authorization Server** – Provide `/oauth2/authorize`, `/oauth2/token`, JWKS, OIDC metadata.
+3. **JWT Issuance** – Sign tokens with per-tenant RSA keys.
+4. **SSO Integration** – Dynamic OIDC client registration per tenant.
+5. **Persistence** – Store authorizations and registered clients in MongoDB.
 
 ---
 
-## 2. Multi-Tenant Model
+## 2. Multi-Tenant Context Model
 
-Multi-tenancy is a first-class design principle.
+Multi-tenancy is implemented using a thread-local context and HTTP filters.
 
-### 2.1 Tenant Context Resolution
+### 2.1 Tenant Context
 
-`TenantContextFilter` extracts the tenant ID from:
-
-- URL path (e.g. `/sas/{tenantId}/oauth2/authorize`)
-- Query parameter (`tenant`)
-- HTTP session
-
-It sets the tenant ID in a thread-local container:
+- `TenantContext` – ThreadLocal storage for the current tenant ID.
+- `TenantContextFilter` – Extracts tenant ID from:
+  - URL path (e.g., `/{tenant}/oauth2/authorize`)
+  - `tenant` query parameter
+  - HTTP session attribute
 
 ```mermaid
 flowchart TD
     Request["Incoming HTTP Request"] --> Filter["TenantContextFilter"]
-    Filter -->|"Extract tenantId"| Context["TenantContext ThreadLocal"]
-    Context --> Controllers["Controllers & Services"]
+    Filter --> Resolve["Resolve tenant from path/query/session"]
+    Resolve --> SetCtx["TenantContext.setTenantId()"]
+    SetCtx --> Continue["Continue Security Chain"]
+    Continue --> Clear["TenantContext.clear()"]
 ```
 
-`TenantContext` ensures all downstream components (JWT, user lookup, key service, SSO config) operate within the correct tenant boundary.
+### 2.2 Onboarding Tenant
+
+`SsoRegistrationConstants.ONBOARDING_TENANT_ID` (`"sso-onboarding"`) is a pseudo-tenant used during SSO-based tenant creation before the real tenant is finalized.
 
 ---
 
 ## 3. Authorization Server Configuration
 
-The `AuthorizationServerConfig` class configures:
+### 3.1 AuthorizationServerConfig
 
-- OAuth2 Authorization Server
-- OIDC support
-- JWT encoder and decoder
-- Per-tenant JWK resolution
-- Token customization
-
-### 3.1 Security Filter Chains
-
-Two ordered filter chains exist:
-
-1. **Authorization Server Chain (Order 1)**
-2. **Default Security Chain (Order 2)**
-
-```mermaid
-flowchart TD
-    Request["HTTP Request"] --> Matcher{"Authorization Endpoint?"}
-
-    Matcher -->|"Yes"| ASChain["Authorization Server SecurityFilterChain"]
-    Matcher -->|"No"| DefaultChain["Default SecurityFilterChain"]
-```
-
-The Authorization Server chain enables:
+`AuthorizationServerConfig` enables Spring Authorization Server with:
 
 - OIDC support
+- Multiple issuers (`multipleIssuersAllowed(true)`)
 - JWT resource server support
-- Custom authentication entry point
+- Custom `OAuth2TokenCustomizer`
 
----
+Key beans:
 
-## 4. Per-Tenant Key Management
+- `SecurityFilterChain` (order 1) – Secures OAuth2 endpoints
+- `JWKSource` – Per-tenant RSA key resolution
+- `JwtEncoder` / `JwtDecoder`
+- `UserDetailsService`
+- `AuthenticationManager`
 
-Each tenant has its own RSA signing key.
-
-### 4.1 TenantKeyService
+### 3.2 Per-Tenant JWKS
 
 `TenantKeyService`:
 
-- Looks up active key in MongoDB
-- Generates a new RSA key pair if none exists
-- Encrypts private key at rest
-- Returns a `RSAKey` for JWT signing
+- Loads or generates RSA key pairs per tenant
+- Stores encrypted private keys in MongoDB
+- Returns `RSAKey` for JWT signing
 
 ```mermaid
-flowchart TD
-    JWTRequest["JWT Signing Request"] --> KeyService["TenantKeyService"]
-    KeyService -->|"Find active key"| Repo["TenantKeyRepository"]
-
-    Repo -->|"No key"| Generator["RsaAuthenticationKeyPairGenerator"]
-    Generator --> Store["Persist TenantKey"]
-
-    KeyService --> RSAKey["RSAKey (Public + Private)"]
+flowchart LR
+    TokenReq["Token Request"] --> JWKSource["JWKSource"]
+    JWKSource --> TenantCtx["TenantContext.getTenantId()"]
+    TenantCtx --> KeySvc["TenantKeyService"]
+    KeySvc --> Repo["TenantKeyRepository (Mongo)"]
+    KeySvc --> RSA["RSAKey (pub+priv)"]
+    RSA --> Sign["JWT Signing"]
 ```
 
-### 4.2 JWT Claims Customization
+If no active key exists for a tenant, a new 2048-bit RSA key pair is generated and persisted.
 
-The `OAuth2TokenCustomizer` injects:
+---
+
+## 4. JWT Customization and Claims
+
+The `OAuth2TokenCustomizer` enriches access tokens with tenant-aware claims.
+
+### Added Claims
 
 - `tenant_id`
 - `userId`
-- `roles`
-
-Role escalation rule:
-
-- If user has `OWNER`, they automatically get `ADMIN` in the token.
-
----
-
-## 5. Mongo-Based OAuth2 Persistence
-
-Spring Authorization Server uses:
-
-- `MongoRegisteredClientRepository`
-- `MongoAuthorizationService`
-- `MongoAuthorizationMapper`
-
-### 5.1 Registered Clients
-
-Clients are stored as `MongoRegisteredClient` documents and mapped to Spring `RegisteredClient`.
-
-Supports:
-
-- Authorization Code
-- Refresh Token
-- PKCE
-- Custom token TTL
-
-### 5.2 PKCE Preservation
-
-`MongoAuthorizationMapper` ensures PKCE parameters:
-
-- `code_challenge`
-- `code_challenge_method`
-
-are preserved across:
-
-- Authorization Request
-- Authorization Code
-- Token Exchange
+- `roles` (OWNER implies ADMIN)
 
 ```mermaid
 flowchart TD
-    AuthRequest["Authorization Request"] --> Save["MongoAuthorizationService.save()"]
-    Save --> Entity["MongoOAuth2Authorization"]
-
-    TokenExchange["Token Request"] --> Load["findByToken()"]
-    Load --> Rehydrate["Rebuild OAuth2Authorization with PKCE"]
+    Principal["Authenticated Principal"] --> LoadUser["UserService.findActiveByEmailAndTenant"]
+    LoadUser --> Claims["Add Custom Claims"]
+    Claims --> JWT["Signed Access Token"]
 ```
+
+On refresh token flows, `lastLogin` is updated.
 
 ---
 
-## 6. Authentication Flows
+## 5. Security Configuration (Non-AS Endpoints)
 
-### 6.1 Username/Password Login
+`SecurityConfig` (order 2) secures all non-authorization-server endpoints.
 
-Handled by:
+### Features
 
-- `UserDetailsService`
-- `AuthenticationManager`
-- `BCryptPasswordEncoder`
+- Custom login page (`/login`)
+- Form login + OAuth2 login
+- OIDC user service with auto-provisioning
+- Microsoft-specific issuer validation
+- Custom authentication failure handling
 
-User lookup is tenant-aware:
+### Microsoft Multi-Tenant Validation
+
+A custom `JwtDecoderFactory` validates issuer URIs against:
 
 ```text
-findActiveByEmailAndTenant(email, tenantId)
+^https://login\.microsoftonline\.com/[^/]+/v2\.0/?$
 ```
 
-On success:
-
-- `AuthSuccessHandler` updates `lastLogin`
-- May mark email verified (Google/Microsoft)
+This enables Azure AD multi-tenant support.
 
 ---
 
-### 6.2 OIDC / SSO Login
+## 6. SSO and Dynamic Client Registration
 
-Configured in `SecurityConfig`.
+### 6.1 DynamicClientRegistrationRepository
 
-Supports:
+Loads OIDC `ClientRegistration` dynamically per tenant using:
 
-- Google
-- Microsoft (multi-tenant issuer validation)
+- `DynamicClientRegistrationService`
+- Tenant-specific SSO configuration
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant AuthServer as Authorization Service
-    participant IdP as OIDC Provider
+If tenant context is missing, resolution fails early.
 
-    User->>AuthServer: GET /oauth2/authorization/google
-    AuthServer->>IdP: Redirect to Provider
-    IdP->>AuthServer: ID Token + Code
-    AuthServer->>AuthServer: Validate JWT
-    AuthServer->>AuthServer: Auto-provision if enabled
-    AuthServer->>User: Authenticated Session
-```
-
-### 6.3 Auto-Provisioning Logic
-
-When SSO login occurs:
-
-1. Load tenant SSO config
-2. Check `autoProvisionUsers`
-3. Validate allowed domains
-4. Create user if not present
-5. Assign default role (ADMIN)
-
-If no tenant config matches, a `GlobalDomainPolicyLookup` may allow automatic mapping.
-
----
-
-## 7. Tenant Registration
-
-### 7.1 Standard Registration
-
-`TenantRegistrationController` handles:
-
-```text
-POST /oauth/register
-```
-
-Creates:
-
-- Tenant
-- Initial user
-
-### 7.2 SSO-Based Tenant Registration
-
-Flow:
-
-1. Start registration (`/oauth/register/sso`)
-2. Store short-lived signed cookie
-3. Redirect to OIDC provider
-4. On success, `TenantRegSsoHandler`:
-   - Creates tenant
-   - Registers user
-   - Redirects into real tenant context
-
-```mermaid
-flowchart TD
-    Start["User Starts SSO Registration"] --> Cookie["Set SSO Registration Cookie"]
-    Cookie --> OIDC["Redirect to OIDC Provider"]
-    OIDC --> Callback["OIDC Callback"]
-    Callback --> Handler["TenantRegSsoHandler"]
-    Handler --> CreateTenant["Create Tenant + User"]
-    CreateTenant --> Redirect["Redirect to Tenant Context"]
-```
-
----
-
-## 8. Invitation-Based Onboarding
-
-### 8.1 Standard Invitation
-
-Endpoint:
-
-```text
-POST /invitations/accept
-```
-
-Creates user under existing tenant.
-
-### 8.2 SSO Invitation Flow
-
-`InviteSsoHandler`:
-
-1. Validates invitation
-2. Stores signed cookie
-3. Redirects to OIDC provider
-4. Creates user after callback
-
----
-
-## 9. Password Reset
-
-`PasswordResetController` exposes:
-
-- `POST /password-reset/request`
-- `POST /password-reset/confirm`
-
-`ResetTokenUtil`:
-
-- Generates 32-byte secure random token
-- Encodes as URL-safe Base64
-
-Password validation enforces:
-
-- Minimum 8 characters
-- Uppercase
-- Lowercase
-- Digit
-- Special character
-
----
-
-## 10. SSO Provider Abstraction
-
-The module uses strategy-based registration:
+### 6.2 Provider Strategies
 
 - `GoogleClientRegistrationStrategy`
 - `MicrosoftClientRegistrationStrategy`
 
 Each strategy:
 
-- Loads per-tenant config
-- Falls back to default provider config
+- Uses provider-specific properties
+- Integrates with `SSOConfigService`
 
-Default providers:
+### 6.3 Default Provider Configs
 
 - `GoogleDefaultProviderConfig`
 - `MicrosoftDefaultProviderConfig`
 
-This enables:
-
-- Tenant-specific credentials
-- System-wide fallback credentials
+Provide fallback client IDs and secrets when tenant-level overrides are not configured.
 
 ---
 
-## 11. Success and Flow Handlers
+## 7. SSO Flows
 
-### 11.1 AuthSuccessHandler
+Two primary SSO-driven flows are supported:
 
-On successful login:
+1. Invitation acceptance
+2. Tenant registration (onboarding)
 
-- Update `lastLogin`
-- Optionally mark email verified
-- Delegate to SSO success handler
+### 7.1 Invitation SSO Flow
 
-### 11.2 SSO Flow Handlers
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant Authz as Authorization Service Core
+    participant IdP as OIDC Provider
 
-Two main implementations:
+    Browser->>Authz: GET /invitations/accept/sso
+    Authz->>Browser: Set of_sso_invite cookie + redirect
+    Browser->>IdP: OAuth2 Authorization Request
+    IdP->>Authz: Callback with code
+    Authz->>Authz: InviteSsoHandler
+    Authz->>Browser: Redirect to tenant context
+```
 
+Handled by:
+
+- `InvitationRegistrationController`
 - `InviteSsoHandler`
-- `TenantRegSsoHandler`
+- `SsoCookieCodec`
 
-They:
+### 7.2 Tenant Registration SSO Flow
 
-- Decode signed cookies
-- Extract user identity from OIDC claims
-- Complete domain-specific registration logic
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant Authz as Authorization Service Core
+    participant IdP as OIDC Provider
 
----
-
-## 12. Security Considerations
-
-| Concern | Mitigation |
-|----------|------------|
-| Tenant isolation | ThreadLocal `TenantContext` |
-| Token signing | Per-tenant RSA keys |
-| Private key storage | Encrypted at rest |
-| PKCE | Persisted and validated |
-| Session switching | Session invalidation on tenant change |
-| Email verification | Provider-validated claims |
+    Browser->>Authz: GET /oauth/register/sso
+    Authz->>Browser: Set of_sso_reg cookie + redirect
+    Browser->>IdP: OAuth2 Authorization
+    IdP->>Authz: Callback
+    Authz->>Authz: TenantRegSsoHandler
+    Authz->>Browser: Redirect to new tenant
+```
 
 ---
 
-## 13. Integration with Other Modules
+## 8. Mongo-Based Authorization Persistence
+
+### 8.1 MongoAuthorizationService
+
+Implements `OAuth2AuthorizationService` and persists:
+
+- Authorization codes
+- Access tokens
+- Refresh tokens
+- PKCE parameters
+
+### 8.2 MongoAuthorizationMapper
+
+Maps between:
+
+- `OAuth2Authorization`
+- `MongoOAuth2Authorization`
+
+Special care is taken to:
+
+- Preserve `code_challenge` and `code_challenge_method`
+- Rehydrate `OAuth2AuthorizationRequest`
+- Restore metadata on load
+
+### 8.3 MongoRegisteredClientRepository
+
+Implements `RegisteredClientRepository` and persists:
+
+- Client ID / secret
+- Grant types
+- Redirect URIs
+- Scopes
+- Token TTLs
+
+---
+
+## 9. Registration and User Lifecycle Hooks
+
+Extension points via conditional beans:
+
+- `RegistrationProcessor`
+- `UserDeactivationProcessor`
+- `UserEmailVerifiedProcessor`
+- `GlobalDomainPolicyLookup`
+
+Default implementations are no-op and can be overridden.
+
+This allows platform-specific customizations without modifying core logic.
+
+---
+
+## 10. Password Reset
+
+`PasswordResetController`:
+
+- `POST /password-reset/request`
+- `POST /password-reset/confirm`
+
+`ResetTokenUtil` generates secure URL-safe tokens using 32 bytes of randomness.
+
+Password validation enforces:
+
+- Minimum 8 characters
+- Uppercase, lowercase, digit, special character
+
+---
+
+## 11. Integration with Other Modules
 
 The Authorization Service Core integrates with:
 
-- **Data Mongo Core** for persistence
-- **Security and OAuth Core** for shared JWT utilities
-- **Gateway Service Core** for downstream JWT validation
-- **API Service Core** for user and SSO configuration services
+- **Mongo Persistence Layer** – Users, tenants, OAuth documents
+- **Security Core and OAuth BFF** – JWT validation, PKCE utilities
+- **Gateway Service Core** – Edge validation of issued JWTs
+- **API Service Core Controllers and GraphQL** – Resource server using `tenant_id` and `roles` claims
 
-It acts as the identity backbone for the entire OpenFrame platform.
+The issued JWT becomes the trust boundary token across the platform.
 
 ---
 
-# Summary
+# Conclusion
 
-The **Authorization Service Core** is a fully multi-tenant OAuth2 and OIDC authorization server that provides:
+The **Authorization Service Core** is a fully multi-tenant OAuth2 + OIDC authorization server built on Spring Authorization Server with:
 
-- Tenant-aware authentication
-- Dynamic SSO provider integration
-- Secure per-tenant JWT signing
-- Mongo-based authorization persistence
-- Flexible onboarding and invitation workflows
+- Per-tenant RSA signing keys
+- Mongo-backed token and client persistence
+- Dynamic SSO provider registration
+- Auto-provisioning and onboarding flows
+- Extensible registration and lifecycle processors
 
-It is designed for scalability, extensibility, and strict tenant isolation — forming the secure foundation of the OpenFrame ecosystem.
+It forms the security foundation of OpenFrame, enabling secure identity, tenant isolation, and standards-compliant OAuth2/OIDC flows across the entire platform.

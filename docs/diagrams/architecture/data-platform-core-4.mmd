@@ -1,5 +1,5 @@
 flowchart TD
-    Request["Secret Request"] --> ToolService["IntegratedToolService"]
-    ToolService --> UrlService["ToolUrlService"]
-    UrlService --> SDK["External Tool SDK Client"]
-    SDK --> Secret["Enrollment Secret"]
+    Input["Log Filter Input"] --> QB["PinotQueryBuilder"]
+    QB --> Exec["Execute Query"]
+    Exec --> RS["ResultSetGroup"]
+    RS --> Map["Map to LogProjection"]

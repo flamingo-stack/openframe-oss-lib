@@ -1,8 +1,0 @@
-flowchart TD
-    JwtConfigBean["JwtConfig"] -->|"loadPublicKey()"| PublicKey["RSAPublicKey"]
-    JwtConfigBean -->|"loadPrivateKey()"| PrivateKey["RSAPrivateKey"]
-
-    PublicKey --> Encoder["NimbusJwtEncoder"]
-    PrivateKey --> Encoder
-
-    PublicKey --> Decoder["NimbusJwtDecoder"]

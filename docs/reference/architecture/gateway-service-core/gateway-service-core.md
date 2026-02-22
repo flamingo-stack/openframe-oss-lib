@@ -2,16 +2,25 @@
 
 ## Overview
 
-The **Gateway Service Core** module is the reactive edge layer of the OpenFrame platform. It acts as a secure, multi-tenant API gateway built on **Spring Cloud Gateway** and **Spring WebFlux**, responsible for:
+The **Gateway Service Core** module is the reactive API gateway of the OpenFrame platform. It acts as the unified ingress layer for:
 
-- Centralized authentication and authorization (JWT, API keys)
-- Multi-tenant issuer resolution
-- HTTP and WebSocket proxying to tools and agents
-- Rate limiting for external APIs
-- CORS management and origin sanitization
-- Token propagation and header normalization
+- REST APIs
+- WebSocket connections
+- External API integrations
+- Tool and agent proxying
+- JWT-based multi-tenant authentication
+- API key authentication with rate limiting
 
-This module sits at the boundary between clients (UI, agents, external integrations) and internal platform services such as API Service Core, Authorization Service Core, External API Service Core, and data services.
+Built on **Spring Cloud Gateway (WebFlux)**, it provides non-blocking, high-throughput routing and security enforcement across the platform.
+
+This module is responsible for:
+
+- Centralized authentication and authorization
+- Multi-tenant JWT issuer validation
+- API key validation and rate limiting for external APIs
+- Dynamic proxying of tool REST and WebSocket traffic
+- Header enrichment and token normalization
+- CORS and origin sanitization
 
 ---
 
@@ -19,295 +28,333 @@ This module sits at the boundary between clients (UI, agents, external integrati
 
 ```mermaid
 flowchart LR
-    Client["Client / UI / Agent"] --> Gateway["Gateway Service Core"]
+    Client["Client / Browser"] --> Gateway["Gateway Service Core"]
+    Agent["Tool Agent"] --> Gateway
+
     Gateway --> ApiService["API Service Core"]
     Gateway --> ExternalApi["External API Service Core"]
     Gateway --> AuthService["Authorization Service Core"]
     Gateway --> Tools["Integrated Tools"]
-    Gateway --> Nats["NATS WebSocket"]
+    Gateway --> Nats["NATS WebSocket Endpoint"]
 
-    subgraph security_layer["Security & Filters"]
-        Jwt["JWT Validation"]
-        ApiKey["API Key Filter"]
-        Cors["CORS / Origin Sanitizer"]
-    end
-
-    Gateway --> Jwt
-    Gateway --> ApiKey
-    Gateway --> Cors
+    Gateway --> Mongo["Mongo Persistence Layer"]
+    Gateway --> Redis["Redis Caching Layer"]
 ```
 
-### Core Responsibilities
-
-1. **Authentication** – Validates JWTs using multi-issuer support.
-2. **API Key Enforcement** – Secures `/external-api/**` endpoints.
-3. **Authorization Rules** – Enforces role-based access (ADMIN, AGENT).
-4. **Tool Proxying** – Routes REST and WebSocket traffic to integrated tools.
-5. **Tenant Awareness** – Dynamically resolves valid issuers per tenant.
-6. **Rate Limiting** – Protects external API endpoints with minute/hour/day quotas.
+The Gateway Service Core sits at the edge of the system and orchestrates communication between clients, agents, tools, and internal services.
 
 ---
 
-# Security Architecture
+## Core Responsibilities
 
-Security in the Gateway Service Core is composed of multiple layers:
+### 1. Reactive Routing and Proxying
 
-```mermaid
-flowchart TD
-    Request["Incoming Request"] --> OriginFilter["OriginSanitizerFilter"]
-    OriginFilter --> AuthHeader["AddAuthorizationHeaderFilter"]
-    AuthHeader --> ApiKeyFilter["ApiKeyAuthenticationFilter"]
-    ApiKeyFilter --> JwtResolver["JwtIssuerReactiveAuthenticationManagerResolver"]
-    JwtResolver --> SecurityChain["SecurityWebFilterChain"]
-    SecurityChain --> Route["Route to Target Service"]
-```
+Routing is implemented using **Spring Cloud Gateway** and `RouteLocator`.
 
-## 1. JWT Authentication and Multi-Issuer Support
+Key configuration:
 
-### Components
+- `WebSocketGatewayConfig`
+- `IntegrationController`
+- `WebClientConfig`
+
+Capabilities:
+
+- Route REST traffic to internal services
+- Proxy tool APIs dynamically based on tool ID
+- Proxy agent endpoints
+- Route WebSocket traffic for tools and NATS
+
+---
+
+### 2. JWT Authentication (Multi-Tenant)
+
+The Gateway functions as an OAuth2 resource server.
+
+Key components:
 
 - `GatewaySecurityConfig`
 - `JwtAuthConfig`
 - `IssuerUrlProvider`
 
-### Flow
+#### Multi-Issuer JWT Resolution
 
-1. `AddAuthorizationHeaderFilter` ensures an `Authorization` header exists.
-2. `JwtAuthConfig` provides a `JwtIssuerReactiveAuthenticationManagerResolver`.
-3. A Caffeine cache stores `ReactiveAuthenticationManager` per issuer.
-4. `IssuerUrlProvider` resolves allowed issuer URLs dynamically from tenant data.
+JWT authentication supports:
 
-```mermaid
-flowchart LR
-    Token["JWT Token"] --> Resolver["Issuer Resolver"]
-    Resolver --> Cache["Issuer Manager Cache"]
-    Cache --> Decoder["NimbusReactiveJwtDecoder"]
-    Decoder --> Validator["Strict Issuer Validator"]
-    Validator --> Authenticated["Authenticated Principal"]
-```
-
-### Role and Scope Mapping
-
-`GatewaySecurityConfig` configures:
-
-- `roles` claim → `ROLE_` authorities
-- `scope` claim → `SCOPE_` authorities
-- `sub` → principal
-
-Authorization rules are path-based using `PathConstants`.
-
----
-
-## 2. API Key Authentication and Rate Limiting
-
-### Component
-
-- `ApiKeyAuthenticationFilter`
-- `RateLimitConstants`
-
-This filter applies **only** to `/external-api/**` endpoints.
-
-### Processing Flow
+- Static issuer (platform default)
+- Dynamic tenant-based issuers
+- Super-tenant support
+- Caffeine-cached authentication managers per issuer
 
 ```mermaid
 flowchart TD
-    ExtReq["/external-api/** Request"] --> CheckKey{{"API Key Present?"}}
-    CheckKey -->|No| Unauthorized["401 Response"]
-    CheckKey -->|Yes| Validate["Validate API Key"]
-    Validate -->|Invalid| Unauthorized
-    Validate -->|Valid| RateCheck["RateLimitService.isAllowed()"]
-    RateCheck -->|No| TooMany["429 Too Many Requests"]
-    RateCheck -->|Yes| AddHeaders["Add User Context & Rate Headers"]
-    AddHeaders --> Forward["Forward to External API Service"]
+    Request["Incoming Request"] --> Resolver["JwtIssuerAuthenticationManagerResolver"]
+    Resolver --> Cache["Issuer Managers Cache"]
+    Cache --> Manager["ReactiveAuthenticationManager"]
+    Manager --> Decoder["NimbusReactiveJwtDecoder"]
+    Decoder --> Validator["Issuer Validator"]
+    Validator --> Authenticated["Authenticated Principal"]
+```
+
+The `IssuerUrlProvider` retrieves allowed issuer URLs from the tenant repository and ensures strict issuer validation.
+
+---
+
+### 3. Authorization Rules
+
+Authorization is defined in `GatewaySecurityConfig`.
+
+Key path groups (from `PathConstants`):
+
+- `/api/**` → `ADMIN` role
+- `/tools/**` → `ADMIN` role
+- `/tools/agent/**` → `AGENT` role
+- `/ws/tools/**` → Role-based access
+- `/clients/**` → Agent access
+- `/external-api/**` → API key protected
+
+Security flow:
+
+```mermaid
+flowchart TD
+    Request["Request"] --> AddAuth["AddAuthorizationHeaderFilter"]
+    AddAuth --> JwtAuth["JWT Authentication"]
+    JwtAuth --> RoleCheck["Role Authorization"]
+    RoleCheck --> Controller["Controller or Route"]
+```
+
+---
+
+## API Key Authentication and Rate Limiting
+
+The `ApiKeyAuthenticationFilter` is a global filter applied to `/external-api/**` endpoints.
+
+### Flow
+
+```mermaid
+flowchart TD
+    Req["/external-api Request"] --> HasKey{{"X-API-Key Present?"}}
+    HasKey -->|No| Unauthorized["401 Unauthorized"]
+    HasKey -->|Yes| Validate["ApiKeyValidationService"]
+    Validate --> Valid{{"Valid?"}}
+    Valid -->|No| Unauthorized
+    Valid -->|Yes| RateCheck["RateLimitService"]
+    RateCheck --> Allowed{{"Within Limits?"}}
+    Allowed -->|No| TooMany["429 Too Many Requests"]
+    Allowed -->|Yes| Enrich["Add User Context Headers"]
+    Enrich --> Forward["Forward to External API"]
 ```
 
 ### Features
 
-- Validates API key using `ApiKeyValidationService`
-- Increments request statistics
-- Enforces minute, hour, and day limits
-- Adds rate limit headers:
-  - `X-Rate-Limit-Limit-Minute`
-  - `X-Rate-Limit-Remaining-Minute`
-  - Hour and day equivalents
-- Strips raw `X-API-Key` header before forwarding
-- Adds contextual headers:
+- Requires `X-API-Key` header
+- Validates API key via `ApiKeyValidationService`
+- Applies per-minute, per-hour, per-day rate limits
+- Adds headers:
   - `X-API-Key-Id`
   - `X-User-Id`
+- Removes raw API key before forwarding
+- Adds standard rate limit headers
+- Records success/failure statistics
 
-Errors are written reactively without relying on controller-level exception handling.
+This isolates external API traffic from internal JWT-based flows.
 
 ---
 
-# HTTP and WebSocket Routing
+## WebSocket Gateway
 
-The Gateway Service Core proxies both REST and WebSocket traffic.
+WebSocket support is configured in `WebSocketGatewayConfig`.
 
-## 1. REST Proxying for Tools
+### Supported Endpoints
 
-### Component
+- `/ws/tools/{toolId}/**`
+- `/ws/tools/agent/{toolId}/**`
+- `/ws/nats`
 
-- `IntegrationController`
+Custom proxy filters:
+
+- `ToolApiWebSocketProxyUrlFilter`
+- `ToolAgentWebSocketProxyUrlFilter`
+
+These filters:
+
+- Extract tool ID from path
+- Resolve tool base URL
+- Dynamically rewrite target URI
+- Proxy WebSocket traffic reactively
+
+```mermaid
+flowchart LR
+    WSClient["WebSocket Client"] --> Gateway["Gateway"]
+    Gateway --> Filter["Tool WebSocket Filter"]
+    Filter --> ToolUrl["Tool URL Resolver"]
+    ToolUrl --> ToolInstance["Tool Service"]
+```
+
+Additionally, the `WebSocketServiceSecurityDecorator` ensures JWT claims are accessible during WebSocket handshake processing.
+
+---
+
+## REST Tool Proxying
+
+`IntegrationController` handles dynamic REST proxying for tools.
 
 ### Endpoints
 
 - `GET /tools/{toolId}/health`
 - `POST /tools/{toolId}/test`
-- `/{toolId}/**` → API proxy
-- `/agent/{toolId}/**` → Agent proxy
+- `/tools/{toolId}/**` (generic proxy)
+- `/tools/agent/{toolId}/**` (agent proxy)
 
-```mermaid
-flowchart LR
-    Client["Client"] --> Gateway["IntegrationController"]
-    Gateway --> RestProxy["RestProxyService"]
-    RestProxy --> Tool["Integrated Tool API"]
+The controller delegates to:
+
+- `IntegrationService`
+- `RestProxyService`
+
+Responsibilities:
+
+- Forward HTTP method and body
+- Preserve authentication context
+- Log tool interactions
+- Handle reactive responses
+
+---
+
+## Token Normalization and Header Enrichment
+
+The `AddAuthorizationHeaderFilter` ensures a standard `Authorization` header exists.
+
+### Token Sources
+
+- Access token cookie
+- Custom `Access-Token` header
+- Authorization query parameter
+
+If found, it injects:
+
+```text
+Authorization: Bearer <token>
 ```
 
-The controller delegates routing to `RestProxyService` and `IntegrationService` for connection validation.
+This enables consistent JWT authentication regardless of how the token is supplied.
 
 ---
 
-## 2. WebSocket Routing
+## CORS and Origin Handling
 
-### Components
+### CorsConfig
 
-- `WebSocketGatewayConfig`
-- `ToolApiWebSocketProxyUrlFilter`
-- `ToolAgentWebSocketProxyUrlFilter`
+- Configurable via `spring.cloud.gateway.globalcors`
+- Enabled unless explicitly disabled
 
-### Supported Paths
+### OriginSanitizerFilter
 
-- `/ws/tools/{toolId}/**` – Tool API WebSocket
-- `/ws/tools/agent/{toolId}/**` – Agent WebSocket
-- `/ws/nats` – NATS WebSocket
-
-```mermaid
-flowchart TD
-    WSRequest["WebSocket Request"] --> RouteLocator["RouteLocator"]
-    RouteLocator --> ToolApiFilter["ToolApiWebSocketProxyUrlFilter"]
-    RouteLocator --> ToolAgentFilter["ToolAgentWebSocketProxyUrlFilter"]
-    RouteLocator --> NatsRoute["Direct NATS Route"]
-```
-
-### Tool URL Resolution
-
-Both WebSocket filters:
-
-- Extract `toolId` from path
-- Query `ReactiveIntegratedToolRepository`
-- Resolve target URL via `ToolUrlService`
-- Use `ProxyUrlResolver` to compute final upstream destination
-
-A custom `WebSocketService` decorator ensures JWT claims are available during handshake.
+- Removes `Origin: null`
+- Prevents invalid browser-origin scenarios
+- Executed at highest precedence
 
 ---
 
-# CORS and Origin Handling
+## WebClient Configuration
 
-### Components
-
-- `CorsConfig`
-- `CorsDisableConfig`
-- `OriginSanitizerFilter`
-
-### Behavior
-
-- Default: CORS enabled via `spring.cloud.gateway.globalcors`
-- SaaS mode (`openframe.gateway.disable-cors=true`): permissive CORS allowing all origins with credentials
-- `OriginSanitizerFilter` removes `Origin: null` headers to prevent CORS validation issues
-
-```mermaid
-flowchart LR
-    Request --> CheckOrigin["Origin Header"]
-    CheckOrigin -->|"null"| RemoveOrigin["Remove Header"]
-    CheckOrigin -->|Valid| Continue["Continue"]
-```
-
----
-
-# Internal and Operational Endpoints
-
-### InternalAuthProbeController
-
-- Path: `/internal/authz/probe`
-- Enabled via property: `openframe.gateway.internal.enable=true`
-- Used for internal health/auth validation
-
----
-
-# WebClient Configuration
-
-### Component
-
-- `WebClientConfig`
-
-Provides a customized `WebClient.Builder` with:
+`WebClientConfig` provides a shared reactive HTTP client with:
 
 - 30s connect timeout
 - 30s read timeout
 - 30s write timeout
 - Reactor Netty configuration
 
-This builder is used for outbound calls from the gateway (e.g., integration checks, proxy operations).
+This WebClient is used for:
+
+- Tool API proxying
+- Integration testing
+- Internal service calls
+
+---
+
+## Internal Auth Probe
+
+`InternalAuthProbeController` exposes:
+
+```
+GET /internal/authz/probe
+```
+
+Enabled only when:
+
+```
+openframe.gateway.internal.enable=true
+```
+
+Used for internal health checks and sidecar validation.
+
+---
+
+## Path Classification
+
+Defined in `PathConstants`:
+
+```text
+/clients
+/api
+/tools
+/ws/tools
+/chat
+```
+
+These constants centralize security and routing decisions.
+
+---
+
+## Integration with Other Platform Modules
+
+The Gateway Service Core interacts with:
+
+- Authorization Service Core → JWT issuance and validation
+- API Service Core → Admin and internal APIs
+- External API Service Core → API key protected endpoints
+- Mongo Persistence Layer → API key, tenant, and user lookups
+- Redis Caching Layer → Rate limiting storage
+- Data Platform Core → Tool and integration metadata
+
+The Gateway does not implement business logic. Instead, it:
+
+- Authenticates
+- Authorizes
+- Routes
+- Enforces limits
+- Normalizes requests
+
+---
+
+## End-to-End Request Lifecycle
 
 ```mermaid
-flowchart LR
-    Gateway --> WebClient["Configured WebClient"]
-    WebClient --> Upstream["Tool / Service"]
+flowchart TD
+    Client["Client"] --> Gateway["Gateway Service Core"]
+    Gateway --> TokenResolve["Resolve Token or API Key"]
+    TokenResolve --> Auth["Authenticate"]
+    Auth --> Authorize["Authorize"]
+    Authorize --> Route["Route / Proxy"]
+    Route --> Service["Target Service or Tool"]
+    Service --> Response["Response"]
+    Response --> Gateway
+    Gateway --> Client
 ```
 
 ---
 
-# Path-Based Authorization Model
+## Summary
 
-`PathConstants` defines core prefixes:
+The **Gateway Service Core** is the secure reactive edge of the OpenFrame platform.
 
-- `/clients`
-- `/api`
-- `/tools`
-- `/ws/tools`
+It provides:
 
-`GatewaySecurityConfig` enforces:
+- Multi-tenant JWT authentication
+- API key validation and rate limiting
+- Role-based authorization
+- REST and WebSocket proxying
+- Header normalization
+- CORS and origin sanitization
+- High-performance reactive routing
 
-- `ROLE_ADMIN` → Dashboard and tool APIs
-- `ROLE_AGENT` → Agent endpoints and NATS WebSocket
-- Public → UI and selected client registration paths
-
----
-
-# Integration with Platform Modules
-
-The Gateway Service Core integrates with:
-
-- **Authorization Service Core** – JWT issuance and OAuth flows
-- **API Service Core** – Dashboard and internal APIs
-- **External API Service Core** – Public external endpoints secured by API keys
-- **Data Mongo Core** – Tenant and API key data
-- **Security and OAuth Core** – JWT configuration and security constants
-
-It does not contain business logic for tools or tenants; it enforces security and routing boundaries.
-
----
-
-# Design Principles
-
-1. **Reactive and Non-Blocking** – Fully built on Spring WebFlux.
-2. **Multi-Tenant Aware** – Dynamic issuer validation.
-3. **Zero Business Logic** – Strictly routing, security, and policy enforcement.
-4. **Edge Observability** – Centralized rate limiting and authentication logging.
-5. **Composable Filters** – Ordered WebFilters and GlobalFilters for clear responsibility boundaries.
-
----
-
-# Summary
-
-The **Gateway Service Core** module is the secure entry point to the OpenFrame platform. It:
-
-- Authenticates JWTs across tenants
-- Enforces API key validation and rate limiting
-- Routes REST and WebSocket traffic to tools and services
-- Applies role-based authorization
-- Manages CORS and origin sanitation
-- Bridges token sources into a unified Authorization header model
-
-By centralizing these concerns, it enables downstream services to remain focused on business logic while the gateway enforces consistent security, routing, and policy behavior across the platform.
+By centralizing ingress concerns, it ensures internal services remain focused on domain logic while maintaining strict security and scalability guarantees.

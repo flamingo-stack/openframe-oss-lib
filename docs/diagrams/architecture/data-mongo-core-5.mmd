@@ -1,6 +1,0 @@
-flowchart TD
-    Client["Client Request"] --> QueryBuilder["Build Query"]
-    QueryBuilder --> ApplyCursor["Apply ObjectId Cursor"]
-    ApplyCursor --> ApplySort["Apply Sort Field + _id"]
-    ApplySort --> Limit["Apply Limit"]
-    Limit --> MongoTemplate

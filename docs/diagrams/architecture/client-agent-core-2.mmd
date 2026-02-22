@@ -1,9 +1,0 @@
-sequenceDiagram
-    participant Agent
-    participant AuthController as AgentAuthController
-    participant AuthService as AgentAuthService
-
-    Agent->>AuthController: POST /oauth/token
-    AuthController->>AuthService: issueClientToken(...)
-    AuthService-->>AuthController: AgentTokenResponse
-    AuthController-->>Agent: JSON token response

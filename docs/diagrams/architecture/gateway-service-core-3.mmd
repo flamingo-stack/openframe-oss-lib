@@ -1,6 +1,5 @@
-flowchart LR
-    Token["JWT Token"] --> Resolver["Issuer Resolver"]
-    Resolver --> Cache["Issuer Manager Cache"]
-    Cache --> Decoder["NimbusReactiveJwtDecoder"]
-    Decoder --> Validator["Strict Issuer Validator"]
-    Validator --> Authenticated["Authenticated Principal"]
+flowchart TD
+    Request["Request"] --> AddAuth["AddAuthorizationHeaderFilter"]
+    AddAuth --> JwtAuth["JWT Authentication"]
+    JwtAuth --> RoleCheck["Role Authorization"]
+    RoleCheck --> Controller["Controller or Route"]

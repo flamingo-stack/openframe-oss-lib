@@ -1,0 +1,8 @@
+flowchart TD
+    Gateway["Gateway Service"] --> API["API Services"]
+    API --> DataCore["Data Platform Core"]
+    DataCore --> Mongo["Mongo Persistence Layer"]
+    DataCore --> Kafka["Kafka Messaging Layer"]
+    DataCore --> Stream["Stream Processing Service"]
+    DataCore --> Pinot["Apache Pinot"]
+    DataCore --> Cassandra["Cassandra"]

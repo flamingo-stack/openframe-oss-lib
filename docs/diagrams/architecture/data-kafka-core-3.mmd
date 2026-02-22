@@ -1,5 +1,0 @@
-flowchart LR
-    MongoChange["Mongo Change"] --> Publisher["Producer"]
-    Publisher --> KafkaTopic["Machine Topic"]
-    KafkaTopic --> StreamService["Stream Processing Core"]
-    StreamService --> Pinot["Pinot Event Entity"]

@@ -1,316 +1,311 @@
 # Development Documentation
 
-Welcome to the **OpenFrame OSS Lib development documentation**. This section provides comprehensive guides for developing, extending, and contributing to the OpenFrame platform foundation.
+Welcome to the OpenFrame OSS Libraries development documentation. This section provides comprehensive guidance for developers working on, with, or extending the OpenFrame backend infrastructure.
 
-## 📚 Documentation Structure
+## Overview
 
-This development documentation is organized into focused sections:
+The development documentation is organized into focused areas covering everything from initial setup to advanced architecture patterns. Whether you're contributing to the core libraries or building integrations, you'll find the information you need here.
 
-| Section | Purpose | Audience |
-|---------|---------|----------|
-| **[Setup](setup/)** | Development environment configuration | All developers |
-| **[Architecture](architecture/)** | System design and component relationships | Platform engineers, contributors |
-| **[Security](security/)** | Authentication, authorization, and security patterns | Security-focused developers |
-| **[Testing](testing/)** | Testing strategies, tools, and best practices | All developers |
-| **[Contributing](contributing/)** | Code standards and contribution workflow | Contributors |
+## Quick Navigation
 
-## 🚀 Quick Navigation
+### **Getting Started**
+- **[Environment Setup](setup/environment.md)** - IDE, tools, and development environment configuration
+- **[Local Development](setup/local-development.md)** - Running and debugging the platform locally
 
-### New to OpenFrame Development?
-1. **[Environment Setup](setup/environment.md)** - Configure your IDE and development tools
-2. **[Local Development](setup/local-development.md)** - Run the full stack locally
-3. **[Architecture Overview](architecture/README.md)** - Understand the system design
+### **Understanding the Platform**
+- **[Architecture Overview](architecture/README.md)** - System design, patterns, and module relationships
+- **[Security Guidelines](security/README.md)** - Authentication, authorization, and security best practices
 
-### Ready to Contribute?
-1. **[Contributing Guidelines](contributing/guidelines.md)** - Code standards and workflow
-2. **[Security Guide](security/README.md)** - Security best practices
-3. **[Testing Guide](testing/README.md)** - Testing strategies and tools
+### **Quality & Testing**
+- **[Testing Overview](testing/README.md)** - Testing strategies, tools, and writing effective tests
 
-### Platform Engineering?
-1. **[Architecture Deep Dive](architecture/README.md)** - Detailed system design
-2. **[Security Architecture](security/README.md)** - Multi-tenant security model
-3. **[Environment Configuration](setup/environment.md)** - Production deployment patterns
+### **Contributing**
+- **[Contributing Guidelines](contributing/guidelines.md)** - Code style, PR process, and contribution workflow
 
-## 🏗️ Development Philosophy
+## Architecture at a Glance
 
-OpenFrame OSS Lib is built with these core principles:
-
-### **Multi-Tenant by Design**
-Every component assumes multi-tenant architecture from day one:
-- Tenant-scoped data access
-- Isolated security contexts  
-- Per-tenant configuration
-- Scalable resource isolation
-
-### **Event-Driven Architecture**
-Communication between components uses events:
-- Kafka for inter-service messaging
-- NATS for real-time agent communication
-- Debezium for data change streams
-- Reactive programming patterns
-
-### **API-First Development**
-All functionality exposed via well-defined APIs:
-- GraphQL for complex queries with cursor pagination
-- REST for command operations and external integrations
-- OpenAPI documentation for all endpoints
-- SDK patterns for tool integrations
-
-### **Security as Foundation**
-Security is embedded at every layer:
-- Asymmetric JWT (RS256) for token validation
-- OAuth2 Authorization Server with OIDC support
-- API key management with rate limiting
-- Multi-tenant key isolation
-
-## 📋 Development Checklist
-
-### Before You Start
-
-- [ ] **Java 21** installed and configured
-- [ ] **Maven 3.8+** for build management
-- [ ] **Docker** for development dependencies
-- [ ] **Git** configured with your identity
-- [ ] **IDE** set up with required plugins
-
-### Development Environment
-
-- [ ] **Local database** (MongoDB, Redis) running
-- [ ] **Message queue** (Kafka) configured for event testing
-- [ ] **Environment variables** set for local development
-- [ ] **Test data** generated using provided utilities
-- [ ] **Integration tests** passing for core modules
-
-### Code Quality Standards
-
-- [ ] **Lombok** used for reducing boilerplate
-- [ ] **Spring Boot conventions** followed
-- [ ] **Multi-tenant patterns** implemented correctly
-- [ ] **Error handling** using standardized responses
-- [ ] **Documentation** updated for new features
-
-## 🔧 Common Development Tasks
-
-### Adding a New Module
-
-```bash
-# 1. Create module structure following existing patterns
-mkdir openframe-new-module
-cd openframe-new-module
-
-# 2. Create pom.xml inheriting from parent
-# 3. Implement core functionality with Spring Boot
-# 4. Add integration tests
-# 5. Update parent pom.xml modules section
-# 6. Document in architecture section
-```
-
-### Integrating External Tools
-
-```bash
-# 1. Create SDK in sdk/ directory
-mkdir sdk/newtool
-
-# 2. Implement client interface
-# 3. Add event deserializers in stream-processing-core
-# 4. Update enrichment services
-# 5. Register tool type in data-platform-core
-```
-
-### Extending API Endpoints
-
-```bash
-# For internal APIs (GraphQL + REST)
-cd openframe-api-service-core
-
-# For external APIs (REST only)
-cd openframe-external-api-service-core
-
-# Add controllers, services, DTOs, and tests
-```
-
-## 📊 Module Dependency Graph
+OpenFrame OSS Libraries follows a modular, event-driven architecture:
 
 ```mermaid
 flowchart TD
-    subgraph "Core Infrastructure"
-        Core["openframe-core"]
-        Security["openframe-security-core"]
-    end
-
-    subgraph "Data Layer"
-        Mongo["openframe-data-mongo"]
-        Redis["openframe-data-redis"]
-        Kafka["openframe-data-kafka"]
-        Platform["openframe-data-platform"]
-    end
-
-    subgraph "API Layer"
-        ApiLib["openframe-api-lib"]
-        ApiService["openframe-api-service-core"]
-        ExternalApi["openframe-external-api-service-core"]
-    end
-
-    subgraph "Security Layer"
-        Auth["openframe-authorization-service-core"]
-        OAuth["openframe-security-oauth"]
-        Gateway["openframe-gateway-service-core"]
-    end
-
-    subgraph "Processing Layer"
-        Stream["openframe-stream-service-core"]
-        Client["openframe-client-core"]
-        Management["openframe-management-service-core"]
-    end
-
-    Core --> Security
-    Security --> Auth
-    Security --> OAuth
-    Security --> Gateway
-
-    Core --> Mongo
-    Core --> Redis
-    Core --> Kafka
+    Dev[Developer] --> IDE[Development Environment]
+    IDE --> Code[Source Code]
     
-    ApiLib --> Mongo
-    ApiService --> ApiLib
-    ExternalApi --> ApiLib
-
-    Gateway --> ApiService
-    Gateway --> ExternalApi
-    Gateway --> Auth
-
-    Stream --> Kafka
-    Stream --> Platform
-    Client --> Kafka
-
-    Management --> Mongo
-    Management --> Redis
-    Management --> Kafka
+    Code --> Core[Core Services]
+    Code --> API[API Layer]
+    Code --> Security[Security Layer]
+    Code --> Data[Data Layer]
+    
+    Core --> Gateway[Gateway Service]
+    Core --> Management[Management Service]
+    
+    API --> REST[REST Controllers]
+    API --> GraphQL[GraphQL API]
+    
+    Security --> OAuth[OAuth2 Server]
+    Security --> JWT[JWT Security]
+    
+    Data --> Mongo[MongoDB]
+    Data --> Kafka[Kafka Streams]
+    Data --> Redis[Redis Cache]
 ```
 
-## 🎯 Development Patterns
+## Development Principles
 
-### Repository Pattern
-```java
-// Follow the established repository pattern
-public interface CustomRepository extends MongoRepository<Entity, String> {
-    // Custom query methods
-    Page<Entity> findByTenantIdAndStatus(String tenantId, Status status, Pageable pageable);
-    
-    // Use @Query for complex operations
-    @Query("{ 'tenantId': ?0, 'metadata.type': ?1 }")
-    List<Entity> findByTenantAndType(String tenantId, String type);
-}
+### **Multi-Tenant by Design**
+Every component considers tenant isolation, from data access to security contexts.
+
+### **Event-Driven Architecture**  
+Services communicate through well-defined events, enabling scalability and decoupling.
+
+### **Security First**
+Authentication and authorization are built into every layer, never bolted on afterward.
+
+### **Observability**
+Comprehensive logging, metrics, and tracing for production-ready operations.
+
+### **Extensibility**
+Plugin points and processor interfaces allow customization without core changes.
+
+## Key Technologies
+
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| **Java** | 21 | Runtime platform with modern language features |
+| **Spring Boot** | 3.3.0 | Application framework and dependency injection |
+| **Spring Security** | 6.x | Authentication and authorization |
+| **Spring Authorization Server** | 1.3.1 | OAuth2/OIDC compliance |
+| **Netflix DGS** | 9.0.3 | GraphQL implementation |
+| **MongoDB** | 5.0+ | Primary operational database |
+| **Apache Kafka** | 2.8+ | Event streaming and messaging |
+| **Redis** | 6.0+ | Caching and session storage |
+| **Maven** | 3.6+ | Build and dependency management |
+
+## Module Structure
+
+The repository is organized into service-core modules:
+
+### **API & Contracts**
+```text
+openframe-api-lib/                  # Shared DTOs and services
+openframe-api-service-core/         # REST + GraphQL orchestration
+openframe-external-api-service-core/ # Stable external APIs
 ```
 
-### Service Layer Pattern
-```java
-@Service
-@RequiredArgsConstructor
-@Slf4j
-public class CustomService {
-    private final CustomRepository repository;
-    private final EventPublisher eventPublisher;
-    
-    @Transactional
-    public CustomEntity create(CreateRequest request, String tenantId) {
-        // Validation
-        // Business logic
-        // Persistence
-        // Event publishing
-        return entity;
-    }
-}
+### **Security & Identity**
+```text
+openframe-authorization-service-core/ # OAuth2/OIDC server
+openframe-security-core/             # JWT and authentication
+openframe-gateway-service-core/      # Reactive gateway
 ```
 
-### Controller Pattern
+### **Data & Infrastructure**
+```text
+openframe-data-mongo/               # MongoDB models and repos
+openframe-data/                     # Analytics and time-series
+openframe-data-kafka/               # Kafka messaging
+openframe-data-redis/               # Caching infrastructure
+```
+
+### **Processing & Management**
+```text
+openframe-stream-service-core/      # Event processing
+openframe-management-service-core/  # Automation and scheduling
+openframe-client-core/              # Agent management
+```
+
+## Development Workflow
+
+### 1. **Environment Setup**
+Start with [Environment Setup](setup/environment.md) to configure your IDE and development tools.
+
+### 2. **Local Development**
+Follow [Local Development](setup/local-development.md) for running services locally with hot reloading.
+
+### 3. **Understanding Architecture**
+Review [Architecture Overview](architecture/README.md) to understand component relationships and data flows.
+
+### 4. **Security Implementation**
+Study [Security Guidelines](security/README.md) for implementing secure, tenant-aware features.
+
+### 5. **Testing Strategy**
+Use [Testing Overview](testing/README.md) to write comprehensive, reliable tests.
+
+### 6. **Contributing Back**
+Follow [Contributing Guidelines](contributing/guidelines.md) for code style and PR processes.
+
+## Common Development Tasks
+
+### **Adding a New REST Endpoint**
+
 ```java
 @RestController
-@RequestMapping("/api/v1/custom")
+@RequestMapping("/api/my-feature")
 @RequiredArgsConstructor
-@Validated
-public class CustomController {
-    private final CustomService customService;
+public class MyFeatureController {
     
-    @PostMapping
-    public ResponseEntity<CustomResponse> create(
-        @Valid @RequestBody CreateRequest request,
+    private final MyFeatureService service;
+    
+    @GetMapping
+    public ResponseEntity<List<MyFeature>> list(
         @AuthenticationPrincipal AuthPrincipal principal
     ) {
-        // Use AuthPrincipal for tenant context
-        return ResponseEntity.ok(customService.create(request, principal.getTenantId()));
+        List<MyFeature> features = service.findByTenant(principal.getTenantId());
+        return ResponseEntity.ok(features);
     }
 }
 ```
 
-## 📈 Performance Guidelines
+### **Creating a GraphQL Data Fetcher**
 
-### Database Optimization
-- **Use cursor pagination** instead of offset-based pagination
-- **Index tenant fields** for multi-tenant queries
-- **Implement caching** for frequently accessed data
-- **Use projections** to limit data transfer
-
-### Event Processing
-- **Batch events** when possible to reduce overhead
-- **Use async processing** for non-critical operations
-- **Implement retry logic** with exponential backoff
-- **Monitor lag** in event stream processing
-
-### Security Performance
-- **Cache JWT validation** to avoid repeated cryptographic operations
-- **Use connection pooling** for database and Redis connections
-- **Implement rate limiting** to prevent abuse
-- **Monitor authentication metrics**
-
-## 🐛 Debugging and Troubleshooting
-
-### Common Issues
-
-#### Multi-tenant Context Issues
-```bash
-# Check tenant context in logs
-grep "tenantId" application.log
-
-# Verify JWT token claims
-echo "<jwt-token>" | base64 -d | jq .
+```java
+@DgsComponent
+public class MyFeatureDataFetcher {
+    
+    @DgsQuery
+    public Connection<MyFeature> myFeatures(
+        @InputArgument Integer first,
+        @InputArgument String after,
+        @DgsContext DgsRequestData requestData
+    ) {
+        String tenantId = extractTenantId(requestData);
+        // Implement pagination and filtering
+    }
+}
 ```
 
-#### Database Connection Issues
+### **Adding Event Processing**
+
+```java
+@Component
+@RequiredArgsConstructor
+public class MyEventHandler {
+    
+    @EventListener
+    public void handleMyEvent(MyCustomEvent event) {
+        // Process the event
+        log.info("Processing event: {}", event);
+    }
+    
+    @KafkaListener(topics = "my-topic")
+    public void handleKafkaMessage(MyMessage message) {
+        // Handle Kafka events
+    }
+}
+```
+
+### **Implementing Custom Security**
+
+```java
+@Component
+public class MySecurityProcessor implements AuthorizationProcessor {
+    
+    @Override
+    public boolean hasPermission(AuthPrincipal principal, String resource, String action) {
+        // Custom authorization logic
+        return checkCustomPermission(principal, resource, action);
+    }
+}
+```
+
+## Best Practices
+
+### **Code Organization**
+- Keep controllers thin - delegate to services
+- Use DTOs for API boundaries
+- Implement proper exception handling
+- Follow REST and GraphQL conventions
+
+### **Security Considerations**
+- Always validate tenant access
+- Use `@AuthenticationPrincipal` for user context
+- Sanitize inputs and validate permissions
+- Implement proper CORS policies
+
+### **Performance Optimization**
+- Use appropriate caching strategies
+- Implement efficient database queries
+- Consider async processing for heavy operations
+- Monitor and profile critical paths
+
+### **Testing Approach**
+- Write unit tests for business logic
+- Create integration tests for APIs
+- Use test containers for database tests
+- Mock external dependencies appropriately
+
+## Debugging and Troubleshooting
+
+### **Common Issues**
+
+**Multi-tenant context not set**
+```java
+// Ensure tenant context is available
+@WithTenantContext
+public class MyService {
+    // Service methods automatically have tenant context
+}
+```
+
+**JWT validation failures**
+```yaml
+# Check issuer configuration
+logging:
+  level:
+    com.openframe.security: DEBUG
+```
+
+**Database connection issues**
 ```bash
-# Test MongoDB connection
+# Verify MongoDB connection
 mongosh --eval "db.adminCommand('ping')"
-
-# Test Redis connection
-redis-cli ping
-
-# Check connection pool status
-# Add logging to application.yml
 ```
 
-#### Event Processing Delays
-```bash
-# Check Kafka consumer lag
-kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group openframe-streams
+### **Development Tools**
 
-# Monitor processing metrics
-# Check stream-processing-core logs
+**Hot Reloading with Spring DevTools**
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-devtools</artifactId>
+    <scope>runtime</scope>
+</dependency>
 ```
 
-## 📚 Additional Resources
+**GraphQL Schema Inspection**
+```
+http://localhost:8080/graphiql
+```
 
-### External Documentation
-- **Spring Boot**: [spring.io/projects/spring-boot](https://spring.io/projects/spring-boot)
-- **MongoDB**: [docs.mongodb.com](https://docs.mongodb.com)
-- **Apache Kafka**: [kafka.apache.org/documentation](https://kafka.apache.org/documentation)
-- **Spring Security OAuth2**: [spring.io/projects/spring-security-oauth](https://spring.io/projects/spring-security-oauth)
+**Actuator Health Endpoints**
+```
+http://localhost:8080/actuator/health
+http://localhost:8080/actuator/info
+```
 
-### Community Resources
-- **OpenMSP Slack**: [Join Community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
-- **OpenFrame Platform**: [openframe.ai](https://openframe.ai)
-- **Flamingo Website**: [flamingo.run](https://flamingo.run)
+## Learning Resources
+
+### **Spring Boot**
+- [Spring Boot Reference](https://docs.spring.io/spring-boot/docs/current/reference/htmlsingle/)
+- [Spring Security Reference](https://docs.spring.io/spring-security/reference/)
+
+### **GraphQL**
+- [Netflix DGS Documentation](https://netflix.github.io/dgs/)
+- [GraphQL Best Practices](https://graphql.org/learn/best-practices/)
+
+### **Event-Driven Architecture**
+- [Spring Kafka Reference](https://docs.spring.io/spring-kafka/docs/current/reference/html/)
+- [Event Sourcing Patterns](https://microservices.io/patterns/data/event-sourcing.html)
+
+## Getting Help
+
+### **Community Support**
+- **OpenMSP Slack**: [Join the community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
+- **GitHub Issues**: [Report bugs and request features](https://github.com/flamingo-stack/openframe-oss-lib/issues)
+
+### **Development Team**
+For questions specific to development processes, reach out through the OpenMSP Slack community in the `#development` channel.
 
 ---
 
-**Ready to start developing?** Begin with the [Environment Setup Guide](setup/environment.md) to configure your development workspace.
+*Ready to contribute to the future of open-source MSP tooling? Start with the [Environment Setup](setup/environment.md) guide and join our growing community of developers.*

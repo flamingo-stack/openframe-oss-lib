@@ -1,7 +1,7 @@
 flowchart TD
-    Client -->|"GET /api/v1/logs/details"| LogController
-    LogController --> LogService
-    LogService --> LogStorage["Log Storage (Pinot or Mongo)"]
-    LogStorage --> LogService
-    LogService --> LogMapper
-    LogMapper --> LogDetailsResponse
+    Client["External Client"] --> IntegrationCtrl
+    IntegrationCtrl --> RestProxy
+    RestProxy --> ToolRepo["IntegratedToolRepository"]
+    RestProxy --> UrlService["ToolUrlService"]
+    RestProxy --> Resolver["ProxyUrlResolver"]
+    Resolver --> Target["Tool API Endpoint"]

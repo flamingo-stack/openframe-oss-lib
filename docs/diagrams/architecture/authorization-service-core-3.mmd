@@ -1,5 +1,7 @@
-flowchart TD
-    Request["HTTP Request"] --> Matcher{"Authorization Endpoint?"}
-
-    Matcher -->|"Yes"| ASChain["Authorization Server SecurityFilterChain"]
-    Matcher -->|"No"| DefaultChain["Default SecurityFilterChain"]
+flowchart LR
+    TokenReq["Token Request"] --> JWKSource["JWKSource"]
+    JWKSource --> TenantCtx["TenantContext.getTenantId()"]
+    TenantCtx --> KeySvc["TenantKeyService"]
+    KeySvc --> Repo["TenantKeyRepository (Mongo)"]
+    KeySvc --> RSA["RSAKey (pub+priv)"]
+    RSA --> Sign["JWT Signing"]

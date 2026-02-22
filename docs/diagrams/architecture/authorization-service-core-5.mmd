@@ -1,6 +1,11 @@
-flowchart TD
-    AuthRequest["Authorization Request"] --> Save["MongoAuthorizationService.save()"]
-    Save --> Entity["MongoOAuth2Authorization"]
+sequenceDiagram
+    participant Browser
+    participant Authz as Authorization Service Core
+    participant IdP as OIDC Provider
 
-    TokenExchange["Token Request"] --> Load["findByToken()"]
-    Load --> Rehydrate["Rebuild OAuth2Authorization with PKCE"]
+    Browser->>Authz: GET /invitations/accept/sso
+    Authz->>Browser: Set of_sso_invite cookie + redirect
+    Browser->>IdP: OAuth2 Authorization Request
+    IdP->>Authz: Callback with code
+    Authz->>Authz: InviteSsoHandler
+    Authz->>Browser: Redirect to tenant context

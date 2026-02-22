@@ -1,5 +1,10 @@
 flowchart TD
-    WSRequest["WebSocket Request"] --> RouteLocator["RouteLocator"]
-    RouteLocator --> ToolApiFilter["ToolApiWebSocketProxyUrlFilter"]
-    RouteLocator --> ToolAgentFilter["ToolAgentWebSocketProxyUrlFilter"]
-    RouteLocator --> NatsRoute["Direct NATS Route"]
+    Client["Client"] --> Gateway["Gateway Service Core"]
+    Gateway --> TokenResolve["Resolve Token or API Key"]
+    TokenResolve --> Auth["Authenticate"]
+    Auth --> Authorize["Authorize"]
+    Authorize --> Route["Route / Proxy"]
+    Route --> Service["Target Service or Tool"]
+    Service --> Response["Response"]
+    Response --> Gateway
+    Gateway --> Client

@@ -1,0 +1,8 @@
+flowchart LR
+    GraphQL["GraphQL API Service"] --> Contracts["Api Lib Contracts And Services"]
+    RestAPI["External REST API Service"] --> Contracts
+    Gateway["Gateway Service"] --> Contracts
+
+    Contracts --> Mongo["Mongo Persistence Layer"]
+    Contracts --> DataPlatform["Data Platform Core"]
+    Contracts --> Kafka["Kafka Messaging Layer"]

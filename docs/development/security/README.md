@@ -1,974 +1,917 @@
-# Security Best Practices
+# Security Guidelines
 
-OpenFrame OSS Lib implements **enterprise-grade security** with multi-tenant isolation, asymmetric JWT authentication, OAuth2 authorization, and comprehensive access control. This guide covers security architecture, implementation patterns, and best practices.
+OpenFrame OSS Libraries implements enterprise-grade security with multi-tenancy, OAuth2/OIDC compliance, and defense-in-depth strategies. This guide covers security best practices, implementation patterns, and common vulnerabilities to avoid.
 
 ## Security Architecture Overview
 
-OpenFrame employs a **defense-in-depth** security model with multiple layers of protection:
-
 ```mermaid
 flowchart TD
-    subgraph "Transport Security"
-        TLS["TLS 1.3 Encryption"]
-        HSTS["HTTP Strict Transport Security"]
+    subgraph "External Layer"
+        Client[Client Applications]
+        Browser[Web Browsers]
+        API[External APIs]
     end
-
+    
+    subgraph "Edge Security"
+        WAF[Web Application Firewall]
+        LB[Load Balancer + TLS]
+        Gateway[Gateway Service]
+    end
+    
     subgraph "Authentication Layer"
-        JWT["Asymmetric JWT (RS256)"]
-        OAuth2["OAuth2 + OIDC"]
-        APIKeys["API Key Authentication"]
-        MFA["Multi-Factor Authentication"]
+        OAuth[OAuth2/OIDC Server]
+        JWT[JWT Validation]
+        MFA[Multi-Factor Auth]
     end
-
+    
     subgraph "Authorization Layer"
-        RBAC["Role-Based Access Control"]
-        TenantIsolation["Multi-Tenant Isolation"]
-        ResourceScoping["Resource-Level Permissions"]
-        RateLimit["Rate Limiting & Quotas"]
+        RBAC[Role-Based Access Control]
+        ABAC[Attribute-Based Access]
+        Tenant[Tenant Isolation]
+    end
+    
+    subgraph "Application Security"
+        Input[Input Validation]
+        CSRF[CSRF Protection]
+        XSS[XSS Prevention]
+        SQL[SQL Injection Prevention]
+    end
+    
+    subgraph "Data Security"
+        Encryption[Data Encryption]
+        Secrets[Secret Management]
+        Audit[Audit Logging]
     end
 
-    subgraph "Data Protection"
-        Encryption["Data Encryption at Rest"]
-        KeyManagement["Key Management"]
-        SecretRotation["Secret Rotation"]
-        DataMasking["Sensitive Data Masking"]
-    end
-
-    subgraph "Audit & Monitoring"
-        AuditLogs["Comprehensive Audit Logging"]
-        SecurityEvents["Security Event Monitoring"]
-        Alerting["Real-time Security Alerts"]
-        Compliance["Compliance Reporting"]
-    end
-
-    TLS --> JWT
+    Client --> WAF
+    Browser --> WAF
+    API --> WAF
+    WAF --> LB
+    LB --> Gateway
+    Gateway --> OAuth
+    Gateway --> JWT
     JWT --> RBAC
-    OAuth2 --> RBAC
-    APIKeys --> RateLimit
-    RBAC --> Encryption
-    TenantIsolation --> KeyManagement
-    Encryption --> AuditLogs
+    RBAC --> ABAC
+    ABAC --> Tenant
 ```
 
-## Authentication Patterns
+## Authentication and Authorization
 
-### 1. Asymmetric JWT Authentication (RS256)
+### OAuth2/OIDC Implementation
 
-OpenFrame uses **RS256 asymmetric cryptography** for JWT token validation, enabling distributed verification without shared secrets.
-
-#### Key Management Architecture
-
-```mermaid
-flowchart LR
-    TenantA[Tenant A] --> KeyPairA[RSA Key Pair A]
-    TenantB[Tenant B] --> KeyPairB[RSA Key Pair B]
-    TenantC[Tenant C] --> KeyPairC[RSA Key Pair C]
-
-    KeyPairA --> PrivateKeyA[Private Key A<br/>JWT Signing]
-    KeyPairA --> PublicKeyA[Public Key A<br/>JWT Validation]
-    
-    KeyPairB --> PrivateKeyB[Private Key B<br/>JWT Signing]
-    KeyPairB --> PublicKeyB[Public Key B<br/>JWT Validation]
-    
-    KeyPairC --> PrivateKeyC[Private Key C<br/>JWT Signing]
-    KeyPairC --> PublicKeyC[Public Key C<br/>JWT Validation]
-
-    PrivateKeyA --> AuthServer[Authorization Server]
-    PrivateKeyB --> AuthServer
-    PrivateKeyC --> AuthServer
-
-    PublicKeyA --> Gateway[API Gateway]
-    PublicKeyB --> Gateway  
-    PublicKeyC --> Gateway
-```
-
-#### Implementation Pattern
-
-```java
-@Service
-@RequiredArgsConstructor
-public class JwtService {
-    private final TenantKeyService tenantKeyService;
-    
-    public String generateToken(AuthPrincipal principal) {
-        // Get tenant-specific private key
-        RSAPrivateKey privateKey = tenantKeyService
-            .getPrivateKey(principal.getTenantId());
-            
-        return Jwts.builder()
-            .setSubject(principal.getUserId())
-            .setIssuer(getIssuerForTenant(principal.getTenantId()))
-            .setIssuedAt(new Date())
-            .setExpiration(new Date(System.currentTimeMillis() + TOKEN_EXPIRY))
-            .claim("tenantId", principal.getTenantId())
-            .claim("email", principal.getEmail())
-            .claim("roles", principal.getRoles())
-            .signWith(privateKey, SignatureAlgorithm.RS256)
-            .compact();
-    }
-    
-    public DecodedJWT validateToken(String token) {
-        String tenantId = extractTenantFromToken(token);
-        RSAPublicKey publicKey = tenantKeyService.getPublicKey(tenantId);
-        
-        return JWT.require(Algorithm.RSA256(publicKey, null))
-            .withIssuer(getIssuerForTenant(tenantId))
-            .build()
-            .verify(token);
-    }
-}
-```
-
-#### Security Benefits
-
-✅ **No shared secrets** - Public keys can be distributed safely  
-✅ **Tenant isolation** - Each tenant has unique key pairs  
-✅ **Scalable validation** - Services can validate tokens independently  
-✅ **Key rotation** - Private keys can be rotated without service coordination  
-
-### 2. OAuth2 Authorization Code + PKCE Flow
-
-For web and mobile applications, OpenFrame implements **OAuth2 Authorization Code flow with PKCE** (Proof Key for Code Exchange) for enhanced security.
-
-#### PKCE Flow Implementation
-
-```mermaid
-sequenceDiagram
-    participant Client as Client App
-    participant BFF as OAuth BFF
-    participant AuthSrv as Auth Server
-    participant ResourceSrv as Resource Server
-
-    Client->>Client: Generate code_verifier + code_challenge
-    Client->>BFF: /oauth/authorize + code_challenge
-    BFF->>AuthSrv: Authorization request + PKCE
-    AuthSrv->>Client: Authorization UI
-    Client->>AuthSrv: User credentials + consent
-    AuthSrv->>BFF: Authorization code
-    BFF->>AuthSrv: Token exchange + code_verifier
-    AuthSrv->>AuthSrv: Verify PKCE challenge
-    AuthSrv->>BFF: Access + Refresh tokens
-    BFF->>Client: Set secure cookies
-    Client->>ResourceSrv: API request with cookie
-    ResourceSrv->>BFF: Extract token from cookie
-    BFF->>ResourceSrv: JWT token
-    ResourceSrv->>Client: API response
-```
-
-#### PKCE Security Configuration
+OpenFrame uses Spring Authorization Server for OAuth2/OIDC compliance:
 
 ```java
 @Configuration
-@EnableWebSecurity
-public class OAuth2SecurityConfig {
-
+@EnableAuthorizationServer
+public class AuthorizationServerConfig {
+    
     @Bean
-    public SecurityFilterChain authorizationServerSecurityFilterChain(
-            HttpSecurity http) throws Exception {
-        
-        OAuth2AuthorizationServerConfiguration
-            .applyDefaultSecurity(http);
-            
-        http.oauth2AuthorizationServer(oauth2 ->
-            oauth2.authorizationEndpoint(authz ->
-                authz.authorizationRequestConverter(pkceAuthorizationRequestConverter())
-            )
-        );
-        
-        return http.build();
+    public RegisteredClientRepository registeredClientRepository() {
+        return new MongoRegisteredClientRepository();
     }
     
     @Bean
-    public AuthorizationRequestConverter pkceAuthorizationRequestConverter() {
-        return new PKCEAuthorizationRequestConverter();
-    }
-}
-
-@Component
-public class PKCEAuthorizationRequestConverter 
-        implements AuthorizationRequestConverter {
-    
-    @Override
-    public OAuth2AuthorizationRequest convert(HttpServletRequest request) {
-        String codeChallenge = request.getParameter("code_challenge");
-        String codeChallengeMethod = request.getParameter("code_challenge_method");
-        
-        if (codeChallenge == null) {
-            throw new OAuth2AuthorizationException("PKCE code_challenge required");
-        }
-        
-        return OAuth2AuthorizationRequest.authorizationCode()
-            .clientId(request.getParameter("client_id"))
-            .redirectUri(request.getParameter("redirect_uri"))
-            .scopes(parseScopes(request.getParameter("scope")))
-            .state(request.getParameter("state"))
-            .additionalParameters(Map.of(
-                "code_challenge", codeChallenge,
-                "code_challenge_method", codeChallengeMethod != null 
-                    ? codeChallengeMethod : "S256"
-            ))
-            .build();
-    }
-}
-```
-
-### 3. API Key Authentication
-
-For programmatic access, OpenFrame provides **API key authentication** with comprehensive usage tracking and rate limiting.
-
-#### API Key Structure
-
-```text
-Format: ak_1a2b3c4d5e6f7890.sk_live_abcdefghijklmnopqrstuvwxyz123456
-        ↑                   ↑
-        Key ID              Secret Key
-```
-
-#### Implementation Pattern
-
-```java
-@Component
-@RequiredArgsConstructor  
-public class ApiKeyAuthenticationFilter implements Filter {
-    private final ApiKeyValidationService apiKeyService;
-    private final RateLimitService rateLimitService;
-
-    @Override
-    public void doFilter(ServletRequest request, ServletResponse response, 
-                        FilterChain chain) throws IOException, ServletException {
-        
-        HttpServletRequest httpRequest = (HttpServletRequest) request;
-        String apiKey = extractApiKey(httpRequest);
-        
-        if (apiKey != null) {
-            try {
-                // Validate API key and extract tenant context
-                ApiKeyPrincipal principal = apiKeyService.validateApiKey(apiKey);
-                
-                // Check rate limits
-                if (!rateLimitService.isAllowed(principal)) {
-                    sendRateLimitResponse((HttpServletResponse) response);
-                    return;
-                }
-                
-                // Track usage statistics
-                apiKeyService.recordUsage(principal, httpRequest);
-                
-                // Set security context
-                SecurityContextHolder.getContext()
-                    .setAuthentication(new ApiKeyAuthentication(principal));
-                    
-            } catch (InvalidApiKeyException e) {
-                sendUnauthorizedResponse((HttpServletResponse) response);
-                return;
-            }
-        }
-        
-        chain.doFilter(request, response);
-    }
-}
-
-@Service
-@RequiredArgsConstructor
-public class ApiKeyValidationService {
-    private final ApiKeyRepository apiKeyRepository;
-    private final RedisTemplate<String, Object> redisTemplate;
-    
-    @Cacheable(value = "api-keys", key = "#keyId")
-    public ApiKeyPrincipal validateApiKey(String apiKey) {
-        String[] parts = apiKey.split("\\.");
-        if (parts.length != 2) {
-            throw new InvalidApiKeyException("Invalid API key format");
-        }
-        
-        String keyId = parts[0];
-        String secretKey = parts[1];
-        
-        ApiKey storedKey = apiKeyRepository.findByKeyId(keyId)
-            .orElseThrow(() -> new InvalidApiKeyException("API key not found"));
-            
-        if (!passwordEncoder.matches(secretKey, storedKey.getHashedSecret())) {
-            throw new InvalidApiKeyException("Invalid API key secret");
-        }
-        
-        if (!storedKey.isActive()) {
-            throw new InvalidApiKeyException("API key is disabled");
-        }
-        
-        return ApiKeyPrincipal.builder()
-            .keyId(keyId)
-            .tenantId(storedKey.getTenantId())
-            .permissions(storedKey.getPermissions())
-            .rateLimit(storedKey.getRateLimit())
-            .build();
-    }
-}
-```
-
-## Authorization Patterns
-
-### 1. Role-Based Access Control (RBAC)
-
-OpenFrame implements a flexible RBAC system with tenant-scoped roles and permissions.
-
-#### Role Hierarchy
-
-```mermaid
-flowchart TD
-    Owner["OWNER<br/>(Full tenant access)"]
-    Admin["ADMIN<br/>(User & resource management)"]
-    User["USER<br/>(Read/write access)"]
-    ReadOnly["READ_ONLY<br/>(View-only access)"]
-    Agent["AGENT<br/>(Machine agent access)"]
-
-    Owner --> Admin
-    Admin --> User
-    User --> ReadOnly
-    
-    Owner -.-> Agent
-    Admin -.-> Agent
-```
-
-#### Permission Enforcement
-
-```java
-@RestController
-@RequestMapping("/api/organizations")
-@PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
-public class OrganizationController {
-    
-    @PostMapping
-    @PreAuthorize("hasRole('OWNER')")
-    public ResponseEntity<OrganizationResponse> createOrganization(
-        @Valid @RequestBody CreateOrganizationRequest request,
-        @AuthenticationPrincipal AuthPrincipal principal
-    ) {
-        // Only OWNER can create organizations
-        return ResponseEntity.ok(
-            organizationService.create(request, principal.getTenantId())
-        );
+    public JwtDecoder jwtDecoder(TenantKeyService keyService) {
+        return new MultiTenantJwtDecoder(keyService);
     }
     
-    @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'USER', 'READ_ONLY')")
-    public ResponseEntity<OrganizationResponse> getOrganization(
-        @PathVariable String id,
-        @AuthenticationPrincipal AuthPrincipal principal
-    ) {
-        // All authenticated users can read organizations
-        return ResponseEntity.ok(
-            organizationService.findById(id, principal.getTenantId())
-        );
-    }
-}
-```
-
-### 2. Multi-Tenant Data Isolation
-
-**Critical Security Principle**: All data access must be tenant-scoped to prevent cross-tenant data leakage.
-
-#### Repository Pattern with Tenant Isolation
-
-```java
-@Repository
-public interface DeviceRepository extends MongoRepository<Device, String> {
-    
-    // ✅ CORRECT: Tenant-scoped query
-    @Query("{ 'tenantId': ?0, 'status': ?1 }")
-    Page<Device> findByTenantAndStatus(String tenantId, DeviceStatus status, Pageable pageable);
-    
-    // ❌ WRONG: Global query without tenant context
-    // Page<Device> findByStatus(DeviceStatus status, Pageable pageable);
-    
-    // ✅ CORRECT: Composite query with tenant isolation
-    @Query("{ 'tenantId': ?0, 'organizationId': ?1, 'lastSeen': { '$gte': ?2 } }")
-    List<Device> findActiveDevicesByTenantAndOrganization(
-        String tenantId, String organizationId, LocalDateTime since);
-}
-
-@Service
-@RequiredArgsConstructor
-public class DeviceService {
-    private final DeviceRepository deviceRepository;
-    
-    public Page<Device> getDevices(String tenantId, DeviceFilter filter, Pageable pageable) {
-        // Always include tenant context in queries
-        return deviceRepository.findByTenantAndStatus(
-            tenantId, 
-            filter.getStatus(), 
-            pageable
-        );
-    }
-    
-    public Device getDeviceById(String deviceId, String tenantId) {
-        return deviceRepository.findById(deviceId)
-            .filter(device -> device.getTenantId().equals(tenantId))
-            .orElseThrow(() -> new DeviceNotFoundException(deviceId));
-    }
-}
-```
-
-### 3. Resource-Level Permissions
-
-For fine-grained access control, implement resource-level permissions:
-
-```java
-@Component
-@RequiredArgsConstructor
-public class ResourcePermissionEvaluator implements PermissionEvaluator {
-    private final DeviceService deviceService;
-    private final OrganizationService organizationService;
-    
-    @Override
-    public boolean hasPermission(Authentication authentication, Object targetDomainObject, 
-                                Object permission) {
-        
-        if (!(authentication.getPrincipal() instanceof AuthPrincipal)) {
-            return false;
-        }
-        
-        AuthPrincipal principal = (AuthPrincipal) authentication.getPrincipal();
-        
-        // Device-level permissions
-        if (targetDomainObject instanceof Device) {
-            Device device = (Device) targetDomainObject;
-            return device.getTenantId().equals(principal.getTenantId())
-                && hasDevicePermission(principal, device, permission.toString());
-        }
-        
-        // Organization-level permissions
-        if (targetDomainObject instanceof Organization) {
-            Organization org = (Organization) targetDomainObject;
-            return org.getTenantId().equals(principal.getTenantId())
-                && hasOrganizationPermission(principal, org, permission.toString());
-        }
-        
-        return false;
-    }
-    
-    private boolean hasDevicePermission(AuthPrincipal principal, Device device, String permission) {
-        // Implement device-specific permission logic
-        return switch (permission) {
-            case "READ" -> principal.hasAnyRole("OWNER", "ADMIN", "USER", "READ_ONLY");
-            case "WRITE" -> principal.hasAnyRole("OWNER", "ADMIN", "USER");
-            case "DELETE" -> principal.hasAnyRole("OWNER", "ADMIN");
-            default -> false;
+    @Bean 
+    public OAuth2TokenCustomizer<JwtEncodingContext> tokenCustomizer() {
+        return context -> {
+            // Add tenant-specific claims
+            String tenantId = extractTenantId(context);
+            context.getClaims().claim("tenant_id", tenantId);
+            context.getClaims().claim("tenant_domain", getTenantDomain(tenantId));
         };
     }
 }
 ```
 
-## Data Protection
+### Multi-Tenant JWT Security
 
-### 1. Encryption at Rest
+Each tenant has isolated RSA key pairs:
 
-Sensitive data must be encrypted before storage:
+```java
+@Component
+@RequiredArgsConstructor
+public class TenantKeyService {
+    
+    private final TenantKeyRepository keyRepository;
+    private final LoadingCache<String, RSAKey> keyCache;
+    
+    public RSAKey getSigningKey(String tenantId) {
+        return keyCache.get(tenantId, () -> {
+            TenantKey key = keyRepository.findByTenantId(tenantId)
+                .orElseThrow(() -> new TenantKeyNotFoundException(tenantId));
+            return RSAKey.parse(key.getPrivateKey());
+        });
+    }
+    
+    public RSAKey getVerificationKey(String tenantId) {
+        RSAKey signingKey = getSigningKey(tenantId);
+        return signingKey.toPublicJWK();
+    }
+}
+```
+
+### Authentication Principal Pattern
+
+Always use `AuthPrincipal` for user context:
+
+```java
+@RestController
+@RequestMapping("/api/organizations")
+public class OrganizationController {
+    
+    @GetMapping
+    public ResponseEntity<List<Organization>> list(
+        @AuthenticationPrincipal AuthPrincipal principal
+    ) {
+        // Principal automatically includes tenant context
+        String tenantId = principal.getTenantId();
+        String userId = principal.getUserId();
+        List<String> roles = principal.getRoles();
+        
+        // Enforce tenant isolation
+        List<Organization> orgs = service.findByTenant(tenantId);
+        return ResponseEntity.ok(orgs);
+    }
+}
+```
+
+### Role-Based Access Control (RBAC)
+
+Define roles and permissions clearly:
+
+```java
+public enum Role {
+    OWNER("OWNER", Set.of(Permission.ALL)),
+    ADMIN("ADMIN", Set.of(
+        Permission.USER_READ, Permission.USER_WRITE,
+        Permission.ORG_READ, Permission.ORG_WRITE,
+        Permission.DEVICE_READ, Permission.DEVICE_WRITE
+    )),
+    USER("USER", Set.of(
+        Permission.USER_READ,
+        Permission.ORG_READ,
+        Permission.DEVICE_READ
+    )),
+    VIEWER("VIEWER", Set.of(
+        Permission.USER_READ,
+        Permission.ORG_READ,
+        Permission.DEVICE_READ
+    ));
+    
+    private final String name;
+    private final Set<Permission> permissions;
+}
+```
+
+### Method-Level Security
+
+Use annotations for fine-grained security:
+
+```java
+@Service
+public class UserService {
+    
+    @PreAuthorize("hasRole('ADMIN') or @userService.isOwner(#userId, authentication.name)")
+    public User updateUser(String userId, UpdateUserRequest request) {
+        // Only admins or the user themselves can update
+    }
+    
+    @PreAuthorize("hasRole('OWNER')")
+    public void deleteUser(String userId) {
+        // Only owners can delete users
+    }
+    
+    @PostAuthorize("@tenantService.belongsToTenant(returnObject.tenantId, authentication.principal.tenantId)")
+    public User findById(String userId) {
+        // Ensure returned user belongs to caller's tenant
+    }
+}
+```
+
+## Data Security and Encryption
+
+### Sensitive Data Encryption
+
+Encrypt sensitive data at rest:
 
 ```java
 @Component
 @RequiredArgsConstructor
 public class EncryptionService {
+    
     private final AESUtil aesUtil;
     
-    @Value("${openframe.security.encryption.secret-key}")
+    @Value("${openframe.security.encryption.key}")
     private String encryptionKey;
     
-    public String encrypt(String plaintext, String tenantId) {
-        // Use tenant-specific salt for additional security
-        String salt = generateTenantSalt(tenantId);
-        return aesUtil.encrypt(plaintext, encryptionKey, salt);
+    public String encrypt(String plaintext) {
+        try {
+            return aesUtil.encrypt(plaintext, encryptionKey);
+        } catch (Exception e) {
+            throw new EncryptionException("Failed to encrypt data", e);
+        }
     }
     
-    public String decrypt(String ciphertext, String tenantId) {
-        String salt = generateTenantSalt(tenantId);
-        return aesUtil.decrypt(ciphertext, encryptionKey, salt);
-    }
-    
-    private String generateTenantSalt(String tenantId) {
-        return DigestUtils.sha256Hex(tenantId + encryptionKey).substring(0, 16);
-    }
-}
-
-// Usage in entity classes
-@Document(collection = "sso_configs")
-public class SSOConfig {
-    @Id
-    private String id;
-    private String tenantId;
-    private String providerId;
-    
-    @JsonIgnore
-    private String encryptedClientSecret;
-    
-    // Helper methods for transparent encryption/decryption
-    public void setClientSecret(String clientSecret) {
-        this.encryptedClientSecret = encryptionService.encrypt(clientSecret, tenantId);
-    }
-    
-    public String getClientSecret() {
-        return encryptionService.decrypt(encryptedClientSecret, tenantId);
+    public String decrypt(String ciphertext) {
+        try {
+            return aesUtil.decrypt(ciphertext, encryptionKey);
+        } catch (Exception e) {
+            throw new EncryptionException("Failed to decrypt data", e);
+        }
     }
 }
 ```
 
-### 2. Secret Management
+### Database Field Encryption
 
-Implement proper secret rotation and management:
+Use MongoDB field-level encryption for sensitive data:
 
 ```java
-@Service
-@RequiredArgsConstructor
-public class SecretRotationService {
-    private final TenantKeyService tenantKeyService;
-    private final JwtService jwtService;
-    private final NotificationService notificationService;
+@Document(collection = "sso_configs")
+public class SSOConfig {
     
-    @Scheduled(cron = "0 0 2 * * 0") // Weekly rotation
-    public void rotateExpiredKeys() {
-        List<Tenant> tenants = tenantRepository.findAll();
-        
-        for (Tenant tenant : tenants) {
-            TenantKey currentKey = tenantKeyService.getCurrentKey(tenant.getId());
-            
-            if (shouldRotateKey(currentKey)) {
-                rotateKeyForTenant(tenant);
-            }
-        }
-    }
+    @Id
+    private String id;
     
-    private void rotateKeyForTenant(Tenant tenant) {
-        try {
-            // Generate new key pair
-            AuthenticationKeyPair newKeyPair = keyGenerator.generate();
-            
-            // Store new key with overlap period
-            tenantKeyService.addKey(tenant.getId(), newKeyPair, KeyStatus.PENDING);
-            
-            // Activate new key after grace period
-            scheduledExecutorService.schedule(() -> {
-                tenantKeyService.activateKey(tenant.getId(), newKeyPair.getKeyId());
-                tenantKeyService.markKeyDeprecated(tenant.getId(), currentKey.getKeyId());
-            }, 24, TimeUnit.HOURS);
-            
-            // Notify tenant administrators
-            notificationService.sendKeyRotationNotification(tenant);
-            
-        } catch (Exception e) {
-            log.error("Failed to rotate key for tenant: {}", tenant.getId(), e);
-            notificationService.sendKeyRotationError(tenant, e);
+    private String clientId;
+    
+    @Encrypted  // Custom annotation
+    private String clientSecret;
+    
+    @Encrypted
+    private String apiKey;
+    
+    // Encryption is handled by custom MongoDB converter
+}
+```
+
+### Secrets Management
+
+Never hardcode secrets in code:
+
+```yaml
+# application.yml - Use environment variables
+openframe:
+  security:
+    jwt:
+      secret: ${JWT_SECRET:}
+    oauth:
+      encryption-key: ${OAUTH_ENCRYPTION_KEY:}
+      
+spring:
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/openframe}
+```
+
+```java
+// Environment-based secret injection
+@Component
+public class SecretService {
+    
+    @Value("${openframe.security.oauth.encryption-key:}")
+    private String encryptionKey;
+    
+    @PostConstruct
+    public void validateSecrets() {
+        if (StringUtils.isBlank(encryptionKey) || encryptionKey.length() < 32) {
+            throw new IllegalStateException("OAuth encryption key must be at least 32 characters");
         }
     }
 }
 ```
 
-### 3. Sensitive Data Masking
+## Input Validation and Sanitization
 
-Implement data masking for logs and audit trails:
+### Request Validation
+
+Always validate incoming requests:
+
+```java
+@RestController
+@Validated
+public class OrganizationController {
+    
+    @PostMapping
+    public ResponseEntity<Organization> create(
+        @Valid @RequestBody CreateOrganizationRequest request,
+        @AuthenticationPrincipal AuthPrincipal principal
+    ) {
+        // Validation annotations on the DTO handle basic validation
+        Organization org = service.create(request, principal.getTenantId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(org);
+    }
+}
+
+// DTO with validation annotations
+public class CreateOrganizationRequest {
+    
+    @NotBlank(message = "Organization name is required")
+    @Length(max = 100, message = "Organization name must not exceed 100 characters")
+    @Pattern(regexp = "^[a-zA-Z0-9\\s\\-\\.]+$", message = "Invalid characters in organization name")
+    private String name;
+    
+    @Valid
+    @NotNull(message = "Contact information is required")
+    private ContactInformationDto contactInformation;
+    
+    @Email(message = "Invalid email format")
+    private String primaryEmail;
+}
+```
+
+### Custom Validators
+
+Create domain-specific validators:
 
 ```java
 @Component
-public class DataMaskingService {
+public class TenantDomainValidator implements ConstraintValidator<ValidTenantDomain, String> {
     
-    private static final Pattern EMAIL_PATTERN = 
-        Pattern.compile("([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})");
-    private static final Pattern PHONE_PATTERN = 
-        Pattern.compile("\\b\\d{3}-\\d{3}-\\d{4}\\b");
+    private static final Pattern DOMAIN_PATTERN = Pattern.compile(
+        "^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\\.[a-zA-Z]{2,}$"
+    );
     
-    public String maskSensitiveData(String input) {
-        if (input == null) return null;
-        
-        String masked = input;
-        
-        // Mask email addresses
-        masked = EMAIL_PATTERN.matcher(masked)
-            .replaceAll(result -> maskEmail(result.group()));
-            
-        // Mask phone numbers
-        masked = PHONE_PATTERN.matcher(masked)
-            .replaceAll("XXX-XXX-XXXX");
-            
-        return masked;
-    }
-    
-    private String maskEmail(String email) {
-        String[] parts = email.split("@");
-        if (parts.length != 2) return email;
-        
-        String username = parts[0];
-        String domain = parts[1];
-        
-        if (username.length() <= 2) {
-            return "XX@" + domain;
-        }
-        
-        return username.charAt(0) + 
-               "X".repeat(username.length() - 2) + 
-               username.charAt(username.length() - 1) + 
-               "@" + domain;
-    }
-}
-```
-
-## Rate Limiting and DDoS Protection
-
-### 1. Multi-Level Rate Limiting
-
-Implement rate limiting at multiple levels:
-
-```java
-@Service
-@RequiredArgsConstructor
-public class RateLimitService {
-    private final RedisTemplate<String, String> redisTemplate;
-    
-    public boolean isAllowed(String identifier, RateLimitWindow window, int limit) {
-        String key = buildRateLimitKey(identifier, window);
-        String currentCountStr = redisTemplate.opsForValue().get(key);
-        
-        int currentCount = currentCountStr != null ? Integer.parseInt(currentCountStr) : 0;
-        
-        if (currentCount >= limit) {
+    @Override
+    public boolean isValid(String domain, ConstraintValidatorContext context) {
+        if (StringUtils.isBlank(domain)) {
             return false;
         }
         
-        // Increment counter with sliding window
-        redisTemplate.opsForValue().increment(key);
-        redisTemplate.expire(key, window.getDuration());
+        // Check format
+        if (!DOMAIN_PATTERN.matcher(domain).matches()) {
+            return false;
+        }
+        
+        // Check for security issues
+        if (containsSuspiciousPatterns(domain)) {
+            return false;
+        }
         
         return true;
     }
     
-    // API Key rate limiting
-    public boolean isApiKeyAllowed(ApiKeyPrincipal principal) {
-        String keyId = principal.getKeyId();
-        
-        // Per-minute limit
-        if (!isAllowed("api_key:" + keyId, RateLimitWindow.MINUTE, 100)) {
-            return false;
-        }
-        
-        // Per-hour limit
-        if (!isAllowed("api_key:" + keyId, RateLimitWindow.HOUR, 1000)) {
-            return false;
-        }
-        
-        // Per-day limit based on tier
-        int dailyLimit = principal.getTier().getDailyLimit();
-        return isAllowed("api_key:" + keyId, RateLimitWindow.DAY, dailyLimit);
-    }
-    
-    // Tenant-level rate limiting
-    public boolean isTenantAllowed(String tenantId) {
-        return isAllowed("tenant:" + tenantId, RateLimitWindow.MINUTE, 1000);
-    }
-    
-    // IP-based rate limiting for DDoS protection
-    public boolean isIpAllowed(String ipAddress) {
-        return isAllowed("ip:" + ipAddress, RateLimitWindow.MINUTE, 60);
+    private boolean containsSuspiciousPatterns(String domain) {
+        String lower = domain.toLowerCase();
+        return lower.contains("script") || 
+               lower.contains("javascript") || 
+               lower.contains("data:");
     }
 }
 ```
 
-### 2. Gateway-Level Protection
+### SQL Injection Prevention
+
+Use parameterized queries and avoid dynamic query building:
 
 ```java
-@Component
-public class RateLimitingGatewayFilter implements GatewayFilter {
-    private final RateLimitService rateLimitService;
+@Repository
+public class CustomOrganizationRepositoryImpl implements CustomOrganizationRepository {
+    
+    @Autowired
+    private MongoTemplate mongoTemplate;
+    
+    // ✅ SECURE: Using Criteria API
+    public List<Organization> findBySearchTerm(String tenantId, String searchTerm) {
+        Criteria criteria = Criteria.where("tenantId").is(tenantId);
+        
+        if (StringUtils.isNotBlank(searchTerm)) {
+            // Use regex with escaped input
+            String escapedTerm = Pattern.quote(searchTerm);
+            criteria.and("name").regex(escapedTerm, "i");
+        }
+        
+        Query query = new Query(criteria);
+        return mongoTemplate.find(query, Organization.class);
+    }
+    
+    // ❌ VULNERABLE: Don't build queries with string concatenation
+    // public List<Organization> findBySearchTermBad(String searchTerm) {
+    //     String queryString = "{ 'name': /" + searchTerm + "/i }";
+    //     // This is vulnerable to NoSQL injection
+    // }
+}
+```
+
+## Cross-Site Request Forgery (CSRF) Protection
+
+Configure CSRF protection appropriately:
+
+```java
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+    
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+            .csrf(csrf -> csrf
+                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                .ignoringRequestMatchers("/api/public/**", "/oauth/**")
+            )
+            .sessionManagement(session -> session
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            );
+        return http.build();
+    }
+}
+```
+
+For SPA applications, provide CSRF token endpoint:
+
+```java
+@RestController
+public class CsrfController {
+    
+    @GetMapping("/api/csrf")
+    public ResponseEntity<Map<String, String>> csrf(CsrfToken token) {
+        Map<String, String> response = Map.of(
+            "token", token.getToken(),
+            "headerName", token.getHeaderName()
+        );
+        return ResponseEntity.ok(response);
+    }
+}
+```
+
+## Cross-Site Scripting (XSS) Prevention
+
+### Output Encoding
+
+Always encode output in templates:
+
+```html
+<!-- Thymeleaf template - automatic escaping -->
+<div th:text="${user.name}">User Name</div>
+
+<!-- Raw HTML - use carefully -->
+<div th:utext="${sanitizedHtml}">HTML Content</div>
+```
+
+### Content Security Policy
+
+Implement CSP headers:
+
+```java
+@Configuration
+public class SecurityHeadersConfig implements WebMvcConfigurer {
     
     @Override
-    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        ServerHttpRequest request = exchange.getRequest();
-        String clientIp = getClientIp(request);
-        
-        // IP-based rate limiting
-        if (!rateLimitService.isIpAllowed(clientIp)) {
-            return handleRateLimit(exchange, "IP rate limit exceeded");
-        }
-        
-        // Extract tenant context for tenant-level limiting
-        return extractTenantId(request)
-            .flatMap(tenantId -> {
-                if (!rateLimitService.isTenantAllowed(tenantId)) {
-                    return handleRateLimit(exchange, "Tenant rate limit exceeded");
-                }
-                return chain.filter(exchange);
-            })
-            .switchIfEmpty(chain.filter(exchange));
-    }
-    
-    private Mono<Void> handleRateLimit(ServerWebExchange exchange, String message) {
-        ServerHttpResponse response = exchange.getResponse();
-        response.setStatusCode(HttpStatus.TOO_MANY_REQUESTS);
-        response.getHeaders().add("X-RateLimit-Limit", "100");
-        response.getHeaders().add("X-RateLimit-Remaining", "0");
-        response.getHeaders().add("Retry-After", "60");
-        
-        String body = "{\"error\":\"" + message + "\"}";
-        DataBuffer buffer = response.bufferFactory().wrap(body.getBytes());
-        return response.writeWith(Mono.just(buffer));
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(new HandlerInterceptor() {
+            @Override
+            public boolean preHandle(HttpServletRequest request, 
+                                   HttpServletResponse response, 
+                                   Object handler) {
+                response.setHeader("Content-Security-Policy", 
+                    "default-src 'self'; " +
+                    "script-src 'self' 'unsafe-inline'; " +
+                    "style-src 'self' 'unsafe-inline'; " +
+                    "img-src 'self' data: https:; " +
+                    "connect-src 'self'"
+                );
+                response.setHeader("X-Content-Type-Options", "nosniff");
+                response.setHeader("X-Frame-Options", "DENY");
+                response.setHeader("X-XSS-Protection", "1; mode=block");
+                return true;
+            }
+        });
     }
 }
 ```
 
-## Security Monitoring and Auditing
+### Input Sanitization
 
-### 1. Comprehensive Audit Logging
+Sanitize user input when necessary:
 
 ```java
-@Aspect
 @Component
-@RequiredArgsConstructor
-public class AuditLoggingAspect {
-    private final AuditEventService auditService;
+public class HtmlSanitizer {
     
-    @AfterReturning(pointcut = "@annotation(auditable)", returning = "result")
-    public void logAuditEvent(JoinPoint joinPoint, Auditable auditable, Object result) {
-        try {
-            AuthPrincipal principal = getCurrentPrincipal();
-            String action = auditable.action().isEmpty() ? 
-                joinPoint.getSignature().getName() : auditable.action();
-            
-            AuditEvent event = AuditEvent.builder()
-                .tenantId(principal.getTenantId())
-                .userId(principal.getUserId())
-                .action(action)
-                .resourceType(auditable.resourceType())
-                .resourceId(extractResourceId(joinPoint, result))
-                .ipAddress(getCurrentIpAddress())
-                .userAgent(getCurrentUserAgent())
-                .timestamp(Instant.now())
-                .success(true)
-                .build();
-                
-            auditService.recordEvent(event);
-            
-        } catch (Exception e) {
-            log.warn("Failed to record audit event", e);
+    private final PolicyFactory policy = Sanitizers.FORMATTING
+        .and(Sanitizers.BLOCKS)
+        .and(Sanitizers.LINKS);
+    
+    public String sanitize(String input) {
+        if (StringUtils.isBlank(input)) {
+            return input;
         }
+        return policy.sanitize(input);
     }
     
-    @AfterThrowing(pointcut = "@annotation(auditable)", throwing = "exception")
-    public void logFailedAuditEvent(JoinPoint joinPoint, Auditable auditable, Throwable exception) {
-        // Log failed operations for security monitoring
+    public String stripHtml(String input) {
+        if (StringUtils.isBlank(input)) {
+            return input;
+        }
+        return Jsoup.clean(input, Whitelist.none());
+    }
+}
+```
+
+## API Security Best Practices
+
+### Rate Limiting
+
+Implement rate limiting to prevent abuse:
+
+```java
+@Component
+@RequiredArgsConstructor
+public class RateLimitService {
+    
+    private final RedisTemplate<String, String> redisTemplate;
+    
+    public boolean isAllowed(String identifier, int maxRequests, Duration window) {
+        String key = "rate_limit:" + identifier;
+        String windowStart = String.valueOf(
+            Instant.now().truncatedTo(ChronoUnit.MINUTES).getEpochSecond()
+        );
+        String fullKey = key + ":" + windowStart;
+        
+        try {
+            Long current = redisTemplate.opsForValue().increment(fullKey);
+            if (current == 1) {
+                redisTemplate.expire(fullKey, window);
+            }
+            return current <= maxRequests;
+        } catch (Exception e) {
+            // Fail open for availability
+            log.warn("Rate limiting failed", e);
+            return true;
+        }
     }
 }
 
-// Usage
 @RestController
-public class DeviceController {
+public class ApiController {
     
-    @PutMapping("/{id}/status")
-    @Auditable(action = "UPDATE_DEVICE_STATUS", resourceType = "DEVICE")
-    public ResponseEntity<Void> updateDeviceStatus(
-        @PathVariable String id,
-        @RequestBody UpdateStatusRequest request
+    @Autowired
+    private RateLimitService rateLimitService;
+    
+    @PostMapping("/api/public/contact")
+    public ResponseEntity<?> contact(
+        @RequestBody ContactRequest request,
+        HttpServletRequest httpRequest
     ) {
-        deviceService.updateStatus(id, request);
+        String clientIP = getClientIP(httpRequest);
+        
+        if (!rateLimitService.isAllowed(clientIP, 5, Duration.ofMinutes(1))) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body("Rate limit exceeded");
+        }
+        
+        // Process request
         return ResponseEntity.ok().build();
     }
 }
 ```
 
-### 2. Security Event Monitoring
+### API Key Security
+
+Secure API key handling:
 
 ```java
-@Service
-@RequiredArgsConstructor
-public class SecurityEventMonitor {
-    private final NotificationService notificationService;
-    private final RedisTemplate<String, Object> redisTemplate;
+@Component
+public class ApiKeyService {
     
-    @EventListener
-    public void handleAuthenticationFailure(AuthenticationFailureEvent event) {
-        String identifier = extractIdentifier(event);
-        
-        // Track failed login attempts
-        String key = "auth_failures:" + identifier;
-        Long failures = redisTemplate.opsForValue().increment(key);
-        redisTemplate.expire(key, Duration.ofMinutes(15));
-        
-        if (failures >= 5) {
-            SecurityAlert alert = SecurityAlert.builder()
-                .type(SecurityAlertType.BRUTE_FORCE_ATTACK)
-                .severity(AlertSeverity.HIGH)
-                .identifier(identifier)
-                .failureCount(failures)
-                .timestamp(Instant.now())
-                .build();
-                
-            notificationService.sendSecurityAlert(alert);
-            
-            // Temporarily block IP/user
-            rateLimitService.blockIdentifier(identifier, Duration.ofHours(1));
-        }
+    // Generate secure API keys
+    public String generateApiKey() {
+        SecureRandom random = new SecureRandom();
+        byte[] keyBytes = new byte[32];
+        random.nextBytes(keyBytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(keyBytes);
     }
     
-    @EventListener
-    public void handleSuspiciousActivity(SuspiciousActivityEvent event) {
-        // Detect patterns like:
-        // - Multiple tenant access attempts
-        // - Unusual API usage patterns
-        // - Geographic anomalies
-        // - Privilege escalation attempts
-        
-        if (isHighRiskActivity(event)) {
-            SecurityAlert alert = SecurityAlert.builder()
-                .type(SecurityAlertType.SUSPICIOUS_ACTIVITY)
-                .severity(AlertSeverity.CRITICAL)
-                .details(event.getDetails())
-                .timestamp(Instant.now())
-                .build();
-                
-            notificationService.sendSecurityAlert(alert);
-        }
+    // Hash API keys for storage
+    public String hashApiKey(String apiKey) {
+        return BCrypt.hashpw(apiKey, BCrypt.gensalt(12));
+    }
+    
+    // Verify API key
+    public boolean verifyApiKey(String providedKey, String storedHash) {
+        return BCrypt.checkpw(providedKey, storedHash);
     }
 }
 ```
 
-## Security Testing and Validation
+### CORS Configuration
 
-### 1. Security Test Patterns
+Configure CORS properly for API access:
 
 ```java
-@SpringBootTest
-@TestPropertySource(properties = {
-    "openframe.security.jwt.secret-key=test-key",
-    "spring.profiles.active=test"
-})
-class SecurityIntegrationTest {
+@Configuration
+public class CorsConfig {
     
-    @Autowired
-    private TestRestTemplate restTemplate;
-    
-    @Test
-    void shouldRejectUnauthorizedRequest() {
-        ResponseEntity<String> response = restTemplate.getForEntity(
-            "/api/devices", String.class);
-            
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        
+        // Don't use wildcard in production
+        configuration.setAllowedOriginPatterns(Arrays.asList(
+            "https://*.yourdomain.com",
+            "https://localhost:*"  // Development only
+        ));
+        
+        configuration.setAllowedMethods(Arrays.asList(
+            "GET", "POST", "PUT", "DELETE", "OPTIONS"
+        ));
+        
+        configuration.setAllowedHeaders(Arrays.asList(
+            "Authorization", "Content-Type", "X-Requested-With"
+        ));
+        
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
+        
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/api/**", configuration);
+        return source;
     }
+}
+```
+
+## Audit Logging and Security Monitoring
+
+### Security Event Logging
+
+Log security-relevant events:
+
+```java
+@Component
+@RequiredArgsConstructor
+public class SecurityAuditLogger {
     
-    @Test  
-    void shouldRejectCrossTenantAccess() {
-        String tenantAToken = generateTokenForTenant("tenant-a");
-        String tenantBDeviceId = "device-belongs-to-tenant-b";
-        
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(tenantAToken);
-        HttpEntity<String> entity = new HttpEntity<>(headers);
-        
-        ResponseEntity<String> response = restTemplate.exchange(
-            "/api/devices/" + tenantBDeviceId,
-            HttpMethod.GET,
-            entity,
-            String.class
+    private final Logger log = LoggerFactory.getLogger("SECURITY_AUDIT");
+    private final EventPublisher eventPublisher;
+    
+    public void logAuthenticationSuccess(String userId, String tenantId, String ipAddress) {
+        Map<String, Object> auditData = Map.of(
+            "event", "AUTHENTICATION_SUCCESS",
+            "userId", userId,
+            "tenantId", tenantId,
+            "ipAddress", ipAddress,
+            "timestamp", Instant.now()
         );
         
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        log.info("Authentication successful: {}", auditData);
+        eventPublisher.publishEvent(new SecurityAuditEvent(auditData));
+    }
+    
+    public void logAuthenticationFailure(String username, String ipAddress, String reason) {
+        Map<String, Object> auditData = Map.of(
+            "event", "AUTHENTICATION_FAILURE",
+            "username", username,
+            "ipAddress", ipAddress,
+            "reason", reason,
+            "timestamp", Instant.now()
+        );
+        
+        log.warn("Authentication failed: {}", auditData);
+        eventPublisher.publishEvent(new SecurityAuditEvent(auditData));
+    }
+    
+    public void logPrivilegeEscalationAttempt(String userId, String requestedResource, String currentRole) {
+        Map<String, Object> auditData = Map.of(
+            "event", "PRIVILEGE_ESCALATION_ATTEMPT",
+            "userId", userId,
+            "requestedResource", requestedResource,
+            "currentRole", currentRole,
+            "timestamp", Instant.now()
+        );
+        
+        log.error("Privilege escalation attempt: {}", auditData);
+        eventPublisher.publishEvent(new SecurityAuditEvent(auditData));
+    }
+}
+```
+
+### Anomaly Detection
+
+Monitor for suspicious patterns:
+
+```java
+@Component
+public class SecurityMonitor {
+    
+    @EventListener
+    @Async
+    public void handleSecurityEvent(SecurityAuditEvent event) {
+        Map<String, Object> data = event.getData();
+        String eventType = (String) data.get("event");
+        
+        switch (eventType) {
+            case "AUTHENTICATION_FAILURE":
+                checkForBruteForce(data);
+                break;
+            case "PRIVILEGE_ESCALATION_ATTEMPT":
+                alertSecurityTeam(data);
+                break;
+            case "SUSPICIOUS_API_USAGE":
+                checkForApiAbuse(data);
+                break;
+        }
+    }
+    
+    private void checkForBruteForce(Map<String, Object> data) {
+        String ipAddress = (String) data.get("ipAddress");
+        // Count failed attempts from this IP
+        // Block if threshold exceeded
+    }
+    
+    private void alertSecurityTeam(Map<String, Object> data) {
+        // Send immediate security alert
+        SecurityAlert alert = new SecurityAlert(
+            "Privilege escalation attempt detected",
+            data.toString()
+        );
+        alertService.sendSecurityAlert(alert);
+    }
+}
+```
+
+## Common Security Vulnerabilities to Avoid
+
+### 1. Tenant Data Leakage
+
+```java
+// ❌ BAD: Missing tenant isolation
+@GetMapping("/api/organizations")
+public List<Organization> getAllOrganizations() {
+    return organizationRepository.findAll();  // Returns ALL tenants' data!
+}
+
+// ✅ GOOD: Proper tenant isolation
+@GetMapping("/api/organizations")
+public List<Organization> getOrganizations(@AuthenticationPrincipal AuthPrincipal principal) {
+    return organizationRepository.findByTenantId(principal.getTenantId());
+}
+```
+
+### 2. Insecure Direct Object References
+
+```java
+// ❌ BAD: No authorization check
+@GetMapping("/api/organizations/{id}")
+public Organization getOrganization(@PathVariable String id) {
+    return organizationRepository.findById(id).orElseThrow();
+}
+
+// ✅ GOOD: Verify ownership
+@GetMapping("/api/organizations/{id}")
+public Organization getOrganization(
+    @PathVariable String id,
+    @AuthenticationPrincipal AuthPrincipal principal
+) {
+    Organization org = organizationRepository.findById(id).orElseThrow();
+    
+    if (!org.getTenantId().equals(principal.getTenantId())) {
+        throw new AccessDeniedException("Organization not found");
+    }
+    
+    return org;
+}
+```
+
+### 3. Mass Assignment Vulnerabilities
+
+```java
+// ❌ BAD: Direct object binding
+@PutMapping("/api/users/{id}")
+public User updateUser(@PathVariable String id, @RequestBody User user) {
+    user.setId(id);
+    return userRepository.save(user);  // Could set isAdmin, tenantId, etc.
+}
+
+// ✅ GOOD: Use specific DTOs
+@PutMapping("/api/users/{id}")
+public User updateUser(@PathVariable String id, @RequestBody @Valid UpdateUserRequest request) {
+    User existingUser = userService.findById(id);
+    // Only update allowed fields
+    existingUser.setFirstName(request.getFirstName());
+    existingUser.setLastName(request.getLastName());
+    existingUser.setEmail(request.getEmail());
+    return userRepository.save(existingUser);
+}
+```
+
+## Security Testing
+
+### Integration Security Tests
+
+```java
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@TestPropertySource(properties = "spring.profiles.active=test")
+class SecurityIntegrationTest {
+    
+    @Test
+    void shouldRejectRequestsWithoutAuthentication() {
+        given()
+            .when()
+            .get("/api/organizations")
+            .then()
+            .statusCode(401);
     }
     
     @Test
-    void shouldEnforceRateLimit() {
-        String apiKey = "test-api-key";
+    void shouldEnforceTenantIsolation() {
+        String tenant1Token = generateTokenForTenant("tenant1");
+        String tenant2Token = generateTokenForTenant("tenant2");
         
-        // Make requests up to the limit
-        for (int i = 0; i < 100; i++) {
-            ResponseEntity<String> response = makeApiRequest(apiKey);
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        }
+        // Create org as tenant1
+        String orgId = given()
+            .auth().oauth2(tenant1Token)
+            .contentType(ContentType.JSON)
+            .body("""
+                {
+                    "name": "Tenant 1 Org",
+                    "contactInformation": {
+                        "email": "admin@tenant1.com"
+                    }
+                }
+                """)
+            .post("/api/organizations")
+            .then()
+            .statusCode(201)
+            .extract().path("id");
         
-        // Next request should be rate limited
-        ResponseEntity<String> response = makeApiRequest(apiKey);
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        // Attempt to access as tenant2
+        given()
+            .auth().oauth2(tenant2Token)
+            .get("/api/organizations/" + orgId)
+            .then()
+            .statusCode(404);  // Should not find the organization
+    }
+    
+    @Test
+    void shouldPreventPrivilegeEscalation() {
+        String userToken = generateTokenForRole("USER");
+        
+        given()
+            .auth().oauth2(userToken)
+            .delete("/api/users/some-user-id")
+            .then()
+            .statusCode(403);  // Forbidden - only admins can delete
     }
 }
 ```
 
-### 2. Security Checklist for Development
+## Security Configuration Checklist
 
-#### Pre-Deployment Security Checklist
+- [ ] **Authentication**
+  - [ ] OAuth2/OIDC properly configured
+  - [ ] JWT tokens include tenant claims
+  - [ ] Token expiration appropriately set
+  - [ ] Refresh token rotation implemented
 
-- [ ] **All endpoints require authentication** (except public health checks)
-- [ ] **All database queries include tenant context** (`tenantId` parameter)
-- [ ] **Sensitive data is encrypted** before storage
-- [ ] **API keys are properly hashed** and never stored in plaintext
-- [ ] **Rate limiting is configured** for all public endpoints
-- [ ] **Input validation** is implemented for all request parameters
-- [ ] **SQL injection protection** via parameterized queries
-- [ ] **XSS protection** through proper output encoding
-- [ ] **CSRF tokens** for state-changing operations
-- [ ] **Audit logging** for all security-relevant operations
+- [ ] **Authorization**
+  - [ ] All endpoints require authentication
+  - [ ] Tenant isolation enforced
+  - [ ] Role-based permissions implemented
+  - [ ] Direct object reference protection
 
-#### Code Review Security Focus Areas
+- [ ] **Input Validation**
+  - [ ] All user input validated
+  - [ ] Custom validators for domain rules
+  - [ ] SQL injection prevention
+  - [ ] XSS prevention measures
 
-- **Authentication bypass** attempts
-- **Authorization logic** flaws
-- **Cross-tenant data access** vulnerabilities  
-- **Injection attack** vectors (SQL, NoSQL, LDAP)
-- **Information disclosure** through error messages
-- **Session management** weaknesses
-- **Cryptographic implementation** errors
+- [ ] **Data Protection**
+  - [ ] Sensitive data encrypted at rest
+  - [ ] Secrets not hardcoded
+  - [ ] Environment-based configuration
+  - [ ] Database field encryption where needed
 
-## Common Security Anti-Patterns to Avoid
+- [ ] **API Security**
+  - [ ] CORS properly configured
+  - [ ] Rate limiting implemented
+  - [ ] API keys securely managed
+  - [ ] CSRF protection enabled
 
-### ❌ Wrong: Global Data Access
+- [ ] **Monitoring**
+  - [ ] Security events logged
+  - [ ] Audit trail implemented
+  - [ ] Anomaly detection configured
+  - [ ] Security alerts set up
 
-```java
-// DON'T DO THIS - No tenant isolation
-public List<Device> getAllDevices() {
-    return deviceRepository.findAll();
-}
-```
+## Next Steps
 
-### ✅ Correct: Tenant-Scoped Access
+With security understanding in place:
 
-```java
-// DO THIS - Always include tenant context
-public List<Device> getDevicesForTenant(String tenantId) {
-    return deviceRepository.findByTenantId(tenantId);
-}
-```
+1. **[Testing Overview](../testing/README.md)** - Test security implementations
+2. **[Contributing Guidelines](../contributing/guidelines.md)** - Follow secure coding practices
+3. **[API Documentation](../../reference/architecture/)** - Review secure API patterns
 
-### ❌ Wrong: Hardcoded Secrets
+## Getting Help
 
-```java
-// DON'T DO THIS - Secrets in code
-private static final String JWT_SECRET = "my-secret-key";
-```
-
-### ✅ Correct: Environment-Based Configuration
-
-```java
-// DO THIS - Externalized configuration
-@Value("${openframe.security.jwt.secret-key}")
-private String jwtSecretKey;
-```
-
-### ❌ Wrong: Role Hardcoding
-
-```java
-// DON'T DO THIS - Hardcoded role checks
-if (user.getRole().equals("ADMIN")) {
-    // Allow operation
-}
-```
-
-### ✅ Correct: Flexible Permission System
-
-```java
-// DO THIS - Use Spring Security annotations
-@PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
-public void performAdminOperation() {
-    // Operation implementation
-}
-```
+- **Security Issues**: Report privately via email to security@flamingo.run
+- **Questions**: Ask in [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) `#security` channel
+- **Best Practices**: Review [OWASP Top 10](https://owasp.org/www-project-top-ten/)
 
 ---
 
-**Next Steps:**
-- **[Testing Guide](../testing/README.md)** - Security testing strategies
-- **[Contributing Guidelines](../contributing/guidelines.md)** - Secure development practices
-- **[Local Development](../setup/local-development.md)** - Security configuration for development
-
-This security guide provides the foundation for building secure, multi-tenant applications with OpenFrame OSS Lib. Always follow the principle of **defense in depth** and regularly review security implementations against current best practices.
+*Security is everyone's responsibility. By following these guidelines, you help ensure OpenFrame OSS Libraries remains secure and trustworthy for all users.*

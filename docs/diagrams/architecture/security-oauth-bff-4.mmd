@@ -1,8 +1,0 @@
-flowchart TD
-    A["POST /oauth/refresh"] --> B{"Refresh Token Present?"}
-    B -->|"No"| C["401 Unauthorized"]
-    B -->|"Yes"| D["Call OAuthBffService"]
-    D --> E{"Valid?"}
-    E -->|"No"| C
-    E -->|"Yes"| F["Set New Auth Cookies"]
-    F --> G["204 No Content"]

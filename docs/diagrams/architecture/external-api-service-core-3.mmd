@@ -1,8 +1,7 @@
 flowchart TD
-    Client --> EventController
-    EventController --> EventMapper
-    EventMapper --> EventService
-    EventService --> EventRepository
-    EventRepository --> EventService
-    EventService --> EventMapper
-    EventMapper --> EventsResponse
+    LogReq["GET /logs"] --> LogCriteria["LogFilterCriteria"]
+    LogCriteria --> LogMapper
+    LogMapper --> LogOptions["LogFilterOptions"]
+    LogOptions --> LogService
+    LogService --> Page["Paginated Result"]
+    Page --> LogsResponse

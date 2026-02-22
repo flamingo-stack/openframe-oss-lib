@@ -1,15 +1,21 @@
 flowchart TD
-    API["API and Service Layer"] --> Repo["Mongo Repositories"]
-    Repo --> Aspect["MachineTagEventAspect"]
-    Aspect --> Service["MachineTagEventServiceImpl"]
-    Service --> Kafka["Kafka Producer"]
-    Kafka --> PinotIngest["Pinot Ingestion Pipeline"]
+    App["Application Layer"] --> DataCore["Data Platform Core"]
 
-    API --> PinotRepo["Pinot Client Repositories"]
-    PinotRepo --> PinotBroker["Pinot Broker"]
+    subgraph storage_layer["Storage & Analytics"]
+        Cassandra["Cassandra"]
+        Pinot["Apache Pinot"]
+        Mongo["MongoDB (External Module)"]
+        Redis["Redis (External Module)"]
+    end
 
-    Config["DataConfiguration"] --> Cassandra["Cassandra Cluster"]
-    Config --> PinotConfig["Pinot Connections"]
+    subgraph streaming_layer["Streaming"]
+        Kafka["Kafka"]
+        NATS["NATS Messages (Models)"]
+    end
 
-    Tools["Integrated Tool Services"] --> Secret["Secret Retrievers"]
-    Secret --> ExternalTool["External Tool APIs"]
+    DataCore --> Cassandra
+    DataCore --> Pinot
+    DataCore --> Kafka
+    DataCore --> Mongo
+    DataCore --> Redis
+    DataCore --> NATS

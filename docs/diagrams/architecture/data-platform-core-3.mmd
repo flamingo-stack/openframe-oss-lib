@@ -1,5 +1,6 @@
 flowchart LR
-    APIQuery["Log Query Request"] --> QueryBuilder["PinotQueryBuilder"]
-    QueryBuilder --> PinotExec["Pinot Broker Execution"]
-    PinotExec --> Mapping["Result Mapping"]
-    Mapping --> Response["LogProjection List"]
+    Filters["Filter Inputs"] --> Builder["Build WHERE Clause"]
+    Builder --> Query["Construct SQL Query"]
+    Query --> Pinot["Pinot Broker"]
+    Pinot --> Result["ResultSet"]
+    Result --> Map["Map to Filter Options / Count"]

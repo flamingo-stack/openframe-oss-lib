@@ -1,11 +1,20 @@
 flowchart TD
-    User["End User Browser"] -->|"Login / OAuth2"| AuthServer["Authorization Service Core"]
+    Browser["User Browser"] --> Login["Login Page /oauth2/authorize"]
+    Login --> AuthServer["Authorization Service Core"]
 
-    AuthServer -->|"OIDC Login"| Google["Google OIDC"]
-    AuthServer -->|"OIDC Login"| Microsoft["Microsoft OIDC"]
+    subgraph authz["Authorization Service Core"]
+        TenantFilter["TenantContextFilter"]
+        AuthzConfig["AuthorizationServerConfig"]
+        SecurityCfg["SecurityConfig"]
+        KeyService["TenantKeyService"]
+        MongoAuthSvc["MongoAuthorizationService"]
+        ClientRepo["MongoRegisteredClientRepository"]
+    end
 
-    AuthServer -->|"Read/Write"| Mongo["MongoDB"]
-    AuthServer -->|"Sign JWT"| TenantKeys["Per-Tenant RSA Keys"]
+    AuthServer --> Mongo[("MongoDB")]
+    AuthServer --> KeyService
+    KeyService --> Mongo
 
-    AuthServer -->|"Access Token"| Gateway["Gateway Service Core"]
-    Gateway -->|"JWT Validation"| Platform["OpenFrame Platform Services"]
+    AuthServer --> JWT["Signed JWT (per-tenant key)"]
+    JWT --> Gateway["Gateway Service Core"]
+    Gateway --> ApiSvc["API Service Core"]

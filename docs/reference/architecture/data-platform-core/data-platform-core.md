@@ -1,318 +1,378 @@
 # Data Platform Core
 
-## Overview
+The **Data Platform Core** module provides the foundational data infrastructure for the OpenFrame ecosystem. It encapsulates configuration, connectivity, health monitoring, event modeling, analytical repositories, and integration-specific services that enable the rest of the platform to persist, query, enrich, and stream data reliably.
 
-The **Data Platform Core** module is the foundational data orchestration layer of the OpenFrame platform. It integrates analytical storage (Apache Pinot), operational storage (Cassandra), event propagation (Kafka), tool SDK integrations, and cross-cutting concerns such as repository event interception.
+This module acts as the central abstraction layer between:
 
-This module acts as the bridge between:
-
-- Persistent data layers (MongoDB, Cassandra)
-- Analytical query engines (Pinot)
+- Operational data stores (MongoDB via a separate persistence module)
+- Analytical data stores (Cassandra and Apache Pinot)
 - Streaming infrastructure (Kafka)
-- External integrated tools (Fleet MDM, Tactical RMM)
-- Higher-level API and service modules
+- External integrated tools (Fleet MDM, Tactical RMM, etc.)
 
-It ensures that data mutations, analytical queries, and tool integrations remain consistent, observable, and scalable.
+It is designed to be multi-tenant aware, cloud-ready, and analytics-first.
 
 ---
 
-## High-Level Architecture
+## Architectural Overview
+
+At a high level, the Data Platform Core coordinates configuration, repositories, models, and event services.
 
 ```mermaid
 flowchart TD
-    API["API and Service Layer"] --> Repo["Mongo Repositories"]
-    Repo --> Aspect["MachineTagEventAspect"]
-    Aspect --> Service["MachineTagEventServiceImpl"]
-    Service --> Kafka["Kafka Producer"]
-    Kafka --> PinotIngest["Pinot Ingestion Pipeline"]
+    App["Application Layer"] --> DataCore["Data Platform Core"]
 
-    API --> PinotRepo["Pinot Client Repositories"]
-    PinotRepo --> PinotBroker["Pinot Broker"]
+    subgraph storage_layer["Storage & Analytics"]
+        Cassandra["Cassandra"]
+        Pinot["Apache Pinot"]
+        Mongo["MongoDB (External Module)"]
+        Redis["Redis (External Module)"]
+    end
 
-    Config["DataConfiguration"] --> Cassandra["Cassandra Cluster"]
-    Config --> PinotConfig["Pinot Connections"]
+    subgraph streaming_layer["Streaming"]
+        Kafka["Kafka"]
+        NATS["NATS Messages (Models)"]
+    end
 
-    Tools["Integrated Tool Services"] --> Secret["Secret Retrievers"]
-    Secret --> ExternalTool["External Tool APIs"]
+    DataCore --> Cassandra
+    DataCore --> Pinot
+    DataCore --> Kafka
+    DataCore --> Mongo
+    DataCore --> Redis
+    DataCore --> NATS
 ```
 
 ### Responsibilities
 
-The Data Platform Core module is responsible for:
+The Data Platform Core module provides:
 
-1. Configuring data infrastructure (Cassandra, Pinot, tool SDKs)
-2. Intercepting repository events and publishing Kafka messages
-3. Providing optimized analytical queries via Pinot
-4. Managing tool integration secrets dynamically
-5. Providing health checks and configuration observability
+1. **Database Configuration & Bootstrapping** (Cassandra, Pinot)
+2. **Health Monitoring** (Cassandra health indicator)
+3. **Analytical Query Repositories** (Pinot repositories)
+4. **Event-to-Stream Publishing** (Kafka publishing for device/tag changes)
+5. **Integration Secret Retrieval** (Fleet MDM, Tactical RMM)
+6. **Shared Domain Models & Tool Types**
 
 ---
 
-# Core Functional Areas
+# Configuration Layer
 
-## 1. Repository Event Interception and Kafka Propagation
+The configuration layer initializes and validates connections to analytical infrastructure.
 
-### MachineTagEventAspect
+## Cassandra Configuration
 
-`MachineTagEventAspect` is an AOP component that intercepts:
+Key components:
 
-- `MachineRepository.save(...)`
-- `MachineRepository.saveAll(...)`
-- `MachineTagRepository.save(...)`
-- `MachineTagRepository.saveAll(...)`
-- `TagRepository.save(...)`
-- `TagRepository.saveAll(...)`
+- `CassandraConfig`
+- `CassandraKeyspaceNormalizer`
+- `DataConfiguration`
+- `CassandraHealthIndicator`
 
-It delegates business logic to `MachineTagEventService`.
+### Key Features
 
-### MachineTagEventServiceImpl
+- Conditional enablement via `spring.data.cassandra.enabled`
+- Automatic keyspace creation (`CREATE_IF_NOT_EXISTS`)
+- Replication factor configuration
+- Load balancing configuration using local datacenter
+- Server-side timestamp generation
+- Health check via `system.local`
 
-This service:
-
-- Fetches related entities (Machine, Tags, MachineTag)
-- Builds a `MachinePinotMessage`
-- Publishes the message via `OssTenantRetryingKafkaProducer`
+### Startup Flow
 
 ```mermaid
 flowchart TD
-    Save["Repository Save"] --> Aspect["MachineTagEventAspect"]
-    Aspect --> Processor["MachineTagEventServiceImpl"]
-    Processor --> Fetch["Fetch Machine and Tags"]
+    Start["Application Start"] --> Normalize["CassandraKeyspaceNormalizer"]
+    Normalize --> Config["CassandraConfig"]
+    Config --> Ensure["Ensure Keyspace Exists"]
+    Ensure --> Session["Create CqlSessionFactoryBean"]
+    Session --> Health["CassandraHealthIndicator Active"]
+```
+
+#### CassandraKeyspaceNormalizer
+
+Cassandra keyspaces cannot contain dashes. This initializer:
+
+- Reads `spring.data.cassandra.keyspace-name`
+- Replaces `-` with `_`
+- Injects normalized value into the environment
+
+This enables tenant IDs with dashes while maintaining Cassandra compatibility.
+
+---
+
+## Pinot Configuration
+
+Key component:
+
+- `PinotConfig`
+
+Two connections are created:
+
+- Broker connection (`pinotBrokerConnection`) for query execution
+- Controller connection (`pinotControllerConnection`) for administrative interactions
+
+Configured via:
+
+- `pinot.broker.url`
+- `pinot.controller.url`
+
+---
+
+## Configuration Logging
+
+`ConfigurationLogger` logs active infrastructure endpoints at application readiness:
+
+- MongoDB URI
+- Cassandra contact points
+- Redis host
+- Pinot controller & broker URLs
+
+This improves observability and deployment diagnostics.
+
+---
+
+# Domain Models & Tool Types
+
+## IntegratedToolTypes
+
+Defines canonical constants for infrastructure and integrated tools, such as:
+
+- `MONGODB`
+- `CASSANDRA`
+- `KAFKA`
+- `PINOT`
+- `FLEET`
+- `AUTHENTIK`
+- `POSTGRESQL`
+
+This centralizes tool identification across modules.
+
+## ToolCredentials
+
+Encapsulates credential types:
+
+- Username / Password
+- Token
+- API Key
+- Client ID / Secret
+
+Used by integration services to authenticate against external systems.
+
+---
+
+# Analytical Repositories (Pinot)
+
+The module provides analytical query repositories backed by Apache Pinot.
+
+## PinotClientDeviceRepository
+
+Responsibilities:
+
+- Filter option aggregation (status, device type, OS type, organization, tags)
+- Filtered device counts
+- Dynamic WHERE clause construction
+- Exclusion-aware filter building
+
+### Query Pattern
+
+```mermaid
+flowchart LR
+    Filters["Filter Inputs"] --> Builder["Build WHERE Clause"]
+    Builder --> Query["Construct SQL Query"]
+    Query --> Pinot["Pinot Broker"]
+    Pinot --> Result["ResultSet"]
+    Result --> Map["Map to Filter Options / Count"]
+```
+
+Key design features:
+
+- Excludes `DELETED` device status
+- Dynamically builds OR/AND conditions
+- Groups results by attribute
+- Returns counts for UI filter rendering
+
+---
+
+## PinotClientLogRepository
+
+Responsibilities:
+
+- Log retrieval with cursor pagination
+- Full-text search support
+- Dynamic sorting validation
+- Distinct option queries (event type, severity, tool type)
+- Organization option resolution
+
+### Log Query Flow
+
+```mermaid
+flowchart TD
+    Input["Log Filter Input"] --> QB["PinotQueryBuilder"]
+    QB --> Exec["Execute Query"]
+    Exec --> RS["ResultSetGroup"]
+    RS --> Map["Map to LogProjection"]
+```
+
+Notable safeguards:
+
+- Sort field validation via `SORTABLE_COLUMNS`
+- Default fallback sort column
+- Cursor-based pagination
+- Date range filtering
+
+This repository powers audit views, log dashboards, and search features.
+
+---
+
+# Event Publishing & Streaming Integration
+
+## MachineTagEventServiceImpl
+
+This service reacts to entity persistence events and publishes enriched machine data to Kafka.
+
+### Triggered On
+
+- Machine save
+- MachineTag save
+- Tag save
+
+### Processing Flow
+
+```mermaid
+flowchart TD
+    Save["Machine/Tag Saved"] --> Fetch["Fetch Related Entities"]
     Fetch --> Build["Build MachinePinotMessage"]
     Build --> Publish["Publish to Kafka Topic"]
 ```
 
-### Why This Matters
+### Key Features
 
-This design ensures:
+- Deduplicates machine IDs for batch operations
+- Enriches machine message with all tags
+- Uses `OssTenantRetryingKafkaProducer`
+- Publishes to tenant-scoped topic
 
-- Strong decoupling between persistence and streaming
-- Automatic propagation of device/tag updates
-- Real-time synchronization of analytical indexes (Pinot)
-- Multi-tenant safe publishing via tenant-aware Kafka producer
+This enables:
+
+- Near real-time device analytics
+- Downstream stream processing
+- Pinot materialization via Kafka pipelines
 
 ---
 
-## 2. Apache Pinot Analytical Layer
+# NATS Event Models
 
-The module provides direct Pinot integration for analytics queries.
+The module defines message payload models for NATS-based communication:
 
-### PinotConfig
+- `ClientConnectionEvent`
+- `InstalledAgentMessage`
+- `ToolConnectionMessage`
 
-Creates:
+These models standardize inter-service messaging without coupling to transport implementation.
 
-- Broker connection
-- Controller connection
+---
 
-These are injected into Pinot repository classes.
+# Tool Agent Registration Secret Retrieval
 
-### PinotClientDeviceRepository
+The module provides dynamic secret retrieval for integrated tools.
 
-Provides:
+## FleetMdmAgentRegistrationSecretRetriever
 
-- Filter option aggregation (status, deviceType, osType, organizationId, tags)
-- Filtered device counts
-- Dynamic WHERE clause generation
+- Tool ID: `fleetmdm-server`
+- Retrieves tool configuration via `IntegratedToolService`
+- Resolves API URL via `ToolUrlService`
+- Uses `FleetMdmClient` to fetch enroll secret
 
-Example query structure:
+## TacticalRmmAgentRegistrationSecretRetriever
 
-```text
-SELECT status, COUNT(*)
-FROM devices
-WHERE status != 'DELETED'
-GROUP BY status
-ORDER BY count DESC
-```
+- Tool ID: `tactical-rmm`
+- Builds `AgentRegistrationSecretRequest`
+- Uses `TacticalRmmClient`
+- Retrieves installation secret
 
-### PinotClientLogRepository
-
-Provides:
-
-- Log filtering by date, tool type, severity, organization
-- Full-text log search
-- Cursor-based pagination
-- Sort validation and enforcement
-- Distinct filter options
+### Integration Flow
 
 ```mermaid
-flowchart LR
-    APIQuery["Log Query Request"] --> QueryBuilder["PinotQueryBuilder"]
-    QueryBuilder --> PinotExec["Pinot Broker Execution"]
-    PinotExec --> Mapping["Result Mapping"]
-    Mapping --> Response["LogProjection List"]
+flowchart TD
+    Request["Secret Requested"] --> ToolLookup["IntegratedToolService"]
+    ToolLookup --> UrlLookup["ToolUrlService"]
+    UrlLookup --> Client["External SDK Client"]
+    Client --> Secret["Enrollment Secret"]
 ```
 
-### Key Characteristics
-
-- Optimized for analytical workloads
-- Strong validation of sortable fields
-- Supports cursor-based pagination
-- Prevents deleted device inclusion
+These retrievers abstract vendor-specific API logic from higher-level modules.
 
 ---
 
-## 3. Cassandra Configuration and Health
+# Health Monitoring
 
-### CassandraConfig
+## CassandraHealthIndicator
 
-Extends `AbstractCassandraConfiguration` and:
-
-- Ensures keyspace exists before connection
-- Configures load balancing
-- Sets schema action to CREATE_IF_NOT_EXISTS
-- Configures timestamp generator
-
-### CassandraKeyspaceNormalizer
-
-Normalizes keyspace names by replacing dashes with underscores.
-
-This ensures compatibility with Cassandra naming rules while allowing flexible tenant identifiers.
-
-### CassandraHealthIndicator
-
-Provides Actuator-based health checks by executing:
+Performs:
 
 ```text
 SELECT release_version FROM system.local
 ```
 
-If the query succeeds → Health is UP.
-If it fails → Health is DOWN.
+If query succeeds → `UP`
+If exception occurs → `DOWN`
+
+This integrates with Spring Boot Actuator health endpoints.
 
 ---
 
-## 4. Tool Integration and Secret Retrieval
+# Multi-Tenant & Analytics-Oriented Design
 
-The Data Platform Core module integrates with external tools.
+The Data Platform Core supports:
 
-### ToolSdkConfig
+- Tenant-specific Kafka publishing
+- Keyspace normalization for tenant-safe Cassandra naming
+- Partitioned analytical queries in Pinot
+- Infrastructure configuration via environment properties
 
-Provides SDK client beans such as:
+This ensures the platform can scale across organizations without schema conflicts.
 
-- TacticalRmmClient
+---
 
-### Secret Retrievers
-
-- FleetMdmAgentRegistrationSecretRetriever
-- TacticalRmmAgentRegistrationSecretRetriever
-
-These components:
-
-1. Retrieve tool configuration via `IntegratedToolService`
-2. Resolve API URL via `ToolUrlService`
-3. Extract credentials
-4. Call external SDK to retrieve registration secrets
+# How Data Platform Core Fits into the Overall System
 
 ```mermaid
 flowchart TD
-    Request["Secret Request"] --> ToolService["IntegratedToolService"]
-    ToolService --> UrlService["ToolUrlService"]
-    UrlService --> SDK["External Tool SDK Client"]
-    SDK --> Secret["Enrollment Secret"]
+    Gateway["Gateway Service"] --> API["API Services"]
+    API --> DataCore["Data Platform Core"]
+    DataCore --> Mongo["Mongo Persistence Layer"]
+    DataCore --> Kafka["Kafka Messaging Layer"]
+    DataCore --> Stream["Stream Processing Service"]
+    DataCore --> Pinot["Apache Pinot"]
+    DataCore --> Cassandra["Cassandra"]
 ```
 
-### Design Benefits
+### Summary of Positioning
 
-- Secrets are not hardcoded
-- Dynamic tool configuration
-- Supports multi-tool extensibility
-- Conditional activation via configuration properties
-
----
-
-## 5. Data Models
-
-### IntegratedToolTypes
-
-Defines supported tool identifiers including:
-
-- Infrastructure tools (MongoDB, Redis, Cassandra, Kafka, Pinot)
-- Integrated tools (Fleet, Authentik, MySQL, PostgreSQL)
-
-### ToolCredentials
-
-Encapsulates multiple credential types:
-
-- Username/password
-- Token
-- API key
-- Client ID / Client Secret
-
-### NATS Message Models
-
-Includes:
-
-- ClientConnectionEvent
-- InstalledAgentMessage
-- ToolConnectionMessage
-
-These represent real-time messaging contracts used across the platform.
-
----
-
-## 6. Configuration Observability
-
-### ConfigurationLogger
-
-On application startup, logs:
-
-- MongoDB URI
-- Cassandra contact points
-- Redis host
-- Pinot controller and broker URLs
-
-This improves deployment transparency and troubleshooting.
-
----
-
-# Runtime Data Flow
-
-```mermaid
-flowchart TD
-    UserAction["Device or Tag Update"] --> Mongo["MongoDB Save"]
-    Mongo --> Aspect["MachineTagEventAspect"]
-    Aspect --> Service["MachineTagEventServiceImpl"]
-    Service --> Kafka["Kafka Event"]
-    Kafka --> Stream["Stream Processing"]
-    Stream --> Pinot["Pinot Analytical Store"]
-    API["Analytics API"] --> Pinot
-```
-
----
-
-# Conditional Configuration
-
-Several components are conditionally enabled:
-
-- Cassandra components: `spring.data.cassandra.enabled=true`
-- Tool integration: `openframe.integration.tool.enabled=true`
-- Device aspect: `openframe.device.aspect.enabled=true`
-
-This makes the Data Platform Core adaptable to different deployment profiles.
+- **Upstream**: API, Gateway, and Management services
+- **Core Responsibility**: Data access, analytics, and event publishing
+- **Downstream**: Stream processing, Pinot analytics, dashboards
 
 ---
 
 # Design Principles
 
-The Data Platform Core follows these architectural principles:
-
-1. Event-driven propagation for consistency
-2. Analytical separation between operational and query workloads
-3. Multi-tenant safe infrastructure integration
-4. Pluggable tool integrations
-5. Conditional auto-configuration
-6. Observability-first configuration logging
+1. **Infrastructure Abstraction** – Encapsulates database drivers and SDKs.
+2. **Analytics First** – Strong integration with Pinot and streaming.
+3. **Event-Driven** – Entity changes propagate via Kafka.
+4. **Tenant-Safe** – Normalized keyspaces and scoped publishing.
+5. **Operational Visibility** – Configuration logging and health checks.
 
 ---
 
-# Summary
+# Conclusion
 
-The **Data Platform Core** module is the backbone of data orchestration within OpenFrame. It:
+The **Data Platform Core** module is the backbone of OpenFrame’s data architecture. It bridges persistence, analytics, streaming, and external tool integration while maintaining clean separation of concerns.
 
-- Synchronizes operational data with analytical systems
-- Enables advanced filtering and search via Pinot
-- Propagates changes using Kafka
-- Integrates external infrastructure tools dynamically
-- Ensures environment health and configuration transparency
+By centralizing configuration, analytical repositories, and event propagation logic, it enables:
 
-It provides the scalable, event-driven data foundation required for modern AI-powered MSP operations.
+- Scalable multi-tenant deployments
+- Real-time device and log analytics
+- Reliable integration with external tools
+- Observable and resilient infrastructure connectivity
+
+It serves as the foundation upon which higher-level API and management services build their data-driven capabilities.

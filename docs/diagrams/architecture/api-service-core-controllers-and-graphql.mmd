@@ -1,0 +1,13 @@
+flowchart TD
+    Client["Client (UI / Internal Service)"] --> Gateway["Gateway Service"]
+    Gateway --> ApiService["Api Service Core Controllers And Graphql"]
+
+    ApiService --> RestControllers["REST Controllers"]
+    ApiService --> GraphQLLayer["GraphQL (DGS)"]
+    ApiService --> Security["Security Configuration"]
+    ApiService --> Config["Application Configuration"]
+
+    RestControllers --> Services["Domain Services"]
+    GraphQLLayer --> Services
+
+    Services --> DataLayer["Data & Persistence Layer"]

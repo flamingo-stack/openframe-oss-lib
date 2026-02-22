@@ -1,5 +1,0 @@
-flowchart LR
-    BFF["Security Oauth Bff"] -->|"Create ticket"| Store["InMemoryOAuthDevTicketStore"]
-    Browser -->|"/dev-exchange?ticket"| BFF
-    BFF -->|"consumeTicket"| Store
-    BFF -->|"Return tokens in headers"| Browser

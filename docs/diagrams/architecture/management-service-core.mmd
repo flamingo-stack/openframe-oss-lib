@@ -1,28 +1,27 @@
 flowchart TD
-    AppStart["Application Startup"] --> InitPhase["Initializers"]
-    AppStart --> Schedulers["Schedulers"]
-    AppStart --> Controllers["Management Controllers"]
+    Management["Management Service Core"]
 
-    InitPhase --> PinotInit["PinotConfigInitializer"]
-    InitPhase --> AgentSecretInit["AgentRegistrationSecretInitializer"]
-    InitPhase --> ToolAgentInit["IntegratedToolAgentInitializer"]
-    InitPhase --> NatsInit["NatsStreamConfigurationInitializer"]
-    InitPhase --> ClientConfigInit["OpenFrameClientConfigurationInitializer"]
-    InitPhase --> DebeziumInit["DebeziumConnectorInitializer"]
+    subgraph storage["Persistence & Data"]
+        Mongo["MongoDB"]
+        Redis["Redis"]
+        Pinot["Apache Pinot"]
+    end
 
-    Controllers --> ToolController["IntegratedToolController"]
-    Controllers --> ReleaseController["ReleaseVersionController"]
+    subgraph messaging["Messaging & CDC"]
+        Kafka["Kafka / Debezium"]
+        NATS["NATS Streams"]
+    end
 
-    Schedulers --> DebeziumHealth["DebeziumHealthCheckScheduler"]
-    Schedulers --> ApiKeySync["ApiKeyStatsSyncScheduler"]
-    Schedulers --> AgentFallback["AgentVersionUpdatePublishFallbackScheduler"]
+    subgraph runtime["Runtime Services"]
+        ClientAgent["Client Agent Service"]
+        StreamService["Stream Processing Service"]
+    end
 
-    ToolController --> DebeziumService["DebeziumService"]
-    DebeziumHealth --> DebeziumService
-    DebeziumInit --> DebeziumService
-
-    ToolAgentInit --> ToolAgentPublisher["ToolAgentUpdatePublisher"]
-    AgentFallback --> ToolAgentPublisher
-
-    ClientConfigInit --> ClientUpdatePublisher["OpenFrameClientUpdatePublisher"]
-    AgentFallback --> ClientUpdatePublisher
+    Management -->|"configures"| Pinot
+    Management -->|"initializes"| NATS
+    Management -->|"creates connectors"| Kafka
+    Management -->|"locks"| Redis
+    Management -->|"persists config"| Mongo
+    Management -->|"publishes updates"| ClientAgent
+    Kafka --> StreamService
+    NATS --> ClientAgent
