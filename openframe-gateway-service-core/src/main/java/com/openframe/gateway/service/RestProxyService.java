@@ -1,9 +1,8 @@
 package com.openframe.gateway.service;
 
 import com.openframe.core.service.ProxyUrlResolver;
-import com.openframe.data.document.apikey.APIKeyType;
+import com.openframe.core.service.ToolApiKeyHeadersResolver;
 import com.openframe.data.document.tool.IntegratedTool;
-import com.openframe.data.document.tool.ToolCredentials;
 import com.openframe.data.document.tool.ToolUrl;
 import com.openframe.data.document.tool.ToolUrlType;
 import com.openframe.data.reactive.repository.tool.ReactiveIntegratedToolRepository;
@@ -30,6 +29,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
+
+
 import static com.openframe.core.constants.HttpHeaders.*;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 import static org.apache.commons.lang3.StringUtils.isNotEmpty;
@@ -44,6 +45,7 @@ public class RestProxyService {
     private final ReactiveIntegratedToolRepository toolRepository;
     private final ProxyUrlResolver proxyUrlResolver;
     private final ToolUrlService toolUrlService;
+    private final ToolApiKeyHeadersResolver apiKeyHeadersResolver;
 
     public Mono<ResponseEntity<String>> proxyApiRequest(String toolId, ServerHttpRequest request, String body) {
         return toolRepository.findById(toolId)
@@ -79,24 +81,7 @@ public class RestProxyService {
         headers.put(ACCEPT_LANGUAGE, "en-US,en;q=0.9");
         headers.put(CONTENT_TYPE, APPLICATION_JSON);
         headers.put(ACCEPT, APPLICATION_JSON);
-
-        ToolCredentials credentials = tool.getCredentials();
-        APIKeyType apiKeyType = credentials != null
-                && credentials.getApiKey() != null ? credentials.getApiKey().getType() : APIKeyType.NONE;
-        switch (apiKeyType) {
-            case HEADER:
-                String keyName = credentials.getApiKey().getKeyName();
-                String key = credentials.getApiKey().getKey();
-                headers.put(keyName, key);
-                break;
-            case BEARER_TOKEN:
-                String token = credentials.getApiKey().getKey();
-                headers.put(AUTHORIZATION, "Bearer " + token);
-                break;
-            case NONE:
-                break;
-        }
-
+        headers.putAll(apiKeyHeadersResolver.resolve(tool));
         return headers;
     }
 
