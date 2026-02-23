@@ -10,8 +10,12 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+import static java.lang.String.format;
+
 @Component
 public class ToolApiKeyHeadersResolver {
+
+    private static final String BEARER_TOKEN_TEMPLATE = "Bearer %s";
 
     public Map<String, String> resolve(IntegratedTool tool) {
         ToolCredentials credentials = tool.getCredentials();
@@ -27,7 +31,7 @@ public class ToolApiKeyHeadersResolver {
             }
             case BEARER_TOKEN -> {
                 String key = credentials.getApiKey().getKey();
-                String authorisation = "Bearer " + key;
+                String authorisation = format(BEARER_TOKEN_TEMPLATE, key);
                 yield Collections.singletonMap(HttpHeaders.AUTHORIZATION, authorisation);
             }
             default -> Collections.emptyMap();
