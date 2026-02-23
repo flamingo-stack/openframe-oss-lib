@@ -43,6 +43,7 @@ public class ToolApiWebSocketProxyUrlFilter extends ToolWebSocketProxyUrlFilter 
         if (apiKeyHeaders.isEmpty()) {
             return exchange;
         }
+
         return exchange.mutate()
                 .request(r -> apiKeyHeaders.forEach(r::header))
                 .build();

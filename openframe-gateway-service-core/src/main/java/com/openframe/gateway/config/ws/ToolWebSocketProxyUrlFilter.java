@@ -43,7 +43,7 @@ public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Orde
         return getTool(toolId)
                 .flatMap(tool -> {
                     ToolUrl toolUrl = toolUrlService.getUrlByToolType(tool, ToolUrlType.WS)
-                            .orElseThrow(() -> new IllegalArgumentException("Tool " + tool.getName() + " have no web socket url"));
+                            .orElseThrow(() -> new IllegalArgumentException("Tool " + toolId + " have no web socket url"));
 
                     String endpointPrefix = getEndpointPrefix();
                     URI proxyUri = proxyUrlResolver.resolve(toolId, toolUrl.getUrl(), toolUrl.getPort(), requestUri, endpointPrefix);

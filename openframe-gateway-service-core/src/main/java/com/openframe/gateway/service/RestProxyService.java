@@ -1,7 +1,6 @@
 package com.openframe.gateway.service;
 
 import com.openframe.core.service.ProxyUrlResolver;
-import com.openframe.gateway.service.ToolApiKeyHeadersResolver;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.tool.ToolUrl;
 import com.openframe.data.document.tool.ToolUrlType;
@@ -28,8 +27,6 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-
-
 
 import static com.openframe.core.constants.HttpHeaders.*;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
