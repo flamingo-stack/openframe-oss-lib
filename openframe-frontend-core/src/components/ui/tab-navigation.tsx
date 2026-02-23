@@ -122,14 +122,13 @@ export function TabNavigation({
                   "flex gap-1 items-center justify-center p-4 relative shrink-0 h-14 cursor-pointer",
                   "transition-all duration-200 bg-transparent border-none outline-none",
                   isActive
-                    ? 'bg-gradient-to-b from-[rgba(255,192,8,0)] to-[rgba(255,192,8,0.1)]'
+                    ? 'bg-gradient-to-b from-[rgba(255,255,255,0)] to-[rgba(255,255,255,0.1)]'
                     : 'hover:bg-gradient-to-b hover:from-[rgba(255,255,255,0)] hover:to-[rgba(255,255,255,0.1)]'
                 )}
               >
                 <div className="relative flex items-center justify-center">
                   <tab.icon
-                    className="h-6 w-6 transition-colors"
-                    color={isActive ? '#ffc008' : '#888888'}
+                    className={cn("h-6 w-6 transition-colors", isActive ? 'text-ods-accent' : 'text-ods-text-secondary')}
                   />
                   {tab.indicator && (
                     <div className={cn(
