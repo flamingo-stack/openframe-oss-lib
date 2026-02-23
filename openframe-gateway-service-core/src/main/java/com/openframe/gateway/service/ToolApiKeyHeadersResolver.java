@@ -1,4 +1,4 @@
-package com.openframe.data.service;
+package com.openframe.gateway.service;
 
 import com.openframe.data.document.apikey.APIKeyType;
 import com.openframe.data.document.tool.IntegratedTool;
@@ -7,7 +7,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 
 import static java.lang.String.format;

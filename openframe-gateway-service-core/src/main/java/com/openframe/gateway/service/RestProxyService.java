@@ -1,7 +1,7 @@
 package com.openframe.gateway.service;
 
 import com.openframe.core.service.ProxyUrlResolver;
-import com.openframe.data.service.ToolApiKeyHeadersResolver;
+import com.openframe.gateway.service.ToolApiKeyHeadersResolver;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.tool.ToolUrl;
 import com.openframe.data.document.tool.ToolUrlType;
