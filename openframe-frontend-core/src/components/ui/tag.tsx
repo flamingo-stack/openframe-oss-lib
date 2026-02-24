@@ -2,7 +2,7 @@
 
 import React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
-import { X } from "lucide-react"
+import { XmarkIcon } from "../icons-v2-generated/signs-and-symbols/xmark-icon"
 import { cn } from "../../utils/cn"
 
 const tagVariants = cva(
@@ -23,7 +23,7 @@ const tagVariants = cva(
           "hover:bg-[var(--ods-system-greys-black-hover)] hover:border-[var(--ods-system-greys-soft-grey-hover)]",
           "active:bg-[var(--ods-system-greys-black-action)] active:border-[var(--ods-system-greys-soft-grey-action)]",
         ],
-        good: [
+        success: [
           "bg-[var(--ods-attention-green-success-secondary)] text-[var(--ods-attention-green-success)]",
           "hover:bg-[#385029] active:bg-[#425a33]",
         ],
@@ -87,7 +87,7 @@ function Tag({
           className="flex items-center justify-center size-5 shrink-0 rounded-full opacity-70 hover:opacity-100 transition-opacity"
           aria-label="Remove"
         >
-          <X className="size-4" />
+          <XmarkIcon className="size-4" />
         </button>
       )}
     </div>

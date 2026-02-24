@@ -1,11 +1,12 @@
 "use client"
 
-import { ExternalLink, Monitor, MoreHorizontal } from 'lucide-react'
+import { MonitorIcon } from '../icons-v2-generated/devices/monitor-icon'
+import { Ellipsis01Icon } from '../icons-v2-generated/interface'
 import React from 'react'
 import { cn } from '../../utils/cn'
 import type { OSPlatformId } from '../../utils/os-platforms'
-import { OSTypeBadge } from '../features/os-type-badge'
-import { InteractiveCard } from './interactive-card'
+import { OSTypeIcon } from '../features/os-type-badge'
+import { Tag, type TagProps } from './tag'
 
 export interface Device {
   id?: string
@@ -45,7 +46,7 @@ export interface DeviceCardProps extends React.HTMLAttributes<HTMLDivElement> {
     }
     customActions?: ActionButton[]
   }
-  statusBadgeComponent?: React.ReactNode
+  statusTag?: TagProps & { label: string }
   onDeviceClick?: (device: Device) => void
 }
 
@@ -54,7 +55,7 @@ export function DeviceCard({
   actions = {
     moreButton: { visible: true }
   },
-  statusBadgeComponent,
+  statusTag,
   onDeviceClick,
   className,
   ...props
@@ -75,114 +76,106 @@ export function DeviceCard({
   }
 
   return (
-    <InteractiveCard
+    <div
       onClick={onDeviceClick ? () => onDeviceClick(device) : undefined}
       className={cn(
-        "bg-ods-card relative rounded-sm size-full border border-ods-border",
+        "bg-ods-card rounded-[6px] border border-ods-border overflow-clip",
+        "flex flex-col gap-4 p-4",
+        onDeviceClick && "cursor-pointer",
         className
       )}
       {...props}
     >
-      {/* Details button - absolutely positioned, vertically centered */}
-      {actions.detailsButton?.visible !== false && actions.detailsButton?.component && (
-        <div className="absolute right-4 top-1/2 -translate-y-1/2 z-10">
-          {actions.detailsButton.component}
+      {/* Row 1: Device icon | OS icon + Name + Organization | More button | Details button | Custom actions */}
+      <div className="flex gap-4 items-center w-full">
+        {/* Device type icon */}
+        <div className="flex items-center justify-center p-2 rounded-[6px] border border-ods-border shrink-0">
+          <MonitorIcon className="text-ods-text-secondary" size={16} />
         </div>
-      )}
 
-      <div className="content-stretch flex flex-col items-start justify-start overflow-clip relative size-full rounded-sm">
-        {/* Row 1: Device icon | Device name (clickable with external link) + More button */}
-        <div className="bg-ods-card box-border content-stretch flex gap-4 items-center justify-start px-4 py-3 relative shrink-0 w-full">
-          {/* Device type icon */}
-          <div className="flex items-center justify-center shrink-0">
-            <div className="bg-ods-card box-border flex items-center justify-center p-2 rounded-[6px] border border-ods-border h-8 w-8">
-              <Monitor className="size-4 text-ods-text-secondary" />
-            </div>
-          </div>
-
-          {/* Device name - clickable with external link icon */}
-          <div className="flex-1 min-w-0 flex items-center gap-2">
-            <h3 className="font-['DM_Sans'] font-medium text-[18px] leading-[24px] text-ods-text-primary truncate transition-colors">
+        {/* OS icon + Device name + Organization (stacked) */}
+        <div className="flex-1 min-w-0 flex flex-col justify-center">
+          <div className="flex gap-1 items-center">
+            {device.operatingSystem && (
+              <OSTypeIcon
+                osType={device.operatingSystem === 'macos' ? 'darwin' : device.operatingSystem}
+                size="w-4 h-4"
+                className="shrink-0"
+              />
+            )}
+            <span className="font-['DM_Sans'] font-medium text-[18px] leading-[24px] text-ods-text-primary truncate">
               {device.name}
-            </h3>
-            {onDeviceClick && (
-              <ExternalLink className="size-4 text-ods-text-secondary group-hover:text-ods-accent transition-colors shrink-0" />
-            )}
+            </span>
           </div>
-
-          {/* More button */}
-          {actions.moreButton?.visible !== false && (
-            <div
-              className="bg-ods-card box-border flex items-center justify-center p-3 rounded-[6px] shrink-0 border border-ods-border cursor-pointer hover:bg-ods-bg-hover transition-colors"
-              onClick={actions.moreButton?.onClick}
-            >
-              <MoreHorizontal className="size-6 text-ods-text-primary" />
-            </div>
-          )}
-        </div>
-
-        {/* Row 2: OS type | Organization name */}
-        <div className="bg-ods-card box-border flex gap-4 items-center px-4 py-2 shrink-0 w-full">
-          {/* OS type badge */}
-          {device.operatingSystem && (
-            <OSTypeBadge
-              osType={device.operatingSystem === 'macos' ? 'darwin' : device.operatingSystem}
-            />
-          )}
-
-          {/* Organization name */}
           {device.organization && (
-            <div className="flex-1 min-w-0 font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary truncate">
+            <span className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary truncate">
               {device.organization}
-            </div>
+            </span>
           )}
         </div>
 
-        {/* Row 3: Custom action buttons (if any) */}
-        {actions.customActions && actions.customActions.some(action => action.visible !== false) && (
-          <div className="bg-ods-card box-border content-stretch flex gap-2 items-center justify-start px-4 py-2 relative shrink-0 w-full">
-            {actions.customActions?.map((action, index) =>
-              action.visible !== false && (
-                <div
-                  key={index}
-                  className="bg-ods-card box-border content-stretch flex gap-2 items-center justify-center px-4 py-3 relative rounded-[6px] shrink-0 border border-ods-border cursor-pointer hover:bg-ods-bg-hover transition-colors"
-                  onClick={action.onClick}
-                >
-                  <div className="font-['DM_Sans'] font-bold leading-[0] relative shrink-0 text-[18px] text-ods-text-primary text-nowrap tracking-[-0.36px]">
-                    <p className="leading-[24px] whitespace-pre">{action.label}</p>
-                  </div>
-                </div>
-              )
-            )}
+        {/* More button */}
+        {actions.moreButton?.visible !== false && (
+          <div
+            className="flex items-center justify-center p-3 rounded-[6px] shrink-0 border border-ods-border cursor-pointer hover:bg-ods-bg-hover transition-colors"
+            onClick={(e) => { e.stopPropagation(); actions.moreButton?.onClick?.() }}
+          >
+            <Ellipsis01Icon className="text-ods-text-primary" />
           </div>
         )}
 
-        {/* Row 4: Status badge | Last seen */}
-        <div className="bg-ods-card box-border content-stretch flex gap-4 items-center justify-start px-4 py-2 relative shrink-0 w-full">
-          {statusBadgeComponent}
-          {device.lastSeen && (
-            <div className="flex-1 font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
-              Last Seen: {formatLastSeen(device.lastSeen)}
-            </div>
-          )}
-        </div>
-
-        {/* Tags section */}
-        {device.tags && device.tags.length > 0 && (
-          <div className="bg-ods-card box-border content-stretch flex gap-2 items-center justify-start p-4 pt-3 relative shrink-0 w-full">
-            {device.tags.map((tag, index) => (
-              <div
-                key={index}
-                className="bg-ods-card box-border content-stretch flex gap-2 h-8 items-center justify-center p-2 relative rounded-[6px] shrink-0 border border-ods-border"
-              >
-                <div className="font-['Azeret_Mono'] font-medium leading-[0] relative shrink-0 text-[14px] text-ods-text-primary text-nowrap tracking-[-0.28px] uppercase">
-                  <p className="leading-[20px] whitespace-pre">{tag}</p>
-                </div>
-              </div>
-            ))}
+        {/* Details button */}
+        {actions.detailsButton?.visible !== false && actions.detailsButton?.component && (
+          <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+            {actions.detailsButton.component}
           </div>
+        )}
+
+        {/* Custom action buttons */}
+        {actions.customActions?.map((action, index) =>
+          action.visible !== false && (
+            <div
+              key={index}
+              className="flex items-center justify-center px-4 py-3 rounded-[6px] shrink-0 border border-ods-border cursor-pointer hover:bg-ods-bg-hover transition-colors"
+              onClick={(e) => { e.stopPropagation(); action.onClick?.() }}
+            >
+              <span className="font-['DM_Sans'] font-bold text-[18px] leading-[24px] text-ods-text-primary text-nowrap tracking-[-0.36px]">
+                {action.label}
+              </span>
+            </div>
+          )
         )}
       </div>
-    </InteractiveCard>
+
+      {/* Row 2: Status badge | Last seen */}
+      {(statusTag || device.lastSeen) && 
+        <div className="flex gap-2 items-center w-full">
+          {statusTag && (
+            <Tag
+              variant={statusTag.variant}
+              icon={statusTag.icon}
+              onClose={statusTag.onClose}
+              className={statusTag.className}
+            >
+              {statusTag.label}
+            </Tag>
+          )}
+          {device.lastSeen && (
+            <span className="flex-1 font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary truncate">
+              Last Seen: {formatLastSeen(device.lastSeen)}
+            </span>
+          )}
+        </div>
+      }
+
+      {/* Tags section */}
+      {device.tags && device.tags.length > 0 && (
+        <div className="flex gap-2 items-center w-full flex-wrap">
+          {device.tags.map((tag, index) => (
+            <Tag key={index} variant="outline">{tag}</Tag>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

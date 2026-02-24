@@ -3,7 +3,7 @@
 import { forwardRef, useState } from "react"
 import { cn } from "../../utils/cn"
 import { Button } from "../ui/button"
-import { StatusTag } from "../ui/status-tag"
+import { Tag } from "../ui/tag"
 import { CheckCircle, XCircle } from "lucide-react"
 import type { ApprovalRequestMessageProps } from "./types"
 
@@ -61,11 +61,12 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
           
           {/* Status indicator */}
           <div className="flex">
-            <StatusTag
-              label={status === 'approved' ? 'Approved' : 'Rejected'}
+            <Tag
               variant={status === 'approved' ? 'success' : 'error'}
-              leftIcon={status === 'approved' ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-            />
+              icon={status === 'approved' ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+            >
+              {status === 'approved' ? 'Approved' : 'Rejected'}
+            </Tag>
           </div>
         </div>
       )
