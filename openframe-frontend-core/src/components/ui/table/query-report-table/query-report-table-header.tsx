@@ -13,12 +13,16 @@ import type { QueryReportTableHeaderProps } from './types'
 export function QueryReportTableHeader({
   columns,
   columnWidth,
+  variant = 'default',
   className
 }: QueryReportTableHeaderProps) {
+  const isCompact = variant === 'compact'
+
   return (
     <div
       className={cn(
-        'flex items-center gap-4 px-4 py-3',
+        'flex items-center gap-4 px-4',
+        isCompact ? 'py-2 border-b border-ods-border' : 'py-3',
         className
       )}
     >

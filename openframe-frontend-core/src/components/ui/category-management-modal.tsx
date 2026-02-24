@@ -122,7 +122,6 @@ export function CategoryManagementModal({
       return
     }
 
-    // Max items check
     if (maxItems && items.length >= maxItems) return
 
     await onCreate(trimmed)

@@ -1,6 +1,5 @@
 'use client'
 
-import React from 'react'
 import { cn } from '../../../../utils/cn'
 import type { QueryReportTableSkeletonProps } from './types'
 
@@ -8,12 +7,18 @@ export function QueryReportTableSkeleton({
   rows,
   columns,
   columnWidth,
+  variant = 'default',
   className
 }: QueryReportTableSkeletonProps) {
+  const isCompact = variant === 'compact'
+
   return (
-    <div className={cn('flex flex-col gap-2', className)}>
+    <div className={cn('flex flex-col', isCompact ? 'gap-0' : 'gap-2', className)}>
       {/* Skeleton header */}
-      <div className="flex items-center gap-4 px-4 py-3">
+      <div className={cn(
+        'flex items-center gap-4 px-4',
+        isCompact ? 'py-2 border-b border-ods-border' : 'py-3'
+      )}>
         {Array.from({ length: columns }).map((_, i) => (
           <div
             key={`header-${i}`}
@@ -29,9 +34,17 @@ export function QueryReportTableSkeleton({
       {Array.from({ length: rows }).map((_, rowIndex) => (
         <div
           key={`row-${rowIndex}`}
-          className="relative rounded-[6px] bg-ods-card border border-ods-border overflow-hidden animate-pulse"
+          className={cn(
+            'animate-pulse',
+            isCompact
+              ? 'border-b border-ods-border'
+              : 'relative rounded-[6px] bg-ods-card border border-ods-border overflow-hidden'
+          )}
         >
-          <div className="flex items-center gap-4 px-4 h-[80px]">
+          <div className={cn(
+            'flex items-center gap-4 px-4',
+            isCompact ? 'h-[56px]' : 'h-[80px]'
+          )}>
             {Array.from({ length: columns }).map((_, colIndex) => (
               <div
                 key={`cell-${rowIndex}-${colIndex}`}
@@ -39,7 +52,7 @@ export function QueryReportTableSkeleton({
                 style={{ width: columnWidth }}
               >
                 <div
-                  className="h-5 bg-ods-bg-surface rounded"
+                  className={cn('bg-ods-bg-surface rounded', isCompact ? 'h-4' : 'h-5')}
                   style={{ width: `${55 + (rowIndex * colIndex * 7) % 35}%` }}
                 />
               </div>

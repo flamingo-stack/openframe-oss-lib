@@ -14,16 +14,24 @@ export function QueryReportTableRow({
   row,
   columns,
   columnWidth,
+  variant = 'default',
   className
 }: QueryReportTableRowProps) {
+  const isCompact = variant === 'compact'
+
   return (
     <div
       className={cn(
-        'relative rounded-[6px] bg-ods-card border border-ods-border overflow-hidden',
+        isCompact
+          ? 'border-b border-ods-border'
+          : 'relative rounded-[6px] bg-ods-card border border-ods-border overflow-hidden',
         className
       )}
     >
-      <div className="flex items-center gap-4 px-4 h-[80px]">
+      <div className={cn(
+        'flex items-center gap-4 px-4',
+        isCompact ? 'h-[56px]' : 'h-[80px]'
+      )}>
         {columns.map((column) => {
           const value = row[column]
           const displayValue = value === null || value === undefined ? '-' : String(value)
@@ -34,15 +42,18 @@ export function QueryReportTableRow({
               style={{ width: columnWidth }}
             >
               <TruncatedCell
-                className="font-sans font-medium text-[18px] leading-[24px] text-ods-text-primary"
+                className={cn(
+                  'text-ods-text-primary',
+                  isCompact
+                    ? 'font-sans font-normal text-[14px] leading-[20px]'
+                    : 'font-sans font-medium text-[18px] leading-[24px]'
+                )}
                 value={displayValue}
               />
             </div>
           )
         })}
       </div>
-      {/* Right-edge gradient fade */}
-      <div className="absolute inset-y-0 right-0 w-[40px] bg-gradient-to-l from-ods-bg to-transparent pointer-events-none" />
     </div>
   )
 }

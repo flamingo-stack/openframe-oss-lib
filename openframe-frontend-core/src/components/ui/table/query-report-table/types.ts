@@ -2,6 +2,8 @@ import type { ReactNode } from 'react'
 
 export type QueryResultRow = Record<string, string | number | null>
 
+export type QueryReportTableVariant = 'default' | 'compact'
+
 export interface QueryReportTableProps {
   /** Dynamic title displayed above the table (e.g., query name) */
   title: string
@@ -27,6 +29,8 @@ export interface QueryReportTableProps {
   onExport?: () => void
   /** Additional actions rendered next to the Export button */
   headerActions?: ReactNode
+  /** Visual variant: 'default' (card rows) or 'compact' (flat rows with border separators) */
+  variant?: QueryReportTableVariant
   className?: string
   tableClassName?: string
 }
@@ -34,6 +38,7 @@ export interface QueryReportTableProps {
 export interface QueryReportTableHeaderProps {
   columns: string[]
   columnWidth: number
+  variant?: QueryReportTableVariant
   className?: string
 }
 
@@ -41,6 +46,7 @@ export interface QueryReportTableRowProps {
   row: QueryResultRow
   columns: string[]
   columnWidth: number
+  variant?: QueryReportTableVariant
   className?: string
 }
 
@@ -48,5 +54,6 @@ export interface QueryReportTableSkeletonProps {
   rows: number
   columns: number
   columnWidth: number
+  variant?: QueryReportTableVariant
   className?: string
 }

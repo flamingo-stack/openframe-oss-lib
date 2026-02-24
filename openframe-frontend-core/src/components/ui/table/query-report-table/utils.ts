@@ -36,7 +36,7 @@ function escapeCSVCell(value: string): string {
 }
 
 /**
- * Export data as a CSV file using Blob + object URL download.
+ * Export data as a CSV file.
  */
 export function exportToCSV(
   data: QueryResultRow[],
