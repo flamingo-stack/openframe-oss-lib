@@ -15,3 +15,6 @@ export type {
   FilterSection, PagePagination, RowAction, TableCardSkeletonProps, TableCellProps, TableColumn, TableEmptyStateProps, TableFilters,
   TableHeaderProps, TableProps, TableRowProps, TailwindBreakpoint
 } from './types'
+
+// Query Report Table (dynamic columns)
+export * from './query-report-table'
