@@ -32,10 +32,6 @@
         </dependency>
         <dependency>
             <groupId>com.openframe.oss</groupId>
-            <artifactId>openframe-security-oauth</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-data</artifactId>
         </dependency>
 
