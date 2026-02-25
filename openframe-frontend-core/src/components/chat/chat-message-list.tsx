@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useEffect, useImperativeHandle, forwardRef } from "react"
+import { useRef, useEffect, useCallback, useImperativeHandle, forwardRef } from "react"
 import { cn } from "../../utils/cn"
 import { ChatMessageEnhanced } from "./chat-message-enhanced"
 import { ChatMessageListSkeleton } from "./chat-message-skeleton"
@@ -16,6 +16,28 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     const touchStartYRef = useRef(0)
     const lastDialogIdRef = useRef<string | undefined>(undefined)
     const lastMessageCountRef = useRef(0)
+    const rafIdRef = useRef<number | null>(null)
+
+    const scrollToBottomDeferred = useCallback((el: HTMLDivElement) => {
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current)
+      }
+
+      rafIdRef.current = requestAnimationFrame(() => {
+        rafIdRef.current = requestAnimationFrame(() => {
+          el.scrollTop = el.scrollHeight
+          rafIdRef.current = null
+        })
+      })
+    }, [])
+
+    useEffect(() => {
+      return () => {
+        if (rafIdRef.current !== null) {
+          cancelAnimationFrame(rafIdRef.current)
+        }
+      }
+    }, [])
 
     useEffect(() => {
       if (!autoScroll) return
@@ -31,14 +53,14 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
 
       if (dialogChanged) {
         isStuckRef.current = true
-        el.scrollTop = el.scrollHeight
+        scrollToBottomDeferred(el)
         return
       }
 
-      if (newCount > prevCount) {
+      if (newCount > prevCount || (newCount > 0 && prevCount === 0)) {
         if (prevCount === 0) {
           isStuckRef.current = true
-          el.scrollTop = el.scrollHeight
+          scrollToBottomDeferred(el)
           return
         }
 
@@ -48,7 +70,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
           el.scrollTop = el.scrollHeight
         }
       }
-    }, [autoScroll, messages.length, dialogId])
+    }, [autoScroll, messages.length, dialogId, isLoading, scrollToBottomDeferred])
 
     useEffect(() => {
       const el = scrollRef.current
