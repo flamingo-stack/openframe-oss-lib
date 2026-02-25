@@ -200,8 +200,9 @@ export function useNatsDialogSubscription({
     return () => {
       closed = true
       setIsConnected(false)
+      setIsSubscribed(false)
       unsubscribeStatus()
-      
+
       // Unsubscribe all subscriptions
       subscriptionRefs.current.forEach((sub) => {
         try {
@@ -211,7 +212,8 @@ export function useNatsDialogSubscription({
         }
       })
       subscriptionRefs.current.clear()
-      
+      lastSubscribedDialogIdRef.current = null
+
       if (clientRef.current && currentWsUrlRef.current) {
         releaseClient(currentWsUrlRef.current)
         clientRef.current = null
