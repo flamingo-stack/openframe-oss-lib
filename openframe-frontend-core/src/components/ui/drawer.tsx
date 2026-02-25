@@ -22,7 +22,7 @@ const DrawerOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-[9997] bg-black/30 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      "fixed inset-0 z-[9997] bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className
     )}
     {...props}
@@ -56,10 +56,10 @@ const drawerPanelVariants = cva(
   {
     variants: {
       side: {
-        right: "h-full w-[400px]",
-        left: "h-full w-[400px]",
-        top: "w-full max-h-[80vh]",
-        bottom: "w-full max-h-[80vh]",
+        right: "h-full",
+        left: "h-full",
+        top: "w-full",
+        bottom: "w-full",
       },
     },
     defaultVariants: {
@@ -82,10 +82,10 @@ const DrawerContent = React.forwardRef<
     <DrawerOverlay />
     <DialogPrimitive.Content
       ref={ref}
-      className={cn(drawerVariants({ side }), className)}
+      className={cn(drawerVariants({ side }))}
       {...props}
     >
-      <div className={cn(drawerPanelVariants({ side }))}>
+      <div className={cn(drawerPanelVariants({ side }), className)}>
         {children}
       </div>
     </DialogPrimitive.Content>

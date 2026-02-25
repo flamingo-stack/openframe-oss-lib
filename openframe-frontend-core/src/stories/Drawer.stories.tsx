@@ -10,7 +10,7 @@ import {
   DrawerHeader,
   DrawerTitle,
   type DrawerSide,
-} from '../components/ui/side-drawer'
+} from '../components/ui/drawer'
 
 const meta: Meta<typeof Drawer> = {
   title: 'UI/Drawer',

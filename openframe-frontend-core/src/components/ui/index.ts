@@ -33,7 +33,7 @@ export * from './image-gallery-modal'
 export * from './modal'
 export * from './separator'
 export * from './sheet'
-export * from './side-drawer'
+export * from './drawer'
 export * from './tabs'
 // Navigation components
 export * from './accordion'
