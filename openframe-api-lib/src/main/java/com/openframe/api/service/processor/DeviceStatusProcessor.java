@@ -1,6 +1,5 @@
 package com.openframe.api.service.processor;
 
-import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 
 /**
@@ -14,5 +13,5 @@ public interface DeviceStatusProcessor {
      *
      * @param machine The machine with updated status
      */
-    void postProcessStatusUpdated(Machine machine, DeviceStatus previousStatus);
+    void postProcessStatusUpdated(Machine machine);
 }

@@ -164,8 +164,7 @@ public class DeviceService {
         log.info("Updating device status. machineId={}, newStatus={}", machineId, status);
         Machine machine = machineRepository.findByMachineId(machineId)
                 .orElseThrow(() -> new DeviceNotFoundException("Device not found: " + machineId));
-        DeviceStatus previousStatus = machine.getStatus();
-        if (previousStatus == status) {
+        if (machine.getStatus() == status) {
             log.info("Device {} already has status {}", machineId, status);
             return;
         }
@@ -174,7 +173,7 @@ public class DeviceService {
         machineRepository.save(machine);
         log.info("Device {} status updated to {}", machineId, status);
         try {
-            deviceStatusProcessor.postProcessStatusUpdated(machine, previousStatus);
+            deviceStatusProcessor.postProcessStatusUpdated(machine);
         } catch (Exception e) {
             log.error("Post-processor failed for machineId={}: {}", machineId, e.getMessage(), e);
         }
