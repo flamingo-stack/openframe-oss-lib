@@ -2,7 +2,7 @@
 
 import React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
-import { XmarkIcon } from "../icons-v2-generated/signs-and-symbols/xmark-icon"
+import { XmarkCircleIcon } from "../icons-v2-generated/signs-and-symbols/xmark-circle-icon"
 import { cn } from "../../utils/cn"
 
 const tagVariants = cva(
@@ -52,18 +52,21 @@ const tagVariants = cva(
 )
 
 export interface TagProps
-  extends React.HTMLAttributes<HTMLDivElement>,
+  extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children'>,
     VariantProps<typeof tagVariants> {
+  label: React.ReactNode
+  labelClassName?: string
   icon?: React.ReactNode
   onClose?: () => void
 }
 
 function Tag({
-  children,
+  label,
   variant,
   icon,
   onClose,
   className,
+  labelClassName,
   ...props
 }: TagProps) {
   return (
@@ -76,7 +79,7 @@ function Tag({
           {icon}
         </span>
       )}
-      <span className="shrink-0">{children}</span>
+      <span className={cn("shrink-0", labelClassName)}>{label}</span>
       {onClose && (
         <button
           type="button"
@@ -87,7 +90,7 @@ function Tag({
           className="flex items-center justify-center size-5 shrink-0 rounded-full opacity-70 hover:opacity-100 transition-opacity"
           aria-label="Remove"
         >
-          <XmarkIcon className="size-4" />
+          <XmarkCircleIcon className="size-4" />
         </button>
       )}
     </div>

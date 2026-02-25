@@ -62,11 +62,10 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
           {/* Status indicator */}
           <div className="flex">
             <Tag
+              label={status === 'approved' ? 'Approved' : 'Rejected'}
               variant={status === 'approved' ? 'success' : 'error'}
               icon={status === 'approved' ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-            >
-              {status === 'approved' ? 'Approved' : 'Rejected'}
-            </Tag>
+            />
           </div>
         </div>
       )

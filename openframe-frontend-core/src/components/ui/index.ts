@@ -10,7 +10,7 @@ export * from './checkbox-block'
 export * from './checkbox-with-description'
 export * from './content-loader'
 export * from './date-picker'
-export * from './error-state'
+export * from './field-wrapper'
 export * from './info-card'
 export * from './info-row'
 export * from './input'
@@ -85,6 +85,7 @@ export * from './tag'
 export * from './title-content-block'
 export * from './toggle'
 export * from './tooltip'
+export * from './error-state'
 
 // Table components
 export {

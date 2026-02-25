@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
+import { FieldWrapper } from '../components/ui/field-wrapper'
 import {
   Select,
   SelectContent,
@@ -155,6 +156,84 @@ export const ManyItems: Story = {
 }
 
 /**
+ * Select with invalid state.
+ */
+export const Invalid: Story = {
+  render: () => (
+    <Select>
+      <SelectTrigger invalid>
+        <SelectValue placeholder="Select a role..." />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="viewer">Viewer</SelectItem>
+        <SelectItem value="editor">Editor</SelectItem>
+        <SelectItem value="admin">Admin</SelectItem>
+      </SelectContent>
+    </Select>
+  ),
+}
+
+/**
+ * Select with label using FieldWrapper.
+ */
+export const WithLabel: Story = {
+  render: () => (
+    <FieldWrapper label="Role">
+      <Select>
+        <SelectTrigger>
+          <SelectValue placeholder="Select a role..." />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="viewer">Viewer</SelectItem>
+          <SelectItem value="editor">Editor</SelectItem>
+          <SelectItem value="admin">Admin</SelectItem>
+        </SelectContent>
+      </Select>
+    </FieldWrapper>
+  ),
+}
+
+/**
+ * Select with label and error message.
+ */
+export const WithLabelAndError: Story = {
+  render: () => (
+    <FieldWrapper label="Role" error="Please select a role">
+      <Select>
+        <SelectTrigger invalid>
+          <SelectValue placeholder="Select a role..." />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="viewer">Viewer</SelectItem>
+          <SelectItem value="editor">Editor</SelectItem>
+          <SelectItem value="admin">Admin</SelectItem>
+        </SelectContent>
+      </Select>
+    </FieldWrapper>
+  ),
+}
+
+/**
+ * Select with label and selected value.
+ */
+export const WithLabelAndValue: Story = {
+  render: () => (
+    <FieldWrapper label="Role">
+      <Select defaultValue="editor">
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="viewer">Viewer</SelectItem>
+          <SelectItem value="editor">Editor</SelectItem>
+          <SelectItem value="admin">Admin</SelectItem>
+        </SelectContent>
+      </Select>
+    </FieldWrapper>
+  ),
+}
+
+/**
  * All select variants displayed together for comparison.
  */
 export const AllVariants: Story = {
@@ -188,6 +267,39 @@ export const AllVariants: Story = {
           <SelectItem value="a">Option A</SelectItem>
         </SelectContent>
       </Select>
+
+      <Select>
+        <SelectTrigger invalid>
+          <SelectValue placeholder="Invalid" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="a">Option A</SelectItem>
+        </SelectContent>
+      </Select>
+
+      <FieldWrapper label="With Label">
+        <Select>
+          <SelectTrigger>
+            <SelectValue placeholder="Select..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="a">Option A</SelectItem>
+            <SelectItem value="b">Option B</SelectItem>
+          </SelectContent>
+        </Select>
+      </FieldWrapper>
+
+      <FieldWrapper label="With Error" error="This field is required">
+        <Select>
+          <SelectTrigger invalid>
+            <SelectValue placeholder="Select..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="a">Option A</SelectItem>
+            <SelectItem value="b">Option B</SelectItem>
+          </SelectContent>
+        </Select>
+      </FieldWrapper>
     </div>
   ),
 }

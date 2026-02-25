@@ -46,7 +46,7 @@ export interface DeviceCardProps extends React.HTMLAttributes<HTMLDivElement> {
     }
     customActions?: ActionButton[]
   }
-  statusTag?: TagProps & { label: string }
+  statusTag?: TagProps
   onDeviceClick?: (device: Device) => void
 }
 
@@ -156,9 +156,8 @@ export function DeviceCard({
               icon={statusTag.icon}
               onClose={statusTag.onClose}
               className={statusTag.className}
-            >
-              {statusTag.label}
-            </Tag>
+              label={statusTag.label}
+            />
           )}
           {device.lastSeen && (
             <span className="flex-1 font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary truncate">
@@ -172,7 +171,7 @@ export function DeviceCard({
       {device.tags && device.tags.length > 0 && (
         <div className="flex gap-2 items-center w-full flex-wrap">
           {device.tags.map((tag, index) => (
-            <Tag key={index} variant="outline">{tag}</Tag>
+            <Tag key={index} variant="outline" label={tag} />
           ))}
         </div>
       )}

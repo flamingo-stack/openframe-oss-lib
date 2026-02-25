@@ -9,7 +9,7 @@ import { Tag, TagProps } from "./tag"
 export interface LogTableRowProps extends React.HTMLAttributes<HTMLDivElement> {
   logId: string
   timestamp: string
-  status: TagProps & { label: string }
+  status: TagProps
   source: {
     name: string
     icon?: React.ReactNode
@@ -75,9 +75,7 @@ export function LogTableRow({
 
         {/* Status Cell - Fixed width */}
         <div className="w-32 shrink-0">
-          <Tag variant={status.variant}>
-            {status.label}
-          </Tag>
+          <Tag variant={status.variant} label={status.label} />
         </div>
 
         {/* Source Cell - Fixed width */}
@@ -165,9 +163,7 @@ export function LogTableRow({
 
         {/* Status tag - Fixed width */}
         <div className="flex gap-2 items-center justify-start shrink-0">
-          <Tag variant={status.variant}>
-            {status.label}
-          </Tag>
+          <Tag variant={status.variant} label={status.label} />
         </div>
 
         {/* Device and description info - Takes remaining space */}
