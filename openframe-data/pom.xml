@@ -33,6 +33,11 @@
         </dependency>
 
         <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-aop</artifactId>
         </dependency>
@@ -45,25 +50,6 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-mongodb-reactive</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-cassandra</artifactId>
-        </dependency>
-
-        <!-- Pinot -->
-        <dependency>
-            <groupId>org.apache.pinot</groupId>
-            <artifactId>pinot-java-client</artifactId>
-            <version>${pinot.version}</version>
-        </dependency>
-
-        <!-- Nats -->
-        <dependency>
-            <groupId>io.nats</groupId>
-            <artifactId>nats-spring-cloud-stream-binder</artifactId>
-            <version>${nats.version}</version>
         </dependency>
 
         <!-- Test dependencies -->

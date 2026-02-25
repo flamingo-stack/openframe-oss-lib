@@ -32,6 +32,14 @@
         </dependency>
         <dependency>
             <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-data-cassandra</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-data-nats</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-data-kafka</artifactId>
         </dependency>
         <dependency>
