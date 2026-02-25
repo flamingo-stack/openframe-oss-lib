@@ -11,6 +11,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -74,9 +75,16 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(UserNotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
-    public ErrorResponse handleUserNotFound(UserActiveInAnotherTenantException ex) {
+    public ErrorResponse handleUserNotFound(UserNotFoundException ex) {
         log.warn("Not found: {}", ex.getMessage());
         return new ErrorResponse("USER_NOT_FOUND", ex.getMessage());
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ErrorResponse handleNoResourceFound(NoResourceFoundException ex) {
+        log.debug("Resource not found: {}", ex.getMessage());
+        return new ErrorResponse("NOT_FOUND", ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)

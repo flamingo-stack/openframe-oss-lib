@@ -1,14 +1,14 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
-import { Autocomplete, AutocompleteOption, AutocompleteProps } from '../components/ui/autocomplete';
+import { Autocomplete, AutocompleteOption } from '../components/ui/autocomplete';
 
-const meta: Meta<AutocompleteProps<string>> = {
+const meta: Meta = {
   title: 'UI/Autocomplete',
   component: Autocomplete,
 };
 
 export default meta;
-type Story = StoryObj<AutocompleteProps<string>>;
+type Story = StoryObj;
 
 const sampleOptions: AutocompleteOption<string>[] = [
   { label: 'Enterprise', value: 'enterprise' },
@@ -23,224 +23,244 @@ const sampleOptions: AutocompleteOption<string>[] = [
   { label: 'Technology', value: 'technology' },
 ];
 
+// ─── Single Select Stories ───
+
 /**
- * Default Autocomplete with no initial selection.
+ * Single select (default mode) — no selection.
  */
-export const Default: Story = {
-  args: {
-    options: sampleOptions,
-    value: [],
-    onChange: () => {},
-    placeholder: 'Search...',
-  },
-  render: function Render(args) {
-    const [value, setValue] = useState<string[]>(args.value);
-    return <Autocomplete {...args} value={value} onChange={setValue} />;
+export const Single: Story = {
+  render: function Render() {
+    const [value, setValue] = useState<string | null>(null);
+    return (
+      <Autocomplete
+        options={sampleOptions}
+        value={value}
+        onChange={setValue}
+        label="Industry"
+        placeholder="Select an industry..."
+      />
+    );
   },
 };
 
 /**
- * Autocomplete with a label.
+ * Single select with a pre-selected value.
  */
-export const WithLabel: Story = {
-  args: {
-    options: sampleOptions,
-    value: [],
-    onChange: () => {},
-    label: 'Industry',
-    placeholder: 'Select industries...',
-  },
-  render: function Render(args) {
-    const [value, setValue] = useState<string[]>(args.value);
-    return <Autocomplete {...args} value={value} onChange={setValue} />;
+export const SingleWithValue: Story = {
+  render: function Render() {
+    const [value, setValue] = useState<string | null>('enterprise');
+    return (
+      <Autocomplete
+        options={sampleOptions}
+        value={value}
+        onChange={setValue}
+        label="Industry"
+        placeholder="Select an industry..."
+      />
+    );
   },
 };
 
 /**
- * Autocomplete with pre-selected values (matching the Figma design).
+ * Single select disabled.
  */
-export const WithSelectedValues: Story = {
-  args: {
-    options: sampleOptions,
-    value: ['enterprise', 'startup', 'smb'],
-    onChange: () => {},
-    placeholder: 'Add More...',
-  },
-  render: function Render(args) {
-    const [value, setValue] = useState<string[]>(args.value);
-    return <Autocomplete {...args} value={value} onChange={setValue} />;
+export const SingleDisabled: Story = {
+  render: function Render() {
+    const [value, setValue] = useState<string | null>('startup');
+    return (
+      <Autocomplete
+        options={sampleOptions}
+        value={value}
+        onChange={setValue}
+        label="Disabled"
+        disabled
+      />
+    );
   },
 };
 
 /**
- * Autocomplete without search icon.
+ * Single select with error.
  */
-export const WithoutSearchIcon: Story = {
-  args: {
-    options: sampleOptions,
-    value: ['enterprise'],
-    onChange: () => {},
-    showSearchIcon: false,
-    placeholder: 'Add More...',
+export const SingleWithError: Story = {
+  render: function Render() {
+    const [value, setValue] = useState<string | null>(null);
+    return (
+      <Autocomplete
+        options={sampleOptions}
+        value={value}
+        onChange={setValue}
+        label="Industry"
+        error="Please select an industry"
+        placeholder="Select..."
+      />
+    );
   },
-  render: function Render(args) {
-    const [value, setValue] = useState<string[]>(args.value);
-    return <Autocomplete {...args} value={value} onChange={setValue} />;
+};
+
+// ─── Multiple Select Stories ───
+
+/**
+ * Multiple select with no initial selection.
+ */
+export const Multiple: Story = {
+  render: function Render() {
+    const [value, setValue] = useState<string[]>([]);
+    return (
+      <Autocomplete
+        multiple
+        options={sampleOptions}
+        value={value}
+        onChange={setValue}
+        label="Industries"
+        placeholder="Search..."
+      />
+    );
   },
 };
 
 /**
- * Autocomplete with max selection limit.
+ * Multiple select with pre-selected values.
  */
-export const WithMaxItems: Story = {
-  args: {
-    options: sampleOptions,
-    value: ['enterprise', 'startup'],
-    onChange: () => {},
-    label: 'Select up to 3 industries',
-    maxItems: 3,
-    placeholder: 'Add More...',
-  },
-  render: function Render(args) {
-    const [value, setValue] = useState<string[]>(args.value);
-    return <Autocomplete {...args} value={value} onChange={setValue} />;
+export const MultipleWithValues: Story = {
+  render: function Render() {
+    const [value, setValue] = useState<string[]>(['enterprise', 'startup', 'smb']);
+    return (
+      <Autocomplete
+        multiple
+        options={sampleOptions}
+        value={value}
+        onChange={setValue}
+        placeholder="Add More..."
+      />
+    );
   },
 };
 
 /**
- * Autocomplete at max capacity.
+ * Multiple select with max selection limit.
  */
-export const MaxItemsReached: Story = {
-  args: {
-    options: sampleOptions,
-    value: ['enterprise', 'startup', 'smb'],
-    onChange: () => {},
-    label: 'Max Reached (3)',
-    maxItems: 3,
-    placeholder: 'Add More...',
-  },
-  render: function Render(args) {
-    const [value, setValue] = useState<string[]>(args.value);
-    return <Autocomplete {...args} value={value} onChange={setValue} />;
+export const MultipleWithMaxItems: Story = {
+  render: function Render() {
+    const [value, setValue] = useState<string[]>(['enterprise', 'startup']);
+    return (
+      <Autocomplete
+        multiple
+        options={sampleOptions}
+        value={value}
+        onChange={setValue}
+        label="Select up to 3 industries"
+        maxItems={3}
+      />
+    );
   },
 };
 
 /**
- * Disabled Autocomplete.
+ * Multiple select disabled.
  */
-export const Disabled: Story = {
-  args: {
-    options: sampleOptions,
-    value: ['enterprise', 'startup'],
-    onChange: () => {},
-    label: 'Disabled',
-    disabled: true,
-    placeholder: 'Add More...',
-  },
-  render: function Render(args) {
-    const [value, setValue] = useState<string[]>(args.value);
-    return <Autocomplete {...args} value={value} onChange={setValue} />;
+export const MultipleDisabled: Story = {
+  render: function Render() {
+    const [value, setValue] = useState<string[]>(['enterprise', 'startup']);
+    return (
+      <Autocomplete
+        multiple
+        options={sampleOptions}
+        value={value}
+        onChange={setValue}
+        label="Disabled"
+        disabled
+      />
+    );
   },
 };
 
 /**
- * Autocomplete with validation error.
+ * Multiple select with validation error.
  */
-export const Invalid: Story = {
-  args: {
-    options: sampleOptions,
-    value: [],
-    onChange: () => {},
-    label: 'Required field',
-    invalid: true,
-    placeholder: 'Select at least one...',
-  },
-  render: function Render(args) {
-    const [value, setValue] = useState<string[]>(args.value);
-    return <Autocomplete {...args} value={value} onChange={setValue} />;
+export const MultipleWithError: Story = {
+  render: function Render() {
+    const [value, setValue] = useState<string[]>([]);
+    return (
+      <Autocomplete
+        multiple
+        options={sampleOptions}
+        value={value}
+        onChange={setValue}
+        label="Industry"
+        error="Please select at least one industry"
+        placeholder="Select industries..."
+      />
+    );
   },
 };
 
 /**
- * Autocomplete with freeSolo mode (allows creating new options).
+ * Multiple select with freeSolo mode.
  */
-export const FreeSolo: Story = {
-  args: {
-    options: sampleOptions,
-    value: [],
-    onChange: () => {},
-    label: 'Tags (type to create new)',
-    freeSolo: true,
-    placeholder: 'Type and press Enter...',
-  },
-  render: function Render(args) {
-    const [value, setValue] = useState<string[]>(args.value);
-    return <Autocomplete {...args} value={value} onChange={setValue} />;
+export const MultipleFreeSolo: Story = {
+  render: function Render() {
+    const [value, setValue] = useState<string[]>([]);
+    return (
+      <Autocomplete
+        multiple
+        options={sampleOptions}
+        value={value}
+        onChange={setValue}
+        label="Tags (type to create new)"
+        freeSolo
+        placeholder="Type and press Enter..."
+      />
+    );
   },
 };
 
 /**
- * Autocomplete with custom option rendering.
+ * Multiple select with limitTags.
  */
-export const CustomOptionRender: Story = {
-  args: {
-    options: sampleOptions,
-    value: [],
-    onChange: () => {},
-    label: 'With Custom Options',
-    placeholder: 'Search...',
-    renderOption: (option, isSelected) => (
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <span style={{
-          width: '8px',
-          height: '8px',
-          borderRadius: '50%',
-          backgroundColor: isSelected ? '#22c55e' : '#888'
-        }} />
-        <span>{option.label}</span>
-      </div>
-    ),
-  },
-  render: function Render(args) {
-    const [value, setValue] = useState<string[]>(args.value);
-    return <Autocomplete {...args} value={value} onChange={setValue} />;
+export const MultipleLimitTags: Story = {
+  render: function Render() {
+    const [value, setValue] = useState<string[]>(['enterprise', 'startup', 'smb', 'government', 'education']);
+    return (
+      <Autocomplete
+        multiple
+        options={sampleOptions}
+        value={value}
+        onChange={setValue}
+        label="Limit Tags (2)"
+        limitTags={2}
+      />
+    );
   },
 };
 
 /**
- * Autocomplete with limitTags - shows only first N tags and "+X" indicator.
+ * Multiple select with custom option rendering.
  */
-export const LimitTags: Story = {
-  args: {
-    options: sampleOptions,
-    value: ['enterprise', 'startup', 'smb', 'government', 'education'],
-    onChange: () => {},
-    label: 'Limit Tags (2)',
-    limitTags: 2,
-    placeholder: 'Add More...',
-  },
-  render: function Render(args) {
-    const [value, setValue] = useState<string[]>(args.value);
-    return <Autocomplete {...args} value={value} onChange={setValue} />;
-  },
-};
-
-/**
- * Autocomplete with limitTags and custom text.
- */
-export const LimitTagsCustomText: Story = {
-  args: {
-    options: sampleOptions,
-    value: ['enterprise', 'startup', 'smb', 'government', 'education', 'nonprofit'],
-    onChange: () => {},
-    label: 'Limit Tags with Custom Text',
-    limitTags: 2,
-    getLimitTagsText: (more) => `ещё ${more}`,
-    placeholder: 'Add More...',
-  },
-  render: function Render(args) {
-    const [value, setValue] = useState<string[]>(args.value);
-    return <Autocomplete {...args} value={value} onChange={setValue} />;
+export const MultipleCustomOptionRender: Story = {
+  render: function Render() {
+    const [value, setValue] = useState<string[]>([]);
+    return (
+      <Autocomplete
+        multiple
+        options={sampleOptions}
+        value={value}
+        onChange={setValue}
+        label="With Custom Options"
+        placeholder="Search..."
+        renderOption={(option, isSelected) => (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: isSelected ? '#22c55e' : '#888'
+            }} />
+            <span>{option.label}</span>
+          </div>
+        )}
+      />
+    );
   },
 };
 
@@ -248,67 +268,78 @@ export const LimitTagsCustomText: Story = {
  * Loading state.
  */
 export const Loading: Story = {
-  args: {
-    options: [],
-    value: [],
-    onChange: () => {},
-    label: 'Loading...',
-    loading: true,
-    loadingText: 'Fetching options...',
-    placeholder: 'Search...',
-  },
-  render: function Render(args) {
-    const [value, setValue] = useState<string[]>(args.value);
-    return <Autocomplete {...args} value={value} onChange={setValue} />;
+  render: function Render() {
+    const [value, setValue] = useState<string[]>([]);
+    return (
+      <Autocomplete
+        multiple
+        options={[]}
+        value={value}
+        onChange={setValue}
+        label="Loading..."
+        loading
+        loadingText="Fetching options..."
+        placeholder="Search..."
+      />
+    );
   },
 };
 
 /**
- * All Autocomplete variants displayed together for comparison.
+ * All variants displayed together for comparison.
  */
 export const AllVariants: Story = {
-  args: {
-    options: sampleOptions,
-    value: [],
-    onChange: () => {},
-  },
   render: function Render() {
-    const [value1, setValue1] = useState<string[]>([]);
-    const [value2, setValue2] = useState<string[]>(['enterprise', 'startup', 'smb']);
-    const [value3, setValue3] = useState<string[]>(['enterprise', 'startup']);
-    const [value4, setValue4] = useState<string[]>(['enterprise']);
+    const [singleValue, setSingleValue] = useState<string | null>(null);
+    const [singleWithValue, setSingleWithValue] = useState<string | null>('enterprise');
+    const [multiValue1, setMultiValue1] = useState<string[]>([]);
+    const [multiValue2, setMultiValue2] = useState<string[]>(['enterprise', 'startup', 'smb']);
+    const [multiValue3, setMultiValue3] = useState<string[]>(['enterprise', 'startup']);
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', width: '500px' }}>
         <Autocomplete
           options={sampleOptions}
-          value={value1}
-          onChange={setValue1}
-          label="Default"
+          value={singleValue}
+          onChange={setSingleValue}
+          label="Single Select"
+          placeholder="Select an industry..."
+        />
+        <Autocomplete
+          options={sampleOptions}
+          value={singleWithValue}
+          onChange={setSingleWithValue}
+          label="Single Select (with value)"
+        />
+        <Autocomplete
+          multiple
+          options={sampleOptions}
+          value={multiValue1}
+          onChange={setMultiValue1}
+          label="Multiple Select"
           placeholder="Search..."
         />
         <Autocomplete
+          multiple
           options={sampleOptions}
-          value={value2}
-          onChange={setValue2}
-          label="With Selected Values"
-          placeholder="Add More..."
+          value={multiValue2}
+          onChange={setMultiValue2}
+          label="Multiple with Values"
         />
         <Autocomplete
+          multiple
           options={sampleOptions}
-          value={value3}
-          onChange={setValue3}
-          label="With Max Items (3)"
+          value={multiValue3}
+          onChange={setMultiValue3}
+          label="Multiple with Max Items (3)"
           maxItems={3}
-          placeholder="Add More..."
         />
         <Autocomplete
           options={sampleOptions}
-          value={value4}
-          onChange={setValue4}
-          label="Disabled"
+          value={'enterprise' as string | null}
+          onChange={() => {}}
+          label="Single Disabled"
           disabled
-          placeholder="Add More..."
         />
       </div>
     );

@@ -36,6 +36,8 @@ export interface UseNatsDialogSubscriptionOptions {
   onConnect?: () => void
   onDisconnect?: () => void
   onSubscribed?: () => void
+  /** Called on disconnect, before nats.ws attempts reconnection. Use to refresh auth (cookies/tokens). */
+  onBeforeReconnect?: () => Promise<void> | void
   /**
    * Function to get the NATS WebSocket URL
    */
@@ -59,11 +61,15 @@ export interface UseChunkCatchupReturn {
   startInitialBuffering: () => void
   isBufferingActive: () => boolean
   processedCount: number
+  /** Reset internal guards and re-run catch-up from the last known sequence ID. Use after reconnection to fetch missed messages. */
+  resetAndCatchUp: () => Promise<void>
 }
 
 export interface UseNatsDialogSubscriptionReturn {
   isConnected: boolean
   isSubscribed: boolean
+  /** Incremented each time the NATS client reconnects after a disconnect. Starts at 0. */
+  reconnectionCount: number
 }
 
 export interface RealtimeChunkCallbacks {

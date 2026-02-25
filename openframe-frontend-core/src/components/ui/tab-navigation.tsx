@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { cn } from '../../utils/cn'
 
@@ -9,7 +9,7 @@ export interface TabItem {
   label: string
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>
   component?: React.ComponentType<any>
-  indicator?: 'good' | 'warning' | 'error'
+  indicator?: 'success' | 'warning' | 'error'
 }
 
 export interface TabNavigationUrlSyncOptions {
@@ -24,6 +24,7 @@ interface TabNavigationProps {
 
   tabs: TabItem[]
   className?: string
+  shadowClassName?: string // Tailwind class for shadow gradient color, e.g. "from-black" or "from-red-500"
 
   // URL sync mode
   urlSync?: boolean | TabNavigationUrlSyncOptions
@@ -38,6 +39,7 @@ export function TabNavigation({
   onTabChange: controlledOnTabChange,
   tabs,
   className,
+  shadowClassName,
   urlSync = false,
   defaultTab,
   children
@@ -106,10 +108,37 @@ export function TabNavigation({
     }
   }
 
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+
+  const updateScrollShadows = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    setCanScrollLeft(el.scrollLeft > 0)
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1)
+  }, [])
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+
+    updateScrollShadows()
+
+    el.addEventListener('scroll', updateScrollShadows, { passive: true })
+    const ro = new ResizeObserver(updateScrollShadows)
+    ro.observe(el)
+
+    return () => {
+      el.removeEventListener('scroll', updateScrollShadows)
+      ro.disconnect()
+    }
+  }, [updateScrollShadows])
+
   return (
     <>
       <div className={cn("relative w-full h-14 border-b border-ods-border", className)}>
-        <div className="flex gap-1 items-center justify-start h-full overflow-x-auto overflow-y-hidden">
+        <div ref={scrollRef} className="flex gap-1 items-center justify-start h-full overflow-x-auto overflow-y-hidden">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id
 
@@ -122,21 +151,20 @@ export function TabNavigation({
                   "flex gap-1 items-center justify-center p-4 relative shrink-0 h-14 cursor-pointer",
                   "transition-all duration-200 bg-transparent border-none outline-none",
                   isActive
-                    ? 'bg-gradient-to-b from-[rgba(255,192,8,0)] to-[rgba(255,192,8,0.1)]'
+                    ? 'bg-gradient-to-b from-[rgba(255,255,255,0)] to-[rgba(255,255,255,0.1)]'
                     : 'hover:bg-gradient-to-b hover:from-[rgba(255,255,255,0)] hover:to-[rgba(255,255,255,0.1)]'
                 )}
               >
                 <div className="relative flex items-center justify-center">
                   <tab.icon
-                    className="h-6 w-6 transition-colors"
-                    color={isActive ? '#ffc008' : '#888888'}
+                    className={cn("h-6 w-6 transition-colors", isActive ? 'text-ods-accent' : 'text-ods-text-secondary')}
                   />
                   {tab.indicator && (
                     <div className={cn(
                       "absolute right-0 top-[-3px] w-3 h-3 rounded-full border-2 border-ods-bg",
                       tab.indicator === 'error' && 'bg-ods-error',
                       tab.indicator === 'warning' && 'bg-ods-accent',
-                      tab.indicator === 'good' && 'bg-green-500'
+                      tab.indicator === 'success' && 'bg-green-500'
                     )} />
                   )}
                 </div>
@@ -157,9 +185,13 @@ export function TabNavigation({
 
         </div>
 
-        {/* Fade shadows */}
-        <div className="absolute left-0 top-0 w-10 h-14 pointer-events-none bg-gradient-to-r from-ods-bg to-transparent" />
-        <div className="absolute right-0 top-0 w-10 h-14 pointer-events-none bg-gradient-to-r from-transparent to-ods-bg" />
+        {/* Fade shadows — only visible when content overflows in that direction */}
+        {canScrollLeft && (
+          <div className={cn("absolute left-0 top-0 w-10 h-14 pointer-events-none bg-gradient-to-r to-transparent", shadowClassName || "from-ods-bg")} />
+        )}
+        {canScrollRight && (
+          <div className={cn("absolute right-0 top-0 w-10 h-14 pointer-events-none bg-gradient-to-l to-transparent", shadowClassName || "from-ods-bg")} />
+        )}
       </div>
 
       {/* Render children with active tab if provided */}
