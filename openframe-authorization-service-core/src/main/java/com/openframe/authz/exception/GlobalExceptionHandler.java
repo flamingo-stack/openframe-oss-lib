@@ -75,7 +75,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(UserNotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
-    public ErrorResponse handleUserNotFound(UserActiveInAnotherTenantException ex) {
+    public ErrorResponse handleUserNotFound(UserNotFoundException ex) {
         log.warn("Not found: {}", ex.getMessage());
         return new ErrorResponse("USER_NOT_FOUND", ex.getMessage());
     }
