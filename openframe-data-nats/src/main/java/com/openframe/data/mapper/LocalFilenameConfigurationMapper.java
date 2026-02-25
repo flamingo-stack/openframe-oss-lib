@@ -1,5 +1,6 @@
 package com.openframe.data.mapper;
 
+import com.openframe.data.model.ToolInstallationMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -10,7 +11,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class LocalFilenameConfigurationMapper {
 
-    public List<com.openframe.data.model.nats.ToolInstallationMessage.LocalFilenameConfiguration> map(
+    public List<ToolInstallationMessage.LocalFilenameConfiguration> map(
             List<com.openframe.data.document.toolagent.LocalFilenameConfiguration> localFilenameConfigurations
     ) {
         if (localFilenameConfigurations == null) {
@@ -21,11 +22,11 @@ public class LocalFilenameConfigurationMapper {
                 .collect(Collectors.toList());
     }
 
-    private com.openframe.data.model.nats.ToolInstallationMessage.LocalFilenameConfiguration mapToNatsLocalFilenameConfiguration(
+    private ToolInstallationMessage.LocalFilenameConfiguration mapToNatsLocalFilenameConfiguration(
             com.openframe.data.document.toolagent.LocalFilenameConfiguration localFilenameConfiguration
     ) {
-        com.openframe.data.model.nats.ToolInstallationMessage.LocalFilenameConfiguration eventConfig =
-                new com.openframe.data.model.nats.ToolInstallationMessage.LocalFilenameConfiguration();
+        ToolInstallationMessage.LocalFilenameConfiguration eventConfig =
+                new ToolInstallationMessage.LocalFilenameConfiguration();
         eventConfig.setFilename(localFilenameConfiguration.getFilename());
         eventConfig.setOs(localFilenameConfiguration.getOs());
         

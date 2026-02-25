@@ -3,7 +3,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
 import com.openframe.client.service.ToolConnectionService;
 import com.openframe.core.exception.NatsException;
-import com.openframe.data.model.nats.ToolConnectionMessage;
+import com.openframe.data.model.ToolConnectionMessage;
 import io.nats.client.*;
 import io.nats.client.api.AckPolicy;
 import io.nats.client.api.ConsumerConfiguration;

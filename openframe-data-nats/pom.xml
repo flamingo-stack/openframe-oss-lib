@@ -28,9 +28,5 @@
             <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-data-mongo</artifactId>
         </dependency>
-        <dependency>
-            <groupId>com.openframe.oss</groupId>
-            <artifactId>openframe-data</artifactId>
-        </dependency>
     </dependencies>
 </project>

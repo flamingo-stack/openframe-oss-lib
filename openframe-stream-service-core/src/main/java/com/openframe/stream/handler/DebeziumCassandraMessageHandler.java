@@ -1,7 +1,7 @@
 package com.openframe.stream.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.openframe.data.model.cassandra.UnifiedLogEvent;
+import com.openframe.data.model.UnifiedLogEvent;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import com.openframe.data.model.enums.Destination;

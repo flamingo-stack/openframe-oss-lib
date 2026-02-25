@@ -28,10 +28,6 @@
         </dependency>
         <dependency>
             <groupId>com.openframe.oss</groupId>
-            <artifactId>openframe-data</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-data-cassandra</artifactId>
         </dependency>
         <dependency>
@@ -45,7 +41,7 @@
         <!-- OpenFrame SDKs -->
         <dependency>
             <groupId>com.openframe.oss</groupId>
-            <artifactId>tacticalrmm</artifactId>
+            <artifactId>openframe-tactical-sdk</artifactId>
         </dependency>
         <!-- Spring Boot Web -->
         <dependency>

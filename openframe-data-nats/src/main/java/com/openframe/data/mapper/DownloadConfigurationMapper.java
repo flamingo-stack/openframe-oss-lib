@@ -1,5 +1,7 @@
 package com.openframe.data.mapper;
 
+import com.openframe.data.model.DownloadConfiguration;
+import com.openframe.data.model.InstallationType;
 import com.openframe.data.resolver.DownloadConfigurationLinkResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -13,7 +15,7 @@ public class DownloadConfigurationMapper {
 
     private final DownloadConfigurationLinkResolver downloadConfigurationResolver;
 
-    public List<com.openframe.data.model.nats.DownloadConfiguration> map(
+    public List<DownloadConfiguration> map(
             List<com.openframe.data.document.clientconfiguration.DownloadConfiguration> downloadConfigurations,
             String version
     ) {
@@ -25,12 +27,12 @@ public class DownloadConfigurationMapper {
                 .collect(Collectors.toList());
     }
 
-    private com.openframe.data.model.nats.DownloadConfiguration mapToNatsDownloadConfiguration(
+    private DownloadConfiguration mapToNatsDownloadConfiguration(
             com.openframe.data.document.clientconfiguration.DownloadConfiguration downloadConfiguration,
             String version
     ) {
-        com.openframe.data.model.nats.DownloadConfiguration natsDownloadConfig =
-                new com.openframe.data.model.nats.DownloadConfiguration();
+        DownloadConfiguration natsDownloadConfig =
+                new DownloadConfiguration();
         natsDownloadConfig.setOs(downloadConfiguration.getOs());
         natsDownloadConfig.setFileName(downloadConfiguration.getFileName());
         natsDownloadConfig.setTargetFileName(downloadConfiguration.getTargetFileName());
@@ -41,15 +43,15 @@ public class DownloadConfigurationMapper {
         return natsDownloadConfig;
     }
 
-    private com.openframe.data.model.nats.InstallationType mapInstallationType(
+    private InstallationType mapInstallationType(
             com.openframe.data.document.clientconfiguration.InstallationType installationType
     ) {
         if (installationType == null) {
-            return com.openframe.data.model.nats.InstallationType.STANDARD;
+            return InstallationType.STANDARD;
         }
         return switch (installationType) {
-            case GUI_APP -> com.openframe.data.model.nats.InstallationType.GUI_APP;
-            case STANDARD -> com.openframe.data.model.nats.InstallationType.STANDARD;
+            case GUI_APP -> InstallationType.GUI_APP;
+            case STANDARD -> InstallationType.STANDARD;
         };
     }
 }
