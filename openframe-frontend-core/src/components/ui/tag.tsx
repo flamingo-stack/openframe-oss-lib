@@ -2,13 +2,13 @@
 
 import React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
-import { X } from "lucide-react"
+import { XmarkCircleIcon } from "../icons-v2-generated/signs-and-symbols/xmark-circle-icon"
 import { cn } from "../../utils/cn"
 
 const tagVariants = cva(
   [
     "inline-flex items-center justify-center gap-2 h-8 px-2 rounded-[6px]",
-    "font-mono font-medium text-sm leading-5 tracking-[-0.28px] uppercase",
+    "font-mono font-medium md:text-[14px] text-[12px] leading-5 tracking-[-0.28px] uppercase",
     "transition-colors duration-150",
   ],
   {
@@ -23,7 +23,7 @@ const tagVariants = cva(
           "hover:bg-[var(--ods-system-greys-black-hover)] hover:border-[var(--ods-system-greys-soft-grey-hover)]",
           "active:bg-[var(--ods-system-greys-black-action)] active:border-[var(--ods-system-greys-soft-grey-action)]",
         ],
-        good: [
+        success: [
           "bg-[var(--ods-attention-green-success-secondary)] text-[var(--ods-attention-green-success)]",
           "hover:bg-[#385029] active:bg-[#425a33]",
         ],
@@ -52,18 +52,21 @@ const tagVariants = cva(
 )
 
 export interface TagProps
-  extends React.HTMLAttributes<HTMLDivElement>,
+  extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children'>,
     VariantProps<typeof tagVariants> {
+  label: React.ReactNode
+  labelClassName?: string
   icon?: React.ReactNode
   onClose?: () => void
 }
 
 function Tag({
-  children,
+  label,
   variant,
   icon,
   onClose,
   className,
+  labelClassName,
   ...props
 }: TagProps) {
   return (
@@ -76,7 +79,7 @@ function Tag({
           {icon}
         </span>
       )}
-      <span className="shrink-0">{children}</span>
+      <span className={cn("shrink-0", labelClassName)}>{label}</span>
       {onClose && (
         <button
           type="button"
@@ -87,7 +90,7 @@ function Tag({
           className="flex items-center justify-center size-5 shrink-0 rounded-full opacity-70 hover:opacity-100 transition-opacity"
           aria-label="Remove"
         >
-          <X className="size-4" />
+          <XmarkCircleIcon className="size-4" />
         </button>
       )}
     </div>

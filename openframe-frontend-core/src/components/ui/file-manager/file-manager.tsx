@@ -2,11 +2,13 @@
 
 import React, { useMemo } from 'react'
 import { cn } from '../../../utils/cn'
-import { SearchBar } from '../search-bar'
+import { Input } from '../input'
+import { SearchIcon } from '../../icons-v2-generated/interface/search-icon'
 import { FileManagerBreadcrumb } from './file-manager-breadcrumb'
 import { FileManagerActionBar } from './file-manager-action-bar'
 import { FileManagerTable } from './file-manager-table'
 import type { FileManagerProps, BreadcrumbItem } from './types'
+import { Loader2 } from 'lucide-react'
 
 export function FileManager({ 
   files,
@@ -14,7 +16,7 @@ export function FileManager({
   selectedFiles,
   searchQuery,
   loading = false,
-  isSearching = false,
+  isSearching,
   showCheckboxes = true,
   showSearch = true,
   showActions = true,
@@ -153,11 +155,13 @@ export function FileManager({
         </div>
         
         {showSearch && (
-          <SearchBar
+          <Input
             value={searchQuery}
-            onSubmit={onSearch}
-            loading={isSearching}
+            onChange={(e) => onSearch?.(e.target.value)}
+            placeholder="Search..."
             disabled={disableSearch}
+            startAdornment={<SearchIcon />}
+            loading={isSearching}
           />
         )}
         

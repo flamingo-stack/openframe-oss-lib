@@ -8,7 +8,7 @@ const meta = {
   argTypes: {
     variant: {
       control: 'select',
-      options: ['primary', 'outline', 'good', 'warning', 'error', 'critical', 'grey'],
+      options: ['primary', 'outline', 'success', 'warning', 'error', 'critical', 'grey'],
     },
   },
 } satisfies Meta<typeof Tag>;
@@ -17,37 +17,37 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Primary: Story = {
-  args: { variant: 'primary', children: 'Tag' },
+  args: { variant: 'primary', label: 'Tag' },
 };
 
 export const Outline: Story = {
-  args: { variant: 'outline', children: 'Tag' },
+  args: { variant: 'outline', label: 'Tag' },
 };
 
-export const Good: Story = {
-  args: { variant: 'good', children: 'Tag' },
+export const Success: Story = {
+  args: { variant: 'success', label: 'Tag' },
 };
 
 export const Warning: Story = {
-  args: { variant: 'warning', children: 'Tag' },
+  args: { variant: 'warning', label: 'Tag' },
 };
 
 export const Error: Story = {
-  args: { variant: 'error', children: 'Tag' },
+  args: { variant: 'error', label: 'Tag' },
 };
 
 export const Critical: Story = {
-  args: { variant: 'critical', children: 'Tag' },
+  args: { variant: 'critical', label: 'Tag' },
 };
 
 export const Grey: Story = {
-  args: { variant: 'grey', children: 'Tag' },
+  args: { variant: 'grey', label: 'Tag' },
 };
 
 export const WithIcon: Story = {
   args: {
     variant: 'primary',
-    children: 'Tag',
+    label: 'Tag',
     icon: <Smile className="size-5" />,
   },
 };
@@ -55,15 +55,15 @@ export const WithIcon: Story = {
 export const WithCloseButton: Story = {
   args: {
     variant: 'primary',
-    children: 'Tag',
+    label: 'Tag',
     onClose: () => alert('close'),
   },
 };
 
 export const WithIconAndClose: Story = {
   args: {
-    variant: 'good',
-    children: 'Tag',
+    variant: 'success',
+    label: 'Tag',
     icon: <Smile className="size-5" />,
     onClose: () => alert('close'),
   },
@@ -72,13 +72,13 @@ export const WithIconAndClose: Story = {
 export const AllVariants: Story = {
   render: () => (
     <div className="flex flex-wrap gap-3">
-      <Tag variant="primary">Primary</Tag>
-      <Tag variant="outline">Outline</Tag>
-      <Tag variant="good">Good</Tag>
-      <Tag variant="warning">Warning</Tag>
-      <Tag variant="error">Error</Tag>
-      <Tag variant="critical">Critical</Tag>
-      <Tag variant="grey">Grey</Tag>
+      <Tag variant="primary" label="Primary" />
+      <Tag variant="outline" label="Outline" />
+      <Tag variant="success" label="Success" />
+      <Tag variant="warning" label="Warning" />
+      <Tag variant="error" label="Error" />
+      <Tag variant="critical" label="Critical" />
+      <Tag variant="grey" label="Grey" />
     </div>
   ),
 };
@@ -86,13 +86,13 @@ export const AllVariants: Story = {
 export const AllWithIcons: Story = {
   render: () => (
     <div className="flex flex-wrap gap-3">
-      <Tag variant="primary" icon={<Smile className="size-5" />}>Primary</Tag>
-      <Tag variant="outline" icon={<Smile className="size-5" />}>Outline</Tag>
-      <Tag variant="good" icon={<Smile className="size-5" />}>Good</Tag>
-      <Tag variant="warning" icon={<Smile className="size-5" />}>Warning</Tag>
-      <Tag variant="error" icon={<Smile className="size-5" />}>Error</Tag>
-      <Tag variant="critical" icon={<Smile className="size-5" />}>Critical</Tag>
-      <Tag variant="grey" icon={<Smile className="size-5" />}>Grey</Tag>
+      <Tag variant="primary" icon={<Smile className="size-5" />} label="Primary" />
+      <Tag variant="outline" icon={<Smile className="size-5" />} label="Outline" />
+      <Tag variant="success" icon={<Smile className="size-5" />} label="Success" />
+      <Tag variant="warning" icon={<Smile className="size-5" />} label="Warning" />
+      <Tag variant="error" icon={<Smile className="size-5" />} label="Error" />
+      <Tag variant="critical" icon={<Smile className="size-5" />} label="Critical" />
+      <Tag variant="grey" icon={<Smile className="size-5" />} label="Grey" />
     </div>
   ),
 };
@@ -100,13 +100,13 @@ export const AllWithIcons: Story = {
 export const AllWithClose: Story = {
   render: () => (
     <div className="flex flex-wrap gap-3">
-      <Tag variant="primary" onClose={() => {}}>Primary</Tag>
-      <Tag variant="outline" onClose={() => {}}>Outline</Tag>
-      <Tag variant="good" onClose={() => {}}>Good</Tag>
-      <Tag variant="warning" onClose={() => {}}>Warning</Tag>
-      <Tag variant="error" onClose={() => {}}>Error</Tag>
-      <Tag variant="critical" onClose={() => {}}>Critical</Tag>
-      <Tag variant="grey" onClose={() => {}}>Grey</Tag>
+      <Tag variant="primary" onClose={() => {}} label="Primary" />
+      <Tag variant="outline" onClose={() => {}} label="Outline" />
+      <Tag variant="success" onClose={() => {}} label="Success" />
+      <Tag variant="warning" onClose={() => {}} label="Warning" />
+      <Tag variant="error" onClose={() => {}} label="Error" />
+      <Tag variant="critical" onClose={() => {}} label="Critical" />
+      <Tag variant="grey" onClose={() => {}} label="Grey" />
     </div>
   ),
 };
@@ -114,13 +114,13 @@ export const AllWithClose: Story = {
 export const AllWithIconAndClose: Story = {
   render: () => (
     <div className="flex flex-wrap gap-3">
-      <Tag variant="primary" icon={<Smile className="size-5" />} onClose={() => {}}>Primary</Tag>
-      <Tag variant="outline" icon={<Smile className="size-5" />} onClose={() => {}}>Outline</Tag>
-      <Tag variant="good" icon={<Smile className="size-5" />} onClose={() => {}}>Good</Tag>
-      <Tag variant="warning" icon={<Smile className="size-5" />} onClose={() => {}}>Warning</Tag>
-      <Tag variant="error" icon={<Smile className="size-5" />} onClose={() => {}}>Error</Tag>
-      <Tag variant="critical" icon={<Smile className="size-5" />} onClose={() => {}}>Critical</Tag>
-      <Tag variant="grey" icon={<Smile className="size-5" />} onClose={() => {}}>Grey</Tag>
+      <Tag variant="primary" icon={<Smile className="size-5" />} onClose={() => {}} label="Primary" />
+      <Tag variant="outline" icon={<Smile className="size-5" />} onClose={() => {}} label="Outline" />
+      <Tag variant="success" icon={<Smile className="size-5" />} onClose={() => {}} label="Success" />
+      <Tag variant="warning" icon={<Smile className="size-5" />} onClose={() => {}} label="Warning" />
+      <Tag variant="error" icon={<Smile className="size-5" />} onClose={() => {}} label="Error" />
+      <Tag variant="critical" icon={<Smile className="size-5" />} onClose={() => {}} label="Critical" />
+      <Tag variant="grey" icon={<Smile className="size-5" />} onClose={() => {}} label="Grey" />
     </div>
   ),
 };
