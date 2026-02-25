@@ -67,16 +67,6 @@ public class SecurityConfig {
             Pattern.compile("^https://login\\.microsoftonline\\.com/[^/]+/v2\\.0/?$");
 
     @Bean
-    @Order(0)
-    public SecurityFilterChain actuatorSecurityFilterChain(HttpSecurity http) throws Exception {
-        return http
-                .securityMatcher(EndpointRequest.toAnyEndpoint())
-                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
-                .csrf(AbstractHttpConfigurer::disable)
-                .build();
-    }
-
-    @Bean
     @Order(2)
     public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http,
                                                           OAuth2UserService<OidcUserRequest, OidcUser> oidcUserService,
@@ -97,7 +87,7 @@ public class SecurityConfig {
                                 "/login",
                                 "/favicon.ico",
                                 "/tenant/**",
-                                "/management/v1/**",
+                                "/management/**",
                                 "/.well-known/**",
                                 "/error",
                                 "/sso/providers/**"
