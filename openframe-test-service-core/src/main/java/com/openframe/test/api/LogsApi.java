@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.openframe.test.api.graphql.LogQueries.*;
-import static com.openframe.test.config.ApiConfig.GRAPHQL;
+import static com.openframe.test.config.EnvironmentConfig.GRAPHQL;
 import static com.openframe.test.helpers.RequestSpecHelper.getAuthorizedSpec;
 import static io.restassured.RestAssured.given;
 

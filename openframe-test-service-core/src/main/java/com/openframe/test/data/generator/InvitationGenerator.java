@@ -7,7 +7,8 @@ import com.openframe.test.data.dto.invitation.InvitationRequest;
 import com.openframe.test.data.dto.user.AuthUser;
 import net.datafaker.Faker;
 
-import static com.openframe.test.config.UserConfig.DEFAULT_PASSWORD;
+import static com.openframe.test.config.UserConfig.getPassword;
+
 
 public class InvitationGenerator {
 
@@ -26,7 +27,7 @@ public class InvitationGenerator {
                 .invitationId(invitation.getId())
                 .firstName(faker.name().firstName())
                 .lastName(faker.name().lastName())
-                .password(DEFAULT_PASSWORD)
+                .password(getPassword())
                 .build();
     }
 

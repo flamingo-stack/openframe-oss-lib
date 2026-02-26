@@ -1,7 +1,7 @@
-package com.openframe.test.api;
+package com.openframe.test.api.auth;
 
+import com.openframe.test.api.TenantApi;
 import com.openframe.test.data.dto.auth.AuthParts;
-import com.openframe.test.data.dto.tenant.Tenant;
 import com.openframe.test.data.dto.user.User;
 import com.openframe.test.util.StringUtils;
 import io.restassured.response.Response;
@@ -11,29 +11,27 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static com.openframe.test.api.AuthApi.*;
-import static com.openframe.test.data.db.collections.TenantsCollection.findTenantByDomain;
 import static com.openframe.test.data.generator.AuthGenerator.generateAuthParts;
 
 @Slf4j
-public class AuthFlow {
+public class AuthFlowOSS implements IAuthFlow {
 
-    private final AuthParts authParts;
+    private static final String DISCOVER = "sas/tenant/discover";
 
-    private AuthFlow(User user) {
-        Tenant tenant = findTenantByDomain(user.getDomain());
-        authParts = generateAuthParts(user, tenant);
+    private User user;
+    private AuthParts authParts;
+
+    public AuthFlowOSS(User user) {
+        this.user = user;
     }
 
-    public static Map<String, String> login(User user) {
-        return new AuthFlow(user)
-                .startFlow()
-                .initAuth()
-                .postCredentials()
-                .getAuthCode()
-                .extractTokens();
+    public AuthFlowOSS discoverTenant() {
+        String tenantId = TenantApi.discoverTenant(user);
+        authParts = generateAuthParts(user, tenantId);
+        return this;
     }
 
-    private AuthFlow startFlow() {
+    public AuthFlowOSS startFlow() {
         Response response = startOAuthFlow(authParts);
         response.then().statusCode(302);
         String location = response.getHeader("Location");
@@ -46,7 +44,7 @@ public class AuthFlow {
         return this;
     }
 
-    private AuthFlow initAuth() {
+    public AuthFlowOSS initAuth() {
         Response response = initiateAuthorization(authParts);
         response.then().statusCode(302);
         Map<String, String> newCookies = response.getCookies();
@@ -54,7 +52,7 @@ public class AuthFlow {
         return this;
     }
 
-    private AuthFlow postCredentials() {
+    public AuthFlowOSS postCredentials() {
         Response response = submitCredentials(authParts);
         response.then().statusCode(302);
         Map<String, String> newCookies = response.getCookies();
@@ -62,7 +60,7 @@ public class AuthFlow {
         return this;
     }
 
-    private AuthFlow getAuthCode() {
+    public AuthFlowOSS getAuthCode() {
         Response response = getAuthorizationCode(authParts);
         response.then().statusCode(302);
         String location = response.getHeader("Location");
@@ -71,7 +69,7 @@ public class AuthFlow {
         return this;
     }
 
-    private Map<String, String> extractTokens() {
+    public Map<String, String> extractTokens() {
         Response response = exchangeCodeForTokens(authParts);
         response.then().statusCode(302);
         Map<String, String> responseCookies = response.getCookies();

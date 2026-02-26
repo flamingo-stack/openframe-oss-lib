@@ -1,12 +1,11 @@
 package com.openframe.test.data.dto.user;
 
-import com.openframe.test.data.dto.invitation.UserRole;
-import com.openframe.test.data.dto.invitation.UserStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
@@ -24,4 +23,7 @@ public class AuthUser {
     private String lastName;
     private List<UserRole> roles;
     private UserStatus status;
+    private String image;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }

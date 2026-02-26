@@ -1,4 +1,4 @@
-package com.openframe.test.data.dto.invitation;
+package com.openframe.test.data.dto.user;
 
 public enum UserStatus {
     ACTIVE,
