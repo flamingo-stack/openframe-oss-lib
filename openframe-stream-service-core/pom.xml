@@ -32,7 +32,7 @@
         </dependency>
         <dependency>
             <groupId>com.openframe.oss</groupId>
-            <artifactId>openframe-data</artifactId>
+            <artifactId>openframe-data-cassandra</artifactId>
         </dependency>
         <dependency>
             <groupId>com.openframe.oss</groupId>
@@ -44,7 +44,7 @@
         </dependency>
         <dependency>
             <groupId>com.openframe.oss</groupId>
-            <artifactId>tacticalrmm</artifactId>
+            <artifactId>openframe-tactical-sdk</artifactId>
         </dependency>
 
         <!-- Spring Boot -->
@@ -73,6 +73,11 @@
         <dependency>
             <groupId>org.apache.kafka</groupId>
             <artifactId>kafka-streams</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
         </dependency>
 
         <!-- Testing -->

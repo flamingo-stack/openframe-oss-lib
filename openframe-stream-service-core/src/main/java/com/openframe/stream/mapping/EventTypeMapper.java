@@ -1,16 +1,16 @@
 package com.openframe.stream.mapping;
 
+import com.openframe.data.cassandra.model.enums.UnifiedEventType;
 import com.openframe.data.model.enums.IntegratedToolType;
-import com.openframe.data.model.enums.UnifiedEventType;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections4.map.HashedMap;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @Slf4j
 public class EventTypeMapper {
 
-    private static final Map<String, UnifiedEventType> mappings = new HashedMap<>();
+    private static final Map<String, UnifiedEventType> mappings = new HashMap<>();
 
     static {
         initializeDefaultMappings();
