@@ -2,7 +2,6 @@ package com.openframe.test.data.generator;
 
 import com.openframe.test.data.dto.auth.AuthParts;
 import com.openframe.test.data.dto.error.ErrorResponse;
-import com.openframe.test.data.dto.tenant.Tenant;
 import com.openframe.test.data.dto.user.ResetConfirmRequest;
 import com.openframe.test.data.dto.user.User;
 
@@ -11,10 +10,10 @@ import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.Map;
 
-import static com.openframe.test.config.UserConfig.NEW_PASSWORD;
-
 
 public class AuthGenerator {
+
+    public static final String NEW_PASSWORD = "Password124!";
 
     public static ResetConfirmRequest resetConfirmRequest(String token) {
         return ResetConfirmRequest.builder()
@@ -37,12 +36,12 @@ public class AuthGenerator {
                 "JSESSIONID", "");
     }
 
-    public static AuthParts generateAuthParts(User user, Tenant tenant) {
+    public static AuthParts generateAuthParts(User user, String tenantId) {
         String codeVerifier = generateCodeVerifier();
         return AuthParts.builder()
                 .email(user.getEmail())
                 .password(user.getPassword())
-                .tenantId(tenant.getId())
+                .tenantId(tenantId)
                 .state(generateState())
                 .codeVerifier(codeVerifier)
                 .codeChallenge(generateCodeChallenge(codeVerifier))

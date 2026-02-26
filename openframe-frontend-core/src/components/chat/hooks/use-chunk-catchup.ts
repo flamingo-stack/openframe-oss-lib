@@ -288,12 +288,27 @@ export function useChunkCatchup({
    */
   const isBufferingActive = useCallback(() => bufferUntilInitialCatchupComplete.current, [])
 
+  /**
+   * Reset internal guards and re-run catch-up from the last known sequence ID.
+   * Use after reconnection to fetch any messages missed during the disconnect.
+   */
+  const resetAndCatchUp = useCallback(async () => {
+    if (!dialogId) return
+    const fromSeq = lastSequenceId.current
+    hasCompletedInitialCatchup.current = false
+    lastFetchParams.current = null
+    bufferUntilInitialCatchupComplete.current = true
+    chunkBuffer.current = []
+    await catchUpChunks(fromSeq)
+  }, [dialogId, catchUpChunks])
+
   return {
     catchUpChunks,
     processChunk,
     resetChunkTracking,
     startInitialBuffering,
     isBufferingActive,
-    processedCount: processedSequenceKeys.current.size
+    processedCount: processedSequenceKeys.current.size,
+    resetAndCatchUp,
   }
 }

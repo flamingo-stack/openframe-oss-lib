@@ -5,12 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class MongoConfig {
 
-    private static final String DEFAULT_MONGODB_URI = "mongodb://mongodb-0.mongodb.datasources.svc.cluster.local:27017/openframe";
-    private static final String DEFAULT_DATABASE_NAME = "openframe";
-    private static final String DEFAULT_MONGO_USER = "openframe";
-    private static final String DEFAULT_MONGO_PASSWORD = "password123456789";
-    private static final String DEFAULT_AUTH_DATABASE = "admin";
-
     private static String mongoUri;
     private static String dbName;
     private static String mongoUser;
@@ -19,14 +13,11 @@ public class MongoConfig {
 
     public static String getMongoDbUri() {
         if (mongoUri == null) {
-            String cmdVar = System.getProperty("mongodb.uri");
             String envVar = System.getenv("MONGODB_URI");
-            if (cmdVar != null && !cmdVar.trim().isEmpty()) {
-                mongoUri = cmdVar;
-            } else if (envVar != null && !envVar.trim().isEmpty()) {
+            if (envVar != null && !envVar.trim().isEmpty()) {
                 mongoUri = envVar;
             } else {
-                mongoUri = DEFAULT_MONGODB_URI;
+                throw new RuntimeException("MONGODB_URI environment variable is not set");
             }
             log.debug("MONGODB_URI: {}", mongoUri);
         }
@@ -35,14 +26,11 @@ public class MongoConfig {
 
     public static String getDatabaseName() {
         if (dbName == null) {
-            String cmdVar = System.getProperty("mongodb.database");
             String envVar = System.getenv("MONGODB_DATABASE");
-            if (cmdVar != null && !cmdVar.trim().isEmpty()) {
-                dbName = cmdVar;
-            } else if (envVar != null && !envVar.trim().isEmpty()) {
+            if (envVar != null && !envVar.trim().isEmpty()) {
                 dbName = envVar;
             } else {
-                dbName = DEFAULT_DATABASE_NAME;
+                throw new RuntimeException("MONGODB_DATABASE environment variable is not set");
             }
             log.debug("MONGODB_DATABASE: {}", dbName);
         }
@@ -51,45 +39,37 @@ public class MongoConfig {
 
     public static String getMongoUser() {
         if (mongoUser == null) {
-            String cmdVar = System.getProperty("mongodb.user");
-            String envVar = System.getenv("MONGODB_USER");
-            if (cmdVar != null && !cmdVar.trim().isEmpty()) {
-                mongoUser = cmdVar;
-            } else if (envVar != null && !envVar.trim().isEmpty()) {
+            String envVar = System.getenv("MONGODB_USERNAME");
+            if (envVar != null && !envVar.trim().isEmpty()) {
                 mongoUser = envVar;
             } else {
-                mongoUser = DEFAULT_MONGO_USER;
+                throw new RuntimeException("MONGODB_USERNAME environment variable is not set");
             }
-            log.debug("MONGODB_USER: {}", mongoUser);
+            log.debug("MONGODB_USERNAME: {}", mongoUser);
         }
         return mongoUser;
     }
 
     public static String getMongoPassword() {
         if (mongoPassword == null) {
-            String cmdVar = System.getProperty("mongodb.password");
             String envVar = System.getenv("MONGODB_PASSWORD");
-            if (cmdVar != null && !cmdVar.trim().isEmpty()) {
-                mongoPassword = cmdVar;
-            } else if (envVar != null && !envVar.trim().isEmpty()) {
+            if (envVar != null && !envVar.trim().isEmpty()) {
                 mongoPassword = envVar;
             } else {
-                mongoPassword = DEFAULT_MONGO_PASSWORD;
+                throw new RuntimeException("MONGODB_PASSWORD environment variable is not set");
             }
+            log.debug("MONGODB_PASSWORD: {}", mongoPassword);
         }
         return mongoPassword;
     }
 
     public static String getAuthDatabase() {
         if (authDatabase == null) {
-            String cmdVar = System.getProperty("mongodb.auth.database");
             String envVar = System.getenv("MONGODB_AUTH_DATABASE");
-            if (cmdVar != null && !cmdVar.trim().isEmpty()) {
-                authDatabase = cmdVar;
-            } else if (envVar != null && !envVar.trim().isEmpty()) {
+            if (envVar != null && !envVar.trim().isEmpty()) {
                 authDatabase = envVar;
             } else {
-                authDatabase = DEFAULT_AUTH_DATABASE;
+                throw new RuntimeException("MONGODB_AUTH_DATABASE environment variable is not set");
             }
             log.debug("MONGODB_AUTH_DATABASE: {}", authDatabase);
         }

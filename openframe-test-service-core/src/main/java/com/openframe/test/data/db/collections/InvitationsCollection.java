@@ -4,16 +4,21 @@ import com.mongodb.client.model.Filters;
 import com.openframe.test.data.dto.invitation.Invitation;
 import com.openframe.test.data.dto.invitation.InvitationStatus;
 
+import static com.openframe.test.data.db.MongoDB.closeConnection;
 import static com.openframe.test.data.db.MongoDB.getCollection;
 
 public class InvitationsCollection {
 
     public static Invitation findInvitation(String email) {
-        return getCollection("invitations", Invitation.class).find(Filters.eq("email", email)).first();
+        Invitation invitation = getCollection("invitations", Invitation.class).find(Filters.eq("email", email)).first();
+        closeConnection();
+        return invitation;
     }
 
     public static Invitation findInvitation(InvitationStatus status) {
-        return getCollection("invitations", Invitation.class).find(Filters.eq("status", status)).first();
+        Invitation invitation = getCollection("invitations", Invitation.class).find(Filters.eq("status", status)).first();
+        closeConnection();
+        return invitation;
     }
 
 }

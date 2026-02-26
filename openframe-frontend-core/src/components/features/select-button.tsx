@@ -75,9 +75,7 @@ export const SelectButton = React.forwardRef<HTMLButtonElement, SelectButtonProp
         </span>
 
         {tag && (
-          <Tag variant={tagVariant} className="shrink-0">
-            {tag}
-          </Tag>
+          <Tag variant={tagVariant} className="shrink-0" label={tag} />
         )}
 
         {selected && (

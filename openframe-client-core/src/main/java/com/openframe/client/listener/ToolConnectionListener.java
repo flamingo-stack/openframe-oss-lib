@@ -1,21 +1,21 @@
 package com.openframe.client.listener;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
 import com.openframe.client.service.ToolConnectionService;
 import com.openframe.core.exception.NatsException;
-import com.openframe.data.model.nats.ToolConnectionMessage;
+import com.openframe.data.nats.model.ToolConnectionMessage;
 import io.nats.client.*;
 import io.nats.client.api.AckPolicy;
 import io.nats.client.api.ConsumerConfiguration;
 import io.nats.client.api.ConsumerInfo;
 import io.nats.client.api.DeliverPolicy;
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
-
-import jakarta.annotation.PreDestroy;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

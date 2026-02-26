@@ -1,12 +1,12 @@
 package com.openframe.api.service;
 
+import com.openframe.api.dto.device.DeviceFilterOption;
 import com.openframe.api.dto.device.DeviceFilterOptions;
 import com.openframe.api.dto.device.DeviceFilters;
-import com.openframe.api.dto.device.DeviceFilterOption;
 import com.openframe.api.dto.device.TagFilterOption;
 import com.openframe.data.document.organization.Organization;
+import com.openframe.data.pinot.repository.PinotDeviceRepository;
 import com.openframe.data.repository.organization.OrganizationRepository;
-import com.openframe.data.repository.pinot.PinotDeviceRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 

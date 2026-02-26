@@ -13,6 +13,11 @@ target/
 # OS
 .DS_Store
 
+# Shell scripts with env vars
+set-env.sh
+clear-env.sh
+print-env.sh
+
 # Logs
 *.log
 *.flattened-pom.xml

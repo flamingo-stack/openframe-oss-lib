@@ -21,7 +21,7 @@
     <url>https://github.com/flamingo-stack/openframe-oss-lib</url>
 
     <properties>
-        <revision>5.35.0</revision>
+        <revision>5.36.1</revision>
         <java.version>21</java.version>
         <lombok.version>1.18.30</lombok.version>
         <spring-data-mongodb.version>4.2.0</spring-data-mongodb.version>
@@ -44,7 +44,11 @@
         <module>openframe-notification-mail</module>
         <module>openframe-data-kafka</module>
         <module>openframe-api-lib</module>
-        <module>openframe-data</module>
+        <module>openframe-data-cassandra</module>
+        <module>openframe-data-pinot</module>
+        <module>openframe-data-nats</module>
+        <module>openframe-data-device-aspect</module>
+        <module>openframe-tool-agent-nats-installation</module>
         <module>openframe-security-core</module>
         <module>openframe-authorization-service-core</module>
         <module>openframe-client-core</module>
@@ -52,6 +56,7 @@
         <module>openframe-management-service-core</module>
         <module>sdk/fleetmdm</module>
         <module>sdk/tacticalrmm</module>
+        <module>openframe-tactical-sdk</module>
         <module>openframe-security-oauth</module>
         <module>openframe-idp-configuration</module>
         <module>openframe-config-core</module>
@@ -110,7 +115,27 @@
             </dependency>
             <dependency>
                 <groupId>com.openframe.oss</groupId>
-                <artifactId>openframe-data</artifactId>
+                <artifactId>openframe-data-cassandra</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openframe.oss</groupId>
+                <artifactId>openframe-data-pinot</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openframe.oss</groupId>
+                <artifactId>openframe-data-nats</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openframe.oss</groupId>
+                <artifactId>openframe-data-device-aspect</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openframe.oss</groupId>
+                <artifactId>openframe-tool-agent-nats-installation</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
@@ -146,6 +171,11 @@
             <dependency>
                 <groupId>com.openframe.oss</groupId>
                 <artifactId>tacticalrmm</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openframe.oss</groupId>
+                <artifactId>openframe-tactical-sdk</artifactId>
                 <version>${revision}</version>
             </dependency>
             <!-- External dependency versions used by modules -->

@@ -5,7 +5,6 @@ const meta = {
   title: 'UI/DeviceCard',
   component: DeviceCard,
   parameters: {
-    layout: 'centered',
     docs: {
       description: {
         component: 'A card component for displaying device information including name, OS type, organization, status, and custom actions.',
@@ -22,22 +21,15 @@ const meta = {
       control: 'object',
       description: 'Action button configurations',
     },
-    statusBadgeComponent: {
-      control: false,
-      description: 'Custom status badge component',
+    statusTag: {
+      control: 'object',
+      description: 'Status tag configuration (label, variant, icon, onClose, className)',
     },
     onDeviceClick: {
       action: 'deviceClicked',
       description: 'Callback when device card is clicked',
     },
   },
-  decorators: [
-    (Story) => (
-      <div style={{ width: '400px' }}>
-        <Story />
-      </div>
-    ),
-  ],
 } satisfies Meta<typeof DeviceCard>
 
 export default meta
@@ -142,16 +134,34 @@ export const Clickable: Story = {
 }
 
 /**
+ * Device with inline details button.
+ */
+export const WithDetailsButton: Story = {
+  args: {
+    device: baseDevice,
+    actions: {
+      moreButton: { visible: true },
+      detailsButton: {
+        visible: true,
+        component: (
+          <div className="bg-ods-card box-border flex gap-2 items-center justify-center px-4 py-3 rounded-[6px] border border-ods-border cursor-pointer hover:bg-ods-bg-hover transition-colors">
+            <span className="font-['DM_Sans'] font-bold text-[18px] leading-[24px] text-ods-text-primary tracking-[-0.36px]">
+              Details
+            </span>
+          </div>
+        ),
+      },
+    },
+  },
+}
+
+/**
  * Device with status badge.
  */
 export const WithStatusBadge: Story = {
   args: {
     device: baseDevice,
-    statusBadgeComponent: (
-      <div className="bg-green-500/20 text-green-500 px-2 py-1 rounded text-sm font-medium">
-        Online
-      </div>
-    ),
+    statusTag: { label: 'Online', variant: 'success' },
   },
 }
 
@@ -164,11 +174,7 @@ export const WithWarningStatus: Story = {
       ...baseDevice,
       status: 'warning',
     },
-    statusBadgeComponent: (
-      <div className="bg-yellow-500/20 text-yellow-500 px-2 py-1 rounded text-sm font-medium">
-        Warning
-      </div>
-    ),
+    statusTag: { label: 'Warning', variant: 'warning' },
   },
 }
 
@@ -182,11 +188,7 @@ export const OfflineDevice: Story = {
       status: 'offline',
       lastSeen: new Date(Date.now() - 86400000 * 7).toISOString(), // 7 days ago
     },
-    statusBadgeComponent: (
-      <div className="bg-gray-500/20 text-gray-500 px-2 py-1 rounded text-sm font-medium">
-        Offline
-      </div>
-    ),
+    statusTag: { label: 'Offline', variant: 'grey' },
   },
 }
 
@@ -226,17 +228,18 @@ export const FullyLoaded: Story = {
     },
     actions: {
       moreButton: { visible: true },
-      customActions: [
-        { label: 'SSH', visible: true },
-        { label: 'Logs', visible: true },
-        { label: 'Restart', visible: true },
-      ],
+      detailsButton: {
+        visible: true,
+        component: (
+          <div className="bg-ods-card box-border flex gap-2 items-center justify-center px-4 py-3 rounded-[6px] border border-ods-border cursor-pointer hover:bg-ods-bg-hover transition-colors">
+            <span className="font-['DM_Sans'] font-bold text-[18px] leading-[24px] text-ods-text-primary tracking-[-0.36px]">
+              Details
+            </span>
+          </div>
+        ),
+      },
     },
-    statusBadgeComponent: (
-      <div className="bg-green-500/20 text-green-500 px-2 py-1 rounded text-sm font-medium">
-        Healthy
-      </div>
-    ),
+    statusTag: { label: 'Healthy', variant: 'success' },
     onDeviceClick: (device) => console.log('Device clicked:', device),
   },
 }

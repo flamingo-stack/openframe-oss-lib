@@ -25,16 +25,28 @@
         </dependency>
         <dependency>
             <groupId>com.openframe.oss</groupId>
-            <artifactId>openframe-data</artifactId>
+            <artifactId>openframe-data-cassandra</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-data-nats</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-tool-agent-nats-installation</artifactId>
         </dependency>
         <dependency>
             <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-security-core</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-data-device-aspect</artifactId>
+        </dependency>
         <!-- OpenFrame SDKs -->
         <dependency>
             <groupId>com.openframe.oss</groupId>
-            <artifactId>tacticalrmm</artifactId>
+            <artifactId>openframe-tactical-sdk</artifactId>
         </dependency>
         <dependency>
             <groupId>com.openframe.oss</groupId>

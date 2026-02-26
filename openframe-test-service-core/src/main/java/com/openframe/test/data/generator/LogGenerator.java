@@ -12,4 +12,9 @@ public class LogGenerator {
                 .toolTypes(List.of(toolType))
                 .build();
     }
+
+    public static String searchTerm(String summary) {
+        String[] words = summary.split(" ");
+        return words[0];
+    }
 }
