@@ -21,4 +21,5 @@ public class UserRegistrationRequest {
     private String password;
     private String tenantName;
     private String tenantDomain;
+    private String accessCode;
 }

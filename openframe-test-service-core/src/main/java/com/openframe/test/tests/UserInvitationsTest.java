@@ -1,13 +1,12 @@
 package com.openframe.test.tests;
 
 import com.openframe.test.api.InvitationApi;
-import com.openframe.test.api.UserApi;
 import com.openframe.test.data.db.collections.InvitationsCollection;
 import com.openframe.test.data.db.collections.UsersCollection;
 import com.openframe.test.data.dto.invitation.*;
 import com.openframe.test.data.dto.user.AuthUser;
+import com.openframe.test.data.dto.user.UserStatus;
 import com.openframe.test.data.generator.InvitationGenerator;
-import com.openframe.test.tests.base.AuthorizedTest;
 import org.junit.jupiter.api.*;
 
 import java.time.temporal.ChronoUnit;
@@ -16,9 +15,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
 @Tag("oss")
-@DisplayName("Invitations and Users")
+@DisplayName("Invitations")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class UserInvitationsTest extends AuthorizedTest {
+public class UserInvitationsTest {
 
     @Order(1)
     @Test
@@ -28,10 +27,11 @@ public class UserInvitationsTest extends AuthorizedTest {
         Invitation apiInvitation = InvitationApi.inviteUser(invitationRequest);
         Invitation dbInvitation = InvitationsCollection.findInvitation(invitationRequest.getEmail());
         assertThat(dbInvitation).as("No invitation found in DB").isNotNull();
-        assertThat(apiInvitation).usingRecursiveComparison()
+        assertThat(apiInvitation).as("API invitation should match DB invitation")
+                .usingRecursiveComparison()
                 .ignoringFields("updatedAt", "expiresAt", "createdAt").isEqualTo(dbInvitation);
-        assertThat(apiInvitation.getCreatedAt()).isCloseTo(dbInvitation.getCreatedAt(), within(1, ChronoUnit.SECONDS));
-        assertThat(apiInvitation.getExpiresAt()).isCloseTo(dbInvitation.getExpiresAt(), within(1, ChronoUnit.SECONDS));
+        assertThat(apiInvitation.getCreatedAt()).as("Invitation createdAt should be close to DB value").isCloseTo(dbInvitation.getCreatedAt(), within(1, ChronoUnit.SECONDS));
+        assertThat(apiInvitation.getExpiresAt()).as("Invitation expiresAt should be close to DB value").isCloseTo(dbInvitation.getExpiresAt(), within(1, ChronoUnit.SECONDS));
     }
 
     @Order(2)
@@ -42,7 +42,7 @@ public class UserInvitationsTest extends AuthorizedTest {
         assertThat(dbInvitation).as("No Pending invitation found in DB").isNotNull();
         AcceptInvitationRequest request = InvitationGenerator.acceptInvitationRequest(dbInvitation);
         AcceptInvitationResponse response = InvitationApi.acceptInvitation(request);
-        assertThat(response.getEmail()).isEqualTo(dbInvitation.getEmail());
+        assertThat(response.getEmail()).as("Accepted invitation email should match DB invitation").isEqualTo(dbInvitation.getEmail());
     }
 
     @Order(3)
@@ -54,7 +54,7 @@ public class UserInvitationsTest extends AuthorizedTest {
         AcceptInvitationRequest request = InvitationGenerator.acceptInvitationRequest(dbInvitation);
         InvitationConflictResponse expectedResponse = InvitationGenerator.alreadyAcceptedResponse();
         InvitationConflictResponse response = InvitationApi.attemptAcceptInvitation(request);
-        assertThat(response).isEqualTo(expectedResponse);
+        assertThat(response).as("Response should match already accepted error").isEqualTo(expectedResponse);
     }
 
     @Order(4)
@@ -66,7 +66,7 @@ public class UserInvitationsTest extends AuthorizedTest {
         InvitationApi.revokeInvitation(apiInvitation.getId());
         Invitation dbInvitation = InvitationsCollection.findInvitation(invitationRequest.getEmail());
         assertThat(dbInvitation).as("No invitation found in DB").isNotNull();
-        assertThat(dbInvitation.getStatus()).isEqualTo(InvitationStatus.REVOKED);
+        assertThat(dbInvitation.getStatus()).as("Invitation status should be REVOKED").isEqualTo(InvitationStatus.REVOKED);
     }
 
     @Order(5)
@@ -78,7 +78,7 @@ public class UserInvitationsTest extends AuthorizedTest {
         AcceptInvitationRequest request = InvitationGenerator.acceptInvitationRequest(dbInvitation);
         InvitationConflictResponse expectedResponse = InvitationGenerator.invitationRevokedResponse();
         InvitationConflictResponse response = InvitationApi.attemptAcceptInvitation(request);
-        assertThat(response).isEqualTo(expectedResponse);
+        assertThat(response).as("Response should match invitation revoked error").isEqualTo(expectedResponse);
     }
 
     @Order(6)
@@ -90,34 +90,9 @@ public class UserInvitationsTest extends AuthorizedTest {
         InvitationRequest invitationRequest = InvitationGenerator.existingUserInvitationRequest(activeUser);
         InvitationConflictResponse expectedResponse = InvitationGenerator.userAlreadyExistsResponse(activeUser);
         InvitationConflictResponse response = InvitationApi.attemptInviteUser(invitationRequest);
-        assertThat(response).isEqualTo(expectedResponse);
+        assertThat(response).as("Response should match user already exists error").isEqualTo(expectedResponse);
     }
 
-    @Order(7)
-    @Test
-    @DisplayName("Delete Admin User")
-    public void testDeleteUser() {
-        AuthUser user = UsersCollection.findUser(UserStatus.ACTIVE);
-        assertThat(user).as("User is not found in DB").isNotNull();
-        int statusCode = UserApi.deleteUser(user.getId());
-        user = UsersCollection.findUser(user.getId());
-        assertThat(statusCode).isEqualTo(204);
-        assertThat(user).as("User is not found in DB").isNotNull();
-        assertThat(user.getStatus()).isEqualTo(UserStatus.DELETED);
-    }
-
-    @Order(8)
-    @Test
-    @DisplayName("Check that Owner User cannot be deleted")
-    public void testDeleteOwner() {
-        AuthUser user = UsersCollection.findUser(UserRole.OWNER);
-        assertThat(user).as("User is not found in DB").isNotNull();
-        int statusCode = UserApi.deleteUser(user.getId());
-        user = UsersCollection.findUser(user.getId());
-        assertThat(statusCode).isEqualTo(409);
-        assertThat(user).as("User is not found in DB").isNotNull();
-        assertThat(user.getStatus()).isEqualTo(UserStatus.ACTIVE);
-    }
 
     @Order(9)
     @Test
@@ -127,7 +102,7 @@ public class UserInvitationsTest extends AuthorizedTest {
         assertThat(deletedUser).as("User is not found in DB").isNotNull();
         InvitationRequest invitationRequest = InvitationGenerator.existingUserInvitationRequest(deletedUser);
         Invitation apiInvitation = InvitationApi.inviteUser(invitationRequest);
-        assertThat(apiInvitation.getStatus()).isEqualTo(InvitationStatus.PENDING);
-        assertThat(apiInvitation.getEmail()).isEqualTo(deletedUser.getEmail());
+        assertThat(apiInvitation.getStatus()).as("Invitation status should be PENDING").isEqualTo(InvitationStatus.PENDING);
+        assertThat(apiInvitation.getEmail()).as("Invitation email should match deleted user email").isEqualTo(deletedUser.getEmail());
     }
 }

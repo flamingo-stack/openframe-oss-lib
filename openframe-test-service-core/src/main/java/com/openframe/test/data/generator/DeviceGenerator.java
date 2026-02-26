@@ -2,32 +2,29 @@ package com.openframe.test.data.generator;
 
 import com.openframe.test.data.dto.device.DeviceFilterInput;
 import com.openframe.test.data.dto.device.DeviceStatus;
+import com.openframe.test.data.dto.device.Machine;
+import com.openframe.test.data.dto.device.ToolConnection;
 
 import java.util.List;
 
 public class DeviceGenerator {
 
     public static DeviceFilterInput onlineDevicesFilter() {
-        return DeviceFilterInput.builder()
-                .statuses(List.of(DeviceStatus.ONLINE))
-                .build();
+        return statusDevicesFilter(DeviceStatus.ONLINE);
     }
 
     public static DeviceFilterInput offlineDevicesFilter() {
-        return DeviceFilterInput.builder()
-                .statuses(List.of(DeviceStatus.OFFLINE))
-                .build();
+        return statusDevicesFilter(DeviceStatus.OFFLINE);
     }
 
-    public static DeviceFilterInput statusAndOSDevicesFilter(DeviceStatus status, String os) {
+    public static DeviceFilterInput osDevicesFilter(String os) {
         return DeviceFilterInput.builder()
-                .statuses(List.of(status))
                 .osTypes(List.of(os))
                 .build();
     }
 
-    public static DeviceFilterInput listedDevicesFilter() {
-        return filterDevicesByStatus(
+    public static DeviceFilterInput listedStatusesDevicesFilter() {
+        return statusDevicesFilter(
                 DeviceStatus.ONLINE,
                 DeviceStatus.OFFLINE,
                 DeviceStatus.ACTIVE,
@@ -37,9 +34,17 @@ public class DeviceGenerator {
                 DeviceStatus.PENDING);
     }
 
-    public static DeviceFilterInput filterDevicesByStatus(DeviceStatus... statuses) {
+    public static DeviceFilterInput statusDevicesFilter(DeviceStatus... statuses) {
         return DeviceFilterInput.builder()
                 .statuses(List.of(statuses))
                 .build();
+    }
+
+    public static String getFleetId(Machine device) {
+        return device.getToolConnections().stream()
+                .filter(tc -> "FLEET_MDM".equals(tc.getToolType()))
+                .findFirst()
+                .map(ToolConnection::getAgentToolId)
+                .orElse(null);
     }
 }

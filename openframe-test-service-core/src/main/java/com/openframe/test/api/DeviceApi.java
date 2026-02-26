@@ -4,19 +4,21 @@ import com.openframe.test.data.dto.device.DeviceFilterInput;
 import com.openframe.test.data.dto.device.DeviceFilters;
 import com.openframe.test.data.dto.device.DeviceStatus;
 import com.openframe.test.data.dto.device.Machine;
+import com.openframe.test.data.dto.device.fleet.FleetHost;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import static com.openframe.test.api.graphql.DeviceQueries.*;
-import static com.openframe.test.config.ApiConfig.GRAPHQL;
+import static com.openframe.test.config.EnvironmentConfig.GRAPHQL;
 import static com.openframe.test.helpers.RequestSpecHelper.getAuthorizedSpec;
 import static io.restassured.RestAssured.given;
 
 public class DeviceApi {
 
     private static final String DEVICES = "api/devices/{machineId}";
+    private static final String FLEET_HOST = "tools/fleetmdm-server/api/latest/fleet/hosts/{fleetId}";
 
     public static List<String> getDeviceHostnames(DeviceFilterInput filter) {
         Map<String, Object> body = new HashMap<>();
@@ -47,6 +49,16 @@ public class DeviceApi {
                 .body(body).post(GRAPHQL)
                 .then().statusCode(200)
                 .extract().jsonPath().getObject("data.device", Machine.class);
+    }
+
+    public static Machine getAnyDevice(DeviceFilterInput... filters) {
+        for (DeviceFilterInput filter : filters) {
+            List<Machine> devices = getDevices(filter);
+            if (!devices.isEmpty()) {
+                return devices.getFirst();
+            }
+        }
+        return null;
     }
 
     public static List<Machine> getDevices(DeviceFilterInput filter) {
@@ -83,6 +95,14 @@ public class DeviceApi {
                 .body(body).post(GRAPHQL)
                 .then().statusCode(200)
                 .extract().jsonPath().getObject("data.devices.edges[0].node", Machine.class);
+    }
+
+    public static FleetHost getFleetInfo(String fleetId) {
+        return given(getAuthorizedSpec())
+                .pathParam("fleetId", fleetId)
+                .get(FLEET_HOST)
+                .then().statusCode(200)
+                .extract().jsonPath().getObject("host", FleetHost.class);
     }
 
     public static DeviceFilters getDeviceFilters() {

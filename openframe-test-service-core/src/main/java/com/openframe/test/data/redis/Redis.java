@@ -4,14 +4,12 @@ import redis.clients.jedis.RedisClient;
 import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.resps.ScanResult;
 
-import static com.openframe.test.config.RedisConfig.getRedisUri;
-
 public class Redis {
-
+    private static final String REDIS_URI = "redis://localhost:6379";
     private static final String KEY = "of:{default}:pwdreset:*";
 
     public static String getResetToken(String email) {
-        RedisClient redis = RedisClient.create(getRedisUri());
+        RedisClient redis = RedisClient.create(REDIS_URI);
         ScanParams scanParams = new ScanParams().match(KEY).count(100);
         String cursor = ScanParams.SCAN_POINTER_START;
         String token = null;
