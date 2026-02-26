@@ -5,6 +5,7 @@ import com.openframe.gateway.service.ToolApiKeyHeadersResolver;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.reactive.repository.tool.ReactiveIntegratedToolRepository;
 import com.openframe.data.service.ToolUrlService;
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 
@@ -40,12 +41,12 @@ public class ToolApiWebSocketProxyUrlFilter extends ToolWebSocketProxyUrlFilter 
     @Override
     protected ServerWebExchange mutateExchange(ServerWebExchange exchange, IntegratedTool tool) {
         Map<String, String> apiKeyHeaders = apiKeyHeadersResolver.resolve(tool);
-        if (apiKeyHeaders.isEmpty()) {
-            return exchange;
-        }
 
         return exchange.mutate()
-                .request(r -> apiKeyHeaders.forEach(r::header))
+                .request(r -> r.headers(h -> {
+                    h.remove(HttpHeaders.ORIGIN);
+                    apiKeyHeaders.forEach(h::set);
+                }))
                 .build();
     }
 }

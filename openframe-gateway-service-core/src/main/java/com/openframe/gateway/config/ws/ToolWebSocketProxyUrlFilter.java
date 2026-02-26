@@ -13,6 +13,7 @@ import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.RouteToRequestUrlFilter;
 import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.core.Ordered;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
@@ -22,6 +23,8 @@ import java.net.URI;
 @RequiredArgsConstructor
 @Slf4j
 public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Ordered {
+
+    public static final String ORIGINAL_AUTHORIZATION_ATTR = "originalAuthorization";
 
     private final ReactiveIntegratedToolRepository toolRepository;
     private final ToolUrlService toolUrlService;
@@ -52,6 +55,11 @@ public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Orde
 
                     exchange.getAttributes()
                             .put(ServerWebExchangeUtils.GATEWAY_REQUEST_URL_ATTR, proxyUri);
+
+                    String originalAuthorization = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+                    if (originalAuthorization != null) {
+                        exchange.getAttributes().put(ORIGINAL_AUTHORIZATION_ATTR, originalAuthorization);
+                    }
 
                     ServerWebExchange mutatedExchange = mutateExchange(exchange, tool);
                     return chain.filter(mutatedExchange);
