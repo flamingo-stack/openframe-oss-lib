@@ -93,6 +93,11 @@ public interface SourceEventTypes {
         String SCRIPT_EXECUTION_FINISHED = "script_run.finished";
         String TASK_RUN_STARTED = "task_run.started";
         String TASK_RUN_FINISHED = "task_run.finished";
+
+        // Task result events (from autotasks_taskresult CDC)
+        String TASK_RESULT_COMPLETED = "task_result.completed";
+        String TASK_RESULT_FAILING = "task_result.failing";
+        String TASK_RESULT_PENDING = "task_result.pending";
         String AUTOMATED_TASK_ADD = "automatedtask.add";
         String AUTOMATED_TASK_MODIFY = "automatedtask.modify";
         String AUTOMATED_TASK_RUN = "automatedtask.task_run";
