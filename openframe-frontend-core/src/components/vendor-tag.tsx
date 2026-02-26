@@ -185,7 +185,7 @@ export function VendorTag({
     <div className={cn(baseClasses, className, hidden && "invisible")}>
       {icon}
       <span className={cn(
-        "font-['Azeret_Mono'] font-semibold uppercase",
+        "font-mono font-semibold uppercase",
         textColor ? textColor : "text-ods-text-primary",
         size === 'sm' ? "text-[10px]" : "text-xs"
       )}>

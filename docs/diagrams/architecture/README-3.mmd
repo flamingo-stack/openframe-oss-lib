@@ -1,7 +1,7 @@
 flowchart TD
-    Request["Incoming Request"] --> Gateway
-    Gateway --> JwtValidation["Validate JWT Issuer"]
-    JwtValidation --> TenantContext["Resolve TenantContext"]
-    TenantContext --> MongoQuery
-    TenantContext --> RedisKey
-    TenantContext --> KafkaProducer
+    ToolDB["Integrated Tool Database"] --> Debezium
+    Debezium --> KafkaInbound["Kafka Inbound Topic"]
+    KafkaInbound --> Stream["Stream Processing Core"]
+    Stream --> Enrichment["Metadata Enrichment"]
+    Enrichment --> Cassandra["Cassandra Audit Storage"]
+    Enrichment --> KafkaOut["Normalized Kafka Topic"]

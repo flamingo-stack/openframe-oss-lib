@@ -1,8 +1,13 @@
 flowchart LR
-    Browser["Browser Client"] -->|"/oauth/login"| Bff["OAuth BFF Controller"]
-    Bff -->|"PKCE + State"| AuthServer["Authorization Server"]
-    AuthServer -->|"Authorization Code"| Bff
-    Bff -->|"Token Exchange"| AuthServer
-    Bff -->|"Set HttpOnly Cookies"| Browser
-    Browser -->|"API Requests with Cookies"| Gateway["API Gateway"]
-    Gateway -->|"JWT Validation"| Resource["Resource Services"]
+    Browser["Browser Client"] -->|"GET /oauth/login"| BffController["OAuthBffController"]
+    BffController -->|"Build authorize URL"| AuthServer["Authorization Server"]
+    AuthServer -->|"Authorization Code"| BffController
+    BffController -->|"Token Exchange"| AuthServer
+    BffController -->|"Set Auth Cookies"| Browser
+
+    BffController --> JwtSecurity["JwtSecurityConfig"]
+    JwtSecurity --> JwtEncoder["JwtEncoder"]
+    JwtSecurity --> JwtDecoder["JwtDecoder"]
+
+    BffController --> PKCE["PKCEUtils"]
+    BffController --> DevStore["OAuthDevTicketStore"]

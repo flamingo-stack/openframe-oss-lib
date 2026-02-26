@@ -36,11 +36,13 @@ export function useNatsDialogSubscription({
   onConnect,
   onDisconnect,
   onSubscribed,
+  onBeforeReconnect,
   getNatsWsUrl,
   clientConfig = {},
 }: UseNatsDialogSubscriptionOptions): UseNatsDialogSubscriptionReturn {
   const [isConnected, setIsConnected] = useState(false)
   const [isSubscribed, setIsSubscribed] = useState(false)
+  const [reconnectionCount, setReconnectionCount] = useState(0)
   
   const clientRef = useRef<NatsClient | null>(null)
   const subscriptionRefs = useRef<Map<NatsMessageType, NatsSubscriptionHandle | null>>(new Map())
@@ -65,6 +67,11 @@ export function useNatsDialogSubscription({
   useEffect(() => {
     onSubscribedRef.current = onSubscribed
   }, [onSubscribed])
+
+  const onBeforeReconnectRef = useRef(onBeforeReconnect)
+  useEffect(() => {
+    onBeforeReconnectRef.current = onBeforeReconnect
+  }, [onBeforeReconnect])
 
   const acquireClient = useCallback((url: string): SharedConnection => {
     if (shared?.wsUrl !== url) {
@@ -149,6 +156,7 @@ export function useNatsDialogSubscription({
     setIsConnected(false)
     
     let hasConnected = false
+    let wasDisconnected = false
 
     const unsubscribeStatus = client.onStatus((event) => {
       const connected = event.status === 'connected'
@@ -158,12 +166,18 @@ export function useNatsDialogSubscription({
         if (!hasConnected) {
           hasConnected = true
           onConnectRef.current?.()
+        } else if (wasDisconnected) {
+          setReconnectionCount(c => c + 1)
+          onConnectRef.current?.()
         }
+        wasDisconnected = false
       }
       if (disconnected) {
         setIsConnected(false)
+        wasDisconnected = true
         hasConnected = false
         onDisconnectRef.current?.()
+        onBeforeReconnectRef.current?.()
       }
     })
 
@@ -186,8 +200,9 @@ export function useNatsDialogSubscription({
     return () => {
       closed = true
       setIsConnected(false)
+      setIsSubscribed(false)
       unsubscribeStatus()
-      
+
       // Unsubscribe all subscriptions
       subscriptionRefs.current.forEach((sub) => {
         try {
@@ -197,7 +212,8 @@ export function useNatsDialogSubscription({
         }
       })
       subscriptionRefs.current.clear()
-      
+      lastSubscribedDialogIdRef.current = null
+
       if (clientRef.current && currentWsUrlRef.current) {
         releaseClient(currentWsUrlRef.current)
         clientRef.current = null
@@ -372,7 +388,7 @@ export function useNatsDialogSubscription({
     }
   }, [isConnected, enabled, topics, topicsKey])
 
-  return { isConnected, isSubscribed }
+  return { isConnected, isSubscribed, reconnectionCount }
 }
 
 /**

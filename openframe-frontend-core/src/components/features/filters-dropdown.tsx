@@ -314,7 +314,7 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
           ref={triggerRef as React.RefObject<HTMLButtonElement>}
           onClick={() => setIsOpen(!isOpen)}
           className={cn(
-            "font-['Azeret_Mono'] font-medium text-xs uppercase tracking-[-0.24px]",
+            "font-mono font-medium text-xs uppercase tracking-[-0.24px]",
             "text-[#888888] hover:text-[#fafafa] transition-colors",
             "flex items-center gap-2"
           )}

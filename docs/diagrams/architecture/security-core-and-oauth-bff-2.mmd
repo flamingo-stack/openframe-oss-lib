@@ -1,4 +1,6 @@
 flowchart TD
-    Props["application.yml jwt.*"] --> Config["JwtConfig"]
-    Config -->|"loadPublicKey()"| PubKey["RSAPublicKey"]
-    Config -->|"loadPrivateKey()"| PrivKey["RSAPrivateKey"]
+    JwtSecurityConfig -->|"loads"| JwtConfig
+    JwtConfig -->|"loadPublicKey()"| PublicKey["RSAPublicKey"]
+    JwtConfig -->|"loadPrivateKey()"| PrivateKey["RSAPrivateKey"]
+    JwtSecurityConfig --> Encoder["NimbusJwtEncoder"]
+    JwtSecurityConfig --> Decoder["NimbusJwtDecoder"]

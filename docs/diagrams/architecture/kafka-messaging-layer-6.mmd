@@ -1,0 +1,5 @@
+flowchart TD
+    Publish["Publish Attempt"] --> Success{"Success?"}
+    Success -->|Yes| End["Completed"]
+    Success -->|No| Recovery["KafkaRecoveryHandlerImpl"]
+    Recovery --> Log["Structured Error Log"]

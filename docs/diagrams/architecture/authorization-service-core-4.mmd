@@ -1,6 +1,4 @@
 flowchart TD
-    TokenRequest["Token Encoding"] --> JwkSource["JWKSource"]
-    JwkSource --> TenantId["TenantContext.getTenantId()"]
-    TenantId --> KeyService["TenantKeyService"]
-    KeyService --> Repo["TenantKeyRepository (Mongo)"]
-    KeyService --> Encoder["NimbusJwtEncoder"]
+    Principal["Authenticated Principal"] --> LoadUser["UserService.findActiveByEmailAndTenant"]
+    LoadUser --> Claims["Add Custom Claims"]
+    Claims --> JWT["Signed Access Token"]

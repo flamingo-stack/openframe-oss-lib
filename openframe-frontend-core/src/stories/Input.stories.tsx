@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
 import { Input } from '../components/ui/input';
+import { SearchIcon } from '../components/icons-v2-generated/interface/search-icon';
 
 const meta = {
   title: 'UI/Input',
@@ -19,11 +21,12 @@ export const Default: Story = {
 };
 
 /**
- * Input with text endAdornment (like "Seconds" from Figma design).
+ * Input with text endAdornment.
  */
 export const WithEndAdornmentText: Story = {
   args: {
     placeholder: '90',
+    endAdornment: 'Seconds',
     className: 'w-full',
   },
 };
@@ -34,6 +37,7 @@ export const WithEndAdornmentText: Story = {
 export const WithStartAdornmentIcon: Story = {
   args: {
     placeholder: 'Search...',
+    startAdornment: '🔍',
   },
 };
 
@@ -43,6 +47,8 @@ export const WithStartAdornmentIcon: Story = {
 export const WithBothAdornments: Story = {
   args: {
     placeholder: '0.00',
+    startAdornment: '$',
+    endAdornment: 'USD',
   },
 };
 
@@ -52,6 +58,7 @@ export const WithBothAdornments: Story = {
 export const WithEndAdornmentIcon: Story = {
   args: {
     placeholder: 'Enter timeout...',
+    endAdornment: '⏱',
   },
 };
 
@@ -61,6 +68,7 @@ export const WithEndAdornmentIcon: Story = {
 export const DisabledWithAdornments: Story = {
   args: {
     placeholder: '90',
+    endAdornment: 'Seconds',
     disabled: true,
   },
 };
@@ -71,6 +79,7 @@ export const DisabledWithAdornments: Story = {
 export const InvalidWithAdornments: Story = {
   args: {
     placeholder: '0',
+    startAdornment: '$',
     invalid: true,
   },
 };
@@ -81,6 +90,7 @@ export const InvalidWithAdornments: Story = {
 export const WithValueAndEndAdornment: Story = {
   args: {
     defaultValue: '90',
+    endAdornment: 'Seconds',
     className: 'max-w-[320px]',
   },
 };
@@ -92,24 +102,77 @@ export const NumberWithUnit: Story = {
   args: {
     type: 'number',
     placeholder: '100',
+    endAdornment: 'ms',
   },
 };
 
 /**
- * Preview mode - displays value as non-interactive element.
+ * Input with label.
  */
-export const Preview: Story = {
+export const WithLabel: Story = {
   args: {
-    value: '90',
+    placeholder: 'Enter text...',
+    label: 'Username',
   },
 };
 
 /**
- * Preview mode with both adornments.
+ * Input with label and error message.
  */
-export const PreviewWithBothAdornments: Story = {
+export const WithLabelAndError: Story = {
   args: {
-    value: '150.00',
+    placeholder: 'Enter text...',
+    label: 'Username',
+    error: 'This field is required',
+  },
+};
+
+/**
+ * Input with label, value and no error (valid state).
+ */
+export const WithLabelAndValue: Story = {
+  args: {
+    label: 'Timeout',
+    defaultValue: '90',
+    endAdornment: 'Seconds',
+  },
+};
+
+/**
+ * Input with error only (no label).
+ */
+export const WithErrorOnly: Story = {
+  args: {
+    placeholder: 'Enter value...',
+    error: 'Invalid value',
+  },
+};
+
+/**
+ * Search input with SearchIcon startAdornment.
+ */
+export const SearchInput: Story = {
+  render: function Render() {
+    const [value, setValue] = useState('');
+    return (
+      <Input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="Search..."
+        startAdornment={<SearchIcon size={20} />}
+      />
+    );
+  },
+};
+
+/**
+ * Input with loading spinner.
+ */
+export const Loading: Story = {
+  args: {
+    placeholder: 'Searching...',
+    loading: true,
+    startAdornment: <SearchIcon size={20} />,
   },
 };
 
@@ -123,9 +186,13 @@ export const AllVariants: Story = {
   render: () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '320px' }}>
       <Input placeholder="Default input" />
+      <Input placeholder="With adornments" startAdornment="$" endAdornment="USD" />
       <Input placeholder="Disabled" disabled />
       <Input placeholder="Invalid" invalid />
-      <Input value="90" />
+      <Input defaultValue="90" endAdornment="Seconds" />
+      <Input label="With Label" placeholder="Enter text..." />
+      <Input label="With Error" placeholder="Enter text..." error="This field is required" />
+      <Input label="Valid Value" defaultValue="90" endAdornment="Seconds" />
     </div>
   ),
 };

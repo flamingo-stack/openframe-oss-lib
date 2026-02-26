@@ -1,6 +1,0 @@
-flowchart TD
-    Client["Client Request<br/>cursor + limit"] --> BuildQuery["Build Query with Criteria"]
-    BuildQuery --> AddCursor["Apply _id based Cursor"]
-    AddCursor --> ApplySort["Apply Sort + Secondary _id Sort"]
-    ApplySort --> MongoTemplate["MongoTemplate.find()"]
-    MongoTemplate --> Result["Limited Page Result"]

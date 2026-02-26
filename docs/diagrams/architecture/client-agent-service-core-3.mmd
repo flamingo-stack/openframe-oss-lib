@@ -1,0 +1,5 @@
+flowchart LR
+    Stream["INSTALLED_AGENTS Stream"] --> Consumer["Durable Consumer"]
+    Consumer --> Listener["Installed Agent Listener"]
+    Listener --> Service["Installed Agent Service"]
+    Service --> Ack["Message Ack"]

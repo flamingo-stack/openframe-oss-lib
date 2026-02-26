@@ -163,6 +163,58 @@ export const Disabled: Story = {
 };
 
 /**
+ * Date picker with label.
+ */
+export const WithLabel: Story = {
+  render: function Render() {
+    const [date, setDate] = useState<Date | undefined>();
+    return (
+      <DatePicker
+        mode="single"
+        placeholder="Select date"
+        value={date}
+        onChange={setDate}
+        label="Start Date"
+      />
+    );
+  },
+};
+
+/**
+ * Date picker with label and error.
+ */
+export const WithLabelAndError: Story = {
+  render: function Render() {
+    return (
+      <DatePicker
+        mode="single"
+        placeholder="Select date"
+        label="Start Date"
+        error="Please select a valid date"
+      />
+    );
+  },
+};
+
+/**
+ * Date range picker with label.
+ */
+export const RangeWithLabel: Story = {
+  render: function Render() {
+    const [range, setRange] = useState<DateRange | undefined>();
+    return (
+      <DatePicker
+        mode="range"
+        placeholder="Select date range"
+        value={range}
+        onChange={setRange}
+        label="Period"
+      />
+    );
+  },
+};
+
+/**
  * Date picker with custom date format.
  */
 export const CustomFormat: Story = {
@@ -230,6 +282,42 @@ export const InputStyle: Story = {
 };
 
 /**
+ * DatePickerInput with label.
+ */
+export const InputWithLabel: Story = {
+  render: function Render() {
+    const [date, setDate] = useState<Date | undefined>();
+    return (
+      <div style={{ width: "320px" }}>
+        <DatePickerInput
+          placeholder="Select date"
+          value={date}
+          onChange={setDate}
+          label="Event Date"
+        />
+      </div>
+    );
+  },
+};
+
+/**
+ * DatePickerInput with label and error.
+ */
+export const InputWithLabelAndError: Story = {
+  render: function Render() {
+    return (
+      <div style={{ width: "320px" }}>
+        <DatePickerInput
+          placeholder="Select date"
+          label="Event Date"
+          error="Date is required"
+        />
+      </div>
+    );
+  },
+};
+
+/**
  * DatePickerInput with time selector - empty initial state.
  */
 export const InputWithTimeEmpty: Story = {
@@ -260,8 +348,8 @@ export const InputWithTimeEmpty: Story = {
           onChange={setDate}
           showTime
         />
-        <div className="text-[14px] text-[#888] p-3 bg-[#161616] rounded-lg border border-[#3a3a3a]">
-          <span className="text-[#fafafa]">Selected:</span> {formatDateTime()}
+        <div className="text-[14px] text-ods-text-secondary p-3 bg-ods-bg rounded-lg border border-ods-border">
+          <span className="text-ods-text-primary">Selected:</span> {formatDateTime()}
         </div>
       </div>
     );
@@ -306,8 +394,8 @@ export const InputWithTime: Story = {
           onChange={setDate}
           showTime
         />
-        <div className="text-[14px] text-[#888] p-3 bg-[#161616] rounded-lg border border-[#3a3a3a]">
-          <span className="text-[#fafafa]">Selected:</span> {formatDateTime()}
+        <div className="text-[14px] text-ods-text-secondary p-3 bg-ods-bg rounded-lg border border-ods-border">
+          <span className="text-ods-text-primary">Selected:</span> {formatDateTime()}
         </div>
       </div>
     );
@@ -353,8 +441,8 @@ export const InputWithTime24Hour: Story = {
           showTime
           use24HourFormat
         />
-        <div className="text-[14px] text-[#888] p-3 bg-[#161616] rounded-lg border border-[#3a3a3a]">
-          <span className="text-[#fafafa]">Selected:</span> {formatDateTime()}
+        <div className="text-[14px] text-ods-text-secondary p-3 bg-ods-bg rounded-lg border border-ods-border">
+          <span className="text-ods-text-primary">Selected:</span> {formatDateTime()}
         </div>
       </div>
     );
@@ -427,7 +515,7 @@ export const AllVariants: Story = {
         }}
       >
         <div>
-          <label className="text-[14px] text-[#888] mb-2 block">
+          <label className="text-[14px] text-ods-text-secondary mb-2 block">
             Single Date Picker
           </label>
           <DatePicker
@@ -436,13 +524,13 @@ export const AllVariants: Story = {
             value={singleDate}
             onChange={setSingleDate}
           />
-          <div className="text-[12px] text-[#888] mt-2">
+          <div className="text-[12px] text-ods-text-secondary mt-2">
             Selected: {formatSingleDate(singleDate)}
           </div>
         </div>
 
         <div>
-          <label className="text-[14px] text-[#888] mb-2 block">
+          <label className="text-[14px] text-ods-text-secondary mb-2 block">
             Date Range Picker
           </label>
           <DatePicker
@@ -451,13 +539,13 @@ export const AllVariants: Story = {
             value={rangeDate}
             onChange={setRangeDate}
           />
-          <div className="text-[12px] text-[#888] mt-2">
+          <div className="text-[12px] text-ods-text-secondary mt-2">
             Selected: {formatRangeDate(rangeDate)}
           </div>
         </div>
 
         <div>
-          <label className="text-[14px] text-[#888] mb-2 block">
+          <label className="text-[14px] text-ods-text-secondary mb-2 block">
             Date Picker with Time
           </label>
           <DatePickerInput
@@ -466,13 +554,13 @@ export const AllVariants: Story = {
             onChange={setInputDate}
             showTime
           />
-          <div className="text-[12px] text-[#888] mt-2">
+          <div className="text-[12px] text-ods-text-secondary mt-2">
             Selected: {formatDateTime()}
           </div>
         </div>
 
         <div>
-          <label className="text-[14px] text-[#888] mb-2 block">
+          <label className="text-[14px] text-ods-text-secondary mb-2 block">
             Disabled
           </label>
           <DatePicker mode="single" placeholder="Select date" disabled />
@@ -525,8 +613,8 @@ export const SimpleInputWithTime: Story = {
           showTime
           timeInterval={30}
         />
-        <div className="text-[14px] text-[#888] p-3 bg-[#161616] rounded-lg border border-[#3a3a3a]">
-          <span className="text-[#fafafa]">Selected:</span> {formatDateTime()}
+        <div className="text-[14px] text-ods-text-secondary p-3 bg-ods-bg rounded-lg border border-ods-border">
+          <span className="text-ods-text-primary">Selected:</span> {formatDateTime()}
         </div>
       </div>
     );
@@ -572,8 +660,8 @@ export const SimpleInputWithTime15Min: Story = {
           showTime
           timeInterval={15}
         />
-        <div className="text-[14px] text-[#888] p-3 bg-[#161616] rounded-lg border border-[#3a3a3a]">
-          <span className="text-[#fafafa]">Selected:</span> {formatDateTime()}
+        <div className="text-[14px] text-ods-text-secondary p-3 bg-ods-bg rounded-lg border border-ods-border">
+          <span className="text-ods-text-primary">Selected:</span> {formatDateTime()}
         </div>
       </div>
     );
@@ -620,8 +708,8 @@ export const SimpleInputWithTime24Hour: Story = {
           timeInterval={30}
           use24HourFormat
         />
-        <div className="text-[14px] text-[#888] p-3 bg-[#161616] rounded-lg border border-[#3a3a3a]">
-          <span className="text-[#fafafa]">Selected:</span> {formatDateTime()}
+        <div className="text-[14px] text-ods-text-secondary p-3 bg-ods-bg rounded-lg border border-ods-border">
+          <span className="text-ods-text-primary">Selected:</span> {formatDateTime()}
         </div>
       </div>
     );
@@ -649,8 +737,8 @@ export const SimpleInputDateOnly: Story = {
           value={date}
           onChange={setDate}
         />
-        <div className="text-[14px] text-[#888] p-3 bg-[#161616] rounded-lg border border-[#3a3a3a]">
-          <span className="text-[#fafafa]">Selected:</span>{" "}
+        <div className="text-[14px] text-ods-text-secondary p-3 bg-ods-bg rounded-lg border border-ods-border">
+          <span className="text-ods-text-primary">Selected:</span>{" "}
           {date
             ? date.toLocaleDateString("en-US", {
                 weekday: "short",

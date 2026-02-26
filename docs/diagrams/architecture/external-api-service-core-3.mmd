@@ -1,6 +1,7 @@
 flowchart TD
-    LogReq["GET /api/v1/logs"] --> BuildLogFilter["Build LogFilterCriteria"]
-    BuildLogFilter --> LogServiceCall["LogService.queryLogs()"]
-    LogServiceCall --> PageResult["Paginated Result"]
-    PageResult --> LogMapper["LogMapper"]
-    LogMapper --> LogsResponse["LogsResponse"]
+    LogReq["GET /logs"] --> LogCriteria["LogFilterCriteria"]
+    LogCriteria --> LogMapper
+    LogMapper --> LogOptions["LogFilterOptions"]
+    LogOptions --> LogService
+    LogService --> Page["Paginated Result"]
+    Page --> LogsResponse

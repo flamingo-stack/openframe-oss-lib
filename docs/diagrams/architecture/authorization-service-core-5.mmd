@@ -1,10 +1,11 @@
 sequenceDiagram
     participant Browser
-    participant Auth as Authorization Service Core
-    participant IdP as External IdP (Google/Microsoft)
+    participant Authz as Authorization Service Core
+    participant IdP as OIDC Provider
 
-    Browser->>Auth: GET /oauth2/authorization/{provider}
-    Auth->>IdP: Redirect to IdP
-    IdP->>Auth: Authorization Code
-    Auth->>IdP: Exchange Code for Tokens
-    Auth->>Browser: Authenticated Session + JWT
+    Browser->>Authz: GET /invitations/accept/sso
+    Authz->>Browser: Set of_sso_invite cookie + redirect
+    Browser->>IdP: OAuth2 Authorization Request
+    IdP->>Authz: Callback with code
+    Authz->>Authz: InviteSsoHandler
+    Authz->>Browser: Redirect to tenant context

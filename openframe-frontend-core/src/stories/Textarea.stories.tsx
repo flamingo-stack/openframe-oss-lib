@@ -107,6 +107,47 @@ export const Invalid: Story = {
 }
 
 /**
+ * Textarea with label.
+ */
+export const WithLabel: Story = {
+  args: {
+    placeholder: 'Enter description...',
+    label: 'Description',
+  },
+}
+
+/**
+ * Textarea with label and error message.
+ */
+export const WithLabelAndError: Story = {
+  args: {
+    placeholder: 'Enter description...',
+    label: 'Description',
+    error: 'Description is required',
+  },
+}
+
+/**
+ * Textarea with label and value.
+ */
+export const WithLabelAndValue: Story = {
+  args: {
+    label: 'Notes',
+    defaultValue: 'Comprehensive Linux system backup script.',
+  },
+}
+
+/**
+ * Textarea with error only (no label).
+ */
+export const WithErrorOnly: Story = {
+  args: {
+    placeholder: 'Enter description...',
+    error: 'Field cannot be empty',
+  },
+}
+
+/**
  * All textarea variants displayed together for comparison.
  */
 export const AllVariants: Story = {
@@ -121,6 +162,9 @@ export const AllVariants: Story = {
       <Textarea placeholder="Invalid state" invalid />
       <Textarea placeholder="Custom rows" rows={8} />
       <Textarea placeholder="No resize" className="!resize-none" />
+      <Textarea label="With Label" placeholder="Enter description..." />
+      <Textarea label="With Error" placeholder="Enter description..." error="Description is required" />
+      <Textarea label="Valid Value" defaultValue="Some text content" />
     </div>
   ),
 }

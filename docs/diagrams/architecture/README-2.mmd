@@ -1,13 +1,12 @@
-flowchart TD
-    MongoSave["Mongo Repository Save"] --> Aspect["MachineTagEventAspect"]
-    Aspect --> KafkaPublish["Publish MachinePinotMessage"]
-    KafkaPublish --> KafkaCluster["Kafka"]
+sequenceDiagram
+    participant Browser
+    participant Gateway
+    participant Auth as Authorization Service
+    participant Api as API Service
 
-    KafkaCluster --> StreamCore["Stream Processing Core"]
-    StreamCore --> UnifiedEvent["UnifiedLogEvent"]
-    UnifiedEvent --> CassandraStore["Cassandra"]
-
-    StreamCore --> OutboundKafka["Outbound IntegratedToolEvent"]
-
-    ApiQuery["API Query"] --> PinotRepo["PinotClientLogRepository"]
-    PinotRepo --> PinotDB["Pinot"]
+    Browser->>Gateway: Request
+    Gateway->>Auth: Validate JWT (issuer-based)
+    Auth-->>Gateway: Validated
+    Gateway->>Api: Forward request
+    Api-->>Gateway: Response
+    Gateway-->>Browser: Response

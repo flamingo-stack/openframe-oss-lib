@@ -3,7 +3,7 @@
 import { forwardRef, useState } from "react"
 import { cn } from "../../utils/cn"
 import { Button } from "../ui/button"
-import { StatusTag } from "../ui/status-tag"
+import { Tag } from "../ui/tag"
 import { CheckCircle, XCircle } from "lucide-react"
 import type { ApprovalRequestMessageProps } from "./types"
 
@@ -61,10 +61,10 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
           
           {/* Status indicator */}
           <div className="flex">
-            <StatusTag
+            <Tag
               label={status === 'approved' ? 'Approved' : 'Rejected'}
               variant={status === 'approved' ? 'success' : 'error'}
-              leftIcon={status === 'approved' ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+              icon={status === 'approved' ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
             />
           </div>
         </div>
@@ -109,7 +109,7 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
             disabled={isProcessing}
             className={cn(
               "bg-ods-accent hover:bg-ods-accent/90",
-              "font-['Azeret_Mono'] font-medium sm:!text-sm text-ods-bg uppercase tracking-[-0.28px]",
+              "font-mono font-medium sm:!text-sm text-ods-bg uppercase tracking-[-0.28px]",
               "px-2 py-1 h-auto"
             )}
           >
@@ -122,7 +122,7 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
             disabled={isProcessing}
             className={cn(
               "bg-ods-card border-ods-border",
-              "font-['Azeret_Mono'] font-medium sm:!text-sm text-ods-text-primary uppercase tracking-[-0.28px]",
+              "font-mono font-medium sm:!text-sm text-ods-text-primary uppercase tracking-[-0.28px]",
               "hover:bg-ods-bg px-2 py-1 h-auto"
             )}
           >

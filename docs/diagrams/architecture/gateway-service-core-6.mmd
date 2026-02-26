@@ -1,9 +1,10 @@
 flowchart TD
-    Client["External Client"] --> Gateway["Gateway Filter"]
-    Gateway --> ApiKeyCheck{{"API Key Present?"}}
-    ApiKeyCheck -->|"No"| Reject["401 Unauthorized"]
-    ApiKeyCheck -->|"Yes"| Validate["Validate API Key"]
-    Validate --> RateCheck{{"Within Rate Limit?"}}
-    RateCheck -->|"No"| TooMany["429 Too Many Requests"]
-    RateCheck -->|"Yes"| Inject["Inject User Context Headers"]
-    Inject --> ExternalService["External API Service"]
+    Client["Client"] --> Gateway["Gateway Service Core"]
+    Gateway --> TokenResolve["Resolve Token or API Key"]
+    TokenResolve --> Auth["Authenticate"]
+    Auth --> Authorize["Authorize"]
+    Authorize --> Route["Route / Proxy"]
+    Route --> Service["Target Service or Tool"]
+    Service --> Response["Response"]
+    Response --> Gateway
+    Gateway --> Client

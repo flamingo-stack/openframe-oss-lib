@@ -1,0 +1,5 @@
+flowchart LR
+    GraphQLNode["Machine Node"] --> TagLoader["TagDataLoader"]
+    GraphQLNode --> ToolConnLoader["ToolConnectionDataLoader"]
+    GraphQLNode --> AgentLoader["InstalledAgentDataLoader"]
+    GraphQLNode --> OrgLoader["OrganizationDataLoader"]

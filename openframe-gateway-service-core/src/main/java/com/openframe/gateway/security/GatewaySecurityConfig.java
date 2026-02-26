@@ -69,7 +69,6 @@ public class GatewaySecurityConfig {
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(
             ServerHttpSecurity http,
-            @Value("${management.endpoints.web.base-path}") String managementBasePath,
             ReactiveAuthenticationManagerResolver<ServerWebExchange> issuerResolver,
             AddAuthorizationHeaderFilter addAuthorizationHeaderFilter
     ) {
@@ -95,7 +94,7 @@ public class GatewaySecurityConfig {
                         .pathMatchers(TOOLS_PREFIX + "/agent/**").hasRole(AGENT)
                         .pathMatchers(WS_TOOLS_PREFIX + "/agent/**").hasRole(AGENT)
                         .pathMatchers(NATS_WS_ENDPOINT_PATH).hasAnyRole(AGENT, ADMIN)
-                        .pathMatchers(CHAT_PREFIX).hasAnyRole(AGENT, ADMIN)
+                        .pathMatchers(CHAT_PREFIX + "/**").hasAnyRole(AGENT, ADMIN)
                         .pathMatchers(CLIENTS_PREFIX + "/**").hasRole(AGENT)
                         .pathMatchers(TOOLS_PREFIX + "/**").hasRole(ADMIN)
                         .pathMatchers(WS_TOOLS_PREFIX + "/**").hasRole(ADMIN)

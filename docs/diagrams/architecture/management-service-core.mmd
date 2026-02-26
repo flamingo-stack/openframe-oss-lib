@@ -1,18 +1,27 @@
 flowchart TD
-    ManagementService["Management Service Core"]
+    Management["Management Service Core"]
 
-    Mongo["MongoDB Domain & Repositories"]
-    Redis["Redis Cache"]
-    Kafka["Kafka Foundation"]
-    Pinot["Pinot Analytics"]
-    Nats["NATS Streams"]
-    Debezium["Debezium Connect"]
-    Tools["Integrated Tools"]
+    subgraph storage["Persistence & Data"]
+        Mongo["MongoDB"]
+        Redis["Redis"]
+        Pinot["Apache Pinot"]
+    end
 
-    ManagementService --> Mongo
-    ManagementService --> Redis
-    ManagementService --> Kafka
-    ManagementService --> Pinot
-    ManagementService --> Nats
-    ManagementService --> Debezium
-    ManagementService --> Tools
+    subgraph messaging["Messaging & CDC"]
+        Kafka["Kafka / Debezium"]
+        NATS["NATS Streams"]
+    end
+
+    subgraph runtime["Runtime Services"]
+        ClientAgent["Client Agent Service"]
+        StreamService["Stream Processing Service"]
+    end
+
+    Management -->|"configures"| Pinot
+    Management -->|"initializes"| NATS
+    Management -->|"creates connectors"| Kafka
+    Management -->|"locks"| Redis
+    Management -->|"persists config"| Mongo
+    Management -->|"publishes updates"| ClientAgent
+    Kafka --> StreamService
+    NATS --> ClientAgent

@@ -1,7 +1,0 @@
-flowchart TD
-    Save["Repository.save()"] --> Aspect["MachineTagEventAspect"]
-    Aspect --> Service["MachineTagEventServiceImpl"]
-    Service --> Build["Build MachinePinotMessage"]
-    Build --> Publish["Publish to Kafka"]
-    Publish --> Stream["Stream Processing Core"]
-    Stream --> Pinot["Pinot Table Update"]

@@ -1,4 +1,7 @@
 flowchart LR
-    Request["HTTP Request"] --> MatchAS{"Authorization<br/>Endpoints?"}
-    MatchAS -->|"Yes"| ASChain["Authorization Server FilterChain"]
-    MatchAS -->|"No"| DefaultChain["Default Security FilterChain"]
+    TokenReq["Token Request"] --> JWKSource["JWKSource"]
+    JWKSource --> TenantCtx["TenantContext.getTenantId()"]
+    TenantCtx --> KeySvc["TenantKeyService"]
+    KeySvc --> Repo["TenantKeyRepository (Mongo)"]
+    KeySvc --> RSA["RSAKey (pub+priv)"]
+    RSA --> Sign["JWT Signing"]

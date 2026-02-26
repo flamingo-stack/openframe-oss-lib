@@ -1,0 +1,5 @@
+flowchart TD
+    GraphQL["GraphQL Query"] --> DataFetcher["DgsComponent DataFetcher"]
+    DataFetcher --> Mapper["GraphQL Mapper"]
+    Mapper --> Service["Domain Service"]
+    Service --> Repository["Repository Layer"]

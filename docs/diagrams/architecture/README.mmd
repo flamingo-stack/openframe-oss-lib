@@ -1,68 +1,27 @@
 flowchart TD
-    subgraph Clients
-        Browser["Browser / Admin UI"]
-        Agent["Client Agent"]
-        ExternalClient["External API Client"]
-    end
+    Client["Browser / External System"] --> Gateway["Gateway Service Core"]
+    Agent["Client Agent"] --> Gateway
 
-    subgraph Edge
-        Gateway["Gateway Service Core"]
-        OAuthBff["Security Core & OAuth BFF"]
-    end
+    Gateway --> Auth["Authorization Service Core"]
+    Gateway --> Api["API Service Core"]
+    Gateway --> External["External API Service Core"]
 
-    subgraph Identity
-        Authz["Authorization Service Core"]
-    end
+    Api --> Contracts["API Lib Contracts"]
+    External --> Contracts
 
-    subgraph ApiLayer
-        ApiCore["Api Service Core"]
-        ExternalApi["External Api Service Core"]
-        Contracts["Api Lib Contracts"]
-    end
+    Api --> Mongo["Mongo Persistence Layer"]
+    Api --> DataCore["Data Platform Core"]
 
-    subgraph ClientLayer
-        ClientCore["Client Service Core"]
-        Nats["NATS"]
-    end
+    DataCore --> Cassandra["Cassandra"]
+    DataCore --> Pinot["Apache Pinot"]
+    DataCore --> Kafka["Kafka Messaging Layer"]
+    DataCore --> Redis["Redis Caching Layer"]
 
-    subgraph Streaming
-        Kafka["Data Kafka Foundation"]
-        StreamCore["Stream Processing Core"]
-    end
+    Kafka --> Stream["Stream Processing Service Core"]
+    Stream --> Cassandra
+    Stream --> Kafka
 
-    subgraph DataLayer
-        Mongo["Data Mongo Domain & Repos"]
-        Redis["Data Redis Cache"]
-        Cassandra["Cassandra"]
-        Pinot["Pinot"]
-    end
-
-    subgraph Management
-        Mgmt["Management Service Core"]
-    end
-
-    Browser --> OAuthBff
-    OAuthBff --> Authz
-    Browser --> Gateway
-    ExternalClient --> Gateway
-    Agent --> ClientCore
-
-    Gateway --> ApiCore
-    Gateway --> ExternalApi
-
-    ApiCore --> Contracts
-    ExternalApi --> Contracts
-    Contracts --> Mongo
-
-    ClientCore --> Mongo
-    ClientCore --> Nats
-
-    ApiCore --> Kafka
-    Kafka --> StreamCore
-    StreamCore --> Cassandra
-    StreamCore --> Pinot
-
-    ApiCore --> Redis
-    Mgmt --> Kafka
-    Mgmt --> Nats
-    Mgmt --> Pinot
+    Management["Management Service Core"] --> Kafka
+    Management --> Pinot
+    Management --> Mongo
+    Management --> NATS["NATS Streams"]

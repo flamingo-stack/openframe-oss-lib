@@ -10,8 +10,10 @@ public interface CustomMachineRepository {
     Query buildDeviceQuery(MachineQueryFilter filter, String search);
 
     List<Machine> findMachinesWithCursor(Query query, String cursor, int limit, String sortField, String sortDirection);
-    
+
+    long countMachines(Query query);
+
     boolean isSortableField(String field);
-    
+
     String getDefaultSortField();
 }

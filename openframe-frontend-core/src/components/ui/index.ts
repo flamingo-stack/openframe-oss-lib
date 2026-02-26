@@ -10,7 +10,7 @@ export * from './checkbox-block'
 export * from './checkbox-with-description'
 export * from './content-loader'
 export * from './date-picker'
-export * from './error-state'
+export * from './field-wrapper'
 export * from './info-card'
 export * from './info-row'
 export * from './input'
@@ -23,6 +23,7 @@ export * from './radio-group'
 export * from './select'
 export * from './switch'
 export * from './tags-input'
+export * from './category-management-modal'
 export * from './textarea'
 // Layout components
 export * from './alert-dialog'
@@ -32,6 +33,7 @@ export * from './image-gallery-modal'
 export * from './modal'
 export * from './separator'
 export * from './sheet'
+export * from './drawer'
 export * from './tabs'
 // Navigation components
 export * from './accordion'
@@ -76,16 +78,14 @@ export * from './mobile-filter-sheet'
 export * from './more-actions-menu'
 export * from './organization-card'
 export * from './page-actions'
-export * from './search-bar'
-export * from './selectable-device-card'
 export * from './service-card'
 export * from './slider'
 export * from './square-avatar'
-export * from './status-tag'
 export * from './tag'
 export * from './title-content-block'
 export * from './toggle'
 export * from './tooltip'
+export * from './error-state'
 
 // Table components
 export {
@@ -96,6 +96,19 @@ export {
 
 export type {
   PagePagination, RowAction, TableCardSkeletonProps, TableCellProps, TableColumn, TableDescriptionCellProps, TableEmptyStateProps, TableHeaderProps, TableProps, TableRowProps, TableTimestampCellProps
+} from './table'
+
+// Query Report Table (dynamic columns for osquery results)
+export {
+  QueryReportTable, QueryReportTableHeader,
+  QueryReportTableRow, QueryReportTableSkeleton,
+  deriveColumns, exportToCSV
+} from './table'
+
+export type {
+  QueryReportTableProps, QueryReportTableHeaderProps,
+  QueryReportTableRowProps, QueryReportTableSkeletonProps,
+  QueryResultRow
 } from './table'
 
 // Pagination components

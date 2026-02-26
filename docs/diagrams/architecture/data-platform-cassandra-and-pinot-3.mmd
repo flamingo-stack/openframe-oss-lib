@@ -1,6 +1,0 @@
-flowchart TD
-    API["API Request"] --> Build["PinotQueryBuilder"]
-    Build --> Execute["Pinot Connection Execute"]
-    Execute --> Map["ResultSet Mapping"]
-    Map --> Projection["LogProjection Objects"]
-    Projection --> Response["Returned to API Layer"]

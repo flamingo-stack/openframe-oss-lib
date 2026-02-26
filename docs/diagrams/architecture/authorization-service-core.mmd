@@ -1,8 +1,20 @@
 flowchart TD
-    Browser["Browser or SPA Client"] -->|"/oauth2/authorize"| AuthServer["Authorization Service Core"]
-    AuthServer -->|"JWT Access Token"| Browser
-    Browser -->|"Bearer Token"| Gateway["Gateway Service Core"]
-    Gateway --> API["API Service Core"]
+    Browser["User Browser"] --> Login["Login Page /oauth2/authorize"]
+    Login --> AuthServer["Authorization Service Core"]
 
-    AuthServer --> Mongo["MongoDB (Users, Tenants, OAuth2)"]
-    AuthServer --> JWKS["Per-Tenant JWKS Endpoint"]
+    subgraph authz["Authorization Service Core"]
+        TenantFilter["TenantContextFilter"]
+        AuthzConfig["AuthorizationServerConfig"]
+        SecurityCfg["SecurityConfig"]
+        KeyService["TenantKeyService"]
+        MongoAuthSvc["MongoAuthorizationService"]
+        ClientRepo["MongoRegisteredClientRepository"]
+    end
+
+    AuthServer --> Mongo[("MongoDB")]
+    AuthServer --> KeyService
+    KeyService --> Mongo
+
+    AuthServer --> JWT["Signed JWT (per-tenant key)"]
+    JWT --> Gateway["Gateway Service Core"]
+    Gateway --> ApiSvc["API Service Core"]

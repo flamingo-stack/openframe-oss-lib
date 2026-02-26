@@ -1,0 +1,7 @@
+flowchart TD
+    Client["API Request with Cursor"] --> QueryBuild["Build Query + Filter"]
+    QueryBuild --> CursorApply["Apply ObjectId Cursor"]
+    CursorApply --> SortApply["Apply Sort Field + Direction"]
+    SortApply --> LimitApply["Apply Limit"]
+    LimitApply --> MongoTemplate
+    MongoTemplate --> Results["Paginated Results"]

@@ -1,7 +1,5 @@
 flowchart TD
-    Client["Admin or Agent"] --> Controller["IntegrationController"]
-    Controller --> ProxyService["RestProxyService"]
-    ProxyService --> ToolService["External Tool API"]
-    ToolService --> ProxyService
-    ProxyService --> Controller
-    Controller --> Client
+    Request["Request"] --> AddAuth["AddAuthorizationHeaderFilter"]
+    AddAuth --> JwtAuth["JWT Authentication"]
+    JwtAuth --> RoleCheck["Role Authorization"]
+    RoleCheck --> Controller["Controller or Route"]

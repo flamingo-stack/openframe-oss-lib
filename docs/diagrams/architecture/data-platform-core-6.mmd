@@ -1,0 +1,5 @@
+flowchart TD
+    Request["Secret Requested"] --> ToolLookup["IntegratedToolService"]
+    ToolLookup --> UrlLookup["ToolUrlService"]
+    UrlLookup --> Client["External SDK Client"]
+    Client --> Secret["Enrollment Secret"]

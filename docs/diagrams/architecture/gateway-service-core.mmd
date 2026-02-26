@@ -1,20 +1,12 @@
-flowchart TD
-    Client["Client / UI / Agent"] --> Gateway["Gateway Service Core"]
+flowchart LR
+    Client["Client / Browser"] --> Gateway["Gateway Service Core"]
+    Agent["Tool Agent"] --> Gateway
 
     Gateway --> ApiService["API Service Core"]
     Gateway --> ExternalApi["External API Service Core"]
-    Gateway --> ClientService["Client Service Core"]
+    Gateway --> AuthService["Authorization Service Core"]
     Gateway --> Tools["Integrated Tools"]
-    Gateway --> Nats["NATS WebSocket"]
+    Gateway --> Nats["NATS WebSocket Endpoint"]
 
-    subgraph security_layer["Security & Filtering"]
-        JwtAuth["JWT Authentication"]
-        ApiKeyAuth["API Key Authentication"]
-        RateLimit["Rate Limiting"]
-        Cors["CORS Handling"]
-    end
-
-    Gateway --> JwtAuth
-    Gateway --> ApiKeyAuth
-    Gateway --> RateLimit
-    Gateway --> Cors
+    Gateway --> Mongo["Mongo Persistence Layer"]
+    Gateway --> Redis["Redis Caching Layer"]

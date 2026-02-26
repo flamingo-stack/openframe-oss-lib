@@ -61,20 +61,22 @@ public class DeviceService {
 
         CursorPaginationCriteria normalizedPagination = paginationCriteria.normalize();
         Query query = buildDeviceQuery(filterOptions, search);
-        
+
         String sortField = validateSortField(sort != null ? sort.getField() : null);
-        SortDirection sortDirection = (sort != null && sort.getDirection() != null) ? 
+        SortDirection sortDirection = (sort != null && sort.getDirection() != null) ?
             sort.getDirection() : SortDirection.DESC;
-        
+
+        long totalFilteredCount = machineRepository.countMachines(query);
+
         List<Machine> pageItems = fetchPageItems(query, normalizedPagination, sortField, sortDirection);
         boolean hasNextPage = pageItems.size() == normalizedPagination.getLimit();
-        
+
         CursorPageInfo pageInfo = buildPageInfo(pageItems, hasNextPage, normalizedPagination.hasCursor());
 
         return CountedGenericQueryResult.<Machine>builder()
                 .items(pageItems)
                 .pageInfo(pageInfo)
-                .filteredCount(pageItems.size())
+                .filteredCount((int) totalFilteredCount)
                 .build();
     }
     

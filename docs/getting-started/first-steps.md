@@ -1,345 +1,493 @@
-# First Steps
+# First Steps with OpenFrame OSS Libraries
 
-Now that you've built OpenFrame OSS Lib, let's explore the key concepts and features that make this library suite powerful for MSP platform development.
+Now that you have OpenFrame OSS Libraries running, let's explore the key features and get you started with the essential operations. This guide covers the first 5 things you should do after installation to understand the platform's capabilities.
 
-## Your First 5 Actions
+## 1. Explore the GraphQL API
 
-### 1. Understand the Module Architecture
+The GraphQL API is your primary interface for querying and manipulating data. Let's start with the GraphQL playground.
 
-OpenFrame OSS Lib organizes functionality into focused, single-responsibility modules:
+### Access GraphQL Playground
+
+Navigate to: `http://localhost:8080/graphiql`
+
+### Discover the Schema
+
+First, explore what's available:
+
+```graphql
+query IntrospectionQuery {
+  __schema {
+    queryType {
+      fields {
+        name
+        description
+        type {
+          name
+        }
+      }
+    }
+  }
+}
+```
+
+### Try Your First Queries
+
+**Query Organizations:**
+```graphql
+query GetOrganizations {
+  organizations(first: 10) {
+    edges {
+      node {
+        id
+        name
+        contactInformation {
+          email
+          phone
+        }
+        createdAt
+        updatedAt
+      }
+    }
+    pageInfo {
+      hasNextPage
+      hasPreviousPage
+      startCursor
+      endCursor
+    }
+  }
+}
+```
+
+**Query Devices (if any exist):**
+```graphql
+query GetDevices {
+  devices(first: 5) {
+    edges {
+      node {
+        id
+        hostname
+        deviceType
+        deviceStatus
+        organization {
+          name
+        }
+        tags {
+          name
+          value
+        }
+      }
+    }
+  }
+}
+```
+
+**Query Logs with Filtering:**
+```graphql
+query GetLogs($filter: LogFilterInput) {
+  logs(first: 10, filter: $filter) {
+    edges {
+      node {
+        id
+        message
+        severity
+        timestamp
+        source
+        organization {
+          name
+        }
+      }
+    }
+  }
+}
+```
+
+With variables:
+```json
+{
+  "filter": {
+    "severities": ["ERROR", "WARNING"]
+  }
+}
+```
+
+## 2. Understand Multi-Tenant Authentication
+
+OpenFrame OSS Libraries is built with multi-tenancy at its core. Let's explore the authentication system.
+
+### OAuth2/OIDC Discovery
+
+Check the OpenID Connect configuration:
+
+```bash
+curl http://localhost:8080/.well-known/openid-configuration | jq
+```
+
+**Key endpoints you'll see:**
+- `authorization_endpoint` - Start OAuth flows
+- `token_endpoint` - Exchange codes for tokens
+- `userinfo_endpoint` - Get user information
+- `jwks_uri` - Public keys for JWT verification
+
+### Test Token Validation
+
+The system uses JWT tokens for authentication. Each tenant has its own issuer and key pair.
+
+```bash
+# Example of a protected endpoint (will return 401 without proper authentication)
+curl -v http://localhost:8080/api/users
+```
+
+### Create Test Users and Organizations
+
+Use the REST API to create test data:
+
+```bash
+# Create an organization
+curl -X POST http://localhost:8080/api/organizations \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Acme IT Services",
+    "contactInformation": {
+      "email": "admin@acmeit.com",
+      "phone": "+1-555-0199",
+      "website": "https://acmeit.com"
+    },
+    "address": {
+      "street": "123 Tech Street",
+      "city": "San Francisco",
+      "state": "CA",
+      "zipCode": "94105",
+      "country": "US"
+    }
+  }'
+```
+
+## 3. Configure Your First Integration
+
+OpenFrame OSS Libraries supports integration with popular MSP tools like Fleet MDM and TacticalRMM.
+
+### Understanding Tool Types
+
+The system supports these tool types:
 
 ```mermaid
 flowchart LR
-    subgraph "Entry Points"
-        Gateway["Gateway Service"]
-        Auth["Authorization Service"] 
-    end
+    Tools[Integrated Tools] --> Fleet[Fleet MDM]
+    Tools --> Tactical[TacticalRMM]
+    Tools --> Mesh[MeshCentral]
+    Tools --> Custom[Custom Tools]
     
-    subgraph "API Layer"
-        Internal["API Service Core"]
-        External["External API Service"]
-        Contracts["API Lib Contracts"]
-    end
-    
-    subgraph "Core Services"
-        Client["Client Service"]
-        Management["Management Service"]
-        Stream["Stream Service"]
-    end
-    
-    subgraph "Foundation"
-        DataMongo["Data Mongo"]
-        DataRedis["Data Redis"] 
-        DataKafka["Data Kafka"]
-        Security["Security Core"]
-        Core["Core Utils"]
-    end
-    
-    Gateway --> Internal
-    Gateway --> External
-    Auth --> Internal
-    Internal --> Contracts
-    External --> Contracts
-    Client --> DataMongo
-    Internal --> DataMongo
-    Internal --> DataRedis
-    Stream --> DataKafka
+    Fleet --> Devices[Device Management]
+    Tactical --> RMM[Remote Monitoring]
+    Mesh --> Remote[Remote Access]
+    Custom --> API[API Integration]
 ```
 
-**Key Insight**: Each module has a specific purpose and clean interfaces. You can use individual modules or the complete stack.
+### Check Available Tool Endpoints
 
-### 2. Explore the Core Domain Models
+```graphql
+query GetToolsInfo {
+  tools(first: 10) {
+    edges {
+      node {
+        id
+        toolType
+        name
+        connectionStatus
+        toolCredentials {
+          username
+        }
+        toolUrls {
+          type
+          url
+        }
+      }
+    }
+  }
+}
+```
 
-The heart of the platform lies in its domain models. Let's examine the key entities:
+### Tool Connection Status
+
+Monitor tool connections:
+
+```graphql
+query ToolConnectionStatus {
+  tools {
+    edges {
+      node {
+        name
+        connectionStatus
+        lastConnected
+        organization {
+          name
+        }
+      }
+    }
+  }
+}
+```
+
+## 4. Explore Event-Driven Architecture
+
+OpenFrame OSS Libraries is built around event-driven patterns. Let's examine the event system.
+
+### Query Recent Events
+
+```graphql
+query RecentEvents {
+  events(first: 20, orderBy: {field: TIMESTAMP, direction: DESC}) {
+    edges {
+      node {
+        id
+        type
+        source
+        timestamp
+        message
+        metadata
+        organization {
+          name
+        }
+      }
+    }
+  }
+}
+```
+
+### Event Types and Sources
+
+The system processes various event types:
+
+| Event Type | Source | Description |
+|------------|--------|-------------|
+| `DEVICE_CONNECTED` | Client Agent | Device comes online |
+| `DEVICE_DISCONNECTED` | Client Agent | Device goes offline |
+| `TOOL_INSTALLED` | Tool Agent | New tool installed |
+| `LOG_ENTRY` | Various | Log message created |
+| `ALERT_TRIGGERED` | Monitoring | Alert condition met |
+| `SCRIPT_EXECUTED` | RMM Tool | Script execution result |
+
+### Create Test Events
 
 ```bash
-# Navigate to the data models
-cd openframe-data-mongo/src/main/java/com/openframe/data/document/
-
-# Check available domain entities
-ls -la
+# Simulate a device connection event via the API
+curl -X POST http://localhost:8080/api/events \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "DEVICE_CONNECTED",
+    "source": "test-agent",
+    "message": "Device laptop-001 connected",
+    "metadata": {
+      "deviceId": "laptop-001",
+      "ipAddress": "192.168.1.100"
+    }
+  }'
 ```
 
-**Core Domain Concepts:**
+## 5. Set Up API Keys for External Access
 
-| Entity | Purpose | Location |
-|--------|---------|----------|
-| **Tenant** | Multi-tenant organization isolation | `tenant/` |
-| **User** | Authentication and user management | `user/` |
-| **Device/Machine** | Managed endpoints and assets | `device/` |
-| **Organization** | Client/customer entities | `organization/` |
-| **Tool Connection** | Integration with external MSP tools | `tool/` |
-| **Event/Log** | Audit trail and monitoring data | `event/` |
+For external integrations, you'll need API keys. Let's create and manage them.
 
-**Example: Understanding the Device Model**
+### Create an API Key
 
 ```bash
-# Look at the Device document structure
-cat openframe-data-mongo/src/main/java/com/openframe/data/document/device/Device.java
+# This requires authentication in a real scenario
+curl -X POST http://localhost:8080/api/api-keys \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "External Integration Key",
+    "description": "API key for third-party tool integration",
+    "permissions": ["READ_DEVICES", "READ_EVENTS", "WRITE_EVENTS"]
+  }'
 ```
 
-### 3. Discover API Contracts
+### Understanding API Key Types
 
-The API contracts define how services communicate. This is crucial for understanding integration patterns:
-
-```bash
-# Explore API DTOs
-cd openframe-api-lib/src/main/java/com/openframe/api/dto/
-
-# Check device-related APIs
-ls device/
-
-# Look at filter patterns  
-ls */filter/
-```
-
-**API Design Patterns:**
-
-- **Request/Response DTOs**: Clean separation between internal domain and API contracts
-- **Filter Objects**: Sophisticated querying capabilities for each domain
-- **Pagination Support**: Cursor-based pagination for scalability
-- **Mapper Interfaces**: Automated conversion between domain and API models
-
-**Example: Device API Pattern**
-
-```bash
-# See how device filtering works
-find . -name "*Device*" -type f | head -5
-```
-
-### 4. Examine Security Architecture
-
-OpenFrame implements a comprehensive security model. Let's understand the key components:
-
-```bash
-# Security core components
-ls openframe-security-core/src/main/java/com/openframe/security/
-
-# OAuth2 authorization server
-ls openframe-authorization-service-core/src/main/java/com/openframe/authz/
-```
-
-**Security Concepts:**
-
-1. **Multi-tenant OAuth2**: Each tenant has isolated authentication
-2. **JWT-based sessions**: Stateless authentication across services  
-3. **API Key support**: For external service integrations
-4. **Role-based access**: Fine-grained permission model
-5. **SSO Integration**: Google, Microsoft, and custom OIDC providers
-
-**Key Files to Explore:**
-
-```bash
-# JWT configuration
-find . -name "*Jwt*" -type f
-
-# OAuth2 flows  
-find . -name "*OAuth*" -type f
-
-# Authentication principals
-find . -name "*Auth*Principal*" -type f
-```
-
-### 5. Run Your First Integration Test
-
-Let's see the platform in action with the included test suite:
-
-```bash
-# Navigate to test module
-cd openframe-test-service-core/
-
-# Look at available test scenarios
-ls src/main/java/com/openframe/test/tests/
-
-# Run a specific test category
-mvn test -Dtest="*Device*"
-```
-
-**Test Categories Available:**
-
-- **Authentication Tests**: OAuth2 flows and JWT validation
-- **Device Tests**: Device management and agent lifecycle
-- **Organization Tests**: Multi-tenant organization management  
-- **User Tests**: User registration and invitation flows
-- **Integration Tests**: End-to-end API workflows
-
-## Key Concepts Deep Dive
-
-### Multi-Tenancy
-
-OpenFrame is built for multi-tenant SaaS from the ground up:
+The system supports different API key types:
 
 ```mermaid
 flowchart TD
-    Request["`**Incoming Request**`"]
+    ApiKeys[API Keys] --> UserKeys[User-Scoped Keys]
+    ApiKeys --> OrgKeys[Organization Keys]
+    ApiKeys --> SystemKeys[System Keys]
     
-    subgraph Tenant_Resolution["Tenant Resolution"]
-        Domain["`**Domain/Subdomain**
-        tenant1.app.com`"]
-        JWT["`**JWT Claims**  
-        tenant_id claim`"]
-        APIKey["`**API Key**
-        tenant-scoped`"]
-    end
-    
-    subgraph Data_Isolation["Data Isolation"]
-        MongoDB["`**MongoDB**
-        tenant_id field`"]
-        Redis["`**Redis**  
-        tenant: prefix`"]
-        Kafka["`**Kafka**
-        tenant-topics`"]
-    end
-    
-    Request --> Domain
-    Request --> JWT  
-    Request --> APIKey
-    
-    Domain --> MongoDB
-    JWT --> Redis
-    APIKey --> Kafka
+    UserKeys --> ReadWrite[Read/Write Access]
+    OrgKeys --> TenantAccess[Tenant-Scoped Access]
+    SystemKeys --> AdminAccess[Administrative Access]
 ```
 
-### Event-Driven Architecture
-
-The platform processes massive amounts of device and log data through event streams:
-
-```mermaid
-sequenceDiagram
-    participant Agent as Device Agent
-    participant Client as Client Service  
-    participant Kafka as Kafka Stream
-    participant Stream as Stream Processor
-    participant Analytics as Analytics DB
-    
-    Agent->>Client: Heartbeat/Logs
-    Client->>Kafka: Publish Event
-    Kafka->>Stream: Stream Processing
-    Stream->>Analytics: Store Aggregated Data
-    Analytics-->>Client: Query Results
-```
-
-### Integration Patterns
-
-OpenFrame connects with existing MSP tools through standardized patterns:
+### Test API Key Authentication
 
 ```bash
-# Check available integrations
-ls sdk/
-# fleetmdm/  tacticalrmm/
-
-# Look at integration interfaces
-ls openframe-client-core/src/main/java/com/openframe/client/service/
+# Use the API key in subsequent requests
+curl -H "Authorization: Bearer your-api-key-here" \
+     http://localhost:8080/api/devices
 ```
 
-## Common Configuration Patterns
+### Monitor API Key Usage
 
-### 1. Database Configuration
-
-OpenFrame uses multiple databases optimally:
-
-- **MongoDB**: Operational data (users, devices, configurations)
-- **Redis**: Caching and session storage  
-- **Cassandra**: Long-term log and event storage
-- **Pinot**: Real-time analytics and reporting
-
-### 2. Messaging Configuration  
-
-- **Kafka**: Event streaming between services
-- **NATS**: Agent communication and real-time updates
-
-### 3. Security Configuration
-
-- **JWT**: Stateless authentication
-- **OAuth2**: Authorization code flow with PKCE
-- **API Keys**: Service-to-service authentication
-
-## Development Workflows
-
-### Adding a New Domain Entity
-
-1. **Create MongoDB Document** in `openframe-data-mongo`
-2. **Add Repository Interface** with custom queries
-3. **Define API DTOs** in `openframe-api-lib`  
-4. **Create REST Endpoints** in `openframe-api-service-core`
-5. **Add GraphQL DataFetchers** for complex queries
-6. **Write Integration Tests** in `openframe-test-service-core`
-
-### Extending Tool Integrations
-
-1. **Create SDK Module** under `sdk/new-tool`
-2. **Define Client Interface** with tool-specific operations
-3. **Add Authentication Logic** for tool API access
-4. **Implement Data Mapping** between tool and OpenFrame models
-5. **Create Agent Transformer** in `openframe-client-core`
-
-### Building Custom Services
-
-1. **Extend Base Configuration** from `openframe-core`
-2. **Use Security Utilities** from `openframe-security-core`
-3. **Leverage Data Repositories** from `openframe-data-mongo`
-4. **Follow API Patterns** from existing service cores
-
-## Exploring Further
-
-### Documentation Resources
-
-Each module contains comprehensive documentation:
-
-```bash
-# Browse generated documentation for each module
-find . -name "*.md" -path "*/docs/*" | head -10
-
-# Check inline code documentation
-find . -name "*.java" -exec grep -l "@Api\|@Service\|@Component" {} \; | head -5
+```graphql
+query ApiKeyStats {
+  me {
+    apiKeys {
+      id
+      name
+      lastUsed
+      requestCount
+      permissions
+    }
+  }
+}
 ```
 
-### Sample Code Patterns
+## Common Configuration Tasks
 
-Look for these patterns throughout the codebase:
+### Configure SSO (Optional)
 
-- **Service Layer**: `@Service` classes with business logic
-- **Repository Layer**: Spring Data repositories with custom queries
-- **Controller Layer**: `@RestController` with DTO mapping
-- **Security Layer**: Method-level security with `@PreAuthorize`
-- **Configuration Layer**: `@Configuration` with property binding
-
-### Interactive Exploration
+Set up Single Sign-On with Google or Microsoft:
 
 ```bash
-# Find all REST endpoints
-grep -r "@GetMapping\|@PostMapping\|@PutMapping\|@DeleteMapping" --include="*.java" . | head -10
+curl -X POST http://localhost:8080/api/sso-config \
+  -H "Content-Type: application/json" \
+  -d '{
+    "provider": "GOOGLE",
+    "clientId": "your-google-client-id",
+    "clientSecret": "your-google-client-secret",
+    "enabled": true,
+    "autoProvision": true,
+    "allowedDomains": ["yourdomain.com"]
+  }'
+```
 
-# Discover GraphQL schemas  
-find . -name "*.graphqls" -o -name "*DataFetcher.java"
+### Set Up User Invitations
 
-# Locate configuration classes
-find . -name "*Config*.java" | head -10
+Invite team members:
+
+```bash
+curl -X POST http://localhost:8080/api/invitations \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "teammate@yourcompany.com",
+    "role": "USER",
+    "message": "Welcome to our OpenFrame instance!"
+  }'
+```
+
+### Configure Logging Levels
+
+Adjust logging for debugging:
+
+```yaml
+# application.yml
+logging:
+  level:
+    com.openframe: DEBUG
+    com.openframe.stream: TRACE  # For event processing details
+    com.openframe.security: DEBUG  # For auth debugging
+```
+
+## Monitoring Your Setup
+
+### Check Service Health
+
+```bash
+# Main health check
+curl http://localhost:8080/health
+
+# Extended health information
+curl http://localhost:8080/actuator/health
+```
+
+### Monitor Database Connections
+
+```bash
+# MongoDB status
+mongosh --eval "db.runCommand({serverStatus: 1}).connections"
+
+# Redis status
+redis-cli info clients
+```
+
+### Review Application Logs
+
+```bash
+# Follow Spring Boot logs
+tail -f logs/application.log
+
+# Check for specific errors
+grep ERROR logs/application.log
+```
+
+## Performance Testing
+
+### Generate Sample Data
+
+Create test organizations, devices, and events to explore performance:
+
+```bash
+#!/bin/bash
+# create-sample-data.sh
+
+for i in {1..10}; do
+  curl -X POST http://localhost:8080/api/organizations \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"name\": \"Test Org ${i}\",
+      \"contactInformation\": {
+        \"email\": \"admin${i}@testorg.com\"
+      }
+    }"
+done
+```
+
+### Test GraphQL Query Performance
+
+```graphql
+query LoadTest {
+  organizations(first: 100) {
+    edges {
+      node {
+        id
+        name
+        devices(first: 10) {
+          edges {
+            node {
+              id
+              hostname
+              deviceStatus
+            }
+          }
+        }
+      }
+    }
+  }
+}
 ```
 
 ## Next Steps
 
-You're now ready to dive deeper into specific areas:
+You're now familiar with the core capabilities of OpenFrame OSS Libraries! Here's where to go next:
 
-### For API Development
-- **[Architecture Overview](../development/architecture/README.md)** - System design patterns
-- **[Local Development](../development/setup/local-development.md)** - Full development environment
+### **Development Path**
+- **[Development Environment Setup](../development/setup/environment.md)** - Configure your IDE and tools
+- **[Local Development Guide](../development/setup/local-development.md)** - Best practices for development
+- **[Architecture Overview](../development/architecture/README.md)** - Understand the system design
 
-### For Security Implementation
-- **[Security Best Practices](../development/security/README.md)** - Authentication and authorization patterns
+### **Integration Path**
+- **[API Documentation](./reference/architecture/api-service-core-controllers-and-graphql/api-service-core-controllers-and-graphql.md)** - Complete API reference
+- **[Security Guidelines](../development/security/README.md)** - Authentication and authorization
+- **[External API Guide](./reference/architecture/external-api-service-core/external-api-service-core.md)** - Third-party integrations
 
-### For Testing
-- **[Testing Guide](../development/testing/README.md)** - Test structure and best practices
+### **Operations Path**
+- **[Testing Guide](../development/testing/README.md)** - Testing strategies and tools
+- **[Contributing Guidelines](../development/contributing/guidelines.md)** - How to contribute back
 
-### For Contributing
-- **[Contributing Guidelines](../development/contributing/guidelines.md)** - Code style and submission process
+## Getting Help
 
-## Community Support
+- **Community**: Join our [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
+- **Documentation**: Browse the complete [reference docs](./reference/architecture/)
+- **Issues**: Report problems on [GitHub](https://github.com/flamingo-stack/openframe-oss-lib/issues)
 
-Questions or need guidance? The OpenFrame community is here to help:
+---
 
-- **Technical Discussions**: [OpenMSP Slack Community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
-- **Platform Information**: [OpenMSP Website](https://www.openmsp.ai/)
-- **OpenFrame Product**: [https://flamingo.run](https://flamingo.run)
-
-Start exploring and building with OpenFrame OSS Lib – the foundation for next-generation MSP platforms!
+*Congratulations! You've taken your first steps with OpenFrame OSS Libraries. The platform is now ready for serious development and integration work.*

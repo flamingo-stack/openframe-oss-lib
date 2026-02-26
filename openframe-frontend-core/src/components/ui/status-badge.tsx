@@ -5,7 +5,7 @@ import { cn } from '../../utils/cn';
 import { cva, type VariantProps } from 'class-variance-authority';
 
 const statusBadgeVariants = cva(
-  "inline-flex items-center justify-center rounded font-['Azeret_Mono'] font-medium uppercase tracking-wide",
+  "inline-flex items-center justify-center rounded font-mono font-medium uppercase tracking-wide",
   {
     variants: {
       variant: {

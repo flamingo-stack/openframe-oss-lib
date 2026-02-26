@@ -10,6 +10,7 @@ import {
 } from "react-day-picker";
 import { cn } from "../../utils/cn";
 import { Button } from "./button";
+import { FieldWrapper } from "./field-wrapper";
 import {
   Select,
   SelectContent,
@@ -41,6 +42,12 @@ export interface DatePickerBaseProps {
   toDate?: Date;
   /** Locale for formatting */
   locale?: DayPickerProps["locale"];
+  /** Label text displayed above the picker */
+  label?: string;
+  /** Error message displayed below the picker */
+  error?: string;
+  /** When true, renders red error border */
+  invalid?: boolean;
 }
 
 export interface SingleDatePickerProps extends DatePickerBaseProps {
@@ -144,44 +151,44 @@ function DatePickerCalendar({
     weekdays: "flex",
     weekday: cn(
       "size-10 flex items-center justify-center",
-      "text-[14px] font-medium leading-5 text-[#888]"
+      "text-[14px] font-medium leading-5 text-ods-text-secondary"
     ),
     week: "flex",
     day: cn(
       "size-10 flex items-center justify-center",
-      "text-[18px] font-medium leading-6 text-[#fafafa]",
+      "text-[18px] font-medium leading-6 text-ods-text-primary",
       "cursor-pointer",
       "transition-colors duration-150",
-      "hover:bg-[#3a3a3a] hover:rounded-[6px]"
+      "hover:bg-ods-bg-surface hover:rounded-[6px]"
     ),
     day_button: cn(
       "size-10 flex items-center justify-center",
       "cursor-pointer bg-transparent border-none outline-none",
       "text-inherit font-inherit"
     ),
-    today: "bg-[#3a3a3a] rounded-[6px] hover:!bg-[#3a3a3a]",
+    today: "bg-ods-bg-surface rounded-[6px] hover:!bg-ods-bg-surface",
     selected: cn(
-      "!bg-[#ffc008] !text-[#212121] !font-bold !rounded-[6px] hover:!bg-[#ffc008]",
+      "!bg-ods-accent !text-ods-card !font-bold !rounded-[6px] hover:!bg-ods-accent",
       // In range mode, selected class should not override range_start/range_end/range_middle
       mode === "range" && "range-selected"
     ),
-    outside: "text-[#3a3a3a] opacity-50 hover:!bg-transparent",
-    disabled: "text-[#3a3a3a] cursor-not-allowed hover:!bg-transparent",
+    outside: "text-ods-border opacity-50 hover:!bg-transparent",
+    disabled: "text-ods-border cursor-not-allowed hover:!bg-transparent",
     hidden: "invisible",
     // Range styles matching Figma design:
     // - range_start: bright yellow #ffc008, bold, left radius (full radius if single selection)
     // - range_end: bright yellow #ffc008, bold, right radius
-    // - range_middle: dark yellow #7f6004, medium weight text
+    // - range_middle: dark yellow var(--ods-open-yellow-light), medium weight text
     // Border radius on row edges is handled via CSS in the style tag below
     range_start: cn(
-      "range-start !bg-[#ffc008] !text-[#212121] !font-bold hover:!bg-[#ffc008]",
+      "range-start !bg-ods-accent !text-ods-card !font-bold hover:!bg-ods-accent",
       hasCompleteRange ? "!rounded-l-[6px] !rounded-r-none" : "!rounded-[6px]"
     ),
     range_end: cn(
-      "range-end !bg-[#ffc008] !text-[#212121] !font-bold hover:!bg-[#ffc008]",
+      "range-end !bg-ods-accent !text-ods-card !font-bold hover:!bg-ods-accent",
       hasCompleteRange ? "!rounded-r-[6px] !rounded-l-none" : "!rounded-[6px]"
     ),
-    range_middle: "range-middle !bg-[#7f6004] !text-[#212121] !font-medium !rounded-none hover:!bg-[#7f6004]",
+    range_middle: "range-middle !bg-[var(--ods-open-yellow-light)] !text-ods-card !font-medium !rounded-none hover:!bg-[var(--ods-open-yellow-light)]",
   };
 
   const [month, setMonth] = React.useState<Date>(
@@ -224,20 +231,20 @@ function DatePickerCalendar({
   // - Add row-edge border radius on range middle dates
   const rangeStyles = `
     .date-picker-calendar .range-middle {
-      background-color: #7f6004 !important;
+      background-color: var(--ods-open-yellow-light) !important;
       font-weight: 500 !important;
     }
     .date-picker-calendar .range-middle:hover {
-      background-color: #7f6004 !important;
+      background-color: var(--ods-open-yellow-light) !important;
     }
     .date-picker-calendar .range-start,
     .date-picker-calendar .range-end {
-      background-color: #ffc008 !important;
+      background-color: var(--color-accent-primary) !important;
       font-weight: 700 !important;
     }
     .date-picker-calendar .range-start:hover,
     .date-picker-calendar .range-end:hover {
-      background-color: #ffc008 !important;
+      background-color: var(--color-accent-primary) !important;
     }
     .date-picker-calendar .range-middle:first-child {
       border-top-left-radius: 6px !important;
@@ -251,14 +258,14 @@ function DatePickerCalendar({
 
   if (mode === "single") {
     return (
-      <div className="bg-[#212121] border border-[#3a3a3a] rounded-[6px] overflow-hidden">
+      <div className="bg-ods-card border border-ods-border rounded-[6px] overflow-hidden">
         <div className="flex items-center justify-between px-4 pt-4">
           <CalendarNavButton
             direction="left"
             onClick={handlePreviousMonth}
             aria-label="Previous month"
           />
-          <span className="text-[18px] font-medium leading-6 text-[#fafafa]">
+          <span className="text-[18px] font-medium leading-6 text-ods-text-primary">
             {formatMonthYear(month)}
           </span>
           <CalendarNavButton
@@ -287,7 +294,7 @@ function DatePickerCalendar({
 
   // Range mode
   return (
-    <div className="bg-[#212121] border border-[#3a3a3a] rounded-[6px] overflow-hidden">
+    <div className="bg-ods-card border border-ods-border rounded-[6px] overflow-hidden">
       <style>{rangeStyles}</style>
       <div className="flex">
         {/* First month */}
@@ -298,7 +305,7 @@ function DatePickerCalendar({
               onClick={handlePreviousMonth}
               aria-label="Previous month"
             />
-            <span className="text-[18px] font-medium leading-6 text-[#fafafa]">
+            <span className="text-[18px] font-medium leading-6 text-ods-text-primary">
               {formatMonthYear(month)}
             </span>
             {numberOfMonths === 1 && (
@@ -328,10 +335,10 @@ function DatePickerCalendar({
 
         {/* Second month (if numberOfMonths === 2) */}
         {numberOfMonths === 2 && (
-          <div className="flex-1 border-l border-[#3a3a3a]">
+          <div className="flex-1 border-l border-ods-border">
             <div className="flex items-center justify-between px-4 pt-4">
               <div className="size-10 sm:size-12" />
-              <span className="text-[18px] font-medium leading-6 text-[#fafafa]">
+              <span className="text-[18px] font-medium leading-6 text-ods-text-primary">
                 {formatMonthYear(getSecondMonth(month))}
               </span>
               <CalendarNavButton
@@ -369,12 +376,12 @@ const triggerButtonStyles = cn(
   "flex items-center gap-2 w-full",
   "h-11 sm:h-12 rounded-[6px] border px-3",
   // Colors
-  "bg-[#212121] border-[#3a3a3a]",
+  "bg-ods-card border-ods-border",
   // Typography
   "text-[18px] font-medium leading-6",
   // States
   "hover:border-ods-accent/30",
-  "focus:outline-none focus:ring-1 focus:ring-ods-accent/20 focus:border-ods-accent",
+  "focus:outline-none",
   "disabled:cursor-not-allowed disabled:opacity-50",
   // Animation
   "transition-colors duration-200"
@@ -383,13 +390,13 @@ const triggerButtonStyles = cn(
 const timeSelectTriggerStyles = cn(
   "flex items-center justify-between gap-1",
   "h-11 sm:h-12 min-h-0 px-3 rounded-[6px] border",
-  "bg-[#212121] border-[#3a3a3a]",
+  "bg-ods-card border-ods-border",
   "text-[18px] font-medium leading-6",
   "hover:border-ods-accent/30",
-  "focus:outline-none focus:ring-1 focus:ring-ods-accent/20 focus:border-ods-accent",
+  "focus:outline-none",
   "disabled:cursor-not-allowed disabled:opacity-50",
   "transition-colors duration-200 cursor-pointer",
-  "text-[#fafafa]"
+  "text-ods-text-primary"
 );
 
 // ============================================================================
@@ -406,9 +413,13 @@ export function DatePicker(props: DatePickerProps) {
     fromDate,
     toDate,
     locale,
+    label,
+    error,
+    invalid = false,
   } = props;
 
   const [open, setOpen] = React.useState(false);
+  const isInvalid = invalid || !!error;
 
   const displayValue = React.useMemo(() => {
     if (props.mode === "single") {
@@ -434,19 +445,19 @@ export function DatePicker(props: DatePickerProps) {
     }
   };
 
-  return (
+  const picker = (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
         <button
           type="button"
           disabled={disabled}
-          className={cn(triggerButtonStyles, className)}
+          className={cn(triggerButtonStyles, "group", open && !isInvalid && "border-ods-accent hover:border-ods-accent", isInvalid && "border-ods-error hover:border-ods-error", className)}
         >
-          <Calendar className="size-6 text-[#888] shrink-0" />
+          <Calendar className="size-6 text-ods-text-secondary shrink-0" />
           <span
             className={cn(
               "flex-1 text-left truncate",
-              displayValue ? "text-[#fafafa]" : "text-[#888]"
+              displayValue ? "text-ods-text-primary" : "text-ods-text-secondary"
             )}
           >
             {displayValue || placeholder}
@@ -479,6 +490,16 @@ export function DatePicker(props: DatePickerProps) {
       </Popover.Portal>
     </Popover.Root>
   );
+
+  if (label !== undefined || error !== undefined) {
+    return (
+      <FieldWrapper label={label} error={error}>
+        {picker}
+      </FieldWrapper>
+    );
+  }
+
+  return picker;
 }
 
 // ============================================================================
@@ -521,8 +542,12 @@ export function DatePickerInput({
   onChange,
   showTime = false,
   use24HourFormat = false,
+  label,
+  error,
+  invalid = false,
 }: DatePickerInputProps) {
   const [open, setOpen] = React.useState(false);
+  const isInvalid = invalid || !!error;
 
   const displayValue = value ? formatDate(value) : "";
 
@@ -595,21 +620,21 @@ export function DatePickerInput({
   const hourOptions = React.useMemo(() => generateHourOptions(use24HourFormat), [use24HourFormat]);
   const minuteOptions = React.useMemo(() => generateMinuteOptions(), []);
 
-  return (
-    <div className={cn("flex items-center gap-2", className)}>
+  const content = (
+    <div className={cn("flex items-center gap-2", !label && !error && className)}>
       {/* Date Picker */}
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild>
           <button
             type="button"
             disabled={disabled}
-            className={cn(triggerButtonStyles, "flex-1")}
+            className={cn(triggerButtonStyles, "group", open && !isInvalid && "border-ods-accent hover:border-ods-accent", isInvalid && "border-ods-error hover:border-ods-error", "flex-1")}
           >
-            <Calendar className="size-6 text-[#888] shrink-0" />
+            <Calendar className="size-6 text-ods-text-secondary shrink-0" />
             <span
               className={cn(
                 "flex-1 text-left truncate",
-                displayValue ? "text-[#fafafa]" : "text-[#888]"
+                displayValue ? "text-ods-text-primary" : "text-ods-text-secondary"
               )}
             >
               {displayValue || placeholder}
@@ -663,7 +688,7 @@ export function DatePickerInput({
             </SelectContent>
           </Select>
 
-          <span className="text-[#888] text-[18px] font-medium">:</span>
+          <span className="text-ods-text-secondary text-[18px] font-medium">:</span>
 
           {/* Minute Select */}
           <Select
@@ -703,6 +728,16 @@ export function DatePickerInput({
       )}
     </div>
   );
+
+  if (label !== undefined || error !== undefined) {
+    return (
+      <FieldWrapper label={label} error={error} className={className}>
+        {content}
+      </FieldWrapper>
+    );
+  }
+
+  return content;
 }
 
 // ============================================================================
@@ -764,8 +799,12 @@ export function DatePickerInputSimple({
   showTime = false,
   timeInterval = 30,
   use24HourFormat = false,
+  label,
+  error,
+  invalid = false,
 }: DatePickerInputSimpleProps) {
   const [open, setOpen] = React.useState(false);
+  const isInvalid = invalid || !!error;
 
   const displayValue = value ? formatDate(value) : "";
 
@@ -816,21 +855,21 @@ export function DatePickerInputSimple({
     [timeInterval, use24HourFormat]
   );
 
-  return (
-    <div className={cn("flex items-center gap-2", className)}>
+  const content = (
+    <div className={cn("flex items-center gap-2", !label && !error && className)}>
       {/* Date Picker */}
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild>
           <button
             type="button"
             disabled={disabled}
-            className={cn(triggerButtonStyles, "flex-1")}
+            className={cn(triggerButtonStyles, "group", open && !isInvalid && "border-ods-accent hover:border-ods-accent", isInvalid && "border-ods-error hover:border-ods-error", "flex-1")}
           >
-            <Calendar className="size-6 text-[#888] shrink-0" />
+            <Calendar className="size-6 text-ods-text-secondary shrink-0" />
             <span
               className={cn(
                 "flex-1 text-left truncate",
-                displayValue ? "text-[#fafafa]" : "text-[#888]"
+                displayValue ? "text-ods-text-primary" : "text-ods-text-secondary"
               )}
             >
               {displayValue || placeholder}
@@ -886,6 +925,16 @@ export function DatePickerInputSimple({
       )}
     </div>
   );
+
+  if (label !== undefined || error !== undefined) {
+    return (
+      <FieldWrapper label={label} error={error} className={className}>
+        {content}
+      </FieldWrapper>
+    );
+  }
+
+  return content;
 }
 
 // ============================================================================

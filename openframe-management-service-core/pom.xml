@@ -34,10 +34,6 @@
             <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-data-kafka</artifactId>
         </dependency>
-        <dependency>
-            <groupId>com.openframe.oss</groupId>
-            <artifactId>openframe-idp-configuration</artifactId>
-        </dependency>
         <!-- OpenFrame SDKs -->
         <dependency>
             <groupId>com.openframe.oss</groupId>

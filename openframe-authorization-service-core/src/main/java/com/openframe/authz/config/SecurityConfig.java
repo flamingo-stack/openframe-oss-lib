@@ -86,7 +86,7 @@ public class SecurityConfig {
                                 "/login",
                                 "/favicon.ico",
                                 "/tenant/**",
-                                "/management/v1/**",
+                                "/management/**",
                                 "/.well-known/**",
                                 "/error",
                                 "/sso/providers/**"
