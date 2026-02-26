@@ -39,13 +39,15 @@ public class ToolApiWebSocketProxyUrlFilter extends ToolWebSocketProxyUrlFilter 
 
     @Override
     protected ServerWebExchange mutateExchange(ServerWebExchange exchange, IntegratedTool tool) {
+        ServerWebExchange mutateExchange = super.mutateExchange(exchange, tool);
+
         Map<String, String> apiKeyHeaders = apiKeyHeadersResolver.resolve(tool);
         if (apiKeyHeaders.isEmpty()) {
-            return exchange;
+            return mutateExchange;
         }
 
-        return exchange.mutate()
-                .request(r -> apiKeyHeaders.forEach(r::header))
+        return mutateExchange.mutate()
+                .request(r -> r.headers(h -> apiKeyHeaders.forEach(h::set)))
                 .build();
     }
 }

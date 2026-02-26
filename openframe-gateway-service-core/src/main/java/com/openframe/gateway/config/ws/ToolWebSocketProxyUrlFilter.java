@@ -67,7 +67,9 @@ public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Orde
     }
 
     protected ServerWebExchange mutateExchange(ServerWebExchange exchange, IntegratedTool tool) {
-        return exchange;
+        return exchange.mutate()
+                .request(r -> r.headers(h -> h.remove("Origin")))
+                .build();
     }
 
     private Mono<IntegratedTool> getTool(String toolId) {
