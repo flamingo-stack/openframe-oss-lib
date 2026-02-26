@@ -1,6 +1,7 @@
 package com.openframe.gateway.config.ws;
 
 import com.openframe.core.service.ProxyUrlResolver;
+import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.tool.ToolUrl;
 import com.openframe.data.document.tool.ToolUrlType;
 import com.openframe.data.reactive.repository.tool.ReactiveIntegratedToolRepository;
@@ -12,6 +13,7 @@ import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.RouteToRequestUrlFilter;
 import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.core.Ordered;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
@@ -21,6 +23,8 @@ import java.net.URI;
 @RequiredArgsConstructor
 @Slf4j
 public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Ordered {
+
+    public static final String ORIGINAL_AUTHORIZATION_ATTR = "originalAuthorization";
 
     private final ReactiveIntegratedToolRepository toolRepository;
     private final ToolUrlService toolUrlService;
@@ -39,8 +43,11 @@ public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Orde
 
         String toolId = getRequestToolId(path);
 
-        return getToolUrl(toolId)
-                .flatMap(toolUrl -> {
+        return getTool(toolId)
+                .flatMap(tool -> {
+                    ToolUrl toolUrl = toolUrlService.getUrlByToolType(tool, ToolUrlType.WS)
+                            .orElseThrow(() -> new IllegalArgumentException("Tool " + toolId + " have no web socket url"));
+
                     String endpointPrefix = getEndpointPrefix();
                     URI proxyUri = proxyUrlResolver.resolve(toolId, toolUrl.getUrl(), toolUrl.getPort(), requestUri, endpointPrefix);
 
@@ -49,21 +56,28 @@ public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Orde
                     exchange.getAttributes()
                             .put(ServerWebExchangeUtils.GATEWAY_REQUEST_URL_ATTR, proxyUri);
 
-                    return chain.filter(exchange);
+                    String originalAuthorization = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+                    if (originalAuthorization != null) {
+                        exchange.getAttributes().put(ORIGINAL_AUTHORIZATION_ATTR, originalAuthorization);
+                    }
+
+                    ServerWebExchange mutatedExchange = mutateExchange(exchange, tool);
+                    return chain.filter(mutatedExchange);
                 });
     }
 
-    private Mono<ToolUrl> getToolUrl(String toolId) {
+    protected ServerWebExchange mutateExchange(ServerWebExchange exchange, IntegratedTool tool) {
+        return exchange;
+    }
+
+    private Mono<IntegratedTool> getTool(String toolId) {
         return toolRepository.findById(toolId)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("Tool not found: " + toolId)))
                 .flatMap(tool -> {
                     if (!tool.isEnabled()) {
                         return Mono.error(new IllegalArgumentException("Tool " + tool.getName() + " is not enabled"));
                     }
-
-                    return toolUrlService.getUrlByToolType(tool, ToolUrlType.WS)
-                            .map(Mono::just)
-                            .orElse(Mono.error(new IllegalArgumentException("Tool " + tool.getName() + " have no web socket url")));
+                    return Mono.just(tool);
                 });
     }
 
