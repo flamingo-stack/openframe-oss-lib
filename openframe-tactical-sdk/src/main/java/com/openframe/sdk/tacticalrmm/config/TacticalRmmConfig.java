@@ -1,10 +1,10 @@
 package com.openframe.sdk.tacticalrmm.config;
 
 import com.openframe.sdk.tacticalrmm.TacticalRmmClient;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 
-@Configuration
+@AutoConfiguration
 public class TacticalRmmConfig {
 
     @Bean
