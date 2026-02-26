@@ -2,6 +2,7 @@ package com.openframe.data.service;
 
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
+import com.openframe.data.nats.publisher.ToolInstallationNatsPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

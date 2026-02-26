@@ -1,14 +1,14 @@
 package com.openframe.api.service;
 
+import com.openframe.api.dto.force.response.ForceAgentStatus;
 import com.openframe.api.dto.force.response.ForceClientUpdateResponse;
 import com.openframe.api.dto.force.response.ForceClientUpdateResponseItem;
-import com.openframe.api.dto.force.response.ForceAgentStatus;
 import com.openframe.api.dto.update.ForceClientUpdateRequest;
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.nats.publisher.OpenFrameClientUpdatePublisher;
 import com.openframe.data.repository.clientconfiguration.OpenFrameClientConfigurationRepository;
 import com.openframe.data.repository.device.MachineRepository;
-import com.openframe.data.service.OpenFrameClientUpdatePublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

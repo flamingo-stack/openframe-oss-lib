@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.service.InstalledAgentService;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
 import com.openframe.core.exception.NatsException;
-import com.openframe.data.model.InstalledAgentMessage;
+import com.openframe.data.nats.model.InstalledAgentMessage;
 import io.nats.client.*;
 import io.nats.client.api.AckPolicy;
 import io.nats.client.api.ConsumerConfiguration;

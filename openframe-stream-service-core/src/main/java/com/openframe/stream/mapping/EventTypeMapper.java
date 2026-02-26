@@ -1,8 +1,9 @@
 package com.openframe.stream.mapping;
 
+import com.openframe.data.cassandra.model.enums.UnifiedEventType;
 import com.openframe.data.model.enums.IntegratedToolType;
-import com.openframe.data.model.enums.UnifiedEventType;
 import lombok.extern.slf4j.Slf4j;
+
 import java.util.HashMap;
 import java.util.Map;
 

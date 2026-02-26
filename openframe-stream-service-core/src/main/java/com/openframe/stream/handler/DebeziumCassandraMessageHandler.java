@@ -1,11 +1,11 @@
 package com.openframe.stream.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.openframe.data.model.UnifiedLogEvent;
-import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
-import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
+import com.openframe.data.cassandra.model.UnifiedLogEvent;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
+import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
+import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.cassandra.repository.CassandraRepository;
 import org.springframework.stereotype.Component;

@@ -3,7 +3,7 @@ package com.openframe.client.listener;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.service.MachineStatusService;
 import com.openframe.core.exception.NatsException;
-import com.openframe.data.model.ClientConnectionEvent;
+import com.openframe.data.nats.model.ClientConnectionEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
