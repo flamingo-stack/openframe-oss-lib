@@ -74,6 +74,7 @@ public class TrmmTaskResultEventDeserializer extends IntegratedToolEventDeserial
         return parseStringField(after, FIELD_STATUS).map(status -> switch (status) {
             case "passing" -> TASK_RESULT_COMPLETED;
             case "failing" -> TASK_RESULT_FAILING;
+            case "pending" -> TASK_RESULT_PENDING;
             default -> "task_result.%s".formatted(status);
         });
     }
