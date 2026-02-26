@@ -26,4 +26,5 @@ public interface AuthUserRepository extends MongoRepository<AuthUser, String> {
      * Find single user by email within a specific tenant regardless of status
      */
     Optional<AuthUser> findByEmailAndTenantId(String email, String tenantId);
+    void deleteByTenantId(String tenantId);
 }

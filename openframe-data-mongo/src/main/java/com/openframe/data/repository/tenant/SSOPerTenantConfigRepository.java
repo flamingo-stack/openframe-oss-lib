@@ -19,4 +19,5 @@ public interface SSOPerTenantConfigRepository extends MongoRepository<SSOPerTena
      * Find per-tenant SSO configs that contain any of the given allowed domains.
      */
     List<SSOPerTenantConfig> findByAllowedDomainsIn(List<String> domains);
+    void deleteByTenantId(String tenantId);
 }

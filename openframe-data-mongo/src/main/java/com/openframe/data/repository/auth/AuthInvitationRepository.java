@@ -12,4 +12,5 @@ public interface AuthInvitationRepository extends MongoRepository<AuthInvitation
     Optional<AuthInvitation> findByTenantIdAndEmailAndStatus(String tenantId, String email, String status);
     List<AuthInvitation> findByTenantIdAndStatusOrderByCreatedAtDesc(String tenantId, String status);
     void deleteByTenantIdAndExpiresAtBefore(String tenantId, Instant cutoff);
+    void deleteByTenantId(String tenantId);
 }
