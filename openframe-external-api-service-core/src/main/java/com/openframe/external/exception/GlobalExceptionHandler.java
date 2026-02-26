@@ -1,8 +1,8 @@
 package com.openframe.external.exception;
 
-import com.openframe.core.dto.ErrorResponse;
-import com.openframe.data.repository.pinot.exception.PinotQueryException;
 import com.openframe.api.exception.DeviceNotFoundException;
+import com.openframe.core.dto.ErrorResponse;
+import com.openframe.data.pinot.repository.exception.PinotQueryException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;

@@ -1,6 +1,6 @@
 package com.openframe.api.exception;
 
-import com.openframe.data.repository.pinot.exception.PinotQueryException;
+import com.openframe.data.pinot.repository.exception.PinotQueryException;
 import graphql.GraphQLError;
 import graphql.execution.DataFetcherExceptionHandlerParameters;
 import graphql.execution.DataFetcherExceptionHandlerResult;

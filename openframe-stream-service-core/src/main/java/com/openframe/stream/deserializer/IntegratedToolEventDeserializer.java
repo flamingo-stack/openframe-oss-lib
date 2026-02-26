@@ -3,13 +3,15 @@ package com.openframe.stream.deserializer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.openframe.stream.mapping.EventTypeMapper;
-import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
-import com.openframe.kafka.model.debezium.DebeziumMessage;
-import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
+import com.openframe.data.cassandra.model.enums.UnifiedEventType;
 import com.openframe.data.model.enums.IntegratedToolType;
 import com.openframe.data.model.enums.MessageType;
-import com.openframe.data.model.enums.UnifiedEventType;
+import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
+import com.openframe.kafka.model.debezium.DebeziumMessage;
+import com.openframe.stream.mapping.EventTypeMapper;
+import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 
 import java.time.Instant;
 import java.time.ZoneId;
@@ -18,9 +20,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 
 @Slf4j
 public abstract class IntegratedToolEventDeserializer implements KafkaMessageDeserializer {
