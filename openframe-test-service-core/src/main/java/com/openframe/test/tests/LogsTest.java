@@ -11,9 +11,10 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static com.openframe.test.data.generator.LogGenerator.searchTerm;
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Tag("shared")
+@Tag("saas")
 @DisplayName("Logs")
 public class LogsTest {
 
@@ -22,7 +23,7 @@ public class LogsTest {
     @DisplayName("Get log filters")
     public void testGetLogFilters() {
         LogFilters filters = LogsApi.getLogFilters();
-        assertThat(filters).isNotNull();
+        assertThat(filters).as("Log filters should not be null").isNotNull();
         assertThat(filters.getToolTypes()).as("Expected at least one tool type").isNotEmpty();
         assertThat(filters.getEventTypes()).as("Expected at least one event type").isNotEmpty();
         assertThat(filters.getSeverities()).as("Expected at least one severity").isNotEmpty();
@@ -35,12 +36,12 @@ public class LogsTest {
         List<LogEvent> logs = LogsApi.getLogs();
         assertThat(logs).as("Expected at least one log").isNotEmpty();
         assertThat(logs).allSatisfy(log -> {
-            assertThat(log.getToolEventId()).isNotNull();
-            assertThat(log.getEventType()).isNotEmpty();
-            assertThat(log.getToolType()).isNotEmpty();
-            assertThat(log.getTimestamp()).isNotEmpty();
-            assertThat(log.getIngestDay()).isNotEmpty();
-            assertThat(log.getHostname()).isNotEmpty();
+            assertThat(log.getToolEventId()).as("Log toolEventId should not be null").isNotNull();
+            assertThat(log.getEventType()).as("Log eventType should not be empty").isNotEmpty();
+            assertThat(log.getToolType()).as("Log toolType should not be empty").isNotEmpty();
+            assertThat(log.getTimestamp()).as("Log timestamp should not be empty").isNotEmpty();
+            assertThat(log.getIngestDay()).as("Log ingestDay should not be empty").isNotEmpty();
+            assertThat(log.getHostname()).as("Log hostname should not be empty").isNotEmpty();
         });
     }
 
@@ -52,10 +53,10 @@ public class LogsTest {
         assertThat(logs).as("Expected at least one log to get details").isNotEmpty();
         LogEvent logEvent = logs.getFirst();
         LogDetails details = LogsApi.getLogDetails(logEvent);
-        assertThat(details).isNotNull();
-        assertThat(details.getToolEventId()).isEqualTo(logEvent.getToolEventId());
-        assertThat(details.getEventType()).isEqualTo(logEvent.getEventType());
-        assertThat(details.getToolType()).isEqualTo(logEvent.getToolType());
+        assertThat(details).as("Log details should not be null").isNotNull();
+        assertThat(details.getToolEventId()).as("Log details toolEventId should match").isEqualTo(logEvent.getToolEventId());
+        assertThat(details.getEventType()).as("Log details eventType should match").isEqualTo(logEvent.getEventType());
+        assertThat(details.getToolType()).as("Log details toolType should match").isEqualTo(logEvent.getToolType());
     }
 
     @Tag("read")
@@ -64,12 +65,10 @@ public class LogsTest {
     public void testSearchLogs() {
         List<LogEvent> logs = LogsApi.getLogs();
         assertThat(logs).as("Expected at least one log for search test").isNotEmpty();
-        String searchTerm = logs.getFirst().getSummary().substring(0, 4);
-        List<LogEvent> searchResults = LogsApi.searchLogs(searchTerm);
-        assertThat(searchResults).as("Expected at least one search result for: " + searchTerm).isNotEmpty();
-        assertThat(searchResults).allSatisfy(log ->
-                assertThat(log.getToolType()).isEqualTo(searchTerm)
-        );
+        String searchWord = searchTerm(logs.getFirst().getSummary());
+        List<LogEvent> searchResults = LogsApi.searchLogs(searchWord);
+        assertThat(searchResults).as("Expected at least one search result for: " + searchWord).isNotEmpty();
+        assertThat(searchResults.getFirst().getSummary()).as("Search result summary should contain " + searchWord).contains(searchWord);
     }
 
     @Tag("read")
@@ -84,8 +83,8 @@ public class LogsTest {
         List<LogEvent> logs = LogsApi.getLogs(LogGenerator.severityAndToolFilter(severity, toolType));
         assertThat(logs).as("Expected logs for severity: %s and tool: %s", severity, toolType).isNotEmpty();
         assertThat(logs).allSatisfy(log -> {
-            assertThat(log.getSeverity()).isEqualTo(severity);
-            assertThat(log.getToolType()).isEqualTo(toolType);
+            assertThat(log.getSeverity()).as("Log severity should match filter").isEqualTo(severity);
+            assertThat(log.getToolType()).as("Log toolType should match filter").isEqualTo(toolType);
         });
     }
 }

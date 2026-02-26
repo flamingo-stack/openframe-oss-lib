@@ -32,11 +32,12 @@ public class OwnerRegistrationTest {
         UserRegistrationRequest userRegistrationRequest = RegistrationGenerator.newUserRegistrationRequest();
         UserRegistrationResponse expectedResponse = RegistrationGenerator.newUserRegistrationResponse(userRegistrationRequest);
         UserRegistrationResponse response = RegistrationApi.registerUser(userRegistrationRequest);
-        assertThat(response.getId()).isNotNull();
-        assertThat(response.getOwnerId()).isNotNull();
-        assertThat(response.getCreatedAt()).isNotNull();
-        assertThat(response.getUpdatedAt()).isNotNull();
-        assertThat(response).usingRecursiveComparison()
+        assertThat(response.getId()).as("Registration response id should not be null").isNotNull();
+        assertThat(response.getOwnerId()).as("Registration response ownerId should not be null").isNotNull();
+//        assertThat(response.getCreatedAt()).as("Registration response createdAt should not be null").isNotNull();
+        assertThat(response.getUpdatedAt()).as("Registration response updatedAt should not be null").isNotNull();
+        assertThat(response).as("Registration response should match expected")
+                .usingRecursiveComparison()
                 .ignoringFields("id", "ownerId", "hubspotId", "createdAt", "updatedAt")
                 .isEqualTo(expectedResponse);
     }

@@ -52,13 +52,6 @@ public class FleetHost {
     @JsonProperty("gigs_total_disk_space")
     private double gigsTotalDiskSpace;
 
-    // Network
-    @JsonProperty("primary_ip")
-    private String primaryIp;
-
-    @JsonProperty("primary_mac")
-    private String primaryMac;
-
     // Users
     private List<FleetUser> users;
 

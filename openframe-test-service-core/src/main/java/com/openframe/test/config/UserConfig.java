@@ -6,11 +6,8 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class UserConfig {
 
-    public static final String DEFAULT_DOMAIN = "localhost";
-
     private static String email;
     private static String password;
-    private static String domain;
     private static User user;
 
     public static User getUser() {
@@ -51,16 +48,7 @@ public class UserConfig {
     }
 
     public static String getDomain() {
-        if (domain == null) {
-            String envVar = System.getenv("TEST_USER_DOMAIN");
-            if (envVar != null && !envVar.trim().isEmpty()) {
-                domain = envVar;
-            } else {
-                domain = DEFAULT_DOMAIN;
-            }
-            log.debug("TEST_USER_DOMAIN: {}", domain);
-        }
-        return domain;
+        return EnvironmentConfig.getUserDomain();
     }
 
 }

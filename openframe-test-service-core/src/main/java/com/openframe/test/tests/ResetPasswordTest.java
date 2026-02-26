@@ -24,12 +24,12 @@ public class ResetPasswordTest {
         User user = UserConfig.getUser();
         UserApi.resetPassword(user);
         String token = Redis.getResetToken(user.getEmail());
-        assertThat(token).isNotNull();
+        assertThat(token).as("Reset token should not be null").isNotNull();
         ResetConfirmRequest confirmRequest = AuthGenerator.resetConfirmRequest(token);
         UserApi.confirmReset(confirmRequest);
         user.setPassword(confirmRequest.getNewPassword());
         MeResponse me = UserApi.me();
-        assertThat(me.isAuthenticated()).isTrue();
+        assertThat(me.isAuthenticated()).as("User should be authenticated after password reset").isTrue();
     }
 
     @Test
@@ -38,6 +38,6 @@ public class ResetPasswordTest {
         String token = "invalid";
         ResetConfirmRequest confirmRequest = AuthGenerator.resetConfirmRequest(token);
         ErrorResponse response = UserApi.attemptConfirmReset(confirmRequest);
-        assertThat(response).isEqualTo(AuthGenerator.invalidTokenResponse());
+        assertThat(response).as("Response should match invalid token error").isEqualTo(AuthGenerator.invalidTokenResponse());
     }
 }

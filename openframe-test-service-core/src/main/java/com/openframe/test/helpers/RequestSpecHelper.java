@@ -5,6 +5,7 @@ import io.restassured.builder.RequestSpecBuilder;
 import io.restassured.config.HttpClientConfig;
 import io.restassured.config.LogConfig;
 import io.restassured.config.SSLConfig;
+import io.restassured.filter.log.RequestLoggingFilter;
 import io.restassured.http.ContentType;
 import io.restassured.specification.RequestSpecification;
 
@@ -37,6 +38,7 @@ public class RequestSpecHelper {
                                 .setParam("http.connection.timeout", (int) DEFAULT_TIMEOUT.toMillis())
                                 .setParam("http.socket.timeout", (int) DEFAULT_TIMEOUT.toMillis())))
                 .setBaseUri(getBaseUrl())
+                .addFilter(new RequestLoggingFilter())
                 .setContentType(ContentType.JSON);
     }
 
@@ -49,6 +51,7 @@ public class RequestSpecHelper {
                                 .setParam("http.connection.timeout", (int) DEFAULT_TIMEOUT.toMillis())
                                 .setParam("http.socket.timeout", (int) DEFAULT_TIMEOUT.toMillis())))
                 .setBaseUri(getAuthUrl())
+                .addFilter(new RequestLoggingFilter())
                 .build();
     }
 }

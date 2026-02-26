@@ -27,10 +27,11 @@ public class UserInvitationsTest {
         Invitation apiInvitation = InvitationApi.inviteUser(invitationRequest);
         Invitation dbInvitation = InvitationsCollection.findInvitation(invitationRequest.getEmail());
         assertThat(dbInvitation).as("No invitation found in DB").isNotNull();
-        assertThat(apiInvitation).usingRecursiveComparison()
+        assertThat(apiInvitation).as("API invitation should match DB invitation")
+                .usingRecursiveComparison()
                 .ignoringFields("updatedAt", "expiresAt", "createdAt").isEqualTo(dbInvitation);
-        assertThat(apiInvitation.getCreatedAt()).isCloseTo(dbInvitation.getCreatedAt(), within(1, ChronoUnit.SECONDS));
-        assertThat(apiInvitation.getExpiresAt()).isCloseTo(dbInvitation.getExpiresAt(), within(1, ChronoUnit.SECONDS));
+        assertThat(apiInvitation.getCreatedAt()).as("Invitation createdAt should be close to DB value").isCloseTo(dbInvitation.getCreatedAt(), within(1, ChronoUnit.SECONDS));
+        assertThat(apiInvitation.getExpiresAt()).as("Invitation expiresAt should be close to DB value").isCloseTo(dbInvitation.getExpiresAt(), within(1, ChronoUnit.SECONDS));
     }
 
     @Order(2)
@@ -41,7 +42,7 @@ public class UserInvitationsTest {
         assertThat(dbInvitation).as("No Pending invitation found in DB").isNotNull();
         AcceptInvitationRequest request = InvitationGenerator.acceptInvitationRequest(dbInvitation);
         AcceptInvitationResponse response = InvitationApi.acceptInvitation(request);
-        assertThat(response.getEmail()).isEqualTo(dbInvitation.getEmail());
+        assertThat(response.getEmail()).as("Accepted invitation email should match DB invitation").isEqualTo(dbInvitation.getEmail());
     }
 
     @Order(3)
@@ -53,7 +54,7 @@ public class UserInvitationsTest {
         AcceptInvitationRequest request = InvitationGenerator.acceptInvitationRequest(dbInvitation);
         InvitationConflictResponse expectedResponse = InvitationGenerator.alreadyAcceptedResponse();
         InvitationConflictResponse response = InvitationApi.attemptAcceptInvitation(request);
-        assertThat(response).isEqualTo(expectedResponse);
+        assertThat(response).as("Response should match already accepted error").isEqualTo(expectedResponse);
     }
 
     @Order(4)
@@ -65,7 +66,7 @@ public class UserInvitationsTest {
         InvitationApi.revokeInvitation(apiInvitation.getId());
         Invitation dbInvitation = InvitationsCollection.findInvitation(invitationRequest.getEmail());
         assertThat(dbInvitation).as("No invitation found in DB").isNotNull();
-        assertThat(dbInvitation.getStatus()).isEqualTo(InvitationStatus.REVOKED);
+        assertThat(dbInvitation.getStatus()).as("Invitation status should be REVOKED").isEqualTo(InvitationStatus.REVOKED);
     }
 
     @Order(5)
@@ -77,7 +78,7 @@ public class UserInvitationsTest {
         AcceptInvitationRequest request = InvitationGenerator.acceptInvitationRequest(dbInvitation);
         InvitationConflictResponse expectedResponse = InvitationGenerator.invitationRevokedResponse();
         InvitationConflictResponse response = InvitationApi.attemptAcceptInvitation(request);
-        assertThat(response).isEqualTo(expectedResponse);
+        assertThat(response).as("Response should match invitation revoked error").isEqualTo(expectedResponse);
     }
 
     @Order(6)
@@ -89,7 +90,7 @@ public class UserInvitationsTest {
         InvitationRequest invitationRequest = InvitationGenerator.existingUserInvitationRequest(activeUser);
         InvitationConflictResponse expectedResponse = InvitationGenerator.userAlreadyExistsResponse(activeUser);
         InvitationConflictResponse response = InvitationApi.attemptInviteUser(invitationRequest);
-        assertThat(response).isEqualTo(expectedResponse);
+        assertThat(response).as("Response should match user already exists error").isEqualTo(expectedResponse);
     }
 
 
@@ -101,7 +102,7 @@ public class UserInvitationsTest {
         assertThat(deletedUser).as("User is not found in DB").isNotNull();
         InvitationRequest invitationRequest = InvitationGenerator.existingUserInvitationRequest(deletedUser);
         Invitation apiInvitation = InvitationApi.inviteUser(invitationRequest);
-        assertThat(apiInvitation.getStatus()).isEqualTo(InvitationStatus.PENDING);
-        assertThat(apiInvitation.getEmail()).isEqualTo(deletedUser.getEmail());
+        assertThat(apiInvitation.getStatus()).as("Invitation status should be PENDING").isEqualTo(InvitationStatus.PENDING);
+        assertThat(apiInvitation.getEmail()).as("Invitation email should match deleted user email").isEqualTo(deletedUser.getEmail());
     }
 }

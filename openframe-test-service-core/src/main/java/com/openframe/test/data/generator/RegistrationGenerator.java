@@ -8,6 +8,8 @@ import net.datafaker.Faker;
 
 import java.time.LocalTime;
 
+import static com.openframe.test.config.EnvironmentConfig.OSS;
+import static com.openframe.test.config.EnvironmentConfig.getEnvMode;
 import static com.openframe.test.config.UserConfig.*;
 
 
@@ -20,14 +22,17 @@ public class RegistrationGenerator {
     private static final String regexTemplate = "[^a-zA-Z0-9]";
 
     public static UserRegistrationRequest newUserRegistrationRequest() {
-        return UserRegistrationRequest.builder()
+        UserRegistrationRequest.UserRegistrationRequestBuilder builder = UserRegistrationRequest.builder()
                 .email(getEmail())
                 .firstName(FIRST_NAME)
                 .lastName(LAST_NAME)
                 .password(getPassword())
-                .tenantName(faker.company().name().replaceAll(regexTemplate, ""))
-                .tenantDomain(getDomain())
-                .build();
+                .tenantName(getDomain())
+                .tenantDomain(getDomain());
+        if (!getEnvMode().equals(OSS)) {
+            builder.accessCode(faker.number().digits(8));
+        }
+        return builder.build();
     }
 
     public static UserRegistrationRequest userRegistrationRequest() {

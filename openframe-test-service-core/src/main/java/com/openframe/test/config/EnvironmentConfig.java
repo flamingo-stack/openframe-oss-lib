@@ -13,8 +13,38 @@ public class EnvironmentConfig {
     public static final String GRAPHQL = "api/graphql";
 
     private static String envMode;
-    private static String baseUrl;
-    private static String authUrl;
+    private static String testBaseUrl;
+    private static String testUserDomain;
+    private static String port;
+    private static boolean envLoaded = false;
+
+    private static void loadEnv() {
+        if (!envLoaded) {
+            String baseUrlVar = System.getenv("TEST_BASE_URL");
+            if (baseUrlVar != null && !baseUrlVar.trim().isEmpty()) {
+                testBaseUrl = baseUrlVar.trim();
+            } else {
+                throw new RuntimeException("TEST_BASE_URL environment variable is not set");
+            }
+
+            String domainVar = System.getenv("TEST_USER_DOMAIN");
+            if (domainVar != null && !domainVar.trim().isEmpty()) {
+                testUserDomain = domainVar.trim();
+            } else {
+                throw new RuntimeException("TEST_USER_DOMAIN environment variable is not set");
+            }
+
+            String portVar = System.getenv("PORT");
+            if (portVar != null && !portVar.trim().isEmpty()) {
+                port = portVar.trim();
+            }
+
+            log.debug("TEST_BASE_URL: {}", testBaseUrl);
+            log.debug("TEST_USER_DOMAIN: {}", testUserDomain);
+            log.debug("PORT: {}", port);
+            envLoaded = true;
+        }
+    }
 
     public static String getEnvMode() {
         if (envMode == null) {
@@ -30,28 +60,22 @@ public class EnvironmentConfig {
     }
 
     public static String getBaseUrl() {
-        if (baseUrl == null) {
-            String envVar = System.getenv("API_BASE_URL");
-            if (envVar != null && !envVar.trim().isEmpty()) {
-                baseUrl = envVar.endsWith("/") ? envVar : envVar.concat("/");
-            } else {
-                throw new RuntimeException("API_BASE_URL environment variable is not set");
-            }
-            log.debug("API_BASE_URL: {}", baseUrl);
-        }
-        return baseUrl;
+        loadEnv();
+        return "https://" + testUserDomain + "." + testBaseUrl + (port != null ? ":" + port : "") + "/";
     }
 
     public static String getAuthUrl() {
-        if (authUrl == null) {
-            String envVar = System.getenv("API_AUTH_URL");
-            if (envVar != null && !envVar.trim().isEmpty()) {
-                authUrl = envVar.endsWith("/") ? envVar : envVar.concat("/");
-            } else {
-                throw new RuntimeException("API_AUTH_URL environment variable is not set");
-            }
-            log.debug("API_AUTH_URL: {}", authUrl);
-        }
-        return authUrl;
+        loadEnv();
+        return "https://" + testBaseUrl + "/";
+    }
+
+    public static String getUserDomain() {
+        loadEnv();
+        return testUserDomain + "." + testBaseUrl;
+    }
+
+    public static String getRegistrationUrl() {
+        loadEnv();
+        return "https://" + testBaseUrl + (port != null ? ":" + port : "") + "/";
     }
 }

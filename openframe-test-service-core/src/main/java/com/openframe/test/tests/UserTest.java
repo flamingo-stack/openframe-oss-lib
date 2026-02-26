@@ -22,13 +22,13 @@ public class UserTest {
     public void testListUsers() {
         List<AuthUser> users = UserApi.getUsers();
         assertThat(users).allSatisfy(user -> {
-            assertThat(user.getId()).isNotEmpty();
-            assertThat(user.getEmail()).isNotEmpty();
-            assertThat(user.getFirstName()).isNotEmpty();
-            assertThat(user.getLastName()).isNotEmpty();
-            assertThat(user.getRoles()).isNotEmpty();
-            assertThat(user.getStatus()).isNotNull();
-            assertThat(user.getUpdatedAt()).isNotNull();
+            assertThat(user.getId()).as("User id should not be empty").isNotEmpty();
+            assertThat(user.getEmail()).as("User email should not be empty").isNotEmpty();
+            assertThat(user.getFirstName()).as("User firstName should not be empty").isNotEmpty();
+            assertThat(user.getLastName()).as("User lastName should not be empty").isNotEmpty();
+            assertThat(user.getRoles()).as("User roles should not be empty").isNotEmpty();
+            assertThat(user.getStatus()).as("User status should not be null").isNotNull();
+            assertThat(user.getUpdatedAt()).as("User updatedAt should not be null").isNotNull();
         });
     }
 
@@ -38,7 +38,7 @@ public class UserTest {
     public void testGetUsers() {
         List<AuthUser> users = UserApi.getUsers();
         AuthUser user = UserApi.getUser(users.getFirst().getId());
-        assertThat(user).isEqualTo(users.getFirst());
+        assertThat(user).as("Retrieved user should match listed user").isEqualTo(users.getFirst());
     }
 
     @Tag("delete")
@@ -48,10 +48,10 @@ public class UserTest {
         List<AuthUser> users = UserApi.getUsers(UserRole.ADMIN);
         assertThat(users).as("No active Admin users").isNotEmpty();
         int statusCode = UserApi.deleteUser(users.getFirst().getId());
-        assertThat(statusCode).isEqualTo(204);
+        assertThat(statusCode).as("Delete user status code should be 204").isEqualTo(204);
         AuthUser deletedUser = UserApi.getUser(users.getFirst().getId());
         assertThat(deletedUser).as("User is not found").isNotNull();
-        assertThat(deletedUser.getStatus()).isEqualTo(UserStatus.DELETED);
+        assertThat(deletedUser.getStatus()).as("User status should be DELETED").isEqualTo(UserStatus.DELETED);
     }
 
     @Tag("delete")
@@ -61,9 +61,9 @@ public class UserTest {
         List<AuthUser> users = UserApi.getUsers(UserRole.OWNER);
         assertThat(users).as("No active Admin users").isNotEmpty();
         int statusCode = UserApi.deleteUser(users.getFirst().getId());
-        assertThat(statusCode).isEqualTo(409);
+        assertThat(statusCode).as("Delete owner status code should be 409").isEqualTo(409);
         AuthUser deletedUser = UserApi.getUser(users.getFirst().getId());
         assertThat(deletedUser).as("User is not found").isNotNull();
-        assertThat(deletedUser.getStatus()).isEqualTo(UserStatus.ACTIVE);
+        assertThat(deletedUser.getStatus()).as("Owner status should remain ACTIVE").isEqualTo(UserStatus.ACTIVE);
     }
 }

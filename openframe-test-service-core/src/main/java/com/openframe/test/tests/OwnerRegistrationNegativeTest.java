@@ -24,7 +24,7 @@ public class OwnerRegistrationNegativeTest {
     public void testRegistrationClosed() {
         UserRegistrationRequest userRegistrationRequest = RegistrationGenerator.userRegistrationRequest();
         ErrorResponse response = RegistrationApi.attemptRegistration(userRegistrationRequest);
-        assertThat(response).isEqualTo(RegistrationGenerator.registrationClosedResponse());
+        assertThat(response).as("Response should match registration closed error").isEqualTo(RegistrationGenerator.registrationClosedResponse());
     }
 
     @Test
@@ -34,6 +34,6 @@ public class OwnerRegistrationNegativeTest {
         assertThat(users).as("No existing user").isNotEmpty();
         UserRegistrationRequest userRegistrationRequest = RegistrationGenerator.existingUserRequest(users.getLast());
         ErrorResponse response = RegistrationApi.attemptRegistration(userRegistrationRequest);
-        assertThat(response).isEqualTo(RegistrationGenerator.existingUserResponse());
+        assertThat(response).as("Response should match existing user error").isEqualTo(RegistrationGenerator.existingUserResponse());
     }
 }
