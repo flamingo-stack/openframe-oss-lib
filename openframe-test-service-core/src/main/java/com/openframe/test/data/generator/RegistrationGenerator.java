@@ -8,13 +8,13 @@ import net.datafaker.Faker;
 
 import java.time.LocalTime;
 
-import static com.openframe.test.config.UserConfig.DEFAULT_EMAIL;
-import static com.openframe.test.config.UserConfig.DEFAULT_PASSWORD;
+import static com.openframe.test.config.EnvironmentConfig.OSS;
+import static com.openframe.test.config.EnvironmentConfig.getEnvMode;
+import static com.openframe.test.config.UserConfig.*;
 
 
 public class RegistrationGenerator {
 
-    private static final String TENANT_DOMAIN_NAME = "localhost";
     private static final String FIRST_NAME = "Auto";
     private static final String LAST_NAME = "Tester";
 
@@ -22,13 +22,27 @@ public class RegistrationGenerator {
     private static final String regexTemplate = "[^a-zA-Z0-9]";
 
     public static UserRegistrationRequest newUserRegistrationRequest() {
-        return UserRegistrationRequest.builder()
-                .email(DEFAULT_EMAIL)
+        UserRegistrationRequest.UserRegistrationRequestBuilder builder = UserRegistrationRequest.builder()
+                .email(getEmail())
                 .firstName(FIRST_NAME)
                 .lastName(LAST_NAME)
-                .password(DEFAULT_PASSWORD)
+                .password(getPassword())
+                .tenantName(getDomain())
+                .tenantDomain(getDomain());
+        if (!getEnvMode().equals(OSS)) {
+            builder.accessCode(faker.number().digits(8));
+        }
+        return builder.build();
+    }
+
+    public static UserRegistrationRequest userRegistrationRequest() {
+        return UserRegistrationRequest.builder()
+                .email(faker.internet().emailAddress())
+                .firstName(faker.name().firstName())
+                .lastName(faker.name().lastName())
+                .password(getPassword())
                 .tenantName(faker.company().name().replaceAll(regexTemplate, ""))
-                .tenantDomain(TENANT_DOMAIN_NAME)
+                .tenantDomain(getDomain())
                 .build();
     }
 
@@ -37,9 +51,9 @@ public class RegistrationGenerator {
                 .email(existingUser.getEmail())
                 .firstName(existingUser.getFirstName())
                 .lastName(existingUser.getLastName())
-                .password(DEFAULT_PASSWORD)
+                .password(getPassword())
                 .tenantName(faker.company().name().replaceAll(regexTemplate, ""))
-                .tenantDomain(TENANT_DOMAIN_NAME)
+                .tenantDomain(getDomain())
                 .build();
     }
 

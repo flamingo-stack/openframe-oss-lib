@@ -2,7 +2,9 @@
 
 import * as React from "react";
 
+import { Loader2 } from "lucide-react";
 import { cn } from "../../utils/cn";
+import { FieldWrapper } from "./field-wrapper";
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   /** When true, renders red error border & ring */
@@ -11,124 +13,84 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
   startAdornment?: React.ReactNode;
   /** Element displayed at the end (right) of the input */
   endAdornment?: React.ReactNode;
-  /** When true, renders as a non-interactive div displaying the value */
-  preview?: boolean;
+  /** Label text displayed above the input */
+  label?: string;
+  /** Error message displayed below the input */
+  error?: string;
+  /** When true, shows a loading spinner as end adornment */
+  loading?: boolean;
 }
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, invalid = false, startAdornment, endAdornment, preview = false, ...props }, ref) => {
-    const hasAdornments = startAdornment || endAdornment
+  ({ className, type, invalid = false, startAdornment, endAdornment, label, error, loading = false, ...props }, ref) => {
+    const isInvalid = invalid || !!error
 
-    if (preview) {
-      return (
-        <div
-          className={cn(
-            // Layout & spacing
-            "flex w-full items-center gap-2 rounded-[6px] border px-3 h-11 sm:h-12",
-            // Theme palette
-            "bg-[#212121] border-[#3a3a3a]",
-            // Typography
-            "text-[18px] font-medium leading-6 text-ods-text-primary",
-            className
-          )}
-        >
-          {startAdornment && (
-            <div className="flex-shrink-0 text-[#888] text-[14px] leading-[20px] font-medium">
-              {startAdornment}
-            </div>
-          )}
-          <span className="flex-1 min-w-0 truncate">
-            {props.value ?? props.defaultValue ?? ""}
-          </span>
-          {endAdornment && (
-            <div className="flex-shrink-0 text-[#888] text-[14px] leading-[20px] font-medium">
-              {endAdornment}
-            </div>
-          )}
-        </div>
-      )
-    }
-
-    if (hasAdornments) {
-      return (
-        <label
-          className={cn(
-            // Layout & spacing
-            "flex w-full items-center gap-2 rounded-[6px] border px-3 h-11 sm:h-12 cursor-text",
-            // Focus-within states
-            "has-[:focus-visible]:outline-none has-[:focus-visible]:ring-1 has-[:focus-visible]:ring-ods-accent/20 has-[:focus-visible]:ring-offset-0",
-            // Animations & touch UX
-            "transition-colors duration-200",
-            // Theme palette
-            "bg-[#212121] border-[#3a3a3a] hover:border-ods-accent/30 has-[:focus]:border-ods-accent",
-            // Disabled
-            props.disabled && "cursor-not-allowed opacity-50",
-            // Invalid
-            invalid && "border-red-500 has-[:focus-visible]:ring-red-500",
-            className
-          )}
-        >
-          {startAdornment && (
-            <span className="flex-shrink-0 text-[#888] text-[14px] leading-[20px] font-medium">
-              {startAdornment}
-            </span>
-          )}
-          <input
-            type={type}
-            className={cn(
-              // Layout
-              "flex-1 min-w-0 bg-transparent border-none outline-none",
-              // Typography
-              "text-[18px] font-medium leading-6",
-              // Colors
-              "text-ods-text-primary placeholder:text-[#888]",
-              // File input adjustments
-              "file:border-0 file:bg-transparent file:text-[18px] file:font-medium",
-              // Disabled
-              "disabled:cursor-not-allowed",
-              // Touch
-              "touch-manipulation"
-            )}
-            ref={ref}
-            {...props}
-          />
-          {endAdornment && (
-            <span className="flex-shrink-0 text-[#888] text-[14px] leading-[20px] font-medium">
-              {endAdornment}
-            </span>
-          )}
-        </label>
-      )
-    }
-
-    return (
-      <input
-        type={type}
+    const content = (
+      <label
+        data-invalid={isInvalid || undefined}
         className={cn(
           // Layout & spacing
-          "flex w-full items-center rounded-[6px] border px-3 h-11 sm:h-12",
-          // Typography
-          "text-[18px] font-medium leading-6",
-          // File input adjustments
-          "ring-offset-background file:border-0 file:bg-transparent file:text-[18px] file:font-medium",
-          // Focus & disabled states
-          "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ods-accent/20 focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50",
+          "flex w-full items-center gap-2 rounded-[6px] border px-3 h-11 sm:h-12 cursor-text",
+          // Focus-within states
+          "has-[:focus-visible]:outline-none",
+          "group",
           // Animations & touch UX
-          "transition-colors duration-200 touch-manipulation",
+          "transition-colors duration-200",
           // Theme palette
-          "bg-[#212121] border-[#3a3a3a] text-ods-text-primary placeholder:text-[#888] hover:border-ods-accent/30 focus:border-ods-accent",
-          // Ensure proper cursor/stacking
-          "cursor-text relative z-10",
-          invalid && "border-red-500 focus-visible:ring-red-500",
+          "bg-ods-card border-ods-border hover:border-ods-accent/30 has-[:focus]:border-ods-accent",
+          // Disabled
+          props.disabled && "cursor-not-allowed opacity-50",
+          // Invalid
+          isInvalid && "border-ods-error hover:border-ods-error has-[:focus]:border-ods-error",
           className
         )}
-        ref={ref}
-        {...props}
-      />
+      >
+        {startAdornment && (
+          <span className="flex-shrink-0 text-ods-text-secondary text-[14px] leading-[20px] font-medium transition-colors duration-200 group-has-[:focus]:text-ods-accent group-data-[invalid]:text-ods-error [&_svg]:size-4 sm:[&_svg]:size-6">
+            {startAdornment}
+          </span>
+        )}
+        <input
+          type={type}
+          className={cn(
+            // Layout
+            "flex-1 min-w-0 bg-transparent border-none outline-none",
+            // Typography
+            "text-[18px] font-medium leading-6",
+            // Colors
+            "text-ods-text-primary placeholder:text-ods-text-secondary",
+            // File input adjustments
+            "file:border-0 file:bg-transparent file:text-[18px] file:font-medium",
+            // Disabled
+            "disabled:cursor-not-allowed",
+            // Touch
+            "touch-manipulation"
+          )}
+          ref={ref}
+          {...props}
+        />
+        {loading && (
+          <Loader2 className="animate-spin flex-shrink-0 text-ods-text-secondary size-4 sm:size-6" />
+        )}
+        {!loading && endAdornment && (
+          <span className="flex-shrink-0 text-ods-text-secondary text-[14px] leading-[20px] font-medium transition-colors duration-200 group-has-[:focus]:text-ods-accent group-data-[invalid]:text-ods-error [&_svg]:size-4 sm:[&_svg]:size-6">
+            {endAdornment}
+          </span>
+        )}
+      </label>
     )
+
+    if (label !== undefined || error !== undefined) {
+      return (
+        <FieldWrapper label={label} error={error}>
+          {content}
+        </FieldWrapper>
+      )
+    }
+
+    return <>{content}</>
   }
 )
 Input.displayName = "Input"
 
 export { Input };
-

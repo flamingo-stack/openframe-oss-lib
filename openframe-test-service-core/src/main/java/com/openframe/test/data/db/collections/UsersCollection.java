@@ -1,9 +1,9 @@
 package com.openframe.test.data.db.collections;
 
 import com.mongodb.client.model.Filters;
-import com.openframe.test.data.dto.invitation.UserRole;
-import com.openframe.test.data.dto.invitation.UserStatus;
 import com.openframe.test.data.dto.user.AuthUser;
+import com.openframe.test.data.dto.user.UserRole;
+import com.openframe.test.data.dto.user.UserStatus;
 
 import static com.openframe.test.data.db.MongoDB.getCollection;
 

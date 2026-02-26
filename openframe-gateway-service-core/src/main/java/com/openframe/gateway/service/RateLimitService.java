@@ -1,6 +1,6 @@
 package com.openframe.gateway.service;
 
-import com.openframe.data.model.enums.RateLimitWindow;
+import com.openframe.gateway.model.RateLimitWindow;
 import com.openframe.data.repository.redis.ReactiveRateLimitRepository;
 import com.openframe.data.repository.redis.ReactiveRateLimitRepository.RateLimitResult;
 import com.openframe.gateway.config.prop.RateLimitProperties;

@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
 import { fn } from 'storybook/test';
-import { Home, Settings, Users, Bell, Shield } from 'lucide-react';
+import { Home, Settings, Users, Bell, Shield, Mail, Star, Heart, Zap, Globe, Lock, Database, Cloud, Cpu, Wifi } from 'lucide-react';
 
 import { TabNavigation, TabItem } from '../components/ui/tab-navigation';
 
@@ -13,11 +13,29 @@ const defaultTabs: TabItem[] = [
 ];
 
 const tabsWithIndicators: TabItem[] = [
-  { id: 'overview', label: 'Overview', icon: Home, indicator: 'good' },
+  { id: 'overview', label: 'Overview', icon: Home, indicator: 'success' },
   { id: 'users', label: 'Users', icon: Users, indicator: 'warning' },
   { id: 'settings', label: 'Settings', icon: Settings },
   { id: 'notifications', label: 'Notifications', icon: Bell, indicator: 'error' },
   { id: 'security', label: 'Security', icon: Shield },
+];
+
+const manyTabs: TabItem[] = [
+  { id: 'overview', label: 'Overview', icon: Home },
+  { id: 'users', label: 'Users', icon: Users },
+  { id: 'settings', label: 'Settings', icon: Settings },
+  { id: 'notifications', label: 'Notifications', icon: Bell },
+  { id: 'security', label: 'Security', icon: Shield },
+  { id: 'mail', label: 'Mail', icon: Mail },
+  { id: 'favorites', label: 'Favorites', icon: Star },
+  { id: 'liked', label: 'Liked', icon: Heart },
+  { id: 'performance', label: 'Performance', icon: Zap },
+  { id: 'global', label: 'Global', icon: Globe },
+  { id: 'permissions', label: 'Permissions', icon: Lock },
+  { id: 'database', label: 'Database', icon: Database },
+  { id: 'cloud', label: 'Cloud', icon: Cloud },
+  { id: 'system', label: 'System', icon: Cpu },
+  { id: 'network', label: 'Network', icon: Wifi },
 ];
 
 const meta = {
@@ -45,6 +63,10 @@ const meta = {
     },
     className: {
       control: 'text',
+    },
+    shadowClassName: {
+      control: 'text',
+      description: 'Tailwind class for shadow gradient color (e.g. "from-black", "from-red-500")',
     },
   },
 } satisfies Meta<typeof TabNavigation>;
@@ -199,6 +221,83 @@ export const CustomClassName: Story = {
         onTabChange={setActive}
         className="bg-ods-card rounded-t-lg"
       />
+    );
+  },
+  args: { tabs: defaultTabs },
+};
+
+/**
+ * Many tabs that overflow the container — scroll to see fade shadows appear.
+ */
+export const ScrollShadows: Story = {
+  render: () => {
+    const [active, setActive] = useState('overview');
+    return (
+      <div style={{ maxWidth: 500 }}>
+        <TabNavigation
+          tabs={manyTabs}
+          activeTab={active}
+          onTabChange={setActive}
+        />
+      </div>
+    );
+  },
+  args: { tabs: manyTabs },
+};
+
+/**
+ * Custom shadow color using `shadowClassName` — red gradient edges.
+ */
+export const CustomShadowColor: Story = {
+  render: () => {
+    const [active, setActive] = useState('overview');
+    return (
+      <div style={{ maxWidth: 500 }}>
+        <TabNavigation
+          tabs={manyTabs}
+          activeTab={active}
+          onTabChange={setActive}
+          shadowClassName="from-red-500"
+        />
+      </div>
+    );
+  },
+  args: { tabs: manyTabs },
+};
+
+/**
+ * Shadows on a custom background — shadow color matches the container.
+ */
+export const ShadowOnCustomBackground: Story = {
+  render: () => {
+    const [active, setActive] = useState('overview');
+    return (
+      <div style={{ maxWidth: 500 }} className="bg-ods-card rounded-lg">
+        <TabNavigation
+          tabs={manyTabs}
+          activeTab={active}
+          onTabChange={setActive}
+          className="bg-ods-card rounded-t-lg"
+          shadowClassName="from-ods-card"
+        />
+      </div>
+    );
+  },
+  args: { tabs: manyTabs },
+};
+
+/**
+ * Few tabs that fit without overflow — no shadows should appear.
+ */
+export const NoShadows: Story = {
+  render: () => {
+    const tabs: TabItem[] = [
+      { id: 'overview', label: 'Overview', icon: Home },
+      { id: 'settings', label: 'Settings', icon: Settings },
+    ];
+    const [active, setActive] = useState('overview');
+    return (
+      <TabNavigation tabs={tabs} activeTab={active} onTabChange={setActive} />
     );
   },
   args: { tabs: defaultTabs },

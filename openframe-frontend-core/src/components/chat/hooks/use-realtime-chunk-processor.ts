@@ -134,7 +134,14 @@ export function useRealtimeChunkProcessor(
         }
 
         case 'error': {
-          const message = 'details' in action ? (action?.details && JSON.parse(action.details)?.error?.message) : undefined
+          let message: string | undefined
+          if ('details' in action && action?.details) {
+            try {
+              message = JSON.parse(action.details)?.error?.message
+            } catch {
+              message = action.details
+            }
+          }
           const segments = accumulator.addError(action.error, message)
           callbacks.onSegmentsUpdate?.(segments)
           callbacks.onError?.(action.error, message)

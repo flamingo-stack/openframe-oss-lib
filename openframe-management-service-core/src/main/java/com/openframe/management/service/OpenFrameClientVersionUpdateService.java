@@ -1,6 +1,6 @@
 package com.openframe.management.service;
 
-import com.openframe.data.service.OpenFrameClientUpdatePublisher;
+import com.openframe.data.nats.publisher.OpenFrameClientUpdatePublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

@@ -2,15 +2,15 @@ package com.openframe.management.initializer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
+import com.openframe.data.nats.publisher.ToolAgentUpdateUpdatePublisher;
 import com.openframe.data.service.IntegratedToolAgentService;
-import com.openframe.data.service.ToolAgentUpdateUpdatePublisher;
 import com.openframe.management.config.AgentConfigurationProperties;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
-import javax.annotation.PostConstruct;
 import java.util.List;
 
 @Component

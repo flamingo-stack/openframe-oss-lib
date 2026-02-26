@@ -1,15 +1,15 @@
 package com.openframe.test.api;
 
 import com.openframe.test.data.dto.auth.AuthParts;
-import com.openframe.test.data.dto.tenant.Tenant;
 import com.openframe.test.data.dto.user.User;
 import io.restassured.response.Response;
 
 import java.util.HashMap;
 import java.util.Map;
 
-import static com.openframe.test.config.ApiConfig.DEFAULT_BASE_URL;
-import static com.openframe.test.config.ApiConfig.getBaseUrl;
+import static com.openframe.test.config.EnvironmentConfig.DEFAULT_BASE_URL;
+import static com.openframe.test.config.EnvironmentConfig.getBaseUrl;
+import static com.openframe.test.helpers.RequestSpecHelper.getAuthFlowRequestSpec;
 import static com.openframe.test.helpers.RequestSpecHelper.getUnAuthorizedSpec;
 import static io.restassured.RestAssured.given;
 
@@ -28,7 +28,7 @@ public class AuthApi {
         Map<String, String> queryParams = Map.of(
                 "tenantId", authParts.getTenantId(),
                 "redirectTo", getBaseUrl().concat(REDIRECT_TO_DASHBOARD));
-        return given()
+        return given(getAuthFlowRequestSpec())
                 .queryParams(queryParams)
                 .redirects().follow(false)
                 .when()
@@ -37,7 +37,7 @@ public class AuthApi {
 
     public static Response initiateAuthorization(AuthParts authParts) {
         Map<String, Object> queryParams = getAuthQueryParams(authParts);
-        return given()
+        return given(getAuthFlowRequestSpec())
                 .cookies(authParts.getCookies())
                 .queryParams(queryParams)
                 .redirects().follow(false)
@@ -49,7 +49,7 @@ public class AuthApi {
         Map<String, Object> formParams = Map.of(
                 "username", authParts.getEmail(),
                 "password", authParts.getPassword());
-        return given()
+        return given(getAuthFlowRequestSpec())
                 .baseUri(DEFAULT_BASE_URL)
                 .cookie("JSESSIONID", authParts.getCookies().get("JSESSIONID"))
                 .formParams(formParams)
@@ -61,7 +61,7 @@ public class AuthApi {
     public static Response getAuthorizationCode(AuthParts authParts) {
         Map<String, Object> queryParams = getAuthQueryParams(authParts);
         queryParams.put("continue", "");
-        return given()
+        return given(getAuthFlowRequestSpec())
                 .cookies(authParts.getCookies())
                 .queryParams(queryParams)
                 .redirects().follow(false)
@@ -73,7 +73,7 @@ public class AuthApi {
         Map<String, String> queryParams = Map.of(
                 "code", authParts.getAuthorizationCode(),
                 "state", authParts.getState());
-        return given()
+        return given(getAuthFlowRequestSpec())
                 .cookies(authParts.getCookies())
                 .queryParams(queryParams)
                 .redirects().follow(false)
@@ -81,10 +81,10 @@ public class AuthApi {
                 .get(OAUTH_CALLBACK);
     }
 
-    public static Map<String, String> refresh(Tenant tenant, Map<String, String> cookies) {
+    public static Map<String, String> refresh(String tenantId, Map<String, String> cookies) {
         return given(getUnAuthorizedSpec())
                 .cookie("refresh_token", cookies.get("refresh_token"))
-                .queryParam("tenantId", tenant.getId())
+                .queryParam("tenantId", tenantId)
                 .when()
                 .post(OAUTH_REFRESH)
                 .then()
@@ -113,10 +113,10 @@ public class AuthApi {
 //                .extract().response().getCookies();
     }
 
-    public static Map<String, String> logout(Tenant tenant, Map<String, String> cookies) {
+    public static Map<String, String> logout(String tenantId, Map<String, String> cookies) {
         return given(getUnAuthorizedSpec())
                 .cookie("refresh_token", cookies.get("refresh_token"))
-                .queryParam("tenantId", tenant.getId())
+                .queryParam("tenantId", tenantId)
                 .get(OAUTH_LOGOUT)
                 .then().statusCode(204)
                 .extract().response().getCookies();

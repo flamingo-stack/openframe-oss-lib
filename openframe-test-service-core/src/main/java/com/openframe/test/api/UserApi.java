@@ -1,10 +1,9 @@
 package com.openframe.test.api;
 
 import com.openframe.test.data.dto.error.ErrorResponse;
-import com.openframe.test.data.dto.user.MeResponse;
-import com.openframe.test.data.dto.user.ResetConfirmRequest;
-import com.openframe.test.data.dto.user.User;
+import com.openframe.test.data.dto.user.*;
 
+import java.util.List;
 import java.util.Map;
 
 import static com.openframe.test.helpers.RequestSpecHelper.getAuthorizedSpec;
@@ -23,6 +22,26 @@ public class UserApi {
                 .get(ME)
                 .then().statusCode(200)
                 .extract().as(MeResponse.class);
+    }
+
+    public static List<AuthUser> getUsers() {
+        return given(getAuthorizedSpec())
+                .get(USERS)
+                .then().statusCode(200)
+                .extract().jsonPath().getList("items", AuthUser.class);
+    }
+
+    public static List<AuthUser> getUsers(UserRole role) {
+        return getUsers().stream()
+                .filter(user -> user.getRoles() != null && user.getRoles().contains(role))
+                .toList();
+    }
+
+    public static AuthUser getUser(String userId) {
+        return given(getAuthorizedSpec())
+                .get(USERS.concat("/").concat(userId))
+                .then().statusCode(200)
+                .extract().as(AuthUser.class);
     }
 
     public static int deleteUser(String userId) {

@@ -1,7 +1,9 @@
 package com.openframe.data.document.tenant;
 
 import lombok.Data;
+import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
@@ -16,7 +18,10 @@ public class TenantKey {
     private String publicPem;
     private String privateEncrypted;
     private boolean active;
+
+    @CreatedDate
     private Instant createdAt;
+    @LastModifiedDate
     private Instant rotatedAt;
 }
 

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.openframe.oss</groupId>
+        <artifactId>openframe-oss-lib</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <artifactId>openframe-tool-agent-nats-installation</artifactId>
+    <packaging>jar</packaging>
+    <name>OpenFrame Tool Agent NATS Installation</name>
+    <description>Tool agent registration secret retrieval and command parameter resolution for NATS-based installation</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-data-mongo</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-data-nats</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-tactical-sdk</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>fleetmdm</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+    </dependencies>
+</project>
