@@ -1,2 +1,2 @@
 org.springframework.context.ApplicationContextInitializer=\
-  com.openframe.data.config.CassandraKeyspaceNormalizer
+  com.openframe.data.cassandra.config.CassandraKeyspaceNormalizer
