@@ -230,7 +230,14 @@ function processMessageData(
 
     case MESSAGE_TYPE.ERROR:
       if ('error' in data) {
-        const message = 'details' in data ? (data?.details && JSON.parse(data.details)?.error?.message) : undefined
+        let message: string | undefined
+        if ('details' in data && data?.details) {
+          try {
+            message = JSON.parse(data.details)?.error?.message
+          } catch {
+            message = data.details
+          }
+        }
         accumulator.addError(
           data.error || 'An error occurred',
           message
