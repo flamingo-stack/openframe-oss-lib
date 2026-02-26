@@ -39,6 +39,7 @@ public class DownloadConfigurationMapper {
         natsDownloadConfig.setLink(downloadConfigurationResolver.resolve(downloadConfiguration, version));
         natsDownloadConfig.setInstallationType(mapInstallationType(downloadConfiguration.getInstallationType()));
         natsDownloadConfig.setBundleId(downloadConfiguration.getBundleId());
+        natsDownloadConfig.setServiceName(downloadConfiguration.getServiceName());
 
         return natsDownloadConfig;
     }
@@ -51,6 +52,7 @@ public class DownloadConfigurationMapper {
         }
         return switch (installationType) {
             case GUI_APP -> InstallationType.GUI_APP;
+            case SERVICE -> InstallationType.SERVICE;
             case STANDARD -> InstallationType.STANDARD;
         };
     }

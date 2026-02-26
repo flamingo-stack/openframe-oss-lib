@@ -25,13 +25,17 @@
       "os": "windows",
       "linkTemplate": "https://github.com/flamingo-stack/MeshAgent/releases/download/{version}/meshagent-windows-amd64.zip",
       "fileName": "meshagent-windows-amd64.zip",
-      "targetFileName": "meshagent.exe"
+      "targetFileName": "meshagent.exe",
+      "installationType": "SERVICE",
+      "serviceName": "Mesh Agent"
     },
     {
       "os": "macos",
       "linkTemplate": "https://github.com/flamingo-stack/MeshAgent/releases/download/{version}/meshagent-macos-universal.tar.gz",
       "fileName": "meshagent-macos-universal.tar.gz",
-      "targetFileName": "MeshAgent.app/Contents/MacOS/meshagent"
+      "targetFileName": "MeshAgent.app/Contents/MacOS/meshagent",
+      "installationType": "SERVICE",
+      "serviceName": "meshagent"
     }
   ],
   "assets": [
