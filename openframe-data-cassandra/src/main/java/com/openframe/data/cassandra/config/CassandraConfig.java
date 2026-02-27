@@ -19,7 +19,7 @@ import java.util.Collections;
 
 @Configuration
 @ConditionalOnProperty(name = "spring.data.cassandra.enabled", havingValue = "true")
-@EnableCassandraRepositories(basePackages = "com.openframe.data.repository.cassandra")
+@EnableCassandraRepositories(basePackages = "com.openframe.data.cassandra.repository")
 public class CassandraConfig extends AbstractCassandraConfiguration {
 
     private static final Logger logger = LoggerFactory.getLogger(CassandraConfig.class);

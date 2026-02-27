@@ -4,17 +4,18 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 
 import java.time.Instant;
 
+import static com.openframe.gateway.config.ws.ToolWebSocketProxyUrlFilter.ORIGINAL_AUTHORIZATION_ATTR;
 import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @Component
 @RequiredArgsConstructor
-public class RequestJwtСlaimsReader {
+public class RequestJwtClaimsReader {
 
     public Instant getExpiration(ServerWebExchange exchange) {
         Claims jwtClaims = getClaims(exchange);
@@ -22,13 +23,13 @@ public class RequestJwtСlaimsReader {
     }
 
     private Claims getClaims(ServerWebExchange exchange) {
-        ServerHttpRequest request = exchange.getRequest();
-        String authorization = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+        String authorization = extractAuthorization(exchange);
+
         if (isBlank(authorization)) {
-            throw new IllegalStateException("No auth header found");
+            throw new IllegalStateException("No Authorization header found");
         }
         if (!authorization.startsWith("Bearer ")) {
-            throw new IllegalStateException("No bearer token found");
+            throw new IllegalStateException("No bearer token in Authorization header");
         }
 
         String jwtClaimsPart = authorization.substring(7, authorization.lastIndexOf('.') + 1);
@@ -36,6 +37,16 @@ public class RequestJwtСlaimsReader {
                 .build()
                 .parseClaimsJwt(jwtClaimsPart)
                 .getBody();
+    }
+
+    private String extractAuthorization(ServerWebExchange exchange) {
+        String authorization = (String) exchange.getAttributes().get(ORIGINAL_AUTHORIZATION_ATTR);
+        if (isNotBlank(authorization)) {
+            return authorization;
+        }
+
+        // fallback for routes that don't go through ToolWebSocketProxyUrlFilter (e.g. /ws/nats)
+        return exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
     }
 
 }

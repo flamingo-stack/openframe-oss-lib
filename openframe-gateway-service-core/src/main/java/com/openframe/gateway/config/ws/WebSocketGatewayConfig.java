@@ -1,6 +1,5 @@
 package com.openframe.gateway.config.ws;
 
-import com.openframe.security.jwt.JwtService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
@@ -46,10 +45,10 @@ public class WebSocketGatewayConfig {
     @Bean
     @Primary
     public WebSocketService webSocketServiceDecorator(
-            RequestJwtСlaimsReader requestJwtСlaimsReader,
+            RequestJwtClaimsReader requestJwtClaimsReader,
             WebSocketService defaultWebSocketService
     ) {
-        return new WebSocketServiceSecurityDecorator(defaultWebSocketService, requestJwtСlaimsReader);
+        return new WebSocketServiceSecurityDecorator(defaultWebSocketService, requestJwtClaimsReader);
     }
 
 

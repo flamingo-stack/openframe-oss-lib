@@ -171,8 +171,12 @@ public class DeviceService {
         machine.setStatus(status);
         machine.setUpdatedAt(now());
         machineRepository.save(machine);
-        deviceStatusProcessor.postProcessStatusUpdated(machine);
         log.info("Device {} status updated to {}", machineId, status);
+        try {
+            deviceStatusProcessor.postProcessStatusUpdated(machine);
+        } catch (Exception e) {
+            log.error("Post-processor failed for machineId={}: {}", machineId, e.getMessage(), e);
+        }
     }
     
     private String validateSortField(String field) {

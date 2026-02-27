@@ -117,6 +117,11 @@ public class EventTypeMapper {
         registerMapping(IntegratedToolType.TACTICAL, SourceEventTypes.Tactical.SCRIPT_EXECUTION_FINISHED, UnifiedEventType.SCRIPT_EXECUTED);
         registerMapping(IntegratedToolType.TACTICAL, SourceEventTypes.Tactical.TASK_RUN_STARTED, UnifiedEventType.SCRIPT_EXECUTION_STARTED);
         registerMapping(IntegratedToolType.TACTICAL, SourceEventTypes.Tactical.TASK_RUN_FINISHED, UnifiedEventType.SCRIPT_EXECUTED);
+        // Task result events (from autotasks_taskresult CDC)
+        registerMapping(IntegratedToolType.TACTICAL, SourceEventTypes.Tactical.TASK_RESULT_COMPLETED, UnifiedEventType.SCRIPT_EXECUTED);
+        registerMapping(IntegratedToolType.TACTICAL, SourceEventTypes.Tactical.TASK_RESULT_FAILING, UnifiedEventType.SCRIPT_FAILED);
+        registerMapping(IntegratedToolType.TACTICAL, SourceEventTypes.Tactical.TASK_RESULT_PENDING, UnifiedEventType.SCRIPT_EXECUTION_STARTED);
+
         registerMapping(IntegratedToolType.TACTICAL, SourceEventTypes.Tactical.AUTOMATED_TASK_ADD, UnifiedEventType.SCRIPT_CREATED);
         registerMapping(IntegratedToolType.TACTICAL, SourceEventTypes.Tactical.AUTOMATED_TASK_MODIFY, UnifiedEventType.SCRIPT_UPDATED);
         registerMapping(IntegratedToolType.TACTICAL, SourceEventTypes.Tactical.AUTOMATED_TASK_RUN, UnifiedEventType.SCRIPT_EXECUTED);

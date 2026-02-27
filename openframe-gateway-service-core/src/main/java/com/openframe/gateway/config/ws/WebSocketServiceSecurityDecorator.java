@@ -20,7 +20,7 @@ import static com.openframe.gateway.config.ws.WebSocketGatewayConfig.*;
 public class WebSocketServiceSecurityDecorator implements WebSocketService {
 
     private final WebSocketService defaultWebSocketService;
-    private final RequestJwtСlaimsReader requestJwtReader;
+    private final RequestJwtClaimsReader requestJwtReader;
     private static final long CLOCK_SKEW_SECONDS = 60; // align with Spring Security default skew
 
     @Override
