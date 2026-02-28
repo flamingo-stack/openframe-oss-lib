@@ -34,10 +34,9 @@ public class Tenant extends CoreTenant{
     /**
      * Tenant plan (for future use)
      */
+    @Deprecated
     @Builder.Default
     private TenantPlan plan = TenantPlan.FREE;
-
-    private String hubspotId;
 
     @CreatedDate
     private LocalDateTime createdAt;
