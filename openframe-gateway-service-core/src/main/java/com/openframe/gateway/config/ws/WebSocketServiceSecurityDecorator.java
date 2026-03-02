@@ -49,7 +49,7 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
         Then if request have token, we should run session remove job etc.
     */
     private boolean isSecuredEndpoint(String path) {
-        return Set.of(TOOLS_API_WS_ENDPOINT_PREFIX, TOOLS_AGENT_WS_ENDPOINT_PREFIX, NATS_WS_ENDPOINT_PATH)
+        return Set.of(TOOLS_API_WS_ENDPOINT_PREFIX, TOOLS_AGENT_WS_ENDPOINT_PREFIX, NATS_WS_ENDPOINT_PATH, NATS_API_WS_ENDPOINT_PATH)
                 .stream()
                 .anyMatch(path::startsWith);
     }
