@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { Search, X } from 'lucide-react';
+import { Search, X, Plus, Loader2 } from 'lucide-react';
 import { Button } from '../ui';
 import { cn } from '../../utils';
 
@@ -15,10 +15,12 @@ interface TagsSelectorProps {
   availableTags: Tag[];
   selectedTagIds: number[];
   onTagsChange: (tagIds: number[]) => void;
+  onCreateTag?: (tagName: string) => Promise<Tag | null>;
   maxTags?: number;
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  allowCreate?: boolean;
 }
 
 /**
@@ -30,18 +32,22 @@ interface TagsSelectorProps {
  * - Tag limit (default 10)
  * - Removable chips
  * - Auto-opens on focus (like blog post wizard)
+ * - Create new tags (when allowCreate is true and onCreateTag is provided)
  */
 export function TagsSelector({
   availableTags,
   selectedTagIds,
   onTagsChange,
+  onCreateTag,
   maxTags = 10,
   placeholder = "Search tags...",
   className,
-  disabled = false
+  disabled = false,
+  allowCreate = true
 }: TagsSelectorProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
 
   const handleTagAdd = (tagId: number) => {
     if (!selectedTagIds.includes(tagId) && selectedTagIds.length < maxTags) {
@@ -52,6 +58,25 @@ export function TagsSelector({
 
   const handleTagRemove = (tagId: number) => {
     onTagsChange(selectedTagIds.filter(id => id !== tagId));
+  };
+
+  const handleCreateTag = async () => {
+    if (!onCreateTag || !searchQuery.trim() || isCreating) return;
+
+    setIsCreating(true);
+    try {
+      const newTag = await onCreateTag(searchQuery.trim());
+      if (newTag) {
+        // Add the new tag to selection
+        onTagsChange([...selectedTagIds, newTag.id]);
+        setSearchQuery('');
+        setShowDropdown(false);
+      }
+    } catch (error) {
+      console.error('Failed to create tag:', error);
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const getFilteredTagsForAutocomplete = () => {
@@ -65,6 +90,14 @@ export function TagsSelector({
     return availableTags.filter(tag => selectedTagIds.includes(tag.id));
   };
 
+  // Check if the search query exactly matches an existing tag (case-insensitive)
+  const tagExistsWithName = (name: string) => {
+    return availableTags.some(tag => tag.name.toLowerCase() === name.toLowerCase());
+  };
+
+  const canCreateNewTag = allowCreate && onCreateTag && searchQuery.trim() && !tagExistsWithName(searchQuery.trim());
+  const filteredTags = getFilteredTagsForAutocomplete();
+
   return (
     <div className={cn("space-y-2", className)}>
       <div className="relative">
@@ -75,30 +108,35 @@ export function TagsSelector({
 
         {/* Input Container with Chips Inside */}
         <div className={cn(
-          "w-full bg-[#161616] border border-ods-border rounded-lg",
-          "focus-within:ring-2 focus-within:ring-[#FFC008] focus-within:border-[#FFC008]",
-          "transition-all duration-200 flex flex-wrap items-start gap-1 p-2 pl-10 min-h-[42px]",
+          "w-full bg-ods-bg border border-ods-border rounded-lg",
+          "focus-within:ring-2 focus-within:ring-ods-accent focus-within:border-ods-accent",
+          "transition-all duration-200 flex flex-wrap items-center gap-1.5 p-2 pl-10 min-h-[42px]",
           disabled && "opacity-50 cursor-not-allowed"
         )}>
           {/* Selected Tag Chips Inside Search Bar */}
           {getSelectedTags().map((tag) => (
-            <div
+            <span
               key={tag.id}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#FFC008] text-black text-xs font-medium font-['DM_Sans'] transition-all"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-ods-accent text-ods-bg text-xs font-medium font-['DM_Sans']"
             >
-              <span>{tag.name}</span>
+              {tag.name}
               {!disabled && (
                 <Button
                   variant="ghost"
-                  size="icon"
-                  onClick={() => handleTagRemove(tag.id)}
-                  className="h-4 w-4 hover:bg-black/10 rounded-sm p-0.5 transition-colors"
+                  size="none"
                   type="button"
-                >
-                  <X className="h-3 w-3" />
-                </Button>
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleTagRemove(tag.id);
+                  }}
+                  centerIcon={<X className="w-2.5 h-2.5" />}
+                  className="w-3 h-3 p-0 min-h-0 min-w-0 ml-0.5 hover:opacity-70 text-ods-bg hover:bg-transparent"
+                  aria-label={`Remove ${tag.name}`}
+                  fullWidthOnMobile={false}
+                />
               )}
-            </div>
+            </span>
           ))}
 
           {/* Search Input - Takes remaining space */}
@@ -117,6 +155,12 @@ export function TagsSelector({
             onBlur={() => {
               setTimeout(() => setShowDropdown(false), 200);
             }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && canCreateNewTag) {
+                e.preventDefault();
+                handleCreateTag();
+              }
+            }}
             placeholder={selectedTagIds.length >= maxTags ? "Maximum tags reached" : selectedTagIds.length === 0 ? placeholder : "Add more..."}
             disabled={disabled || selectedTagIds.length >= maxTags}
             className={cn(
@@ -129,16 +173,17 @@ export function TagsSelector({
           {searchQuery && (
             <Button
               variant="ghost"
-              size="icon"
+              size="none"
+              type="button"
               onClick={() => {
                 setSearchQuery("");
                 setShowDropdown(false);
               }}
-              className="h-6 w-6 text-ods-text-secondary hover:text-ods-text-primary transition-colors duration-150 flex-shrink-0"
-              type="button"
-            >
-              <X className="h-3 w-3" />
-            </Button>
+              centerIcon={<X className="w-3 h-3" />}
+              className="w-5 h-5 p-0 min-h-0 min-w-0 shrink-0 text-ods-text-secondary hover:text-ods-text-primary hover:bg-transparent"
+              aria-label="Clear search"
+              fullWidthOnMobile={false}
+            />
           )}
         </div>
 
@@ -146,25 +191,46 @@ export function TagsSelector({
         {showDropdown && !disabled && (
           <div className="absolute z-50 w-full mt-1 bg-ods-card border border-ods-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
             <div className="p-3">
-              {getFilteredTagsForAutocomplete().length > 0 ? (
-                <div className="flex flex-wrap gap-1">
-                  {getFilteredTagsForAutocomplete().map((tag) => (
-                    <div
+              {/* Create New Tag Option */}
+              {canCreateNewTag && (
+                <Button
+                  variant="outline"
+                  size="none"
+                  type="button"
+                  onClick={handleCreateTag}
+                  disabled={isCreating}
+                  leftIcon={isCreating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                  className="w-full flex flex-row items-center gap-1.5 px-2 py-1 mb-2 h-auto rounded border-dashed border-ods-accent bg-ods-bg hover:bg-ods-card text-ods-accent font-['DM_Sans'] !text-xs !font-medium"
+                  fullWidthOnMobile={true}
+                >
+                  Create tag: <strong>"{searchQuery.trim()}"</strong>
+                </Button>
+              )}
+
+              {/* Existing Tags */}
+              {filteredTags.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {filteredTags.map((tag) => (
+                    <Button
                       key={tag.id}
+                      variant="outline"
+                      size="none"
+                      type="button"
                       onClick={() => handleTagAdd(tag.id)}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-ods-border hover:border-[#FFC008] bg-ods-bg-secondary hover:bg-ods-surface cursor-pointer text-ods-text-primary font-['DM_Sans'] text-[14px] transition-all"
+                      className="h-auto px-2 py-0.5 rounded border-ods-border hover:border-ods-accent bg-ods-bg hover:bg-ods-card text-ods-text-primary font-['DM_Sans'] !text-xs !font-medium"
+                      fullWidthOnMobile={false}
                     >
                       {tag.name}
-                    </div>
+                    </Button>
                   ))}
                 </div>
-              ) : (
+              ) : !canCreateNewTag ? (
                 <div className="py-4 px-4 text-center w-full">
                   <p className="text-ods-text-secondary text-sm font-['DM_Sans']">
                     {searchQuery.trim() ? `No tags found for "${searchQuery}"` : "No tags available"}
                   </p>
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
         )}
@@ -176,7 +242,7 @@ export function TagsSelector({
           {selectedTagIds.length} / {maxTags} tags selected
         </div>
         {selectedTagIds.length >= maxTags && (
-          <span className="text-[11px] text-[#EF4444] font-['DM_Sans']">
+          <span className="text-[11px] text-[--ods-attention-red-error] font-['DM_Sans']">
             (Maximum reached)
           </span>
         )}
