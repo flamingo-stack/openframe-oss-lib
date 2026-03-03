@@ -187,6 +187,8 @@ public class RestProxyService {
         return HttpClient.create()
                 .responseTimeout(Duration.ofSeconds(60))
                 .option(io.netty.channel.ChannelOption.CONNECT_TIMEOUT_MILLIS, 30000)
+                .option(io.netty.channel.ChannelOption.SO_LINGER, 0)
+                .option(io.netty.channel.ChannelOption.TCP_NODELAY, true)
                 // Configure decoder for larger responses
                 .httpResponseDecoder(spec -> spec
                         .maxHeaderSize(16384)
