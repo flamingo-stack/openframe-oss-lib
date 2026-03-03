@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.within;
 @Tag("oss")
 @DisplayName("Invitations")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class UserInvitationsTest {
+public class UserInvitationsTest extends BaseTest {
 
     @Order(1)
     @Test

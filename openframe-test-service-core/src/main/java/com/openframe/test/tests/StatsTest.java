@@ -24,7 +24,7 @@ import static com.openframe.test.data.generator.DeviceGenerator.statDevicesFilte
 import static com.openframe.test.helpers.RequestSpecHelper.setBaseUrl;
 
 @Disabled
-public class StatsTest {
+public class StatsTest extends BaseTest {
 
     public static List<String> getDomains() throws Exception {
         ObjectMapper mapper = new ObjectMapper();

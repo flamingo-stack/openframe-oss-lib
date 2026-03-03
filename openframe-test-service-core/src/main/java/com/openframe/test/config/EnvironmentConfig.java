@@ -67,7 +67,7 @@ public class EnvironmentConfig {
 
     public static String getBaseUrl() {
         loadEnv();
-        return "https://" + testUserDomain + "." + testBaseUrl + (port != null ? ":" + port : "") + "/";
+        return testUserDomain.contains("localhost") ? "https://localhost/" : "https://" + testUserDomain + "." + testBaseUrl + (port != null ? ":" + port : "") + "/";
     }
 
     public static String getAuthUrl() {
@@ -77,7 +77,7 @@ public class EnvironmentConfig {
 
     public static String getUserDomain() {
         loadEnv();
-        return testUserDomain + "." + testBaseUrl;
+        return testUserDomain.contains("localhost") ? "localhost" : testUserDomain + "." + testBaseUrl;
     }
 
     public static String getRegistrationUrl() {
