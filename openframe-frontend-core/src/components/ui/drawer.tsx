@@ -115,7 +115,7 @@ const DrawerTitle = React.forwardRef<
     <DialogPrimitive.Title
       ref={ref}
       className={cn(
-        "flex-1 font-sans text-lg font-bold leading-6 tracking-[-0.36px] text-ods-text-primary",
+        "min-w-0 flex-1 break-words font-sans text-lg font-bold leading-6 tracking-[-0.36px] text-ods-text-primary",
         className
       )}
       {...props}
@@ -137,7 +137,7 @@ const DrawerDescription = React.forwardRef<
   <DialogPrimitive.Description
     ref={ref}
     className={cn(
-      "font-sans text-sm font-medium leading-5 text-ods-text-secondary",
+      "min-w-0 break-words font-sans text-sm font-medium leading-5 text-ods-text-secondary",
       className
     )}
     {...props}

@@ -301,7 +301,7 @@ function AutocompleteInner<T = string>(
 
   const canAddMore = multiple ? (!maxItems || valueArray.length < maxItems) : true
   const hasValue = valueArray.length > 0
-  const hasFieldChrome = label !== undefined || error !== undefined
+
 
   // Placeholder logic
   const inputPlaceholder = multiple
@@ -315,8 +315,8 @@ function AutocompleteInner<T = string>(
           className={cn(
             containerStyles,
             "group",
-            !disabled && "hover:border-ods-accent/30",
-            disabled && "cursor-not-allowed opacity-50",
+            !disabled && "hover:bg-ods-bg-hover hover:border-ods-border-hover active:bg-ods-bg-active active:border-ods-border-active",
+            disabled && "!cursor-not-allowed bg-ods-bg",
             isOpen && !isInvalid && "border-ods-accent hover:border-ods-accent",
             isInvalid && "border-ods-error hover:border-ods-error"
           )}
@@ -498,20 +498,12 @@ function AutocompleteInner<T = string>(
     </PopoverPrimitive.Root>
   )
 
-  if (hasFieldChrome) {
-    return (
-      <FieldWrapper label={label} error={error} className={className}>
-        <div className="relative" ref={containerRef}>
-          {popover}
-        </div>
-      </FieldWrapper>
-    )
-  }
-
   return (
-    <div className={cn("relative", className)} ref={containerRef}>
-      {popover}
-    </div>
+    <FieldWrapper label={label} error={error} className={className}>
+      <div className="relative" ref={containerRef}>
+        {popover}
+      </div>
+    </FieldWrapper>
   )
 }
 

@@ -7,6 +7,7 @@ import { Chevron02DownIcon } from "../icons-v2-generated/arrows/chevron-02-down-
 import * as React from "react"
 
 import { cn } from "../../utils/cn"
+import { FieldWrapper } from "./field-wrapper"
 
 const Select = SelectPrimitive.Root
 
@@ -16,34 +17,52 @@ const SelectValue = SelectPrimitive.Value
 
 const SelectTrigger = React.forwardRef<
   React.ComponentRef<typeof SelectPrimitive.Trigger>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger> & { invalid?: boolean }
->(({ className, children, invalid, ...props }, ref) => (
-  <SelectPrimitive.Trigger
-    ref={ref}
-    data-invalid={invalid || undefined}
-    className={cn(
-      // Layout & spacing - match Input
-      "flex w-full items-center justify-between gap-2 rounded-[6px] border px-3 h-11 sm:h-12",
-      // Typography - match Input exactly
-      "text-[18px] font-medium leading-6",
-      // Theme palette - match Input exactly
-      "bg-ods-card border-ods-border text-ods-text-primary",
-      "hover:border-ods-accent/30 data-[state=open]:border-ods-accent data-[state=open]:hover:border-ods-accent",
-      "group",
-      "disabled:cursor-not-allowed disabled:opacity-50",
-      "transition-colors duration-200 cursor-pointer",
-      "[&>span]:line-clamp-1",
-      invalid && "border-ods-error hover:border-ods-error data-[state=open]:border-ods-error",
-      className
-    )}
-    {...props}
-  >
-    {children}
-    <SelectPrimitive.Icon asChild>
-      <Chevron02DownIcon className="shrink-0 text-ods-text-secondary transition-all duration-200 group-data-[state=open]:rotate-180 group-data-[state=open]:text-ods-accent group-data-[invalid]:text-ods-error" size={24} />
-    </SelectPrimitive.Icon>
-  </SelectPrimitive.Trigger>
-))
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger> & {
+    invalid?: boolean
+    label?: string
+    error?: string
+  }
+>(({ className, children, invalid, label, error, ...props }, ref) => {
+  const isInvalid = invalid || !!error
+
+  const trigger = (
+    <SelectPrimitive.Trigger
+      ref={ref}
+      data-invalid={isInvalid || undefined}
+      className={cn(
+        // Layout & spacing - match Input
+        "flex w-full items-center justify-between gap-2 rounded-[6px] border px-3 h-11 sm:h-12 outline-none",
+        // Typography - match Input exactly
+        "text-[18px] font-medium leading-6",
+        // Theme palette - match Input exactly
+        "bg-ods-card border-ods-border text-ods-text-primary data-[placeholder]:text-ods-text-secondary",
+        "enabled:hover:bg-ods-bg-hover enabled:hover:border-ods-border-hover enabled:active:bg-ods-bg-active enabled:active:border-ods-border-active",
+        !isInvalid && "data-[state=open]:border-ods-accent data-[state=open]:hover:border-ods-accent",
+        "group",
+        "disabled:!cursor-not-allowed disabled:bg-ods-bg",
+        "transition-colors duration-200 cursor-pointer",
+        "[&>span]:line-clamp-1",
+        isInvalid && "border-ods-error enabled:hover:border-ods-error enabled:active:border-ods-error data-[state=open]:border-ods-error",
+        className
+      )}
+      {...props}
+    >
+      {children}
+      <SelectPrimitive.Icon asChild>
+        <Chevron02DownIcon className={cn(
+          "shrink-0 text-ods-text-secondary transition-all duration-200 group-data-[state=open]:rotate-180",
+          isInvalid ? "text-ods-error" : "group-data-[state=open]:text-ods-accent"
+        )} size={24} />
+      </SelectPrimitive.Icon>
+    </SelectPrimitive.Trigger>
+  )
+
+  return (
+    <FieldWrapper label={label} error={error}>
+      {trigger}
+    </FieldWrapper>
+  )
+})
 SelectTrigger.displayName = SelectPrimitive.Trigger.displayName
 
 const SelectScrollUpButton = React.forwardRef<

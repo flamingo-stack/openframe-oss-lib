@@ -25,12 +25,16 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           "flex min-h-[96px] w-full rounded-[6px] border p-3",
           // Typography - match Input exactly
           "text-[18px] font-medium leading-6",
-          // Focus & disabled states - match Input
-          "focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
+          // Focus states
+          "focus-visible:outline-none focus:border-ods-accent",
           // Animations & touch UX
           "transition-colors duration-200 touch-manipulation",
-          // Theme palette - match Input exactly
-          "bg-ods-card border-ods-border text-ods-text-primary placeholder:text-ods-text-secondary hover:border-ods-accent/30 focus:border-ods-accent",
+          // Theme palette
+          "bg-ods-card border-ods-border text-ods-text-primary placeholder:text-ods-text-secondary",
+          // Hover & active (not disabled)
+          !props.disabled && "hover:bg-ods-bg-hover hover:border-ods-border-hover active:bg-ods-bg-active active:border-ods-border-active",
+          // Disabled
+          props.disabled && "!cursor-not-allowed bg-ods-bg disabled:placeholder:text-ods-border",
           // Ensure proper cursor/stacking
           "cursor-text relative z-10",
           // Textarea-specific
@@ -44,15 +48,11 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
       />
     )
 
-    if (label !== undefined || error !== undefined) {
-      return (
-        <FieldWrapper label={label} error={error}>
-          {content}
-        </FieldWrapper>
-      )
-    }
-
-    return content
+    return (
+      <FieldWrapper label={label} error={error}>
+        {content}
+      </FieldWrapper>
+    )
   }
 )
 Textarea.displayName = "Textarea"
