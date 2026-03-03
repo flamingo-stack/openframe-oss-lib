@@ -1,10 +1,5 @@
 package com.openframe.test.api;
 
-import com.openframe.test.data.dto.device.DeviceFilterInput;
-import com.openframe.test.data.dto.device.DeviceFilters;
-import com.openframe.test.data.dto.device.DeviceStatus;
-import com.openframe.test.data.dto.device.Machine;
-import com.openframe.test.data.dto.device.fleet.FleetHost;
 import com.openframe.test.data.dto.device.*;
 import com.openframe.test.data.dto.device.fleet.FleetHost;
 import com.openframe.test.data.dto.shared.CursorPaginationInput;
@@ -17,9 +12,8 @@ import java.util.Map;
 
 import static com.openframe.test.api.graphql.DeviceQueries.*;
 import static com.openframe.test.config.EnvironmentConfig.GRAPHQL;
-import static com.openframe.test.config.EnvironmentConfig.GRAPHQL;
-import static com.openframe.test.helpers.RequestSpecHelper.getBaseUrl;
 import static com.openframe.test.helpers.RequestSpecHelper.getAuthorizedSpec;
+import static com.openframe.test.helpers.RequestSpecHelper.getBaseUrl;
 import static io.restassured.RestAssured.given;
 
 public class DeviceApi {
@@ -167,14 +161,6 @@ public class DeviceApi {
             System.out.printf("%s%s -> %d%n", getBaseUrl(), FLEET_HOST.replace("{fleetId}", fleetId), response.getStatusCode());
         }
         return null;
-    }
-
-    public static FleetHost getFleetInfo(String fleetId) {
-        return given(getAuthorizedSpec())
-                .pathParam("fleetId", fleetId)
-                .get(FLEET_HOST)
-                .then().statusCode(200)
-                .extract().jsonPath().getObject("host", FleetHost.class);
     }
 
     public static DeviceFilters getDeviceFilters() {

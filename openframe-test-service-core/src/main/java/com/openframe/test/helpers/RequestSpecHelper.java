@@ -1,5 +1,6 @@
 package com.openframe.test.helpers;
 
+import com.openframe.test.config.EnvironmentConfig;
 import io.restassured.RestAssured;
 import io.restassured.builder.RequestSpecBuilder;
 import io.restassured.config.HttpClientConfig;
@@ -16,7 +17,6 @@ import java.io.PrintStream;
 import java.time.Duration;
 
 import static com.openframe.test.config.EnvironmentConfig.getAuthUrl;
-import static com.openframe.test.config.EnvironmentConfig.getBaseUrl;
 import static com.openframe.test.helpers.AuthHelper.getCookies;
 
 public class RequestSpecHelper {
@@ -24,6 +24,16 @@ public class RequestSpecHelper {
     private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(10);
     private static final Logger log = LoggerFactory.getLogger(RequestSpecHelper.class);
     private static final PrintStream SLF4J_STREAM = new PrintStream(new Slf4jOutputStream(log), true);
+
+    private static final ThreadLocal<String> baseUrl = new ThreadLocal<>();
+
+    public static void setBaseUrl(String url) {
+        baseUrl.set(url);
+    }
+
+    public static String getBaseUrl() {
+        return baseUrl.get() != null ? baseUrl.get() : EnvironmentConfig.getBaseUrl();
+    }
 
     public static RequestSpecification getAuthorizedSpec() {
         return prebuildRequestSpec()

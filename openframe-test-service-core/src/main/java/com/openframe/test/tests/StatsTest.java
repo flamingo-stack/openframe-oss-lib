@@ -2,9 +2,8 @@ package com.openframe.test.tests;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.openframe.test.config.EnvironmentConfig;
 import com.openframe.test.data.dto.shared.CursorPaginationInput;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -24,13 +23,8 @@ import static com.openframe.test.api.DeviceApi.getFleetOsVersion;
 import static com.openframe.test.data.generator.DeviceGenerator.statDevicesFilter;
 import static com.openframe.test.helpers.RequestSpecHelper.setBaseUrl;
 
+@Disabled
 public class StatsTest {
-
-    @BeforeAll
-    public static void setup() {
-        EnvironmentConfig.setEnvMode("STAGE");
-        EnvironmentConfig.setAuthUrl("https://openframe.ai/");
-    }
 
     public static List<String> getDomains() throws Exception {
         ObjectMapper mapper = new ObjectMapper();
@@ -56,7 +50,8 @@ public class StatsTest {
                         try {
                             Thread.sleep(50);
                             String osVersion = getFleetOsVersion(fleetId);
-                            if (osVersion != null && !osVersion.isBlank()) stats.merge(normalizeOsVersion(osVersion), 1, Integer::sum);
+                            if (osVersion != null && !osVersion.isBlank())
+                                stats.merge(normalizeOsVersion(osVersion), 1, Integer::sum);
                         } catch (Exception e) {
                         }
                     }
