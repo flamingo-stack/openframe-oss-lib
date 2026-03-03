@@ -18,6 +18,12 @@ public class EnvironmentConfig {
     private static String port;
     private static boolean envLoaded = false;
 
+    public static void configure(String baseUrl, String userDomain) {
+        testBaseUrl = baseUrl;
+        testUserDomain = userDomain;
+        envLoaded = true;
+    }
+
     private static void loadEnv() {
         if (!envLoaded) {
             String baseUrlVar = System.getenv("TEST_BASE_URL");
@@ -52,7 +58,7 @@ public class EnvironmentConfig {
             if (envVar != null && !envVar.trim().isEmpty()) {
                 envMode = envVar;
             } else {
-                envMode = OSS;
+                envMode = DEV;
             }
             log.debug("TEST_ENV_MODE: {}", envMode);
         }

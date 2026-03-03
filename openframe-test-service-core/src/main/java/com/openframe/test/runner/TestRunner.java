@@ -62,5 +62,5 @@ public class TestRunner {
                         .build())
                 .collect(Collectors.toList());
     }
-    
+
 }

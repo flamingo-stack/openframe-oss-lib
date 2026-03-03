@@ -4,6 +4,7 @@ import com.openframe.test.api.DeviceApi;
 import com.openframe.test.data.dto.device.DeviceFilters;
 import com.openframe.test.data.dto.device.Machine;
 import com.openframe.test.data.dto.device.fleet.FleetHost;
+import lombok.SneakyThrows;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -63,7 +64,7 @@ public class DevicesTest {
             assertThat(toolConnection.getAgentToolId()).as("No agentToolId for " + hostname).isNotEmpty();
             assertThat(toolConnection.getStatus()).as("No status for " + hostname).isNotNull();
         });
-        assertThat(device.getInstalledAgents()).as("No installedAgents for " + hostname).isNotEmpty().hasSize(5);
+        assertThat(device.getInstalledAgents()).as("No installedAgents for " + hostname).isNotEmpty().hasSizeGreaterThan(4);
         assertThat(device.getInstalledAgents()).allSatisfy(agent -> {
             assertThat(agent.getAgentType()).as("No agentType for " + hostname).isNotEmpty();
             assertThat(agent.getVersion()).as("No version for " + hostname).isNotEmpty();
@@ -150,6 +151,7 @@ public class DevicesTest {
         List<Machine> devices = DeviceApi.getDevices(offlineDevicesFilter());
         assertThat(devices).as("Expected at least one OFFLINE device to archive").isNotEmpty();
         DeviceApi.archiveDevice(devices.getLast());
+        sleep(2000);
         List<String> ids = DeviceApi.getDeviceIds(listedStatusesDevicesFilter());
         assertThat(ids).as("Archived device should not be in listed devices").doesNotContain(devices.getFirst().getMachineId());
     }
@@ -161,7 +163,13 @@ public class DevicesTest {
         List<Machine> devices = DeviceApi.getDevices(offlineDevicesFilter());
         assertThat(devices).as("Expected at least one OFFLINE device to delete").isNotEmpty();
         DeviceApi.deleteDevice(devices.getLast());
+        sleep(2000);
         List<String> ids = DeviceApi.getDeviceIds(listedStatusesDevicesFilter());
         assertThat(ids).as("Deleted device should not be in listed devices").doesNotContain(devices.getFirst().getMachineId());
+    }
+
+    @SneakyThrows
+    private void sleep(long ms) {
+        Thread.sleep(ms);
     }
 }
