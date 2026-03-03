@@ -1,6 +1,5 @@
 package com.openframe.gateway.config.ws;
 
-import com.openframe.security.jwt.JwtService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
@@ -20,6 +19,7 @@ public class WebSocketGatewayConfig {
     public static final String TOOLS_AGENT_WS_ENDPOINT_PREFIX = "/ws/tools/agent";
     public static final String TOOLS_API_WS_ENDPOINT_PREFIX = "/ws/tools";
     public static final String NATS_WS_ENDPOINT_PATH = "/ws/nats";
+    public static final String NATS_API_WS_ENDPOINT_PATH = "/ws/nats-api";
 
     @Bean
     public RouteLocator customRouteLocator(
@@ -40,16 +40,19 @@ public class WebSocketGatewayConfig {
                 .route("nats_websocket_route", r -> r
                         .path(NATS_WS_ENDPOINT_PATH)
                         .uri(natsWsUrl))
+                .route("nats_api_websocket_route", r -> r
+                        .path(NATS_API_WS_ENDPOINT_PATH)
+                        .uri(natsWsUrl))
                 .build();
     }
 
     @Bean
     @Primary
     public WebSocketService webSocketServiceDecorator(
-            RequestJwtСlaimsReader requestJwtСlaimsReader,
+            RequestJwtClaimsReader requestJwtClaimsReader,
             WebSocketService defaultWebSocketService
     ) {
-        return new WebSocketServiceSecurityDecorator(defaultWebSocketService, requestJwtСlaimsReader);
+        return new WebSocketServiceSecurityDecorator(defaultWebSocketService, requestJwtClaimsReader);
     }
 
 

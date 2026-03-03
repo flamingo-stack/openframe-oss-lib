@@ -10,11 +10,13 @@ import org.springframework.web.server.ServerWebExchange;
 import java.time.Instant;
 
 import static com.openframe.gateway.config.ws.ToolWebSocketProxyUrlFilter.ORIGINAL_AUTHORIZATION_ATTR;
+import static com.openframe.gateway.config.ws.WebSocketServiceSecurityDecorator.CLOCK_SKEW_SECONDS;
 import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @Component
 @RequiredArgsConstructor
-public class RequestJwtСlaimsReader {
+public class RequestJwtClaimsReader {
 
     public Instant getExpiration(ServerWebExchange exchange) {
         Claims jwtClaims = getClaims(exchange);
@@ -22,7 +24,7 @@ public class RequestJwtСlaimsReader {
     }
 
     private Claims getClaims(ServerWebExchange exchange) {
-        String authorization = (String) exchange.getAttributes().get(ORIGINAL_AUTHORIZATION_ATTR);
+        String authorization = extractAuthorization(exchange);
 
         if (isBlank(authorization)) {
             throw new IllegalStateException("No Authorization header found");
@@ -33,9 +35,20 @@ public class RequestJwtСlaimsReader {
 
         String jwtClaimsPart = authorization.substring(7, authorization.lastIndexOf('.') + 1);
         return Jwts.parserBuilder()
+                .setAllowedClockSkewSeconds(CLOCK_SKEW_SECONDS)
                 .build()
                 .parseClaimsJwt(jwtClaimsPart)
                 .getBody();
+    }
+
+    private String extractAuthorization(ServerWebExchange exchange) {
+        String authorization = (String) exchange.getAttributes().get(ORIGINAL_AUTHORIZATION_ATTR);
+        if (isNotBlank(authorization)) {
+            return authorization;
+        }
+
+        // fallback for routes that don't go through ToolWebSocketProxyUrlFilter (e.g. /ws/nats)
+        return exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
     }
 
 }

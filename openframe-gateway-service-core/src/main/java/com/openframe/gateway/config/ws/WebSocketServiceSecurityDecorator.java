@@ -19,9 +19,10 @@ import static com.openframe.gateway.config.ws.WebSocketGatewayConfig.*;
 @Slf4j
 public class WebSocketServiceSecurityDecorator implements WebSocketService {
 
+    public static final long CLOCK_SKEW_SECONDS = 60; // align with Spring Security default skew
+
     private final WebSocketService defaultWebSocketService;
-    private final RequestJwtСlaimsReader requestJwtReader;
-    private static final long CLOCK_SKEW_SECONDS = 60; // align with Spring Security default skew
+    private final RequestJwtClaimsReader requestJwtReader;
 
     @Override
     public Mono<Void> handleRequest(ServerWebExchange exchange, WebSocketHandler defaultWebSocketHandler) {
@@ -29,7 +30,14 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
 
         if (isSecuredEndpoint(path)) {
             return defaultWebSocketService.handleRequest(exchange, session -> {
-                Instant expiresAt = requestJwtReader.getExpiration(exchange);
+                Instant expiresAt;
+                try {
+                    expiresAt = requestJwtReader.getExpiration(exchange);
+                } catch (Exception e) {
+                    log.warn("Failed to read JWT expiration for session {}, closing: {}", session.getId(), e.getMessage());
+                    return session.close();
+                }
+
                 long secondsUntilExpiration = Duration.between(Instant.now(), expiresAt).getSeconds();
 
                 // Account for clock skew (same tolerance as Spring Security JwtTimestampValidator)
@@ -49,7 +57,7 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
         Then if request have token, we should run session remove job etc.
     */
     private boolean isSecuredEndpoint(String path) {
-        return Set.of(TOOLS_API_WS_ENDPOINT_PREFIX, TOOLS_AGENT_WS_ENDPOINT_PREFIX, NATS_WS_ENDPOINT_PATH)
+        return Set.of(TOOLS_API_WS_ENDPOINT_PREFIX, TOOLS_AGENT_WS_ENDPOINT_PREFIX, NATS_WS_ENDPOINT_PATH, NATS_API_WS_ENDPOINT_PATH)
                 .stream()
                 .anyMatch(path::startsWith);
     }
