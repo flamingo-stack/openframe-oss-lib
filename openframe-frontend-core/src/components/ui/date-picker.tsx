@@ -379,10 +379,11 @@ const triggerButtonStyles = cn(
   "bg-ods-card border-ods-border",
   // Typography
   "text-[18px] font-medium leading-6",
-  // States
-  "hover:border-ods-accent/30",
+  // Hover & active (not disabled)
+  "enabled:hover:bg-ods-bg-hover enabled:hover:border-ods-border-hover enabled:active:bg-ods-bg-active enabled:active:border-ods-border-active",
   "focus:outline-none",
-  "disabled:cursor-not-allowed disabled:opacity-50",
+  // Disabled
+  "disabled:!cursor-not-allowed disabled:bg-ods-bg",
   // Animation
   "transition-colors duration-200"
 );
@@ -392,9 +393,9 @@ const timeSelectTriggerStyles = cn(
   "h-11 sm:h-12 min-h-0 px-3 rounded-[6px] border",
   "bg-ods-card border-ods-border",
   "text-[18px] font-medium leading-6",
-  "hover:border-ods-accent/30",
+  "enabled:hover:bg-ods-bg-hover enabled:hover:border-ods-border-hover enabled:active:bg-ods-bg-active enabled:active:border-ods-border-active",
   "focus:outline-none",
-  "disabled:cursor-not-allowed disabled:opacity-50",
+  "disabled:!cursor-not-allowed disabled:bg-ods-bg",
   "transition-colors duration-200 cursor-pointer",
   "text-ods-text-primary"
 );
@@ -451,7 +452,7 @@ export function DatePicker(props: DatePickerProps) {
         <button
           type="button"
           disabled={disabled}
-          className={cn(triggerButtonStyles, "group", open && !isInvalid && "border-ods-accent hover:border-ods-accent", isInvalid && "border-ods-error hover:border-ods-error", className)}
+          className={cn(triggerButtonStyles, "group", open && !isInvalid && "border-ods-accent enabled:hover:border-ods-accent enabled:hover:bg-ods-card", isInvalid && "border-ods-error enabled:hover:border-ods-error enabled:hover:bg-ods-card", className)}
         >
           <Calendar className="size-6 text-ods-text-secondary shrink-0" />
           <span
@@ -491,15 +492,11 @@ export function DatePicker(props: DatePickerProps) {
     </Popover.Root>
   );
 
-  if (label !== undefined || error !== undefined) {
-    return (
-      <FieldWrapper label={label} error={error}>
-        {picker}
-      </FieldWrapper>
-    );
-  }
-
-  return picker;
+  return (
+    <FieldWrapper label={label} error={error}>
+      {picker}
+    </FieldWrapper>
+  );
 }
 
 // ============================================================================
@@ -628,7 +625,7 @@ export function DatePickerInput({
           <button
             type="button"
             disabled={disabled}
-            className={cn(triggerButtonStyles, "group", open && !isInvalid && "border-ods-accent hover:border-ods-accent", isInvalid && "border-ods-error hover:border-ods-error", "flex-1")}
+            className={cn(triggerButtonStyles, "group", open && !isInvalid && "border-ods-accent enabled:hover:border-ods-accent enabled:hover:bg-ods-card", isInvalid && "border-ods-error enabled:hover:border-ods-error enabled:hover:bg-ods-card", "flex-1")}
           >
             <Calendar className="size-6 text-ods-text-secondary shrink-0" />
             <span
@@ -729,15 +726,11 @@ export function DatePickerInput({
     </div>
   );
 
-  if (label !== undefined || error !== undefined) {
-    return (
-      <FieldWrapper label={label} error={error} className={className}>
-        {content}
-      </FieldWrapper>
-    );
-  }
-
-  return content;
+  return (
+    <FieldWrapper label={label} error={error} className={className}>
+      {content}
+    </FieldWrapper>
+  );
 }
 
 // ============================================================================
@@ -863,7 +856,7 @@ export function DatePickerInputSimple({
           <button
             type="button"
             disabled={disabled}
-            className={cn(triggerButtonStyles, "group", open && !isInvalid && "border-ods-accent hover:border-ods-accent", isInvalid && "border-ods-error hover:border-ods-error", "flex-1")}
+            className={cn(triggerButtonStyles, "group", open && !isInvalid && "border-ods-accent enabled:hover:border-ods-accent enabled:hover:bg-ods-card", isInvalid && "border-ods-error enabled:hover:border-ods-error enabled:hover:bg-ods-card", "flex-1")}
           >
             <Calendar className="size-6 text-ods-text-secondary shrink-0" />
             <span
@@ -926,15 +919,11 @@ export function DatePickerInputSimple({
     </div>
   );
 
-  if (label !== undefined || error !== undefined) {
-    return (
-      <FieldWrapper label={label} error={error} className={className}>
-        {content}
-      </FieldWrapper>
-    );
-  }
-
-  return content;
+  return (
+    <FieldWrapper label={label} error={error} className={className}>
+      {content}
+    </FieldWrapper>
+  );
 }
 
 // ============================================================================

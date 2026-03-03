@@ -37,9 +37,11 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           // Animations & touch UX
           "transition-colors duration-200",
           // Theme palette
-          "bg-ods-card border-ods-border hover:border-ods-accent/30 has-[:focus]:border-ods-accent",
+          "bg-ods-card border-ods-border has-[:focus]:border-ods-accent",
+          // Hover & active (not disabled)
+          !props.disabled && "hover:bg-ods-bg-hover hover:border-ods-border-hover active:bg-ods-bg-active active:border-ods-border-active",
           // Disabled
-          props.disabled && "cursor-not-allowed opacity-50",
+          props.disabled && "!cursor-not-allowed bg-ods-bg",
           // Invalid
           isInvalid && "border-ods-error hover:border-ods-error has-[:focus]:border-ods-error",
           className
@@ -62,7 +64,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             // File input adjustments
             "file:border-0 file:bg-transparent file:text-[18px] file:font-medium",
             // Disabled
-            "disabled:cursor-not-allowed",
+            "disabled:cursor-not-allowed disabled:placeholder:text-ods-border",
             // Touch
             "touch-manipulation"
           )}
@@ -80,15 +82,11 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       </label>
     )
 
-    if (label !== undefined || error !== undefined) {
-      return (
-        <FieldWrapper label={label} error={error}>
-          {content}
-        </FieldWrapper>
-      )
-    }
-
-    return <>{content}</>
+    return (
+      <FieldWrapper label={label} error={error}>
+        {content}
+      </FieldWrapper>
+    )
   }
 )
 Input.displayName = "Input"
