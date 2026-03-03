@@ -34,6 +34,15 @@ public class DeviceGenerator {
                 DeviceStatus.PENDING);
     }
 
+    public static DeviceFilterInput statDevicesFilter() {
+        return statusDevicesFilter(
+                DeviceStatus.ONLINE,
+                DeviceStatus.OFFLINE,
+                DeviceStatus.ACTIVE,
+                DeviceStatus.INACTIVE,
+                DeviceStatus.MAINTENANCE);
+    }
+
     public static DeviceFilterInput statusDevicesFilter(DeviceStatus... statuses) {
         return DeviceFilterInput.builder()
                 .statuses(List.of(statuses))

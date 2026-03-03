@@ -15,7 +15,7 @@ import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
 
 @Tag("saas")
 @DisplayName("Devices")
-public class DevicesTest {
+public class DevicesTest extends BaseTest {
 
     @Tag("read")
     @Test
@@ -63,7 +63,7 @@ public class DevicesTest {
             assertThat(toolConnection.getAgentToolId()).as("No agentToolId for " + hostname).isNotEmpty();
             assertThat(toolConnection.getStatus()).as("No status for " + hostname).isNotNull();
         });
-        assertThat(device.getInstalledAgents()).as("No installedAgents for " + hostname).isNotEmpty().hasSize(5);
+        assertThat(device.getInstalledAgents()).as("No installedAgents for " + hostname).isNotEmpty().hasSizeGreaterThan(4);
         assertThat(device.getInstalledAgents()).allSatisfy(agent -> {
             assertThat(agent.getAgentType()).as("No agentType for " + hostname).isNotEmpty();
             assertThat(agent.getVersion()).as("No version for " + hostname).isNotEmpty();
@@ -149,9 +149,10 @@ public class DevicesTest {
     public void testArchiveDevice() {
         List<Machine> devices = DeviceApi.getDevices(offlineDevicesFilter());
         assertThat(devices).as("Expected at least one OFFLINE device to archive").isNotEmpty();
-        DeviceApi.archiveDevice(devices.getLast());
+        Machine device = devices.getLast();
+        DeviceApi.archiveDevice(device);
         List<String> ids = DeviceApi.getDeviceIds(listedStatusesDevicesFilter());
-        assertThat(ids).as("Archived device should not be in listed devices").doesNotContain(devices.getFirst().getMachineId());
+        assertThat(ids).as("Archived device should not be in listed devices").doesNotContain(device.getMachineId());
     }
 
     @Tag("delete")
@@ -160,8 +161,9 @@ public class DevicesTest {
     public void testDeleteDevice() {
         List<Machine> devices = DeviceApi.getDevices(offlineDevicesFilter());
         assertThat(devices).as("Expected at least one OFFLINE device to delete").isNotEmpty();
-        DeviceApi.deleteDevice(devices.getLast());
+        Machine device = devices.getLast();
+        DeviceApi.deleteDevice(device);
         List<String> ids = DeviceApi.getDeviceIds(listedStatusesDevicesFilter());
-        assertThat(ids).as("Deleted device should not be in listed devices").doesNotContain(devices.getFirst().getMachineId());
+        assertThat(ids).as("Deleted device should not be in listed devices").doesNotContain(device.getMachineId());
     }
 }

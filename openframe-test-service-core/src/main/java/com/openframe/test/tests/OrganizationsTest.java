@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Tag("saas")
 @DisplayName("Organizations")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class OrganizationsTest {
+public class OrganizationsTest extends BaseTest {
 
     @Tag("create")
     @Order(1)

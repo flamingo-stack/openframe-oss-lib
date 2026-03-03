@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Tag("registration")
 @DisplayName("Owner registration")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class OwnerRegistrationTest {
+public class OwnerRegistrationTest extends BaseTest {
 
     @Order(1)
     @Test

@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @Tag("oss")
 @DisplayName("Test Access tokens")
-public class AuthTokensTest {
+public class AuthTokensTest extends BaseTest {
 
     @Tag("token")
     @Test

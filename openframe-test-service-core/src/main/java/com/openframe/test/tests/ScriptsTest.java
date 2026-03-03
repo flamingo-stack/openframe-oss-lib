@@ -9,24 +9,26 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Tag("saas")
+
 @DisplayName("Scripts")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class ScriptsTest {
+public class ScriptsTest extends BaseTest {
 
+    @Tag("saas")
     @Tag("read")
     @Test
     @DisplayName("List scripts")
     public void testListScripts() {
         List<Script> scripts = ScriptApi.listScripts();
         assertThat(scripts).as("Expected at least one script").isNotEmpty();
-        assertThat(scripts).allSatisfy(script -> {
-            assertThat(script.getId()).as("Script id should not be null").isNotNull();
-            assertThat(script.getName()).as("Script name should not be empty").isNotEmpty();
-            assertThat(script.getDescription()).as("Script description should not be empty").isNotEmpty();
+        assertThat(scripts).withFailMessage("Some fields are empty").allSatisfy(script -> {
+            assertThat(script.getId()).isNotNull();
+            assertThat(script.getName()).isNotEmpty();
+            assertThat(script.getDescription()).isNotEmpty();
         });
     }
 
+    @Tag("saas")
     @Tag("read")
     @Test
     @DisplayName("Get script")

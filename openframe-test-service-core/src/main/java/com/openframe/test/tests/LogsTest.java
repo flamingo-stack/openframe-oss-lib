@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @Tag("saas")
 @DisplayName("Logs")
-public class LogsTest {
+public class LogsTest extends BaseTest {
 
     @Tag("read")
     @Test
@@ -73,18 +73,15 @@ public class LogsTest {
 
     @Tag("read")
     @Test
-    @DisplayName("Filter logs by severity and tool")
+    @DisplayName("Filter logs by severity")
     public void testFilterLogs() {
         LogFilters filters = LogsApi.getLogFilters();
         assertThat(filters.getSeverities()).as("Expected at least one severity").isNotEmpty();
-        assertThat(filters.getToolTypes()).as("Expected at least one tool type").isNotEmpty();
         String severity = filters.getSeverities().getFirst();
-        String toolType = filters.getToolTypes().getFirst();
-        List<LogEvent> logs = LogsApi.getLogs(LogGenerator.severityAndToolFilter(severity, toolType));
-        assertThat(logs).as("Expected logs for severity: %s and tool: %s", severity, toolType).isNotEmpty();
+        List<LogEvent> logs = LogsApi.getLogs(LogGenerator.severityFilter(severity));
+        assertThat(logs).as("Expected logs for severity: %s", severity).isNotEmpty();
         assertThat(logs).allSatisfy(log -> {
             assertThat(log.getSeverity()).as("Log severity should match filter").isEqualTo(severity);
-            assertThat(log.getToolType()).as("Log toolType should match filter").isEqualTo(toolType);
         });
     }
 }

@@ -14,10 +14,11 @@ public class ScriptApi {
     private static final String SCRIPT = SCRIPTS + "{id}/";
 
     public static List<Script> listScripts() {
-        return given(getAuthorizedSpec())
+        List<Script> scripts = given(getAuthorizedSpec())
                 .get(SCRIPTS)
                 .then().statusCode(200)
                 .extract().jsonPath().getList(".", Script.class);
+        return scripts.size() >= 10 ? scripts.subList(0, 9) : null;
     }
 
     public static Script getScript(Integer id) {
