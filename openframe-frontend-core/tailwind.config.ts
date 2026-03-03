@@ -140,6 +140,7 @@ const config: Config = {
         "ods-border": "var(--color-border-default)",
         "ods-border-hover": "var(--color-border-hover)",
         "ods-border-focus": "var(--color-border-focus)",
+        "ods-border-active": "var(--color-border-active)",
         "ods-divider": "var(--color-divider)",
         "ods-text-primary": "var(--color-text-primary)",
         "ods-text-secondary": "var(--color-text-secondary)",

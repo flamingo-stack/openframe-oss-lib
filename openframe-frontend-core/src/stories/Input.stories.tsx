@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
+import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { SearchIcon } from '../components/icons-v2-generated/interface/search-icon';
 
@@ -173,6 +174,28 @@ export const Loading: Story = {
     placeholder: 'Searching...',
     loading: true,
     startAdornment: <SearchIcon size={20} />,
+  },
+};
+
+/**
+ * Input with a submit button.
+ */
+export const WithButton: Story = {
+  render: function Render() {
+    const [value, setValue] = useState('');
+    return (
+      <div className="flex items-start gap-2">
+        <Input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="Enter your email..."
+          error='sdfsd'
+        />
+        <Button variant="primary" size="default">
+          Submit
+        </Button>
+      </div>
+    );
   },
 };
 
