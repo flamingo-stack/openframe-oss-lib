@@ -12,6 +12,8 @@ import reactor.core.publisher.Mono;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 import static com.openframe.gateway.config.ws.WebSocketGatewayConfig.*;
 
@@ -23,6 +25,9 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
 
     private final WebSocketService defaultWebSocketService;
     private final RequestJwtClaimsReader requestJwtReader;
+    private final ConcurrentMap<String, SessionInfo> sessionRegistry = new ConcurrentHashMap<>();
+
+    private record SessionInfo(Instant createdAt, String path) {}
 
     @Override
     public Mono<Void> handleRequest(ServerWebExchange exchange, WebSocketHandler defaultWebSocketHandler) {
@@ -30,11 +35,14 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
 
         if (isSecuredEndpoint(path)) {
             return defaultWebSocketService.handleRequest(exchange, session -> {
+                sessionRegistry.put(session.getId(), new SessionInfo(Instant.now(), path));
+
                 Instant expiresAt;
                 try {
                     expiresAt = requestJwtReader.getExpiration(exchange);
                 } catch (Exception e) {
                     log.warn("Failed to read JWT expiration for session {}, closing: {}", session.getId(), e.getMessage());
+                    sessionRegistry.remove(session.getId());
                     return session.close();
                 }
 
@@ -44,7 +52,7 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                 long effectiveSeconds = secondsUntilExpiration + CLOCK_SKEW_SECONDS;
 
                 Disposable disposable = scheduleSessionRemoveJob(session, effectiveSeconds);
-                processSessionClosedEvent(session, disposable);
+                processSessionClosedEvent(session, path, disposable);
                 return defaultWebSocketHandler.handle(session);
             });
         } else {
@@ -75,13 +83,17 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                 .subscribe();
     }
 
-    private void processSessionClosedEvent(WebSocketSession session, Disposable disposable) {
+    private void processSessionClosedEvent(WebSocketSession session, String path, Disposable disposable) {
         session.closeStatus()
                 .subscribe(status -> {
-                    log.info("Session {} has been closed with status {}", session.getId(), status);
-                    log.info("Cancelling session remove job: {}", session.getId());
+                    String sessionId = session.getId();
+                    SessionInfo info = sessionRegistry.remove(sessionId);
+                    long lifetimeMs = info != null
+                            ? Duration.between(info.createdAt(), Instant.now()).toMillis()
+                            : -1;
+                    log.info("Session {} closed | path={} | code={} | reason={} | lifetime={}ms",
+                            sessionId, path, status.getCode(), status.getReason(), lifetimeMs);
                     disposable.dispose();
-                    log.info("Cancelled session remove job: {}", session.getId());
                 });
     }
 }
