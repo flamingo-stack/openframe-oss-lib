@@ -5,13 +5,20 @@ import com.openframe.test.data.dto.device.DeviceFilters;
 import com.openframe.test.data.dto.device.DeviceStatus;
 import com.openframe.test.data.dto.device.Machine;
 import com.openframe.test.data.dto.device.fleet.FleetHost;
+import com.openframe.test.data.dto.device.*;
+import com.openframe.test.data.dto.device.fleet.FleetHost;
+import com.openframe.test.data.dto.shared.CursorPaginationInput;
+import io.restassured.response.Response;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import static com.openframe.test.api.graphql.DeviceQueries.*;
 import static com.openframe.test.config.EnvironmentConfig.GRAPHQL;
+import static com.openframe.test.config.EnvironmentConfig.GRAPHQL;
+import static com.openframe.test.helpers.RequestSpecHelper.getBaseUrl;
 import static com.openframe.test.helpers.RequestSpecHelper.getAuthorizedSpec;
 import static io.restassured.RestAssured.given;
 
@@ -71,6 +78,51 @@ public class DeviceApi {
                 .extract().jsonPath().getList("data.devices.edges.node", Machine.class);
     }
 
+    public static List<String> getAllDevices(DeviceFilterInput filter, CursorPaginationInput pagination) {
+        List<String> fleetIds = new ArrayList<>();
+        String cursor = pagination.getCursor();
+        boolean hasNextPage = true;
+
+        while (hasNextPage) {
+            Map<String, Object> variables = new HashMap<>();
+            variables.put("filter", filter);
+            variables.put("pagination", CursorPaginationInput.builder()
+                    .limit(pagination.getLimit())
+                    .cursor(cursor)
+                    .build());
+            Map<String, Object> body = new HashMap<>();
+            body.put("query", ALL_DEVICES);
+            body.put("variables", variables);
+
+            var responseR = given(getAuthorizedSpec())
+                    .body(body).post(GRAPHQL);
+            if (responseR.statusCode() == 200) {
+                var response = responseR.then()
+                        .extract().jsonPath();
+
+                List<DeviceWithConnections> devices = response.getList(
+                        "data.devices.edges.node", DeviceWithConnections.class);
+
+                for (DeviceWithConnections device : devices) {
+                    device.getToolConnections().stream()
+                            .filter(tc -> "FLEET_MDM".equals(tc.getToolType()))
+                            .findFirst()
+                            .map(ToolConnection::getAgentToolId)
+                            .ifPresent(fleetIds::add);
+                }
+
+                Boolean next = response.getObject("data.devices.pageInfo.hasNextPage", Boolean.class);
+                hasNextPage = Boolean.TRUE.equals(next);
+                cursor = response.getString("data.devices.pageInfo.endCursor");
+            } else {
+                System.out.printf("%s -> %d%n", getBaseUrl(), responseR.getStatusCode());
+            }
+
+        }
+
+        return fleetIds;
+    }
+
     public static void updateDeviceStatus(Machine device, DeviceStatus status) {
         given(getAuthorizedSpec())
                 .pathParam("machineId", device.getMachineId())
@@ -95,6 +147,26 @@ public class DeviceApi {
                 .body(body).post(GRAPHQL)
                 .then().statusCode(200)
                 .extract().jsonPath().getObject("data.devices.edges[0].node", Machine.class);
+    }
+
+    public static FleetHost getFleetInfo(String fleetId) {
+        return given(getAuthorizedSpec())
+                .pathParam("fleetId", fleetId)
+                .get(FLEET_HOST)
+                .then().statusCode(200)
+                .extract().jsonPath().getObject("host", FleetHost.class);
+    }
+
+    public static String getFleetOsVersion(String fleetId) {
+        Response response = given(getAuthorizedSpec())
+                .pathParam("fleetId", fleetId)
+                .get(FLEET_HOST);
+        if (response.getStatusCode() == 200) {
+            return response.then().extract().jsonPath().getString("host.os_version");
+        } else {
+            System.out.printf("%s%s -> %d%n", getBaseUrl(), FLEET_HOST.replace("{fleetId}", fleetId), response.getStatusCode());
+        }
+        return null;
     }
 
     public static FleetHost getFleetInfo(String fleetId) {
