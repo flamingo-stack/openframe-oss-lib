@@ -7,6 +7,7 @@ import com.openframe.data.service.IntegratedToolService;
 import com.openframe.data.service.ToolUrlService;
 import com.openframe.sdk.tacticalrmm.TacticalRmmClient;
 import com.openframe.sdk.tacticalrmm.model.AgentListItem;
+import com.openframe.sdk.tacticalrmm.model.AutomatedTaskItem;
 import com.openframe.sdk.tacticalrmm.model.ScriptListItem;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -97,6 +98,30 @@ public class TacticalRmmCacheService {
                     
         } catch (Exception e) {
             log.error("Error fetching script name for script ID: {}", scriptId, e);
+            return null;
+        }
+    }
+
+    /**
+     * Get task name from cache or Tactical RMM API by task ID
+     *
+     * @param taskId the automated task ID
+     * @return the task name, or null if not found
+     */
+    @Cacheable(value = "taskNameCache", key = "#taskId", unless = "#result == null")
+    public String getTaskNameById(Integer taskId) {
+        log.debug("Fetching task name for task ID: {}", taskId);
+        try {
+            TacticalRmmClient client = getTacticalRmmClient();
+            if (client == null || tacticalApiKey == null) {
+                log.warn("TacticalRmmClient is not available");
+                return null;
+            }
+            AutomatedTaskItem task = client.getAutomatedTask(baseUrl, tacticalApiKey, taskId.toString());
+            return task != null ? task.getName() : null;
+
+        } catch (Exception e) {
+            log.error("Error fetching task name for task ID: {}", taskId, e);
             return null;
         }
     }

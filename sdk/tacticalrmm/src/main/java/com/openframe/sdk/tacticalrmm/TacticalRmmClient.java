@@ -7,6 +7,7 @@ import com.openframe.sdk.tacticalrmm.exception.TacticalRmmException;
 import com.openframe.sdk.tacticalrmm.model.AgentInfo;
 import com.openframe.sdk.tacticalrmm.model.AgentListItem;
 import com.openframe.sdk.tacticalrmm.model.AgentRegistrationSecretRequest;
+import com.openframe.sdk.tacticalrmm.model.AutomatedTaskItem;
 import com.openframe.sdk.tacticalrmm.model.CommandResult;
 import com.openframe.sdk.tacticalrmm.model.CreateScriptRequest;
 import com.openframe.sdk.tacticalrmm.model.ScriptListItem;
@@ -342,6 +343,53 @@ public class TacticalRmmClient {
             throw e;
         } catch (Exception e) {
             throw new TacticalRmmException("Failed to get script info for: " + scriptId, e);
+        }
+    }
+
+    /**
+     * Get automated task information by task ID
+     * @param tacticalServerUrl The Tactical RMM server URL
+     * @param apiKey The API key for authentication
+     * @param taskId The ID of the automated task to get info for
+     * @return AutomatedTaskItem containing basic task information
+     */
+    public AutomatedTaskItem getAutomatedTask(String tacticalServerUrl, String apiKey, String taskId) {
+        // Validate parameters
+        if (tacticalServerUrl == null || tacticalServerUrl.trim().isEmpty()) {
+            throw new IllegalArgumentException("Tactical server URL cannot be null or empty");
+        }
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            throw new IllegalArgumentException("API key cannot be null or empty");
+        }
+        if (taskId == null || taskId.trim().isEmpty()) {
+            throw new IllegalArgumentException("Task ID cannot be null or empty");
+        }
+
+        try {
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(tacticalServerUrl + "/tasks/" + taskId + "/"))
+                    .GET()
+                    .header("Content-Type", "application/json")
+                    .header("Accept", "application/json")
+                    .header("X-API-KEY", apiKey)
+                    .timeout(Duration.ofSeconds(10))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 401) {
+                throw new TacticalRmmApiException("Authentication failed. Please check your API key.", response.statusCode(), response.body());
+            } else if (response.statusCode() == 404) {
+                throw new TacticalRmmApiException("Automated task not found with ID: " + taskId, response.statusCode(), response.body());
+            } else if (response.statusCode() != 200) {
+                throw new TacticalRmmApiException("Failed to get automated task info", response.statusCode(), response.body());
+            }
+
+            return objectMapper.readValue(response.body(), AutomatedTaskItem.class);
+        } catch (TacticalRmmApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new TacticalRmmException("Failed to get automated task info for: " + taskId, e);
         }
     }
 
