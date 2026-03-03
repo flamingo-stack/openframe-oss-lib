@@ -13,5 +13,6 @@ public class DownloadConfiguration {
     private String link;
     private InstallationType installationType = InstallationType.STANDARD;
     private String bundleId;
+    private String serviceName;
 
 }
