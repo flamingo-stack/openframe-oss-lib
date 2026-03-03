@@ -31,6 +31,13 @@ public enum UnifiedEventType {
     SCRIPT_CREATED(Severity.INFO, "Script created"),
     SCRIPT_UPDATED(Severity.INFO, "Script updated"),
 
+    //Task events
+    TASK_EXECUTION_STARTED(Severity.INFO, "Task execution started"),
+    TASK_CREATED(Severity.INFO, "Task created"),
+    TASK_EXECUTED(Severity.INFO, "Task executed"),
+    TASK_FAILED(Severity.ERROR, "Task execution failed"),
+    TASK_UPDATED(Severity.INFO, "Task updated"),
+
     COMMAND_RUN_STARTED(Severity.INFO, "Command run started"),
     COMMAND_RUN_FINISHED(Severity.INFO, "Command run finished"),
 
