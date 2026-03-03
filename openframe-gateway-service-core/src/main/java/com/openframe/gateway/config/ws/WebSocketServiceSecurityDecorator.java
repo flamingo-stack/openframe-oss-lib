@@ -2,6 +2,7 @@ package com.openframe.gateway.config.ws;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.reactive.socket.CloseStatus;
 import org.springframework.web.reactive.socket.WebSocketHandler;
 import org.springframework.web.reactive.socket.WebSocketSession;
 import org.springframework.web.reactive.socket.server.WebSocketService;
@@ -12,6 +13,8 @@ import reactor.core.publisher.Mono;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 import static com.openframe.gateway.config.ws.WebSocketGatewayConfig.*;
 
@@ -23,6 +26,9 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
 
     private final WebSocketService defaultWebSocketService;
     private final RequestJwtClaimsReader requestJwtReader;
+    private final ConcurrentMap<String, SessionInfo> sessionRegistry = new ConcurrentHashMap<>();
+
+    private record SessionInfo(Instant createdAt, String path) {}
 
     @Override
     public Mono<Void> handleRequest(ServerWebExchange exchange, WebSocketHandler defaultWebSocketHandler) {
@@ -30,11 +36,14 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
 
         if (isSecuredEndpoint(path)) {
             return defaultWebSocketService.handleRequest(exchange, session -> {
+                sessionRegistry.put(session.getId(), new SessionInfo(Instant.now(), path));
+
                 Instant expiresAt;
                 try {
                     expiresAt = requestJwtReader.getExpiration(exchange);
                 } catch (Exception e) {
                     log.warn("Failed to read JWT expiration for session {}, closing: {}", session.getId(), e.getMessage());
+                    sessionRegistry.remove(session.getId());
                     return session.close();
                 }
 
@@ -44,8 +53,24 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                 long effectiveSeconds = secondsUntilExpiration + CLOCK_SKEW_SECONDS;
 
                 Disposable disposable = scheduleSessionRemoveJob(session, effectiveSeconds);
-                processSessionClosedEvent(session, disposable);
-                return defaultWebSocketHandler.handle(session);
+                processSessionClosedEvent(session, path);
+                return defaultWebSocketHandler.handle(session)
+                        .doFinally(signal -> {
+                            SessionInfo info = sessionRegistry.remove(session.getId());
+                            long lifetimeMs = info != null
+                                    ? Duration.between(info.createdAt(), Instant.now()).toMillis()
+                                    : -1;
+                            log.info("Session {} handler completed | path={} | signal={} | lifetime={}ms",
+                                    session.getId(), path, signal, lifetimeMs);
+                            if (session.isOpen()) {
+                                log.warn("Server session {} still open after handler completed, closing",
+                                        session.getId());
+                                session.close(CloseStatus.GOING_AWAY)
+                                        .subscribe(null, ex -> log.warn("Failed to close server session {}: {}",
+                                                session.getId(), ex.getMessage()));
+                            }
+                            disposable.dispose();
+                        });
             });
         } else {
             return defaultWebSocketService.handleRequest(exchange, defaultWebSocketHandler);
@@ -75,13 +100,13 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                 .subscribe();
     }
 
-    private void processSessionClosedEvent(WebSocketSession session, Disposable disposable) {
+    private void processSessionClosedEvent(WebSocketSession session, String path) {
         session.closeStatus()
-                .subscribe(status -> {
-                    log.info("Session {} has been closed with status {}", session.getId(), status);
-                    log.info("Cancelling session remove job: {}", session.getId());
-                    disposable.dispose();
-                    log.info("Cancelled session remove job: {}", session.getId());
-                });
+                .subscribe(
+                        status -> log.info("Session {} close status | path={} | code={} | reason={}",
+                                session.getId(), path, status.getCode(), status.getReason()),
+                        ex -> log.debug("Error observing close status for session {}: {}",
+                                session.getId(), ex.getMessage())
+                );
     }
 }
