@@ -18,6 +18,12 @@ public class EnvironmentConfig {
     private static String port;
     private static boolean envLoaded = false;
 
+    public static void configure(String baseUrl, String userDomain) {
+        testBaseUrl = baseUrl;
+        testUserDomain = userDomain;
+        envLoaded = true;
+    }
+
     private static void loadEnv() {
         if (!envLoaded) {
             String baseUrlVar = System.getenv("TEST_BASE_URL");
@@ -52,7 +58,7 @@ public class EnvironmentConfig {
             if (envVar != null && !envVar.trim().isEmpty()) {
                 envMode = envVar;
             } else {
-                envMode = OSS;
+                envMode = DEV;
             }
             log.debug("TEST_ENV_MODE: {}", envMode);
         }
@@ -61,7 +67,7 @@ public class EnvironmentConfig {
 
     public static String getBaseUrl() {
         loadEnv();
-        return "https://" + testUserDomain + "." + testBaseUrl + (port != null ? ":" + port : "") + "/";
+        return testUserDomain.contains("localhost") ? "https://localhost/" : "https://" + testUserDomain + "." + testBaseUrl + (port != null ? ":" + port : "") + "/";
     }
 
     public static String getAuthUrl() {
@@ -71,7 +77,7 @@ public class EnvironmentConfig {
 
     public static String getUserDomain() {
         loadEnv();
-        return testUserDomain + "." + testBaseUrl;
+        return testUserDomain.contains("localhost") ? "localhost" : testUserDomain + "." + testBaseUrl;
     }
 
     public static String getRegistrationUrl() {

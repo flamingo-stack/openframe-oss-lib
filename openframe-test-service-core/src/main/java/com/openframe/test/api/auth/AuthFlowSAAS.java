@@ -34,6 +34,7 @@ public class AuthFlowSAAS implements IAuthFlow {
         Map<String, String> queryParams = Map.of(
                 "tenantId", tenantId);
         Response response = given()
+                .relaxedHTTPSValidation()
                 .baseUri(getAuthUrl())
                 .queryParams(queryParams)
                 .redirects().follow(false)
@@ -46,6 +47,7 @@ public class AuthFlowSAAS implements IAuthFlow {
 
     public AuthFlowSAAS initAuth() {
         Response response = given()
+                .relaxedHTTPSValidation()
                 .urlEncodingEnabled(false)
                 .redirects().follow(false)
                 .get(nextLocation);
@@ -60,6 +62,7 @@ public class AuthFlowSAAS implements IAuthFlow {
                 "username", user.getEmail(),
                 "password", user.getPassword());
         Response response = given()
+                .relaxedHTTPSValidation()
                 .urlEncodingEnabled(false)
                 .cookie("JSESSIONID", allCookies.get("JSESSIONID"))
                 .formParams(formParams)
@@ -73,6 +76,7 @@ public class AuthFlowSAAS implements IAuthFlow {
 
     public AuthFlowSAAS getAuthCode() {
         Response response = given()
+                .relaxedHTTPSValidation()
                 .urlEncodingEnabled(false)
                 .cookie("JSESSIONID", allCookies.get("JSESSIONID"))
                 .redirects().follow(false)
@@ -84,6 +88,7 @@ public class AuthFlowSAAS implements IAuthFlow {
 
     public Map<String, String> extractTokens() {
         Response response = given()
+                .relaxedHTTPSValidation()
                 .urlEncodingEnabled(false)
                 .cookies(allCookies)
                 .redirects().follow(false)

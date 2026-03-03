@@ -10,6 +10,11 @@ public class UserConfig {
     private static String password;
     private static User user;
 
+    public static void configure(String email, String password) {
+        UserConfig.email = email;
+        UserConfig.password = password;
+    }
+
     public static User getUser() {
         if (user == null) {
             user = User.builder()

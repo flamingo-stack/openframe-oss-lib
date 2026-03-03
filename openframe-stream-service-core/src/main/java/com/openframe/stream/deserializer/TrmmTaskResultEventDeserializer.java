@@ -87,12 +87,18 @@ public class TrmmTaskResultEventDeserializer extends IntegratedToolEventDeserial
     @Override
     protected Optional<String> getMessage(JsonNode after) {
         String status = parseStringField(after, FIELD_STATUS).orElse("unknown");
-        String runStatus = parseStringField(after, FIELD_RUN_STATUS).orElse("unknown");
         String taskId = parseStringField(after, FIELD_TASK_ID).orElse("unknown");
-        String retcode = parseStringField(after, FIELD_RETCODE).orElse("N/A");
-
-        return Optional.of(String.format("Task %s %s (run_status: %s, retcode: %s)",
-                taskId, status, runStatus, retcode));
+        String taskName = null;
+        try {
+            Integer taskIdInt = Integer.parseInt(taskId);
+            taskName = tacticalRmmCacheService.getTaskNameById(taskIdInt);
+        } catch (NumberFormatException e) {
+            log.error("Invalid task_id format: {}", taskId, e);
+        }
+        if (taskName != null) {
+            return Optional.of(String.format("Task '%s' %s", taskName, status));
+        }
+        return Optional.of(String.format("Task %s %s", taskId, status));
     }
 
     @Override

@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @Tag("users")
 @DisplayName("Users")
-public class UserTest {
+public class UserTest extends BaseTest {
 
     @Tag("read")
     @Test
