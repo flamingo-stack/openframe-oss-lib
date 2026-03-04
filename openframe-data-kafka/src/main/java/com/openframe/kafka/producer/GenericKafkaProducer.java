@@ -65,10 +65,17 @@ public abstract class GenericKafkaProducer {
             if (cause instanceof RecordTooLargeException
                     || cause instanceof AuthorizationException
                     || cause instanceof SerializationException
-                    || cause instanceof InvalidTopicException
-                    || cause instanceof UnknownTopicOrPartitionException) {
+                    || cause instanceof InvalidTopicException) {
                 throw new NonRetryableKafkaException(
                         "fatal kafka error: topic=%s key=%s".formatted(topic, key), cause);
+            }
+
+            // UnknownTopicOrPartitionException is retryable — topic may be in the process
+            // of being auto-created by the broker and will become available shortly.
+            if (cause instanceof UnknownTopicOrPartitionException) {
+                log.warn("Kafka topic not yet available (may be auto-creating): topic={}, key={}", topic, key);
+                throw new TransientKafkaSendException(
+                        "topic not yet available: topic=%s key=%s".formatted(topic, key), cause);
             }
 
             // Retryable (transient)
