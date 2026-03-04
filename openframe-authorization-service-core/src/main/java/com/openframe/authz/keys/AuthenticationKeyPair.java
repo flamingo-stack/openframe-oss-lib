@@ -10,7 +10,8 @@ public record AuthenticationKeyPair(
         RSAPublicKey publicKey,
         RSAPrivateKey privateKey,
         String publicPem,
-        String privatePem
+        String privatePem,
+        String kid
 ) {
 }
 
