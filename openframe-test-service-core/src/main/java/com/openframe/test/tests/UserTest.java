@@ -12,9 +12,10 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Tag("users")
+
+@Tag("oss")
 @DisplayName("Users")
-public class UserTest {
+public class UserTest extends BaseTest {
 
     @Tag("read")
     @Test
@@ -41,18 +42,6 @@ public class UserTest {
         assertThat(user).as("Retrieved user should match listed user").isEqualTo(users.getFirst());
     }
 
-    @Tag("delete")
-    @Test
-    @DisplayName("Delete Admin User")
-    public void testDeleteUser() {
-        List<AuthUser> users = UserApi.getUsers(UserRole.ADMIN);
-        assertThat(users).as("No active Admin users").isNotEmpty();
-        int statusCode = UserApi.deleteUser(users.getFirst().getId());
-        assertThat(statusCode).as("Delete user status code should be 204").isEqualTo(204);
-        AuthUser deletedUser = UserApi.getUser(users.getFirst().getId());
-        assertThat(deletedUser).as("User is not found").isNotNull();
-        assertThat(deletedUser.getStatus()).as("User status should be DELETED").isEqualTo(UserStatus.DELETED);
-    }
 
     @Tag("delete")
     @Test

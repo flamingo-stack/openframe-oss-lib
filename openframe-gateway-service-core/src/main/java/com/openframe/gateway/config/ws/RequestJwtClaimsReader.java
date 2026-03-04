@@ -10,6 +10,7 @@ import org.springframework.web.server.ServerWebExchange;
 import java.time.Instant;
 
 import static com.openframe.gateway.config.ws.ToolWebSocketProxyUrlFilter.ORIGINAL_AUTHORIZATION_ATTR;
+import static com.openframe.gateway.config.ws.WebSocketServiceSecurityDecorator.CLOCK_SKEW_SECONDS;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
@@ -34,6 +35,7 @@ public class RequestJwtClaimsReader {
 
         String jwtClaimsPart = authorization.substring(7, authorization.lastIndexOf('.') + 1);
         return Jwts.parserBuilder()
+                .setAllowedClockSkewSeconds(CLOCK_SKEW_SECONDS)
                 .build()
                 .parseClaimsJwt(jwtClaimsPart)
                 .getBody();

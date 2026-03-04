@@ -11,5 +11,6 @@ public class DownloadConfiguration {
     private String targetFileName;
     private InstallationType installationType = InstallationType.STANDARD;
     private String bundleId;
+    private String serviceName;
 
 }

@@ -11,6 +11,8 @@ export type NatsMessageType = 'message' | 'admin-message'
 
 export type NatsConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'reconnecting' | 'closed' | 'error'
 
+export type NatsConnectionSource = 'client' | 'agent' | 'dashboard'
+
 // ========== Network Configuration ==========
 
 export const NETWORK_CONFIG = {

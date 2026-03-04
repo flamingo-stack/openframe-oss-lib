@@ -133,6 +133,19 @@ public class DeviceQueries {
             }
             """;
 
+    public static final String ALL_DEVICES = """
+            query($filter: DeviceFilterInput, $pagination: CursorPaginationInput) {
+                devices(filter: $filter, pagination: $pagination) {
+                    edges {
+                        node {
+                            toolConnections { toolType agentToolId }
+                        }
+                    }
+                    pageInfo { hasNextPage endCursor }
+                }
+            }
+            """;
+
     public static final String DEVICE_FILTERS = """
             query {
                 deviceFilters {

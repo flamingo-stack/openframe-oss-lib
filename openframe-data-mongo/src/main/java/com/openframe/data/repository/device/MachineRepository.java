@@ -27,5 +27,7 @@ public interface MachineRepository extends MongoRepository<Machine, String>, Cus
 
     List<Machine> findByStatusInAndRegisteredAtBefore(Collection<DeviceStatus> statuses, Instant before);
 
+    List<Machine> findByStatusAndLastSeenBefore(DeviceStatus status, Instant threshold);
+
     boolean existsByOrganizationId(String organizationId);
 } 

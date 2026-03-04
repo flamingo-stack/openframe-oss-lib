@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createNatsClient, type NatsClient, type NatsSubscriptionHandle } from '../../../nats'
 import {
+  type NatsConnectionSource,
   type NatsMessageType,
   type UseNatsDialogSubscriptionOptions,
   type UseNatsDialogSubscriptionReturn,
@@ -400,9 +401,11 @@ export function buildNatsWsUrl(
   options?: {
     token?: string
     includeAuthParam?: boolean
+    source?: NatsConnectionSource
   }
 ): string {
-  const u = new URL('/ws/nats', apiBaseUrl)
+  const path = options?.source === 'dashboard' ? '/ws/nats-api' : '/ws/nats'
+  const u = new URL(path, apiBaseUrl)
   u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:'
 
   if (options?.includeAuthParam && options?.token) {

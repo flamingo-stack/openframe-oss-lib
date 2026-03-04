@@ -1,15 +1,18 @@
 package com.openframe.test.tests;
 
 import com.openframe.test.api.InvitationApi;
+import com.openframe.test.api.UserApi;
 import com.openframe.test.data.db.collections.InvitationsCollection;
 import com.openframe.test.data.db.collections.UsersCollection;
 import com.openframe.test.data.dto.invitation.*;
 import com.openframe.test.data.dto.user.AuthUser;
+import com.openframe.test.data.dto.user.UserRole;
 import com.openframe.test.data.dto.user.UserStatus;
 import com.openframe.test.data.generator.InvitationGenerator;
 import org.junit.jupiter.api.*;
 
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
@@ -17,7 +20,7 @@ import static org.assertj.core.api.Assertions.within;
 @Tag("oss")
 @DisplayName("Invitations")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class UserInvitationsTest {
+public class UserInvitationsTest extends BaseTest {
 
     @Order(1)
     @Test
@@ -93,6 +96,19 @@ public class UserInvitationsTest {
         assertThat(response).as("Response should match user already exists error").isEqualTo(expectedResponse);
     }
 
+    @Order(8)
+    @Tag("delete")
+    @Test
+    @DisplayName("Delete Admin User")
+    public void testDeleteUser() {
+        List<AuthUser> users = UserApi.getUsers(UserRole.ADMIN);
+        assertThat(users).as("No active Admin users").isNotEmpty();
+        int statusCode = UserApi.deleteUser(users.getFirst().getId());
+        assertThat(statusCode).as("Delete user status code should be 204").isEqualTo(204);
+        AuthUser deletedUser = UserApi.getUser(users.getFirst().getId());
+        assertThat(deletedUser).as("User is not found").isNotNull();
+        assertThat(deletedUser.getStatus()).as("User status should be DELETED").isEqualTo(UserStatus.DELETED);
+    }
 
     @Order(9)
     @Test

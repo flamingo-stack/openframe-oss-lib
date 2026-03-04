@@ -5,7 +5,6 @@ import com.openframe.test.data.dto.organization.CreateOrganizationRequest;
 import com.openframe.test.data.dto.organization.Organization;
 import com.openframe.test.helpers.RequestSpecHelper;
 import io.restassured.http.ContentType;
-import io.restassured.response.Response;
 
 import java.util.List;
 import java.util.Map;
@@ -28,9 +27,10 @@ public class OrganizationApi {
 
     public static List<Organization> listOrganizations() {
         Map<String, String> body = Map.of("query", OrganizationQueries.ORGANIZATIONS);
-        Response response = given(RequestSpecHelper.getAuthorizedSpec())
-                .body(body).post(GRAPHQL);
-        return response.then().extract().jsonPath().getList("data.organizations.edges.node", Organization.class);
+        return given(RequestSpecHelper.getAuthorizedSpec())
+                .body(body).post(GRAPHQL)
+                .then().statusCode(200)
+                .extract().jsonPath().getList("data.organizations.edges.node", Organization.class);
     }
 
     public static List<Organization> getOrganizations(boolean isDefault) {
@@ -46,7 +46,8 @@ public class OrganizationApi {
         );
         return given(RequestSpecHelper.getAuthorizedSpec())
                 .body(body).post(GRAPHQL)
-                .then().extract().jsonPath().getObject("data.organization", Organization.class);
+                .then().statusCode(200)
+                .extract().jsonPath().getObject("data.organization", Organization.class);
     }
 
     public static Organization createOrganization(CreateOrganizationRequest request) {

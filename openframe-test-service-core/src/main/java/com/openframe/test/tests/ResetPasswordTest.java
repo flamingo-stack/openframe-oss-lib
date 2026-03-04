@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @Tag("reset")
 @DisplayName("Reset Password")
-public class ResetPasswordTest {
+public class ResetPasswordTest extends BaseTest {
 
     @Test
     @DisplayName("Verify that user can reset password")

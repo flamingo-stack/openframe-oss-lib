@@ -11,6 +11,8 @@ import org.bson.codecs.configuration.CodecProvider;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.codecs.pojo.PojoCodecProvider;
 
+import java.util.concurrent.TimeUnit;
+
 import static com.mongodb.MongoClientSettings.getDefaultCodecRegistry;
 import static com.openframe.test.config.MongoConfig.*;
 import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
@@ -18,6 +20,7 @@ import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
 
 public class MongoDB {
 
+    private static final long TIMEOUT = 10;
     private static final ThreadLocal<MongoClient> mongoClient = new ThreadLocal<>();
     private static final ThreadLocal<MongoDatabase> database = new ThreadLocal<>();
 
@@ -46,6 +49,12 @@ public class MongoDB {
             MongoClientSettings settings = MongoClientSettings.builder()
                     .applyConnectionString(new ConnectionString(getMongoDbUri()))
                     .credential(credential)
+                    .applyToClusterSettings(cluster ->
+                            cluster.serverSelectionTimeout(TIMEOUT, TimeUnit.SECONDS))
+                    .applyToSocketSettings(socket -> {
+                        socket.connectTimeout(TIMEOUT, TimeUnit.SECONDS);
+                        socket.readTimeout(TIMEOUT, TimeUnit.SECONDS);
+                    })
                     .build();
 
             mongoClient.set(MongoClients.create(settings));
