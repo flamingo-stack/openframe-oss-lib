@@ -49,7 +49,7 @@ public class TenantKeyService {
         TenantKey doc = new TenantKey();
         doc.setId(randomUUID().toString());
         doc.setTenantId(tenantId);
-        doc.setKeyId("kid-" + randomUUID());
+        doc.setKeyId(pair.kid());
         doc.setPublicPem(pair.publicPem());
         doc.setPrivateEncrypted(enc);
         doc.setActive(true);
