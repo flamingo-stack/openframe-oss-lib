@@ -15,21 +15,21 @@ export interface FieldWrapperProps {
 
 const FieldWrapper = React.forwardRef<HTMLDivElement, FieldWrapperProps>(
   ({ label, error, className, children }, ref) => {
+    const hasChrome = label != null || error != null
+
     return (
-      <div ref={ref} className={cn("flex flex-col gap-1", className)}>
+      <div ref={ref} className={cn(hasChrome ? "relative flex w-full flex-col" : "contents", className)}>
         {label && (
-          <div className="text-[18px] font-medium leading-6 text-ods-text-primary">
+          <label className="text-[14px] md:text-[18px] font-medium leading-5 md:leading-6 text-ods-text-primary mb-1">
             {label}
-          </div>
+          </label>
         )}
         {children}
-        <div className="min-h-[20px]">
-          {error && (
-            <p className="text-[14px] font-medium leading-5 text-ods-error">
-              {error}
-            </p>
-          )}
-        </div>
+        {error && (
+          <p className="absolute bottom-0 left-0 translate-y-full text-[12px] md:text-[14px] font-medium leading-4 md:leading-5 text-ods-error">
+            {error}
+          </p>
+        )}
       </div>
     )
   }
