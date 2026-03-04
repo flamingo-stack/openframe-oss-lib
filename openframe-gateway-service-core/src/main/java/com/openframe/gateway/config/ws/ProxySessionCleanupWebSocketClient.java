@@ -6,6 +6,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.web.reactive.socket.CloseStatus;
 import org.springframework.web.reactive.socket.WebSocketHandler;
 import org.springframework.web.reactive.socket.WebSocketSession;
+import org.springframework.web.reactive.socket.adapter.ReactorNettyWebSocketSessionCloser;
 import org.springframework.web.reactive.socket.client.WebSocketClient;
 import reactor.core.publisher.Mono;
 
@@ -42,7 +43,7 @@ public class ProxySessionCleanupWebSocketClient implements WebSocketClient {
                             if (proxySession.isOpen()) {
                                 log.warn("Proxy session {} still open after relay completed (signal={}), closing",
                                          proxySession.getId(), signal);
-                                proxySession.close(CloseStatus.GOING_AWAY)
+                                ReactorNettyWebSocketSessionCloser.closeGracefully(proxySession, CloseStatus.GOING_AWAY)
                                         .subscribe(null,
                                                 ex -> log.error("Failed to close proxy session {}: {}",
                                                         proxySession.getId(), ex.getMessage()));
