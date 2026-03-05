@@ -10,6 +10,7 @@ import org.springframework.web.reactive.socket.server.WebSocketService;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.SignalType;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -24,6 +25,13 @@ import static com.openframe.gateway.config.ws.WebSocketGatewayConfig.*;
 public class WebSocketServiceSecurityDecorator implements WebSocketService {
 
     public static final long CLOCK_SKEW_SECONDS = 60; // align with Spring Security default skew
+
+    /**
+     * Delay before force-closing a server session after normal handler completion.
+     * Gives Reactor Netty time to complete its own close handshake (sendCloseNow)
+     * without our close call racing it and causing StacklessClosedChannelException.
+     */
+    private static final Duration CLOSE_DELAY = Duration.ofSeconds(2);
 
     private final WebSocketService defaultWebSocketService;
     private final RequestJwtClaimsReader requestJwtReader;
@@ -64,11 +72,30 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                             log.info("Session {} handler completed | path={} | signal={} | lifetime={}ms",
                                     session.getId(), path, signal, lifetimeMs);
                             if (session.isOpen()) {
-                                log.warn("Server session {} still open after handler completed, closing",
-                                        session.getId());
-                                ReactorNettyWebSocketSessionCloser.closeGracefully(session, CloseStatus.GOING_AWAY)
-                                        .subscribe(null, ex -> log.warn("Failed to close server session {}: {}",
-                                                session.getId(), ex.getMessage()));
+                                if (signal == SignalType.ON_COMPLETE) {
+                                    // On normal completion, delay our close to avoid racing with
+                                    // Reactor Netty's internal close handshake (sendCloseNow),
+                                    // which causes StacklessClosedChannelException and onErrorDropped.
+                                    // The delay still acts as a safety net if Netty doesn't close.
+                                    Mono.delay(CLOSE_DELAY)
+                                            .subscribe(
+                                                    __ -> {
+                                                        if (session.isOpen()) {
+                                                            log.debug("Server session {} still open {}ms after handler completed, closing",
+                                                                    session.getId(), CLOSE_DELAY.toMillis());
+                                                            ReactorNettyWebSocketSessionCloser.closeGracefully(session, CloseStatus.GOING_AWAY)
+                                                                    .subscribe();
+                                                        }
+                                                    },
+                                                    ex -> log.debug("Error in delayed server session close for {}: {}",
+                                                            session.getId(), ex.getMessage())
+                                            );
+                                } else {
+                                    log.warn("Server session {} still open after handler completed (signal={}), closing",
+                                            session.getId(), signal);
+                                    ReactorNettyWebSocketSessionCloser.closeGracefully(session, CloseStatus.GOING_AWAY)
+                                            .subscribe();
+                                }
                             }
                             disposable.dispose();
                         });
