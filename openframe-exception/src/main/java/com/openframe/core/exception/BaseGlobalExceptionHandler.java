@@ -6,15 +6,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.context.request.ServletWebRequest;
-import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
@@ -26,18 +24,13 @@ public abstract class BaseGlobalExceptionHandler {
     protected static final Logger log = LoggerFactory.getLogger(BaseGlobalExceptionHandler.class);
 
     @ExceptionHandler(BaseException.class)
-    public ResponseEntity<ErrorResponse> handleBaseException(BaseException ex, WebRequest request) {
+    public ResponseEntity<ErrorResponse> handleBaseException(BaseException ex) {
         log.error("{}: {}", ex.getErrorCode().getCode(), ex.getMessage(), ex);
 
-        ErrorResponse.ErrorResponseBuilder builder = ErrorResponse.builder()
-                .code(ex.getErrorCode().getCode())
-                .message(ex.getMessage())
-                .status(ex.getHttpStatus().value())
-                .timestamp(Instant.now().toString())
-                .path(getPath(request));
+        ErrorResponse response = buildResponse(ex.getErrorCode(), ex.getMessage());
 
         if (ex instanceof ValidationException validationEx && !validationEx.getFieldErrors().isEmpty()) {
-            builder.fieldErrors(validationEx.getFieldErrors().stream()
+            response.setFieldErrors(validationEx.getFieldErrors().stream()
                     .map(fe -> ErrorResponse.FieldError.builder()
                             .field(fe.field())
                             .message(fe.message())
@@ -45,11 +38,12 @@ public abstract class BaseGlobalExceptionHandler {
                     .toList());
         }
 
-        return ResponseEntity.status(ex.getHttpStatus()).body(builder.build());
+        return ResponseEntity.status(ex.getHttpStatus()).body(response);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleMethodArgumentNotValid(MethodArgumentNotValidException ex, WebRequest request) {
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleMethodArgumentNotValid(MethodArgumentNotValidException ex) {
         List<ErrorResponse.FieldError> fieldErrors = ex.getBindingResult().getFieldErrors().stream()
                 .map(error -> ErrorResponse.FieldError.builder()
                         .field(error.getField())
@@ -57,26 +51,15 @@ public abstract class BaseGlobalExceptionHandler {
                         .build())
                 .toList();
 
-        String errorMessage = ex.getBindingResult().getFieldErrors().stream()
-                .map(error -> error.getField() + ": " + error.getDefaultMessage())
-                .collect(Collectors.joining(", "));
+        String errorMessage = toMessage(fieldErrors);
 
         log.warn("Validation error: {}", errorMessage);
-
-        ErrorResponse response = ErrorResponse.builder()
-                .code(ErrorCode.VALIDATION_ERROR.getCode())
-                .message(errorMessage)
-                .status(HttpStatus.BAD_REQUEST.value())
-                .timestamp(Instant.now().toString())
-                .path(getPath(request))
-                .fieldErrors(fieldErrors)
-                .build();
-
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        return buildValidationResponse(errorMessage, fieldErrors);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException ex, WebRequest request) {
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleConstraintViolation(ConstraintViolationException ex) {
         List<ErrorResponse.FieldError> fieldErrors = ex.getConstraintViolations().stream()
                 .map(violation -> ErrorResponse.FieldError.builder()
                         .field(violation.getPropertyPath().toString())
@@ -84,103 +67,84 @@ public abstract class BaseGlobalExceptionHandler {
                         .build())
                 .toList();
 
-        String errorMessage = ex.getConstraintViolations().stream()
-                .map(violation -> violation.getPropertyPath() + ": " + violation.getMessage())
-                .collect(Collectors.joining(", "));
+        String errorMessage = toMessage(fieldErrors);
 
         log.warn("Constraint violation: {}", errorMessage);
-
-        ErrorResponse response = ErrorResponse.builder()
-                .code(ErrorCode.VALIDATION_ERROR.getCode())
-                .message(errorMessage)
-                .status(HttpStatus.BAD_REQUEST.value())
-                .timestamp(Instant.now().toString())
-                .path(getPath(request))
-                .fieldErrors(fieldErrors)
-                .build();
-
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-    }
-
-    @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex, WebRequest request) {
-        log.error("Access denied: ", ex);
-        return buildResponse(ErrorCode.UNAUTHORIZED, ex.getMessage(), HttpStatus.UNAUTHORIZED, request);
-    }
-
-    @ExceptionHandler(BadCredentialsException.class)
-    public ResponseEntity<ErrorResponse> handleBadCredentials(BadCredentialsException ex, WebRequest request) {
-        log.error("Authentication failed: ", ex);
-        return buildResponse(ErrorCode.UNAUTHORIZED, ex.getMessage(), HttpStatus.UNAUTHORIZED, request);
+        return buildValidationResponse(errorMessage, fieldErrors);
     }
 
     @ExceptionHandler(MissingRequestHeaderException.class)
-    public ResponseEntity<ErrorResponse> handleMissingRequestHeader(MissingRequestHeaderException ex, WebRequest request) {
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleMissingRequestHeader(MissingRequestHeaderException ex) {
         log.error("Missing required header: ", ex);
-        return buildResponse(ErrorCode.BAD_REQUEST, "Required header '" + ex.getHeaderName() + "' is missing",
-                HttpStatus.BAD_REQUEST, request);
+        return buildResponse(ErrorCode.BAD_REQUEST, "Required header '" + ex.getHeaderName() + "' is missing");
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleMissingServletRequestParameter(MissingServletRequestParameterException ex) {
+        log.warn("Missing required parameter: {}", ex.getParameterName());
+        return buildResponse(ErrorCode.BAD_REQUEST, "Required parameter '" + ex.getParameterName() + "' is missing");
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex, WebRequest request) {
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleIllegalArgument(IllegalArgumentException ex) {
         log.error("Invalid request: ", ex);
-        return buildResponse(ErrorCode.BAD_REQUEST, ex.getMessage(), HttpStatus.BAD_REQUEST, request);
+        return buildResponse(ErrorCode.BAD_REQUEST, ex.getMessage());
     }
 
     @ExceptionHandler(IllegalStateException.class)
-    public ResponseEntity<ErrorResponse> handleIllegalState(IllegalStateException ex, WebRequest request) {
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleIllegalState(IllegalStateException ex) {
         log.warn("Conflict: {}", ex.getMessage());
-        return buildResponse(ErrorCode.CONFLICT, ex.getMessage(), HttpStatus.CONFLICT, request);
+        return buildResponse(ErrorCode.CONFLICT, ex.getMessage());
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
-    public ResponseEntity<ErrorResponse> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex, WebRequest request) {
+    @ResponseStatus(HttpStatus.METHOD_NOT_ALLOWED)
+    public ErrorResponse handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
         log.error("Method not supported: ", ex);
-        return buildResponse(ErrorCode.METHOD_NOT_ALLOWED, ex.getMessage(), HttpStatus.METHOD_NOT_ALLOWED, request);
+        return buildResponse(ErrorCode.METHOD_NOT_ALLOWED, ex.getMessage());
     }
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
-    public ResponseEntity<ErrorResponse> handleMediaTypeNotSupported(HttpMediaTypeNotSupportedException ex, WebRequest request) {
+    @ResponseStatus(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+    public ErrorResponse handleMediaTypeNotSupported(HttpMediaTypeNotSupportedException ex) {
         log.error("Media type not supported: ", ex);
-        return buildResponse(ErrorCode.UNSUPPORTED_MEDIA_TYPE, ex.getMessage(), HttpStatus.UNSUPPORTED_MEDIA_TYPE, request);
+        return buildResponse(ErrorCode.UNSUPPORTED_MEDIA_TYPE, ex.getMessage());
     }
 
     @ExceptionHandler(ResponseStatusException.class)
-    public ResponseEntity<ErrorResponse> handleResponseStatusException(ResponseStatusException ex, WebRequest request) {
+    public ResponseEntity<ErrorResponse> handleResponseStatusException(ResponseStatusException ex) {
         log.warn("Response status exception: {} - {}", ex.getStatusCode(), ex.getReason());
-        ErrorResponse response = ErrorResponse.builder()
-                .code("error")
-                .message(ex.getReason())
-                .status(ex.getStatusCode().value())
-                .timestamp(Instant.now().toString())
-                .path(getPath(request))
-                .build();
-        return ResponseEntity.status(ex.getStatusCode()).body(response);
+        return ResponseEntity.status(ex.getStatusCode()).body(buildResponse(ErrorCode.INTERNAL_ERROR, ex.getReason()));
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleException(Exception ex, WebRequest request) {
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public ErrorResponse handleException(Exception ex) {
         log.error("Unexpected error: ", ex);
-        return buildResponse(ErrorCode.INTERNAL_ERROR, "An unexpected error occurred",
-                HttpStatus.INTERNAL_SERVER_ERROR, request);
+        return buildResponse(ErrorCode.INTERNAL_ERROR, "An unexpected error occurred");
     }
 
-    protected ResponseEntity<ErrorResponse> buildResponse(ErrorCode errorCode, String message,
-                                                           HttpStatus status, WebRequest request) {
-        ErrorResponse response = ErrorResponse.builder()
+    protected ErrorResponse buildResponse(ErrorCode errorCode, String message) {
+        return ErrorResponse.builder()
                 .code(errorCode.getCode())
                 .message(message)
-                .status(status.value())
                 .timestamp(Instant.now().toString())
-                .path(getPath(request))
                 .build();
-        return ResponseEntity.status(status).body(response);
     }
 
-    protected String getPath(WebRequest request) {
-        if (request instanceof ServletWebRequest servletRequest) {
-            return servletRequest.getRequest().getRequestURI();
-        }
-        return null;
+    private ErrorResponse buildValidationResponse(String message, List<ErrorResponse.FieldError> fieldErrors) {
+        ErrorResponse response = buildResponse(ErrorCode.VALIDATION_ERROR, message);
+        response.setFieldErrors(fieldErrors);
+        return response;
+    }
+
+    private String toMessage(List<ErrorResponse.FieldError> fieldErrors) {
+        return fieldErrors.stream()
+                .map(fe -> fe.getField() + ": " + fe.getMessage())
+                .collect(Collectors.joining(", "));
     }
 }
