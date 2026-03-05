@@ -10,6 +10,7 @@ import org.springframework.web.reactive.socket.server.WebSocketService;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.SignalType;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -64,11 +65,19 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                             log.info("Session {} handler completed | path={} | signal={} | lifetime={}ms",
                                     session.getId(), path, signal, lifetimeMs);
                             if (session.isOpen()) {
-                                log.warn("Server session {} still open after handler completed, closing",
-                                        session.getId());
-                                ReactorNettyWebSocketSessionCloser.closeGracefully(session, CloseStatus.GOING_AWAY)
-                                        .subscribe(null, ex -> log.warn("Failed to close server session {}: {}",
-                                                session.getId(), ex.getMessage()));
+                                // On normal completion, Reactor Netty handles the close handshake itself.
+                                // Force-closing here races with Netty's internal sendCloseNow(), causing
+                                // StacklessClosedChannelException and onErrorDropped noise.
+                                // Only force-close on error/cancel where Netty won't initiate a close.
+                                if (signal == SignalType.ON_COMPLETE) {
+                                    log.debug("Server session {} still open after handler completed normally, " +
+                                              "deferring to Netty close handshake", session.getId());
+                                } else {
+                                    log.warn("Server session {} still open after handler completed (signal={}), closing",
+                                            session.getId(), signal);
+                                    ReactorNettyWebSocketSessionCloser.closeGracefully(session, CloseStatus.GOING_AWAY)
+                                            .subscribe();
+                                }
                             }
                             disposable.dispose();
                         });

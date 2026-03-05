@@ -9,6 +9,7 @@ import org.springframework.web.reactive.socket.WebSocketSession;
 import org.springframework.web.reactive.socket.adapter.ReactorNettyWebSocketSessionCloser;
 import org.springframework.web.reactive.socket.client.WebSocketClient;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.SignalType;
 
 import java.net.URI;
 import java.util.List;
@@ -40,14 +41,22 @@ public class ProxySessionCleanupWebSocketClient implements WebSocketClient {
             public Mono<Void> handle(WebSocketSession proxySession) {
                 return handler.handle(proxySession)
                         .doFinally(signal -> {
-                            if (proxySession.isOpen()) {
-                                log.warn("Proxy session {} still open after relay completed (signal={}), closing",
-                                         proxySession.getId(), signal);
-                                ReactorNettyWebSocketSessionCloser.closeGracefully(proxySession, CloseStatus.GOING_AWAY)
-                                        .subscribe(null,
-                                                ex -> log.error("Failed to close proxy session {}: {}",
-                                                        proxySession.getId(), ex.getMessage()));
+                            if (!proxySession.isOpen()) {
+                                return;
                             }
+                            // On normal completion, Reactor Netty handles the close handshake itself.
+                            // Force-closing here races with Netty's internal sendCloseNow(), causing
+                            // StacklessClosedChannelException and onErrorDropped noise.
+                            // Only force-close on error/cancel where Netty won't initiate a close.
+                            if (signal == SignalType.ON_COMPLETE) {
+                                log.debug("Proxy session {} still open after relay completed normally, " +
+                                          "deferring to Netty close handshake", proxySession.getId());
+                                return;
+                            }
+                            log.warn("Proxy session {} still open after relay completed (signal={}), closing",
+                                     proxySession.getId(), signal);
+                            ReactorNettyWebSocketSessionCloser.closeGracefully(proxySession, CloseStatus.GOING_AWAY)
+                                    .subscribe();
                         });
             }
         };
