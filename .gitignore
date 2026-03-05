@@ -50,3 +50,4 @@ pnpm-lock.yaml
 
 *storybook.log
 storybook-static
+openframe-frontend-core/tsup.config.bundled_*
