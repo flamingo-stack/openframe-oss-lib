@@ -73,18 +73,23 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                                     session.getId(), path, signal, lifetimeMs);
                             if (session.isOpen()) {
                                 if (signal == SignalType.ON_COMPLETE) {
-                                    // On normal completion, Reactor Netty usually handles the close
-                                    // handshake itself via sendCloseNow(). Delay our close to avoid
-                                    // racing it, but still close as a safety net in case Netty doesn't.
+                                    // On normal completion, delay our close to avoid racing with
+                                    // Reactor Netty's internal close handshake (sendCloseNow),
+                                    // which causes StacklessClosedChannelException and onErrorDropped.
+                                    // The delay still acts as a safety net if Netty doesn't close.
                                     Mono.delay(CLOSE_DELAY)
-                                            .subscribe(__ -> {
-                                                if (session.isOpen()) {
-                                                    log.debug("Server session {} still open after handler completed, closing",
-                                                            session.getId());
-                                                    ReactorNettyWebSocketSessionCloser.closeGracefully(session, CloseStatus.GOING_AWAY)
-                                                            .subscribe();
-                                                }
-                                            });
+                                            .subscribe(
+                                                    __ -> {
+                                                        if (session.isOpen()) {
+                                                            log.debug("Server session {} still open {}ms after handler completed, closing",
+                                                                    session.getId(), CLOSE_DELAY.toMillis());
+                                                            ReactorNettyWebSocketSessionCloser.closeGracefully(session, CloseStatus.GOING_AWAY)
+                                                                    .subscribe();
+                                                        }
+                                                    },
+                                                    ex -> log.debug("Error in delayed server session close for {}: {}",
+                                                            session.getId(), ex.getMessage())
+                                            );
                                 } else {
                                     log.warn("Server session {} still open after handler completed (signal={}), closing",
                                             session.getId(), signal);

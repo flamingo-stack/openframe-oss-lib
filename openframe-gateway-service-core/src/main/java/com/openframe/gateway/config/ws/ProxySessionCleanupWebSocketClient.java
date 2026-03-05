@@ -53,18 +53,23 @@ public class ProxySessionCleanupWebSocketClient implements WebSocketClient {
                                 return;
                             }
                             if (signal == SignalType.ON_COMPLETE) {
-                                // On normal completion, Reactor Netty usually handles the close
-                                // handshake itself via sendCloseNow(). Delay our close to avoid
-                                // racing it, but still close as a safety net in case Netty doesn't.
+                                // On normal completion, delay our close to avoid racing with
+                                // Reactor Netty's internal close handshake (sendCloseNow),
+                                // which causes StacklessClosedChannelException and onErrorDropped.
+                                // The delay still acts as a safety net if Netty doesn't close.
                                 Mono.delay(CLOSE_DELAY)
-                                        .subscribe(__ -> {
-                                            if (proxySession.isOpen()) {
-                                                log.debug("Proxy session {} still open after relay completed, closing",
-                                                        proxySession.getId());
-                                                ReactorNettyWebSocketSessionCloser.closeGracefully(proxySession, CloseStatus.GOING_AWAY)
-                                                        .subscribe();
-                                            }
-                                        });
+                                        .subscribe(
+                                                __ -> {
+                                                    if (proxySession.isOpen()) {
+                                                        log.debug("Proxy session {} still open {}ms after relay completed, closing",
+                                                                proxySession.getId(), CLOSE_DELAY.toMillis());
+                                                        ReactorNettyWebSocketSessionCloser.closeGracefully(proxySession, CloseStatus.GOING_AWAY)
+                                                                .subscribe();
+                                                    }
+                                                },
+                                                ex -> log.debug("Error in delayed proxy session close for {}: {}",
+                                                        proxySession.getId(), ex.getMessage())
+                                        );
                             } else {
                                 log.warn("Proxy session {} still open after relay completed (signal={}), closing",
                                         proxySession.getId(), signal);
