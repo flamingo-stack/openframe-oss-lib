@@ -80,35 +80,28 @@ const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(
     const showEmptyState = dialogs.length === 0 && !children
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const loadMoreRef = useRef<HTMLDivElement>(null)
+    const onLoadMoreRef = useRef(onLoadMore)
+    onLoadMoreRef.current = onLoadMore
+    const isFetchingRef = useRef(isFetchingNextPage)
+    isFetchingRef.current = isFetchingNextPage
 
     useEffect(() => {
       const scrollContainer = scrollContainerRef.current
       const loadMoreElement = loadMoreRef.current
-
-      if (!scrollContainer || !loadMoreElement || !hasNextPage || isFetchingNextPage) {
-        return
-      }
+      if (!scrollContainer || !loadMoreElement || !hasNextPage) return
 
       const observer = new IntersectionObserver(
         (entries) => {
           const [entry] = entries
-          if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
-            onLoadMore?.()
+          if (entry.isIntersecting && !isFetchingRef.current) {
+            onLoadMoreRef.current?.()
           }
         },
-        {
-          root: scrollContainer,
-          rootMargin: '100px',
-          threshold: 0.1
-        }
+        { root: scrollContainer, rootMargin: '100px', threshold: 0.1 }
       )
-
       observer.observe(loadMoreElement)
-
-      return () => {
-        observer.unobserve(loadMoreElement)
-      }
-    }, [hasNextPage, isFetchingNextPage, onLoadMore])
+      return () => observer.disconnect()
+    }, [hasNextPage])
 
     if (isLoading && dialogs.length === 0 && !children) {
       return (

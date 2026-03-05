@@ -45,14 +45,17 @@ export function processHistoricalMessages(
   
   let currentAssistantId: string | null = null
   let currentAssistantTimestamp: Date | null = null
+  let lastAssistantId: string | null = null
 
   /**
-   * Flush the current assistant message to processedMessages
+   * Flush the current assistant message to processedMessages.
+   * Uses the LAST message ID in the group for stable React keys across page boundaries.
    */
   const flushAssistantMessage = () => {
-    if (currentAssistantId && accumulator.hasContent()) {
+    const idToUse = lastAssistantId || currentAssistantId
+    if (idToUse && accumulator.hasContent()) {
       processedMessages.push({
-        id: currentAssistantId,
+        id: idToUse,
         role: 'assistant',
         content: accumulator.getSegments(),
         name: assistantName,
@@ -63,6 +66,7 @@ export function processHistoricalMessages(
       accumulator.resetSegments()
       currentAssistantId = null
       currentAssistantTimestamp = null
+      lastAssistantId = null
     }
   }
 
@@ -98,6 +102,7 @@ export function processHistoricalMessages(
         currentAssistantId = msg.id
         currentAssistantTimestamp = new Date(msg.createdAt)
       }
+      lastAssistantId = msg.id
 
       messageDataArray.forEach((data) => {
         processMessageData(data, accumulator, approvalStatuses, { displayApprovalTypes }, escalatedApprovals)
@@ -305,11 +310,13 @@ export function processHistoricalMessagesWithErrors(
 
   let currentAssistantId: string | null = null
   let currentAssistantTimestamp: Date | null = null
+  let lastAssistantId: string | null = null
 
   const flushAssistantMessage = () => {
-    if (currentAssistantId && accumulator.hasContent()) {
+    const idToUse = lastAssistantId || currentAssistantId
+    if (idToUse && accumulator.hasContent()) {
       processedMessages.push({
-        id: currentAssistantId,
+        id: idToUse,
         role: 'assistant',
         content: accumulator.getSegments(),
         name: assistantName,
@@ -320,6 +327,7 @@ export function processHistoricalMessagesWithErrors(
       accumulator.resetSegments()
       currentAssistantId = null
       currentAssistantTimestamp = null
+      lastAssistantId = null
     }
   }
 
@@ -354,6 +362,7 @@ export function processHistoricalMessagesWithErrors(
         currentAssistantId = msg.id
         currentAssistantTimestamp = new Date(msg.createdAt)
       }
+      lastAssistantId = msg.id
 
       messageDataArray.forEach((data) => {
         processMessageData(data, accumulator, approvalStatuses, { displayApprovalTypes }, escalatedApprovals)
