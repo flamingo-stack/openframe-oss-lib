@@ -12,7 +12,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.web.PageableHandlerMethodArgumentResolver;
 import org.springframework.http.MediaType;
-import org.springframework.security.authentication.BadCredentialsException;
+import com.openframe.client.exception.AgentRegistrationSecretValidationErrorException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
@@ -98,7 +98,7 @@ class AgentControllerTest {
     @Test
     void register_WithInvalidInitialKey_ReturnsUnauthorized() throws Exception {
         when(agentRegistrationService.register(any(String.class), any(AgentRegistrationRequest.class)))
-                .thenThrow(new BadCredentialsException("Invalid initial key"));
+                .thenThrow(new AgentRegistrationSecretValidationErrorException("Invalid initial key"));
 
         mockMvc.perform(post("/api/agents/register")
                         .header("X-Initial-Key", "invalid-key")
