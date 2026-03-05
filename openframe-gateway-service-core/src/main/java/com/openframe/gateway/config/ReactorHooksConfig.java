@@ -3,7 +3,7 @@ package com.openframe.gateway.config;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Configuration;
-import reactor.core.Hooks;
+import reactor.core.publisher.Hooks;
 import reactor.netty.channel.AbortedException;
 
 /**
