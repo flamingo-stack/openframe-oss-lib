@@ -1,7 +1,11 @@
 package com.openframe.api.exception;
 
-public class OperationNotAllowedException extends RuntimeException {
+import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.ForbiddenException;
+
+public class OperationNotAllowedException extends ForbiddenException {
+
     public OperationNotAllowedException(String message) {
-        super(message);
+        super(ErrorCode.OPERATION_NOT_ALLOWED, message);
     }
 }

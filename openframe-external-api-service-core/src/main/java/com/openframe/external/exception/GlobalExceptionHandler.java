@@ -1,82 +1,38 @@
 package com.openframe.external.exception;
 
-import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.core.dto.ErrorResponse;
+import com.openframe.core.exception.BaseGlobalExceptionHandler;
+import com.openframe.core.exception.ErrorCode;
 import com.openframe.data.pinot.repository.exception.PinotQueryException;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
-@Slf4j
-public class GlobalExceptionHandler {
-
-    @ExceptionHandler(DeviceNotFoundException.class)
-    @ResponseStatus(HttpStatus.NOT_FOUND)
-    public ErrorResponse handleDeviceNotFound(DeviceNotFoundException ex) {
-        log.warn("Device not found: {}", ex.getMessage());
-        return new ErrorResponse("DEVICE_NOT_FOUND", ex.getMessage());
-    }
-
-    @ExceptionHandler(EventNotFoundException.class)
-    @ResponseStatus(HttpStatus.NOT_FOUND)
-    public ErrorResponse handleEventNotFound(EventNotFoundException ex) {
-        log.warn("Event not found: {}", ex.getMessage());
-        return new ErrorResponse("EVENT_NOT_FOUND", ex.getMessage());
-    }
-
-    @ExceptionHandler(LogNotFoundException.class)
-    @ResponseStatus(HttpStatus.NOT_FOUND)
-    public ErrorResponse handleLogNotFound(LogNotFoundException ex) {
-        log.warn("Log not found: {}", ex.getMessage());
-        return new ErrorResponse("LOG_NOT_FOUND", ex.getMessage());
-    }
-
-    @ExceptionHandler(OrganizationNotFoundException.class)
-    @ResponseStatus(HttpStatus.NOT_FOUND)
-    public ErrorResponse handleOrganizationNotFound(OrganizationNotFoundException ex) {
-        log.warn("Organization not found: {}", ex.getMessage());
-        return new ErrorResponse("ORGANIZATION_NOT_FOUND", ex.getMessage());
-    }
-
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ErrorResponse handleValidationErrors(MethodArgumentNotValidException ex) {
-        log.warn("Validation error: {}", ex.getMessage());
-        return new ErrorResponse("VALIDATION_ERROR", "Invalid request parameters");
-    }
+public class GlobalExceptionHandler extends BaseGlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ErrorResponse handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex, WebRequest request) {
         log.warn("Type mismatch error: {}", ex.getMessage());
         String message = String.format("Invalid value '%s' for parameter '%s'", ex.getValue(), ex.getName());
-        return new ErrorResponse("TYPE_MISMATCH", message);
+        return buildResponse(ErrorCode.TYPE_MISMATCH, message, HttpStatus.BAD_REQUEST, request);
     }
 
     @ExceptionHandler(PinotQueryException.class)
-    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
-    public ErrorResponse handlePinotQueryException(PinotQueryException ex) {
+    public ResponseEntity<ErrorResponse> handlePinotQueryException(PinotQueryException ex, WebRequest request) {
         log.error("Pinot query error: ", ex);
-        return new ErrorResponse("PINOT_QUERY_ERROR", "Query service temporarily unavailable. Please try again later.");
+        return buildResponse(ErrorCode.PINOT_QUERY_ERROR, "Query service temporarily unavailable. Please try again later.",
+                HttpStatus.SERVICE_UNAVAILABLE, request);
     }
 
     @ExceptionHandler(DataAccessException.class)
-    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
-    public ErrorResponse handleDataAccessException(DataAccessException ex) {
+    public ResponseEntity<ErrorResponse> handleDataAccessException(DataAccessException ex, WebRequest request) {
         log.error("Database access error: ", ex);
-        return new ErrorResponse("DATABASE_ERROR", "Database operation failed. Please try again later.");
+        return buildResponse(ErrorCode.DATABASE_ERROR, "Database operation failed. Please try again later.",
+                HttpStatus.SERVICE_UNAVAILABLE, request);
     }
-
-    @ExceptionHandler(Exception.class)
-    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public ErrorResponse handleGenericException(Exception ex) {
-        log.error("Unexpected error occurred", ex);
-        return new ErrorResponse("INTERNAL_ERROR", "Internal server error");
-    }
-} 
+}

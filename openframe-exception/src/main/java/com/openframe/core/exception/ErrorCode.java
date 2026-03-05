@@ -1,0 +1,58 @@
+package com.openframe.core.exception;
+
+public enum ErrorCode {
+
+    // Generic HTTP error codes
+    NOT_FOUND("NOT_FOUND", 404),
+    BAD_REQUEST("BAD_REQUEST", 400),
+    VALIDATION_ERROR("VALIDATION_ERROR", 400),
+    UNAUTHORIZED("UNAUTHORIZED", 401),
+    FORBIDDEN("FORBIDDEN", 403),
+    CONFLICT("CONFLICT", 409),
+    INTERNAL_ERROR("INTERNAL_ERROR", 500),
+    METHOD_NOT_ALLOWED("METHOD_NOT_ALLOWED", 405),
+    UNSUPPORTED_MEDIA_TYPE("UNSUPPORTED_MEDIA_TYPE", 415),
+
+    // Domain-specific error codes
+    USER_NOT_FOUND("USER_NOT_FOUND", 404),
+    DEVICE_NOT_FOUND("DEVICE_NOT_FOUND", 404),
+    API_KEY_NOT_FOUND("API_KEY_NOT_FOUND", 404),
+    ENCRYPTION_FAILED("ENCRYPTION_FAILED", 500),
+    DECRYPTION_FAILED("DECRYPTION_FAILED", 500),
+    ENCRYPTION_ERROR("ENCRYPTION_ERROR", 500),
+    AGENT_REGISTRATION_SECRET_NOT_FOUND("AGENT_REGISTRATION_SECRET_NOT_FOUND", 404),
+    NO_ACTIVE_SECRET_FOUND("NO_ACTIVE_SECRET_FOUND", 404),
+    INITIAL_KEY_EMPTY("INITIAL_KEY_EMPTY", 401),
+    INITIAL_KEY_INVALID("INITIAL_KEY_INVALID", 401),
+    OPERATION_NOT_ALLOWED("OPERATION_NOT_ALLOWED", 403),
+    USER_SELF_DELETE_NOT_ALLOWED("USER_SELF_DELETE_NOT_ALLOWED", 409),
+
+    // External API specific
+    EVENT_NOT_FOUND("EVENT_NOT_FOUND", 404),
+    LOG_NOT_FOUND("LOG_NOT_FOUND", 404),
+    ORGANIZATION_NOT_FOUND("ORGANIZATION_NOT_FOUND", 404),
+
+    // Authorization specific
+    USER_ACTIVE_IN_ANOTHER_TENANT("USER_IS_ACTIVE_IN_ANOTHER_TENANT", 409),
+
+    // Infrastructure error codes
+    TYPE_MISMATCH("TYPE_MISMATCH", 400),
+    PINOT_QUERY_ERROR("PINOT_QUERY_ERROR", 503),
+    DATABASE_ERROR("DATABASE_ERROR", 503);
+
+    private final String code;
+    private final int httpStatus;
+
+    ErrorCode(String code, int httpStatus) {
+        this.code = code;
+        this.httpStatus = httpStatus;
+    }
+
+    public String getCode() {
+        return code;
+    }
+
+    public int getHttpStatus() {
+        return httpStatus;
+    }
+}

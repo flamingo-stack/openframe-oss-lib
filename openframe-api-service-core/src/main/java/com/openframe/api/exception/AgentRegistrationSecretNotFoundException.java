@@ -1,15 +1,11 @@
 package com.openframe.api.exception;
 
-import lombok.Getter;
+import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.NotFoundException;
 
-@Getter
-public class AgentRegistrationSecretNotFoundException extends RuntimeException {
+public class AgentRegistrationSecretNotFoundException extends NotFoundException {
 
-    private final String errorCode;
-
-    public AgentRegistrationSecretNotFoundException(String errorCode, String message) {
-        super(message);
-        this.errorCode = errorCode;
+    public AgentRegistrationSecretNotFoundException(ErrorCode errorCode, String message) {
+        super(errorCode, message);
     }
-
 }

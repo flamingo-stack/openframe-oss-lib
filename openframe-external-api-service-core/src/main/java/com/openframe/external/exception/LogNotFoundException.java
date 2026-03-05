@@ -1,8 +1,10 @@
 package com.openframe.external.exception;
 
-public class LogNotFoundException extends RuntimeException {
-    
+import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.NotFoundException;
+
+public class LogNotFoundException extends NotFoundException {
     public LogNotFoundException(String message) {
-        super(message);
+        super(ErrorCode.LOG_NOT_FOUND, message);
     }
 }

@@ -1,6 +1,7 @@
 package com.openframe.core.service;
 
 import com.openframe.core.exception.EncryptionException;
+import com.openframe.core.exception.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.encrypt.Encryptors;
@@ -50,7 +51,7 @@ public class EncryptionService {
             return textEncryptor.encrypt(plainText);
         } catch (Exception e) {
             log.error("Failed to encrypt data", e);
-            throw new EncryptionException("encryption_failed", "Failed to encrypt sensitive data", e);
+            throw new EncryptionException(ErrorCode.ENCRYPTION_FAILED, "Failed to encrypt sensitive data", e);
         }
     }
 
@@ -70,7 +71,7 @@ public class EncryptionService {
             return textEncryptor.decrypt(encryptedText);
         } catch (Exception e) {
             log.error("Failed to decrypt data", e);
-            throw new EncryptionException("decryption_failed", "Failed to decrypt sensitive data", e);
+            throw new EncryptionException(ErrorCode.DECRYPTION_FAILED, "Failed to decrypt sensitive data", e);
         }
     }
 
@@ -90,7 +91,7 @@ public class EncryptionService {
             return encrypt(clientSecret);
         } catch (Exception e) {
             log.error("Failed to encrypt client secret", e);
-            throw new EncryptionException("encryption_failed", "Failed to encrypt client secret", e);
+            throw new EncryptionException(ErrorCode.ENCRYPTION_FAILED, "Failed to encrypt client secret", e);
         }
     }
 
@@ -110,7 +111,7 @@ public class EncryptionService {
             return decrypt(encryptedClientSecret);
         } catch (Exception e) {
             log.error("Failed to decrypt client secret", e);
-            throw new EncryptionException("decryption_failed", "Failed to decrypt client secret", e);
+            throw new EncryptionException(ErrorCode.DECRYPTION_FAILED, "Failed to decrypt client secret", e);
         }
     }
 } 

@@ -1,6 +1,8 @@
 package com.openframe.client.exception;
 
-public class InvalidAgentIdException extends RuntimeException {
+import com.openframe.core.exception.BadRequestException;
+
+public class InvalidAgentIdException extends BadRequestException {
     public InvalidAgentIdException(String message) {
         super(message);
     }
