@@ -1,10 +1,11 @@
 package com.openframe.data.exception;
 
-public class UserNotFoundException extends RuntimeException {
-    public UserNotFoundException(String userId)
-    {
-        super("User not found: " + userId);
+import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.NotFoundException;
+
+public class UserNotFoundException extends NotFoundException {
+
+    public UserNotFoundException(String userId) {
+        super(ErrorCode.USER_NOT_FOUND, "User not found: " + userId);
     }
 }
-
-

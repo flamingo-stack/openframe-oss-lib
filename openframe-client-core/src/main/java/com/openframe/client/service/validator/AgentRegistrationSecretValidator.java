@@ -2,6 +2,7 @@ package com.openframe.client.service.validator;
 
 import com.openframe.client.exception.AgentRegistrationSecretValidationErrorException;
 import com.openframe.client.exception.AgentRegistrationSecretValidationException;
+import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.service.EncryptionService;
 import com.openframe.data.document.agent.AgentRegistrationSecret;
 import com.openframe.data.repository.agent.AgentRegistrationSecretRepository;
@@ -19,7 +20,7 @@ public class AgentRegistrationSecretValidator {
 
     public void validate(String initialKey) {
         if (isBlank(initialKey)) {
-            throw new AgentRegistrationSecretValidationException("initial_key_empty", "Initial key is empty");
+            throw new AgentRegistrationSecretValidationException(ErrorCode.INITIAL_KEY_EMPTY, "Initial key is empty");
         }
 
         AgentRegistrationSecret secret = secretRepository.findByActiveTrue()
@@ -27,7 +28,7 @@ public class AgentRegistrationSecretValidator {
 
         String decryptedSecretKey = encryptionService.decrypt(secret.getSecretKey());
         if (!decryptedSecretKey.equals(initialKey)) {
-            throw new AgentRegistrationSecretValidationException("initial_key_invalid", "Invalid initial key");
+            throw new AgentRegistrationSecretValidationException(ErrorCode.INITIAL_KEY_INVALID, "Invalid initial key");
         }
     }
 

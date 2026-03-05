@@ -1,15 +1,11 @@
 package com.openframe.client.exception;
 
-import lombok.Getter;
+import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.UnauthorizedException;
 
-@Getter
-public class AgentRegistrationSecretValidationException extends RuntimeException {
+public class AgentRegistrationSecretValidationException extends UnauthorizedException {
 
-    private final String errorCode;
-
-    public AgentRegistrationSecretValidationException(String errorCode, String message) {
-        super(message);
-        this.errorCode = errorCode;
+    public AgentRegistrationSecretValidationException(ErrorCode errorCode, String message) {
+        super(errorCode, message);
     }
-
 }

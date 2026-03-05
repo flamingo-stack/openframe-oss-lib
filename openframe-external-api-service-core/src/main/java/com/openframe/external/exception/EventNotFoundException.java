@@ -1,7 +1,10 @@
 package com.openframe.external.exception;
 
-public class EventNotFoundException extends RuntimeException {
+import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.NotFoundException;
+
+public class EventNotFoundException extends NotFoundException {
     public EventNotFoundException(String message) {
-        super(message);
+        super(ErrorCode.EVENT_NOT_FOUND, message);
     }
-} 
+}

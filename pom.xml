@@ -38,6 +38,7 @@
     </properties>
 
     <modules>
+        <module>openframe-exception</module>
         <module>openframe-core</module>
         <module>openframe-data-mongo</module>
         <module>openframe-data-redis</module>
@@ -82,6 +83,11 @@
                 <version>${spring-cloud.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.openframe.oss</groupId>
+                <artifactId>openframe-exception</artifactId>
+                <version>${revision}</version>
             </dependency>
             <dependency>
                 <groupId>com.openframe.oss</groupId>

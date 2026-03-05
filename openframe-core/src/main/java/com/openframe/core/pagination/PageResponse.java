@@ -1,4 +1,4 @@
-package com.openframe.core.dto;
+package com.openframe.core.pagination;
 
 import lombok.Data;
 import lombok.NoArgsConstructor;
