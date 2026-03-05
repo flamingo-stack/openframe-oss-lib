@@ -13,21 +13,22 @@ import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public abstract class BaseGlobalExceptionHandler {
+@RestControllerAdvice
+public class BaseGlobalExceptionHandler {
 
-    protected static final Logger log = LoggerFactory.getLogger(BaseGlobalExceptionHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(BaseGlobalExceptionHandler.class);
 
     @ExceptionHandler(BaseException.class)
     public ResponseEntity<ErrorResponse> handleBaseException(BaseException ex) {
         log.error("{}: {}", ex.getErrorCode().getCode(), ex.getMessage(), ex);
 
-        ErrorResponse response = buildResponse(ex.getErrorCode(), ex.getMessage());
+        ErrorResponse response = ErrorResponse.of(ex.getErrorCode(), ex.getMessage());
 
         if (ex instanceof ValidationException validationEx && !validationEx.getFieldErrors().isEmpty()) {
             response.setFieldErrors(validationEx.getFieldErrors().stream()
@@ -77,67 +78,59 @@ public abstract class BaseGlobalExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse handleMissingRequestHeader(MissingRequestHeaderException ex) {
         log.error("Missing required header: ", ex);
-        return buildResponse(ErrorCode.BAD_REQUEST, "Required header '" + ex.getHeaderName() + "' is missing");
+        return ErrorResponse.of(ErrorCode.BAD_REQUEST, "Required header '" + ex.getHeaderName() + "' is missing");
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse handleMissingServletRequestParameter(MissingServletRequestParameterException ex) {
         log.warn("Missing required parameter: {}", ex.getParameterName());
-        return buildResponse(ErrorCode.BAD_REQUEST, "Required parameter '" + ex.getParameterName() + "' is missing");
+        return ErrorResponse.of(ErrorCode.BAD_REQUEST, "Required parameter '" + ex.getParameterName() + "' is missing");
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse handleIllegalArgument(IllegalArgumentException ex) {
         log.error("Invalid request: ", ex);
-        return buildResponse(ErrorCode.BAD_REQUEST, ex.getMessage());
+        return ErrorResponse.of(ErrorCode.BAD_REQUEST, ex.getMessage());
     }
 
     @ExceptionHandler(IllegalStateException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleIllegalState(IllegalStateException ex) {
         log.warn("Conflict: {}", ex.getMessage());
-        return buildResponse(ErrorCode.CONFLICT, ex.getMessage());
+        return ErrorResponse.of(ErrorCode.CONFLICT, ex.getMessage());
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     @ResponseStatus(HttpStatus.METHOD_NOT_ALLOWED)
     public ErrorResponse handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
         log.error("Method not supported: ", ex);
-        return buildResponse(ErrorCode.METHOD_NOT_ALLOWED, ex.getMessage());
+        return ErrorResponse.of(ErrorCode.METHOD_NOT_ALLOWED, ex.getMessage());
     }
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     @ResponseStatus(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
     public ErrorResponse handleMediaTypeNotSupported(HttpMediaTypeNotSupportedException ex) {
         log.error("Media type not supported: ", ex);
-        return buildResponse(ErrorCode.UNSUPPORTED_MEDIA_TYPE, ex.getMessage());
+        return ErrorResponse.of(ErrorCode.UNSUPPORTED_MEDIA_TYPE, ex.getMessage());
     }
 
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ErrorResponse> handleResponseStatusException(ResponseStatusException ex) {
         log.warn("Response status exception: {} - {}", ex.getStatusCode(), ex.getReason());
-        return ResponseEntity.status(ex.getStatusCode()).body(buildResponse(ErrorCode.INTERNAL_ERROR, ex.getReason()));
+        return ResponseEntity.status(ex.getStatusCode()).body(ErrorResponse.of(ErrorCode.INTERNAL_ERROR, ex.getReason()));
     }
 
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ErrorResponse handleException(Exception ex) {
         log.error("Unexpected error: ", ex);
-        return buildResponse(ErrorCode.INTERNAL_ERROR, "An unexpected error occurred");
-    }
-
-    protected ErrorResponse buildResponse(ErrorCode errorCode, String message) {
-        return ErrorResponse.builder()
-                .code(errorCode.getCode())
-                .message(message)
-                .timestamp(Instant.now().toString())
-                .build();
+        return ErrorResponse.of(ErrorCode.INTERNAL_ERROR, "An unexpected error occurred");
     }
 
     private ErrorResponse buildValidationResponse(String message, List<ErrorResponse.FieldError> fieldErrors) {
-        ErrorResponse response = buildResponse(ErrorCode.VALIDATION_ERROR, message);
+        ErrorResponse response = ErrorResponse.of(ErrorCode.VALIDATION_ERROR, message);
         response.setFieldErrors(fieldErrors);
         return response;
     }

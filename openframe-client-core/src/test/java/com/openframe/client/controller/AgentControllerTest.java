@@ -1,7 +1,9 @@
 package com.openframe.client.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.openframe.client.exception.*;
+import com.openframe.client.exception.AgentRegistrationSecretValidationErrorException;
+import com.openframe.client.exception.DuplicateConnectionException;
+import com.openframe.core.exception.BaseGlobalExceptionHandler;
 import com.openframe.client.service.agentregistration.AgentRegistrationService;
 import com.openframe.client.util.TestAuthenticationManager;
 import com.openframe.client.dto.agent.*;
@@ -12,7 +14,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.web.PageableHandlerMethodArgumentResolver;
 import org.springframework.http.MediaType;
-import com.openframe.client.exception.AgentRegistrationSecretValidationErrorException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
@@ -44,7 +45,7 @@ class AgentControllerTest {
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setCustomArgumentResolvers(new PageableHandlerMethodArgumentResolver())
                 .addFilter(new BasicAuthenticationFilter(new TestAuthenticationManager()))
-                .setControllerAdvice(new GlobalExceptionHandler())
+                .setControllerAdvice(new BaseGlobalExceptionHandler())
                 .build();
 
         objectMapper = new ObjectMapper();
