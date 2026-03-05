@@ -10,6 +10,7 @@ import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 
+import static com.openframe.gateway.config.ws.WebSocketGatewayConfig.NATS_API_WS_ENDPOINT_PATH;
 import static com.openframe.gateway.config.ws.WebSocketGatewayConfig.NATS_WS_ENDPOINT_PATH;
 import static com.openframe.gateway.security.PathConstants.*;
 import static com.openframe.security.oauth.SecurityConstants.ACCESS_TOKEN_HEADER;
@@ -68,6 +69,7 @@ public class AddAuthorizationHeaderFilter implements WebFilter {
                 || path.startsWith(TOOLS_PREFIX + "/")
                 || path.startsWith(WS_TOOLS_PREFIX + "/")
                 || path.startsWith(NATS_WS_ENDPOINT_PATH)
+                || path.startsWith(NATS_API_WS_ENDPOINT_PATH)
                 || path.startsWith(CHAT_ENDPOINT_PATH + "/")
                 || path.startsWith(INTERNAL_AUTH_PROBE)
                 || clientPrivate;

@@ -28,9 +28,9 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 
+import static com.openframe.gateway.config.ws.WebSocketGatewayConfig.NATS_API_WS_ENDPOINT_PATH;
 import static com.openframe.gateway.config.ws.WebSocketGatewayConfig.NATS_WS_ENDPOINT_PATH;
 import static com.openframe.gateway.security.PathConstants.*;
-import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.REACTIVE)
 @Configuration
@@ -94,6 +94,7 @@ public class GatewaySecurityConfig {
                         .pathMatchers(TOOLS_PREFIX + "/agent/**").hasRole(AGENT)
                         .pathMatchers(WS_TOOLS_PREFIX + "/agent/**").hasRole(AGENT)
                         .pathMatchers(NATS_WS_ENDPOINT_PATH).hasAnyRole(AGENT, ADMIN)
+                        .pathMatchers(NATS_API_WS_ENDPOINT_PATH).hasAnyRole(AGENT, ADMIN)
                         .pathMatchers(CHAT_PREFIX + "/**").hasAnyRole(AGENT, ADMIN)
                         .pathMatchers(CLIENTS_PREFIX + "/**").hasRole(AGENT)
                         .pathMatchers(TOOLS_PREFIX + "/**").hasRole(ADMIN)
