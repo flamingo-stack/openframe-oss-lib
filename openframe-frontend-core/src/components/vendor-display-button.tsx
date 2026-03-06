@@ -79,7 +79,7 @@ export function VendorDisplayButton({ vendor, onClick, variant = 'default', exte
           </span>
         </div>
       )}
-      <span className="font-['DM_Sans'] font-medium text-[18px] leading-[1.33] text-ods-text-primary truncate min-w-0">
+      <span className="text-h4 text-ods-text-primary truncate min-w-0">
         {vendor.title}
       </span>
     </button>

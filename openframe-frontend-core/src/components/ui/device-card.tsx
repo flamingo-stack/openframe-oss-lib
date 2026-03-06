@@ -103,7 +103,7 @@ export function DeviceCard({
                 className="shrink-0"
               />
             )}
-            <span className="font-['DM_Sans'] font-medium text-[18px] leading-[24px] text-ods-text-primary truncate">
+            <span className="text-h4 text-ods-text-primary truncate">
               {device.name}
             </span>
           </div>
@@ -139,7 +139,7 @@ export function DeviceCard({
               className="flex items-center justify-center px-4 py-3 rounded-[6px] shrink-0 border border-ods-border cursor-pointer hover:bg-ods-bg-hover transition-colors"
               onClick={(e) => { e.stopPropagation(); action.onClick?.() }}
             >
-              <span className="font-['DM_Sans'] font-bold text-[18px] leading-[24px] text-ods-text-primary text-nowrap tracking-[-0.36px]">
+              <span className="text-h3 text-ods-text-primary text-nowrap tracking-[-0.36px]">
                 {action.label}
               </span>
             </div>

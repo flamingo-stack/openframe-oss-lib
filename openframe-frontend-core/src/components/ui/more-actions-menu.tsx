@@ -49,7 +49,7 @@ export function MoreActionsMenu({
           className={className || 'bg-ods-card border-ods-border hover:bg-ods-bg-hover flex items-center justify-center'}
           aria-label={ariaLabel}
         >
-          <Ellipsis01Icon size={24} className="text-text-primary" />
+          <Ellipsis01Icon size={24} className="text-ods-text-primary" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent

@@ -95,7 +95,7 @@ type Story = StoryObj<typeof meta>
  */
 export const Basic: Story = {
   args: {
-    title: 'Devices',
+    title: 'The quick brown fox',
     searchPlaceholder: 'Search devices...',
     searchValue: '',
     onSearch: () => {},

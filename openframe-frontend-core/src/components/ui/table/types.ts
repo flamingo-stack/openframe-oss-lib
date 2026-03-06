@@ -1,6 +1,6 @@
 import { ReactNode } from 'react'
 
-export type TailwindBreakpoint = 'sm' | 'md' | 'lg' | 'xl' | '2xl'
+export type TailwindBreakpoint = 'md' | 'lg' | 'xl' | '2xl'
 
 export interface TableColumn<T = any> {
   key: string

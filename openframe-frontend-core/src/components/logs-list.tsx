@@ -143,7 +143,7 @@ export const LogsList = React.forwardRef<
     >
       <div
         ref={containerRef}
-        className="overflow-y-auto px-4 py-3 logs-list-scrollbar flex-1"
+        className="overflow-y-auto px-4 py-3 flex-1"
       >
         {logs.map((log, index) => (
           <LogCard

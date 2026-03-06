@@ -33,7 +33,7 @@ export function InfoCard({ data, className = '' }: InfoCardProps) {
       {data.title && (
         <div className="flex flex-col justify-center shrink-0 mb-3">
           <div className="flex items-center gap-2">
-            <span className="font-['DM_Sans'] font-medium text-[18px] leading-[24px] text-ods-text-primary truncate">
+            <span className="text-h4 text-ods-text-primary truncate">
               {data.title}
             </span>
             {data.icon}
@@ -43,7 +43,7 @@ export function InfoCard({ data, className = '' }: InfoCardProps) {
 
       {/* Subtitle */}
       {data.subtitle && (
-        <div className="font-['DM_Sans'] font-medium text-[18px] text-[#888888] leading-[24px] truncate mb-3">
+        <div className="text-h4 text-[#888888] truncate mb-3">
           {data.subtitle}
         </div>
       )}
@@ -57,13 +57,13 @@ export function InfoCard({ data, className = '' }: InfoCardProps) {
             <React.Fragment key={index}>
               {values.map((val, valIndex) => (
                 <div key={`${index}-${valIndex}`} className="flex gap-2 items-center w-full">
-                  <span className="font-['DM_Sans'] font-medium text-[18px] text-[#fafafa] leading-[24px] whitespace-nowrap">
+                  <span className="text-h4 text-[#fafafa] whitespace-nowrap">
                     {valIndex === 0 ? item.label : ''}
                   </span>
                   <div className="flex-1 h-px bg-[#3a3a3a]" />
                   <div className="flex items-center gap-2 max-w-[60%]">
                     <span
-                      className="font-['DM_Sans'] font-medium text-[18px] text-[#fafafa] leading-[24px] truncate select-text"
+                      className="text-h4 text-[#fafafa] truncate select-text"
                       title={val}
                     >
                       {val}

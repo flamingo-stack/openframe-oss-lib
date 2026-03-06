@@ -144,7 +144,7 @@ export function ListPageLayout({
           onChange={(e) => setLocalSearchValue(e.target.value)}
           value={localSearchValue}
           className="flex-1"
-          startAdornment={<SearchIcon className="w-4 h-4 sm:w-6 sm:h-6" />}
+          startAdornment={<SearchIcon className="w-4 h-4 md:w-6 md:h-6" />}
         />
 
         {/* Mobile Filter Button - only visible on mobile when filter is enabled */}
