@@ -7,7 +7,7 @@ import type { TableColumn, TailwindBreakpoint } from './types'
  *
  * @example
  * getHideClasses('md') // Returns: 'hidden md:flex'
- * getHideClasses(['sm', 'md']) // Returns: 'sm:hidden md:hidden lg:flex'
+ * getHideClasses(['md', 'lg']) // Returns: 'md:hidden lg:hidden xl:flex'
  * getHideClasses(undefined, true) // Returns: 'hidden md:flex' (backward compatibility)
  */
 export function getHideClasses(
@@ -21,7 +21,7 @@ export function getHideClasses(
   const breakpoints = Array.isArray(hideAt) ? hideAt : [hideAt]
 
   // Breakpoint order for Tailwind (smallest to largest)
-  const breakpointOrder: TailwindBreakpoint[] = ['sm', 'md', 'lg', 'xl', '2xl']
+  const breakpointOrder: TailwindBreakpoint[] = ['md', 'lg', 'xl', '2xl']
 
   // Find the largest breakpoint in the hideAt array
   const maxBreakpointIndex = Math.max(
@@ -35,7 +35,7 @@ export function getHideClasses(
   }
 
   // For multiple breakpoints: hide at specified breakpoints, show after the largest one
-  // e.g., hideAt: ['sm', 'md'] -> 'sm:hidden md:hidden lg:flex'
+  // e.g., hideAt: ['md', 'lg'] -> 'md:hidden lg:hidden xl:flex'
   const hideClasses = breakpoints
     .map(bp => `${bp}:hidden`)
     .join(' ')
@@ -63,6 +63,6 @@ export function isHiddenOnMobile<T>(column: TableColumn<T>): boolean {
 
   const breakpoints = Array.isArray(column.hideAt) ? column.hideAt : [column.hideAt]
 
-  // Check if 'sm' or 'md' is in the list (mobile breakpoints)
-  return breakpoints.some(bp => bp === 'sm' || bp === 'md')
+  // Check if 'md' is in the list (mobile breakpoints)
+  return breakpoints.some(bp => bp === 'md')
 }

@@ -111,7 +111,7 @@ export function CursorPagination({
             leftIcon={<ResetIcon className="h-4 w-4" />}
             aria-label="Go to first page"
           >
-            <span className={compact ? 'hidden sm:inline' : ''}>{resetButtonLabel}</span>
+            <span className={compact ? 'hidden md:inline' : ''}>{resetButtonLabel}</span>
           </Button>
         ) : (
           hasPreviousPage !== undefined && onPrevious && (
@@ -126,7 +126,7 @@ export function CursorPagination({
               leftIcon={<ChevronLeft className="h-4 w-4" />}
               aria-label="Go to previous page"
             >
-              <span className={compact ? 'hidden sm:inline' : ''}>Previous</span>
+              <span className={compact ? 'hidden md:inline' : ''}>Previous</span>
             </Button>
           )
         )}
@@ -142,7 +142,7 @@ export function CursorPagination({
           rightIcon={<ChevronRight className="h-4 w-4" />}
           aria-label="Go to next page"
         >
-          <span className={compact ? 'hidden sm:inline' : ''}>Next</span>
+          <span className={compact ? 'hidden md:inline' : ''}>Next</span>
         </Button>
       </div>
     </div>

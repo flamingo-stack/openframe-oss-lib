@@ -160,7 +160,7 @@ export function UserSummary({
         <div className="flex-1 grid grid-cols-[1fr_auto] gap-4">
           {/* LEFT : text stack */}
           <div className="min-h-[6rem] flex flex-col justify-center space-y-3 truncate">
-          <p className="font-['Azeret_Mono'] text-[24px] md:text-[32px] font-semibold text-ods-text-primary leading-none truncate">
+          <p className="text-h2 text-ods-text-primary leading-none truncate">
             {name}
           </p>
             <p className="font-['DM_Sans'] text-[18px] text-ods-text-secondary leading-none break-all truncate">

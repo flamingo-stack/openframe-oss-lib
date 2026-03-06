@@ -18,14 +18,14 @@ const WhyItMattersItem: React.FC<WhyItMattersItemProps> = ({ number, title, desc
         ${!isLast ? 'border-b border-ods-border' : ''}
       `}
     >
-      <span className="font-['Azeret_Mono'] text-[32px] font-semibold leading-[1.25em] tracking-[-0.02em] text-ods-accent">
+      <span className="text-h2 tracking-[-0.02em] text-ods-accent">
         {number}
       </span>
       <div className="flex-1">
-        <h3 className="font-['Azeret_Mono'] text-[32px] font-semibold leading-[1.25em] tracking-[-0.02em] text-ods-text-primary">
+        <h3 className="text-h2 tracking-[-0.02em] text-ods-text-primary">
           {title}
         </h3>
-        <p className="font-['DM_Sans'] text-lg font-medium leading-[1.33em] text-ods-text-primary mt-4">
+        <p className="text-h4 text-ods-text-primary mt-4">
           {description}
         </p>
       </div>
@@ -61,7 +61,7 @@ const WhyItMatters = () => {
   return (
     <section className="bg-[#161616]">
       <div className="w-full max-w-[1920px] mx-auto px-6 md:px-20">
-        <h2 className="font-['Azeret_Mono'] text-center text-[32px] sm:text-[40px] lg:text-[56px] font-semibold text-ods-text-primary leading-[1.14em] tracking-[-0.02em] mb-6">
+        <h2 className="text-h1 text-center text-ods-text-primary tracking-[-0.02em] mb-6">
           Why It Matters
         </h2>
         <div className="bg-ods-card border border-ods-border rounded-3xl overflow-hidden w-full">

@@ -34,7 +34,7 @@ export const SoftwareInfo: React.FC<SoftwareInfoProps> = ({
   return (
     <div className={cn('flex flex-col gap-1', className)}>
       <div className="flex items-center gap-2">
-        <div className="font-['DM_Sans'] font-medium text-[18px] leading-[20px] text-ods-text-primary">
+        <div className="text-h4 text-ods-text-primary">
           {name}
         </div>
         {version && (

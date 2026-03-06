@@ -1,5 +1,13 @@
 import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { extendTailwindMerge } from "tailwind-merge"
+
+const twMerge = extendTailwindMerge<'ods-typography'>({
+  extend: {
+    classGroups: {
+      'ods-typography': ['text-h1', 'text-h2', 'text-h3', 'text-h4', 'text-h5', 'text-h6'],
+    },
+  },
+})
 
 /**
  * Combine class names with Tailwind's merge utility

@@ -99,7 +99,7 @@ export function TableTimestampCell({
 
   return (
     <div className={cn("flex flex-col justify-center shrink-0", className)}>
-      <span className="font-['DM_Sans'] font-medium text-[18px] leading-[24px] text-ods-text-primary truncate">
+      <span className="text-h4 text-ods-text-primary truncate">
         {displayTimestamp}
       </span>
       <span className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary truncate">

@@ -109,7 +109,7 @@ export function CommandBox({
           {command}
         </div>
         {(primaryAction || secondaryAction) && (
-          <div className="flex flex-col sm:flex-row gap-3 sm:justify-end mt-4">
+          <div className="flex flex-col md:flex-row gap-3 md:justify-end mt-4">
             {secondaryAction && (
               <Button
                 variant={secondaryAction.variant || 'outline'}
@@ -117,7 +117,7 @@ export function CommandBox({
                 onClick={secondaryAction.onClick}
                 disabled={secondaryAction.disabled}
                 loading={secondaryAction.loading}
-                className="w-full sm:w-auto"
+                className="w-full md:w-auto"
               >
                 {secondaryAction.label}
               </Button>
@@ -129,7 +129,7 @@ export function CommandBox({
                 onClick={primaryAction.onClick}
                 disabled={primaryAction.disabled}
                 loading={primaryAction.loading}
-                className="w-full sm:w-auto"
+                className="w-full md:w-auto"
               >
                 {primaryAction.label}
               </Button>

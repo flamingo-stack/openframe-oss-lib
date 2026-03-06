@@ -30,7 +30,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         data-invalid={isInvalid || undefined}
         className={cn(
           // Layout & spacing
-          "flex w-full items-center gap-2 rounded-[6px] border px-3 h-11 sm:h-12 cursor-text",
+          "flex w-full items-center gap-2 rounded-[6px] border px-3 h-11 md:h-12 cursor-text",
           // Focus-within states
           "has-[:focus-visible]:outline-none",
           "group",
@@ -48,7 +48,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         )}
       >
         {startAdornment && (
-          <span className="flex-shrink-0 text-ods-text-secondary text-[14px] leading-[20px] font-medium transition-colors duration-200 group-has-[:focus]:text-ods-accent group-data-[invalid]:text-ods-error [&_svg]:size-4 sm:[&_svg]:size-6">
+          <span className="text-h6 flex-shrink-0 text-ods-text-secondary transition-colors duration-200 group-has-[:focus]:text-ods-accent group-data-[invalid]:text-ods-error [&_svg]:size-4 md:[&_svg]:size-6">
             {startAdornment}
           </span>
         )}
@@ -58,11 +58,11 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             // Layout
             "flex-1 min-w-0 bg-transparent border-none outline-none",
             // Typography
-            "text-[18px] font-medium leading-6",
+            // "text-h4",
             // Colors
             "text-ods-text-primary placeholder:text-ods-text-secondary",
             // File input adjustments
-            "file:border-0 file:bg-transparent file:text-[18px] file:font-medium",
+            "file:border-0 file:bg-transparent",
             // Disabled
             "disabled:cursor-not-allowed disabled:placeholder:text-ods-border",
             // Touch
@@ -72,10 +72,10 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           {...props}
         />
         {loading && (
-          <Loader2 className="animate-spin flex-shrink-0 text-ods-text-secondary size-4 sm:size-6" />
+          <Loader2 className="animate-spin flex-shrink-0 text-ods-text-secondary size-4 md:size-6" />
         )}
         {!loading && endAdornment && (
-          <span className="flex-shrink-0 text-ods-text-secondary text-[14px] leading-[20px] font-medium transition-colors duration-200 group-has-[:focus]:text-ods-accent group-data-[invalid]:text-ods-error [&_svg]:size-4 sm:[&_svg]:size-6">
+          <span className="text-h6 flex-shrink-0 text-ods-text-secondary transition-colors duration-200 group-has-[:focus]:text-ods-accent group-data-[invalid]:text-ods-error [&_svg]:size-4 md:[&_svg]:size-6">
             {endAdornment}
           </span>
         )}

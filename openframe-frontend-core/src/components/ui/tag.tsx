@@ -7,8 +7,7 @@ import { cn } from "../../utils/cn"
 
 const tagVariants = cva(
   [
-    "inline-flex items-center justify-center gap-2 h-8 px-2 rounded-[6px]",
-    "font-mono font-medium md:text-[14px] text-[12px] leading-5 tracking-[-0.28px] uppercase",
+    "text-h5 inline-flex items-center justify-center gap-2 h-8 px-2 rounded-[6px]",
     "transition-colors duration-150",
   ],
   {
