@@ -1,7 +1,9 @@
 package com.openframe.core.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.openframe.core.exception.ErrorCode;
 
+import java.time.Instant;
 import java.util.List;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -32,6 +34,10 @@ public class ErrorResponse {
         this.timestamp = timestamp;
         this.path = path;
         this.fieldErrors = fieldErrors;
+    }
+
+    public static ErrorResponse of(ErrorCode errorCode, String message) {
+        return new ErrorResponse(errorCode.getCode(), message, null, Instant.now().toString(), null, null);
     }
 
     public static ErrorResponseBuilder builder() {
