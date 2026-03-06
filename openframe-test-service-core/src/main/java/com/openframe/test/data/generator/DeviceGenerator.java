@@ -49,6 +49,14 @@ public class DeviceGenerator {
                 .build();
     }
 
+    public static String getTacticalId(Machine device) {
+        return device.getToolConnections().stream()
+                .filter(tc -> "TACTICAL_RMM".equals(tc.getToolType()))
+                .findFirst()
+                .map(ToolConnection::getAgentToolId)
+                .orElse(null);
+    }
+
     public static String getFleetId(Machine device) {
         return device.getToolConnections().stream()
                 .filter(tc -> "FLEET_MDM".equals(tc.getToolType()))

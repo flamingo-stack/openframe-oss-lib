@@ -5,7 +5,7 @@ import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.resps.ScanResult;
 
 public class Redis {
-    private static final String REDIS_URI = "redis://localhost:6379";
+    private static final String REDIS_URI = "redis://redis-master.datasources.svc.cluster.local:6379";
     private static final String KEY = "of:{default}:pwdreset:*";
 
     public static String getResetToken(String email) {

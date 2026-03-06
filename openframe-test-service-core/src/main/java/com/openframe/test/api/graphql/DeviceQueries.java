@@ -14,6 +14,19 @@ public class DeviceQueries {
             }
             """;
 
+    public static final String ALL_DEVICE_IDS = """
+            query($filter: DeviceFilterInput, $pagination: CursorPaginationInput) {
+                devices(filter: $filter, pagination: $pagination) {
+                    edges {
+                        node {
+                            machineId
+                        }
+                    }
+                    pageInfo { hasNextPage endCursor }
+                }
+            }
+            """;
+
     public static final String DEVICE_HOSTNAMES = """
             query($filter: DeviceFilterInput) {
                 devices(filter: $filter) {

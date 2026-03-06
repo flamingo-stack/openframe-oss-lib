@@ -15,9 +15,9 @@ import org.slf4j.LoggerFactory;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.time.Duration;
+import java.util.Map;
 
 import static com.openframe.test.config.EnvironmentConfig.getAuthUrl;
-import static com.openframe.test.helpers.AuthHelper.getCookies;
 
 public class RequestSpecHelper {
 
@@ -26,6 +26,8 @@ public class RequestSpecHelper {
     private static final PrintStream SLF4J_STREAM = new PrintStream(new Slf4jOutputStream(log), true);
 
     private static final ThreadLocal<String> baseUrl = new ThreadLocal<>();
+    private static final ThreadLocal<Map<String, String>> cookies = new ThreadLocal<>();
+    private static Boolean enableLogging = true;
 
     public static void setBaseUrl(String url) {
         baseUrl.set(url);
@@ -33,6 +35,21 @@ public class RequestSpecHelper {
 
     public static String getBaseUrl() {
         return baseUrl.get() != null ? baseUrl.get() : EnvironmentConfig.getBaseUrl();
+    }
+
+    public static void setCookies(Map<String, String> newCookies) {
+        cookies.set(newCookies);
+    }
+
+    public static Map<String, String> getCookies() {
+        if (cookies.get() == null) {
+            cookies.set(AuthHelper.getCookies());
+        }
+        return cookies.get();
+    }
+
+    public static void setEnableLogging(boolean enabled) {
+        enableLogging = enabled;
     }
 
     public static RequestSpecification getAuthorizedSpec() {
@@ -46,7 +63,7 @@ public class RequestSpecHelper {
     }
 
     private static RequestSpecBuilder prebuildRequestSpec() {
-        return new RequestSpecBuilder()
+        RequestSpecBuilder builder = new RequestSpecBuilder()
                 .setConfig(RestAssured.config()
                         .logConfig(LogConfig.logConfig()
                                 .defaultStream(SLF4J_STREAM)
@@ -56,12 +73,16 @@ public class RequestSpecHelper {
                                 .setParam("http.connection.timeout", (int) DEFAULT_TIMEOUT.toMillis())
                                 .setParam("http.socket.timeout", (int) DEFAULT_TIMEOUT.toMillis())))
                 .setBaseUri(getBaseUrl())
-                .addFilter(new RequestLoggingFilter(SLF4J_STREAM))
                 .setContentType(ContentType.JSON);
+        if (enableLogging) {
+            builder.addFilter(new RequestLoggingFilter(SLF4J_STREAM));
+
+        }
+        return builder;
     }
 
     public static RequestSpecification getAuthFlowRequestSpec() {
-        return new RequestSpecBuilder()
+        RequestSpecBuilder builder = new RequestSpecBuilder()
                 .setConfig(RestAssured.config()
                         .logConfig(LogConfig.logConfig()
                                 .defaultStream(SLF4J_STREAM)
@@ -70,9 +91,11 @@ public class RequestSpecHelper {
                         .httpClient(HttpClientConfig.httpClientConfig()
                                 .setParam("http.connection.timeout", (int) DEFAULT_TIMEOUT.toMillis())
                                 .setParam("http.socket.timeout", (int) DEFAULT_TIMEOUT.toMillis())))
-                .setBaseUri(getAuthUrl())
-                .addFilter(new RequestLoggingFilter(SLF4J_STREAM))
-                .build();
+                .setBaseUri(getAuthUrl());
+        if (enableLogging) {
+            builder.addFilter(new RequestLoggingFilter(SLF4J_STREAM));
+        }
+        return builder.build();
     }
 
     private static class Slf4jOutputStream extends OutputStream {

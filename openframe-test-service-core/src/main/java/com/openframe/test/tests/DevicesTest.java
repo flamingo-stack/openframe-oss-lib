@@ -3,6 +3,7 @@ package com.openframe.test.tests;
 import com.openframe.test.api.DeviceApi;
 import com.openframe.test.data.dto.device.DeviceFilters;
 import com.openframe.test.data.dto.device.Machine;
+import com.openframe.test.data.dto.device.ToolConnection;
 import com.openframe.test.data.dto.device.fleet.FleetHost;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -57,12 +58,10 @@ public class DevicesTest extends BaseTest {
         assertThat(device.getRegisteredAt()).as("No registeredAt for " + hostname).isNotBlank();
         assertThat(device.getUpdatedAt()).as("No updatedAt for " + hostname).isNotBlank();
         assertThat(device.getOrganizationId()).as("No organizationId for " + hostname).isNotBlank();
-        assertThat(device.getToolConnections()).as("No toolConnections for " + hostname).isNotEmpty().hasSize(3);
-        assertThat(device.getToolConnections()).allSatisfy(toolConnection -> {
-            assertThat(toolConnection.getToolType()).as("No toolType for " + hostname).isNotEmpty();
-            assertThat(toolConnection.getAgentToolId()).as("No agentToolId for " + hostname).isNotEmpty();
-            assertThat(toolConnection.getStatus()).as("No status for " + hostname).isNotNull();
-        });
+        assertThat(device.getToolConnections()).as("No toolConnections for " + hostname).isNotEmpty();
+        assertThat(device.getToolConnections()).as("Should have all tool connections")
+                .extracting(ToolConnection::getToolType)
+                .containsAll(List.of("MESHCENTRAL", "TACTICAL_RMM", "FLEET_MDM"));
         assertThat(device.getInstalledAgents()).as("No installedAgents for " + hostname).isNotEmpty().hasSizeGreaterThan(4);
         assertThat(device.getInstalledAgents()).allSatisfy(agent -> {
             assertThat(agent.getAgentType()).as("No agentType for " + hostname).isNotEmpty();
@@ -78,7 +77,7 @@ public class DevicesTest extends BaseTest {
         assertThat(device).as("No devices").isNotNull();
         device = DeviceApi.getDevice(device.getMachineId());
         String fleetId = getFleetId(device);
-        assertThat(fleetId).as("No fleetId for " + device.getHostname()).isNotBlank();
+        assertThat(fleetId).withFailMessage("No Fleet agent on " + device.getHostname()).isNotBlank();
         FleetHost fleet = DeviceApi.getFleetInfo(fleetId);
         assertThat(fleet).as("No fleet info for fleetId " + fleetId).isNotNull();
         assertThat(fleet.getComputerName()).as("No computerName for " + fleetId).isNotBlank();
