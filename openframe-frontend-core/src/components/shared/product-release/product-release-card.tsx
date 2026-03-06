@@ -44,11 +44,11 @@ export function ProductReleaseCard({
       {/* Left column - content */}
       <div className="flex-1 w-full md:w-auto min-w-0 flex flex-col justify-center gap-2">
         <div className="min-h-[48px] flex items-center">
-          <h3 className="font-['DM_Sans'] font-bold text-[18px] leading-[24px] text-ods-text-primary tracking-[-0.36px] line-clamp-2">
+          <h3 className="text-h3 text-ods-text-primary tracking-[-0.36px] line-clamp-2">
             {title}
           </h3>
         </div>
-        <p className="font-['DM_Sans'] font-medium text-[18px] leading-[24px] text-ods-text-secondary line-clamp-3">
+        <p className="text-h4 text-ods-text-secondary line-clamp-3">
           {summary || '\u00A0'}
         </p>
       </div>
@@ -59,7 +59,7 @@ export function ProductReleaseCard({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="w-[200px] flex flex-col justify-center gap-2">
-          <p className="font-['DM_Sans'] font-bold text-[18px] leading-[24px] text-ods-text-primary tracking-[-0.36px] truncate">
+          <p className="text-h3 text-ods-text-primary tracking-[-0.36px] truncate">
             {version}
           </p>
           <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary truncate">

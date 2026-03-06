@@ -120,7 +120,7 @@ export function OSPlatformSelector({
                 iconColor={selected ? 'black' : 'white'}
                 rightIcon={badgeElement}
                 className={cn(
-                  '!w-full sm:!w-full min-h-[52px] items-center justify-center rounded-[4px] p-2 text-[14px] md:text-[18px] font-medium transition-colors pointer-events-auto',
+                  '!w-full md:!w-full min-h-[52px] items-center justify-center rounded-[4px] p-2 text-[14px] md:text-[18px] font-medium transition-colors pointer-events-auto',
                   isDisabled
                     ? 'bg-transparent text-ods-text-secondary opacity-50 cursor-not-allowed'
                     : selected

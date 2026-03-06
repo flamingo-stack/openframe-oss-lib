@@ -25,7 +25,7 @@ export function TableEmptyState({
       </div>
       
       {/* Message */}
-      <p className="font-['DM_Sans'] font-medium text-[18px] leading-[24px] text-[#888888] text-center mb-6">
+      <p className="text-h4 text-[#888888] text-center mb-6">
         {message}
       </p>
       

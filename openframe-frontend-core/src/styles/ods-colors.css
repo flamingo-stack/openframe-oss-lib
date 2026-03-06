@@ -1,21 +1,36 @@
 /* Open Design System – color tokens generated from ods_color_tokens.json */
 :root {
-  /* Attention */
+  /* Attention – Success */
   --ods-attention-green-success: #5ea62e;
-  --ods-attention-green-success-action: #4a921a;
   --ods-attention-green-success-hover: #549c24;
+  --ods-attention-green-success-action: #4a921a;
   --ods-attention-green-success-secondary: #2e461f;
+  --ods-attention-green-success-secondary-hover: #385029;
+  --ods-attention-green-success-secondary-action: #425a33;
+
+  /* Attention – Error */
   --ods-attention-red-error: #f36666;
-  --ods-attention-red-error-action: #df5252;
   --ods-attention-red-error-hover: #e95c5c;
+  --ods-attention-red-error-action: #df5252;
   --ods-attention-red-error-secondary: #4a2121;
-  --ods-attention-yellow-warning: #ffc008;
-  --ods-attention-yellow-warning-secondary: #4a3b1f;
+  --ods-attention-red-error-secondary-hover: #542b2b;
+  --ods-attention-red-error-secondary-action: #5e3535;
+
+  /* Attention – Warning */
+  --ods-attention-yellow-warning: #e1b32f;
+  --ods-attention-yellow-warning-hover: #d7a925;
+  --ods-attention-yellow-warning-action: #cd9f1b;
+  --ods-attention-yellow-warning-secondary: #5a4d25;
+  --ods-attention-yellow-warning-secondary-hover: #64572f;
+  --ods-attention-yellow-warning-secondary-action: #6e6139;
 
   /* Flamingo Cyan */
   --ods-flamingo-cyan-base: #5efaf0;
-  --ods-flamingo-cyan-action: #4ae6dc;
   --ods-flamingo-cyan-hover: #54f0e6;
+  --ods-flamingo-cyan-action: #4ae6dc;
+  --ods-flamingo-cyan-secondary: #058c83;
+  --ods-flamingo-cyan-secondary-hover: #008279;
+  --ods-flamingo-cyan-secondary-action: #00786f;
   --ods-flamingo-cyan-dark: #058c83;
   --ods-flamingo-cyan-dark-action: #00786f;
   --ods-flamingo-cyan-dark-hover: #008279;
@@ -25,8 +40,11 @@
 
   /* Flamingo Pink */
   --ods-flamingo-pink-base: #f357bb;
-  --ods-flamingo-pink-action: #df43a7;
   --ods-flamingo-pink-hover: #e94db1;
+  --ods-flamingo-pink-action: #df43a7;
+  --ods-flamingo-pink-secondary: #792b5d;
+  --ods-flamingo-pink-secondary-hover: #6f2153;
+  --ods-flamingo-pink-secondary-action: #651749;
   --ods-flamingo-pink-dark: #792b5d;
   --ods-flamingo-pink-dark-action: #651749;
   --ods-flamingo-pink-dark-hover: #6f2153;
@@ -36,8 +54,11 @@
 
   /* Open Yellow */
   --ods-open-yellow-base: #ffc008;
-  --ods-open-yellow-action: #ebac00;
   --ods-open-yellow-hover: #f5b600;
+  --ods-open-yellow-action: #ebac00;
+  --ods-open-yellow-secondary: #7f6004;
+  --ods-open-yellow-secondary-hover: #755600;
+  --ods-open-yellow-secondary-action: #6b4c00;
   --ods-open-yellow-dark: #ffe084;
   --ods-open-yellow-dark-action: #ebcc70;
   --ods-open-yellow-dark-hover: #f5d67a;
@@ -121,12 +142,21 @@
   --color-success: var(--ods-attention-green-success);
   --color-success-hover: var(--ods-attention-green-success-hover);
   --color-success-active: var(--ods-attention-green-success-action);
+  --color-success-secondary: var(--ods-attention-green-success-secondary);
+  --color-success-secondary-hover: var(--ods-attention-green-success-secondary-hover);
+  --color-success-secondary-active: var(--ods-attention-green-success-secondary-action);
   --color-error: var(--ods-attention-red-error);
   --color-error-hover: var(--ods-attention-red-error-hover);
   --color-error-active: var(--ods-attention-red-error-action);
-  --color-warning: #f59e0b;
-  --color-warning-hover: #d97706;
-  --color-warning-active: #b45309;
+  --color-error-secondary: var(--ods-attention-red-error-secondary);
+  --color-error-secondary-hover: var(--ods-attention-red-error-secondary-hover);
+  --color-error-secondary-active: var(--ods-attention-red-error-secondary-action);
+  --color-warning: var(--ods-attention-yellow-warning);
+  --color-warning-hover: var(--ods-attention-yellow-warning-hover);
+  --color-warning-active: var(--ods-attention-yellow-warning-action);
+  --color-warning-secondary: var(--ods-attention-yellow-warning-secondary);
+  --color-warning-secondary-hover: var(--ods-attention-yellow-warning-secondary-hover);
+  --color-warning-secondary-active: var(--ods-attention-yellow-warning-secondary-action);
   --color-info: var(--ods-flamingo-cyan-base);
   --color-info-hover: var(--ods-flamingo-cyan-hover);
   --color-info-active: var(--ods-flamingo-cyan-action);
@@ -325,8 +355,11 @@
   --text: var(--color-text-primary);
   --accent: var(--color-accent-primary);
   --success: var(--color-success);
+  --success-sec: var(--color-success-secondary);
   --error: var(--color-error);
+  --error-sec: var(--color-error-secondary);
   --warning: var(--color-warning);
+  --warning-sec: var(--color-warning-secondary);
   --info: var(--color-info);
   --disabled: var(--color-disabled);
   --focus: var(--color-focus-ring);

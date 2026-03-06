@@ -75,7 +75,7 @@ If you need granular control, you can import specific files:
 The styles automatically adapt based on your `NEXT_PUBLIC_APP_TYPE` environment variable:
 
 - **openmsp**: Yellow accent (#FFC008), dark theme
-- **admin-hub**: Pink accent (#F357BB), dark theme  
+- **admin-hub**: Pink accent (#F357BB), dark theme
 - **flamingo**: Pink accent (#F357BB), light theme
 - **openframe**: Cyan accent (#5EFAF0), dark theme
 - **flamingo-teaser**: Yellow accent (#FFC008), dark theme
@@ -100,14 +100,62 @@ The styles automatically adapt based on your `NEXT_PUBLIC_APP_TYPE` environment 
 ```
 
 ### Typography
-```css
-/* Font families */
-font-family: var(--font-heading);  /* Azeret Mono */
-font-family: var(--font-body);     /* DM Sans */
 
-/* Responsive typography */
---fluid-text-xs to --fluid-text-6xl
+All typography is driven by CSS variables defined in `ods-design-tokens.css`. Both the Tailwind config and component styles reference these variables as a single source of truth.
+
+#### Font Families
+```css
+/* Base font family tokens (defined in ods-design-tokens.css) */
+--font-family-heading: "Azeret Mono", "SF Mono", Monaco, Inconsolata, "Roboto Mono", Consolas, "Courier New", monospace;
+--font-family-body: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+/* Per-heading font family tokens (reference base tokens) */
+--font-h1-family: var(--font-family-heading);
+--font-h2-family: var(--font-family-heading);
+--font-h3-family: var(--font-family-body);
+--font-h4-family: var(--font-family-body);
+--font-h5-family: var(--font-family-heading);
+--font-h6-family: var(--font-family-heading);
 ```
+
+#### Tailwind Font Family Integration
+Tailwind `fontFamily` mappings reference CSS variables, not hardcoded font names:
+
+```typescript
+// tailwind.config.ts
+fontFamily: {
+  sans: ["var(--font-family-body)"],
+  mono: ["var(--font-family-heading)"],
+  body: ["var(--font-family-body)"],
+  heading: ["var(--font-family-heading)"],
+}
+```
+
+This means `font-sans`, `font-mono`, `font-body`, `font-heading` all resolve through CSS variables, ensuring consistency with the rest of the design system.
+
+#### Typography Utility Classes
+The `odsTypographyPlugin` in `tailwind.config.ts` provides composite typography classes that bundle font-family, weight, size, line-height, and letter-spacing:
+
+| Class | Font | Weight | Size | Line Height | Letter Spacing |
+|-------|------|--------|------|-------------|----------------|
+| `text-h1` | `--font-h1-family` | `--font-h1-weight` | `--font-size-h1-title` | `--font-line-space-h1-main-title` | `-0.02em` |
+| `text-h2` | `--font-h2-family` | `--font-h2-weight` | `--font-size-h2-sub-title` | `--font-line-space-h2-sub-title` | `-0.02em` |
+| `text-h3` | `--font-h3-family` | `--font-h3-weight` | `--font-size-h3-body` | `--font-line-space-h3-body` | `-0.02em` |
+| `text-h4` | `--font-h4-family` | `--font-h4-weight` | `--font-size-h4-body` | `--font-line-space-h4-body` | - |
+| `text-h5` | `--font-h5-family` | `--font-h5-weight` | `--font-size-h5-caption` | `--font-line-space-h5-caption` | `-0.02em` + uppercase |
+| `text-h6` | `--font-h6-family` | `--font-h6-weight` | `--font-size-h6-caption` | `--font-line-space-h6-caption` | - |
+
+Additionally, Tailwind `fontSize` utilities are available for size + line-height only:
+
+```typescript
+// Usage: text-heading-1, text-heading-2, etc.
+'heading-1': ['var(--font-size-h1-title)', { lineHeight: 'var(--font-line-space-h1-main-title)' }],
+'heading-2': ['var(--font-size-h2-sub-title)', { lineHeight: 'var(--font-line-space-h2-sub-title)' }],
+// ...
+```
+
+#### Responsive Typography
+Font sizes use `clamp()` functions for fluid scaling between breakpoints. The actual values are defined in `ods-responsive-tokens.css`.
 
 ### Spacing
 ```css
@@ -122,15 +170,19 @@ font-family: var(--font-body);     /* DM Sans */
 The styles work seamlessly with Tailwind CSS:
 
 ```jsx
+// Typography utilities apply all styles at once
+<h1 className="text-h1">Main Title</h1>
+<h2 className="text-h2">Subtitle</h2>
+<p className="font-body text-heading-3">Body text with heading-3 size</p>
+
 // Platform-aware colors automatically applied
-<button className="bg-accent text-on-accent">
+<button className="bg-ods-accent text-ods-text-on-accent">
   Platform Button
 </button>
 
-// ODS spacing tokens
-<div className="p-space-4 m-space-2">
-  Consistent Spacing
-</div>
+// Font family utilities
+<span className="font-heading">Azeret Mono text</span>
+<span className="font-body">DM Sans text</span>
 ```
 
 ### CSS-in-JS Integration
@@ -140,6 +192,7 @@ Access design tokens in CSS-in-JS solutions:
 const StyledComponent = styled.div`
   background-color: var(--color-bg-card);
   color: var(--color-text-primary);
+  font-family: var(--font-family-body);
   padding: var(--space-4);
   border-radius: var(--radius-lg);
 `;
@@ -172,6 +225,7 @@ To override specific tokens, define them after the import:
 :root {
   /* Override specific tokens */
   --color-accent-primary: #custom-color;
+  --font-family-body: "Inter", sans-serif;
   --space-custom: 2.5rem;
 }
 ```
@@ -181,8 +235,8 @@ To override specific tokens, define them after the import:
 ### Styles Not Loading
 Ensure you're importing the correct path:
 ```css
-@import "@flamingo/ui-kit/styles"; /* ✅ Correct */
-@import "@flamingo/ui-kit/styles/index.css"; /* ❌ Incorrect */
+@import "@flamingo/ui-kit/styles"; /* Correct */
+@import "@flamingo/ui-kit/styles/index.css"; /* Incorrect */
 ```
 
 ### Platform Theming Not Working
@@ -211,9 +265,11 @@ If you see duplicate styles, ensure you're not importing both:
 
 1. **Always import the complete styles** unless you have specific needs for granular imports
 2. **Use CSS variables** instead of hardcoded values for consistency
-3. **Leverage platform theming** by using accent colors and semantic tokens
-4. **Test across all platforms** when making style changes
-5. **Keep custom styles minimal** - prefer using design system tokens
+3. **Use `text-h1`..`text-h6` utilities** for headings — they apply the full typography stack (family, weight, size, line-height, letter-spacing)
+4. **Use `font-heading` / `font-body`** for font-family only — they reference CSS variables, not hardcoded fonts
+5. **Leverage platform theming** by using accent colors and semantic tokens
+6. **Test across all platforms** when making style changes
+7. **Keep custom styles minimal** - prefer using design system tokens
 
 ## Migration from Legacy Styles
 
@@ -222,8 +278,9 @@ If migrating from individual style files:
 1. Remove individual `@import` statements for ODS files
 2. Replace with single `@import "@flamingo/ui-kit/styles"`
 3. Delete duplicate style files from your project
-4. Update any hardcoded colors/spacing to use CSS variables
-5. Test that platform theming still works correctly
+4. Replace hardcoded font names with CSS variable references (e.g. `"DM Sans"` -> `var(--font-family-body)`)
+5. Update any hardcoded colors/spacing to use CSS variables
+6. Test that platform theming still works correctly
 
 ## Contributing
 
@@ -232,5 +289,6 @@ When adding new styles to the ui-kit:
 1. **Design tokens** go in the appropriate `ods-*.css` file
 2. **Application-specific styles** go in `app-globals.css`
 3. **Platform-specific overrides** go in `ods-dynamic-theming.css`
-4. **Update this README** when adding new features or changing structure
-5. **Test across all platforms** before committing changes
+4. **Typography changes** must update both CSS variables in `ods-design-tokens.css` and the plugin in `tailwind.config.ts`
+5. **Update this README** when adding new features or changing structure
+6. **Test across all platforms** before committing changes

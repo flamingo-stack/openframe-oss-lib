@@ -94,7 +94,7 @@ export function SEOEditorPreview({
 
   return (
     <div className={cn('space-y-6 p-6 bg-ods-card border border-ods-border rounded-lg', className)}>
-      <h3 className="font-['Azeret_Mono'] text-[18px] font-semibold uppercase text-ods-text-primary">
+      <h3 className="text-h5 text-ods-text-primary">
         SEO & Open Graph
       </h3>
 

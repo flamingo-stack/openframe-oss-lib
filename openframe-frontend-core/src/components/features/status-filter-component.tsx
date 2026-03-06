@@ -38,7 +38,7 @@ export function StatusFilterComponent({
     <div className={`flex flex-wrap items-center gap-3 p-4 bg-ods-card border border-ods-border rounded-lg ${className}`}>
       <div className="flex items-center gap-2">
         <Filter className="h-4 w-4 text-ods-accent" />
-        <span className="text-ods-text-secondary font-['Azeret_Mono'] text-[14px] uppercase font-semibold">
+        <span className="text-h5 text-ods-text-secondary">
           Status
         </span>
       </div>
@@ -49,7 +49,7 @@ export function StatusFilterComponent({
         variant={selectedStatus === 'all' ? "primary" : "outline"}
         size="sm"
         onClick={() => onStatusChange('all')}
-        className="font-['DM_Sans'] text-[16px] md:text-[18px] font-bold"
+        className="text-h3"
       >
         All
       </Button>
@@ -62,7 +62,7 @@ export function StatusFilterComponent({
           variant={selectedStatus === option.value ? "primary" : "outline"}
           size="sm"
           onClick={() => onStatusChange(option.value)}
-          className="font-['DM_Sans'] text-[16px] md:text-[18px] font-bold"
+          className="text-h3"
         >
           {option.label}
         </Button>

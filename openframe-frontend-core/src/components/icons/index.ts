@@ -67,7 +67,6 @@ export { EditProfileIcon } from './edit-profile-icon';
 export { EmptyVendorIcon } from './empty-vendor-icon';
 export { ErrorIcon } from './error-icon';
 export { MarginCrisisIcon } from './margin-crisis-icon';
-export { RefreshIcon } from './refresh-icon';
 export { CopyIcon } from './copy-icon';
 
 // OpenFrame benefit icons
@@ -186,9 +185,6 @@ export { JumpInIcon } from './jump-in-icon';
 // Utility exports
 export * from './icon-utils';
 
-export * from './tactical-icon';
-export * from './meshcentral-icon';
-export * from './fleet-icon';
 
 // Shell type icons
 export { PowerShellIcon } from './powershell-icon';
