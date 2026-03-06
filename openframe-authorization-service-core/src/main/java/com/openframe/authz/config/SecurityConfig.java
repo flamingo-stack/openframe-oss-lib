@@ -122,7 +122,10 @@ public class SecurityConfig {
             String tenantId = TenantContext.getTenantId();
             log.error("OAuth2 login failed. tenantId={}, requestUri={}, error={}",
                     tenantId, request.getRequestURI(), exception.getMessage(), exception);
-            response.sendRedirect(request.getContextPath() + "/login?error");
+            String msg = java.net.URLEncoder.encode(
+                    exception.getMessage() != null ? exception.getMessage() : "SSO login failed. Please try again.",
+                    java.nio.charset.StandardCharsets.UTF_8);
+            response.sendRedirect(request.getContextPath() + "/auth/error?error=" + msg);
         };
     }
 

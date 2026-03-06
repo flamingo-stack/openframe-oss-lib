@@ -12,6 +12,8 @@ import org.springframework.security.web.authentication.SavedRequestAwareAuthenti
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 
@@ -47,7 +49,8 @@ public class SsoTenantRegistrationSuccessHandler extends SavedRequestAwareAuthen
             handler.handle(request, response, authentication);
         } catch (Exception e) {
             log.error("SSO tenant registration finalization failed: {}", e.getMessage(), e);
-            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "tenant_registration_failed");
+            String msg = URLEncoder.encode(e.getMessage() != null ? e.getMessage() : "Registration failed. Please try again.", StandardCharsets.UTF_8);
+            response.sendRedirect(request.getContextPath() + "/auth/error?error=" + msg);
         }
     }
 
@@ -61,7 +64,7 @@ public class SsoTenantRegistrationSuccessHandler extends SavedRequestAwareAuthen
             expectedState = ssoCookieCodec.decodeInvite(token).map(SsoInviteCookiePayload::s).orElse(null);
         }
         if (expectedState == null || !expectedState.equals(returnedState)) {
-            throw new IllegalStateException("invalid_state");
+            throw new IllegalStateException("SSO session expired. Please try again.");
         }
     }
 
