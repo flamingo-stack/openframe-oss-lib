@@ -19,7 +19,7 @@ public class FleetMdmSetupScheduler {
     private final IntegratedToolRepository toolRepository;
     private final FleetMdmSetupService fleetMdmSetupService;
 
-    @Scheduled(fixedDelayString = "${openframe.fleet-mdm.setup.scheduler-interval-ms:10000}")
+    @Scheduled(fixedDelayString = "${openframe.fleet-mdm.setup.scheduler-interval-ms:30000}")
     public void runSetupIfNeeded() {
         try {
             toolRepository.findById(FLEETMDM_SERVER)
