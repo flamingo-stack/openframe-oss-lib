@@ -1,5 +1,6 @@
 package com.openframe.test.data.dto.invitation;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.openframe.test.data.dto.user.UserRole;
 import com.openframe.test.data.dto.user.UserStatus;
 import lombok.AllArgsConstructor;
@@ -15,6 +16,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class AcceptInvitationResponse {
     private String id;
     private String email;
