@@ -12,13 +12,18 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 import static com.openframe.authz.web.AuthStateUtils.clearAuthState;
 import static com.openframe.authz.web.Redirects.seeOther;
 import static org.springframework.http.HttpStatus.OK;
 
+@Slf4j
 @RestController
 @RequestMapping(path = "/invitations", produces = MediaType.APPLICATION_JSON_VALUE)
 @RequiredArgsConstructor
@@ -37,17 +42,22 @@ public class InvitationRegistrationController {
     public void acceptViaSso(@Valid @ModelAttribute SsoInvitationAcceptRequest request,
                              HttpServletRequest httpRequest,
                              HttpServletResponse httpResponse) throws Exception {
-        clearAuthState(httpRequest, httpResponse);
-        // start SSO accept flow and set short-lived HMAC cookie
-        SsoTenantRegistrationService.SsoAuthorizeData init = ssoInvitationService.startAccept(request);
-        Cookie cookie = new Cookie(SsoRegistrationConstants.COOKIE_SSO_INVITE, init.cookieValue());
-        cookie.setHttpOnly(true);
-        cookie.setSecure(true);
-        cookie.setPath("/");
-        cookie.setMaxAge(init.cookieTtlSeconds());
-        httpResponse.addCookie(cookie);
+        try {
+            clearAuthState(httpRequest, httpResponse);
+            SsoTenantRegistrationService.SsoAuthorizeData init = ssoInvitationService.startAccept(request);
+            Cookie cookie = new Cookie(SsoRegistrationConstants.COOKIE_SSO_INVITE, init.cookieValue());
+            cookie.setHttpOnly(true);
+            cookie.setSecure(true);
+            cookie.setPath("/");
+            cookie.setMaxAge(init.cookieTtlSeconds());
+            httpResponse.addCookie(cookie);
 
-        seeOther(httpResponse, init.redirectPath());
+            seeOther(httpResponse, init.redirectPath());
+        } catch (Exception e) {
+            log.error("SSO invitation accept failed: {}", e.getMessage(), e);
+            String msg = URLEncoder.encode(e.getMessage() != null ? e.getMessage() : "Invitation acceptance failed. Please try again.", StandardCharsets.UTF_8);
+            httpResponse.sendRedirect(httpRequest.getContextPath() + "/auth/error?error=" + msg);
+        }
     }
 }
 

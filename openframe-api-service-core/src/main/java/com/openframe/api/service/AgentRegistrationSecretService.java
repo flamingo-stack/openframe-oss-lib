@@ -2,6 +2,7 @@ package com.openframe.api.service;
 
 import com.openframe.api.dto.AgentRegistrationSecretResponse;
 import com.openframe.api.exception.AgentRegistrationSecretNotFoundException;
+import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.service.AgentRegistrationSecretGenerator;
 import com.openframe.core.service.EncryptionService;
 import com.openframe.data.document.agent.AgentRegistrationSecret;
@@ -30,7 +31,7 @@ public class AgentRegistrationSecretService {
                         .createdAt(secret.getCreatedAt())
                         .active(secret.isActive())
                         .build())
-                .orElseThrow(() -> new AgentRegistrationSecretNotFoundException("agent_registration_secret_not_found", "Active agent registration secret not found"));
+                .orElseThrow(() -> new AgentRegistrationSecretNotFoundException(ErrorCode.AGENT_REGISTRATION_SECRET_NOT_FOUND, "Active agent registration secret not found"));
     }
 
     public List<AgentRegistrationSecretResponse> getAllSecrets() {
@@ -67,7 +68,7 @@ public class AgentRegistrationSecretService {
 
     private void deactivateExisting() {
         AgentRegistrationSecret activeSecret = secretRepository.findByActiveTrue()
-                .orElseThrow(() -> new AgentRegistrationSecretNotFoundException("no_active_secret_found", "Not found active agent secret"));
+                .orElseThrow(() -> new AgentRegistrationSecretNotFoundException(ErrorCode.NO_ACTIVE_SECRET_FOUND, "Not found active agent secret"));
         activeSecret.setActive(false);
         secretRepository.save(activeSecret);
         log.info("Deactivated previous key with ID: {}", activeSecret.getId());

@@ -14,13 +14,18 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 import static com.openframe.authz.security.SsoRegistrationConstants.COOKIE_SSO_REG;
 import static com.openframe.authz.web.AuthStateUtils.clearAuthState;
 import static com.openframe.authz.web.Redirects.seeOther;
 import static org.springframework.http.HttpStatus.OK;
 
+@Slf4j
 @RestController
 @RequestMapping(path = "/oauth", produces = MediaType.APPLICATION_JSON_VALUE)
 @RequiredArgsConstructor
@@ -40,13 +45,18 @@ public class TenantRegistrationController {
     public void startSsoRegistration(@Valid @ModelAttribute SsoTenantRegistrationInitRequest request,
                                      HttpServletRequest httpRequest,
                                      HttpServletResponse httpResponse) throws IOException {
-        clearAuthState(httpRequest, httpResponse);
+        try {
+            clearAuthState(httpRequest, httpResponse);
 
-        SsoAuthorizeData ssoAuthorizeData = ssoRegistrationService.startRegistration(request);
-        httpResponse.addCookie(buildSsoRegistrationCookie(ssoAuthorizeData.cookieValue(), ssoAuthorizeData.cookieTtlSeconds()));
+            SsoAuthorizeData ssoAuthorizeData = ssoRegistrationService.startRegistration(request);
+            httpResponse.addCookie(buildSsoRegistrationCookie(ssoAuthorizeData.cookieValue(), ssoAuthorizeData.cookieTtlSeconds()));
 
-        // Redirect to Spring Security's oauth2 authorization endpoint under onboarding tenant context via Location header
-        seeOther(httpResponse, ssoAuthorizeData.redirectPath());
+            seeOther(httpResponse, ssoAuthorizeData.redirectPath());
+        } catch (Exception e) {
+            log.error("SSO registration init failed: {}", e.getMessage(), e);
+            String msg = URLEncoder.encode(e.getMessage() != null ? e.getMessage() : "Registration failed. Please try again.", StandardCharsets.UTF_8);
+            httpResponse.sendRedirect(httpRequest.getContextPath() + "/auth/error?error=" + msg);
+        }
     }
 
     private Cookie buildSsoRegistrationCookie(String value, int ttlSeconds) {

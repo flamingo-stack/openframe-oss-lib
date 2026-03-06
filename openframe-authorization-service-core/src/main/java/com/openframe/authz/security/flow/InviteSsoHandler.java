@@ -32,7 +32,7 @@ public class InviteSsoHandler implements SsoFlowHandler {
         Cookie cookie = requireCookie(request);
         OidcUser user = requireOidcUser(authentication);
         SsoInviteCookiePayload payload = ssoCookieCodec.decodeInvite(cookie.getValue())
-                .orElseThrow(() -> new IllegalStateException("invalid_cookie"));
+                .orElseThrow(() -> new IllegalStateException("SSO session is invalid. Please try again."));
 
         requireEmail(user); // ensure email present even if not directly used
         String[] names = resolveNames(user);

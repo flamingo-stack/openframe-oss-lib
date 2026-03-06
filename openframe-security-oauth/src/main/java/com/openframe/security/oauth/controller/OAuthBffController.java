@@ -85,11 +85,11 @@ public class OAuthBffController {
                         state
                 )))
                 .onErrorResume(e -> {
+                    log.error("OAuth callback failed: {}", e.getMessage(), e);
                     String msg = URLEncoder.encode(
-                            e.getMessage() != null ? e.getMessage() : "token_exchange_failed",
+                            e.getMessage() != null ? e.getMessage() : "Authentication failed. Please try again.",
                             StandardCharsets.UTF_8);
-                    String target = buildErrorRedirectTarget(state, request, msg);
-                    return Mono.just(buildFound(target, state));
+                    return Mono.just(buildFound("/auth/error?error=" + msg, state));
                 });
     }
 
@@ -137,12 +137,6 @@ public class OAuthBffController {
                 .switchIfEmpty(Mono.just(ResponseEntity.status(404).build()));
     }
 
-    private static boolean isAbsoluteUrl(String url) {
-        if (url == null) return false;
-        String u = url.toLowerCase();
-        return (u.startsWith("https://") || u.startsWith("http://"));
-    }
-
     private String safeRedirect(String redirectTo) {
         return (redirectTo != null && !redirectTo.isBlank()) ? redirectTo : "/";
     }
@@ -186,17 +180,4 @@ public class OAuthBffController {
         if (hasText(tokens.refresh_token())) headers.add(REFRESH_TOKEN_HEADER, tokens.refresh_token());
     }
 
-    private String buildErrorRedirectTarget(String state, ServerHttpRequest request, String msg) {
-        String originalRedirectTo = oauthBffService.tryGetRedirectFromStateCookie(state, request);
-        String base;
-        if (isAbsoluteUrl(originalRedirectTo)) {
-            base = originalRedirectTo;
-        } else {
-            String referer = request.getHeaders().getFirst(HttpHeaders.REFERER);
-            base = (referer != null && !referer.isBlank()) ? referer : "/";
-        }
-        return base.contains("?")
-                ? base + "&error=oauth_failed&message=" + msg
-                : base + "?error=oauth_failed&message=" + msg;
-    }
 }

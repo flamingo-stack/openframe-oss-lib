@@ -80,7 +80,7 @@ public class OAuthBffService {
                                                     ServerHttpRequest request) {
         OAuthSessionData sessionData = validateAndExtractCookieData(state, request)
                 .orElse(null);
-        if (sessionData == null) return Mono.error(new IllegalStateException("invalid_state"));
+        if (sessionData == null) return Mono.error(new IllegalStateException("Authentication session expired. Please try again."));
         return exchangeCodeForTokens(sessionData, code, request)
                 .flatMap(tokens -> redirectTargetResolver
                         .resolve(sessionData.tenantId(), sessionData.redirectTo(), request)
@@ -163,7 +163,7 @@ public class OAuthBffService {
                 .retrieve()
                 .onStatus(s -> s.is4xxClientError() || s.is5xxServerError(), resp ->
                         resp.bodyToMono(String.class).defaultIfEmpty("")
-                                .flatMap(body -> Mono.error(new IllegalStateException("token_exchange_failed:" + body)))
+                                .flatMap(body -> Mono.error(new IllegalStateException("Authentication failed. Please try again.")))
                 )
                 .bodyToMono(TokenResponse.class);
     }
@@ -293,18 +293,6 @@ public class OAuthBffService {
         return jwtService.generateToken(claims);
     }
 
-    public String tryGetRedirectFromStateCookie(String state, ServerHttpRequest request) {
-        String cookieName = "of_oauth_" + state;
-        var cookie = request.getCookies().getFirst(cookieName);
-        if (cookie == null) return null;
-        try {
-            var jwt = jwtService.decodeToken(cookie.getValue());
-            Object rt = jwt.getClaims().get("rt");
-            return rt != null ? rt.toString() : null;
-        } catch (Exception e) {
-            return null;
-        }
-    }
 }
 
 

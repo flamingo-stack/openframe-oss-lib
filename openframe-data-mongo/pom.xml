@@ -33,6 +33,11 @@
     </scm>
 
     <dependencies>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-exception</artifactId>
+        </dependency>
+
         <!-- Spring Data Mongo (blocking + reactive) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

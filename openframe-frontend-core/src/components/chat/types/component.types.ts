@@ -62,6 +62,10 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
   pendingApprovals?: MessageSegment[]
   onApprove?: (requestId?: string) => void | Promise<void>
   onReject?: (requestId?: string) => void | Promise<void>
+  // Infinite scroll for loading older messages
+  hasNextPage?: boolean
+  isFetchingNextPage?: boolean
+  onLoadMore?: () => void
 }
 
 export interface ChatMessageListRef {

@@ -1,7 +1,9 @@
 package com.openframe.client.exception;
 
-public class DuplicateConnectionException extends RuntimeException {
-  public DuplicateConnectionException(String message) {
-    super(message);
-  }
+import com.openframe.core.exception.ConflictException;
+
+public class DuplicateConnectionException extends ConflictException {
+    public DuplicateConnectionException(String message) {
+        super(message);
+    }
 }

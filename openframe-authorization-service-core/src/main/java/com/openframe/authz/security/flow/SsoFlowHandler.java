@@ -28,7 +28,7 @@ public interface SsoFlowHandler {
 
     default Cookie requireCookie(HttpServletRequest request) {
         Cookie c = resolveCookie(request);
-        if (c == null) throw new IllegalStateException("sso_cookie_missing");
+        if (c == null) throw new IllegalStateException("SSO session expired. Please try again.");
         return c;
     }
 
@@ -40,12 +40,12 @@ public interface SsoFlowHandler {
 
     default OidcUser requireOidcUser(Authentication authentication) {
         if (authentication != null && authentication.getPrincipal() instanceof OidcUser u) return u;
-        throw new IllegalStateException("OIDC principal expected");
+        throw new IllegalStateException("Unexpected authentication type. Please use SSO login.");
     }
 
     default String requireEmail(OidcUser u) {
         String email = resolveEmail(u);
-        if (email == null || email.isBlank()) throw new IllegalStateException("email_not_available");
+        if (email == null || email.isBlank()) throw new IllegalStateException("Email not provided by SSO provider. Please use an account with a verified email.");
         return email.toLowerCase(ROOT);
     }
 
