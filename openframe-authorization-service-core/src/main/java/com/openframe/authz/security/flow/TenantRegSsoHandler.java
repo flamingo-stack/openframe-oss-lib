@@ -36,14 +36,14 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
         String email = requireEmail(user);
 
         SsoTenantRegCookiePayload payload = ssoCookieCodec.decodeTenant(cookie.getValue())
-                .orElseThrow(() -> new IllegalStateException("invalid_cookie"));
+                .orElseThrow(() -> new IllegalStateException("SSO session is invalid. Please try again."));
 
         String[] names = resolveNames(user);
         String givenName = names[0];
         String familyName = names[1];
 
         if (payload.tenantName() == null || payload.tenantDomain() == null) {
-            throw new IllegalStateException("invalid_sso_registration_context");
+            throw new IllegalStateException("Missing registration details. Please start the registration again.");
         }
 
         TenantRegistrationRequest reg = TenantRegistrationRequest.builder()
