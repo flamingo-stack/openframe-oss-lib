@@ -46,6 +46,8 @@ public class FleetHost {
     @JsonProperty("cpu_logical_cores")
     private int cpuLogicalCores;
 
+    private String status;
+
     private long memory;
     private long uptime;
 

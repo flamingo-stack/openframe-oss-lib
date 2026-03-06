@@ -2,7 +2,9 @@ package com.openframe.test.api;
 
 import com.openframe.test.data.dto.device.*;
 import com.openframe.test.data.dto.device.fleet.FleetHost;
+import com.openframe.test.data.dto.device.tactical.TacticalAgent;
 import com.openframe.test.data.dto.shared.CursorPaginationInput;
+import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 
 import java.util.ArrayList;
@@ -20,6 +22,7 @@ public class DeviceApi {
 
     private static final String DEVICES = "api/devices/{machineId}";
     private static final String FLEET_HOST = "tools/fleetmdm-server/api/latest/fleet/hosts/{fleetId}";
+    private static final String TACTICAL_AGENT = "tools/tactical-rmm/agents/{tacticalId}/";
 
     public static List<String> getDeviceHostnames(DeviceFilterInput filter) {
         Map<String, Object> body = new HashMap<>();
@@ -39,6 +42,43 @@ public class DeviceApi {
                 .body(body).post(GRAPHQL)
                 .then().statusCode(200)
                 .extract().jsonPath().get("data.devices.edges.node.machineId");
+    }
+
+    public static List<String> getAllDeviceIds(DeviceFilterInput filter, CursorPaginationInput pagination) {
+        List<String> machineIds = new ArrayList<>();
+        String cursor = pagination.getCursor();
+        boolean hasNextPage = true;
+
+        while (hasNextPage) {
+            Map<String, Object> variables = new HashMap<>();
+            variables.put("filter", filter);
+            variables.put("pagination", CursorPaginationInput.builder()
+                    .limit(pagination.getLimit())
+                    .cursor(cursor)
+                    .build());
+            Map<String, Object> body = new HashMap<>();
+            body.put("query", ALL_DEVICE_IDS);
+            body.put("variables", variables);
+
+            var responseR = given(getAuthorizedSpec())
+                    .body(body).post(GRAPHQL);
+            if (responseR.statusCode() == 200) {
+                var response = responseR.then()
+                        .extract().jsonPath();
+
+                List<String> ids = response.getList("data.devices.edges.node.machineId", String.class);
+                machineIds.addAll(ids);
+
+                Boolean next = response.getObject("data.devices.pageInfo.hasNextPage", Boolean.class);
+                hasNextPage = Boolean.TRUE.equals(next);
+                cursor = response.getString("data.devices.pageInfo.endCursor");
+            } else {
+                System.out.printf("%s -> %d%n", getBaseUrl(), responseR.getStatusCode());
+                break;
+            }
+        }
+
+        return machineIds;
     }
 
     public static Machine getDevice(String machineId) {
@@ -110,6 +150,7 @@ public class DeviceApi {
                 cursor = response.getString("data.devices.pageInfo.endCursor");
             } else {
                 System.out.printf("%s -> %d%n", getBaseUrl(), responseR.getStatusCode());
+                break;
             }
 
         }
@@ -141,6 +182,15 @@ public class DeviceApi {
                 .body(body).post(GRAPHQL)
                 .then().statusCode(200)
                 .extract().jsonPath().getObject("data.devices.edges[0].node", Machine.class);
+    }
+
+    public static TacticalAgent getTacticalInfo(String tacticalId) {
+        return given(getAuthorizedSpec())
+                .accept(ContentType.JSON)
+                .pathParam("tacticalId", tacticalId)
+                .get(TACTICAL_AGENT)
+                .then().statusCode(200)
+                .extract().as(TacticalAgent.class);
     }
 
     public static FleetHost getFleetInfo(String fleetId) {

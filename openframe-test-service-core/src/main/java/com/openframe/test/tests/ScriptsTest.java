@@ -21,10 +21,11 @@ public class ScriptsTest extends BaseTest {
     public void testListScripts() {
         List<Script> scripts = ScriptApi.listScripts();
         assertThat(scripts).as("Expected at least one script").isNotEmpty();
-        assertThat(scripts).withFailMessage("Some fields are empty").allSatisfy(script -> {
-            assertThat(script.getId()).isNotNull();
-            assertThat(script.getName()).isNotEmpty();
-            assertThat(script.getDescription()).isNotEmpty();
+        assertThat(scripts).withFailMessage("Expected to have mandatory fields").allSatisfy(script -> {
+            assertThat(script.getId()).as("No Id").isNotNull();
+            assertThat(script.getName()).as("No Name for " + script.getId()).isNotEmpty();
+            assertThat(script.getCategory()).as("No Category for " + script.getName()).isNotEmpty();
+            assertThat(script.getShell()).as("No Shell for " + script.getName()).isNotEmpty();
         });
     }
 
