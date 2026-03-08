@@ -32,7 +32,7 @@ export interface CaseStudy {
   og_image_url: string | null
 
   // Publishing
-  status: 'draft' | 'published' | 'scheduled' | 'archived'
+  status: 'draft' | 'ai_drafted' | 'published' | 'scheduled' | 'archived'
   published_at: string | null
   author_id: string | null
 
@@ -74,7 +74,7 @@ export interface CreateCaseStudyData {
   seo_description?: string
   seo_keywords?: string
   og_image_url?: string
-  status: 'draft' | 'published' | 'scheduled' | 'archived'
+  status: 'draft' | 'ai_drafted' | 'published' | 'scheduled' | 'archived'
   published_at?: string | null
   author_id: string
   platforms: string[] // Array of platform IDs (UUIDs)
