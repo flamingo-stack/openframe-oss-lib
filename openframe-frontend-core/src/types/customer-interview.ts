@@ -45,6 +45,12 @@ export interface CustomerInterview {
   main_video_url: string | null
   teasers: VideoTeaser[] // JSONB array
 
+  // Highlight video (AI-generated summary video)
+  highlight_video_url?: string | null
+  highlight_video_thumbnail?: string | null
+  highlight_video_duration_ms?: number | null
+  highlight_video_source?: 'manual' | 'ai_generated' | null
+
   // Optional case study link
   case_study_id: number | null
 
