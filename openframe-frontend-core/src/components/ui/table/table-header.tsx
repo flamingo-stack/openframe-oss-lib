@@ -69,7 +69,7 @@ export function TableHeader<T = any>({
   return (
     <div
       className={cn(
-        'hidden md:flex items-center gap-4 px-4 py-3 relative',
+        'hidden md:flex items-center gap-4 px-4 py-3 relative h-11',
         className
       )}
     >
