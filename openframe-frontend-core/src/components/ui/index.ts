@@ -83,6 +83,7 @@ export * from './title-content-block'
 export * from './toggle'
 export * from './tooltip'
 export * from './error-state'
+export * from './content-loader'
 
 // Table components
 export {
