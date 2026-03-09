@@ -11,6 +11,7 @@ import com.openframe.authz.service.user.UserService;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.tenant.SSOPerTenantConfig;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -62,6 +63,9 @@ public class SecurityConfig {
 
     public static final String EMAIL = "email";
     public static final String SUB = "sub";
+
+    @Value("${openframe.auth.error-url}")
+    private String authErrorUrl;
     private static final Pattern MS_ISSUER_PATTERN =
             Pattern.compile("^https://login\\.microsoftonline\\.com/[^/]+/v2\\.0/?$");
 
@@ -125,7 +129,7 @@ public class SecurityConfig {
             String msg = java.net.URLEncoder.encode(
                     exception.getMessage() != null ? exception.getMessage() : "SSO login failed. Please try again.",
                     java.nio.charset.StandardCharsets.UTF_8);
-            response.sendRedirect(request.getContextPath() + "/auth/error?error=" + msg);
+            response.sendRedirect(authErrorUrl + "?error=" + msg);
         };
     }
 
