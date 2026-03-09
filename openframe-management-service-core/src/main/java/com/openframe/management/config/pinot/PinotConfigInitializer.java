@@ -77,8 +77,28 @@ public class PinotConfigInitializer {
                 log.error("Failed to deploy Pinot configuration for {}", config.getName(), e);
             }
         }
-
         log.info("Pinot configuration deployment completed");
+        warmUpPinotConnections();
+    }
+
+    private void warmUpPinotConnections() {
+        try {
+            TimeUnit.SECONDS.sleep(3);
+
+            String url = String.format("http://%s/sql", pinotControllerUrl);
+            String query = "{\"sql\": \"SELECT COUNT(*) FROM devices LIMIT 1\"}";
+
+            HttpHeaders headers = createHeaders();
+            HttpEntity<String> request = new HttpEntity<>(query, headers);
+            restTemplate.exchange(url, HttpMethod.POST, request, String.class);
+
+            log.info("Pinot warm-up query executed successfully");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("Pinot warm-up interrupted");
+        } catch (Exception e) {
+            log.warn("Pinot warm-up query failed (non-blocking): {}", e.getMessage());
+        }
     }
 
     private void deployPinotConfig(PinotConfig config) {
