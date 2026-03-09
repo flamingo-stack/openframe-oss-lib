@@ -88,6 +88,31 @@ export interface CustomerInterview {
   assemblyai_transcript_id?: string
   twelvelabs_video_id?: string
 
+  // Word-level transcript data for video processing
+  transcript_words_data?: Array<{
+    text: string
+    start: number  // milliseconds
+    end: number    // milliseconds
+    confidence: number
+    speaker?: string
+  }>
+
+  // Incentive mention exclusion ranges (computed during transcription)
+  incentive_excluded_ranges?: Array<{
+    start: number  // seconds
+    end: number    // seconds
+  }>
+
+  // Speaker identification mapping (computed during transcription)
+  // Maps AssemblyAI labels ("A", "B") to actual person info
+  speaker_mapping?: {
+    [label: string]: {
+      name: string
+      role: 'interviewer' | 'interviewee'
+      userId?: string
+    }
+  }
+
   // Timestamps
   created_at: string
   updated_at: string
