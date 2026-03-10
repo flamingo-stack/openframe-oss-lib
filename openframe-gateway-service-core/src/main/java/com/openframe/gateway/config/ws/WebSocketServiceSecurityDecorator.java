@@ -22,7 +22,7 @@ import static com.openframe.gateway.config.ws.WebSocketGatewayConfig.*;
 @Slf4j
 public class WebSocketServiceSecurityDecorator implements WebSocketService {
 
-    private static final String LOG_PREFIX = "sessionId={} path={} sub={} | ";
+    private static final String LOG_PREFIX = "Debug ws sessionId={} path={} sub={} | ";
 
     public static final long CLOCK_SKEW_SECONDS = 60; // align with Spring Security default skew
 
