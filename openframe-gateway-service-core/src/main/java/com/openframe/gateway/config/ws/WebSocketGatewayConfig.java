@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
+import com.openframe.gateway.metrics.GatewayTrafficMetrics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.reactive.socket.client.WebSocketClient;
@@ -59,9 +60,10 @@ public class WebSocketGatewayConfig {
     @Primary
     public WebSocketService webSocketServiceDecorator(
             RequestJwtClaimsReader requestJwtClaimsReader,
-            WebSocketService defaultWebSocketService
+            WebSocketService defaultWebSocketService,
+            GatewayTrafficMetrics gatewayTrafficMetrics
     ) {
-        return new WebSocketServiceSecurityDecorator(defaultWebSocketService, requestJwtClaimsReader);
+        return new WebSocketServiceSecurityDecorator(defaultWebSocketService, requestJwtClaimsReader, gatewayTrafficMetrics);
     }
 
 

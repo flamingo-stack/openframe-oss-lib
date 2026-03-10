@@ -1,5 +1,6 @@
 package com.openframe.gateway.config.ws;
 
+import com.openframe.gateway.metrics.GatewayTrafficMetrics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.reactive.socket.CloseStatus;
@@ -27,6 +28,7 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
 
     private final WebSocketService defaultWebSocketService;
     private final RequestJwtClaimsReader requestJwtReader;
+    private final GatewayTrafficMetrics gatewayTrafficMetrics;
     private final ConcurrentMap<String, SessionInfo> sessionRegistry = new ConcurrentHashMap<>();
 
     private record SessionInfo(Instant createdAt, String path) {}
@@ -48,6 +50,8 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                     return ReactorNettyWebSocketSessionCloser.closeGracefully(session, CloseStatus.POLICY_VIOLATION);
                 }
 
+                gatewayTrafficMetrics.webSocketOpened();
+
                 long secondsUntilExpiration = Duration.between(Instant.now(), expiresAt).getSeconds();
 
                 // Account for clock skew (same tolerance as Spring Security JwtTimestampValidator)
@@ -57,6 +61,7 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                 processSessionClosedEvent(session, path);
                 return defaultWebSocketHandler.handle(session)
                         .doFinally(signal -> {
+                            gatewayTrafficMetrics.webSocketClosed();
                             SessionInfo info = sessionRegistry.remove(session.getId());
                             long lifetimeMs = info != null
                                     ? Duration.between(info.createdAt(), Instant.now()).toMillis()
