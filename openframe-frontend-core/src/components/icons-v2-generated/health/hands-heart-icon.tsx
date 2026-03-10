@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface HandsHeartIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface HandsHeartIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function HandsHeartIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: HandsHeartIconProps) {
+export function HandsHeartIcon({ className = '', size = 24, color = 'currentColor', ...props }: HandsHeartIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

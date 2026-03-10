@@ -7,9 +7,9 @@
 export const CHAT_TYPE = {
   CLIENT: 'CLIENT_CHAT',
   ADMIN: 'ADMIN_AI_CHAT',
-} as const
+} as const;
 
-export type ChatType = typeof CHAT_TYPE[keyof typeof CHAT_TYPE]
+export type ChatType = (typeof CHAT_TYPE)[keyof typeof CHAT_TYPE];
 
 // ========== Owner Type Definitions ==========
 
@@ -17,9 +17,9 @@ export const OWNER_TYPE = {
   CLIENT: 'CLIENT',
   ADMIN: 'ADMIN',
   ASSISTANT: 'ASSISTANT',
-} as const
+} as const;
 
-export type OwnerType = typeof OWNER_TYPE[keyof typeof OWNER_TYPE]
+export type OwnerType = (typeof OWNER_TYPE)[keyof typeof OWNER_TYPE];
 
 // ========== Role Definitions ==========
 
@@ -28,18 +28,18 @@ export const MESSAGE_ROLE = {
   ASSISTANT: 'assistant',
   ERROR: 'error',
   SYSTEM: 'system',
-} as const
+} as const;
 
-export type MessageRole = typeof MESSAGE_ROLE[keyof typeof MESSAGE_ROLE]
+export type MessageRole = (typeof MESSAGE_ROLE)[keyof typeof MESSAGE_ROLE];
 
 // ========== Assistant Type Definitions ==========
 
 export const ASSISTANT_TYPE = {
   FAE: 'fae',
   MINGO: 'mingo',
-} as const
+} as const;
 
-export type AssistantType = typeof ASSISTANT_TYPE[keyof typeof ASSISTANT_TYPE]
+export type AssistantType = (typeof ASSISTANT_TYPE)[keyof typeof ASSISTANT_TYPE];
 
 // ========== Approval Status Definitions ==========
 
@@ -47,9 +47,9 @@ export const APPROVAL_STATUS = {
   PENDING: 'pending',
   APPROVED: 'approved',
   REJECTED: 'rejected',
-} as const
+} as const;
 
-export type ChatApprovalStatus = typeof APPROVAL_STATUS[keyof typeof APPROVAL_STATUS]
+export type ChatApprovalStatus = (typeof APPROVAL_STATUS)[keyof typeof APPROVAL_STATUS];
 
 // ========== Connection Status Definitions ==========
 
@@ -60,15 +60,15 @@ export const CONNECTION_STATUS = {
   RECONNECTING: 'reconnecting',
   CLOSED: 'closed',
   ERROR: 'error',
-} as const
+} as const;
 
-export type ConnectionStatus = typeof CONNECTION_STATUS[keyof typeof CONNECTION_STATUS]
+export type ConnectionStatus = (typeof CONNECTION_STATUS)[keyof typeof CONNECTION_STATUS];
 
 // ========== Message Owner Interface ==========
 
 export interface MessageOwner {
-  type: OwnerType
-  machineId?: string
-  userId?: string
-  model?: string
+  type: OwnerType;
+  machineId?: string;
+  userId?: string;
+  model?: string;
 }

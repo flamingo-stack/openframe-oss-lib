@@ -1,11 +1,11 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { cn } from '../../../utils/cn'
+import React from 'react';
+import { cn } from '../../../utils/cn';
 
 export interface ProductReleaseCardSkeletonProps {
   /** Additional CSS classes */
-  className?: string
+  className?: string;
 }
 
 export function ProductReleaseCardSkeleton({ className }: ProductReleaseCardSkeletonProps) {
@@ -18,7 +18,7 @@ export function ProductReleaseCardSkeleton({ className }: ProductReleaseCardSkel
         'gap-3 md:gap-4',
         'p-4',
         'animate-pulse',
-        className
+        className,
       )}
     >
       {/* Left column - content */}
@@ -48,5 +48,5 @@ export function ProductReleaseCardSkeleton({ className }: ProductReleaseCardSkel
         <div className="h-6 w-6 bg-ods-border rounded shrink-0 mx-3" />
       </div>
     </div>
-  )
+  );
 }

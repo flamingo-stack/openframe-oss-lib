@@ -5,9 +5,7 @@ interface TelegramIconProps {
   className?: string;
 }
 
-export function TelegramIcon({ className ,
-  color = 'white'
-}:  TelegramIconProps) {
+export function TelegramIcon({ className, color = 'white' }: TelegramIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

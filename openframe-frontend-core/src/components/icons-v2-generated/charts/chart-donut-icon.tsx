@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface ChartDonutIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface ChartDonutIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function ChartDonutIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: ChartDonutIconProps) {
+export function ChartDonutIcon({ className = '', size = 24, color = 'currentColor', ...props }: ChartDonutIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

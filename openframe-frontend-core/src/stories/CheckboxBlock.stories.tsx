@@ -9,7 +9,8 @@ const meta = {
     layout: 'centered',
     docs: {
       description: {
-        component: 'A checkbox with label inside a bordered block container. Matches the ODS design system with dark theme styling.',
+        component:
+          'A checkbox with label inside a bordered block container. Matches the ODS design system with dark theme styling.',
       },
     },
   },
@@ -41,7 +42,7 @@ const meta = {
     },
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ width: '320px' }}>
         <Story />
       </div>
@@ -112,14 +113,8 @@ export const Controlled: Story = {
     const [checked, setChecked] = useState(false);
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        <CheckboxBlock
-          label="Controlled Checkbox"
-          checked={checked}
-          onCheckedChange={setChecked}
-        />
-        <span style={{ color: '#888', fontSize: '14px' }}>
-          Checked: {checked ? 'true' : 'false'}
-        </span>
+        <CheckboxBlock label="Controlled Checkbox" checked={checked} onCheckedChange={setChecked} />
+        <span style={{ color: '#888', fontSize: '14px' }}>Checked: {checked ? 'true' : 'false'}</span>
       </div>
     );
   },

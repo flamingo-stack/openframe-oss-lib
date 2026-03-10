@@ -1,20 +1,20 @@
-import * as React from "react"
-import { cn } from "../../utils/cn"
-import type { ChatTypingIndicatorProps } from "./types"
+import * as React from 'react';
+import { cn } from '../../utils/cn';
+import type { ChatTypingIndicatorProps } from './types';
 
 const ChatTypingIndicator = React.forwardRef<HTMLDivElement, ChatTypingIndicatorProps>(
   ({ className, size = 'md', showText = false, dotClassName, ...props }, ref) => {
     const dotSizeClasses = {
       sm: 'w-1 h-1',
       md: 'w-1.5 h-1.5',
-      lg: 'w-2 h-2'
-    }
+      lg: 'w-2 h-2',
+    };
 
     const containerSizeClasses = {
       sm: 'h-4',
       md: 'h-6',
-      lg: 'h-8'
-    }
+      lg: 'h-8',
+    };
 
     const dotAnimation = `
       @keyframes dotPulse {
@@ -27,61 +27,41 @@ const ChatTypingIndicator = React.forwardRef<HTMLDivElement, ChatTypingIndicator
           opacity: 1;
         }
       }
-    `
+    `;
 
     return (
-      <div
-        ref={ref}
-        className={cn("flex items-center gap-2", className)}
-        {...props}
-      >
+      <div ref={ref} className={cn('flex items-center gap-2', className)} {...props}>
+        {/* biome-ignore lint/style/useNamingConvention: __html is required by React's dangerouslySetInnerHTML API */}
         <style dangerouslySetInnerHTML={{ __html: dotAnimation }} />
-        {showText && (
-          <span className="text-ods-text-secondary text-sm">Assistant is typing</span>
-        )}
-        <div className={cn(
-          "inline-flex items-center justify-center gap-1",
-          containerSizeClasses[size]
-        )}>
-          <div 
-            className={cn(
-              dotSizeClasses[size],
-              "rounded-full",
-              dotClassName || "bg-ods-text-primary"
-            )}
-            style={{ 
+        {showText && <span className="text-ods-text-secondary text-sm">Assistant is typing</span>}
+        <div className={cn('inline-flex items-center justify-center gap-1', containerSizeClasses[size])}>
+          <div
+            className={cn(dotSizeClasses[size], 'rounded-full', dotClassName || 'bg-ods-text-primary')}
+            style={{
               animation: 'dotPulse 1.4s ease-in-out infinite',
-              animationDelay: '0ms' 
+              animationDelay: '0ms',
             }}
           />
-          <div 
-            className={cn(
-              dotSizeClasses[size],
-              "rounded-full",
-              dotClassName || "bg-ods-text-primary"
-            )}
-            style={{ 
+          <div
+            className={cn(dotSizeClasses[size], 'rounded-full', dotClassName || 'bg-ods-text-primary')}
+            style={{
               animation: 'dotPulse 1.4s ease-in-out infinite',
-              animationDelay: '200ms' 
+              animationDelay: '200ms',
             }}
           />
-          <div 
-            className={cn(
-              dotSizeClasses[size],
-              "rounded-full",
-              dotClassName || "bg-ods-text-primary"
-            )}
-            style={{ 
+          <div
+            className={cn(dotSizeClasses[size], 'rounded-full', dotClassName || 'bg-ods-text-primary')}
+            style={{
               animation: 'dotPulse 1.4s ease-in-out infinite',
-              animationDelay: '400ms' 
+              animationDelay: '400ms',
             }}
           />
         </div>
       </div>
-    )
-  }
-)
+    );
+  },
+);
 
-ChatTypingIndicator.displayName = "ChatTypingIndicator"
+ChatTypingIndicator.displayName = 'ChatTypingIndicator';
 
-export { ChatTypingIndicator }
+export { ChatTypingIndicator };

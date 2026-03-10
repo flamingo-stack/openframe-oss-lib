@@ -9,7 +9,8 @@ const meta = {
     layout: 'centered',
     docs: {
       description: {
-        component: 'Displays a tool type badge with icon for OpenFrame integrated tools. Used in tables to show tool sources like Tactical RMM, Fleet MDM, etc.',
+        component:
+          'Displays a tool type badge with icon for OpenFrame integrated tools. Used in tables to show tool sources like Tactical RMM, Fleet MDM, etc.',
       },
     },
   },
@@ -25,7 +26,7 @@ const meta = {
         'OPENFRAME',
         'OPENFRAME_CHAT',
         'OPENFRAME_CLIENT',
-        'SYSTEM'
+        'SYSTEM',
       ] as ToolType[],
       description: 'The type of tool to display',
     },
@@ -126,4 +127,3 @@ export const AllTools: Story = {
     </div>
   ),
 };
-

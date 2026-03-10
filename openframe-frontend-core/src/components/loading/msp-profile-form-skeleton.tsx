@@ -1,17 +1,13 @@
-import React from 'react'
-import { cn } from "../../utils/cn"
-import {
-  UnifiedSkeleton,
-  TextSkeleton,
-  InteractiveSkeleton
-} from './unified-skeleton'
+import React from 'react';
+import { cn } from '../../utils/cn';
+import { InteractiveSkeleton, TextSkeleton, UnifiedSkeleton } from './unified-skeleton';
 
 interface SkeletonProps {
-  className?: string
+  className?: string;
   /**
    * Number of input fields to render on the right column (defaults to 4).
    */
-  fields?: number
+  fields?: number;
 }
 
 /**
@@ -28,16 +24,10 @@ interface SkeletonProps {
  * – Mobile (<768px) collapses to one column via grid existing classes.
  * – Uses UnifiedSkeleton system to stay consistent with global loading design.
  */
-export function MspProfileFormSkeleton({
-  className,
-  fields = 4,
-}: SkeletonProps) {
+export function MspProfileFormSkeleton({ className, fields = 4 }: SkeletonProps) {
   return (
     <div
-      className={cn(
-        'grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch',
-        className,
-      )}
+      className={cn('grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch', className)}
       role="status"
       aria-label="Loading MSP profile form"
     >
@@ -60,5 +50,5 @@ export function MspProfileFormSkeleton({
         ))}
       </div>
     </div>
-  )
-} 
+  );
+}

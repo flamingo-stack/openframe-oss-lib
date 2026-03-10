@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface SpatulaIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface SpatulaIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function SpatulaIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: SpatulaIconProps) {
+export function SpatulaIcon({ className = '', size = 24, color = 'currentColor', ...props }: SpatulaIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

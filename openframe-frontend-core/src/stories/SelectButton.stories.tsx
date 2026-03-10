@@ -1,7 +1,7 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { useState } from 'react'
-import { SelectButton } from '../components/features/select-button'
-import { Smile, Monitor, Globe, Zap } from 'lucide-react'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { Globe, Monitor, Smile, Zap } from 'lucide-react';
+import { useState } from 'react';
+import { SelectButton } from '../components/features/select-button';
 
 const meta = {
   title: 'Features/SelectButton',
@@ -16,10 +16,10 @@ const meta = {
     selected: { control: 'boolean' },
     disabled: { control: 'boolean' },
   },
-} satisfies Meta<typeof SelectButton>
+} satisfies Meta<typeof SelectButton>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
@@ -27,7 +27,7 @@ export const Default: Story = {
     description: 'Description text',
     selected: false,
   },
-}
+};
 
 export const Selected: Story = {
   args: {
@@ -35,7 +35,7 @@ export const Selected: Story = {
     description: 'Description text',
     selected: true,
   },
-}
+};
 
 export const WithIcon: Story = {
   args: {
@@ -43,7 +43,7 @@ export const WithIcon: Story = {
     description: 'Description text',
     icon: <Smile size={24} />,
   },
-}
+};
 
 export const WithIconSelected: Story = {
   args: {
@@ -52,7 +52,7 @@ export const WithIconSelected: Story = {
     icon: <Smile size={24} />,
     selected: true,
   },
-}
+};
 
 export const WithImage: Story = {
   args: {
@@ -63,7 +63,7 @@ export const WithImage: Story = {
       alt: 'Sample',
     },
   },
-}
+};
 
 export const WithImageSelected: Story = {
   args: {
@@ -75,13 +75,13 @@ export const WithImageSelected: Story = {
     },
     selected: true,
   },
-}
+};
 
 export const NoDescription: Story = {
   args: {
     title: 'Title Only',
   },
-}
+};
 
 export const Disabled: Story = {
   args: {
@@ -89,14 +89,14 @@ export const Disabled: Story = {
     description: 'Cannot select',
     disabled: true,
   },
-}
+};
 
 export const IconWithTitleOnly: Story = {
   args: {
     title: 'Option',
     icon: <Smile size={24} />,
   },
-}
+};
 
 export const WithTag: Story = {
   args: {
@@ -104,7 +104,7 @@ export const WithTag: Story = {
     icon: <Monitor size={24} />,
     tag: 'Coming Soon',
   },
-}
+};
 
 export const WithTagDisabled: Story = {
   args: {
@@ -113,7 +113,7 @@ export const WithTagDisabled: Story = {
     tag: 'Coming Soon',
     disabled: true,
   },
-}
+};
 
 export const WithTagSelected: Story = {
   args: {
@@ -122,21 +122,21 @@ export const WithTagSelected: Story = {
     tag: 'Coming Soon',
     selected: true,
   },
-}
+};
 
 export const InteractiveGroup = {
   render: () => {
-    const [selectedId, setSelectedId] = useState<string | null>('monitor')
+    const [selectedId, setSelectedId] = useState<string | null>('monitor');
 
     const options = [
       { id: 'monitor', title: 'Monitor', description: 'System monitoring', icon: <Monitor size={24} /> },
       { id: 'web', title: 'Web App', description: 'Browser based', icon: <Globe size={24} /> },
       { id: 'api', title: 'API', description: 'REST endpoints', icon: <Zap size={24} /> },
-    ]
+    ];
 
     return (
       <div className="flex flex-col gap-2">
-        {options.map((option) => (
+        {options.map(option => (
           <SelectButton
             key={option.id}
             title={option.title}
@@ -147,23 +147,23 @@ export const InteractiveGroup = {
           />
         ))}
       </div>
-    )
+    );
   },
-}
+};
 
 export const InteractiveIconTitleOnly = {
   render: () => {
-    const [selectedId, setSelectedId] = useState<string | null>('monitor')
+    const [selectedId, setSelectedId] = useState<string | null>('monitor');
 
     const options = [
       { id: 'monitor', title: 'Monitor', icon: <Monitor size={24} /> },
       { id: 'web', title: 'Web App', icon: <Globe size={24} /> },
       { id: 'api', title: 'API', icon: <Zap size={24} /> },
-    ]
+    ];
 
     return (
       <div className="flex flex-col gap-2">
-        {options.map((option) => (
+        {options.map(option => (
           <SelectButton
             key={option.id}
             title={option.title}
@@ -173,6 +173,6 @@ export const InteractiveIconTitleOnly = {
           />
         ))}
       </div>
-    )
+    );
   },
-}
+};

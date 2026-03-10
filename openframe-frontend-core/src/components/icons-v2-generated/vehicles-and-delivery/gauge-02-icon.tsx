@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface Gauge02IconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface Gauge02IconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function Gauge02Icon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: Gauge02IconProps) {
+export function Gauge02Icon({ className = '', size = 24, color = 'currentColor', ...props }: Gauge02IconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

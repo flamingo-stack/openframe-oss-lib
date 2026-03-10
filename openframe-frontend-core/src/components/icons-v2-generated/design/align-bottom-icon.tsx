@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface AlignBottomIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface AlignBottomIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function AlignBottomIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: AlignBottomIconProps) {
+export function AlignBottomIcon({ className = '', size = 24, color = 'currentColor', ...props }: AlignBottomIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

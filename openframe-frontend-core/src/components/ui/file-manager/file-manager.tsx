@@ -1,16 +1,16 @@
-'use client'
+'use client';
 
-import React, { useMemo } from 'react'
-import { cn } from '../../../utils/cn'
-import { Input } from '../input'
-import { SearchIcon } from '../../icons-v2-generated/interface/search-icon'
-import { FileManagerBreadcrumb } from './file-manager-breadcrumb'
-import { FileManagerActionBar } from './file-manager-action-bar'
-import { FileManagerTable } from './file-manager-table'
-import type { FileManagerProps, BreadcrumbItem } from './types'
-import { Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { cn } from '../../../utils/cn';
+import { SearchIcon } from '../../icons-v2-generated/interface/search-icon';
+import { Input } from '../input';
+import { FileManagerActionBar } from './file-manager-action-bar';
+import { FileManagerBreadcrumb } from './file-manager-breadcrumb';
+import { FileManagerTable } from './file-manager-table';
+import type { BreadcrumbItem, FileManagerProps } from './types';
 
-export function FileManager({ 
+export function FileManager({
   files,
   currentPath,
   selectedFiles,
@@ -31,112 +31,107 @@ export function FileManager({
   onFileAction,
   onFileClick,
   onFolderOpen,
-  className 
+  className,
 }: FileManagerProps) {
   const breadcrumbItems = useMemo((): BreadcrumbItem[] => {
-    const items: BreadcrumbItem[] = []
-    
-    items.push({ label: 'Root', path: '' })
-    
+    const items: BreadcrumbItem[] = [];
+
+    items.push({ label: 'Root', path: '' });
+
     if (!currentPath || currentPath === '' || currentPath === '/') {
-      return items
+      return items;
     }
-    
-    const isWindowsPath = currentPath.includes('\\') || /^[A-Za-z]:/.test(currentPath)
-    const separator = isWindowsPath ? '\\' : '/'
-    
-    const parts = currentPath.split(separator).filter(Boolean)
-    
-    let startIndex = 0
+
+    const isWindowsPath = currentPath.includes('\\') || /^[A-Za-z]:/.test(currentPath);
+    const separator = isWindowsPath ? '\\' : '/';
+
+    const parts = currentPath.split(separator).filter(Boolean);
+
+    let startIndex = 0;
     if (isWindowsPath && parts.length > 0) {
-      const driveMatch = parts[0].match(/^([A-Za-z]:)/)
+      const driveMatch = parts[0].match(/^([A-Za-z]:)/);
       if (driveMatch) {
         items.push({
           label: driveMatch[1],
-          path: driveMatch[1] + separator
-        })
+          path: driveMatch[1] + separator,
+        });
         if (parts[0] === driveMatch[1]) {
-          startIndex = 1
+          startIndex = 1;
         } else {
-          parts[0] = parts[0].substring(driveMatch[1].length)
+          parts[0] = parts[0].substring(driveMatch[1].length);
         }
       }
     }
-    
-    let accumulatedPath = ''
+
+    let accumulatedPath = '';
     if (isWindowsPath && items.length > 1) {
-      accumulatedPath = items[items.length - 1].path
+      accumulatedPath = items[items.length - 1].path;
     }
-    
+
     for (let i = startIndex; i < parts.length; i++) {
-      const part = parts[i]
-      if (!part) continue
-      
+      const part = parts[i];
+      if (!part) continue;
+
       if (isWindowsPath) {
-        accumulatedPath = accumulatedPath.endsWith(separator) 
-          ? accumulatedPath + part 
-          : accumulatedPath + separator + part
+        accumulatedPath = accumulatedPath.endsWith(separator)
+          ? accumulatedPath + part
+          : accumulatedPath + separator + part;
       } else {
-        accumulatedPath = accumulatedPath === '' || accumulatedPath === '/'
-          ? '/' + part 
-          : accumulatedPath + '/' + part
+        accumulatedPath = accumulatedPath === '' || accumulatedPath === '/' ? '/' + part : accumulatedPath + '/' + part;
       }
-      
+
       items.push({
         label: part,
-        path: accumulatedPath
-      })
+        path: accumulatedPath,
+      });
     }
-    
-    return items
-  }, [currentPath])
+
+    return items;
+  }, [currentPath]);
 
   const handleBreadcrumbClick = (path: string) => {
-    onBreadcrumbClick?.(path)
-    onNavigate?.(path)
-  }
+    onBreadcrumbClick?.(path);
+    onNavigate?.(path);
+  };
 
   const handleFolderOpen = (file: any) => {
-    let newPath: string
-    
+    let newPath: string;
+
     if (!currentPath || currentPath === '') {
       if (file.name && /^[A-Za-z]:/.test(file.name)) {
-        newPath = file.name + (file.name.endsWith('\\') ? '' : '\\')
+        newPath = file.name + (file.name.endsWith('\\') ? '' : '\\');
       } else {
-        newPath = file.name
+        newPath = file.name;
       }
     } else {
-      const separator = currentPath.includes('\\') ? '\\' : '/'
-      
+      const separator = currentPath.includes('\\') ? '\\' : '/';
+
       if (currentPath === '/') {
-        newPath = '/' + file.name
+        newPath = '/' + file.name;
       } else if (currentPath.endsWith(separator)) {
-        newPath = currentPath + file.name
+        newPath = currentPath + file.name;
       } else {
-        newPath = currentPath + separator + file.name
+        newPath = currentPath + separator + file.name;
       }
     }
-    
-    onFolderOpen?.(file)
-    onNavigate?.(newPath)
-  }
+
+    onFolderOpen?.(file);
+    onNavigate?.(newPath);
+  };
 
   const handleSelectAll = (selected: boolean) => {
-    onSelectAll?.(selected)
-  }
+    onSelectAll?.(selected);
+  };
 
   const handleSelectFile = (fileId: string, selected: boolean) => {
-    onSelectFile?.(fileId, selected)
-  }
+    onSelectFile?.(fileId, selected);
+  };
 
   return (
     <div className={cn('flex flex-col h-full bg-ods-bg', className)}>
       <div className="flex-1 flex flex-col py-2 space-y-6 min-h-0">
         <div className="flex flex-col justify-between gap-4 mb-4 md:flex-row">
-          <FileManagerBreadcrumb
-            items={breadcrumbItems}
-            onItemClick={handleBreadcrumbClick}
-          />
+          <FileManagerBreadcrumb items={breadcrumbItems} onItemClick={handleBreadcrumbClick} />
 
           {showActions && (
             <FileManagerActionBar
@@ -151,18 +146,18 @@ export function FileManager({
             />
           )}
         </div>
-        
+
         {showSearch && (
           <Input
             value={searchQuery}
-            onChange={(e) => onSearch?.(e.target.value)}
+            onChange={e => onSearch?.(e.target.value)}
             placeholder="Search..."
             disabled={disableSearch}
             startAdornment={<SearchIcon />}
             loading={isSearching}
           />
         )}
-        
+
         <div className="flex-1 min-h-0">
           <FileManagerTable
             files={files}
@@ -180,5 +175,5 @@ export function FileManager({
         </div>
       </div>
     </div>
-  )
+  );
 }

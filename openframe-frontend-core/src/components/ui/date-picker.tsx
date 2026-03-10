@@ -1,29 +1,19 @@
-"use client";
+'use client';
 
-import * as Popover from "@radix-ui/react-popover";
-import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
-import * as React from "react";
-import {
-  DayPicker,
-  type DateRange,
-  type DayPickerProps,
-} from "react-day-picker";
-import { cn } from "../../utils/cn";
-import { Button } from "./button";
-import { FieldWrapper } from "./field-wrapper";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./select";
+import * as Popover from '@radix-ui/react-popover';
+import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import * as React from 'react';
+import { type DateRange, DayPicker, type DayPickerProps } from 'react-day-picker';
+import { cn } from '../../utils/cn';
+import { Button } from './button';
+import { FieldWrapper } from './field-wrapper';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select';
 
 // ============================================================================
 // Types
 // ============================================================================
 
-export type DatePickerMode = "single" | "range";
+export type DatePickerMode = 'single' | 'range';
 
 export interface DatePickerBaseProps {
   /** Placeholder text when no date is selected */
@@ -41,7 +31,7 @@ export interface DatePickerBaseProps {
   /** Maximum selectable date */
   toDate?: Date;
   /** Locale for formatting */
-  locale?: DayPickerProps["locale"];
+  locale?: DayPickerProps['locale'];
   /** Label text displayed above the picker */
   label?: string;
   /** Error message displayed below the picker */
@@ -51,13 +41,13 @@ export interface DatePickerBaseProps {
 }
 
 export interface SingleDatePickerProps extends DatePickerBaseProps {
-  mode: "single";
+  mode: 'single';
   value?: Date;
   onChange?: (date: Date | undefined) => void;
 }
 
 export interface RangeDatePickerProps extends DatePickerBaseProps {
-  mode: "range";
+  mode: 'range';
   value?: DateRange;
   onChange?: (range: DateRange | undefined) => void;
 }
@@ -69,18 +59,15 @@ export type DatePickerProps = SingleDatePickerProps | RangeDatePickerProps;
 // ============================================================================
 
 const defaultFormatDate = (date: Date): string => {
-  return date.toLocaleDateString("en-US", {
-    month: "2-digit",
-    day: "2-digit",
-    year: "numeric",
+  return date.toLocaleDateString('en-US', {
+    month: '2-digit',
+    day: '2-digit',
+    year: 'numeric',
   });
 };
 
-const formatDateRange = (
-  range: DateRange | undefined,
-  formatFn: (date: Date) => string
-): string => {
-  if (!range?.from) return "";
+const formatDateRange = (range: DateRange | undefined, formatFn: (date: Date) => string): string => {
+  if (!range?.from) return '';
   if (!range.to) return formatFn(range.from);
   return `${formatFn(range.from)} - ${formatFn(range.to)}`;
 };
@@ -90,12 +77,12 @@ const formatDateRange = (
 // ============================================================================
 
 interface CalendarNavButtonProps {
-  direction: "left" | "right";
+  direction: 'left' | 'right';
   onClick?: () => void;
-  "aria-label"?: string;
+  'aria-label'?: string;
 }
 
-function CalendarNavButton({ direction, onClick, "aria-label": ariaLabel }: CalendarNavButtonProps) {
+function CalendarNavButton({ direction, onClick, 'aria-label': ariaLabel }: CalendarNavButtonProps) {
   return (
     <Button
       type="button"
@@ -103,7 +90,7 @@ function CalendarNavButton({ direction, onClick, "aria-label": ariaLabel }: Cale
       size="icon"
       onClick={onClick}
       aria-label={ariaLabel}
-      centerIcon={direction === "left" ? <ChevronLeft className="size-6" /> : <ChevronRight className="size-6" />}
+      centerIcon={direction === 'left' ? <ChevronLeft className="size-6" /> : <ChevronRight className="size-6" />}
     />
   );
 }
@@ -119,7 +106,7 @@ interface DatePickerCalendarProps {
   numberOfMonths?: 1 | 2;
   fromDate?: Date;
   toDate?: Date;
-  locale?: DayPickerProps["locale"];
+  locale?: DayPickerProps['locale'];
 }
 
 function DatePickerCalendar({
@@ -136,69 +123,68 @@ function DatePickerCalendar({
   // Check if we have a complete range (both from and to, and they're different)
   const rangeSelected = selected as DateRange | undefined;
   const hasCompleteRange =
-    mode === "range" &&
+    mode === 'range' &&
     rangeSelected?.from &&
     rangeSelected?.to &&
     rangeSelected.from.getTime() !== rangeSelected.to.getTime();
 
-  const classNames: DayPickerProps["classNames"] = {
-    root: "p-4 date-picker-calendar",
-    months: "flex gap-8",
-    month: "flex flex-col gap-2",
-    month_caption: "hidden",
-    nav: "hidden",
-    month_grid: "border-collapse",
-    weekdays: "flex",
+  const classNames: DayPickerProps['classNames'] = {
+    root: 'p-4 date-picker-calendar',
+    months: 'flex gap-8',
+    month: 'flex flex-col gap-2',
+    month_caption: 'hidden',
+    nav: 'hidden',
+    month_grid: 'border-collapse',
+    weekdays: 'flex',
     weekday: cn(
-      "size-10 flex items-center justify-center",
-      "text-[14px] font-medium leading-5 text-ods-text-secondary"
+      'size-10 flex items-center justify-center',
+      'text-[14px] font-medium leading-5 text-ods-text-secondary',
     ),
-    week: "flex",
+    week: 'flex',
     day: cn(
-      "size-10 flex items-center justify-center",
-      "text-[18px] font-medium leading-6 text-ods-text-primary",
-      "cursor-pointer",
-      "transition-colors duration-150",
-      "hover:bg-ods-bg-surface hover:rounded-[6px]"
+      'size-10 flex items-center justify-center',
+      'text-[18px] font-medium leading-6 text-ods-text-primary',
+      'cursor-pointer',
+      'transition-colors duration-150',
+      'hover:bg-ods-bg-surface hover:rounded-[6px]',
     ),
     day_button: cn(
-      "size-10 flex items-center justify-center",
-      "cursor-pointer bg-transparent border-none outline-none",
-      "text-inherit font-inherit"
+      'size-10 flex items-center justify-center',
+      'cursor-pointer bg-transparent border-none outline-none',
+      'text-inherit font-inherit',
     ),
-    today: "bg-ods-bg-surface rounded-[6px] hover:!bg-ods-bg-surface",
+    today: 'bg-ods-bg-surface rounded-[6px] hover:!bg-ods-bg-surface',
     selected: cn(
-      "!bg-ods-accent !text-ods-card !font-bold !rounded-[6px] hover:!bg-ods-accent",
+      '!bg-ods-accent !text-ods-card !font-bold !rounded-[6px] hover:!bg-ods-accent',
       // In range mode, selected class should not override range_start/range_end/range_middle
-      mode === "range" && "range-selected"
+      mode === 'range' && 'range-selected',
     ),
-    outside: "text-ods-border opacity-50 hover:!bg-transparent",
-    disabled: "text-ods-border cursor-not-allowed hover:!bg-transparent",
-    hidden: "invisible",
+    outside: 'text-ods-border opacity-50 hover:!bg-transparent',
+    disabled: 'text-ods-border cursor-not-allowed hover:!bg-transparent',
+    hidden: 'invisible',
     // Range styles matching Figma design:
     // - range_start: bright yellow #ffc008, bold, left radius (full radius if single selection)
     // - range_end: bright yellow #ffc008, bold, right radius
     // - range_middle: dark yellow var(--ods-open-yellow-light), medium weight text
     // Border radius on row edges is handled via CSS in the style tag below
     range_start: cn(
-      "range-start !bg-ods-accent !text-ods-card !font-bold hover:!bg-ods-accent",
-      hasCompleteRange ? "!rounded-l-[6px] !rounded-r-none" : "!rounded-[6px]"
+      'range-start !bg-ods-accent !text-ods-card !font-bold hover:!bg-ods-accent',
+      hasCompleteRange ? '!rounded-l-[6px] !rounded-r-none' : '!rounded-[6px]',
     ),
     range_end: cn(
-      "range-end !bg-ods-accent !text-ods-card !font-bold hover:!bg-ods-accent",
-      hasCompleteRange ? "!rounded-r-[6px] !rounded-l-none" : "!rounded-[6px]"
+      'range-end !bg-ods-accent !text-ods-card !font-bold hover:!bg-ods-accent',
+      hasCompleteRange ? '!rounded-r-[6px] !rounded-l-none' : '!rounded-[6px]',
     ),
-    range_middle: "range-middle !bg-[var(--ods-open-yellow-light)] !text-ods-card !font-medium !rounded-none hover:!bg-[var(--ods-open-yellow-light)]",
+    range_middle:
+      'range-middle !bg-[var(--ods-open-yellow-light)] !text-ods-card !font-medium !rounded-none hover:!bg-[var(--ods-open-yellow-light)]',
   };
 
   const [month, setMonth] = React.useState<Date>(
-    mode === "single"
-      ? (selected as Date) || today
-      : (selected as DateRange)?.from || today
+    mode === 'single' ? (selected as Date) || today : (selected as DateRange)?.from || today,
   );
 
   const handlePreviousMonth = () => {
-    setMonth((prev) => {
+    setMonth(prev => {
       const newMonth = new Date(prev);
       newMonth.setMonth(newMonth.getMonth() - 1);
       return newMonth;
@@ -206,7 +192,7 @@ function DatePickerCalendar({
   };
 
   const handleNextMonth = () => {
-    setMonth((prev) => {
+    setMonth(prev => {
       const newMonth = new Date(prev);
       newMonth.setMonth(newMonth.getMonth() + 1);
       return newMonth;
@@ -214,9 +200,9 @@ function DatePickerCalendar({
   };
 
   const formatMonthYear = (date: Date): string => {
-    return date.toLocaleDateString("en-US", {
-      month: "long",
-      year: "numeric",
+    return date.toLocaleDateString('en-US', {
+      month: 'long',
+      year: 'numeric',
     });
   };
 
@@ -256,28 +242,18 @@ function DatePickerCalendar({
     }
   `;
 
-  if (mode === "single") {
+  if (mode === 'single') {
     return (
       <div className="bg-ods-card border border-ods-border rounded-[6px] overflow-hidden">
         <div className="flex items-center justify-between px-4 pt-4">
-          <CalendarNavButton
-            direction="left"
-            onClick={handlePreviousMonth}
-            aria-label="Previous month"
-          />
-          <span className="text-[18px] font-medium leading-6 text-ods-text-primary">
-            {formatMonthYear(month)}
-          </span>
-          <CalendarNavButton
-            direction="right"
-            onClick={handleNextMonth}
-            aria-label="Next month"
-          />
+          <CalendarNavButton direction="left" onClick={handlePreviousMonth} aria-label="Previous month" />
+          <span className="text-[18px] font-medium leading-6 text-ods-text-primary">{formatMonthYear(month)}</span>
+          <CalendarNavButton direction="right" onClick={handleNextMonth} aria-label="Next month" />
         </div>
         <DayPicker
           mode="single"
           selected={selected as Date | undefined}
-          onSelect={(date) => onSelect(date)}
+          onSelect={date => onSelect(date)}
           month={month}
           onMonthChange={setMonth}
           classNames={classNames}
@@ -300,27 +276,17 @@ function DatePickerCalendar({
         {/* First month */}
         <div className="flex-1">
           <div className="flex items-center justify-between px-4 pt-4">
-            <CalendarNavButton
-              direction="left"
-              onClick={handlePreviousMonth}
-              aria-label="Previous month"
-            />
-            <span className="text-[18px] font-medium leading-6 text-ods-text-primary">
-              {formatMonthYear(month)}
-            </span>
+            <CalendarNavButton direction="left" onClick={handlePreviousMonth} aria-label="Previous month" />
+            <span className="text-[18px] font-medium leading-6 text-ods-text-primary">{formatMonthYear(month)}</span>
             {numberOfMonths === 1 && (
-              <CalendarNavButton
-                direction="right"
-                onClick={handleNextMonth}
-                aria-label="Next month"
-              />
+              <CalendarNavButton direction="right" onClick={handleNextMonth} aria-label="Next month" />
             )}
             {numberOfMonths === 2 && <div className="size-10 md:size-12" />}
           </div>
           <DayPicker
             mode="range"
             selected={selected as DateRange | undefined}
-            onSelect={(range) => onSelect(range)}
+            onSelect={range => onSelect(range)}
             month={month}
             onMonthChange={setMonth}
             classNames={classNames}
@@ -341,16 +307,12 @@ function DatePickerCalendar({
               <span className="text-[18px] font-medium leading-6 text-ods-text-primary">
                 {formatMonthYear(getSecondMonth(month))}
               </span>
-              <CalendarNavButton
-                direction="right"
-                onClick={handleNextMonth}
-                aria-label="Next month"
-              />
+              <CalendarNavButton direction="right" onClick={handleNextMonth} aria-label="Next month" />
             </div>
             <DayPicker
               mode="range"
               selected={selected as DateRange | undefined}
-              onSelect={(range) => onSelect(range)}
+              onSelect={range => onSelect(range)}
               month={getSecondMonth(month)}
               classNames={classNames}
               showOutsideDays
@@ -373,31 +335,31 @@ function DatePickerCalendar({
 
 const triggerButtonStyles = cn(
   // Layout
-  "flex items-center gap-2 w-full",
-  "h-11 md:h-12 rounded-[6px] border px-3",
+  'flex items-center gap-2 w-full',
+  'h-11 md:h-12 rounded-[6px] border px-3',
   // Colors
-  "bg-ods-card border-ods-border",
+  'bg-ods-card border-ods-border',
   // Typography
-  "text-[18px] font-medium leading-6",
+  'text-[18px] font-medium leading-6',
   // Hover & active (not disabled)
-  "enabled:hover:bg-ods-bg-hover enabled:hover:border-ods-border-hover enabled:active:bg-ods-bg-active enabled:active:border-ods-border-active",
-  "focus:outline-none",
+  'enabled:hover:bg-ods-bg-hover enabled:hover:border-ods-border-hover enabled:active:bg-ods-bg-active enabled:active:border-ods-border-active',
+  'focus:outline-none',
   // Disabled
-  "disabled:!cursor-not-allowed disabled:bg-ods-bg",
+  'disabled:!cursor-not-allowed disabled:bg-ods-bg',
   // Animation
-  "transition-colors duration-200"
+  'transition-colors duration-200',
 );
 
 const timeSelectTriggerStyles = cn(
-  "flex items-center justify-between gap-1",
-  "h-11 md:h-12 min-h-0 px-3 rounded-[6px] border",
-  "bg-ods-card border-ods-border",
-  "text-[18px] font-medium leading-6",
-  "enabled:hover:bg-ods-bg-hover enabled:hover:border-ods-border-hover enabled:active:bg-ods-bg-active enabled:active:border-ods-border-active",
-  "focus:outline-none",
-  "disabled:!cursor-not-allowed disabled:bg-ods-bg",
-  "transition-colors duration-200 cursor-pointer",
-  "text-ods-text-primary"
+  'flex items-center justify-between gap-1',
+  'h-11 md:h-12 min-h-0 px-3 rounded-[6px] border',
+  'bg-ods-card border-ods-border',
+  'text-[18px] font-medium leading-6',
+  'enabled:hover:bg-ods-bg-hover enabled:hover:border-ods-border-hover enabled:active:bg-ods-bg-active enabled:active:border-ods-border-active',
+  'focus:outline-none',
+  'disabled:!cursor-not-allowed disabled:bg-ods-bg',
+  'transition-colors duration-200 cursor-pointer',
+  'text-ods-text-primary',
 );
 
 // ============================================================================
@@ -406,7 +368,7 @@ const timeSelectTriggerStyles = cn(
 
 export function DatePicker(props: DatePickerProps) {
   const {
-    placeholder = "Select date",
+    placeholder = 'Select date',
     formatDate = defaultFormatDate,
     disabled = false,
     className,
@@ -423,14 +385,14 @@ export function DatePicker(props: DatePickerProps) {
   const isInvalid = invalid || !!error;
 
   const displayValue = React.useMemo(() => {
-    if (props.mode === "single") {
-      return props.value ? formatDate(props.value) : "";
+    if (props.mode === 'single') {
+      return props.value ? formatDate(props.value) : '';
     }
     return formatDateRange(props.value, formatDate);
   }, [props.mode, props.value, formatDate]);
 
   const handleSelect = (value: Date | DateRange | undefined) => {
-    if (props.mode === "single") {
+    if (props.mode === 'single') {
       props.onChange?.(value as Date | undefined);
       if (value) {
         setOpen(false);
@@ -452,13 +414,19 @@ export function DatePicker(props: DatePickerProps) {
         <button
           type="button"
           disabled={disabled}
-          className={cn(triggerButtonStyles, "group", open && !isInvalid && "border-ods-accent enabled:hover:border-ods-accent enabled:hover:bg-ods-card", isInvalid && "border-ods-error enabled:hover:border-ods-error enabled:hover:bg-ods-card", className)}
+          className={cn(
+            triggerButtonStyles,
+            'group',
+            open && !isInvalid && 'border-ods-accent enabled:hover:border-ods-accent enabled:hover:bg-ods-card',
+            isInvalid && 'border-ods-error enabled:hover:border-ods-error enabled:hover:bg-ods-card',
+            className,
+          )}
         >
           <Calendar className="size-6 text-ods-text-secondary shrink-0" />
           <span
             className={cn(
-              "flex-1 text-left truncate",
-              displayValue ? "text-ods-text-primary" : "text-ods-text-secondary"
+              'flex-1 text-left truncate',
+              displayValue ? 'text-ods-text-primary' : 'text-ods-text-secondary',
             )}
           >
             {displayValue || placeholder}
@@ -469,11 +437,11 @@ export function DatePicker(props: DatePickerProps) {
       <Popover.Portal>
         <Popover.Content
           className={cn(
-            "z-[9999]",
-            "animate-in fade-in-0 zoom-in-95",
-            "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
-            "data-[side=bottom]:slide-in-from-top-2",
-            "data-[side=top]:slide-in-from-bottom-2"
+            'z-[9999]',
+            'animate-in fade-in-0 zoom-in-95',
+            'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
+            'data-[side=bottom]:slide-in-from-top-2',
+            'data-[side=top]:slide-in-from-bottom-2',
           )}
           sideOffset={8}
           align="start"
@@ -504,7 +472,7 @@ export function DatePicker(props: DatePickerProps) {
 // ============================================================================
 
 export interface DatePickerInputProps extends DatePickerBaseProps {
-  mode?: "single";
+  mode?: 'single';
   value?: Date;
   onChange?: (date: Date | undefined) => void;
   /** Show time selector next to date */
@@ -516,18 +484,18 @@ export interface DatePickerInputProps extends DatePickerBaseProps {
 // Generate hour options
 const generateHourOptions = (use24Hour: boolean): string[] => {
   if (use24Hour) {
-    return Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, "0"));
+    return Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0'));
   }
-  return Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, "0"));
+  return Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
 };
 
 // Generate minute options (00, 01, 02, ... 59)
 const generateMinuteOptions = (): string[] => {
-  return Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, "0"));
+  return Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
 };
 
 export function DatePickerInput({
-  placeholder = "Select date",
+  placeholder = 'Select date',
   formatDate = defaultFormatDate,
   disabled = false,
   className,
@@ -546,27 +514,27 @@ export function DatePickerInput({
   const [open, setOpen] = React.useState(false);
   const isInvalid = invalid || !!error;
 
-  const displayValue = value ? formatDate(value) : "";
+  const displayValue = value ? formatDate(value) : '';
 
   // Extract time from value
   const hour = React.useMemo(() => {
-    if (!value) return "";
+    if (!value) return '';
     const hours = value.getHours();
     if (use24HourFormat) {
-      return hours.toString().padStart(2, "0");
+      return hours.toString().padStart(2, '0');
     }
     const hour12 = hours % 12 || 12;
-    return hour12.toString().padStart(2, "0");
+    return hour12.toString().padStart(2, '0');
   }, [value, use24HourFormat]);
 
   const minute = React.useMemo(() => {
-    if (!value) return "";
-    return value.getMinutes().toString().padStart(2, "0");
+    if (!value) return '';
+    return value.getMinutes().toString().padStart(2, '0');
   }, [value]);
 
-  const period = React.useMemo((): "AM" | "PM" => {
-    if (!value) return "AM";
-    return value.getHours() >= 12 ? "PM" : "AM";
+  const period = React.useMemo((): 'AM' | 'PM' => {
+    if (!value) return 'AM';
+    return value.getHours() >= 12 ? 'PM' : 'AM';
   }, [value]);
 
   const handleSelect = (date: Date | DateRange | undefined) => {
@@ -585,11 +553,11 @@ export function DatePickerInput({
     const date = value ? new Date(value) : new Date();
     let hours = parseInt(newHour, 10);
     if (!use24HourFormat) {
-      const isPM = period === "PM";
+      const isPm = period === 'PM';
       if (hours === 12) {
-        hours = isPM ? 12 : 0;
+        hours = isPm ? 12 : 0;
       } else {
-        hours = isPM ? hours + 12 : hours;
+        hours = isPm ? hours + 12 : hours;
       }
     }
     date.setHours(hours);
@@ -602,12 +570,12 @@ export function DatePickerInput({
     onChange?.(date);
   };
 
-  const handlePeriodChange = (newPeriod: "AM" | "PM") => {
+  const handlePeriodChange = (newPeriod: 'AM' | 'PM') => {
     const date = value ? new Date(value) : new Date();
     let hours = date.getHours();
-    if (newPeriod === "AM" && hours >= 12) {
+    if (newPeriod === 'AM' && hours >= 12) {
       hours -= 12;
-    } else if (newPeriod === "PM" && hours < 12) {
+    } else if (newPeriod === 'PM' && hours < 12) {
       hours += 12;
     }
     date.setHours(hours);
@@ -618,20 +586,26 @@ export function DatePickerInput({
   const minuteOptions = React.useMemo(() => generateMinuteOptions(), []);
 
   const content = (
-    <div className={cn("flex items-center gap-2", !label && !error && className)}>
+    <div className={cn('flex items-center gap-2', !label && !error && className)}>
       {/* Date Picker */}
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild>
           <button
             type="button"
             disabled={disabled}
-            className={cn(triggerButtonStyles, "group", open && !isInvalid && "border-ods-accent enabled:hover:border-ods-accent enabled:hover:bg-ods-card", isInvalid && "border-ods-error enabled:hover:border-ods-error enabled:hover:bg-ods-card", "flex-1")}
+            className={cn(
+              triggerButtonStyles,
+              'group',
+              open && !isInvalid && 'border-ods-accent enabled:hover:border-ods-accent enabled:hover:bg-ods-card',
+              isInvalid && 'border-ods-error enabled:hover:border-ods-error enabled:hover:bg-ods-card',
+              'flex-1',
+            )}
           >
             <Calendar className="size-6 text-ods-text-secondary shrink-0" />
             <span
               className={cn(
-                "flex-1 text-left truncate",
-                displayValue ? "text-ods-text-primary" : "text-ods-text-secondary"
+                'flex-1 text-left truncate',
+                displayValue ? 'text-ods-text-primary' : 'text-ods-text-secondary',
               )}
             >
               {displayValue || placeholder}
@@ -642,11 +616,11 @@ export function DatePickerInput({
         <Popover.Portal>
           <Popover.Content
             className={cn(
-              "z-[9999]",
-              "animate-in fade-in-0 zoom-in-95",
-              "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
-              "data-[side=bottom]:slide-in-from-top-2",
-              "data-[side=top]:slide-in-from-bottom-2"
+              'z-[9999]',
+              'animate-in fade-in-0 zoom-in-95',
+              'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
+              'data-[side=bottom]:slide-in-from-top-2',
+              'data-[side=top]:slide-in-from-bottom-2',
             )}
             sideOffset={8}
             align="start"
@@ -668,16 +642,12 @@ export function DatePickerInput({
       {showTime && (
         <div className="flex items-center gap-1">
           {/* Hour Select */}
-          <Select
-            value={hour}
-            onValueChange={handleHourChange}
-            disabled={disabled}
-          >
-            <SelectTrigger className={cn(timeSelectTriggerStyles, "w-[80px]")}>
+          <Select value={hour} onValueChange={handleHourChange} disabled={disabled}>
+            <SelectTrigger className={cn(timeSelectTriggerStyles, 'w-[80px]')}>
               <SelectValue placeholder="HH" />
             </SelectTrigger>
             <SelectContent>
-              {hourOptions.map((h) => (
+              {hourOptions.map(h => (
                 <SelectItem key={h} value={h}>
                   {h}
                 </SelectItem>
@@ -688,16 +658,12 @@ export function DatePickerInput({
           <span className="text-ods-text-secondary text-[18px] font-medium">:</span>
 
           {/* Minute Select */}
-          <Select
-            value={minute}
-            onValueChange={handleMinuteChange}
-            disabled={disabled}
-          >
-            <SelectTrigger className={cn(timeSelectTriggerStyles, "w-[80px]")}>
+          <Select value={minute} onValueChange={handleMinuteChange} disabled={disabled}>
+            <SelectTrigger className={cn(timeSelectTriggerStyles, 'w-[80px]')}>
               <SelectValue placeholder="MM" />
             </SelectTrigger>
             <SelectContent>
-              {minuteOptions.map((m) => (
+              {minuteOptions.map(m => (
                 <SelectItem key={m} value={m}>
                   {m}
                 </SelectItem>
@@ -707,12 +673,8 @@ export function DatePickerInput({
 
           {/* AM/PM Select (only for 12-hour format) */}
           {!use24HourFormat && (
-            <Select
-              value={period}
-              onValueChange={(val) => handlePeriodChange(val as "AM" | "PM")}
-              disabled={disabled}
-            >
-              <SelectTrigger className={cn(timeSelectTriggerStyles, "w-[80px]")}>
+            <Select value={period} onValueChange={val => handlePeriodChange(val as 'AM' | 'PM')} disabled={disabled}>
+              <SelectTrigger className={cn(timeSelectTriggerStyles, 'w-[80px]')}>
                 <SelectValue placeholder="AM" />
               </SelectTrigger>
               <SelectContent>
@@ -738,7 +700,7 @@ export function DatePickerInput({
 // ============================================================================
 
 export interface DatePickerInputSimpleProps extends DatePickerBaseProps {
-  mode?: "single";
+  mode?: 'single';
   value?: Date;
   onChange?: (date: Date | undefined) => void;
   /** Show time selector next to date */
@@ -750,10 +712,7 @@ export interface DatePickerInputSimpleProps extends DatePickerBaseProps {
 }
 
 // Generate time options with specified interval
-const generateTimeOptions = (
-  intervalMinutes: number,
-  use24Hour: boolean
-): { value: string; label: string }[] => {
+const generateTimeOptions = (intervalMinutes: number, use24Hour: boolean): { value: string; label: string }[] => {
   const options: { value: string; label: string }[] = [];
   const totalMinutesInDay = 24 * 60;
 
@@ -761,15 +720,15 @@ const generateTimeOptions = (
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
 
-    const value = `${hours.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}`;
+    const value = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
 
     let label: string;
     if (use24Hour) {
       label = value;
     } else {
       const hour12 = hours % 12 || 12;
-      const period = hours >= 12 ? "PM" : "AM";
-      label = `${hour12.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")} ${period}`;
+      const period = hours >= 12 ? 'PM' : 'AM';
+      label = `${hour12.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')} ${period}`;
     }
 
     options.push({ value, label });
@@ -779,7 +738,7 @@ const generateTimeOptions = (
 };
 
 export function DatePickerInputSimple({
-  placeholder = "Select date",
+  placeholder = 'Select date',
   formatDate = defaultFormatDate,
   disabled = false,
   className,
@@ -799,29 +758,29 @@ export function DatePickerInputSimple({
   const [open, setOpen] = React.useState(false);
   const isInvalid = invalid || !!error;
 
-  const displayValue = value ? formatDate(value) : "";
+  const displayValue = value ? formatDate(value) : '';
 
   // Get current time value as HH:MM string
   const timeValue = React.useMemo(() => {
-    if (!value) return "";
+    if (!value) return '';
     const hours = value.getHours();
     const minutes = value.getMinutes();
-    return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   }, [value]);
 
   // Get display label for current time
   const timeDisplayLabel = React.useMemo(() => {
-    if (!value) return "";
+    if (!value) return '';
     const hours = value.getHours();
     const minutes = value.getMinutes();
 
     if (use24HourFormat) {
-      return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
     }
 
     const hour12 = hours % 12 || 12;
-    const period = hours >= 12 ? "PM" : "AM";
-    return `${hour12.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")} ${period}`;
+    const period = hours >= 12 ? 'PM' : 'AM';
+    return `${hour12.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${period}`;
   }, [value, use24HourFormat]);
 
   const handleSelect = (date: Date | DateRange | undefined) => {
@@ -837,7 +796,7 @@ export function DatePickerInputSimple({
   };
 
   const handleTimeChange = (newTime: string) => {
-    const [hours, minutes] = newTime.split(":").map(Number);
+    const [hours, minutes] = newTime.split(':').map(Number);
     const date = value ? new Date(value) : new Date();
     date.setHours(hours, minutes, 0, 0);
     onChange?.(date);
@@ -845,24 +804,30 @@ export function DatePickerInputSimple({
 
   const timeOptions = React.useMemo(
     () => generateTimeOptions(timeInterval, use24HourFormat),
-    [timeInterval, use24HourFormat]
+    [timeInterval, use24HourFormat],
   );
 
   const content = (
-    <div className={cn("flex items-center gap-2", !label && !error && className)}>
+    <div className={cn('flex items-center gap-2', !label && !error && className)}>
       {/* Date Picker */}
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild>
           <button
             type="button"
             disabled={disabled}
-            className={cn(triggerButtonStyles, "group", open && !isInvalid && "border-ods-accent enabled:hover:border-ods-accent enabled:hover:bg-ods-card", isInvalid && "border-ods-error enabled:hover:border-ods-error enabled:hover:bg-ods-card", "flex-1")}
+            className={cn(
+              triggerButtonStyles,
+              'group',
+              open && !isInvalid && 'border-ods-accent enabled:hover:border-ods-accent enabled:hover:bg-ods-card',
+              isInvalid && 'border-ods-error enabled:hover:border-ods-error enabled:hover:bg-ods-card',
+              'flex-1',
+            )}
           >
             <Calendar className="size-6 text-ods-text-secondary shrink-0" />
             <span
               className={cn(
-                "flex-1 text-left truncate",
-                displayValue ? "text-ods-text-primary" : "text-ods-text-secondary"
+                'flex-1 text-left truncate',
+                displayValue ? 'text-ods-text-primary' : 'text-ods-text-secondary',
               )}
             >
               {displayValue || placeholder}
@@ -873,11 +838,11 @@ export function DatePickerInputSimple({
         <Popover.Portal>
           <Popover.Content
             className={cn(
-              "z-[9999]",
-              "animate-in fade-in-0 zoom-in-95",
-              "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
-              "data-[side=bottom]:slide-in-from-top-2",
-              "data-[side=top]:slide-in-from-bottom-2"
+              'z-[9999]',
+              'animate-in fade-in-0 zoom-in-95',
+              'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
+              'data-[side=bottom]:slide-in-from-top-2',
+              'data-[side=top]:slide-in-from-bottom-2',
             )}
             sideOffset={8}
             align="start"
@@ -897,18 +862,12 @@ export function DatePickerInputSimple({
 
       {/* Single Time Select (optional) */}
       {showTime && (
-        <Select
-          value={timeValue}
-          onValueChange={handleTimeChange}
-          disabled={disabled}
-        >
-          <SelectTrigger className={cn(timeSelectTriggerStyles, "flex-1")}>
-            <SelectValue placeholder="Select time">
-              {timeDisplayLabel || "Select time"}
-            </SelectValue>
+        <Select value={timeValue} onValueChange={handleTimeChange} disabled={disabled}>
+          <SelectTrigger className={cn(timeSelectTriggerStyles, 'flex-1')}>
+            <SelectValue placeholder="Select time">{timeDisplayLabel || 'Select time'}</SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {timeOptions.map((option) => (
+            {timeOptions.map(option => (
               <SelectItem key={option.value} value={option.value}>
                 {option.label}
               </SelectItem>

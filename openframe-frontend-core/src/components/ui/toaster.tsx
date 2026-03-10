@@ -1,10 +1,10 @@
-'use client'
+'use client';
 
-import { Toaster as SonnerToaster } from 'sonner'
+import { Toaster as SonnerToaster } from 'sonner';
 
 export function Toaster() {
   return (
-    <SonnerToaster 
+    <SonnerToaster
       position="bottom-right"
       toastOptions={{
         classNames: {
@@ -18,5 +18,5 @@ export function Toaster() {
         },
       }}
     />
-  )
+  );
 }

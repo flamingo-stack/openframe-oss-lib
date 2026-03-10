@@ -1,14 +1,13 @@
-import type { SVGProps } from "react";
-export interface MobilePhoneVibrationIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface MobilePhoneVibrationIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
 export function MobilePhoneVibrationIcon({
-  className = "",
+  className = '',
   size = 24,
-  color = "currentColor",
+  color = 'currentColor',
   ...props
 }: MobilePhoneVibrationIconProps) {
   return (

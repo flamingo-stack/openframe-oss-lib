@@ -1,12 +1,12 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { FolderPlus, Clipboard, Upload, CheckSquare, Copy, Scissors } from 'lucide-react'
-import { Button } from '../button'
-import { cn } from '../../../utils/cn'
-import type { FileManagerActionBarProps } from './types'
+import { CheckSquare, Clipboard, Copy, FolderPlus, Scissors, Upload } from 'lucide-react';
+import React from 'react';
+import { cn } from '../../../utils/cn';
+import { Button } from '../button';
+import type { FileManagerActionBarProps } from './types';
 
-export function FileManagerActionBar({ 
+export function FileManagerActionBar({
   canPaste = false,
   hasSelection = false,
   onNewFolder,
@@ -15,7 +15,7 @@ export function FileManagerActionBar({
   onCut,
   onUpload,
   onSelectAll,
-  className 
+  className,
 }: FileManagerActionBarProps) {
   return (
     <div className={cn('flex items-center gap-4 flex-wrap md:justify-end', className)}>
@@ -82,5 +82,5 @@ export function FileManagerActionBar({
         Select All
       </Button>
     </div>
-  )
+  );
 }

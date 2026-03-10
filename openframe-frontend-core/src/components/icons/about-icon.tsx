@@ -7,12 +7,7 @@ interface AboutIconProps {
   color?: string;
 }
 
-export function AboutIcon({
-  width = 24,
-  height = 24,
-  className = "",
-  color = 'white'
-}: AboutIconProps) {
+export function AboutIcon({ width = 24, height = 24, className = '', color = 'white' }: AboutIconProps) {
   return (
     <svg
       width={width}
@@ -28,4 +23,4 @@ export function AboutIcon({
       />
     </svg>
   );
-} 
+}

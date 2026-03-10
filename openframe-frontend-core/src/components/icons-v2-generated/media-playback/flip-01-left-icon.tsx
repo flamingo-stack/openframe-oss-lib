@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface Flip01LeftIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface Flip01LeftIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function Flip01LeftIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: Flip01LeftIconProps) {
+export function Flip01LeftIcon({ className = '', size = 24, color = 'currentColor', ...props }: Flip01LeftIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

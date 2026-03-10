@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface AlarmSnoozeIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface AlarmSnoozeIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function AlarmSnoozeIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: AlarmSnoozeIconProps) {
+export function AlarmSnoozeIcon({ className = '', size = 24, color = 'currentColor', ...props }: AlarmSnoozeIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

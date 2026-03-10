@@ -1,29 +1,29 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { CopyIcon } from '../icons'
-import { ProgressBar } from './progress-bar'
+import React from 'react';
+import { CopyIcon } from '../icons';
+import { ProgressBar } from './progress-bar';
 
 interface InfoCardData {
-  title?: string
-  subtitle?: string
-  icon?: React.ReactNode
+  title?: string;
+  subtitle?: string;
+  icon?: React.ReactNode;
   items: Array<{
-    label?: string
-    value: string | string[]
-    copyable?: boolean
-  }>
+    label?: string;
+    value: string | string[];
+    copyable?: boolean;
+  }>;
   progress?: {
-    value: number
-    warningThreshold?: number
-    criticalThreshold?: number
-    inverted?: boolean  // if true, high values are good (green), low values are bad (red)
-  }
+    value: number;
+    warningThreshold?: number;
+    criticalThreshold?: number;
+    inverted?: boolean; // if true, high values are good (green), low values are bad (red)
+  };
 }
 
 interface InfoCardProps {
-  data: InfoCardData
-  className?: string
+  data: InfoCardData;
+  className?: string;
 }
 
 export function InfoCard({ data, className = '' }: InfoCardProps) {
@@ -33,39 +33,28 @@ export function InfoCard({ data, className = '' }: InfoCardProps) {
       {data.title && (
         <div className="flex flex-col justify-center shrink-0 mb-3">
           <div className="flex items-center gap-2">
-            <span className="text-h4 text-ods-text-primary truncate">
-              {data.title}
-            </span>
+            <span className="text-h4 text-ods-text-primary truncate">{data.title}</span>
             {data.icon}
           </div>
         </div>
       )}
 
       {/* Subtitle */}
-      {data.subtitle && (
-        <div className="text-h4 text-[#888888] truncate mb-3">
-          {data.subtitle}
-        </div>
-      )}
+      {data.subtitle && <div className="text-h4 text-[#888888] truncate mb-3">{data.subtitle}</div>}
 
       {/* Info items */}
       <div className="flex flex-col gap-2">
         {data.items.map((item, index) => {
-          const values = Array.isArray(item.value) ? item.value : [item.value]
+          const values = Array.isArray(item.value) ? item.value : [item.value];
 
           return (
             <React.Fragment key={index}>
               {values.map((val, valIndex) => (
                 <div key={`${index}-${valIndex}`} className="flex gap-2 items-center w-full">
-                  <span className="text-h4 text-[#fafafa] whitespace-nowrap">
-                    {valIndex === 0 ? item.label : ''}
-                  </span>
+                  <span className="text-h4 text-[#fafafa] whitespace-nowrap">{valIndex === 0 ? item.label : ''}</span>
                   <div className="flex-1 h-px bg-[#3a3a3a]" />
                   <div className="flex items-center gap-2 max-w-[60%]">
-                    <span
-                      className="text-h4 text-[#fafafa] truncate select-text"
-                      title={val}
-                    >
+                    <span className="text-h4 text-[#fafafa] truncate select-text" title={val}>
                       {val}
                     </span>
                     {item.copyable && (
@@ -82,7 +71,7 @@ export function InfoCard({ data, className = '' }: InfoCardProps) {
                 </div>
               ))}
             </React.Fragment>
-          )
+          );
         })}
       </div>
 
@@ -96,5 +85,5 @@ export function InfoCard({ data, className = '' }: InfoCardProps) {
         />
       )}
     </div>
-  )
+  );
 }

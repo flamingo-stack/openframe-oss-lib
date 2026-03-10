@@ -5,8 +5,8 @@
  * Example: { filter: { severity: [...] } } → URL params: ?severity=...
  */
 
-import { VariableDefinition, JSType } from './graphql-parser'
-import { GraphQLIntrospector } from './introspection'
+import { JSType, VariableDefinition } from './graphql-parser';
+import { GraphQLIntrospector } from './introspection';
 
 /**
  * Flattened URL parameter configuration
@@ -15,17 +15,17 @@ import { GraphQLIntrospector } from './introspection'
  */
 export interface FlattenedParam {
   /** URL parameter name (e.g., "severity") */
-  urlParamName: string
+  urlParamName: string;
   /** Path in GraphQL variables (e.g., "filter.severity") */
-  graphqlPath: string
+  graphqlPath: string;
   /** JavaScript type for URL handling */
-  type: JSType
+  type: JSType;
   /** Default value for this parameter */
-  defaultValue?: any
+  defaultValue?: any;
   /** Whether this parameter is required */
-  required?: boolean
+  required?: boolean;
   /** Whether this parameter is an array */
-  isArray?: boolean
+  isArray?: boolean;
 }
 
 /**
@@ -58,9 +58,9 @@ export interface FlattenedParam {
  */
 export async function flattenQueryVariables(
   queryVariables: Record<string, VariableDefinition>,
-  introspector: GraphQLIntrospector
+  introspector: GraphQLIntrospector,
 ): Promise<Record<string, FlattenedParam>> {
-  const flattened: Record<string, FlattenedParam> = {}
+  const flattened: Record<string, FlattenedParam> = {};
 
   for (const [varName, varDef] of Object.entries(queryVariables)) {
     // Primitive types or arrays - keep at top level
@@ -70,15 +70,15 @@ export async function flattenQueryVariables(
         graphqlPath: varName,
         type: varDef.isArray ? 'array' : varDef.type,
         required: varDef.required,
-        isArray: varDef.isArray
-      }
-      continue
+        isArray: varDef.isArray,
+      };
+      continue;
     }
 
     // Input object types - flatten fields to top level
     // This requires introspection to know the input type's fields
     if (introspector.isLoaded() && introspector.hasType(varDef.graphqlTypeName)) {
-      const fields = introspector.getInputTypeFields(varDef.graphqlTypeName)
+      const fields = introspector.getInputTypeFields(varDef.graphqlTypeName);
 
       for (const [fieldName, fieldDef] of Object.entries(fields)) {
         flattened[fieldName] = {
@@ -86,8 +86,8 @@ export async function flattenQueryVariables(
           graphqlPath: `${varName}.${fieldName}`,
           type: fieldDef.isArray ? 'array' : fieldDef.type,
           required: fieldDef.required,
-          isArray: fieldDef.isArray
-        }
+          isArray: fieldDef.isArray,
+        };
       }
     } else {
       // Introspection not available or type not found
@@ -97,12 +97,12 @@ export async function flattenQueryVariables(
         graphqlPath: varName,
         type: 'object',
         required: varDef.required,
-        isArray: false
-      }
+        isArray: false,
+      };
     }
   }
 
-  return flattened
+  return flattened;
 }
 
 /**
@@ -114,18 +114,18 @@ export async function flattenQueryVariables(
  */
 export function mergeDefaults(
   schema: Record<string, FlattenedParam>,
-  defaults: Record<string, any>
+  defaults: Record<string, any>,
 ): Record<string, FlattenedParam> {
-  const merged: Record<string, FlattenedParam> = {}
+  const merged: Record<string, FlattenedParam> = {};
 
   for (const [key, param] of Object.entries(schema)) {
     merged[key] = {
       ...param,
-      defaultValue: defaults[key] !== undefined ? defaults[key] : param.defaultValue
-    }
+      defaultValue: defaults[key] !== undefined ? defaults[key] : param.defaultValue,
+    };
   }
 
-  return merged
+  return merged;
 }
 
 /**
@@ -137,15 +137,13 @@ export function mergeDefaults(
  * @throws Error if conflicts are detected
  */
 export function validateSchema(schema: Record<string, FlattenedParam>): void {
-  const urlParamNames = new Set<string>()
+  const urlParamNames = new Set<string>();
 
-  for (const [key, param] of Object.entries(schema)) {
+  for (const [_key, param] of Object.entries(schema)) {
     if (urlParamNames.has(param.urlParamName)) {
-      throw new Error(
-        `[FlattenSchema] Conflict: Multiple parameters map to URL param "${param.urlParamName}"`
-      )
+      throw new Error(`[FlattenSchema] Conflict: Multiple parameters map to URL param "${param.urlParamName}"`);
     }
-    urlParamNames.add(param.urlParamName)
+    urlParamNames.add(param.urlParamName);
   }
 }
 
@@ -161,7 +159,7 @@ export function validateSchema(schema: Record<string, FlattenedParam>): void {
 export function getArrayParams(schema: Record<string, FlattenedParam>): string[] {
   return Object.entries(schema)
     .filter(([_, param]) => param.type === 'array' || param.isArray)
-    .map(([key]) => key)
+    .map(([key]) => key);
 }
 
 /**
@@ -173,7 +171,7 @@ export function getArrayParams(schema: Record<string, FlattenedParam>): string[]
 export function getRequiredParams(schema: Record<string, FlattenedParam>): string[] {
   return Object.entries(schema)
     .filter(([_, param]) => param.required)
-    .map(([key]) => key)
+    .map(([key]) => key);
 }
 
 /**
@@ -188,29 +186,26 @@ export function getRequiredParams(schema: Record<string, FlattenedParam>): strin
  * @param param - Parameter configuration
  * @returns Whether to include in URL
  */
-export function shouldIncludeInUrl(
-  value: any,
-  param: FlattenedParam
-): boolean {
+export function shouldIncludeInUrl(value: any, param: FlattenedParam): boolean {
   // Null/undefined - exclude
   if (value === null || value === undefined) {
-    return false
+    return false;
   }
 
   // Empty arrays - exclude
   if (Array.isArray(value) && value.length === 0) {
-    return false
+    return false;
   }
 
   // Empty strings - exclude
   if (value === '') {
-    return false
+    return false;
   }
 
   // Default values - exclude to keep URL clean
   if (param.defaultValue !== undefined && value === param.defaultValue) {
-    return false
+    return false;
   }
 
-  return true
+  return true;
 }

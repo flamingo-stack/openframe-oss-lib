@@ -1,4 +1,4 @@
-import { defineConfig } from 'tsup'
+import { defineConfig } from 'tsup';
 
 // Config is split into two builds: client and server/universal.
 //
@@ -30,7 +30,7 @@ export default defineConfig([
       'types/navigation': 'src/types/navigation.ts',
       'types/announcement': 'src/types/announcement.ts',
       'assets/index': 'src/assets/index.ts',
-      'fonts': 'src/fonts.ts',
+      fonts: 'src/fonts.ts',
       'tailwind.config': './tailwind.config.ts',
       'utils/index': 'src/utils/index.ts',
     },
@@ -46,7 +46,7 @@ export default defineConfig([
   // bundle as a Client Component boundary.
   {
     entry: {
-      'index': 'src/index.ts',
+      index: 'src/index.ts',
       'components/index': 'src/components/index.ts',
       'components/ui/index': 'src/components/ui/index.ts',
       'components/ui/file-manager/index': 'src/components/ui/file-manager/index.ts',
@@ -66,4 +66,4 @@ export default defineConfig([
       js: '"use client";',
     },
   },
-])
+]);

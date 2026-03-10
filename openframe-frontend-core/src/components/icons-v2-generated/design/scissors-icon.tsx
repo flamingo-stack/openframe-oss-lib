@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface ScissorsIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface ScissorsIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function ScissorsIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: ScissorsIconProps) {
+export function ScissorsIcon({ className = '', size = 24, color = 'currentColor', ...props }: ScissorsIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

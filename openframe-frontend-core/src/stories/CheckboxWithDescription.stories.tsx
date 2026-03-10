@@ -9,7 +9,8 @@ const meta = {
     layout: 'centered',
     docs: {
       description: {
-        component: 'A checkbox component with title and description inside a bordered card. Useful for settings and configuration options that need additional context.',
+        component:
+          'A checkbox component with title and description inside a bordered card. Useful for settings and configuration options that need additional context.',
       },
     },
   },
@@ -41,7 +42,7 @@ const meta = {
     },
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ width: '400px' }}>
         <Story />
       </div>
@@ -113,7 +114,8 @@ export const LongDescription: Story = {
   args: {
     id: 'long-desc',
     title: 'Data retention',
-    description: 'Keep historical data for analytics and reporting purposes. This includes device logs, script execution history, and system metrics collected over time.',
+    description:
+      'Keep historical data for analytics and reporting purposes. This includes device logs, script execution history, and system metrics collected over time.',
     checked: false,
     onCheckedChange: () => {},
   },
@@ -141,9 +143,7 @@ export const Controlled: Story = {
           checked={checked}
           onCheckedChange={setChecked}
         />
-        <span className="text-xs text-[#888]">
-          Checked: {checked ? 'true' : 'false'}
-        </span>
+        <span className="text-xs text-[#888]">Checked: {checked ? 'true' : 'false'}</span>
       </div>
     );
   },

@@ -22,6 +22,6 @@ export function useDynamicThemeContext(): DynamicThemeContext {
     animateAccentColor: () => {},
     generateThemeGradient: (baseColor: string) => baseColor,
     getOptimalTextColor: () => '#000000',
-    transitionToPlatform: () => {}
+    transitionToPlatform: () => {},
   };
 }

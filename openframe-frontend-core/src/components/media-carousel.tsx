@@ -1,26 +1,26 @@
-"use client";
+'use client';
 
-import { useState, useRef, useEffect, memo, useCallback } from 'react';
-import { cn } from "../utils/cn";
-import { MediaItem } from '../utils/media-carousel-utils-stub';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { cn } from '../utils/cn';
 import { LiteYouTubeEmbed } from '../utils/lite-youtube-embed-stub';
+import { MediaItem } from '../utils/media-carousel-utils-stub';
 
 // Navigation icons
 const ChevronLeftIcon = () => (
   <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <polyline points="15,18 9,12 15,6"/>
+    <polyline points="15,18 9,12 15,6" />
   </svg>
 );
 
 const ChevronRightIcon = () => (
   <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <polyline points="9,18 15,12 9,6"/>
+    <polyline points="9,18 15,12 9,6" />
   </svg>
 );
 
 const PlayIcon = () => (
   <svg width="24" height="24" fill="white" viewBox="0 0 24 24">
-    <path d="M8 5v14l11-7z"/>
+    <path d="M8 5v14l11-7z" />
   </svg>
 );
 
@@ -105,20 +105,123 @@ const CarouselYouTubeEmbed = ({ videoId, title }: { videoId: string; title: stri
   );
 };
 
-export const MediaCarousel = memo(function MediaCarousel({ 
-  media, 
+export const MediaCarousel = memo(function MediaCarousel({
+  media,
   className,
-  aspectRatio = "16/9",
+  aspectRatio = '16/9',
   showThumbnails = true,
   autoPlay = false,
-  objectFit = 'contain'
+  objectFit = 'contain',
 }: MediaCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
-  const [playingVideos, setPlayingVideos] = useState<Set<number>>(new Set());
+  const [_playingVideos, setPlayingVideos] = useState<Set<number>>(new Set());
   const carouselRef = useRef<HTMLDivElement>(null);
   const thumbnailsRef = useRef<HTMLDivElement>(null);
+
+  // Handle video play/pause
+  const handleVideoClick = useCallback(
+    (index: number) => {
+      const item = media[index];
+      if (item.type !== 'video') return;
+
+      // Find the video element
+      const videoElements = document.querySelectorAll(`video[data-video-index="${index}"]`);
+      const video = videoElements[0] as HTMLVideoElement;
+
+      if (!video) {
+        console.log('❌ Video element not found for index:', index);
+        return;
+      }
+
+      if (video.paused) {
+        const playPromise = video.play();
+
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              const playButton = video.parentElement?.querySelector('.video-play-button');
+              if (playButton) {
+                (playButton as HTMLElement).style.display = 'none';
+              }
+            })
+            .catch(error => {
+              if (error.name === 'NotSupportedError' || error.name === 'MediaElementError') {
+                const fallbackDiv = document.createElement('div');
+                fallbackDiv.className = 'absolute inset-0 flex items-center justify-center bg-ods-card text-center p-4';
+                fallbackDiv.innerHTML = `
+                <div>
+                  <p class="text-ods-text-primary text-sm mb-2">Video format not supported</p>
+                  <a href="${item.src}" target="_blank" rel="noopener noreferrer" 
+                     class="text-ods-accent hover:text-[#FFD700] text-sm">
+                    Open Video Directly
+                  </a>
+                </div>
+              `;
+                video.parentElement?.appendChild(fallbackDiv);
+              }
+            });
+        }
+      } else {
+        video.pause();
+        const playButton = video.parentElement?.querySelector('.video-play-button');
+        if (playButton) {
+          (playButton as HTMLElement).style.display = 'flex';
+        }
+      }
+    },
+    [media],
+  );
+
+  // Navigation functions
+  const nextSlide = useCallback(() => {
+    const currentVideo = document.querySelector(`[data-video-index="${currentIndex}"]`) as HTMLVideoElement;
+    if (currentVideo && !currentVideo.paused) {
+      currentVideo.pause();
+    }
+    setPlayingVideos(new Set());
+    setCurrentIndex(prev => (prev + 1) % media.length);
+  }, [currentIndex, media.length]);
+
+  const prevSlide = useCallback(() => {
+    const currentVideo = document.querySelector(`[data-video-index="${currentIndex}"]`) as HTMLVideoElement;
+    if (currentVideo && !currentVideo.paused) {
+      currentVideo.pause();
+    }
+    setPlayingVideos(new Set());
+    setCurrentIndex(prev => (prev - 1 + media.length) % media.length);
+  }, [currentIndex, media.length]);
+
+  const selectSlide = useCallback(
+    (index: number) => {
+      if (index === currentIndex) return;
+
+      const currentVideo = document.querySelector(`[data-video-index="${currentIndex}"]`) as HTMLVideoElement;
+      if (currentVideo && !currentVideo.paused) {
+        currentVideo.pause();
+      }
+      setPlayingVideos(new Set());
+      setCurrentIndex(index);
+    },
+    [currentIndex],
+  );
+
+  // Keyboard navigation - only when carousel is focused
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (media.length <= 1) return;
+
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        prevSlide();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        nextSlide();
+      }
+    },
+    [nextSlide, prevSlide, media.length],
+  );
 
   // Early return if no media provided
   if (!media || media.length === 0) {
@@ -131,100 +234,6 @@ export const MediaCarousel = memo(function MediaCarousel({
   if (!currentItem) {
     return null;
   }
-
-  // Handle video play/pause
-  const handleVideoClick = useCallback((index: number) => {
-    const item = media[index];
-    if (item.type !== 'video') return;
-    
-    // Find the video element
-    const videoElements = document.querySelectorAll(`video[data-video-index="${index}"]`);
-    const video = videoElements[0] as HTMLVideoElement;
-    
-    if (!video) {
-      console.log('❌ Video element not found for index:', index);
-      return;
-    }
-    
-    if (video.paused) {
-      const playPromise = video.play();
-      
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            const playButton = video.parentElement?.querySelector('.video-play-button');
-            if (playButton) {
-              (playButton as HTMLElement).style.display = 'none';
-            }
-          })
-          .catch((error) => {
-            if (error.name === 'NotSupportedError' || error.name === 'MediaElementError') {
-              const fallbackDiv = document.createElement('div');
-              fallbackDiv.className = 'absolute inset-0 flex items-center justify-center bg-ods-card text-center p-4';
-              fallbackDiv.innerHTML = `
-                <div>
-                  <p class="text-ods-text-primary text-sm mb-2">Video format not supported</p>
-                  <a href="${item.src}" target="_blank" rel="noopener noreferrer" 
-                     class="text-ods-accent hover:text-[#FFD700] text-sm">
-                    Open Video Directly
-                  </a>
-                </div>
-              `;
-              video.parentElement?.appendChild(fallbackDiv);
-            }
-          });
-      }
-    } else {
-      video.pause();
-      const playButton = video.parentElement?.querySelector('.video-play-button');
-      if (playButton) {
-        (playButton as HTMLElement).style.display = 'flex';
-      }
-    }
-  }, [media]);
-
-  // Navigation functions
-  const nextSlide = useCallback(() => {
-    const currentVideo = document.querySelector(`[data-video-index="${currentIndex}"]`) as HTMLVideoElement;
-    if (currentVideo && !currentVideo.paused) {
-      currentVideo.pause();
-    }
-    setPlayingVideos(new Set());
-    setCurrentIndex((prev) => (prev + 1) % media.length);
-  }, [currentIndex, media.length]);
-
-  const prevSlide = useCallback(() => {
-    const currentVideo = document.querySelector(`[data-video-index="${currentIndex}"]`) as HTMLVideoElement;
-    if (currentVideo && !currentVideo.paused) {
-      currentVideo.pause();
-    }
-    setPlayingVideos(new Set());
-    setCurrentIndex((prev) => (prev - 1 + media.length) % media.length);
-  }, [currentIndex, media.length]);
-
-  const selectSlide = useCallback((index: number) => {
-    if (index === currentIndex) return;
-    
-    const currentVideo = document.querySelector(`[data-video-index="${currentIndex}"]`) as HTMLVideoElement;
-    if (currentVideo && !currentVideo.paused) {
-      currentVideo.pause();
-    }
-    setPlayingVideos(new Set());
-    setCurrentIndex(index);
-  }, [currentIndex]);
-
-  // Keyboard navigation - only when carousel is focused
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (media.length <= 1) return;
-    
-    if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      prevSlide();
-    } else if (e.key === 'ArrowRight') {
-      e.preventDefault();
-      nextSlide();
-    }
-  }, [nextSlide, prevSlide, media.length]);
 
   // Touch/swipe handling
   const minSwipeDistance = 50;
@@ -240,7 +249,7 @@ export const MediaCarousel = memo(function MediaCarousel({
 
   const onTouchEnd = () => {
     if (!touchStart || !touchEnd) return;
-    
+
     const distance = touchStart - touchEnd;
     const isLeftSwipe = distance > minSwipeDistance;
     const isRightSwipe = distance < -minSwipeDistance;
@@ -275,7 +284,7 @@ export const MediaCarousel = memo(function MediaCarousel({
   // Render video
   const renderVideo = (item: MediaItem, index: number) => (
     <div className="absolute inset-0 bg-black">
-      <video 
+      <video
         className={`w-full h-full object-${objectFit}`}
         poster={item.poster}
         preload="metadata"
@@ -285,24 +294,28 @@ export const MediaCarousel = memo(function MediaCarousel({
         data-video-index={index}
         onClick={() => handleVideoClick(index)}
         onPlay={() => {
-          const playButton = document.querySelector(`[data-video-index="${index}"]`)?.parentElement?.querySelector('.video-play-button');
+          const playButton = document
+            .querySelector(`[data-video-index="${index}"]`)
+            ?.parentElement?.querySelector('.video-play-button');
           if (playButton) {
             (playButton as HTMLElement).style.display = 'none';
           }
         }}
         onPause={() => {
-          const playButton = document.querySelector(`[data-video-index="${index}"]`)?.parentElement?.querySelector('.video-play-button');
+          const playButton = document
+            .querySelector(`[data-video-index="${index}"]`)
+            ?.parentElement?.querySelector('.video-play-button');
           if (playButton) {
             (playButton as HTMLElement).style.display = 'flex';
           }
         }}
-        onLoadedMetadata={(e) => {
+        onLoadedMetadata={e => {
           const video = e.target as HTMLVideoElement;
           video.currentTime = 1;
         }}
-        onError={(e) => {
+        onError={e => {
           const target = e.target as HTMLVideoElement;
-          
+
           if (target.crossOrigin) {
             target.crossOrigin = '';
             target.load();
@@ -328,9 +341,9 @@ export const MediaCarousel = memo(function MediaCarousel({
         <source src={item.src} type="video/ogg" />
         Your browser does not support the video tag.
       </video>
-      
+
       {/* Play Button Overlay */}
-      <div 
+      <div
         className="video-play-button absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 cursor-pointer transition-opacity hover:bg-opacity-30"
         onClick={() => handleVideoClick(index)}
       >
@@ -344,12 +357,12 @@ export const MediaCarousel = memo(function MediaCarousel({
   // Render image
   const renderImage = (item: MediaItem, index: number) => (
     <div className="absolute inset-0 bg-black">
-      <img 
-        src={item.src} 
-        alt={item.alt || `Media ${index + 1}`} 
+      <img
+        src={item.src}
+        alt={item.alt || `Media ${index + 1}`}
         className={`w-full h-full object-${objectFit}`}
         loading="lazy"
-        onError={(e) => {
+        onError={e => {
           console.log('❌ Image failed to load:', item.src);
           const target = e.target as HTMLImageElement;
           target.style.display = 'none';
@@ -361,7 +374,7 @@ export const MediaCarousel = memo(function MediaCarousel({
   // Render main media item
   const renderMainMedia = (item: MediaItem, index: number) => {
     console.log('🎬 Rendering media item:', { type: item.type, src: item.src.substring(0, 100) + '...' });
-    
+
     switch (item.type) {
       case 'youtube':
         return renderYouTubeEmbed(item, index);
@@ -376,7 +389,7 @@ export const MediaCarousel = memo(function MediaCarousel({
   // Render thumbnail
   const renderThumbnail = (item: MediaItem, index: number) => {
     const isActive = index === currentIndex;
-    
+
     let thumbnailSrc = item.src;
     if (item.type === 'youtube') {
       const videoId = getYouTubeVideoId(item.src);
@@ -390,11 +403,9 @@ export const MediaCarousel = memo(function MediaCarousel({
         key={index}
         onClick={() => selectSlide(index)}
         className={cn(
-          "relative flex-shrink-0 overflow-hidden transition-all duration-200",
-          "w-20 h-20 md:w-24 md:h-24 rounded-lg border-2",
-          isActive 
-            ? "border-[#FFC008] ring-2 ring-[#FFC008]/20" 
-            : "border-ods-border hover:border-[#888888]"
+          'relative flex-shrink-0 overflow-hidden transition-all duration-200',
+          'w-20 h-20 md:w-24 md:h-24 rounded-lg border-2',
+          isActive ? 'border-[#FFC008] ring-2 ring-[#FFC008]/20' : 'border-ods-border hover:border-[#888888]',
         )}
       >
         <img
@@ -403,22 +414,20 @@ export const MediaCarousel = memo(function MediaCarousel({
           className="w-full h-full object-cover"
           loading="lazy"
         />
-        
+
         {/* Play icon overlay for videos */}
         {(item.type === 'video' || item.type === 'youtube') && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/30">
             <div className="bg-black/70 rounded-full p-1">
               <svg width="12" height="12" fill="white" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z"/>
+                <path d="M8 5v14l11-7z" />
               </svg>
             </div>
           </div>
         )}
-        
+
         {/* Active indicator */}
-        {isActive && (
-          <div className="absolute bottom-1 right-1 w-2 h-2 bg-[#FFC008] rounded-full" />
-        )}
+        {isActive && <div className="absolute bottom-1 right-1 w-2 h-2 bg-[#FFC008] rounded-full" />}
       </button>
     );
   };
@@ -439,21 +448,21 @@ export const MediaCarousel = memo(function MediaCarousel({
   };
 
   return (
-    <div className={cn("space-y-4", className)}>
+    <div className={cn('space-y-4', className)}>
       {/* Main Display Area with Fixed Aspect Ratio */}
-      <div 
+      <div
         ref={carouselRef}
         className={cn(
-          "relative bg-[#161616] border border-ods-border rounded-2xl overflow-hidden group w-full",
-          getAspectRatioClass()
+          'relative bg-[#161616] border border-ods-border rounded-2xl overflow-hidden group w-full',
+          getAspectRatioClass(),
         )}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
         onKeyDown={media.length > 1 ? handleKeyDown : undefined}
         tabIndex={media.length > 1 ? 0 : undefined}
-        role={media.length > 1 ? "region" : undefined}
-        aria-label={media.length > 1 ? "Media carousel, use arrow keys to navigate" : undefined}
+        role={media.length > 1 ? 'region' : undefined}
+        aria-label={media.length > 1 ? 'Media carousel, use arrow keys to navigate' : undefined}
       >
         {/* Media content */}
         {renderMainMedia(currentItem, currentIndex)}
@@ -488,7 +497,7 @@ export const MediaCarousel = memo(function MediaCarousel({
       {/* Thumbnail Navigation - only show if multiple items and showThumbnails is true */}
       {media.length > 1 && showThumbnails && (
         <div className="w-full">
-          <div 
+          <div
             ref={thumbnailsRef}
             className="flex gap-2 overflow-x-auto scrollbar-none py-2"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
@@ -499,4 +508,4 @@ export const MediaCarousel = memo(function MediaCarousel({
       )}
     </div>
   );
-}); 
+});

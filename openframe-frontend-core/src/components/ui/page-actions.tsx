@@ -1,34 +1,29 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { cn } from '../../utils/cn'
-import { Ellipsis01Icon } from '../icons-v2-generated'
-import { Button } from './button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from './dropdown-menu'
-import { MoreActionsMenu, type MoreActionsItem } from './more-actions-menu'
+import React from 'react';
+import { cn } from '../../utils/cn';
+import { Ellipsis01Icon } from '../icons-v2-generated';
+import { Button } from './button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './dropdown-menu';
+import { type MoreActionsItem, MoreActionsMenu } from './more-actions-menu';
 
 export type PageActionButton = {
-  label: string
-  onClick: () => void
-  icon?: React.ReactNode
-  variant?: 'primary' | 'outline'
-  disabled?: boolean
-  loading?: boolean
+  label: string;
+  onClick: () => void;
+  icon?: React.ReactNode;
+  variant?: 'primary' | 'outline';
+  disabled?: boolean;
+  loading?: boolean;
   /** Show action only on mobile (below md). Default: visible on all screens. */
-  showOnlyMobile?: boolean
-}
+  showOnlyMobile?: boolean;
+};
 
 export interface PageActionsProps {
-  variant?: 'icon-buttons' | 'primary-buttons' | 'menu-primary'
-  actions: PageActionButton[]
-  menuActions?: MoreActionsItem[]
-  className?: string
-  gap?: 'sm' | 'md' | 'lg'
+  variant?: 'icon-buttons' | 'primary-buttons' | 'menu-primary';
+  actions: PageActionButton[];
+  menuActions?: MoreActionsItem[];
+  className?: string;
+  gap?: 'sm' | 'md' | 'lg';
 }
 
 export function PageActions({
@@ -36,45 +31,52 @@ export function PageActions({
   actions,
   menuActions,
   className,
-  gap = 'md'
+  gap = 'md',
 }: PageActionsProps) {
   const gapClasses = {
     sm: 'gap-2',
     md: 'gap-4',
-    lg: 'gap-6'
-  }
+    lg: 'gap-6',
+  };
 
   if (variant === 'icon-buttons') {
-    return <IconButtonsVariant actions={actions} className={className} gapClass={gapClasses[gap]} />
+    return <IconButtonsVariant actions={actions} className={className} gapClass={gapClasses[gap]} />;
   }
 
   if (variant === 'menu-primary') {
-    return <MenuPrimaryVariant actions={actions} menuActions={menuActions || []} className={className} gapClass={gapClasses[gap]} />
+    return (
+      <MenuPrimaryVariant
+        actions={actions}
+        menuActions={menuActions || []}
+        className={className}
+        gapClass={gapClasses[gap]}
+      />
+    );
   }
 
-  return <PrimaryButtonsVariant actions={actions} className={className} gapClass={gapClasses[gap]} />
+  return <PrimaryButtonsVariant actions={actions} className={className} gapClass={gapClasses[gap]} />;
 }
 
 function IconButtonsVariant({
   actions,
   className,
-  gapClass
+  gapClass,
 }: {
-  actions: PageActionButton[]
-  className?: string
-  gapClass: string
+  actions: PageActionButton[];
+  className?: string;
+  gapClass: string;
 }) {
-  const desktopActions = actions.filter(a => !a.showOnlyMobile)
+  const desktopActions = actions.filter(a => !a.showOnlyMobile);
 
   const menuItems: MoreActionsItem[] = actions.map(action => ({
     label: action.label,
     onClick: action.onClick,
     icon: action.icon,
-    disabled: action.disabled
-  }))
+    disabled: action.disabled,
+  }));
 
-  const isSingleAction = actions.length === 1
-  const singleAction = isSingleAction ? actions[0] : null
+  const isSingleAction = actions.length === 1;
+  const singleAction = isSingleAction ? actions[0] : null;
 
   return (
     <>
@@ -111,7 +113,7 @@ function IconButtonsVariant({
         )}
       </div>
     </>
-  )
+  );
 }
 
 /**
@@ -121,20 +123,20 @@ function IconButtonsVariant({
 function PrimaryButtonsVariant({
   actions,
   className,
-  gapClass
+  gapClass,
 }: {
-  actions: PageActionButton[]
-  className?: string
-  gapClass: string
+  actions: PageActionButton[];
+  className?: string;
+  gapClass: string;
 }) {
   // Sort actions: primary first, then outline
   const sortedActions = [...actions].sort((a, b) => {
-    if (a.variant === 'primary' && b.variant !== 'primary') return 1
-    if (a.variant !== 'primary' && b.variant === 'primary') return -1
-    return 0
-  })
+    if (a.variant === 'primary' && b.variant !== 'primary') return 1;
+    if (a.variant !== 'primary' && b.variant === 'primary') return -1;
+    return 0;
+  });
 
-  const desktopActions = sortedActions.filter(a => !a.showOnlyMobile)
+  const desktopActions = sortedActions.filter(a => !a.showOnlyMobile);
 
   return (
     <>
@@ -157,7 +159,7 @@ function PrimaryButtonsVariant({
       {/* Mobile: Fixed bottom bar */}
       <MobileBottomActions actions={sortedActions} gapClass={gapClass} />
     </>
-  )
+  );
 }
 
 /**
@@ -168,14 +170,14 @@ function MenuPrimaryVariant({
   actions,
   menuActions,
   className,
-  gapClass
+  gapClass,
 }: {
-  actions: PageActionButton[]
-  menuActions: MoreActionsItem[]
-  className?: string
-  gapClass: string
+  actions: PageActionButton[];
+  menuActions: MoreActionsItem[];
+  className?: string;
+  gapClass: string;
 }) {
-  const desktopActions = actions.filter(a => !a.showOnlyMobile)
+  const desktopActions = actions.filter(a => !a.showOnlyMobile);
 
   return (
     <>
@@ -197,12 +199,14 @@ function MenuPrimaryVariant({
       </div>
 
       {/* Mobile: Fixed bottom bar — full-width menu button + primary buttons */}
-      <div className={cn(
-        'fixed md:hidden bottom-0 left-0 right-0 z-50',
-        'bg-ods-card border-t border-ods-border',
-        'flex items-start pt-6 pb-6 px-6',
-        gapClass
-      )}>
+      <div
+        className={cn(
+          'fixed md:hidden bottom-0 left-0 right-0 z-50',
+          'bg-ods-card border-t border-ods-border',
+          'flex items-start pt-6 pb-6 px-6',
+          gapClass,
+        )}
+      >
         {menuActions.length > 0 && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -222,17 +226,26 @@ function MenuPrimaryVariant({
               {menuActions.map((item, idx) => (
                 <DropdownMenuItem
                   key={`mobile-menu-${item.label}-${idx}`}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (!item.disabled) item.onClick()
+                  onClick={e => {
+                    e.stopPropagation();
+                    if (!item.disabled) item.onClick();
                   }}
                   disabled={item.disabled}
                   className="flex items-center gap-2 px-4 py-3 bg-ods-bg hover:bg-ods-bg-hover focus:bg-ods-bg-hover border-b border-ods-border last:border-b-0 rounded-none cursor-pointer data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed"
                 >
                   {item.icon && (
-                    <div className={cn(item.danger ? 'text-ods-error' : 'text-ods-text-secondary', '[&_svg]:size-6 [&_svg]:shrink-0')}>{item.icon}</div>
+                    <div
+                      className={cn(
+                        item.danger ? 'text-ods-error' : 'text-ods-text-secondary',
+                        '[&_svg]:size-6 [&_svg]:shrink-0',
+                      )}
+                    >
+                      {item.icon}
+                    </div>
                   )}
-                  <span className={`font-medium text-[18px] leading-6 ${item.danger ? 'text-ods-text-primary' : 'text-ods-text-primary'}`}>
+                  <span
+                    className={`font-medium text-[18px] leading-6 ${item.danger ? 'text-ods-text-primary' : 'text-ods-text-primary'}`}
+                  >
                     {item.label}
                   </span>
                 </DropdownMenuItem>
@@ -255,23 +268,19 @@ function MenuPrimaryVariant({
         ))}
       </div>
     </>
-  )
+  );
 }
 
-function MobileBottomActions({
-  actions,
-  gapClass
-}: {
-  actions: PageActionButton[]
-  gapClass: string
-}) {
+function MobileBottomActions({ actions, gapClass }: { actions: PageActionButton[]; gapClass: string }) {
   return (
-    <div className={cn(
-      'fixed md:hidden bottom-0 left-0 right-0 z-50',
-      'bg-ods-card border-t border-ods-border',
-      'flex items-start pt-6 pb-6 px-6',
-      gapClass
-    )}>
+    <div
+      className={cn(
+        'fixed md:hidden bottom-0 left-0 right-0 z-50',
+        'bg-ods-card border-t border-ods-border',
+        'flex items-start pt-6 pb-6 px-6',
+        gapClass,
+      )}
+    >
       {actions.map((action, idx) => (
         <Button
           key={`mobile-${action.label}-${idx}`}
@@ -286,11 +295,11 @@ function MobileBottomActions({
         </Button>
       ))}
     </div>
-  )
+  );
 }
 
 export function usePageActionsBottomPadding(variant: PageActionsProps['variant']) {
-  return variant === 'primary-buttons' || variant === 'menu-primary' ? 'pb-40 md:pb-0' : ''
+  return variant === 'primary-buttons' || variant === 'menu-primary' ? 'pb-40 md:pb-0' : '';
 }
 
-export default PageActions
+export default PageActions;

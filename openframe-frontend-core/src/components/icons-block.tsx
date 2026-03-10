@@ -1,15 +1,15 @@
-"use client";
+'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import { CheckCircle, Github, Moon, PlusCircle, Sun } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  VendorDirectoryIcon,
-  OpenSourceIcon,
   CommunityHubIcon,
-  VendorsIcon,
   CommunityIcon,
   CompareIcon,
+  OpenSourceIcon,
+  VendorDirectoryIcon,
+  VendorsIcon,
 } from './icons-stub';
-import { Sun, Moon, CheckCircle, Github, PlusCircle } from 'lucide-react';
 
 // Map lucide icons
 const SunIcon = Sun;
@@ -40,26 +40,28 @@ const availableIcons = [
   CheckCircleIcon,
   GitHubIcon,
   PlusCircleIcon,
-  OpenmspLogo
+  OpenmspLogo,
 ];
 
 export function ResponsiveIconsBlock({ loading = false }: IconsBlockProps) {
   const [columns, setColumns] = useState(24);
-  const [iconGrid, setIconGrid] = useState<Array<Array<React.ComponentType<{ width?: number; height?: number; className?: string }>>>>([]);
-  const [iconsLoaded, setIconsLoaded] = useState(false);
+  const [iconGrid, setIconGrid] = useState<
+    Array<Array<React.ComponentType<{ width?: number; height?: number; className?: string }>>>
+  >([]);
+  const [_iconsLoaded, setIconsLoaded] = useState(false);
   const randomSeedRef = useRef<number>(0);
 
   useEffect(() => {
     function calculateColumns() {
-        const cols = Math.ceil(window.innerWidth / 56) + 4;
-        setColumns(cols);
+      const cols = Math.ceil(window.innerWidth / 56) + 4;
+      setColumns(cols);
     }
 
     calculateColumns();
     window.addEventListener('resize', calculateColumns);
-    
+
     setIconsLoaded(true);
-    
+
     return () => window.removeEventListener('resize', calculateColumns);
   }, []);
 
@@ -171,16 +173,11 @@ export function ResponsiveIconsBlock({ loading = false }: IconsBlockProps) {
               }}
               role="presentation"
             >
-                  <IconComponent
-                    width={16}
-                    height={16}
-                    className="text-[#666666] md:w-5 md:h-5"
-                    aria-hidden="true"
-                  />
+              <IconComponent width={16} height={16} className="text-[#666666] md:w-5 md:h-5" aria-hidden="true" />
             </div>
           );
         })}
       </div>
     </div>
   );
-} 
+}

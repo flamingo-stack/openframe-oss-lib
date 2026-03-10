@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import { useState, useRef } from 'react';
-import { Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from '../ui';
-import { Trash2, Plus, Image as ImageIcon, Video, Upload, Loader2, GripVertical } from 'lucide-react';
+import { GripVertical, Image as ImageIcon, Loader2, Plus, Trash2, Upload, Video } from 'lucide-react';
 import Image from 'next/image';
+import { useRef, useState } from 'react';
+import { Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from '../ui';
 
 export interface ReleaseMediaItem {
   media_type: 'image' | 'video' | 'screenshot' | 'demo';
@@ -11,7 +11,9 @@ export interface ReleaseMediaItem {
   title?: string;
   description?: string;
   display_order?: number;
+  // biome-ignore lint/style/useNamingConvention: internal marker convention
   _file?: File; // Temporary file before upload
+  // biome-ignore lint/style/useNamingConvention: internal marker convention
   _uploading?: boolean; // Upload in progress
 }
 
@@ -22,12 +24,7 @@ interface ReleaseMediaManagerProps {
   className?: string;
 }
 
-export function ReleaseMediaManager({
-  media,
-  onChange,
-  onUpload,
-  className = ''
-}: ReleaseMediaManagerProps) {
+export function ReleaseMediaManager({ media, onChange, onUpload, className = '' }: ReleaseMediaManagerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
 
@@ -51,8 +48,10 @@ export function ReleaseMediaManager({
       media_type: mediaType,
       media_url: '',
       title: file.name,
+      // biome-ignore lint/style/useNamingConvention: internal marker convention
       _file: file,
-      _uploading: true
+      // biome-ignore lint/style/useNamingConvention: internal marker convention
+      _uploading: true,
     };
 
     onChange([...media, newMedia]);
@@ -63,9 +62,10 @@ export function ReleaseMediaManager({
       const url = await onUpload(file, mediaType);
 
       // Update with uploaded URL
+      // biome-ignore lint/style/useNamingConvention: internal marker convention for _file and _uploading
       const updated = [...media, { ...newMedia, media_url: url, _file: undefined, _uploading: false }];
       onChange(updated);
-    } catch (error) {
+    } catch (_error) {
       // Remove failed upload
       onChange(media);
     } finally {
@@ -135,12 +135,8 @@ export function ReleaseMediaManager({
             <h3 className="font-['DM_Sans'] font-semibold text-ods-text-primary mb-1">
               {uploadingIndex !== null ? 'Uploading...' : 'Upload Media'}
             </h3>
-            <p className="text-sm text-ods-text-secondary">
-              Drag and drop or click to select images and videos
-            </p>
-            <p className="text-xs text-ods-text-secondary mt-1">
-              Maximum file size: 50MB
-            </p>
+            <p className="text-sm text-ods-text-secondary">Drag and drop or click to select images and videos</p>
+            <p className="text-xs text-ods-text-secondary mt-1">Maximum file size: 50MB</p>
           </div>
           <Button
             type="button"
@@ -205,12 +201,7 @@ export function ReleaseMediaManager({
                 {item.media_url && (
                   <div className="aspect-video relative bg-[#1A1A1A]">
                     {item.media_type === 'video' || item.media_type === 'demo' ? (
-                      <video
-                        src={item.media_url}
-                        className="w-full h-full object-cover"
-                        controls
-                        preload="metadata"
-                      />
+                      <video src={item.media_url} className="w-full h-full object-cover" controls preload="metadata" />
                     ) : (
                       <Image
                         src={item.media_url}
@@ -256,8 +247,8 @@ export function ReleaseMediaManager({
                   <Input
                     placeholder="Title (optional)"
                     value={item.title}
-                    onChange={(e) => updateMedia(index, 'title', e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
+                    onChange={e => updateMedia(index, 'title', e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && e.preventDefault()}
                     className="bg-[#161616] h-8 text-xs"
                     disabled={item._uploading}
                   />
@@ -271,12 +262,8 @@ export function ReleaseMediaManager({
       {media.length === 0 && (
         <div className="text-center py-8 px-4 bg-ods-bg-secondary border border-ods-border rounded-lg">
           <ImageIcon className="h-12 w-12 text-ods-text-secondary mx-auto mb-4" />
-          <h3 className="font-['DM_Sans'] font-semibold text-ods-text-primary mb-2">
-            No media uploaded yet
-          </h3>
-          <p className="text-sm text-ods-text-secondary">
-            Upload your first image or video to get started
-          </p>
+          <h3 className="font-['DM_Sans'] font-semibold text-ods-text-primary mb-2">No media uploaded yet</h3>
+          <p className="text-sm text-ods-text-secondary">Upload your first image or video to get started</p>
         </div>
       )}
     </div>

@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface ShuffleIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface ShuffleIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function ShuffleIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: ShuffleIconProps) {
+export function ShuffleIcon({ className = '', size = 24, color = 'currentColor', ...props }: ShuffleIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

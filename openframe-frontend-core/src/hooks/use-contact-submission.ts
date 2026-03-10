@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect } from 'react';
-import { useToast } from "./use-toast";
 import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
+import { useToast } from './use-toast';
 
 interface ContactSubmissionOptions {
   userId?: string;
@@ -32,50 +32,53 @@ export function useContactSubmission(options: ContactSubmissionOptions = {}) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  const submit = useCallback(async (formData: ContactFormData) => {
-    if (isSubmitting) return;
+  const submit = useCallback(
+    async (formData: ContactFormData) => {
+      if (isSubmitting) return;
 
-    setIsSubmitting(true);
+      setIsSubmitting(true);
 
-    try {
-      const response = await fetch('/api/contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          ...formData,
-          user_id: userId
-        }),
-      });
+      try {
+        const response = await fetch('/api/contact', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...formData,
+            user_id: userId,
+          }),
+        });
 
-      const data = await response.json();
+        const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to submit contact form');
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to submit contact form');
+        }
+
+        // Success
+        setIsSuccess(true);
+        const message = successToastMessage
+          ? `Thank you! Your message has been sent. ${successToastMessage}`
+          : 'Thank you! Your message has been sent successfully.';
+
+        toast({
+          title: 'Message sent!',
+          description: message,
+          variant: 'success',
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Something went wrong. Please try again.';
+        toast({
+          title: 'Failed to send message',
+          description: message,
+          variant: 'destructive',
+        });
+        throw error; // allow caller to handle if needed
+      } finally {
+        setIsSubmitting(false);
       }
-
-      // Success
-      setIsSuccess(true);
-      const message = successToastMessage 
-        ? `Thank you! Your message has been sent. ${successToastMessage}`
-        : 'Thank you! Your message has been sent successfully.';
-      
-      toast({
-        title: "Message sent!",
-        description: message,
-        variant: 'success',
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Something went wrong. Please try again.';
-      toast({ 
-        title: 'Failed to send message', 
-        description: message, 
-        variant: 'destructive' 
-      });
-      throw error; // allow caller to handle if needed
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [isSubmitting, toast, userId, successToastMessage]);
+    },
+    [isSubmitting, toast, userId, successToastMessage],
+  );
 
   // Handle redirect after success
   useEffect(() => {
@@ -89,7 +92,7 @@ export function useContactSubmission(options: ContactSubmissionOptions = {}) {
           router.push(successRedirectUrl);
         }
       }, 1500);
-      
+
       return () => clearTimeout(timer);
     }
   }, [isSuccess, successRedirectUrl, router]);

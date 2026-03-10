@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface AlarmPlusIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface AlarmPlusIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function AlarmPlusIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: AlarmPlusIconProps) {
+export function AlarmPlusIcon({ className = '', size = 24, color = 'currentColor', ...props }: AlarmPlusIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

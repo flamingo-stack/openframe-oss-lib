@@ -45,4 +45,4 @@ export interface TeamData {
 export interface GetTeamOptions {
   includeInactive?: boolean;
   department?: string;
-} 
+}

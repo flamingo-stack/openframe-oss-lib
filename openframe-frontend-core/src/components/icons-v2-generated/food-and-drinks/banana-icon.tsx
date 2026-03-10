@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface BananaIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface BananaIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function BananaIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: BananaIconProps) {
+export function BananaIcon({ className = '', size = 24, color = 'currentColor', ...props }: BananaIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

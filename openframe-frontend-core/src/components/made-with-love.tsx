@@ -1,8 +1,8 @@
-'use client'
+'use client';
 
-import React, { useState, useEffect } from 'react';
-import { FlamingoLogo } from './flamingo-logo';
+import React, { useEffect, useState } from 'react';
 import { getBaseUrl } from '../utils';
+import { FlamingoLogo } from './flamingo-logo';
 
 interface MadeWithLoveProps {
   /** Custom class name for the container */
@@ -13,11 +13,7 @@ interface MadeWithLoveProps {
   showOnMobile?: boolean;
 }
 
-export function MadeWithLove({
-  className = '',
-  size = 'md',
-  showOnMobile = true
-}: MadeWithLoveProps) {
+export function MadeWithLove({ className = '', size = 'md', showOnMobile = true }: MadeWithLoveProps) {
   const [isMobile, setIsMobile] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
@@ -38,20 +34,20 @@ export function MadeWithLove({
       logoSize: 14,
       fontSizeMobile: '12px',
       fontSizeDesktop: '14px',
-      gap: '4px'
+      gap: '4px',
     },
     md: {
       logoSize: 16,
       fontSizeMobile: '14px',
       fontSizeDesktop: '16px',
-      gap: '4px'
+      gap: '4px',
     },
     lg: {
       logoSize: 20,
       fontSizeMobile: '16px',
       fontSizeDesktop: '18px',
-      gap: '6px'
-    }
+      gap: '6px',
+    },
   };
 
   const config = sizeConfig[size];
@@ -59,13 +55,13 @@ export function MadeWithLove({
 
   // Container styles using primitive CSS
   const containerStyle: React.CSSProperties = {
-    display: (!showOnMobile && isMobile) ? 'none' : 'inline-flex',
+    display: !showOnMobile && isMobile ? 'none' : 'inline-flex',
     alignItems: 'center',
     gap: config.gap,
     fontSize: isMobile ? config.fontSizeMobile : config.fontSizeDesktop,
     lineHeight: 1.5,
     color: '#ffffff',
-    fontFamily: 'inherit'
+    fontFamily: 'inherit',
   };
 
   // Button/link styles using primitive CSS
@@ -83,7 +79,7 @@ export function MadeWithLove({
     fontSize: '14px',
     fontFamily: '"Azeret Mono", monospace',
     transition: 'text-decoration 0.2s ease',
-    outline: 'none'
+    outline: 'none',
   };
 
   // Logo container styles
@@ -91,21 +87,18 @@ export function MadeWithLove({
     marginLeft: '2px',
     flexShrink: 0,
     display: 'flex',
-    alignItems: 'center'
+    alignItems: 'center',
   };
 
   // Text span styles
   const textStyle: React.CSSProperties = {
     color: '#ffffff',
     marginLeft: '4px',
-    textDecoration: 'none'
+    textDecoration: 'none',
   };
 
   return (
-    <div
-      style={containerStyle}
-      className={className}
-    >
+    <div style={containerStyle} className={className}>
       Made with love by
       <a
         href={flamingoUrl}

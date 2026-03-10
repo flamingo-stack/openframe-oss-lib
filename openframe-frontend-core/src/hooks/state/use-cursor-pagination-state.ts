@@ -23,171 +23,168 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useApiParams, type UseApiParamsReturn } from './use-api-params';
+import { type UseApiParamsReturn, useApiParams } from './use-api-params';
 
 export interface UseCursorPaginationStateOptions {
   /**
    * Debounce delay for search input (default: 300ms)
    */
-  debounceMs?: number
+  debounceMs?: number;
 
   /**
    * Callback for initial page load
    * Called once on mount with current search and cursor from URL
    */
-  onInitialLoad: (search: string, cursor: string | null) => void | Promise<unknown>
+  onInitialLoad: (search: string, cursor: string | null) => void | Promise<unknown>;
 
   /**
    * Callback when search term changes (after debounce)
    * Called after URL is updated, cursor is already reset
    */
-  onSearchChange: (search: string) => void | Promise<unknown>
+  onSearchChange: (search: string) => void | Promise<unknown>;
 }
 
 const urlSchema = {
   search: { type: 'string' as const, default: '' },
   cursor: { type: 'string' as const, default: '' },
-}
+};
 
-type ApiParamsReturn = UseApiParamsReturn<typeof urlSchema>
+type ApiParamsReturn = UseApiParamsReturn<typeof urlSchema>;
 
 /** Pagination params managed by this hook */
-export type PaginationParams = ApiParamsReturn['params']
+export type PaginationParams = ApiParamsReturn['params'];
 
 export interface CursorPaginationStateReturn {
   // Search
-  searchInput: string
-  setSearchInput: (value: string) => void
+  searchInput: string;
+  setSearchInput: (value: string) => void;
 
   // Pagination tracking
-  hasLoadedBeyondFirst: boolean
-  setHasLoadedBeyondFirst: (value: boolean) => void
+  hasLoadedBeyondFirst: boolean;
+  setHasLoadedBeyondFirst: (value: boolean) => void;
 
   // Handlers for useTablePagination
-  handleNextPage: (endCursor: string, fetchFn: () => Promise<unknown>) => Promise<void>
-  handleResetToFirstPage: (fetchFn: () => Promise<unknown>) => Promise<void>
+  handleNextPage: (endCursor: string, fetchFn: () => Promise<unknown>) => Promise<void>;
+  handleResetToFirstPage: (fetchFn: () => Promise<unknown>) => Promise<void>;
 
   // URL params access (for advanced use cases)
-  params: PaginationParams
-  setParam: ApiParamsReturn['setParam']
-  setParams: ApiParamsReturn['setParams']
+  params: PaginationParams;
+  setParam: ApiParamsReturn['setParam'];
+  setParams: ApiParamsReturn['setParams'];
 }
 
-export function useCursorPaginationState(
-  options: UseCursorPaginationStateOptions
-): CursorPaginationStateReturn {
-  const {
-    onInitialLoad,
-    onSearchChange,
-  } = options
+export function useCursorPaginationState(options: UseCursorPaginationStateOptions): CursorPaginationStateReturn {
+  const { onInitialLoad, onSearchChange } = options;
 
-  const { params, setParam, setParams } = useApiParams(urlSchema)
+  const { params, setParam, setParams } = useApiParams(urlSchema);
 
   // Local search input with debounce
-  const [searchInput, setSearchInput] = useState(params.search || '')
+  const [searchInput, setSearchInput] = useState(params.search || '');
 
   // Pagination tracking
-  const [hasLoadedBeyondFirst, setHasLoadedBeyondFirst] = useState(false)
+  const [hasLoadedBeyondFirst, setHasLoadedBeyondFirst] = useState(false);
   // Use a counter instead of boolean to ensure effects see the latest state
-  const [initialLoadCount, setInitialLoadCount] = useState(0)
+  const [initialLoadCount, setInitialLoadCount] = useState(0);
   // Initialize to null to distinguish "never set" from "set to empty string"
-  const lastSearchRef = useRef<string | null>(null)
+  const lastSearchRef = useRef<string | null>(null);
   // Track if we're syncing from URL to prevent loops
-  const isSyncingFromUrl = useRef(false)
+  const isSyncingFromUrl = useRef(false);
   // Track if initial load is in progress to block ALL other effects
-  const isInitialLoadInProgress = useRef(true)
+  const isInitialLoadInProgress = useRef(true);
 
   // Sync local input with URL param (for tab switches that clear params)
   // Only sync if the URL changed externally (not from our own debounce update)
   useEffect(() => {
     // Block during initial load
-    if (isInitialLoadInProgress.current) return
+    if (isInitialLoadInProgress.current) return;
 
-    const urlSearch = params.search || ''
+    const urlSearch = params.search || '';
     // Only sync if URL differs from current input
     if (urlSearch !== searchInput) {
-      isSyncingFromUrl.current = true
-      setSearchInput(urlSearch)
+      isSyncingFromUrl.current = true;
+      setSearchInput(urlSearch);
       // Reset the flag after a tick to allow normal operation
-      setTimeout(() => { isSyncingFromUrl.current = false }, 0)
+      setTimeout(() => {
+        isSyncingFromUrl.current = false;
+      }, 0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.search, initialLoadCount]) // Add initialLoadCount to re-run after initial load
+  }, [params.search, searchInput]); // Add initialLoadCount to re-run after initial load
 
   // Sync debounced search to URL, reset cursor when search changes
   useEffect(() => {
     // Block during initial load
-    if (isInitialLoadInProgress.current) return
+    if (isInitialLoadInProgress.current) return;
     // Skip if we're syncing from URL to prevent loops
-    if (isSyncingFromUrl.current) return
+    if (isSyncingFromUrl.current) return;
 
     if (searchInput !== params.search) {
       setParams({
         search: searchInput,
-        cursor: '' // Reset cursor when search changes
-      })
+        cursor: '', // Reset cursor when search changes
+      });
     }
-  }, [searchInput, params.search, setParams, initialLoadCount])
+  }, [searchInput, params.search, setParams]);
 
   // Initial load effect - runs once and blocks all other effects until complete
   useEffect(() => {
     if (initialLoadCount === 0) {
-      const cursor = params.cursor || null
-      const search = params.search || ''
+      const cursor = params.cursor || null;
+      const search = params.search || '';
 
       // Set all refs BEFORE calling onInitialLoad
-      lastSearchRef.current = search
+      lastSearchRef.current = search;
 
       // If we have a cursor in URL (page refresh), we're beyond first page
       if (cursor) {
-        setHasLoadedBeyondFirst(true)
+        setHasLoadedBeyondFirst(true);
       }
 
       // Call the initial load and wait for it to complete before
       // marking initial load as done (handles async onInitialLoad)
       Promise.resolve(onInitialLoad(search, cursor)).finally(() => {
-        isInitialLoadInProgress.current = false
-        setInitialLoadCount(1)
-      })
+        isInitialLoadInProgress.current = false;
+        setInitialLoadCount(1);
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [initialLoadCount, onInitialLoad, params.cursor, params.search]);
 
   // Search change detection - only after initial load is fully complete
   useEffect(() => {
     // Block during initial load
-    if (isInitialLoadInProgress.current) return
-    if (initialLoadCount === 0) return
+    if (isInitialLoadInProgress.current) return;
+    if (initialLoadCount === 0) return;
 
-    const currentSearch = params.search || ''
+    const currentSearch = params.search || '';
     // Only trigger search change if:
     // 1. lastSearchRef has been set (not null - means initial load happened)
     // 2. The search actually changed
     if (lastSearchRef.current !== null && currentSearch !== lastSearchRef.current) {
-      lastSearchRef.current = currentSearch
-      setHasLoadedBeyondFirst(false)
-      onSearchChange(currentSearch)
+      lastSearchRef.current = currentSearch;
+      setHasLoadedBeyondFirst(false);
+      onSearchChange(currentSearch);
     }
-  }, [params.search, onSearchChange, initialLoadCount])
+  }, [params.search, onSearchChange, initialLoadCount]);
 
   // Pagination handlers
   const handleNextPage = useCallback(
     async (endCursor: string, fetchFn: () => Promise<unknown>) => {
-      setParam('cursor', endCursor)
-      await fetchFn()
-      setHasLoadedBeyondFirst(true)
+      setParam('cursor', endCursor);
+      await fetchFn();
+      setHasLoadedBeyondFirst(true);
     },
-    [setParam]
-  )
+    [setParam],
+  );
 
   const handleResetToFirstPage = useCallback(
     async (fetchFn: () => Promise<unknown>) => {
-      setParam('cursor', '')
-      await fetchFn()
-      setHasLoadedBeyondFirst(false)
+      setParam('cursor', '');
+      await fetchFn();
+      setHasLoadedBeyondFirst(false);
     },
-    [setParam]
-  )
+    [setParam],
+  );
 
   return {
     searchInput,
@@ -199,5 +196,5 @@ export function useCursorPaginationState(
     params,
     setParam,
     setParams,
-  }
+  };
 }

@@ -141,7 +141,11 @@
     "yalc:publish": "yalc publish",
     "generate:icons": "node scripts/generate-icons.mjs",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "lint:biome": "biome check .",
+    "lint:biome:fix": "biome check --fix .",
+    "format": "biome format .",
+    "format:fix": "biome format --fix ."
   },
   "peerDependencies": {
     "@tanstack/react-query": "^5.0.0",
@@ -211,6 +215,7 @@
     "vaul": "^1.1.2"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.4",
     "@storybook/nextjs-vite": "^10.1.11",
     "@svgr/cli": "^8.1.0",
     "@testing-library/jest-dom": "^6.9.1",

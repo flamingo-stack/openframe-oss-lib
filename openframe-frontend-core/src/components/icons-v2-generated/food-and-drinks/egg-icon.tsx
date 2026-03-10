@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface EggIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface EggIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function EggIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: EggIconProps) {
+export function EggIcon({ className = '', size = 24, color = 'currentColor', ...props }: EggIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

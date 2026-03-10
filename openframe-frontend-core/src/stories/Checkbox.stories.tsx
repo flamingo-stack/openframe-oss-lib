@@ -77,13 +77,10 @@ export const DisabledChecked: Story = {
  */
 export const WithLabel: Story = {
   args: {},
-  render: (args) => (
+  render: args => (
     <div className="flex items-center gap-2">
       <Checkbox id="terms" {...args} />
-      <label
-        htmlFor="terms"
-        className="text-sm text-ods-text-primary cursor-pointer select-none"
-      >
+      <label htmlFor="terms" className="text-sm text-ods-text-primary cursor-pointer select-none">
         Accept terms and conditions
       </label>
     </div>
@@ -100,21 +97,12 @@ export const Controlled: Story = {
     return (
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
-          <Checkbox
-            id="controlled"
-            checked={checked}
-            onCheckedChange={(value) => setChecked(value === true)}
-          />
-          <label
-            htmlFor="controlled"
-            className="text-sm text-ods-text-primary cursor-pointer select-none"
-          >
+          <Checkbox id="controlled" checked={checked} onCheckedChange={value => setChecked(value === true)} />
+          <label htmlFor="controlled" className="text-sm text-ods-text-primary cursor-pointer select-none">
             Controlled checkbox
           </label>
         </div>
-        <span className="text-xs text-[#888]">
-          Checked: {checked ? 'true' : 'false'}
-        </span>
+        <span className="text-xs text-[#888]">Checked: {checked ? 'true' : 'false'}</span>
       </div>
     );
   },
@@ -159,21 +147,29 @@ export const AllVariants: Story = {
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
           <Checkbox id="unchecked" />
-          <label htmlFor="unchecked" className="text-sm text-ods-text-primary">Unchecked</label>
+          <label htmlFor="unchecked" className="text-sm text-ods-text-primary">
+            Unchecked
+          </label>
         </div>
         <div className="flex items-center gap-2">
           <Checkbox id="checked" defaultChecked />
-          <label htmlFor="checked" className="text-sm text-ods-text-primary">Checked</label>
+          <label htmlFor="checked" className="text-sm text-ods-text-primary">
+            Checked
+          </label>
         </div>
       </div>
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
           <Checkbox id="disabled-unchecked" disabled />
-          <label htmlFor="disabled-unchecked" className="text-sm text-ods-text-secondary">Disabled</label>
+          <label htmlFor="disabled-unchecked" className="text-sm text-ods-text-secondary">
+            Disabled
+          </label>
         </div>
         <div className="flex items-center gap-2">
           <Checkbox id="disabled-checked" disabled defaultChecked />
-          <label htmlFor="disabled-checked" className="text-sm text-ods-text-secondary">Disabled Checked</label>
+          <label htmlFor="disabled-checked" className="text-sm text-ods-text-secondary">
+            Disabled Checked
+          </label>
         </div>
       </div>
     </div>

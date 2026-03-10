@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface PianoKeyIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface PianoKeyIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function PianoKeyIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: PianoKeyIconProps) {
+export function PianoKeyIcon({ className = '', size = 24, color = 'currentColor', ...props }: PianoKeyIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

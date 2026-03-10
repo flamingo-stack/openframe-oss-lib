@@ -5,20 +5,11 @@ interface MlgLogoProps {
   size?: number;
 }
 
-export const MlgLogo: React.FC<MlgLogoProps> = ({
-  size = 240,
-  color = 'white'
-}) => {
+export const MlgLogo: React.FC<MlgLogoProps> = ({ size = 240, color = 'white' }) => {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 1080 1081.4"
-      xmlns="http://www.w3.org/2000/svg"
-      style={{ color }}
-    >
+    <svg width={size} height={size} viewBox="0 0 1080 1081.4" xmlns="http://www.w3.org/2000/svg" style={{ color }}>
       <g>
-        <path 
+        <path
           d="M534.4,893.1c0,0-20.9,3.6-50.8,3.6c-75.3,0-99.1-48.1-110.5-75c-14.7-35-33.9-51.5-54.2-64.6
           c-12.5-8.1-15.4-17.6-0.9-20.3c66.7-12.6,83.7,75.6,128.2,89.6c31.8,10,72.6,5.7,92.9-7.4c2.7-26.9,22.1-50.2,38.3-62.5
           c-13.8-1.3-27.6-3.1-41.2-5.6c-41.5-7.4-83.3-20.9-117.8-45.3c41.5-25,69.3-70.6,69.3-122.6c0-79-64.1-143.1-143.1-143.1
@@ -28,7 +19,7 @@ export const MlgLogo: React.FC<MlgLogoProps> = ({
           s-51.2,114.5-114.5,114.5S230.2,646.3,230.2,583.1z"
           fill={color}
         />
-        <path 
+        <path
           d="M753,756.1c36.1,22.7,46.4,51.2,46.4,128.3c0,71.3-0.9,85.5-0.8,101.3H920v-282C881.5,733.9,826.5,748.5,753,756.1z"
           fill={color}
         />

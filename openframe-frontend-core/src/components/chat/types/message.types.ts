@@ -3,7 +3,7 @@
  * Contains all message structures, segments, and content types
  */
 
-import type { AssistantType, ChatApprovalStatus, MessageOwner } from './chat.types'
+import type { AssistantType, ChatApprovalStatus, MessageOwner } from './chat.types';
 
 // ========== Message Type Definitions ==========
 
@@ -18,122 +18,122 @@ export const MESSAGE_TYPE = {
   MESSAGE_END: 'MESSAGE_END',
   MESSAGE_REQUEST: 'MESSAGE_REQUEST',
   AI_METADATA: 'AI_METADATA',
-} as const
+} as const;
 
-export type MessageType = typeof MESSAGE_TYPE[keyof typeof MESSAGE_TYPE]
+export type MessageType = (typeof MESSAGE_TYPE)[keyof typeof MESSAGE_TYPE];
 
 // ========== Tool Execution Types ==========
 
 export interface ToolExecutionData {
-  type: 'EXECUTING_TOOL' | 'EXECUTED_TOOL'
-  integratedToolType: string
-  toolFunction: string
-  parameters?: Record<string, any>
-  result?: string
-  success?: boolean
+  type: 'EXECUTING_TOOL' | 'EXECUTED_TOOL';
+  integratedToolType: string;
+  toolFunction: string;
+  parameters?: Record<string, any>;
+  result?: string;
+  success?: boolean;
 }
 
 // ========== Approval Request Types ==========
 
 export interface ApprovalRequestData {
-  command: string
-  explanation?: string
-  icon?: React.ReactNode
-  requestId?: string
-  approvalRequestId?: string
-  approvalType?: string
+  command: string;
+  explanation?: string;
+  icon?: React.ReactNode;
+  requestId?: string;
+  approvalRequestId?: string;
+  approvalType?: string;
 }
 
 export interface ApprovalResultData {
-  approvalRequestId: string
-  approved: boolean
-  approvalType?: string
+  approvalRequestId: string;
+  approved: boolean;
+  approvalType?: string;
 }
 
 // ========== Message Segment Types ==========
 
 export type TextSegment = {
-  type: 'text'
-  text: string
-}
+  type: 'text';
+  text: string;
+};
 
 export type ToolExecutionSegment = {
-  type: 'tool_execution'
-  data: ToolExecutionData
-}
+  type: 'tool_execution';
+  data: ToolExecutionData;
+};
 
 export type ApprovalRequestSegment = {
-  type: 'approval_request'
-  data: ApprovalRequestData & { approvalType?: string }
-  status?: ChatApprovalStatus
-  onApprove?: (requestId?: string) => void | Promise<void>
-  onReject?: (requestId?: string) => void | Promise<void>
-}
+  type: 'approval_request';
+  data: ApprovalRequestData & { approvalType?: string };
+  status?: ChatApprovalStatus;
+  onApprove?: (requestId?: string) => void | Promise<void>;
+  onReject?: (requestId?: string) => void | Promise<void>;
+};
 
 export type ErrorSegment = {
-  type: 'error'
-  title: string
-  details?: string
-}
+  type: 'error';
+  title: string;
+  details?: string;
+};
 
-export type MessageSegment = TextSegment | ToolExecutionSegment | ApprovalRequestSegment | ErrorSegment
+export type MessageSegment = TextSegment | ToolExecutionSegment | ApprovalRequestSegment | ErrorSegment;
 
-export type MessageContent = string | MessageSegment[]
+export type MessageContent = string | MessageSegment[];
 
 // ========== Message Data Types (from GraphQL/API) ==========
 
 export interface MessageDataBase {
-  type: MessageType
+  type: MessageType;
 }
 
 export interface TextMessageData extends MessageDataBase {
-  type: 'TEXT'
-  text?: string
+  type: 'TEXT';
+  text?: string;
 }
 
 export interface ExecutingToolMessageData extends MessageDataBase {
-  type: 'EXECUTING_TOOL'
-  integratedToolType?: string
-  toolFunction?: string
-  parameters?: Record<string, any>
+  type: 'EXECUTING_TOOL';
+  integratedToolType?: string;
+  toolFunction?: string;
+  parameters?: Record<string, any>;
 }
 
 export interface ExecutedToolMessageData extends MessageDataBase {
-  type: 'EXECUTED_TOOL'
-  integratedToolType?: string
-  toolFunction?: string
-  parameters?: Record<string, any>
-  result?: string
-  success?: boolean
+  type: 'EXECUTED_TOOL';
+  integratedToolType?: string;
+  toolFunction?: string;
+  parameters?: Record<string, any>;
+  result?: string;
+  success?: boolean;
 }
 
 export interface ApprovalRequestMessageData extends MessageDataBase {
-  type: 'APPROVAL_REQUEST'
-  approvalRequestId?: string
-  approvalType?: string
-  command?: string
-  explanation?: string
+  type: 'APPROVAL_REQUEST';
+  approvalRequestId?: string;
+  approvalType?: string;
+  command?: string;
+  explanation?: string;
 }
 
 export interface ApprovalResultMessageData extends MessageDataBase {
-  type: 'APPROVAL_RESULT'
-  approvalRequestId?: string
-  approved?: boolean
-  approvalType?: string
+  type: 'APPROVAL_RESULT';
+  approvalRequestId?: string;
+  approved?: boolean;
+  approvalType?: string;
 }
 
 export interface ErrorMessageData extends MessageDataBase {
-  type: 'ERROR'
-  error?: string
-  details?: string
+  type: 'ERROR';
+  error?: string;
+  details?: string;
 }
 
 export interface AIMetadataMessageData extends MessageDataBase {
-  type: 'AI_METADATA'
-  modelName?: string
-  providerName?: string
-  provider?: string
-  contextWindow?: number
+  type: 'AI_METADATA';
+  modelName?: string;
+  providerName?: string;
+  provider?: string;
+  contextWindow?: number;
 }
 
 export type MessageData =
@@ -143,39 +143,39 @@ export type MessageData =
   | ApprovalRequestMessageData
   | ApprovalResultMessageData
   | ErrorMessageData
-  | AIMetadataMessageData
+  | AIMetadataMessageData;
 
 // ========== Historical Message Types ==========
 
 export interface HistoricalMessage {
-  id: string
-  dialogId?: string
-  chatType?: string
-  createdAt: string
-  owner?: MessageOwner
-  messageData?: MessageData | MessageData[]
+  id: string;
+  dialogId?: string;
+  chatType?: string;
+  createdAt: string;
+  owner?: MessageOwner;
+  messageData?: MessageData | MessageData[];
 }
 
 // ========== Processed Message Types ==========
 
 export interface ProcessedMessage {
-  id: string
-  role: 'user' | 'assistant' | 'error'  // Limited to display roles
-  content: MessageContent
-  name?: string
-  assistantType?: AssistantType
-  timestamp: Date
-  avatar?: string
+  id: string;
+  role: 'user' | 'assistant' | 'error'; // Limited to display roles
+  content: MessageContent;
+  name?: string;
+  assistantType?: AssistantType;
+  timestamp: Date;
+  avatar?: string;
 }
 
 // ========== Base Message Interface ==========
 
 export interface Message {
-  id: string
-  role: 'user' | 'assistant' | 'error'  // Limited to display roles
-  content: MessageContent
-  name?: string
-  assistantType?: AssistantType
-  timestamp?: Date
-  avatar?: string | null
+  id: string;
+  role: 'user' | 'assistant' | 'error'; // Limited to display roles
+  content: MessageContent;
+  name?: string;
+  assistantType?: AssistantType;
+  timestamp?: Date;
+  avatar?: string | null;
 }

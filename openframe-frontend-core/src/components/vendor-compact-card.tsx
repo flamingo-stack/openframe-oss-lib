@@ -1,15 +1,15 @@
-"use client"
+'use client';
 
 import React from 'react';
-import { VendorIcon } from './vendor-icon';
-import { ChevronButton } from './chevron-button';
-import { XButton } from './x-button';
-import { PricingDisplay, PRICING_STYLES } from './pricing-display';
-import { EmptyVendorIcon } from './empty-vendor-icon';
-import { cn } from "../utils/cn";
+import { cn } from '../utils/cn';
+import { type ComparisonPricing, getStructuredPricingSummary } from '../utils/compare-utils-stub';
 import { VendorWithMedia } from '../utils/vendor-media-stub';
-import { getStructuredPricingSummary, type ComparisonPricing } from '../utils/compare-utils-stub';
+import { ChevronButton } from './chevron-button';
+import { EmptyVendorIcon } from './empty-vendor-icon';
 import { OpenmspLogo } from './openmsp-logo';
+import { PRICING_STYLES, PricingDisplay } from './pricing-display';
+import { VendorIcon } from './vendor-icon';
+import { XButton } from './x-button';
 
 interface VendorCompactCardProps {
   vendor: VendorWithMedia & {
@@ -96,7 +96,7 @@ export function VendorCompactCard({
   isEmptyState = false,
   onClick,
   isEditableText = false,
-  editableValue = "",
+  editableValue = '',
   onEditableChange,
   onEditableKeyDown,
   onEditableFocus,
@@ -120,46 +120,46 @@ export function VendorCompactCard({
         window.open(url, '_blank', 'noopener,noreferrer');
       }
     },
-    [onClick, linkToVendor, vendor?.slug]
+    [onClick, linkToVendor, vendor?.slug],
   );
 
   return (
-    <div 
+    <div
       className={cn(
-        "flex items-center justify-between relative",
-        (onClick || (linkToVendor && vendor?.slug)) && "cursor-pointer",
-        className
+        'flex items-center justify-between relative',
+        (onClick || (linkToVendor && vendor?.slug)) && 'cursor-pointer',
+        className,
       )}
       onClick={defaultOnClick}
     >
       {/* Left: Vendor Icon, Name, and Score */}
-      <div className={cn(
-        "flex items-center gap-3 min-w-0 flex-1",
-        contentClassName
-      )}>
+      <div className={cn('flex items-center gap-3 min-w-0 flex-1', contentClassName)}>
         {isEmptyState ? (
           // Empty state icon with same containerization as VendorIcon
           <div className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 bg-[#161616] border border-ods-border">
-            <OpenmspLogo className="w-6 h-6" innerFrontBubbleColor="#0f0f0f" backBubbleColor="#888888" frontBubbleColor="#888888" />
+            <OpenmspLogo
+              className="w-6 h-6"
+              innerFrontBubbleColor="#0f0f0f"
+              backBubbleColor="#888888"
+              frontBubbleColor="#888888"
+            />
           </div>
         ) : (
-          <VendorIcon 
-            vendor={vendor}
-            size="lg"
-            backgroundStyle="dark"
-          />
+          <VendorIcon vendor={vendor} size="lg" backgroundStyle="dark" />
         )}
         <div className="flex flex-col min-w-0">
           {isEditableText ? (
             <input
               type="text"
               value={editableValue}
-              onChange={(e) => onEditableChange?.(e.target.value)}
+              onChange={e => onEditableChange?.(e.target.value)}
               onKeyDown={onEditableKeyDown}
               onFocus={onEditableFocus}
               className={cn(
                 "font-['DM_Sans'] text-[18px] font-medium leading-tight bg-transparent border-none outline-none w-full",
-                isEmptyState ? "text-ods-text-secondary placeholder-[#888888]" : "text-ods-text-primary placeholder-[#888888]"
+                isEmptyState
+                  ? 'text-ods-text-secondary placeholder-[#888888]'
+                  : 'text-ods-text-primary placeholder-[#888888]',
               )}
               placeholder={vendor.title}
               autoFocus
@@ -170,7 +170,7 @@ export function VendorCompactCard({
             <h3
               className={cn(
                 "font-['DM_Sans'] text-[18px] md:text-[18px] font-medium leading-tight truncate whitespace-nowrap max-w-[120px] md:max-w-[160px] lg:max-w-[220px]",
-                isEmptyState ? "text-ods-text-secondary" : "text-ods-text-primary"
+                isEmptyState ? 'text-ods-text-secondary' : 'text-ods-text-primary',
               )}
               title={vendor.title}
             >
@@ -197,7 +197,7 @@ export function VendorCompactCard({
                   </span>
                 ) : (
                   <button
-                    onClick={(e) => {
+                    onClick={e => {
                       e.stopPropagation();
                       onLearnMore?.();
                     }}
@@ -206,48 +206,38 @@ export function VendorCompactCard({
                     Learn More
                   </button>
                 )
+              ) : // Commercial - Show feature summary in comparison context, otherwise pricing
+              comparisonContext && featureSummary ? (
+                <span className="font-['DM_Sans'] text-[12px] text-ods-text-secondary font-medium">
+                  {featureSummary}
+                </span>
               ) : (
-                // Commercial - Show feature summary in comparison context, otherwise pricing
-                comparisonContext && featureSummary ? (
-                  <span className="font-['DM_Sans'] text-[12px] text-ods-text-secondary font-medium">
-                    {featureSummary}
-                  </span>
-                ) : (
-                  // Show pricing for commercial vendors outside comparison context
-                  <div className="font-['DM_Sans'] font-medium">
-                    {vendor.vendor_pricing && vendor.vendor_pricing.length > 0 ? (
-                      (() => {
-                        // Convert vendor_pricing to ComparisonPricing format
-                        const comparisonPricing: ComparisonPricing[] = vendor.vendor_pricing.map(p => ({
-                          id: p.id || 0,
-                          vendor_id: p.vendor_id || vendor.id || 0,
-                          model: p.model,
-                          price: p.price,
-                          unit: p.unit,
-                          tier: p.tier,
-                          billing_cycle: p.billing_cycle,
-                          setup_cost: p.setup_cost,
-                          notes: p.notes
-                        }));
-                        
-                        // Use EXACT same function and component as comparison table
-                        const structuredPricing = getStructuredPricingSummary(comparisonPricing);
-                        
-                        return (
-                          <PricingDisplay 
-                            pricing={structuredPricing} 
-                            styleConfig={PRICING_STYLES.compact}
-                          />
-                        );
-                      })()
-                    ) : (
-                      <PricingDisplay 
-                        pricing={[]} 
-                        styleConfig={PRICING_STYLES.compact}
-                      />
-                    )}
-                  </div>
-                )
+                // Show pricing for commercial vendors outside comparison context
+                <div className="font-['DM_Sans'] font-medium">
+                  {vendor.vendor_pricing && vendor.vendor_pricing.length > 0 ? (
+                    (() => {
+                      // Convert vendor_pricing to ComparisonPricing format
+                      const comparisonPricing: ComparisonPricing[] = vendor.vendor_pricing.map(p => ({
+                        id: p.id || 0,
+                        vendor_id: p.vendor_id || vendor.id || 0,
+                        model: p.model,
+                        price: p.price,
+                        unit: p.unit,
+                        tier: p.tier,
+                        billing_cycle: p.billing_cycle,
+                        setup_cost: p.setup_cost,
+                        notes: p.notes,
+                      }));
+
+                      // Use EXACT same function and component as comparison table
+                      const structuredPricing = getStructuredPricingSummary(comparisonPricing);
+
+                      return <PricingDisplay pricing={structuredPricing} styleConfig={PRICING_STYLES.compact} />;
+                    })()
+                  ) : (
+                    <PricingDisplay pricing={[]} styleConfig={PRICING_STYLES.compact} />
+                  )}
+                </div>
               )}
             </div>
           )}
@@ -269,7 +259,7 @@ export function VendorCompactCard({
           <XButton
             size={chevronSize}
             onClick={onXClick}
-            className={cn("flex-shrink-0", xButtonClassName)}
+            className={cn('flex-shrink-0', xButtonClassName)}
             backgroundColor={chevronBackgroundColor}
             borderColor={chevronBorderColor}
           />
@@ -280,7 +270,7 @@ export function VendorCompactCard({
             size={chevronSize}
             isExpanded={isExpanded}
             onClick={onChevronClick}
-            className={cn("flex-shrink-0", chevronClassName)}
+            className={cn('flex-shrink-0', chevronClassName)}
             backgroundColor={chevronBackgroundColor}
             borderColor={chevronBorderColor}
           />
@@ -288,4 +278,4 @@ export function VendorCompactCard({
       </div>
     </div>
   );
-} 
+}

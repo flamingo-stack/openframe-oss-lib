@@ -1,6 +1,6 @@
-"use client"
+'use client';
 
-import React from "react";
+import React from 'react';
 
 interface CategoryCardProps {
   name: string;
@@ -32,10 +32,12 @@ export function CategoryCard({ name, description, categoryCount, productCount, i
             style={{ minWidth: 48, minHeight: 48 }}
             aria-label={`View ${name}`}
           >
-            <svg width="24" height="24" fill="none" stroke="#FAFAFA" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+            <svg width="24" height="24" fill="none" stroke="#FAFAFA" strokeWidth="2" viewBox="0 0 24 24">
+              <path d="M9 18l6-6-6-6" />
+            </svg>
           </button>
         </div>
       </div>
     </article>
   );
-} 
+}

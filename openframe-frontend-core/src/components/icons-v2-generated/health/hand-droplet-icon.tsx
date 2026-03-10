@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface HandDropletIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface HandDropletIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function HandDropletIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: HandDropletIconProps) {
+export function HandDropletIcon({ className = '', size = 24, color = 'currentColor', ...props }: HandDropletIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

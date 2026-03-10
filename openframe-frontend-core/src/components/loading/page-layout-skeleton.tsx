@@ -1,10 +1,10 @@
-import type React from "react"
-import { cn } from "../../utils/cn"
-import { UnifiedSkeleton, TextSkeleton, MediaSkeleton, InteractiveSkeleton } from "./unified-skeleton"
-import { CardSkeletonGrid } from "./card-skeleton"
+import type React from 'react';
+import { cn } from '../../utils/cn';
+import { CardSkeletonGrid } from './card-skeleton';
+import { InteractiveSkeleton, MediaSkeleton, TextSkeleton, UnifiedSkeleton } from './unified-skeleton';
 
 interface PageLayoutSkeletonProps {
-  className?: string
+  className?: string;
 }
 
 /**
@@ -17,19 +17,19 @@ export function AnnouncementBarSkeleton() {
         <div className="box-border flex flex-row gap-4 md:gap-6 items-center justify-start pl-4 md:pl-6 pr-12 md:pr-16 py-3 md:py-4 relative w-full">
           {/* Logo skeleton */}
           <div className="relative shrink-0 w-6 h-6 md:w-8 md:h-8 bg-ods-border rounded"></div>
-          
+
           {/* Text content skeleton */}
           <div className="flex-1 min-w-0 space-y-1 md:space-y-2">
             <div className="h-[14px] md:h-[18px] bg-ods-border rounded w-3/4 max-w-md"></div>
             <div className="h-[12px] md:h-[18px] bg-ods-border rounded w-full max-w-lg hidden md:block"></div>
           </div>
-          
+
           {/* Close button skeleton */}
           <div className="absolute right-2 top-2 w-6 h-6 bg-ods-border rounded"></div>
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 /**
@@ -58,7 +58,7 @@ export function HeaderSkeleton() {
         <div className="md:hidden">
           <InteractiveSkeleton.Button className="h-10 w-10" />
         </div>
-        
+
         {/* Desktop: Show action buttons skeletons */}
         <div className="hidden md:flex items-center gap-4">
           <InteractiveSkeleton.Button className="w-10 h-10" />
@@ -67,7 +67,7 @@ export function HeaderSkeleton() {
         </div>
       </div>
     </header>
-  )
+  );
 }
 
 /**
@@ -78,33 +78,33 @@ export function HeroSkeleton() {
     <section
       className="w-full flex flex-col items-center justify-center py-12 px-4 md:py-20 md:px-8 text-center animate-pulse"
       style={{
-        background: 'radial-gradient(circle at 50% 0%, #242323 0%, #1A1A1A 100%)'
+        background: 'radial-gradient(circle at 50% 0%, #242323 0%, #1A1A1A 100%)',
       }}
     >
       {/* Title skeleton */}
       <TextSkeleton.Heading className="h-12 md:h-20 lg:h-24 mb-4 md:mb-6 max-w-4xl w-full" />
-      
+
       {/* Subtitle skeleton */}
       <div className="space-y-3 mb-8 md:mb-10 max-w-4xl w-full px-2">
         <TextSkeleton.Body className="h-5 md:h-7" />
         <TextSkeleton.Body className="h-5 md:h-7 w-3/4 mx-auto" />
       </div>
-      
+
       {/* CTA Button skeleton */}
       <InteractiveSkeleton.Button className="w-full md:w-64 h-12" />
     </section>
-  )
+  );
 }
 
 /**
  * Search container skeleton with filters
  */
-export function SearchContainerSkeleton({ 
+export function SearchContainerSkeleton({
   className,
-  showFilters = true 
+  showFilters = true,
 }: PageLayoutSkeletonProps & { showFilters?: boolean }) {
   return (
-    <div className={cn("space-y-4", className || "")}>
+    <div className={cn('space-y-4', className || '')}>
       {/* Search input and button */}
       <div className="flex gap-2 md:gap-4">
         <InteractiveSkeleton.Input className="flex-1" />
@@ -121,7 +121,7 @@ export function SearchContainerSkeleton({
         </div>
       )}
     </div>
-  )
+  );
 }
 
 /**
@@ -129,11 +129,11 @@ export function SearchContainerSkeleton({
  */
 export function CategorySidebarSkeleton({ className }: PageLayoutSkeletonProps) {
   return (
-    <div className={cn("w-full lg:w-[320px] space-y-6", className)}>
+    <div className={cn('w-full lg:w-[320px] space-y-6', className)}>
       <div className="bg-ods-card border border-ods-border rounded-lg p-4 md:p-6">
         {/* Sidebar header */}
         <TextSkeleton.Subheading className="mb-4 w-1/2" />
-        
+
         {/* Category list */}
         <div className="space-y-3">
           {Array.from({ length: 8 }).map((_, index) => (
@@ -158,7 +158,7 @@ export function CategorySidebarSkeleton({ className }: PageLayoutSkeletonProps) 
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 /**
@@ -166,7 +166,7 @@ export function CategorySidebarSkeleton({ className }: PageLayoutSkeletonProps) 
  */
 export function BreadcrumbSkeleton({ className }: PageLayoutSkeletonProps) {
   return (
-    <div className={cn("flex items-center space-x-1 mb-6", className)}>
+    <div className={cn('flex items-center space-x-1 mb-6', className)}>
       <TextSkeleton.Caption className="w-16" />
       <UnifiedSkeleton variant="default" className="w-4 h-4 rounded-full" />
       <TextSkeleton.Caption className="w-24" />
@@ -175,7 +175,7 @@ export function BreadcrumbSkeleton({ className }: PageLayoutSkeletonProps) {
       <UnifiedSkeleton variant="default" className="w-4 h-4 rounded-full" />
       <TextSkeleton.Caption className="w-24" />
     </div>
-  )
+  );
 }
 
 /**
@@ -183,13 +183,13 @@ export function BreadcrumbSkeleton({ className }: PageLayoutSkeletonProps) {
  */
 export function ResultsHeaderSkeleton({ className }: PageLayoutSkeletonProps) {
   return (
-    <div className={cn("flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6", className)}>
+    <div className={cn('flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6', className)}>
       <div className="space-y-1">
         <TextSkeleton.Body className="w-48" />
         {/* <TextSkeleton.Caption className="w-32" /> */}
       </div>
     </div>
-  )
+  );
 }
 
 /**
@@ -199,21 +199,23 @@ export function TwoColumnLayoutSkeleton({
   className,
   sidebarContent,
   mainContent,
-  sidebarPosition = 'left'
+  sidebarPosition = 'left',
 }: PageLayoutSkeletonProps & {
-  sidebarContent?: React.ReactNode
-  mainContent?: React.ReactNode
-  sidebarPosition?: 'left' | 'right'
+  sidebarContent?: React.ReactNode;
+  mainContent?: React.ReactNode;
+  sidebarPosition?: 'left' | 'right';
 }) {
-  const sidebar = sidebarContent || <CategorySidebarSkeleton />
-  const main = mainContent || <CardSkeletonGrid count={6} />
+  const sidebar = sidebarContent || <CategorySidebarSkeleton />;
+  const main = mainContent || <CardSkeletonGrid count={6} />;
 
   return (
-    <div className={cn(
-      "grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6 lg:gap-8",
-      sidebarPosition === 'right' && "lg:grid-cols-[1fr_320px]",
-      className
-    )}>
+    <div
+      className={cn(
+        'grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6 lg:gap-8',
+        sidebarPosition === 'right' && 'lg:grid-cols-[1fr_320px]',
+        className,
+      )}
+    >
       {sidebarPosition === 'left' ? (
         <>
           <aside className="order-2 lg:order-1">{sidebar}</aside>
@@ -226,7 +228,7 @@ export function TwoColumnLayoutSkeleton({
         </>
       )}
     </div>
-  )
+  );
 }
 
 /**
@@ -234,7 +236,7 @@ export function TwoColumnLayoutSkeleton({
  */
 export function ArticleLayoutSkeleton({ className }: PageLayoutSkeletonProps) {
   return (
-    <article className={cn("max-w-4xl mx-auto", className)}>
+    <article className={cn('max-w-4xl mx-auto', className)}>
       {/* Article header */}
       <header className="mb-8 md:mb-12 space-y-4 md:space-y-6">
         {/* Category/tags */}
@@ -242,13 +244,13 @@ export function ArticleLayoutSkeleton({ className }: PageLayoutSkeletonProps) {
           <InteractiveSkeleton.Chip />
           <InteractiveSkeleton.Chip className="w-16" />
         </div>
-        
+
         {/* Title */}
         <div className="space-y-3">
           <TextSkeleton.Heading className="w-full" />
           <TextSkeleton.Heading className="w-3/4" />
         </div>
-        
+
         {/* Metadata */}
         <div className="flex items-center gap-4 pt-4 border-t border-ods-divider">
           <div className="flex items-center gap-2">
@@ -276,7 +278,7 @@ export function ArticleLayoutSkeleton({ className }: PageLayoutSkeletonProps) {
             <TextSkeleton.Body className="w-3/4" />
           </div>
         ))}
-        
+
         {/* Subheading in content */}
         <div className="py-4">
           <TextSkeleton.Subheading className="w-2/3 mb-4" />
@@ -287,7 +289,7 @@ export function ArticleLayoutSkeleton({ className }: PageLayoutSkeletonProps) {
         </div>
       </div>
     </article>
-  )
+  );
 }
 
 /**
@@ -296,7 +298,7 @@ export function ArticleLayoutSkeleton({ className }: PageLayoutSkeletonProps) {
  */
 export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProps) {
   return (
-    <main className={cn("bg-[#161616] min-h-screen", className)}>
+    <main className={cn('bg-[#161616] min-h-screen', className)}>
       <div className="max-w-[1920px] mx-auto px-6 md:px-20 py-6 md:py-10">
         {/* Breadcrumb */}
         <BreadcrumbSkeleton className="mb-6" />
@@ -305,13 +307,12 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
         <div className="flex flex-col lg:flex-row lg:gap-10">
           {/* Left Content Area */}
           <div className="flex-1 min-w-0">
-            
             {/* Vendor Hero Section */}
             <div className="mb-10">
               {/* Header - Logo and Title Side by Side */}
               <div className="flex gap-6 mb-6">
                 <div className="w-20 h-20 bg-ods-card border border-ods-border rounded-lg animate-pulse flex-shrink-0"></div>
-                
+
                 <div className="flex flex-col gap-3">
                   <div className="flex flex-col gap-2">
                     {/* Large title skeleton */}
@@ -319,7 +320,7 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
                     {/* Category text */}
                     <div className="h-5 md:h-6 bg-[#2A2A2A] rounded animate-pulse w-32"></div>
                   </div>
-                  
+
                   {/* Pricing tags */}
                   <div className="flex items-center gap-2">
                     <div className="h-8 bg-[#2A2A2A] rounded animate-pulse w-20"></div>
@@ -340,13 +341,13 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
               <div className="space-y-4">
                 {/* Deploy Button */}
                 <div className="h-12 bg-ods-card border border-ods-border rounded-lg animate-pulse"></div>
-                
+
                 {/* Voting Buttons */}
                 <div className="space-y-2">
                   <div className="h-12 bg-ods-card border border-ods-border rounded-lg animate-pulse"></div>
                   <div className="h-12 bg-ods-card border border-ods-border rounded-lg animate-pulse"></div>
                 </div>
-                
+
                 {/* GitHub Score Section */}
                 <div className="border border-ods-border rounded-lg overflow-hidden">
                   {/* Header */}
@@ -357,7 +358,7 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
                       <div className="h-6 bg-[#2A2A2A] rounded animate-pulse w-12"></div>
                     </div>
                   </div>
-                  
+
                   {/* Stats */}
                   <div className="p-4 space-y-3">
                     {Array.from({ length: 4 }).map((_, i) => (
@@ -371,7 +372,7 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
                     ))}
                   </div>
                 </div>
-                
+
                 {/* Action Buttons */}
                 <div className="space-y-3">
                   <div className="h-12 bg-ods-card border border-ods-border rounded-lg animate-pulse"></div>
@@ -384,13 +385,16 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
             {/* Alternatives Container */}
             <div className="flex flex-col gap-6 mb-20">
               <div className="h-8 md:h-10 bg-[#2A2A2A] rounded animate-pulse w-48"></div>
-              
+
               {/* Open Source Alternatives */}
               <div className="flex flex-col gap-4">
                 <div className="h-5 bg-[#2A2A2A] rounded animate-pulse w-48"></div>
                 <div className="flex flex-wrap gap-2">
                   {Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="h-10 bg-ods-card border border-ods-border rounded-lg animate-pulse w-24"></div>
+                    <div
+                      key={i}
+                      className="h-10 bg-ods-card border border-ods-border rounded-lg animate-pulse w-24"
+                    ></div>
                   ))}
                 </div>
               </div>
@@ -400,7 +404,10 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
                 <div className="h-5 bg-[#2A2A2A] rounded animate-pulse w-52"></div>
                 <div className="flex flex-wrap gap-2">
                   {Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="h-10 bg-ods-card border border-ods-border rounded-lg animate-pulse w-28"></div>
+                    <div
+                      key={i}
+                      className="h-10 bg-ods-card border border-ods-border rounded-lg animate-pulse w-28"
+                    ></div>
                   ))}
                 </div>
               </div>
@@ -409,7 +416,7 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
             {/* About Section */}
             <div className="flex flex-col gap-6 mb-20">
               <div className="h-8 md:h-10 bg-[#2A2A2A] rounded animate-pulse w-64"></div>
-              
+
               <div className="bg-ods-card border border-ods-border rounded-lg p-6 md:p-8">
                 <div className="space-y-4">
                   <div className="h-6 bg-[#2A2A2A] rounded animate-pulse"></div>
@@ -484,14 +491,14 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
                       </div>
                       <div className="h-6 bg-[#2A2A2A] rounded animate-pulse w-20"></div>
                     </div>
-                    
+
                     {/* Description */}
                     <div className="space-y-2">
                       <div className="h-4 bg-[#2A2A2A] rounded animate-pulse"></div>
                       <div className="h-4 bg-[#2A2A2A] rounded animate-pulse w-5/6"></div>
                       <div className="h-4 bg-[#2A2A2A] rounded animate-pulse w-4/5"></div>
                     </div>
-                    
+
                     {/* Footer */}
                     <div className="flex items-center justify-between pt-2 border-t border-ods-border">
                       <div className="h-4 bg-[#2A2A2A] rounded animate-pulse w-16"></div>
@@ -507,7 +514,7 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
             {/* Comments Section */}
             <div className="flex flex-col gap-6 mb-20">
               <div className="h-8 md:h-10 bg-[#2A2A2A] rounded animate-pulse w-64"></div>
-              
+
               {/* Comment Form Skeleton */}
               <div className="space-y-3">
                 <div className="flex gap-3">
@@ -517,7 +524,7 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
                       <div className="h-3 bg-[#2A2A2A] rounded animate-pulse w-8 mb-2"></div>
                       <div className="h-6 bg-[#2A2A2A] rounded animate-pulse w-full"></div>
                     </div>
-                    
+
                     {/* Description Section */}
                     <div className="p-3">
                       <div className="h-3 bg-[#2A2A2A] rounded animate-pulse w-16 mb-2"></div>
@@ -528,14 +535,14 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Send Button */}
                   <div className="flex items-stretch">
                     <div className="h-[120px] w-20 bg-[#2A2A2A] rounded-lg animate-pulse"></div>
                   </div>
                 </div>
               </div>
-              
+
               {/* Sample Comment Cards */}
               <div className="space-y-4">
                 {Array.from({ length: 3 }).map((_, i) => (
@@ -548,12 +555,12 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
                           <div className="w-8 h-8 bg-[#2A2A2A] rounded-lg animate-pulse"></div>
                           <div className="h-4 bg-[#2A2A2A] rounded animate-pulse w-20"></div>
                         </div>
-                        
+
                         {/* Timestamp */}
                         <div className="h-4 bg-[#2A2A2A] rounded animate-pulse w-12"></div>
                       </div>
                     </div>
-                    
+
                     {/* Comment Content */}
                     <div className="space-y-2">
                       <div className="h-6 bg-[#2A2A2A] rounded animate-pulse w-2/3"></div>
@@ -574,13 +581,13 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
             <div className="space-y-4">
               {/* Deploy Button */}
               <div className="h-12 bg-ods-card border border-ods-border rounded-lg animate-pulse"></div>
-              
+
               {/* Voting Buttons */}
               <div className="space-y-2">
                 <div className="h-12 bg-ods-card border border-ods-border rounded-lg animate-pulse"></div>
                 <div className="h-12 bg-ods-card border border-ods-border rounded-lg animate-pulse"></div>
               </div>
-              
+
               {/* GitHub Score Section */}
               <div className="border border-ods-border rounded-lg overflow-hidden">
                 {/* Header */}
@@ -591,7 +598,7 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
                     <div className="h-6 bg-[#2A2A2A] rounded animate-pulse w-12"></div>
                   </div>
                 </div>
-                
+
                 {/* Stats */}
                 <div className="p-4 space-y-3">
                   {Array.from({ length: 4 }).map((_, i) => (
@@ -605,7 +612,7 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
                   ))}
                 </div>
               </div>
-              
+
               {/* Action Buttons */}
               <div className="space-y-3">
                 <div className="h-12 bg-ods-card border border-ods-border rounded-lg animate-pulse"></div>
@@ -617,23 +624,22 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
         </div>
       </div>
     </main>
-  )
+  );
 }
 
 /**
  * Stats/features section skeleton for homepage
  */
-export function StatsSectionSkeleton({ 
-  className,
-  columns = 3 
-}: PageLayoutSkeletonProps & { columns?: number }) {
+export function StatsSectionSkeleton({ className, columns = 3 }: PageLayoutSkeletonProps & { columns?: number }) {
   return (
-    <div className={cn(
-      "grid gap-6 mb-12 md:mb-16",
-      columns === 3 && "grid-cols-1 md:grid-cols-3",
-      columns === 4 && "grid-cols-1 md:grid-cols-2 lg:grid-cols-4",
-      className
-    )}>
+    <div
+      className={cn(
+        'grid gap-6 mb-12 md:mb-16',
+        columns === 3 && 'grid-cols-1 md:grid-cols-3',
+        columns === 4 && 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4',
+        className,
+      )}
+    >
       {Array.from({ length: columns }).map((_, i) => (
         <div key={i} className="bg-ods-card border border-ods-border rounded-lg p-6">
           <div className="space-y-4">
@@ -647,9 +653,8 @@ export function StatsSectionSkeleton({
         </div>
       ))}
     </div>
-  )
+  );
 }
-
 
 /**
  * Blog Card Grid Skeleton - Always displays exactly 4 blog card skeletons
@@ -657,14 +662,10 @@ export function StatsSectionSkeleton({
  */
 export function BlogCardGridSkeleton({ className }: PageLayoutSkeletonProps) {
   return (
-    <div className={cn("space-y-6", className)}>
-      <CardSkeletonGrid 
-        count={4}
-        variant="blog"
-        className="grid-cols-1 md:grid-cols-2"
-      />
+    <div className={cn('space-y-6', className)}>
+      <CardSkeletonGrid count={4} variant="blog" className="grid-cols-1 md:grid-cols-2" />
     </div>
-  )
+  );
 }
 
 /**
@@ -673,14 +674,10 @@ export function BlogCardGridSkeleton({ className }: PageLayoutSkeletonProps) {
  */
 export function VendorGridSkeleton({ className }: PageLayoutSkeletonProps) {
   return (
-    <div className={cn("space-y-6", className)}>
-      <CardSkeletonGrid 
-        count={12}
-        variant="vendor"
-        className="grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
-      />
+    <div className={cn('space-y-6', className)}>
+      <CardSkeletonGrid count={12} variant="vendor" className="grid-cols-1 md:grid-cols-2 lg:grid-cols-3" />
     </div>
-  )
+  );
 }
 
 /**
@@ -689,13 +686,9 @@ export function VendorGridSkeleton({ className }: PageLayoutSkeletonProps) {
  */
 export function SlackCommunitySkeleton() {
   return (
-    <section 
-      className="w-full bg-[#161616] px-4 md:px-20 lg:px-20 py-12 md:py-20"
-      aria-label="Slack Community Loading"
-    >
+    <section className="w-full bg-[#161616] px-4 md:px-20 lg:px-20 py-12 md:py-20" aria-label="Slack Community Loading">
       {/* Frame 651 Container */}
       <div className="w-full flex flex-col gap-4 md:gap-6">
-        
         {/* Title Skeleton */}
         <div className="w-full">
           <div className="h-8 md:h-12 lg:h-14 bg-[#2A2A2A] rounded-lg animate-pulse max-w-md"></div>
@@ -703,7 +696,6 @@ export function SlackCommunitySkeleton() {
 
         {/* Content Area - Channel List + Chat Interface */}
         <div className="w-full flex flex-col lg:flex-row lg:justify-end lg:items-start gap-4 md:gap-6 min-w-0">
-          
           {/* Channel List Skeleton */}
           <div className="w-full lg:w-[290px] lg:max-w-[290px] bg-[#161616] border border-ods-border rounded flex flex-col flex-shrink-0 overflow-hidden animate-pulse">
             <div className="p-4 space-y-4">
@@ -748,7 +740,6 @@ export function SlackCommunitySkeleton() {
 
           {/* Chat Interface Skeleton */}
           <div className="flex-1 min-h-[450px] h-[450px] md:min-h-[500px] md:h-[500px] lg:min-h-[600px] lg:h-[600px] bg-ods-card border border-ods-border rounded-lg flex flex-col min-w-0 animate-pulse">
-            
             {/* Header */}
             <div className="flex items-center justify-between p-4 md:p-6 border-b border-ods-border bg-[#161616] h-[56px] md:h-[60px] flex-shrink-0">
               <div className="flex items-center gap-2">
@@ -785,4 +776,4 @@ export function SlackCommunitySkeleton() {
       </div>
     </section>
   );
-} 
+}

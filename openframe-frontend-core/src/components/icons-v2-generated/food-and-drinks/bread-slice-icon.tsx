@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface BreadSliceIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface BreadSliceIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function BreadSliceIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: BreadSliceIconProps) {
+export function BreadSliceIcon({ className = '', size = 24, color = 'currentColor', ...props }: BreadSliceIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

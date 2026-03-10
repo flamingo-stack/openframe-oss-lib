@@ -1,7 +1,7 @@
 // Report related TypeScript interfaces
 // This centralizes types used by margin analysis wizard and DAL utilities.
 
-import { StackVendorSelection, UserStack } from "./stack";
+import { StackVendorSelection, UserStack } from './stack';
 
 // Vendor objects returned with lightweight=true from getVendorsBySlugs
 
@@ -39,4 +39,4 @@ export interface CreateMarginReportPayload {
   aiAltMap: Record<string, any>;
   stackVendorsToSlugs: StackVendorSelection[];
   // other dynamic AI prompt fields...
-} 
+}

@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface Arrow02LeftIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface Arrow02LeftIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function Arrow02LeftIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: Arrow02LeftIconProps) {
+export function Arrow02LeftIcon({ className = '', size = 24, color = 'currentColor', ...props }: Arrow02LeftIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

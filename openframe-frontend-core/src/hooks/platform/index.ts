@@ -1,2 +1,2 @@
 // Platform Hooks exports
-export * from './use-platform-config'
+export * from './use-platform-config';

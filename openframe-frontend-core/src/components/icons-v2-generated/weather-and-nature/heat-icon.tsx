@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface HeatIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface HeatIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function HeatIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: HeatIconProps) {
+export function HeatIcon({ className = '', size = 24, color = 'currentColor', ...props }: HeatIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

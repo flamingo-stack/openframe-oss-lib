@@ -1,8 +1,8 @@
-import React from "react"
+import React from 'react';
 
-export interface MessageCircleIconProps extends React.SVGProps<SVGSVGElement> { }
+export interface MessageCircleIconProps extends React.SVGProps<SVGSVGElement> {}
 
-export function MessageCircleIcon({ className = "h-6 w-6", color = 'white', ...props }: MessageCircleIconProps) {
+export function MessageCircleIcon({ className = 'h-6 w-6', color = 'white', ...props }: MessageCircleIconProps) {
   return (
     <svg
       width="24"
@@ -20,27 +20,9 @@ export function MessageCircleIcon({ className = "h-6 w-6", color = 'white', ...p
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <path
-        d="M8 12H8.01"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M12 12H12.01"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M16 12H16.01"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <path d="M8 12H8.01" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12 12H12.01" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M16 12H16.01" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
-  )
+  );
 }

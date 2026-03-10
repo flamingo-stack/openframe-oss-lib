@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface RetweetIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface RetweetIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function RetweetIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: RetweetIconProps) {
+export function RetweetIcon({ className = '', size = 24, color = 'currentColor', ...props }: RetweetIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

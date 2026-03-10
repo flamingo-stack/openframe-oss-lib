@@ -1,14 +1,13 @@
-import type { SVGProps } from "react";
-export interface GoogleGeminiLogoIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface GoogleGeminiLogoIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
 export function GoogleGeminiLogoIcon({
-  className = "",
+  className = '',
   size = 24,
-  color = "currentColor",
+  color = 'currentColor',
   ...props
 }: GoogleGeminiLogoIconProps) {
   return (
@@ -29,7 +28,7 @@ export function GoogleGeminiLogoIcon({
         y={2}
         maskUnits="userSpaceOnUse"
         style={{
-          maskType: "alpha",
+          maskType: 'alpha',
         }}
       >
         <path
@@ -121,10 +120,7 @@ export function GoogleGeminiLogoIcon({
         >
           <feFlood floodOpacity={0} result="BackgroundImageFix" />
           <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
-          <feGaussianBlur
-            result="effect1_foregroundBlur_983_149"
-            stdDeviation={0.757}
-          />
+          <feGaussianBlur result="effect1_foregroundBlur_983_149" stdDeviation={0.757} />
         </filter>
         <filter
           id="google-gemini-logo_svg__d"
@@ -137,10 +133,7 @@ export function GoogleGeminiLogoIcon({
         >
           <feFlood floodOpacity={0} result="BackgroundImageFix" />
           <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
-          <feGaussianBlur
-            result="effect1_foregroundBlur_983_149"
-            stdDeviation={3.659}
-          />
+          <feGaussianBlur result="effect1_foregroundBlur_983_149" stdDeviation={3.659} />
         </filter>
         <filter
           id="google-gemini-logo_svg__e"
@@ -153,10 +146,7 @@ export function GoogleGeminiLogoIcon({
         >
           <feFlood floodOpacity={0} result="BackgroundImageFix" />
           <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
-          <feGaussianBlur
-            result="effect1_foregroundBlur_983_149"
-            stdDeviation={3.11}
-          />
+          <feGaussianBlur result="effect1_foregroundBlur_983_149" stdDeviation={3.11} />
         </filter>
         <filter
           id="google-gemini-logo_svg__f"
@@ -169,10 +159,7 @@ export function GoogleGeminiLogoIcon({
         >
           <feFlood floodOpacity={0} result="BackgroundImageFix" />
           <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
-          <feGaussianBlur
-            result="effect1_foregroundBlur_983_149"
-            stdDeviation={3.11}
-          />
+          <feGaussianBlur result="effect1_foregroundBlur_983_149" stdDeviation={3.11} />
         </filter>
         <filter
           id="google-gemini-logo_svg__g"
@@ -185,10 +172,7 @@ export function GoogleGeminiLogoIcon({
         >
           <feFlood floodOpacity={0} result="BackgroundImageFix" />
           <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
-          <feGaussianBlur
-            result="effect1_foregroundBlur_983_149"
-            stdDeviation={3.11}
-          />
+          <feGaussianBlur result="effect1_foregroundBlur_983_149" stdDeviation={3.11} />
         </filter>
         <filter
           id="google-gemini-logo_svg__h"
@@ -201,10 +185,7 @@ export function GoogleGeminiLogoIcon({
         >
           <feFlood floodOpacity={0} result="BackgroundImageFix" />
           <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
-          <feGaussianBlur
-            result="effect1_foregroundBlur_983_149"
-            stdDeviation={2.956}
-          />
+          <feGaussianBlur result="effect1_foregroundBlur_983_149" stdDeviation={2.956} />
         </filter>
         <filter
           id="google-gemini-logo_svg__i"
@@ -217,10 +198,7 @@ export function GoogleGeminiLogoIcon({
         >
           <feFlood floodOpacity={0} result="BackgroundImageFix" />
           <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
-          <feGaussianBlur
-            result="effect1_foregroundBlur_983_149"
-            stdDeviation={2.679}
-          />
+          <feGaussianBlur result="effect1_foregroundBlur_983_149" stdDeviation={2.679} />
         </filter>
         <filter
           id="google-gemini-logo_svg__j"
@@ -233,10 +211,7 @@ export function GoogleGeminiLogoIcon({
         >
           <feFlood floodOpacity={0} result="BackgroundImageFix" />
           <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
-          <feGaussianBlur
-            result="effect1_foregroundBlur_983_149"
-            stdDeviation={2.392}
-          />
+          <feGaussianBlur result="effect1_foregroundBlur_983_149" stdDeviation={2.392} />
         </filter>
         <filter
           id="google-gemini-logo_svg__k"
@@ -249,10 +224,7 @@ export function GoogleGeminiLogoIcon({
         >
           <feFlood floodOpacity={0} result="BackgroundImageFix" />
           <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
-          <feGaussianBlur
-            result="effect1_foregroundBlur_983_149"
-            stdDeviation={2.141}
-          />
+          <feGaussianBlur result="effect1_foregroundBlur_983_149" stdDeviation={2.141} />
         </filter>
         <filter
           id="google-gemini-logo_svg__l"
@@ -265,10 +237,7 @@ export function GoogleGeminiLogoIcon({
         >
           <feFlood floodOpacity={0} result="BackgroundImageFix" />
           <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
-          <feGaussianBlur
-            result="effect1_foregroundBlur_983_149"
-            stdDeviation={1.808}
-          />
+          <feGaussianBlur result="effect1_foregroundBlur_983_149" stdDeviation={1.808} />
         </filter>
         <filter
           id="google-gemini-logo_svg__m"
@@ -281,10 +250,7 @@ export function GoogleGeminiLogoIcon({
         >
           <feFlood floodOpacity={0} result="BackgroundImageFix" />
           <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
-          <feGaussianBlur
-            result="effect1_foregroundBlur_983_149"
-            stdDeviation={2.238}
-          />
+          <feGaussianBlur result="effect1_foregroundBlur_983_149" stdDeviation={2.238} />
         </filter>
         <linearGradient
           id="google-gemini-logo_svg__a"

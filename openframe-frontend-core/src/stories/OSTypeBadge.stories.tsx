@@ -8,7 +8,8 @@ const meta = {
     layout: 'centered',
     docs: {
       description: {
-        component: 'Displays operating system type with icon and label. Automatically normalizes OS type strings from various sources like Fleet MDM, Tactical RMM, etc.',
+        component:
+          'Displays operating system type with icon and label. Automatically normalizes OS type strings from various sources like Fleet MDM, Tactical RMM, etc.',
       },
     },
   },

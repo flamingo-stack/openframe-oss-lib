@@ -6,21 +6,21 @@
  * Responsive layout: stacks cells on mobile, shows grid on desktop.
  */
 
-import React from 'react'
-import { cn } from '../../utils/cn'
-import { getOSLabel } from '../../utils/os-utils'
-import { getShellLabel } from '../../utils/shell-utils'
+import React from 'react';
+import { cn } from '../../utils/cn';
+import { getOSLabel } from '../../utils/os-utils';
+import { getShellLabel } from '../../utils/shell-utils';
 
 /**
  * Props for author avatar display
  */
 export interface ScriptAuthor {
   /** Author name */
-  name: string
+  name: string;
   /** Author initials (used when no photo) */
-  initials?: string
+  initials?: string;
   /** URL to author's photo */
-  photoUrl?: string
+  photoUrl?: string;
 }
 
 /**
@@ -28,19 +28,19 @@ export interface ScriptAuthor {
  */
 export interface ScriptInfoSectionProps {
   /** Script title/name */
-  headline: string
+  headline: string;
   /** Script description */
-  subheadline?: string
+  subheadline?: string;
   /** Shell type (POWERSHELL, BASH, CMD, etc.) */
-  shellType?: string
+  shellType?: string;
   /** Array of supported platform strings (windows, darwin, linux, etc.) */
-  supportedPlatforms?: string[]
+  supportedPlatforms?: string[];
   /** Script category */
-  category: string
+  category: string;
   /** Author information */
-  author?: ScriptAuthor
+  author?: ScriptAuthor;
   /** Additional CSS classes */
-  className?: string
+  className?: string;
 }
 
 /**
@@ -50,9 +50,9 @@ export interface ScriptInfoSectionProps {
  */
 function formatSupportedPlatforms(platforms?: string[]): string {
   if (!platforms || platforms.length === 0) {
-    return 'All Platforms'
+    return 'All Platforms';
   }
-  return platforms.map((platform) => getOSLabel(platform)).join(', ')
+  return platforms.map(platform => getOSLabel(platform)).join(', ');
 }
 
 /**
@@ -61,21 +61,21 @@ function formatSupportedPlatforms(platforms?: string[]): string {
  * @returns Two-letter initials
  */
 function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/)
+  const parts = name.trim().split(/\s+/);
   if (parts.length >= 2) {
-    return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
   }
-  return name.slice(0, 2).toUpperCase()
+  return name.slice(0, 2).toUpperCase();
 }
 
 /**
  * InfoCell - Single info cell with label and value
  */
 interface InfoCellProps {
-  label: string
-  value: string
-  avatar?: ScriptAuthor
-  className?: string
+  label: string;
+  value: string;
+  avatar?: ScriptAuthor;
+  className?: string;
 }
 
 function InfoCell({ label, value, avatar, className }: InfoCellProps) {
@@ -85,11 +85,7 @@ function InfoCell({ label, value, avatar, className }: InfoCellProps) {
       {avatar && (
         <div className="relative shrink-0 size-8 rounded-full bg-ods-bg border border-ods-border overflow-hidden">
           {avatar.photoUrl ? (
-            <img
-              src={avatar.photoUrl}
-              alt={avatar.name}
-              className="size-full object-cover"
-            />
+            <img src={avatar.photoUrl} alt={avatar.name} className="size-full object-cover" />
           ) : (
             <div className="size-full flex items-center justify-center text-ods-text-secondary text-sm font-medium">
               {avatar.initials || getInitials(avatar.name)}
@@ -108,7 +104,7 @@ function InfoCell({ label, value, avatar, className }: InfoCellProps) {
         </span>
       </div>
     </div>
-  )
+  );
 }
 
 /**
@@ -133,18 +129,13 @@ export const ScriptInfoSection: React.FC<ScriptInfoSectionProps> = ({
   supportedPlatforms,
   category,
   author,
-  className
+  className,
 }) => {
-  const shellLabel = getShellLabel(shellType)
-  const platformsLabel = formatSupportedPlatforms(supportedPlatforms)
+  const shellLabel = getShellLabel(shellType);
+  const platformsLabel = formatSupportedPlatforms(supportedPlatforms);
 
   return (
-    <div
-      className={cn(
-        'bg-ods-card border border-ods-border rounded-[6px] overflow-hidden',
-        className
-      )}
-    >
+    <div className={cn('bg-ods-card border border-ods-border rounded-[6px] overflow-hidden', className)}>
       {/* Header row with title and description */}
       <div className="p-4 border-b border-ods-border">
         <div className="flex flex-col gap-1">
@@ -169,24 +160,15 @@ export const ScriptInfoSection: React.FC<ScriptInfoSectionProps> = ({
         <InfoCell label="Supported Platforms" value={platformsLabel} />
         {/* Desktop only: Category and Author in same row */}
         <InfoCell label="Category" value={category} className="hidden lg:flex" />
-        {author && (
-          <InfoCell
-            label="Added by"
-            value={author.name}
-            avatar={author}
-            className="hidden lg:flex"
-          />
-        )}
+        {author && <InfoCell label="Added by" value={author.name} avatar={author} className="hidden lg:flex" />}
       </div>
       {/* Second row (mobile/tablet only): Category, Author */}
       <div className="px-4 py-4 grid grid-cols-2 gap-4 lg:hidden">
         <InfoCell label="Category" value={category} />
-        {author && (
-          <InfoCell label="Added by" value={author.name} avatar={author} />
-        )}
+        {author && <InfoCell label="Added by" value={author.name} avatar={author} />}
       </div>
     </div>
-  )
-}
+  );
+};
 
-ScriptInfoSection.displayName = 'ScriptInfoSection'
+ScriptInfoSection.displayName = 'ScriptInfoSection';

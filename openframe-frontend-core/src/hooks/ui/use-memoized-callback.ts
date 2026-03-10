@@ -1,6 +1,6 @@
-"use client"
+'use client';
 
-import { useCallback, useRef } from "react"
+import { useCallback, useRef } from 'react';
 
 /**
  * Hook to memoize a callback with dependencies
@@ -11,20 +11,20 @@ import { useCallback, useRef } from "react"
  */
 export function useMemoizedCallback<T extends (...args: any[]) => any>(callback: T, dependencies: any[]): T {
   // Store the callback and dependencies
-  const callbackRef = useRef<T>(callback)
-  const dependenciesRef = useRef<any[]>(dependencies)
+  const callbackRef = useRef<T>(callback);
+  const dependenciesRef = useRef<any[]>(dependencies);
 
   // Update the callback if it changes
-  callbackRef.current = callback
+  callbackRef.current = callback;
 
   // Check if dependencies have changed
-  const depsChanged = dependencies.some((dep, i) => !Object.is(dep, dependenciesRef.current[i]))
+  const depsChanged = dependencies.some((dep, i) => !Object.is(dep, dependenciesRef.current[i]));
 
   // Update dependencies if they've changed
   if (depsChanged) {
-    dependenciesRef.current = dependencies
+    dependenciesRef.current = dependencies;
   }
 
   // Return memoized callback
-  return useCallback(((...args: any[]) => callbackRef.current(...args)) as T, [depsChanged])
+  return useCallback(((...args: any[]) => callbackRef.current(...args)) as T, []);
 }

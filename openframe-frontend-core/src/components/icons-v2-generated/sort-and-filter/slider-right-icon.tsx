@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface SliderRightIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface SliderRightIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function SliderRightIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: SliderRightIconProps) {
+export function SliderRightIcon({ className = '', size = 24, color = 'currentColor', ...props }: SliderRightIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

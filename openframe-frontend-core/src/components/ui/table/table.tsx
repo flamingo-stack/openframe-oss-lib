@@ -1,15 +1,15 @@
-'use client'
+'use client';
 
-import { type ReactNode } from 'react'
-import { cn } from '../../../utils/cn'
-import { Pagination } from '../../pagination'
-import { Button } from '../button'
-import { CursorPagination } from '../cursor-pagination'
-import { TableEmptyState } from './table-empty-state'
-import { TableHeader } from './table-header'
-import { TableRow } from './table-row'
-import { ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE, TableCardSkeleton } from './table-skeleton'
-import type { RowAction, TableColumn, TableProps } from './types'
+import { type ReactNode } from 'react';
+import { cn } from '../../../utils/cn';
+import { Pagination } from '../../pagination';
+import { Button } from '../button';
+import { CursorPagination } from '../cursor-pagination';
+import { TableEmptyState } from './table-empty-state';
+import { TableHeader } from './table-header';
+import { TableRow } from './table-row';
+import { ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE, TableCardSkeleton } from './table-skeleton';
+import type { RowAction, TableColumn, TableProps } from './types';
 
 /**
  * Injects a synthetic actions column into the columns array when row actions exist
@@ -19,8 +19,8 @@ function injectActionsColumn<T>(
   rowActions?: RowAction<T>[],
   renderRowActions?: (item: T) => ReactNode,
 ): TableColumn<T>[] {
-  const hasActions = Boolean(rowActions?.length) || Boolean(renderRowActions)
-  if (!hasActions) return columns
+  const hasActions = Boolean(rowActions?.length) || Boolean(renderRowActions);
+  if (!hasActions) return columns;
 
   const actionsColumn: TableColumn<T> = {
     key: '__actions__',
@@ -29,30 +29,28 @@ function injectActionsColumn<T>(
     align: 'right',
     renderCell: (item: T) => (
       <div className="flex gap-2 items-center justify-end" data-no-row-click>
-        {renderRowActions ? (
-          renderRowActions(item)
-        ) : (
-          rowActions!.map((action, actionIndex) => (
-            <Button
-              key={actionIndex}
-              variant={action.variant || 'outline'}
-              onClick={(e) => {
-                e.stopPropagation()
-                action.onClick(item)
-              }}
-              leftIcon={action.icon && action.label ? action.icon : undefined}
-              centerIcon={action.icon && !action.label ? action.icon : undefined}
-              className={action.className}
-            >
-              {action.label}
-            </Button>
-          ))
-        )}
+        {renderRowActions
+          ? renderRowActions(item)
+          : rowActions!.map((action, actionIndex) => (
+              <Button
+                key={actionIndex}
+                variant={action.variant || 'outline'}
+                onClick={e => {
+                  e.stopPropagation();
+                  action.onClick(item);
+                }}
+                leftIcon={action.icon && action.label ? action.icon : undefined}
+                centerIcon={action.icon && !action.label ? action.icon : undefined}
+                className={action.className}
+              >
+                {action.label}
+              </Button>
+            ))}
       </div>
     ),
-  }
+  };
 
-  return [...columns, actionsColumn]
+  return [...columns, actionsColumn];
 }
 
 export function Table<T = any>({
@@ -81,56 +79,56 @@ export function Table<T = any>({
   showToolbar,
   cursorPagination,
   pagePagination,
-  paginationClassName
+  paginationClassName,
 }: TableProps<T>) {
   // Inject synthetic actions column if needed
-  const columnsWithActions = injectActionsColumn(columns, rowActions, renderRowActions)
+  const columnsWithActions = injectActionsColumn(columns, rowActions, renderRowActions);
   const getRowKey = (item: T, index: number): string => {
     if (typeof rowKey === 'function') {
-      return rowKey(item)
+      return rowKey(item);
     }
-    const key = item[rowKey]
-    return key?.toString() || index.toString()
-  }
+    const key = item[rowKey];
+    return key?.toString() || index.toString();
+  };
 
   const getRowClassName = (item: T, index: number): string => {
     if (typeof rowClassName === 'function') {
-      return rowClassName(item, index)
+      return rowClassName(item, index);
     }
-    return rowClassName || ''
-  }
+    return rowClassName || '';
+  };
 
   const isRowSelected = (item: T) => {
-    if (!selectable || !selectedRows) return false
-    const key = getRowKey(item, -1)
-    return selectedRows.some(row => getRowKey(row, -1) === key)
-  }
+    if (!selectable || !selectedRows) return false;
+    const key = getRowKey(item, -1);
+    return selectedRows.some(row => getRowKey(row, -1) === key);
+  };
 
   const handleSelectRow = (item: T) => {
-    if (!onSelectionChange) return
+    if (!onSelectionChange) return;
 
-    const key = getRowKey(item, -1)
-    const isSelected = isRowSelected(item)
+    const key = getRowKey(item, -1);
+    const isSelected = isRowSelected(item);
 
     if (isSelected) {
-      onSelectionChange(selectedRows.filter(row => getRowKey(row, -1) !== key))
+      onSelectionChange(selectedRows.filter(row => getRowKey(row, -1) !== key));
     } else {
-      onSelectionChange([...selectedRows, item])
+      onSelectionChange([...selectedRows, item]);
     }
-  }
+  };
 
   const handleSelectAll = () => {
-    if (!onSelectionChange) return
+    if (!onSelectionChange) return;
 
     if (selectedRows.length === data.length) {
-      onSelectionChange([])
+      onSelectionChange([]);
     } else {
-      onSelectionChange([...data])
+      onSelectionChange([...data]);
     }
-  }
+  };
 
-  const allSelected = selectedRows.length > 0 && selectedRows.length === data.length
-  const someSelected = selectedRows.length > 0 && selectedRows.length < data.length
+  const allSelected = selectedRows.length > 0 && selectedRows.length === data.length;
+  const someSelected = selectedRows.length > 0 && selectedRows.length < data.length;
 
   return (
     <div className={cn('flex flex-col gap-1 w-full', containerClassName)}>
@@ -147,9 +145,9 @@ export function Table<T = any>({
                 onClick={() => action.onClick(selectedRows)}
                 disabled={action.requiresSelection && selectedRows.length === 0}
                 className={cn(
-                  "px-3 py-1.5 text-sm rounded border transition-colors",
-                  "bg-[#212121] border-[#3a3a3a] hover:bg-[#2a2a2a] text-[#fafafa]",
-                  action.className
+                  'px-3 py-1.5 text-sm rounded border transition-colors',
+                  'bg-[#212121] border-[#3a3a3a] hover:bg-[#2a2a2a] text-[#fafafa]',
+                  action.className,
                 )}
               >
                 {action.icon}
@@ -237,18 +235,12 @@ export function Table<T = any>({
           compact={cursorPagination.compact}
           resetButtonLabel={cursorPagination.resetButtonLabel}
           resetButtonIcon={cursorPagination.resetButtonIcon}
-          className={cn(
-            'border-t border-[#3a3a3a] pt-3 mt-2',
-            paginationClassName
-          )}
+          className={cn('border-t border-[#3a3a3a] pt-3 mt-2', paginationClassName)}
         />
       )}
 
       {pagePagination && !cursorPagination && data.length > 0 && (
-        <div className={cn(
-          'border-t border-[#3a3a3a] pt-3 mt-2',
-          paginationClassName
-        )}>
+        <div className={cn('border-t border-[#3a3a3a] pt-3 mt-2', paginationClassName)}>
           <Pagination
             currentPage={pagePagination.currentPage}
             totalPages={pagePagination.totalPages}
@@ -257,5 +249,5 @@ export function Table<T = any>({
         </div>
       )}
     </div>
-  )
+  );
 }

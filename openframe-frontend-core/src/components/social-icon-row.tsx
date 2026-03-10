@@ -1,7 +1,21 @@
-"use client"
+'use client';
 
+import {
+  FacebookIcon,
+  GitHubIcon,
+  GlobeIcon,
+  InstagramIcon,
+  LinkedInIcon,
+  LumaIcon,
+  MessageCircleIcon,
+  RedditIcon,
+  SlackIcon,
+  TelegramIcon,
+  WhatsAppIcon,
+  XLogo,
+  YouTubeIcon,
+} from './icons';
 import { Button } from './ui/button';
-import { GitHubIcon, RedditIcon, XLogo, LinkedInIcon, LumaIcon, WhatsAppIcon, GlobeIcon, MessageCircleIcon, TelegramIcon, YouTubeIcon, InstagramIcon, FacebookIcon, SlackIcon } from './icons';
 
 interface SocialLink {
   platform: string;
@@ -12,13 +26,36 @@ interface SocialLink {
 interface SocialIconRowProps {
   className?: string;
   links?: SocialLink[];
-  variant?: "destructive" | "outline" | "secondary" | "ghost" | "link" | "search" | "primary" | "white" | "transparent" | "ghost-nav" | "submit" | "success" | "warning" | "info" | "flamingo-primary" | "flamingo-secondary" | "footer-link" | "filter" | "filter-active" | "section" | "section-active" | null | undefined;
+  variant?:
+    | 'destructive'
+    | 'outline'
+    | 'secondary'
+    | 'ghost'
+    | 'link'
+    | 'search'
+    | 'primary'
+    | 'white'
+    | 'transparent'
+    | 'ghost-nav'
+    | 'submit'
+    | 'success'
+    | 'warning'
+    | 'info'
+    | 'flamingo-primary'
+    | 'flamingo-secondary'
+    | 'footer-link'
+    | 'filter'
+    | 'filter-active'
+    | 'section'
+    | 'section-active'
+    | null
+    | undefined;
 }
 
 const defaultLinks: SocialLink[] = [
   { platform: 'github', href: 'https://github.com/flamingo-stack', label: 'GitHub' },
   { platform: 'linkedin', href: 'https://linkedin.com/company/flamingo.run', label: 'LinkedIn' },
-  { platform: 'facebook', href: 'https://www.facebook.com/flamingoai.msp', label: 'Facebook' }
+  { platform: 'facebook', href: 'https://www.facebook.com/flamingoai.msp', label: 'Facebook' },
 ];
 
 function renderSocialIcon(platform: string) {
@@ -66,23 +103,12 @@ export function SocialIconRow({ className = '', links = defaultLinks, variant = 
   return (
     <div className={`flex flex-row gap-3 w-full ${className}`}>
       {links.map((link, index) => (
-        <Button
-          key={index}
-          asChild
-          variant={variant}
-          size="icon"
-          className="flex-1"
-        >
-          <a
-            href={link.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={link.label || link.platform}
-          >
+        <Button key={index} asChild variant={variant} size="icon" className="flex-1">
+          <a href={link.href} target="_blank" rel="noopener noreferrer" aria-label={link.label || link.platform}>
             {renderSocialIcon(link.platform)}
           </a>
         </Button>
       ))}
     </div>
   );
-} 
+}

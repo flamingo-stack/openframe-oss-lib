@@ -1,14 +1,13 @@
-import type { SVGProps } from "react";
-export interface CoinsExchangeCurrencyIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface CoinsExchangeCurrencyIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
 export function CoinsExchangeCurrencyIcon({
-  className = "",
+  className = '',
   size = 24,
-  color = "currentColor",
+  color = 'currentColor',
   ...props
 }: CoinsExchangeCurrencyIconProps) {
   return (

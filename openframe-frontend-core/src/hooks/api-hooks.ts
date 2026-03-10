@@ -1,25 +1,25 @@
 // Stub API hooks
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 export function useCategories() {
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [categories, _setCategories] = useState([]);
+  const [loading, _setLoading] = useState(false);
+  const [error, _setError] = useState(null);
 
   return { categories, loading, error };
 }
 
 export function useVendors() {
-  const [vendors, setVendors] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [vendors, _setVendors] = useState([]);
+  const [loading, _setLoading] = useState(false);
+  const [error, _setError] = useState(null);
 
   return { vendors, loading, error };
 }
 
 export function useAnnouncements() {
-  const [announcements, setAnnouncements] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [announcements, _setAnnouncements] = useState([]);
+  const [loading, _setLoading] = useState(false);
 
   return { announcements, loading };
 }

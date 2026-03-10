@@ -56,7 +56,10 @@ export function MarginReportSkeleton({ animate = true, description, overlayConte
         {/* Vendor solution lists (Commercial & Open-Source) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {['Commercial Stack', 'Open-Source Stack'].map((label, idx) => (
-            <div key={idx} className="bg-ods-card border border-ods-border rounded-lg overflow-hidden flex flex-col animate-pulse">
+            <div
+              key={idx}
+              className="bg-ods-card border border-ods-border rounded-lg overflow-hidden flex flex-col animate-pulse"
+            >
               {/* list header */}
               <div className="flex items-center justify-between px-6 py-4">
                 <div className="h-6 w-40 bg-[#2A2A2A] rounded" />
@@ -69,7 +72,10 @@ export function MarginReportSkeleton({ animate = true, description, overlayConte
               {/* vendor rows */}
               <div className="flex-1 flex flex-col gap-3 p-3">
                 {Array.from({ length: 5 }).map((_, j) => (
-                  <div key={j} className="bg-[#161616] border border-ods-border rounded-lg px-4 py-3 flex items-center justify-between">
+                  <div
+                    key={j}
+                    className="bg-[#161616] border border-ods-border rounded-lg px-4 py-3 flex items-center justify-between"
+                  >
                     {/* left section: icon + text */}
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-12 h-12 bg-[#2A2A2A] rounded-lg flex-shrink-0" />
@@ -126,15 +132,11 @@ export function MarginReportSkeleton({ animate = true, description, overlayConte
         <div className="absolute inset-0 bg-ods-card/80 z-10 rounded-lg pointer-events-none">
           {/* Button centered relative to viewport */}
           <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto flex flex-col items-center gap-4 text-center px-4">
-            {description && (
-              <h3 >
-                {description}
-              </h3>
-            )}
+            {description && <h3>{description}</h3>}
             {overlayContent}
           </div>
         </div>
       )}
     </main>
   );
-} 
+}

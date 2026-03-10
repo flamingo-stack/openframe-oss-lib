@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface AlienIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface AlienIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function AlienIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: AlienIconProps) {
+export function AlienIcon({ className = '', size = 24, color = 'currentColor', ...props }: AlienIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

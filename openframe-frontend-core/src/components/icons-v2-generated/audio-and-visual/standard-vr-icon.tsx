@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface StandardVrIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface StandardVrIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function StandardVrIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: StandardVrIconProps) {
+export function StandardVrIcon({ className = '', size = 24, color = 'currentColor', ...props }: StandardVrIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface InfoCircleIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface InfoCircleIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function InfoCircleIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: InfoCircleIconProps) {
+export function InfoCircleIcon({ className = '', size = 24, color = 'currentColor', ...props }: InfoCircleIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

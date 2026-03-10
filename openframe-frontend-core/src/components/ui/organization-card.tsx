@@ -1,96 +1,96 @@
-"use client"
+'use client';
 
-import React from "react"
-import { useRouter } from "next/navigation"
-import { Monitor } from "lucide-react"
-import { cn } from "../../utils/cn"
-import { OrganizationIcon } from "../features/organization-icon"
-import { InteractiveCard } from "./interactive-card"
+import { Monitor } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import React from 'react';
+import { cn } from '../../utils/cn';
+import { OrganizationIcon } from '../features/organization-icon';
+import { InteractiveCard } from './interactive-card';
 
 export interface Organization {
-  id: string
-  organizationId?: string
-  name: string
-  imageUrl?: string | null
-  industry?: string
-  tier?: string
-  websiteUrl?: string
-  description?: string
+  id: string;
+  organizationId?: string;
+  name: string;
+  imageUrl?: string | null;
+  industry?: string;
+  tier?: string;
+  websiteUrl?: string;
+  description?: string;
   // Stats for footer (optional)
-  totalDevices?: number
-  activeDevices?: number
-  mrrUsd?: number
+  totalDevices?: number;
+  activeDevices?: number;
+  mrrUsd?: number;
   // Custom metadata
-  [key: string]: any
+  [key: string]: any;
 }
 
 export interface OrganizationCardProps {
   /**
    * Organization data
    */
-  organization: Organization
+  organization: Organization;
 
   /**
    * Pre-fetched image URL (from useBatchImages)
    * If not provided, OrganizationIcon will fetch automatically
    */
-  fetchedImageUrl?: string
+  fetchedImageUrl?: string;
 
   /**
    * Additional CSS classes
    */
-  className?: string
+  className?: string;
 
   /**
    * Custom hover accent color (defaults to ods-accent)
    */
-  hoverAccentColor?: string
+  hoverAccentColor?: string;
 
   /**
    * Show action button in top-right
    */
-  showActionButton?: boolean
+  showActionButton?: boolean;
 
   /**
    * Action button configuration
    */
   actionButton?: {
-    icon: React.ReactNode
-    label: string
-    onClick: (org: Organization, e: React.MouseEvent) => void
-    variant?: 'ghost' | 'primary'
-    disabled?: boolean
-  }
+    icon: React.ReactNode;
+    label: string;
+    onClick: (org: Organization, e: React.MouseEvent) => void;
+    variant?: 'ghost' | 'primary';
+    disabled?: boolean;
+  };
 
   /**
    * Custom click handler (default: navigate to /organizations/details/{id})
    */
-  onClick?: (org: Organization) => void
+  onClick?: (org: Organization) => void;
 
   /**
    * Base URL for navigation (default: current domain)
    */
-  baseUrl?: string
+  baseUrl?: string;
 
   /**
    * Footer stats to display (optional)
    */
   footerStats?: Array<{
-    icon?: React.ReactNode
-    value: string | number
-    label?: string
-  }>
+    icon?: React.ReactNode;
+    value: string | number;
+    label?: string;
+  }>;
 
   /**
    * Custom footer component (replaces default stats)
    */
-  customFooter?: React.ReactNode
+  customFooter?: React.ReactNode;
 
   /**
    * Device count to display in top-right corner
    * If not provided, top-right area will be hidden
    */
-  deviceCount?: number
+  deviceCount?: number;
 }
 
 /**
@@ -145,48 +145,48 @@ export function OrganizationCard({
   showActionButton = false,
   actionButton,
   onClick,
-  baseUrl = "",
+  baseUrl = '',
   footerStats,
   customFooter,
-  deviceCount
+  deviceCount,
 }: OrganizationCardProps) {
-  const router = useRouter()
+  const router = useRouter();
 
   const handleActionClick = (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    actionButton?.onClick(organization, e)
-  }
+    e.preventDefault();
+    e.stopPropagation();
+    actionButton?.onClick(organization, e);
+  };
 
   const handleCardClick = (e: React.MouseEvent) => {
     // Only handle card click if not clicking on buttons
     if ((e.target as HTMLElement).closest('button')) {
-      return
+      return;
     }
 
     if (onClick) {
-      onClick(organization)
+      onClick(organization);
     } else {
       // Default navigation
       const orgUrl = baseUrl
         ? `${baseUrl}/organizations/details/${organization.id}`
-        : `/organizations/details/${organization.id}`
+        : `/organizations/details/${organization.id}`;
 
       if (baseUrl) {
-        window.open(orgUrl, '_blank')
+        window.open(orgUrl, '_blank');
       } else {
-        router.push(orgUrl)
+        router.push(orgUrl);
       }
     }
-  }
+  };
 
   return (
     <InteractiveCard
       onClick={handleCardClick}
       hoverAccentColor={hoverAccentColor}
       className={cn(
-        "flex flex-col bg-ods-card border border-ods-border rounded-lg p-4 gap-3 w-full relative",
-        className
+        'flex flex-col bg-ods-card border border-ods-border rounded-lg p-4 gap-3 w-full relative',
+        className,
       )}
     >
       {/* Device count with icon (top-right corner) - Only show if provided */}
@@ -203,10 +203,10 @@ export function OrganizationCard({
       {!deviceCount && showActionButton && actionButton && (
         <button
           className={cn(
-            "absolute top-2 right-2 h-8 w-8 rounded flex items-center justify-center z-10 transition-colors",
+            'absolute top-2 right-2 h-8 w-8 rounded flex items-center justify-center z-10 transition-colors',
             actionButton.variant === 'primary'
-              ? "bg-ods-accent text-black hover:bg-ods-accent-hover"
-              : "text-ods-text-secondary hover:text-red-500 hover:bg-red-100/10"
+              ? 'bg-ods-accent text-black hover:bg-ods-accent-hover'
+              : 'text-ods-text-secondary hover:text-red-500 hover:bg-red-100/10',
           )}
           onClick={handleActionClick}
           disabled={actionButton.disabled}
@@ -231,15 +231,17 @@ export function OrganizationCard({
         {/* Text Container - Column, center justify, 8px vertical padding */}
         <div className="flex-1 flex flex-col justify-center py-2 min-w-0">
           {/* Title - DM Sans 700, 18px, 1.33 line height, matching VendorCard */}
-          <h3 className={cn(
-            "font-['DM_Sans'] font-bold text-lg leading-[1.33] tracking-[-0.02em] text-ods-text-primary transition-colors truncate",
-            !hoverAccentColor && 'group-hover:text-ods-accent'
-          )}>
+          <h3
+            className={cn(
+              "font-['DM_Sans'] font-bold text-lg leading-[1.33] tracking-[-0.02em] text-ods-text-primary transition-colors truncate",
+              !hoverAccentColor && 'group-hover:text-ods-accent',
+            )}
+          >
             {organization.name}
           </h3>
           {/* Subtitle - Industry or Tier, DM Sans 500, 14px */}
           <p className="font-['DM_Sans'] font-medium text-sm leading-[1.43] text-ods-text-secondary truncate">
-            {organization.industry || organization.tier || organization.websiteUrl || "Organization"}
+            {organization.industry || organization.tier || organization.websiteUrl || 'Organization'}
           </p>
         </div>
       </div>
@@ -267,9 +269,7 @@ export function OrganizationCard({
                   {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
                 </span>
                 {stat.label && (
-                  <span className="font-['DM_Sans'] font-medium text-sm text-ods-text-secondary">
-                    {stat.label}
-                  </span>
+                  <span className="font-['DM_Sans'] font-medium text-sm text-ods-text-secondary">{stat.label}</span>
                 )}
               </div>
             ))}
@@ -277,5 +277,5 @@ export function OrganizationCard({
         </div>
       ) : null}
     </InteractiveCard>
-  )
+  );
 }

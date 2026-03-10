@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface GarageIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface GarageIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function GarageIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: GarageIconProps) {
+export function GarageIcon({ className = '', size = 24, color = 'currentColor', ...props }: GarageIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

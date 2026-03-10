@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface Crosshair02IconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface Crosshair02IconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function Crosshair02Icon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: Crosshair02IconProps) {
+export function Crosshair02Icon({ className = '', size = 24, color = 'currentColor', ...props }: Crosshair02IconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

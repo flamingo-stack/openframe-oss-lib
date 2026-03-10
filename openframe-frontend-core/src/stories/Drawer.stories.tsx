@@ -1,6 +1,6 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { useState } from 'react'
-import { Button } from '../components/ui/button'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
+import { Button } from '../components/ui/button';
 import {
   Drawer,
   DrawerBody,
@@ -8,9 +8,9 @@ import {
   DrawerDescription,
   DrawerFooter,
   DrawerHeader,
-  DrawerTitle,
   type DrawerSide,
-} from '../components/ui/drawer'
+  DrawerTitle,
+} from '../components/ui/drawer';
 
 const meta: Meta<typeof Drawer> = {
   title: 'UI/Drawer',
@@ -18,14 +18,14 @@ const meta: Meta<typeof Drawer> = {
   parameters: {
     layout: 'centered',
   },
-}
+};
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 export const Right: Story = {
   render: function Render() {
-    const [open, setOpen] = useState(false)
+    const [open, setOpen] = useState(false);
 
     return (
       <Drawer open={open} onOpenChange={setOpen}>
@@ -42,13 +42,13 @@ export const Right: Story = {
           </DrawerBody>
         </DrawerContent>
       </Drawer>
-    )
+    );
   },
-}
+};
 
 export const Left: Story = {
   render: function Render() {
-    const [open, setOpen] = useState(false)
+    const [open, setOpen] = useState(false);
 
     return (
       <Drawer open={open} onOpenChange={setOpen}>
@@ -65,13 +65,13 @@ export const Left: Story = {
           </DrawerBody>
         </DrawerContent>
       </Drawer>
-    )
+    );
   },
-}
+};
 
 export const Top: Story = {
   render: function Render() {
-    const [open, setOpen] = useState(false)
+    const [open, setOpen] = useState(false);
 
     return (
       <Drawer open={open} onOpenChange={setOpen}>
@@ -88,13 +88,13 @@ export const Top: Story = {
           </DrawerBody>
         </DrawerContent>
       </Drawer>
-    )
+    );
   },
-}
+};
 
 export const Bottom: Story = {
   render: function Render() {
-    const [open, setOpen] = useState(false)
+    const [open, setOpen] = useState(false);
 
     return (
       <Drawer open={open} onOpenChange={setOpen}>
@@ -111,19 +111,19 @@ export const Bottom: Story = {
           </DrawerBody>
         </DrawerContent>
       </Drawer>
-    )
+    );
   },
-}
+};
 
 export const AllSides: Story = {
   render: function Render() {
-    const [openSide, setOpenSide] = useState<DrawerSide | null>(null)
-    const sides: DrawerSide[] = ['right', 'left', 'top', 'bottom']
+    const [openSide, setOpenSide] = useState<DrawerSide | null>(null);
+    const sides: DrawerSide[] = ['right', 'left', 'top', 'bottom'];
 
     return (
       <div className="flex gap-2">
-        {sides.map((side) => (
-          <Drawer key={side} open={openSide === side} onOpenChange={(open) => setOpenSide(open ? side : null)}>
+        {sides.map(side => (
+          <Drawer key={side} open={openSide === side} onOpenChange={open => setOpenSide(open ? side : null)}>
             <Button variant="outline" onClick={() => setOpenSide(side)}>
               {side.charAt(0).toUpperCase() + side.slice(1)}
             </Button>
@@ -144,13 +144,13 @@ export const AllSides: Story = {
           </Drawer>
         ))}
       </div>
-    )
+    );
   },
-}
+};
 
 export const WithFooter: Story = {
   render: function Render() {
-    const [open, setOpen] = useState(false)
+    const [open, setOpen] = useState(false);
 
     return (
       <Drawer open={open} onOpenChange={setOpen}>
@@ -175,13 +175,13 @@ export const WithFooter: Story = {
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
-    )
+    );
   },
-}
+};
 
 export const LongContent: Story = {
   render: function Render() {
-    const [open, setOpen] = useState(false)
+    const [open, setOpen] = useState(false);
 
     return (
       <Drawer open={open} onOpenChange={setOpen}>
@@ -195,10 +195,7 @@ export const LongContent: Story = {
           </DrawerHeader>
           <DrawerBody>
             {Array.from({ length: 20 }, (_, i) => (
-              <div
-                key={i}
-                className="rounded-md border border-ods-border bg-ods-bg p-4"
-              >
+              <div key={i} className="rounded-md border border-ods-border bg-ods-bg p-4">
                 <p className="text-sm font-medium text-ods-text-primary">Item {i + 1}</p>
                 <p className="text-sm text-ods-text-secondary">Description for item {i + 1}</p>
               </div>
@@ -206,6 +203,6 @@ export const LongContent: Story = {
           </DrawerBody>
         </DrawerContent>
       </Drawer>
-    )
+    );
   },
-}
+};

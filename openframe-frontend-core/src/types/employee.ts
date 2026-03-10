@@ -19,4 +19,4 @@ export interface EmployeeProfileData {
   avatar_url: string;
   role: string;
   job_title: string;
-} 
+}

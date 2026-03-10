@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface CaterIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface CaterIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function CaterIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: CaterIconProps) {
+export function CaterIcon({ className = '', size = 24, color = 'currentColor', ...props }: CaterIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

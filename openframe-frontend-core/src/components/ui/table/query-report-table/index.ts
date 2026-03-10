@@ -1,13 +1,12 @@
-export { QueryReportTable } from './query-report-table'
-export { QueryReportTableHeader } from './query-report-table-header'
-export { QueryReportTableRow } from './query-report-table-row'
-export { QueryReportTableSkeleton } from './query-report-table-skeleton'
-export { deriveColumns, exportToCSV } from './utils'
-
+export { QueryReportTable } from './query-report-table';
+export { QueryReportTableHeader } from './query-report-table-header';
+export { QueryReportTableRow } from './query-report-table-row';
+export { QueryReportTableSkeleton } from './query-report-table-skeleton';
 export type {
-  QueryReportTableProps,
   QueryReportTableHeaderProps,
+  QueryReportTableProps,
   QueryReportTableRowProps,
   QueryReportTableSkeletonProps,
-  QueryResultRow
-} from './types'
+  QueryResultRow,
+} from './types';
+export { deriveColumns, exportToCSV } from './utils';

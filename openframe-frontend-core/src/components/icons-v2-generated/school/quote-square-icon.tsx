@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface QuoteSquareIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface QuoteSquareIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function QuoteSquareIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: QuoteSquareIconProps) {
+export function QuoteSquareIcon({ className = '', size = 24, color = 'currentColor', ...props }: QuoteSquareIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

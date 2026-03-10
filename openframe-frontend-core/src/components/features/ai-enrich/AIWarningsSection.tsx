@@ -1,30 +1,21 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { cn } from '../../../utils/cn'
+import React from 'react';
+import { cn } from '../../../utils/cn';
 
 export interface AIWarningsSectionProps {
-  warnings: string[]
-  title?: string
-  className?: string
+  warnings: string[];
+  title?: string;
+  className?: string;
 }
 
-export const AIWarningsSection: React.FC<AIWarningsSectionProps> = ({
-  warnings,
-  title = 'AI Warnings',
-  className,
-}) => {
+export const AIWarningsSection: React.FC<AIWarningsSectionProps> = ({ warnings, title = 'AI Warnings', className }) => {
   if (!warnings || warnings.length === 0) {
-    return null
+    return null;
   }
 
   return (
-    <div
-      className={cn(
-        'rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4',
-        className
-      )}
-    >
+    <div className={cn('rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4', className)}>
       <div className="flex items-start gap-2">
         <svg
           className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5"
@@ -40,15 +31,10 @@ export const AIWarningsSection: React.FC<AIWarningsSectionProps> = ({
           />
         </svg>
         <div className="flex-1">
-          <h4 className="text-sm font-semibold text-yellow-500 mb-2">
-            {title}
-          </h4>
+          <h4 className="text-sm font-semibold text-yellow-500 mb-2">{title}</h4>
           <ul className="space-y-1">
             {warnings.map((warning, index) => (
-              <li
-                key={index}
-                className="text-sm text-yellow-500/80 list-disc list-inside"
-              >
+              <li key={index} className="text-sm text-yellow-500/80 list-disc list-inside">
                 {warning}
               </li>
             ))}
@@ -56,5 +42,5 @@ export const AIWarningsSection: React.FC<AIWarningsSectionProps> = ({
         </div>
       </div>
     </div>
-  )
-}
+  );
+};

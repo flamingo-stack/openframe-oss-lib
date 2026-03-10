@@ -1,16 +1,16 @@
-'use client'
+'use client';
 
-import { useMemo } from 'react'
-import { cn } from '../../../../utils/cn'
-import { Button } from '../../button'
-import { Download02Icon } from '../../../icons-v2-generated/interface/download-02-icon'
-import { useHorizontalScrollbar } from '../../../../hooks/ui/use-horizontal-scrollbar'
-import { TableEmptyState } from '../table-empty-state'
-import { QueryReportTableHeader } from './query-report-table-header'
-import { QueryReportTableRow } from './query-report-table-row'
-import { QueryReportTableSkeleton } from './query-report-table-skeleton'
-import { deriveColumns, exportToCSV } from './utils'
-import type { QueryReportTableProps } from './types'
+import { useMemo } from 'react';
+import { useHorizontalScrollbar } from '../../../../hooks/ui/use-horizontal-scrollbar';
+import { cn } from '../../../../utils/cn';
+import { Download02Icon } from '../../../icons-v2-generated/interface/download-02-icon';
+import { Button } from '../../button';
+import { TableEmptyState } from '../table-empty-state';
+import { QueryReportTableHeader } from './query-report-table-header';
+import { QueryReportTableRow } from './query-report-table-row';
+import { QueryReportTableSkeleton } from './query-report-table-skeleton';
+import type { QueryReportTableProps } from './types';
+import { deriveColumns, exportToCSV } from './utils';
 
 export function QueryReportTable({
   title,
@@ -27,20 +27,17 @@ export function QueryReportTable({
   headerActions,
   variant = 'default',
   className,
-  tableClassName
+  tableClassName,
 }: QueryReportTableProps) {
-  const isCompact = variant === 'compact'
-  const columns = useMemo(
-    () => deriveColumns(data, columnOrder),
-    [data, columnOrder]
-  )
+  const isCompact = variant === 'compact';
+  const columns = useMemo(() => deriveColumns(data, columnOrder), [data, columnOrder]);
 
   const handleExport = () => {
-    exportToCSV(data, columns, exportFilename)
-    onExport?.()
-  }
+    exportToCSV(data, columns, exportFilename);
+    onExport?.();
+  };
 
-  const tableMinWidth = columns.length * (columnWidth + 16) // columnWidth + gap
+  const tableMinWidth = columns.length * (columnWidth + 16); // columnWidth + gap
 
   const {
     scrollRef,
@@ -55,21 +52,19 @@ export function QueryReportTable({
     onThumbPointerDown,
     onThumbPointerMove,
     onThumbPointerUp,
-  } = useHorizontalScrollbar()
+  } = useHorizontalScrollbar();
 
   return (
     <div className={cn('flex flex-col w-full', isCompact ? 'gap-0' : 'gap-6', className)}>
       {/* Title bar — hidden in compact mode */}
       {!isCompact && (
         <div className="flex items-end justify-between pt-6">
-          <h2 className="font-mono font-semibold text-[32px] leading-[40px] text-ods-text-primary">
-            {title}
-          </h2>
+          <h2 className="font-mono font-semibold text-[32px] leading-[40px] text-ods-text-primary">{title}</h2>
           <div className="flex items-center gap-3">
             {headerActions}
             {showExport && data.length > 0 && (
               <Button
-                className='bg-ods-card'
+                className="bg-ods-card"
                 variant="outline"
                 size="sm"
                 leftIcon={<Download02Icon size={18} />}
@@ -93,9 +88,7 @@ export function QueryReportTable({
       )}
 
       {/* Empty state */}
-      {!loading && data.length === 0 && (
-        <TableEmptyState message={emptyMessage} />
-      )}
+      {!loading && data.length === 0 && <TableEmptyState message={emptyMessage} />}
 
       {/* Table content */}
       {!loading && data.length > 0 && (
@@ -125,17 +118,9 @@ export function QueryReportTable({
 
           {/* Scrollable table container */}
           <div className="relative">
-            <div
-              ref={scrollRef}
-              className={cn('overflow-x-auto', tableClassName)}
-              onScroll={onScroll}
-            >
+            <div ref={scrollRef} className={cn('overflow-x-auto', tableClassName)} onScroll={onScroll}>
               <div style={{ minWidth: tableMinWidth }}>
-                <QueryReportTableHeader
-                  columns={columns}
-                  columnWidth={columnWidth}
-                  variant={variant}
-                />
+                <QueryReportTableHeader columns={columns} columnWidth={columnWidth} variant={variant} />
                 <div className={cn('flex flex-col', isCompact ? 'gap-0' : 'gap-2')}>
                   {data.map((row, index) => (
                     <QueryReportTableRow
@@ -161,5 +146,5 @@ export function QueryReportTable({
         </div>
       )}
     </div>
-  )
+  );
 }

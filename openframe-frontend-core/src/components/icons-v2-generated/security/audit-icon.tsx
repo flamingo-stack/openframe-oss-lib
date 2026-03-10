@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface AuditIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface AuditIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function AuditIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: AuditIconProps) {
+export function AuditIcon({ className = '', size = 24, color = 'currentColor', ...props }: AuditIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

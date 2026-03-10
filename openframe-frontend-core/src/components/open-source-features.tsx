@@ -1,7 +1,7 @@
-"use client"
+'use client';
 
+import { DollarSign, Network, Terminal, Users } from 'lucide-react';
 import React from 'react';
-import { Terminal, DollarSign, Network, Users } from 'lucide-react';
 
 interface FeatureCardProps {
   icon: React.ReactNode;
@@ -14,19 +14,13 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description }) =
     <div className="bg-ods-card border border-ods-border rounded-3xl p-6 flex flex-col gap-6 h-full hover:bg-[#252525] transition-colors duration-200">
       {/* Icon Container */}
       <div className="w-12 h-12 bg-[#161616] border border-ods-border rounded flex items-center justify-center">
-        <div className="w-6 h-6 text-ods-text-secondary">
-          {icon}
-        </div>
+        <div className="w-6 h-6 text-ods-text-secondary">{icon}</div>
       </div>
-      
+
       {/* Text Container */}
       <div className="flex flex-col gap-2">
-        <h3 className="text-h3 text-ods-text-primary tracking-[-0.36px]">
-          {title}
-        </h3>
-        <p className="text-h4 text-ods-text-primary">
-          {description}
-        </p>
+        <h3 className="text-h3 text-ods-text-primary tracking-[-0.36px]">{title}</h3>
+        <p className="text-h4 text-ods-text-primary">{description}</p>
       </div>
     </div>
   );
@@ -36,24 +30,25 @@ const OpenSourceFeatures: React.FC = () => {
   const features = [
     {
       icon: <Terminal className="w-6 h-6" />,
-      title: "Built on FOSS",
-      description: "No black boxes. No hidden fees. Just transparent, community-driven software you control."
+      title: 'Built on FOSS',
+      description: 'No black boxes. No hidden fees. Just transparent, community-driven software you control.',
     },
     {
       icon: <DollarSign className="w-6 h-6" />,
-      title: "Own Your Stack",
-      description: "Replace overpriced, proprietary tools with open, auditable, and customizable components."
+      title: 'Own Your Stack',
+      description: 'Replace overpriced, proprietary tools with open, auditable, and customizable components.',
     },
     {
       icon: <Network className="w-6 h-6" />,
-      title: "Modular by Design",
-      description: "Add, remove, or extend features with ease — OpenFrame adapts to how you work."
+      title: 'Modular by Design',
+      description: 'Add, remove, or extend features with ease — OpenFrame adapts to how you work.',
     },
     {
       icon: <Users className="w-6 h-6" />,
-      title: "Community-Powered",
-      description: "Developed with and for MSPs by a global open-source community. You're not just a user — you're part of the roadmap."
-    }
+      title: 'Community-Powered',
+      description:
+        "Developed with and for MSPs by a global open-source community. You're not just a user — you're part of the roadmap.",
+    },
   ];
 
   return (
@@ -67,17 +62,12 @@ const OpenSourceFeatures: React.FC = () => {
             <span className="text-ods-accent">0%</span>
             <span> Bullsh*t.</span>
           </h2>
-          
+
           {/* Features Grid */}
           <div className="w-full">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {features.map((feature, index) => (
-                <FeatureCard
-                  key={index}
-                  icon={feature.icon}
-                  title={feature.title}
-                  description={feature.description}
-                />
+                <FeatureCard key={index} icon={feature.icon} title={feature.title} description={feature.description} />
               ))}
             </div>
           </div>
@@ -87,4 +77,4 @@ const OpenSourceFeatures: React.FC = () => {
   );
 };
 
-export default OpenSourceFeatures; 
+export default OpenSourceFeatures;

@@ -1,9 +1,8 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from 'react';
+import { Loader2, Plus, Save, Trash2 } from 'lucide-react';
+import { ClipboardEvent, ReactNode, useEffect, useState } from 'react';
 import { Button, Input, Label } from '../ui';
-import { Trash2, Plus, Save, Loader2 } from 'lucide-react';
-import { ReactNode, ClipboardEvent } from 'react';
 
 interface ArrayEntryManagerProps<T extends { [key: string]: any }> {
   title: ReactNode; // Support string or ReactNode for badge integration
@@ -36,7 +35,7 @@ export function ArrayEntryManager<T extends { [key: string]: any }>({
   requireSave = false,
   onDirtyChange,
   renderLabel,
-  isSaving = false
+  isSaving = false,
 }: ArrayEntryManagerProps<T>) {
   // Local state for draft changes (when requireSave=true)
   const [draftItems, setDraftItems] = useState<T[]>(items);
@@ -89,7 +88,10 @@ export function ArrayEntryManager<T extends { [key: string]: any }>({
     const pastedText = e.clipboardData.getData('text');
 
     // Split by newlines (handles \n, \r\n, \r)
-    const lines = pastedText.split(/[\r\n]+/).map(line => line.trim()).filter(line => line.length > 0);
+    const lines = pastedText
+      .split(/[\r\n]+/)
+      .map(line => line.trim())
+      .filter(line => line.length > 0);
 
     // If only one line, let default paste behavior handle it
     if (lines.length <= 1) {
@@ -110,11 +112,11 @@ export function ArrayEntryManager<T extends { [key: string]: any }>({
       newItems[index] = { ...newItems[index], [fieldKey]: lines[0] };
 
       // Add remaining lines as new items after current index
-      const additionalItems = lines.slice(1).map(line => ({ [fieldKey]: line } as T));
+      const additionalItems = lines.slice(1).map(line => ({ [fieldKey]: line }) as T);
       newItems.splice(index + 1, 0, ...additionalItems);
     } else {
       // If current field has value, add all pasted lines as new items after current
-      const additionalItems = lines.map(line => ({ [fieldKey]: line } as T));
+      const additionalItems = lines.map(line => ({ [fieldKey]: line }) as T);
       newItems.splice(index + 1, 0, ...additionalItems);
     }
 
@@ -152,21 +154,20 @@ export function ArrayEntryManager<T extends { [key: string]: any }>({
       </div>
 
       {workingItems.map((item, index) => (
-        <div key={index} className="flex items-center gap-3 p-3 bg-ods-bg-secondary rounded-lg border border-ods-border">
-          {icon && (
-            <div className="w-8 h-8 flex items-center justify-center">
-              {icon}
-            </div>
-          )}
+        <div
+          key={index}
+          className="flex items-center gap-3 p-3 bg-ods-bg-secondary rounded-lg border border-ods-border"
+        >
+          {icon && <div className="w-8 h-8 flex items-center justify-center">{icon}</div>}
 
           <div className="flex-1 space-y-2">
             {renderLabel && renderLabel(item, index)}
             <Input
               placeholder={placeholder}
               value={item[fieldKey] as string}
-              onChange={(e) => updateItem(index, e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
-              onPaste={(e) => handlePaste(index, e)}
+              onChange={e => updateItem(index, e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && e.preventDefault()}
+              onPaste={e => handlePaste(index, e)}
               className="bg-ods-bg border-ods-border text-ods-text-primary"
             />
           </div>
@@ -185,12 +186,9 @@ export function ArrayEntryManager<T extends { [key: string]: any }>({
 
       {workingItems.length === 0 && (
         <div className="text-center py-4 px-4 bg-ods-bg-secondary border border-ods-border rounded-lg">
-          <p className="text-ods-text-secondary text-sm font-['DM_Sans']">
-            {emptyMessage}
-          </p>
+          <p className="text-ods-text-secondary text-sm font-['DM_Sans']">{emptyMessage}</p>
         </div>
       )}
     </div>
   );
 }
-

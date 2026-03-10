@@ -2,190 +2,190 @@
  * Component prop types
  */
 
-import type { HTMLAttributes, TextareaHTMLAttributes } from 'react'
-import type { Message, MessageSegment, ApprovalRequestData, ToolExecutionData } from './message.types'
-import type { AssistantType, ConnectionStatus, ChatApprovalStatus } from './chat.types'
+import type { HTMLAttributes, TextareaHTMLAttributes } from 'react';
+import type { AssistantType, ChatApprovalStatus, ConnectionStatus } from './chat.types';
+import type { ApprovalRequestData, Message, MessageSegment, ToolExecutionData } from './message.types';
 
 // ========== Chat Container Props ==========
 
 export interface ChatContainerProps extends HTMLAttributes<HTMLDivElement> {
-  children?: React.ReactNode
+  children?: React.ReactNode;
 }
 
 // ========== Chat Header Props ==========
 
 export interface ChatHeaderProps extends HTMLAttributes<HTMLDivElement> {
-  userName?: string
-  userTitle?: string
-  userAvatar?: string
-  onSettingsClick?: () => void
-  onNewChat?: () => void
-  showNewChat?: boolean
-  connectionStatus?: ConnectionStatus
-  serverUrl?: string | null
+  userName?: string;
+  userTitle?: string;
+  userAvatar?: string;
+  onSettingsClick?: () => void;
+  onNewChat?: () => void;
+  showNewChat?: boolean;
+  connectionStatus?: ConnectionStatus;
+  serverUrl?: string | null;
 }
 
 // ========== Connection Indicator Props ==========
 
 export interface ConnectionIndicatorProps {
-  status: ConnectionStatus
+  status: ConnectionStatus;
 }
 
 // ========== Chat Message Enhanced Props ==========
 
 export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivElement>, 'content'> {
-  role: 'user' | 'assistant' | 'error'
-  content: string | MessageSegment[]
-  name?: string
-  assistantType?: AssistantType
-  avatar?: string | null
-  timestamp?: Date
-  showAvatar?: boolean
-  isTyping?: boolean
-  onApprove?: (requestId?: string) => void | Promise<void>
-  onReject?: (requestId?: string) => void | Promise<void>
+  role: 'user' | 'assistant' | 'error';
+  content: string | MessageSegment[];
+  name?: string;
+  assistantType?: AssistantType;
+  avatar?: string | null;
+  timestamp?: Date;
+  showAvatar?: boolean;
+  isTyping?: boolean;
+  onApprove?: (requestId?: string) => void | Promise<void>;
+  onReject?: (requestId?: string) => void | Promise<void>;
 }
 
 // ========== Chat Message List Props ==========
 
 export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
-  messages: Message[]
-  dialogId?: string
-  isLoading?: boolean
-  isTyping?: boolean
-  typingMessage?: string
-  smoothScroll?: boolean
-  autoScroll?: boolean
-  showAvatars?: boolean
-  contentClassName?: string
-  assistantType?: AssistantType
-  pendingApprovals?: MessageSegment[]
-  onApprove?: (requestId?: string) => void | Promise<void>
-  onReject?: (requestId?: string) => void | Promise<void>
+  messages: Message[];
+  dialogId?: string;
+  isLoading?: boolean;
+  isTyping?: boolean;
+  typingMessage?: string;
+  smoothScroll?: boolean;
+  autoScroll?: boolean;
+  showAvatars?: boolean;
+  contentClassName?: string;
+  assistantType?: AssistantType;
+  pendingApprovals?: MessageSegment[];
+  onApprove?: (requestId?: string) => void | Promise<void>;
+  onReject?: (requestId?: string) => void | Promise<void>;
   // Infinite scroll for loading older messages
-  hasNextPage?: boolean
-  isFetchingNextPage?: boolean
-  onLoadMore?: () => void
+  hasNextPage?: boolean;
+  isFetchingNextPage?: boolean;
+  onLoadMore?: () => void;
 }
 
 export interface ChatMessageListRef {
-  scrollToBottom: (smooth?: boolean) => void
-  getScrollPosition: () => { scrollTop: number; scrollHeight: number; clientHeight: number }
-  setScrollPosition: (position: { scrollTop: number }) => void
+  scrollToBottom: (smooth?: boolean) => void;
+  getScrollPosition: () => { scrollTop: number; scrollHeight: number; clientHeight: number };
+  setScrollPosition: (position: { scrollTop: number }) => void;
 }
 
 // ========== Chat Input Props ==========
 
 export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'onSubmit'> {
-  onSend?: (message: string) => void
-  sending?: boolean
-  awaitingResponse?: boolean
-  reserveAvatarOffset?: boolean
-  disabled?: boolean
-  maxRows?: number
-  showSendButton?: boolean
-  sendButtonLabel?: string
+  onSend?: (message: string) => void;
+  sending?: boolean;
+  awaitingResponse?: boolean;
+  reserveAvatarOffset?: boolean;
+  disabled?: boolean;
+  maxRows?: number;
+  showSendButton?: boolean;
+  sendButtonLabel?: string;
 }
 
 export interface ChatInputRef {
-  focus: () => void
-  blur: () => void
-  clear: () => void
-  setValue: (value: string) => void
-  getValue: () => string
+  focus: () => void;
+  blur: () => void;
+  clear: () => void;
+  setValue: (value: string) => void;
+  getValue: () => string;
 }
 
 // ========== Chat Typing Indicator Props ==========
 
 export interface ChatTypingIndicatorProps extends HTMLAttributes<HTMLDivElement> {
-  size?: 'sm' | 'md' | 'lg'
-  showText?: boolean
-  text?: string
-  name?: string
-  dotClassName?: string
+  size?: 'sm' | 'md' | 'lg';
+  showText?: boolean;
+  text?: string;
+  name?: string;
+  dotClassName?: string;
 }
 
 // ========== Tool Execution Display Props ==========
 
 export interface ToolExecutionDisplayProps extends HTMLAttributes<HTMLDivElement> {
-  message: ToolExecutionData
-  isExpanded?: boolean
-  onToggleExpand?: () => void
+  message: ToolExecutionData;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
 }
 
 // ========== Approval Request Message Props ==========
 
 export interface ApprovalRequestMessageProps extends HTMLAttributes<HTMLDivElement> {
-  data: ApprovalRequestData
-  onApprove?: (requestId?: string) => void | Promise<void>
-  onReject?: (requestId?: string) => void | Promise<void>
-  status?: ChatApprovalStatus
-  disabled?: boolean
+  data: ApprovalRequestData;
+  onApprove?: (requestId?: string) => void | Promise<void>;
+  onReject?: (requestId?: string) => void | Promise<void>;
+  status?: ChatApprovalStatus;
+  disabled?: boolean;
 }
 
 // ========== Error Message Display Props ==========
 
 export interface ErrorMessageDisplayProps extends HTMLAttributes<HTMLDivElement> {
-  title: string
-  details?: string
+  title: string;
+  details?: string;
 }
 
 // ========== Model Display Props ==========
 
 export interface ModelDisplayProps extends HTMLAttributes<HTMLDivElement> {
-  provider?: string
-  modelName?: string
-  displayName?: string
-  contextWindow?: number
-  showIcon?: boolean
+  provider?: string;
+  modelName?: string;
+  displayName?: string;
+  contextWindow?: number;
+  showIcon?: boolean;
 }
 
 // ========== Chat Quick Action Props ==========
 
 export interface ChatQuickActionProps extends HTMLAttributes<HTMLButtonElement> {
-  text: string
-  icon?: React.ReactNode
-  onAction?: (text: string) => void
-  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void
+  text: string;
+  icon?: React.ReactNode;
+  onAction?: (text: string) => void;
+  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
   /** Whether this action should show the hint animation */
-  isHintActive?: boolean
+  isHintActive?: boolean;
   /** Callback when user clicks the action - stops hint */
-  onHintInteraction?: () => void
-  disabled?: boolean
-  loading?: boolean
+  onHintInteraction?: () => void;
+  disabled?: boolean;
+  loading?: boolean;
 }
 
 // ========== Dialog Item Props ==========
 
 export interface DialogItem {
-  id: string
-  title: string
-  lastMessage?: string
-  timestamp?: Date | string
-  isActive?: boolean
-  unreadMessagesCount?: number
+  id: string;
+  title: string;
+  lastMessage?: string;
+  timestamp?: Date | string;
+  isActive?: boolean;
+  unreadMessagesCount?: number;
 }
 
 // ========== Chat Sidebar Props ==========
 
 export interface ChatSidebarProps extends HTMLAttributes<HTMLDivElement> {
-  onNewChat?: () => void
-  onDialogSelect?: (dialogId: string) => void
-  dialogs?: DialogItem[]
-  activeDialogId?: string
-  isLoading?: boolean
-  isCreatingDialog?: boolean
-  children?: React.ReactNode
+  onNewChat?: () => void;
+  onDialogSelect?: (dialogId: string) => void;
+  dialogs?: DialogItem[];
+  activeDialogId?: string;
+  isLoading?: boolean;
+  isCreatingDialog?: boolean;
+  children?: React.ReactNode;
   // Infinite scroll props
-  hasNextPage?: boolean
-  isFetchingNextPage?: boolean
-  onLoadMore?: () => void
+  hasNextPage?: boolean;
+  isFetchingNextPage?: boolean;
+  onLoadMore?: () => void;
 }
 
 // ========== Dialog List Item Props ==========
 
 export interface DialogListItemProps extends HTMLAttributes<HTMLDivElement> {
-  dialog: DialogItem
-  isActive?: boolean
-  onDialogSelect?: (dialogId: string) => void
+  dialog: DialogItem;
+  isActive?: boolean;
+  onDialogSelect?: (dialogId: string) => void;
 }

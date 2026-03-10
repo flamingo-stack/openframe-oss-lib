@@ -1,19 +1,19 @@
-"use client";
+'use client';
 
-import { useState, useEffect, ComponentType } from 'react';
+import { AlertTriangle, BookMarked, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
-import { Card, CardContent } from '../../ui/card';
-import { PageContainer } from '../../layout/page-container';
-import { ReleaseChangelogSection } from '../../ui/release-changelog-section';
-import { StatusBadge } from '../../ui/status-badge';
-import { SquareAvatar } from '../../ui/square-avatar';
-import { ImageGalleryModal } from '../../ui/image-gallery-modal';
-import { GitHubIcon } from '../../icons/github-icon';
-import { AlertTriangle, ExternalLink, BookMarked } from 'lucide-react';
-import { formatReleaseDate } from '../../../utils/date-formatters';
-import { YouTubeEmbed, extractYouTubeId } from '../../features/youtube-embed';
-import { DetailPageSkeleton } from '../detail-page-skeleton';
+import { ComponentType, useEffect, useState } from 'react';
 import type { ChangelogEntry } from '../../../types/product-release';
+import { formatReleaseDate } from '../../../utils/date-formatters';
+import { extractYouTubeId, YouTubeEmbed } from '../../features/youtube-embed';
+import { GitHubIcon } from '../../icons/github-icon';
+import { PageContainer } from '../../layout/page-container';
+import { Card, CardContent } from '../../ui/card';
+import { ImageGalleryModal } from '../../ui/image-gallery-modal';
+import { ReleaseChangelogSection } from '../../ui/release-changelog-section';
+import { SquareAvatar } from '../../ui/square-avatar';
+import { StatusBadge } from '../../ui/status-badge';
+import { DetailPageSkeleton } from '../detail-page-skeleton';
 
 // Types for injectable components
 export interface MarkdownRendererProps {
@@ -75,7 +75,7 @@ export function ReleaseDetailPage({
   RoadmapSection,
   DeliverySection,
   roadmapApiEndpoint = '/api/roadmap',
-  deliveryApiEndpoint = '/api/delivery'
+  deliveryApiEndpoint = '/api/delivery',
 }: ReleaseDetailPageProps) {
   // Use pre-fetched data if provided (admin preview), otherwise fetch via hook (public)
   const { data: fetchedRelease, error, isLoading } = useRelease(initialData ? undefined : slug);
@@ -159,11 +159,18 @@ export function ReleaseDetailPage({
   const releaseDate = release.release_date as string;
   const releaseType = release.release_type as string;
   const releaseStatus = release.release_status as string;
-  const blogTags = release.blog_tags as Array<{ id?: string; name?: string; blog_tags?: { id: string; name: string } }> | undefined;
-  const releaseMedia = release.release_media as Array<{ id?: string; media_type: string; media_url: string; title?: string }> | undefined;
+  const blogTags = release.blog_tags as
+    | Array<{ id?: string; name?: string; blog_tags?: { id: string; name: string } }>
+    | undefined;
+  const releaseMedia = release.release_media as
+    | Array<{ id?: string; media_type: string; media_url: string; title?: string }>
+    | undefined;
   const author = release.author as { avatar_url?: string; full_name?: string } | undefined;
   const githubReleases = release.github_releases as Array<{ id: string; github_release_url: string }> | undefined;
-  const knowledgeBaseLinks = release.knowledge_base_links as Array<{ id?: string; kb_article_path: string }> | string[] | undefined;
+  const knowledgeBaseLinks = release.knowledge_base_links as
+    | Array<{ id?: string; kb_article_path: string }>
+    | string[]
+    | undefined;
   const migrationGuideUrl = release.migration_guide_url as string | undefined;
   const documentationUrl = release.documentation_url as string | undefined;
   const youtubeUrl = release.youtube_url as string | undefined;
@@ -184,21 +191,17 @@ export function ReleaseDetailPage({
         <div className="flex flex-col md:flex-row md:items-end gap-4 w-full">
           <div className="flex-1 flex flex-col gap-2">
             {/* Title */}
-            <h1 className="text-h1 tracking-[-1.12px] text-ods-text-primary">
-              {releaseTitle}
-            </h1>
+            <h1 className="text-h1 tracking-[-1.12px] text-ods-text-primary">{releaseTitle}</h1>
 
             {/* Version */}
-            <p className="text-h4 text-ods-text-secondary">
-              Version: {releaseVersion}
-            </p>
+            <p className="text-h4 text-ods-text-secondary">Version: {releaseVersion}</p>
           </div>
         </div>
 
         {/* Category Tags */}
         <div className="flex flex-wrap gap-2 w-full">
           {/* Blog Tags */}
-          {blogTags?.map((tag) => (
+          {blogTags?.map(tag => (
             <StatusBadge
               key={tag.id || tag.blog_tags?.id}
               text={(tag.name || tag.blog_tags?.name || '').toUpperCase()}
@@ -213,9 +216,7 @@ export function ReleaseDetailPage({
           {/* Release Type */}
           <div className="bg-ods-card border-b md:border-b-0 md:border-r border-ods-border p-4 flex flex-col gap-3">
             <div className="flex flex-col gap-0">
-              <p className="text-h4 text-ods-text-primary">
-                {releaseType.toLocaleUpperCase()}
-              </p>
+              <p className="text-h4 text-ods-text-primary">{releaseType.toLocaleUpperCase()}</p>
               <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
                 Release Type
               </p>
@@ -225,9 +226,7 @@ export function ReleaseDetailPage({
           {/* Release Status */}
           <div className="bg-ods-card border-b md:border-b-0 md:border-r border-ods-border p-4 flex flex-col gap-3">
             <div className="flex flex-col gap-0">
-              <p className="text-h4 text-ods-text-primary">
-                {releaseStatus.toLocaleUpperCase()}
-              </p>
+              <p className="text-h4 text-ods-text-primary">{releaseStatus.toLocaleUpperCase()}</p>
               <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
                 Release Status
               </p>
@@ -237,9 +236,7 @@ export function ReleaseDetailPage({
           {/* Release Date */}
           <div className="bg-ods-card border-b md:border-b-0 md:border-r border-ods-border p-4 flex flex-col gap-3">
             <div className="flex flex-col gap-0">
-              <p className="text-h4 text-ods-text-primary">
-                {formatReleaseDate(releaseDate)}
-              </p>
+              <p className="text-h4 text-ods-text-primary">{formatReleaseDate(releaseDate)}</p>
               <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
                 Release Date
               </p>
@@ -259,9 +256,7 @@ export function ReleaseDetailPage({
               <p className="text-h3 tracking-[-0.36px] text-ods-text-primary truncate">
                 {author?.full_name || 'Unknown Author'}
               </p>
-              <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
-                Author
-              </p>
+              <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">Author</p>
             </div>
           </div>
         </div>
@@ -283,7 +278,11 @@ export function ReleaseDetailPage({
                 {mediaItem.media_type === 'video' || mediaItem.media_type === 'demo' ? (
                   <video src={mediaItem.media_url} className="w-full h-full object-cover" controls preload="metadata" />
                 ) : (
-                  <img src={mediaItem.media_url} alt={mediaItem.title || `Media ${index + 1}`} className="w-full h-full object-cover" />
+                  <img
+                    src={mediaItem.media_url}
+                    alt={mediaItem.title || `Media ${index + 1}`}
+                    className="w-full h-full object-cover"
+                  />
                 )}
               </div>
             ))}
@@ -298,17 +297,13 @@ export function ReleaseDetailPage({
         )}
 
         {/* YouTube Video Section - Full Width */}
-        {youtubeUrl && (() => {
-          const videoId = extractYouTubeId(youtubeUrl);
-          return videoId ? (
-              <YouTubeEmbed
-                videoId={videoId}
-                title={`${releaseTitle} - Video`}
-                showTitle={false}
-                showMeta={true}
-              />
-          ) : null;
-        })()}
+        {youtubeUrl &&
+          (() => {
+            const videoId = extractYouTubeId(youtubeUrl);
+            return videoId ? (
+              <YouTubeEmbed videoId={videoId} title={`${releaseTitle} - Video`} showTitle={false} showMeta={true} />
+            ) : null;
+          })()}
 
         {/* Content */}
         {releaseContent && (
@@ -325,7 +320,9 @@ export function ReleaseDetailPage({
                 <AlertTriangle className="h-6 w-6 text-red-500" />
                 <div>
                   <h3 className="font-bold text-red-500 text-lg">Breaking Changes</h3>
-                  <p className="text-ods-text-secondary">This release contains breaking changes. Review carefully before upgrading.</p>
+                  <p className="text-ods-text-secondary">
+                    This release contains breaking changes. Review carefully before upgrading.
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -359,53 +356,40 @@ export function ReleaseDetailPage({
         {/* Related Roadmap Items */}
         {RoadmapSection && (roadmapLoading || roadmapTasks.length > 0) && (
           <div className="space-y-4 w-full">
-            <p className="text-h5 tracking-[-0.28px] text-ods-text-secondary">
-              Related Roadmap Items
-            </p>
+            <p className="text-h5 tracking-[-0.28px] text-ods-text-secondary">Related Roadmap Items</p>
             <RoadmapSection
               items={roadmapTasks}
               isLoading={roadmapLoading}
-              onItemUpdate={(updatedItem) => {
-                setRoadmapTasks(prevTasks =>
-                  prevTasks.map(task =>
-                    task.id === updatedItem.id ? updatedItem : task
-                  )
-                );
+              onItemUpdate={updatedItem => {
+                setRoadmapTasks(prevTasks => prevTasks.map(task => (task.id === updatedItem.id ? updatedItem : task)));
               }}
             />
           </div>
         )}
 
         {/* Bug-fixes & Enhancements Section */}
-        {DeliverySection && (deliveryLoading || (deliveryData && (deliveryData.completed.length > 0 || deliveryData.inProgress.length > 0))) && (
-          <div className="w-full space-y-4">
-            <p className="text-h5 tracking-[-0.28px] text-ods-text-secondary">
-              Related Enhancements and Bug-fixes
-            </p>
-            <DeliverySection
-              data={deliveryData}
-              isLoading={deliveryLoading}
-            />
-          </div>
-        )}
+        {DeliverySection &&
+          (deliveryLoading ||
+            (deliveryData && (deliveryData.completed.length > 0 || deliveryData.inProgress.length > 0))) && (
+            <div className="w-full space-y-4">
+              <p className="text-h5 tracking-[-0.28px] text-ods-text-secondary">Related Enhancements and Bug-fixes</p>
+              <DeliverySection data={deliveryData} isLoading={deliveryLoading} />
+            </div>
+          )}
 
         {/* Related Links */}
         {(githubReleases?.length || knowledgeBaseLinks?.length || migrationGuideUrl || documentationUrl) && (
           <div className="space-y-1 w-full">
-            <p className="text-h5 tracking-[-0.28px] text-ods-text-secondary">
-              Related Links
-            </p>
+            <p className="text-h5 tracking-[-0.28px] text-ods-text-secondary">Related Links</p>
             <Card className="bg-ods-card border-ods-border p-6">
               <div className="space-y-4">
                 {/* GitHub Releases */}
                 {githubReleases && githubReleases.length > 0 && (
                   <>
-                    {githubReleases.map((ghRelease) => (
+                    {githubReleases.map(ghRelease => (
                       <div key={ghRelease.id} className="flex items-start gap-1">
                         <GitHubIcon className="shrink-0" width={24} height={24} color="var(--color-text-secondary)" />
-                        <span className="text-h4 text-ods-text-primary">
-                          Github Release
-                        </span>
+                        <span className="text-h4 text-ods-text-primary">Github Release</span>
                         <a
                           href={ghRelease.github_release_url}
                           target="_blank"
@@ -423,17 +407,19 @@ export function ReleaseDetailPage({
                 {/* Knowledge Base Links */}
                 {knowledgeBaseLinks && knowledgeBaseLinks.length > 0 && (
                   <>
-                    {knowledgeBaseLinks.map((linkObj) => {
+                    {knowledgeBaseLinks.map(linkObj => {
                       const path = typeof linkObj === 'string' ? linkObj : linkObj.kb_article_path;
                       const linkId = typeof linkObj === 'string' ? path : linkObj.id || path;
                       return (
                         <div key={linkId} className="flex items-start gap-1">
                           <BookMarked className="h-6 w-6 text-ods-text-secondary shrink-0" />
-                          <span className="text-h4 text-ods-text-primary">
-                            Knowledge Base
-                          </span>
+                          <span className="text-h4 text-ods-text-primary">Knowledge Base</span>
                           <Link
-                            href={path.startsWith('http') ? path : `/knowledge-base${path.startsWith('/') ? '' : '/'}${path}`}
+                            href={
+                              path.startsWith('http')
+                                ? path
+                                : `/knowledge-base${path.startsWith('/') ? '' : '/'}${path}`
+                            }
                             className="text-h4 text-[#ffc008] hover:underline"
                           >
                             {path.replace(/^\//, '').split('/').pop()?.replace(/-/g, ' ') || 'View Article'}
@@ -483,9 +469,9 @@ export function ReleaseDetailPage({
       </div>
 
       {/* Gallery Modal */}
-      {releaseMedia && releaseMedia.filter((m) => m.media_type !== 'video' && m.media_type !== 'demo').length > 0 && (
+      {releaseMedia && releaseMedia.filter(m => m.media_type !== 'video' && m.media_type !== 'demo').length > 0 && (
         <ImageGalleryModal
-          images={releaseMedia.filter((m) => m.media_type !== 'video' && m.media_type !== 'demo').map((m) => m.media_url)}
+          images={releaseMedia.filter(m => m.media_type !== 'video' && m.media_type !== 'demo').map(m => m.media_url)}
           isOpen={galleryOpen}
           onClose={() => setGalleryOpen(false)}
           initialIndex={galleryIndex}

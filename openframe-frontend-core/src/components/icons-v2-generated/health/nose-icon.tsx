@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface NoseIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface NoseIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function NoseIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: NoseIconProps) {
+export function NoseIcon({ className = '', size = 24, color = 'currentColor', ...props }: NoseIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

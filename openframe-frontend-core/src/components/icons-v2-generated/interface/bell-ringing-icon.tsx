@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface BellRingingIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface BellRingingIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function BellRingingIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: BellRingingIconProps) {
+export function BellRingingIcon({ className = '', size = 24, color = 'currentColor', ...props }: BellRingingIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

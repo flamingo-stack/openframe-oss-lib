@@ -1,16 +1,16 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { useState } from 'react'
-import { fn } from 'storybook/test'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
+import { fn } from 'storybook/test';
 
 import {
   BracketCurlyIcon,
   ChartDonutIcon,
   IdCardIcon,
   MonitorIcon,
-  Settings02Icon
-} from '../components/icons-v2-generated'
-import { AppLayout } from '../components/navigation/app-layout'
-import { NavigationSidebarConfig } from '../types/navigation'
+  Settings02Icon,
+} from '../components/icons-v2-generated';
+import { AppLayout } from '../components/navigation/app-layout';
+import { NavigationSidebarConfig } from '../types/navigation';
 
 const defaultNavigationItems: NavigationSidebarConfig['items'] = [
   {
@@ -38,7 +38,7 @@ const defaultNavigationItems: NavigationSidebarConfig['items'] = [
     icon: <BracketCurlyIcon size={24} />,
     path: '/scripts',
   },
-]
+];
 
 const secondaryNavigationItems: NavigationSidebarConfig['items'] = [
   {
@@ -48,12 +48,9 @@ const secondaryNavigationItems: NavigationSidebarConfig['items'] = [
     path: '/settings',
     section: 'secondary',
   },
-]
+];
 
-const allNavigationItems: NavigationSidebarConfig['items'] = [
-  ...defaultNavigationItems,
-  ...secondaryNavigationItems,
-]
+const allNavigationItems: NavigationSidebarConfig['items'] = [...defaultNavigationItems, ...secondaryNavigationItems];
 
 const meta = {
   title: 'Navigation/AppLayout',
@@ -84,9 +81,9 @@ A unified application layout component that combines the NavigationSidebar, AppH
 - **Configurable Header**: Optional header with user menu, notifications, search
 - **Suspense Integration**: Built-in loading state support for main content
 - **Flexible Styling**: Customizable via className props
-        `
-      }
-    }
+        `,
+      },
+    },
   },
   tags: ['autodocs'],
   args: {
@@ -110,10 +107,10 @@ A unified application layout component that combines the NavigationSidebar, AppH
       </div>
     ),
   },
-} satisfies Meta<typeof AppLayout>
+} satisfies Meta<typeof AppLayout>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 /**
  * Default layout with sidebar, header, and main content area.
@@ -129,18 +126,18 @@ export const Default: Story = {
       },
     },
   },
-  render: (args) => {
-    const [items, setItems] = useState(args.sidebarConfig.items)
+  render: args => {
+    const [items, setItems] = useState(args.sidebarConfig.items);
 
     const handleNavigate = (path: string) => {
-      fn()(path)
+      fn()(path);
       setItems(prevItems =>
         prevItems.map(item => ({
           ...item,
           isActive: item.path === path,
-        }))
-      )
-    }
+        })),
+      );
+    };
 
     return (
       <AppLayout
@@ -151,9 +148,9 @@ export const Default: Story = {
           onNavigate: handleNavigate,
         }}
       />
-    )
+    );
   },
-}
+};
 
 /**
  * Layout without custom user info - using only headerProps user data.
@@ -175,7 +172,7 @@ export const WithHeaderUserOnly: Story = {
       </div>
     ),
   },
-}
+};
 
 /**
  * Layout with header showing search and organization selector.
@@ -215,7 +212,7 @@ export const WithSearchAndOrganizations: Story = {
       </div>
     ),
   },
-}
+};
 
 /**
  * Layout with custom loading fallback for Suspense.
@@ -242,7 +239,7 @@ export const WithLoadingFallback: Story = {
       </div>
     ),
   },
-}
+};
 
 /**
  * Layout with custom main content styling.
@@ -265,7 +262,7 @@ export const WithCustomMainClassName: Story = {
       </div>
     ),
   },
-}
+};
 
 /**
  * Layout with minimized sidebar by default.
@@ -293,7 +290,7 @@ export const MinimizedSidebar: Story = {
       </div>
     ),
   },
-}
+};
 
 /**
  * Interactive example with working navigation.
@@ -310,20 +307,20 @@ export const Interactive: Story = {
     },
   },
   render: function InteractiveStory() {
-    const [items, setItems] = useState(allNavigationItems)
-    const [currentPage, setCurrentPage] = useState('Dashboard')
+    const [items, setItems] = useState(allNavigationItems);
+    const [currentPage, setCurrentPage] = useState('Dashboard');
 
     const handleNavigate = (path: string) => {
-      const pageName = path.replace('/', '').replace(/-/g, ' ')
-      const formattedName = pageName.charAt(0).toUpperCase() + pageName.slice(1) || 'Dashboard'
-      setCurrentPage(formattedName)
+      const pageName = path.replace('/', '').replace(/-/g, ' ');
+      const formattedName = pageName.charAt(0).toUpperCase() + pageName.slice(1) || 'Dashboard';
+      setCurrentPage(formattedName);
       setItems(prevItems =>
         prevItems.map(item => ({
           ...item,
           isActive: item.path === path,
-        }))
-      )
-    }
+        })),
+      );
+    };
 
     return (
       <AppLayout
@@ -356,15 +353,13 @@ export const Interactive: Story = {
           </p>
           <div className="mt-6 p-4 bg-ods-bg-card rounded-lg border border-ods-border">
             <h2 className="text-lg font-medium text-ods-text-primary mb-2">Current Route</h2>
-            <code className="text-sm text-ods-accent">
-              /{currentPage.toLowerCase().replace(/ /g, '-')}
-            </code>
+            <code className="text-sm text-ods-accent">/{currentPage.toLowerCase().replace(/ /g, '-')}</code>
           </div>
         </div>
       </AppLayout>
-    )
+    );
   },
-}
+};
 
 /**
  * Example mimicking a typical dashboard page.
@@ -406,7 +401,7 @@ export const DashboardExample: Story = {
             { label: 'Total Devices', value: '1,234' },
             { label: 'Active Users', value: '567' },
             { label: 'Scripts Run', value: '89' },
-          ].map((stat) => (
+          ].map(stat => (
             <div key={stat.label} className="p-4 bg-ods-bg-card rounded-lg border border-ods-border">
               <p className="text-sm text-ods-text-secondary">{stat.label}</p>
               <p className="text-2xl font-semibold text-ods-text-primary mt-1">{stat.value}</p>
@@ -422,7 +417,10 @@ export const DashboardExample: Story = {
               { action: 'Device added', target: 'MacBook-Pro-15', time: '15 min ago' },
               { action: 'User invited', target: 'sarah@company.com', time: '1 hour ago' },
             ].map((activity, index) => (
-              <div key={index} className="flex justify-between items-center py-2 border-b border-ods-border last:border-0">
+              <div
+                key={index}
+                className="flex justify-between items-center py-2 border-b border-ods-border last:border-0"
+              >
                 <div>
                   <p className="text-sm text-ods-text-primary">{activity.action}</p>
                   <p className="text-xs text-ods-text-secondary">{activity.target}</p>
@@ -435,4 +433,4 @@ export const DashboardExample: Story = {
       </div>
     ),
   },
-}
+};

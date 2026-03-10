@@ -27,11 +27,8 @@ export function LiteYouTubeEmbed({ id, title = 'YouTube video', thumbnail, class
   }
 
   return (
-    <div 
-      className={`cursor-pointer relative ${className}`}
-      onClick={handleLoad}
-    >
-      <img 
+    <div className={`cursor-pointer relative ${className}`} onClick={handleLoad}>
+      <img
         src={thumbnail || `https://img.youtube.com/vi/${id}/maxresdefault.jpg`}
         alt={title}
         className="w-full h-full object-cover"

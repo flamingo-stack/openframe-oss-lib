@@ -1,4 +1,4 @@
-"use client"
+'use client';
 
 // Stub auth provider and hooks
 import { createContext, useContext } from 'react';
@@ -28,7 +28,7 @@ export function useAuth() {
       if (realAuth && realAuth.user) {
         return realAuth;
       }
-    } catch (error) {
+    } catch (_error) {
       // Fallback if real auth fails
     }
   }
@@ -36,7 +36,7 @@ export function useAuth() {
   // Fallback mock user for UI kit context
   return {
     user: { id: 'mock-user-id', name: 'Mock User' },
-    isLoading: false
+    isLoading: false,
   };
 }
 

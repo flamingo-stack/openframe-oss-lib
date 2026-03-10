@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface Copy01IconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface Copy01IconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function Copy01Icon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: Copy01IconProps) {
+export function Copy01Icon({ className = '', size = 24, color = 'currentColor', ...props }: Copy01IconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

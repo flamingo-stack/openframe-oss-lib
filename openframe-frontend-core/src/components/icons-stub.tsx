@@ -1,5 +1,5 @@
 // Stub implementations for missing icons
-import { DollarSign, Code, Users, Building, GitCompare, MessageSquare } from "lucide-react";
+import { Building, Code, DollarSign, GitCompare, MessageSquare, Users } from 'lucide-react';
 
 export const OpenSourceIcon = Code;
 export const CoinsIcon = DollarSign;

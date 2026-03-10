@@ -1,10 +1,10 @@
-import React from "react"
+import React from 'react';
 
 export interface UsersIconProps extends React.SVGProps<SVGSVGElement> {
   color?: string;
 }
 
-export function UsersIcon({ className = "h-6 w-6", color = 'white', ...props }: UsersIconProps) {
+export function UsersIcon({ className = 'h-6 w-6', color = 'white', ...props }: UsersIconProps) {
   return (
     <svg
       width="24"
@@ -44,5 +44,5 @@ export function UsersIcon({ className = "h-6 w-6", color = 'white', ...props }: 
         strokeLinejoin="round"
       />
     </svg>
-  )
+  );
 }

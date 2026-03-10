@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import Image from "next/image";
-import { getProxiedImageUrl } from "../utils/image-proxy-stub";
+import Image from 'next/image';
+import { getProxiedImageUrl } from '../utils/image-proxy-stub';
 
 interface Props {
   name: string;
@@ -40,13 +40,13 @@ interface Props {
 const getAuthProviderIcon = (provider: string) => {
   const p = provider.toLowerCase();
   switch (p) {
-    case "google":
+    case 'google':
       return <Image src="/icons/google-logo.svg" alt="Google" width={16} height={16} className="w-4 h-4" />;
-    case "microsoft":
-    case "azure":
+    case 'microsoft':
+    case 'azure':
       return <Image src="/icons/microsoft-logo.svg" alt="Microsoft" width={16} height={16} className="w-4 h-4" />;
-    case "slack":
-    case "slack_oidc":
+    case 'slack':
+    case 'slack_oidc':
       return <div className="w-4 h-4 bg-[#888888] rounded-full" />; // Slack icon stub
     default:
       return <div className="w-4 h-4 bg-[#888888] rounded-full" />;
@@ -76,7 +76,7 @@ export function UserSummary({
   avatarUrl,
   authProviders,
   showEditButton = false,
-  editHref = "/profile/edit",
+  editHref = '/profile/edit',
   userId,
   profileData,
   mspPreview,
@@ -92,28 +92,40 @@ export function UserSummary({
         <div className="relative shrink-0" style={{ width: avatarSize, height: avatarSize }}>
           <div className="rounded-lg overflow-hidden bg-ods-card border border-ods-border w-full h-full relative">
             {avatarUrl ? (
-              <Image src={getProxiedImageUrl(avatarUrl) ?? avatarUrl} alt={name} fill className="object-cover" unoptimized />
+              <Image
+                src={getProxiedImageUrl(avatarUrl) ?? avatarUrl}
+                alt={name}
+                fill
+                className="object-cover"
+                unoptimized
+              />
             ) : (
               <div className="flex items-center justify-center h-full w-full bg-[#FFC008] text-[#161616] font-['Azeret_Mono'] font-bold">
-                {name.split(' ').map((n: string) => n.charAt(0)).join('').slice(0, 2)}
+                {name
+                  .split(' ')
+                  .map((n: string) => n.charAt(0))
+                  .join('')
+                  .slice(0, 2)}
               </div>
             )}
           </div>
           {mspPreview && mspPreview.logoUrl && (
             <div className="absolute -bottom-1 -right-1 size-6 rounded-full bg-[#FAFAFA] ring-1 ring-[#161616] overflow-hidden flex items-center justify-center select-none z-10">
-              <img src={getProxiedImageUrl(mspPreview.logoUrl) ?? mspPreview.logoUrl} alt={mspPreview.name || 'MSP'} className="object-cover w-full h-full" />
+              <img
+                src={getProxiedImageUrl(mspPreview.logoUrl) ?? mspPreview.logoUrl}
+                alt={mspPreview.name || 'MSP'}
+                className="object-cover w-full h-full"
+              />
             </div>
           )}
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-['DM_Sans'] text-[16px] leading-[1.3] text-ods-text-primary truncate">
             {name}
-            {mspPreview?.name && (
-              <span className="text-ods-text-secondary"> • {mspPreview.name}</span>
-            )}
+            {mspPreview?.name && <span className="text-ods-text-secondary"> • {mspPreview.name}</span>}
           </p>
           <p className="font-['DM_Sans'] text-[14px] leading-none text-ods-text-secondary truncate">
-            {subtitle && subtitle.trim().length > 0 ? subtitle : (email && email.trim().length > 0 ? email : '\u00A0')}
+            {subtitle && subtitle.trim().length > 0 ? subtitle : email && email.trim().length > 0 ? email : '\u00A0'}
           </p>
         </div>
       </div>
@@ -123,12 +135,18 @@ export function UserSummary({
   return (
     <div className="flex flex-col gap-4 w-full">
       {/* Header Row */}
-    <div className="flex gap-6 w-full items-start">
+      <div className="flex gap-6 w-full items-start">
         {/* Avatar with badge wrapper */}
         <div className="relative shrink-0 h-24 w-24 overflow-visible">
           <div className="rounded-full overflow-hidden bg-ods-card border border-ods-border w-full h-full relative">
             {avatarUrl ? (
-              <Image src={getProxiedImageUrl(avatarUrl) ?? avatarUrl} alt={name} fill className="object-cover" unoptimized />
+              <Image
+                src={getProxiedImageUrl(avatarUrl) ?? avatarUrl}
+                alt={name}
+                fill
+                className="object-cover"
+                unoptimized
+              />
             ) : (
               <div className="flex items-center justify-center h-full w-full text-3xl text-ods-text-secondary font-['Azeret_Mono']">
                 {name.charAt(0).toUpperCase()}
@@ -160,31 +178,27 @@ export function UserSummary({
         <div className="flex-1 grid grid-cols-[1fr_auto] gap-4">
           {/* LEFT : text stack */}
           <div className="min-h-[6rem] flex flex-col justify-center space-y-3 truncate">
-          <p className="text-h2 text-ods-text-primary leading-none truncate">
-            {name}
-          </p>
+            <p className="text-h2 text-ods-text-primary leading-none truncate">{name}</p>
             <p className="font-['DM_Sans'] text-[18px] text-ods-text-secondary leading-none break-all truncate">
-              {(subtitle && subtitle.trim().length > 0) ? subtitle : (email && email.trim().length > 0 ? email : '\u00A0')}
+              {subtitle && subtitle.trim().length > 0 ? subtitle : email && email.trim().length > 0 ? email : '\u00A0'}
             </p>
             {mspPreview && (
               <p className="font-['DM_Sans'] text-[14px] text-ods-text-primary leading-none truncate">
                 {/* Build string with separators */}
                 {[
                   mspPreview.name ?? '—',
-                  typeof mspPreview.seatCount === 'number'
-                    ? `${formatNumber(mspPreview.seatCount)} Seats`
-                    : null,
+                  typeof mspPreview.seatCount === 'number' ? `${formatNumber(mspPreview.seatCount)} Seats` : null,
                   typeof mspPreview.technicianCount === 'number'
                     ? `${formatNumber(mspPreview.technicianCount)} Technicians`
                     : null,
-                  typeof mspPreview.annualRevenue === 'number'
-                    ? `$${formatNumber(mspPreview.annualRevenue)}`
-                    : null,
+                  typeof mspPreview.annualRevenue === 'number' ? `$${formatNumber(mspPreview.annualRevenue)}` : null,
                 ]
                   .filter(Boolean)
                   .flatMap((txt, idx) => (idx === 0 ? [txt] : [' • ', txt]))
                   .map((seg, idx) => (
-                    <span key={idx} className={seg === ' • ' ? 'text-ods-text-secondary' : ''}>{seg}</span>
+                    <span key={idx} className={seg === ' • ' ? 'text-ods-text-secondary' : ''}>
+                      {seg}
+                    </span>
                   ))}
               </p>
             )}
@@ -194,25 +208,23 @@ export function UserSummary({
           {(authProviders?.length || showEditButton) && (
             <div className="hidden md:flex flex-col items-end justify-between flex-shrink-0 min-h-[6rem]">
               {/* top part */}
-          {authProviders && authProviders.length > 0 && (
+              {authProviders && authProviders.length > 0 && (
                 <div className="flex items-center gap-2">
-              <span className="text-[12px] text-ods-text-secondary whitespace-nowrap select-none">
-                Authorized by
-              </span>
-              <div className="flex items-center gap-2">
-                {authProviders.map((p) => (
-                  <div key={p} className="flex items-center justify-center w-4 h-4">
-                    {getAuthProviderIcon(p)}
+                  <span className="text-[12px] text-ods-text-secondary whitespace-nowrap select-none">
+                    Authorized by
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {authProviders.map(p => (
+                      <div key={p} className="flex items-center justify-center w-4 h-4">
+                        {getAuthProviderIcon(p)}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
+                </div>
+              )}
 
               {/* bottom part - Edit button would go here */}
-          {showEditButton && (
-                <div className="text-xs text-ods-text-secondary">Edit Profile</div>
-              )}
+              {showEditButton && <div className="text-xs text-ods-text-secondary">Edit Profile</div>}
             </div>
           )}
         </div>
@@ -225,7 +237,7 @@ export function UserSummary({
             <div className="flex items-center gap-2">
               <span className="text-[12px] text-ods-text-secondary whitespace-nowrap select-none">Authorized by</span>
               <div className="flex items-center gap-2">
-                {authProviders.map((p) => (
+                {authProviders.map(p => (
                   <div key={p} className="flex items-center justify-center w-4 h-4">
                     {getAuthProviderIcon(p)}
                   </div>
@@ -234,9 +246,7 @@ export function UserSummary({
             </div>
           )}
 
-          {showEditButton && (
-            <div className="text-xs text-ods-text-secondary">Edit Profile</div>
-          )}
+          {showEditButton && <div className="text-xs text-ods-text-secondary">Edit Profile</div>}
         </div>
       )}
     </div>

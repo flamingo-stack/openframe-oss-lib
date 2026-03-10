@@ -1,14 +1,13 @@
-import type { SVGProps } from "react";
-export interface Ellipsis02CircleIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface Ellipsis02CircleIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
 export function Ellipsis02CircleIcon({
-  className = "",
+  className = '',
   size = 24,
-  color = "currentColor",
+  color = 'currentColor',
   ...props
 }: Ellipsis02CircleIconProps) {
   return (

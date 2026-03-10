@@ -1,39 +1,42 @@
-import { forwardRef, useRef, useEffect } from "react"
-import { cn } from "../../utils/cn"
-import { Button } from "../ui/button"
-import { ChatPlusIcon, ChatsIcon } from "../icons-v2-generated"
-import { Chevron02RightIcon } from "../icons-v2-generated"
-import { ChatSidebarSkeleton, DialogListItemSkeleton } from "./chat-sidebar-skeleton"
-import type { ChatSidebarProps, DialogListItemProps } from "./types"
+import { forwardRef, useEffect, useRef } from 'react';
+import { cn } from '../../utils/cn';
+import { ChatPlusIcon, ChatsIcon, Chevron02RightIcon } from '../icons-v2-generated';
+import { Button } from '../ui/button';
+import { ChatSidebarSkeleton, DialogListItemSkeleton } from './chat-sidebar-skeleton';
+import type { ChatSidebarProps, DialogListItemProps } from './types';
 
 const DialogListItem = forwardRef<HTMLDivElement, DialogListItemProps>(
   ({ className, dialog, isActive, onDialogSelect, onClick, ...props }, ref) => {
     const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
-      onDialogSelect?.(dialog.id)
-      onClick?.(e)
-    }
+      onDialogSelect?.(dialog.id);
+      onClick?.(e);
+    };
 
     const formatTimestamp = (timestamp?: Date | string) => {
-      if (!timestamp) return ''
-      const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-      }) + ', ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
-    }
+      if (!timestamp) return '';
+      const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
+      return (
+        date.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        }) +
+        ', ' +
+        date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+      );
+    };
 
     return (
       <div
         ref={ref}
         className={cn(
-          "flex items-center gap-4 overflow-clip",
-          "px-4 py-3",
-          "cursor-pointer border-b border-ods-border",
-          "bg-ods-card",
-          "hover:bg-ods-bg-hover transition-colors",
-          isActive && "bg-ods-bg-hover border-l-2 border-l-ods-accent",
-          className
+          'flex items-center gap-4 overflow-clip',
+          'px-4 py-3',
+          'cursor-pointer border-b border-ods-border',
+          'bg-ods-card',
+          'hover:bg-ods-bg-hover transition-colors',
+          isActive && 'bg-ods-bg-hover border-l-2 border-l-ods-accent',
+          className,
         )}
         onClick={handleClick}
         {...props}
@@ -41,11 +44,14 @@ const DialogListItem = forwardRef<HTMLDivElement, DialogListItemProps>(
         {/* Content area */}
         <div className="flex flex-1 flex-col items-start justify-center gap-1 min-w-0">
           <div className="flex items-center w-full min-w-0">
-            <h3 className={cn(
-              "text-base font-medium leading-5 min-w-0 flex-1",
-              isActive ? "text-ods-accent" : "text-ods-text-primary",
-              "truncate"
-            )} title={dialog.title || 'Untitled Chat'}>
+            <h3
+              className={cn(
+                'text-base font-medium leading-5 min-w-0 flex-1',
+                isActive ? 'text-ods-accent' : 'text-ods-text-primary',
+                'truncate',
+              )}
+              title={dialog.title || 'Untitled Chat'}
+            >
               {dialog.title || 'Untitled Chat'}
             </h3>
           </div>
@@ -55,7 +61,7 @@ const DialogListItem = forwardRef<HTMLDivElement, DialogListItemProps>(
             </p>
           )}
         </div>
-        
+
         {/* Right side indicator - always visible */}
         <div className="flex-shrink-0 ml-2">
           {dialog.unreadMessagesCount && dialog.unreadMessagesCount > 0 ? (
@@ -69,59 +75,64 @@ const DialogListItem = forwardRef<HTMLDivElement, DialogListItemProps>(
           )}
         </div>
       </div>
-    )
-  }
-)
+    );
+  },
+);
 
-DialogListItem.displayName = "DialogListItem"
+DialogListItem.displayName = 'DialogListItem';
 
 const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(
-  ({ className, onNewChat, onDialogSelect, dialogs = [], activeDialogId, isLoading, isCreatingDialog, children, hasNextPage, isFetchingNextPage, onLoadMore, ...props }, ref) => {
-    const showEmptyState = dialogs.length === 0 && !children
-    const scrollContainerRef = useRef<HTMLDivElement>(null)
-    const loadMoreRef = useRef<HTMLDivElement>(null)
-    const onLoadMoreRef = useRef(onLoadMore)
-    onLoadMoreRef.current = onLoadMore
-    const isFetchingRef = useRef(isFetchingNextPage)
-    isFetchingRef.current = isFetchingNextPage
+  (
+    {
+      className,
+      onNewChat,
+      onDialogSelect,
+      dialogs = [],
+      activeDialogId,
+      isLoading,
+      isCreatingDialog,
+      children,
+      hasNextPage,
+      isFetchingNextPage,
+      onLoadMore,
+      ...props
+    },
+    ref,
+  ) => {
+    const showEmptyState = dialogs.length === 0 && !children;
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const loadMoreRef = useRef<HTMLDivElement>(null);
+    const onLoadMoreRef = useRef(onLoadMore);
+    onLoadMoreRef.current = onLoadMore;
+    const isFetchingRef = useRef(isFetchingNextPage);
+    isFetchingRef.current = isFetchingNextPage;
 
     useEffect(() => {
-      const scrollContainer = scrollContainerRef.current
-      const loadMoreElement = loadMoreRef.current
-      if (!scrollContainer || !loadMoreElement || !hasNextPage) return
+      const scrollContainer = scrollContainerRef.current;
+      const loadMoreElement = loadMoreRef.current;
+      if (!scrollContainer || !loadMoreElement || !hasNextPage) return;
 
       const observer = new IntersectionObserver(
-        (entries) => {
-          const [entry] = entries
+        entries => {
+          const [entry] = entries;
           if (entry.isIntersecting && !isFetchingRef.current) {
-            onLoadMoreRef.current?.()
+            onLoadMoreRef.current?.();
           }
         },
-        { root: scrollContainer, rootMargin: '100px', threshold: 0.1 }
-      )
-      observer.observe(loadMoreElement)
-      return () => observer.disconnect()
-    }, [hasNextPage])
+        { root: scrollContainer, rootMargin: '100px', threshold: 0.1 },
+      );
+      observer.observe(loadMoreElement);
+      return () => observer.disconnect();
+    }, [hasNextPage]);
 
     if (isLoading && dialogs.length === 0 && !children) {
-      return (
-        <ChatSidebarSkeleton
-          className={className}
-          dialogCount={8}
-          showNewChatButton={true}
-        />
-      )
+      return <ChatSidebarSkeleton className={className} dialogCount={8} showNewChatButton={true} />;
     }
 
     return (
       <div
         ref={ref}
-        className={cn(
-          "w-80 h-full flex flex-col",
-          "bg-ods-bg",
-          "border-r border-ods-border",
-          className
-        )}
+        className={cn('w-80 h-full flex flex-col', 'bg-ods-bg', 'border-r border-ods-border', className)}
         {...props}
       >
         {/* Start New Chat Button */}
@@ -144,24 +155,18 @@ const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(
             <div className="flex-1 flex flex-col items-center justify-center gap-6 p-6">
               <ChatsIcon className="w-6 h-6 text-ods-text-secondary" />
               <div className="text-center space-y-2">
-                <h3 className="text-lg font-medium text-ods-text-secondary">
-                  No Current Chats
-                </h3>
-                <p className="text-sm font-medium text-ods-text-secondary">
-                  Previous Mingo sessions will show here
-                </p>
+                <h3 className="text-lg font-medium text-ods-text-secondary">No Current Chats</h3>
+                <p className="text-sm font-medium text-ods-text-secondary">Previous Mingo sessions will show here</p>
               </div>
             </div>
           ) : children ? (
             /* Custom children content */
-            <div className="flex-1 overflow-y-auto">
-              {children}
-            </div>
+            <div className="flex-1 overflow-y-auto">{children}</div>
           ) : (
             /* Dialogs List */
             <div ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0">
               <div className="flex flex-col">
-                {dialogs.map((dialog) => (
+                {dialogs.map(dialog => (
                   <DialogListItem
                     key={dialog.id}
                     dialog={dialog}
@@ -169,7 +174,7 @@ const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(
                     onDialogSelect={onDialogSelect}
                   />
                 ))}
-                
+
                 {/* Infinite scroll loading indicator and intersection target */}
                 {hasNextPage && (
                   <div ref={loadMoreRef}>
@@ -187,10 +192,10 @@ const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(
           )}
         </div>
       </div>
-    )
-  }
-)
+    );
+  },
+);
 
-ChatSidebar.displayName = "ChatSidebar"
+ChatSidebar.displayName = 'ChatSidebar';
 
-export { ChatSidebar, DialogListItem }
+export { ChatSidebar, DialogListItem };

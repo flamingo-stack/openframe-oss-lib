@@ -1,20 +1,20 @@
-"use client"
+'use client';
 
 import React from 'react';
-import { Button, ButtonProps } from '../ui/button';
 import { GitHubIcon } from '../icons';
+import { Button, ButtonProps } from '../ui/button';
 
 interface GithubRepoButtonProps extends Omit<ButtonProps, 'children' | 'leftIcon' | 'variant' | 'size'> {
   children?: React.ReactNode;
   size?: 'default' | 'sm' | 'lg' | 'icon';
 }
 
-export function GithubRepoButton({ 
+export function GithubRepoButton({
   children = 'Get Started',
   size = 'default',
   href = 'https://github.com/flamingo-stack/openframe-oss-tenant',
   className = '',
-  ...props 
+  ...props
 }: GithubRepoButtonProps) {
   return (
     <Button

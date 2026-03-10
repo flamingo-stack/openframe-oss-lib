@@ -1,24 +1,24 @@
-export { FileManager } from './file-manager'
-export { FileManagerSkeleton } from './file-manager-skeleton'
-export { FileManagerBreadcrumb } from './file-manager-breadcrumb'
-export { FileManagerActionBar } from './file-manager-action-bar'
-export { FileManagerTable } from './file-manager-table'
-export { FileManagerTableRow } from './file-manager-table-row'
-export { FileManagerContextMenu } from './file-manager-context-menu'
-export { FileManagerEmpty } from './file-manager-empty'
-export { FileIcon } from './file-icon'
+export { FileIcon } from './file-icon';
+export { FileManager } from './file-manager';
+export { FileManagerActionBar } from './file-manager-action-bar';
+export { FileManagerBreadcrumb } from './file-manager-breadcrumb';
+export { FileManagerContextMenu } from './file-manager-context-menu';
+export { FileManagerEmpty } from './file-manager-empty';
+export { FileManagerSkeleton } from './file-manager-skeleton';
+export { FileManagerTable } from './file-manager-table';
+export { FileManagerTableRow } from './file-manager-table-row';
 
 export type {
-  FileType,
-  FileAction,
-  FileItem,
   BreadcrumbItem,
-  FileManagerProps,
-  FileManagerBreadcrumbProps,
+  FileAction,
+  FileIconProps,
+  FileItem,
   FileManagerActionBarProps,
+  FileManagerBreadcrumbProps,
+  FileManagerContextMenuProps,
+  FileManagerEmptyProps,
+  FileManagerProps,
   FileManagerTableProps,
   FileManagerTableRowProps,
-  FileManagerContextMenuProps,
-  FileIconProps,
-  FileManagerEmptyProps
-} from './types'
+  FileType,
+} from './types';

@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface BagXmarkIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface BagXmarkIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function BagXmarkIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: BagXmarkIconProps) {
+export function BagXmarkIcon({ className = '', size = 24, color = 'currentColor', ...props }: BagXmarkIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

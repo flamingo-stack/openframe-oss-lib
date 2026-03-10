@@ -29,4 +29,4 @@ export const GoogleLogo = ({ className, ...props }: { className?: string } & Rea
       />
     </g>
   </svg>
-); 
+);

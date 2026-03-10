@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface StomachIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface StomachIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function StomachIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: StomachIconProps) {
+export function StomachIcon({ className = '', size = 24, color = 'currentColor', ...props }: StomachIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

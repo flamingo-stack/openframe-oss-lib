@@ -3,13 +3,12 @@ import type { Preview } from '@storybook/nextjs-vite';
 import '../src/styles/storybook-fonts.css';
 import '../src/styles/index.css';
 
-
 const preview: Preview = {
   parameters: {
     controls: {
       matchers: {
-       color: /(background|color)$/i,
-       date: /Date$/i,
+        color: /(background|color)$/i,
+        date: /Date$/i,
       },
     },
   },

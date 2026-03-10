@@ -1,10 +1,4 @@
-import type {
-  ConnectionOptions,
-  MsgHdrs as NatsHeaders,
-  Msg,
-  NatsConnection,
-  Subscription,
-} from 'nats.ws'
+import type { ConnectionOptions, Msg, NatsConnection, MsgHdrs as NatsHeaders, Subscription } from 'nats.ws';
 
 export interface NatsClientOptions {
   /**
@@ -12,150 +6,146 @@ export interface NatsClientOptions {
    * - "wss://nats.example.com:443"
    * - ["wss://nats-1.example.com:443", "wss://nats-2.example.com:443"]
    */
-  servers: string | string[]
+  servers: string | string[];
 
   /**
    * Connection name (shows up in NATS monitoring).
    */
-  name?: string
+  name?: string;
 
   /**
    * Auth options (pick one: token or user/pass).
    */
-  token?: string
-  user?: string
-  pass?: string
+  token?: string;
+  user?: string;
+  pass?: string;
 
   /**
    * Reconnect behavior.
    */
-  reconnect?: boolean
-  maxReconnectAttempts?: number
-  reconnectTimeWaitMs?: number
+  reconnect?: boolean;
+  maxReconnectAttempts?: number;
+  reconnectTimeWaitMs?: number;
 
   /**
    * Ping behavior (keep-alive).
    */
-  pingIntervalMs?: number
-  maxPingOut?: number
+  pingIntervalMs?: number;
+  maxPingOut?: number;
 
   /**
    * Optional inbox prefix (useful if you want to isolate request/reply inboxes).
    */
-  inboxPrefix?: string
+  inboxPrefix?: string;
 
   /**
    * Connection timeout in milliseconds (maps to `nats.ws` connect option `timeout`).
    * If you see `NatsError: TIMEOUT` during connect, increase this.
    */
-  connectTimeoutMs?: number
+  connectTimeoutMs?: number;
 }
 
 export interface NatsSubscribeOptions {
   /**
    * Queue group for load-balancing messages across subscribers.
    */
-  queue?: string
+  queue?: string;
 
   /**
    * Auto-unsubscribe after receiving this many messages.
    */
-  max?: number
+  max?: number;
 
   /**
    * Abort signal to stop message iteration and unsubscribe.
    */
-  signal?: AbortSignal
+  signal?: AbortSignal;
 }
 
-export type NatsHeadersInit = Record<string, string> | NatsHeaders | undefined
+export type NatsHeadersInit = Record<string, string> | NatsHeaders | undefined;
 
 export interface NatsPublishOptions {
-  headers?: NatsHeadersInit
+  headers?: NatsHeadersInit;
 }
 
 export interface NatsRequestOptions {
-  timeoutMs?: number
-  headers?: NatsHeadersInit
+  timeoutMs?: number;
+  headers?: NatsHeadersInit;
 }
 
 export interface NatsSubscriptionHandle {
-  readonly subscription: Subscription
-  unsubscribe(): void
+  readonly subscription: Subscription;
+  unsubscribe(): void;
 }
 
-export type NatsStatus =
-  | 'connecting'
-  | 'connected'
-  | 'disconnected'
-  | 'reconnecting'
-  | 'closed'
-  | 'error'
+export type NatsStatus = 'connecting' | 'connected' | 'disconnected' | 'reconnecting' | 'closed' | 'error';
 
 export interface NatsStatusEvent {
-  status: NatsStatus
-  data?: unknown
+  status: NatsStatus;
+  data?: unknown;
 }
 
 export interface NatsClient {
-  connect(): Promise<void>
-  close(): Promise<void>
+  connect(): Promise<void>;
+  close(): Promise<void>;
 
-  isConnected(): boolean
+  isConnected(): boolean;
 
-  publishBytes(subject: string, payload: Uint8Array, options?: NatsPublishOptions): void
-  publishString(subject: string, payload: string, options?: NatsPublishOptions): void
-  publishJson<T>(subject: string, payload: T, options?: NatsPublishOptions): void
+  publishBytes(subject: string, payload: Uint8Array, options?: NatsPublishOptions): void;
+  publishString(subject: string, payload: string, options?: NatsPublishOptions): void;
+  publishJson<T>(subject: string, payload: T, options?: NatsPublishOptions): void;
 
-  requestBytes(subject: string, payload: Uint8Array, options?: NatsRequestOptions): Promise<Msg>
-  requestString(subject: string, payload: string, options?: NatsRequestOptions): Promise<string>
+  requestBytes(subject: string, payload: Uint8Array, options?: NatsRequestOptions): Promise<Msg>;
+  requestString(subject: string, payload: string, options?: NatsRequestOptions): Promise<string>;
   requestJson<TResponse, TRequest = unknown>(
     subject: string,
     payload: TRequest,
     options?: NatsRequestOptions,
-  ): Promise<TResponse>
+  ): Promise<TResponse>;
 
   subscribeBytes(
     subject: string,
     onMessage: (msg: Msg) => void | Promise<void>,
     options?: NatsSubscribeOptions,
-  ): NatsSubscriptionHandle
+  ): NatsSubscriptionHandle;
   subscribeString(
     subject: string,
     onMessage: (payload: string, msg: Msg) => void | Promise<void>,
     options?: NatsSubscribeOptions,
-  ): NatsSubscriptionHandle
+  ): NatsSubscriptionHandle;
   subscribeJson<T>(
     subject: string,
     onMessage: (payload: T, msg: Msg) => void | Promise<void>,
     options?: NatsSubscribeOptions,
-  ): NatsSubscriptionHandle
+  ): NatsSubscriptionHandle;
 
-  onStatus(listener: (event: NatsStatusEvent) => void): () => void
+  onStatus(listener: (event: NatsStatusEvent) => void): () => void;
 }
 
 function assertClientSide(): void {
   // This wrapper is meant for browser/Tauri usage via WebSockets.
   // Keep it safe to import from Next.js server bundles by throwing only when used.
   if (typeof window === 'undefined') {
-    throw new Error('NATS client can only connect from the browser/runtime with WebSocket support (window is undefined).')
+    throw new Error(
+      'NATS client can only connect from the browser/runtime with WebSocket support (window is undefined).',
+    );
   }
 }
 
 async function importNats(): Promise<typeof import('nats.ws')> {
   // Browser/Tauri only: always use the websocket client (no Node-only deps).
-  return await import('nats.ws')
+  return await import('nats.ws');
 }
 
 function toNatsHeaders(nats: typeof import('nats.ws'), init: NatsHeadersInit): NatsHeaders | undefined {
-  if (!init) return undefined
-  if (typeof (init as NatsHeaders).get === 'function') return init as NatsHeaders
+  if (!init) return undefined;
+  if (typeof (init as NatsHeaders).get === 'function') return init as NatsHeaders;
 
-  const h = nats.headers()
+  const h = nats.headers();
   for (const [k, v] of Object.entries(init as Record<string, string>)) {
-    if (v !== undefined && v !== null) h.set(k, String(v))
+    if (v !== undefined && v !== null) h.set(k, String(v));
   }
-  return h
+  return h;
 }
 
 function mapOptionsToConnectionOptions(opts: NatsClientOptions): ConnectionOptions {
@@ -172,29 +162,29 @@ function mapOptionsToConnectionOptions(opts: NatsClientOptions): ConnectionOptio
     pingInterval: opts.pingIntervalMs,
     maxPingOut: opts.maxPingOut,
     inboxPrefix: opts.inboxPrefix,
-  }
+  };
 }
 
 function mapNatsTypeToStatus(type: unknown): NatsStatus | null {
-  const t = String(type).toLowerCase()
-  if (t.includes('disconnect')) return 'disconnected'
-  if (t === 'reconnecting') return 'reconnecting'
-  if (t === 'reconnect' || t.includes('connect')) return 'connected'
-  if (t.includes('error')) return 'error'
-  if (t.includes('close')) return 'closed'
-  return null
+  const t = String(type).toLowerCase();
+  if (t.includes('disconnect')) return 'disconnected';
+  if (t === 'reconnecting') return 'reconnecting';
+  if (t === 'reconnect' || t.includes('connect')) return 'connected';
+  if (t.includes('error')) return 'error';
+  if (t.includes('close')) return 'closed';
+  return null;
 }
 
 export function createNatsClient(options: NatsClientOptions): NatsClient {
-  let nc: NatsConnection | null = null
-  let statusLoopAbort: AbortController | null = null
+  let nc: NatsConnection | null = null;
+  let statusLoopAbort: AbortController | null = null;
 
-  const statusListeners = new Set<(event: NatsStatusEvent) => void>()
+  const statusListeners = new Set<(event: NatsStatusEvent) => void>();
 
   function emitStatus(event: NatsStatusEvent) {
     for (const listener of statusListeners) {
       try {
-        listener(event)
+        listener(event);
       } catch {
         // ignore listener failures
       }
@@ -202,116 +192,116 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
   }
 
   async function connect(): Promise<void> {
-    if (nc && !nc.isClosed()) return
-    assertClientSide()
+    if (nc && !nc.isClosed()) return;
+    assertClientSide();
 
-    emitStatus({ status: 'connecting' })
+    emitStatus({ status: 'connecting' });
 
-    const nats = await importNats()
-    const conn = await nats.connect(mapOptionsToConnectionOptions(options))
-    nc = conn
+    const nats = await importNats();
+    const conn = await nats.connect(mapOptionsToConnectionOptions(options));
+    nc = conn;
 
-    emitStatus({ status: 'connected' })
+    emitStatus({ status: 'connected' });
 
-    statusLoopAbort = new AbortController()
-    const signal = statusLoopAbort.signal
+    statusLoopAbort = new AbortController();
+    const signal = statusLoopAbort.signal;
 
-    ;(async () => {
+    (async () => {
       try {
         for await (const s of conn.status()) {
-          if (signal.aborted) return
-          const mapped = mapNatsTypeToStatus((s as any)?.type)
+          if (signal.aborted) return;
+          const mapped = mapNatsTypeToStatus((s as any)?.type);
           if (mapped) {
-            emitStatus({ status: mapped, data: (s as any)?.data })
+            emitStatus({ status: mapped, data: (s as any)?.data });
             if (mapped === 'closed') {
-              nc = null
+              nc = null;
             }
           }
         }
       } catch (e) {
         if (!signal.aborted) {
-          emitStatus({ status: 'error', data: e })
-          nc = null
+          emitStatus({ status: 'error', data: e });
+          nc = null;
         }
       }
     })().catch(() => {
       // ignore
-    })
+    });
   }
 
   async function close(): Promise<void> {
-    const conn = nc
-    nc = null
+    const conn = nc;
+    nc = null;
 
     if (statusLoopAbort) {
       try {
-        statusLoopAbort.abort()
+        statusLoopAbort.abort();
       } catch {
         // ignore
       }
-      statusLoopAbort = null
+      statusLoopAbort = null;
     }
 
-    if (!conn) return
+    if (!conn) return;
     try {
-      await conn.drain()
+      await conn.drain();
     } finally {
       try {
-        await conn.close()
+        await conn.close();
       } finally {
-        emitStatus({ status: 'closed' })
+        emitStatus({ status: 'closed' });
       }
     }
   }
 
   function requireConnection(): NatsConnection {
-    if (!nc) throw new Error('NATS is not connected. Call client.connect() first.')
-    return nc
+    if (!nc) throw new Error('NATS is not connected. Call client.connect() first.');
+    return nc;
   }
 
   function isConnected(): boolean {
-    return Boolean(nc) && !nc!.isClosed()
+    return Boolean(nc) && !nc!.isClosed();
   }
 
   function publishBytes(subject: string, payload: Uint8Array, opts?: NatsPublishOptions): void {
-    const conn = requireConnection()
-    ;(async () => {
-      const nats = await importNats()
-      conn.publish(subject, payload, { headers: toNatsHeaders(nats, opts?.headers) })
-    })().catch((e) => emitStatus({ status: 'error', data: e }))
+    const conn = requireConnection();
+    (async () => {
+      const nats = await importNats();
+      conn.publish(subject, payload, { headers: toNatsHeaders(nats, opts?.headers) });
+    })().catch(e => emitStatus({ status: 'error', data: e }));
   }
 
   function publishString(subject: string, payload: string, opts?: NatsPublishOptions): void {
-    ;(async () => {
-      const nats = await importNats()
-      const sc = nats.StringCodec()
-      publishBytes(subject, sc.encode(payload), opts)
-    })().catch((e) => emitStatus({ status: 'error', data: e }))
+    (async () => {
+      const nats = await importNats();
+      const sc = nats.StringCodec();
+      publishBytes(subject, sc.encode(payload), opts);
+    })().catch(e => emitStatus({ status: 'error', data: e }));
   }
 
   function publishJson<T>(subject: string, payload: T, opts?: NatsPublishOptions): void {
-    ;(async () => {
-      const nats = await importNats()
-      const jc = nats.JSONCodec<T>()
-      publishBytes(subject, jc.encode(payload), opts)
-    })().catch((e) => emitStatus({ status: 'error', data: e }))
+    (async () => {
+      const nats = await importNats();
+      const jc = nats.JSONCodec<T>();
+      publishBytes(subject, jc.encode(payload), opts);
+    })().catch(e => emitStatus({ status: 'error', data: e }));
   }
 
   async function requestBytes(subject: string, payload: Uint8Array, opts?: NatsRequestOptions): Promise<Msg> {
-    const conn = requireConnection()
-    const nats = await importNats()
+    const conn = requireConnection();
+    const nats = await importNats();
     const msg = await conn.request(subject, payload, {
       timeout: opts?.timeoutMs ?? 2000,
       headers: toNatsHeaders(nats, opts?.headers),
-    })
-    return msg
+    });
+    return msg;
   }
 
   async function requestString(subject: string, payload: string, opts?: NatsRequestOptions): Promise<string> {
-    const nats = await importNats()
-    const sc = nats.StringCodec()
-    const msg = await requestBytes(subject, sc.encode(payload), opts)
-    return sc.decode(msg.data)
+    const nats = await importNats();
+    const sc = nats.StringCodec();
+    const msg = await requestBytes(subject, sc.encode(payload), opts);
+    return sc.decode(msg.data);
   }
 
   async function requestJson<TResponse, TRequest = unknown>(
@@ -319,11 +309,11 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
     payload: TRequest,
     opts?: NatsRequestOptions,
   ): Promise<TResponse> {
-    const nats = await importNats()
-    const reqCodec = nats.JSONCodec<TRequest>()
-    const resCodec = nats.JSONCodec<TResponse>()
-    const msg = await requestBytes(subject, reqCodec.encode(payload), opts)
-    return resCodec.decode(msg.data)
+    const nats = await importNats();
+    const reqCodec = nats.JSONCodec<TRequest>();
+    const resCodec = nats.JSONCodec<TResponse>();
+    const msg = await requestBytes(subject, reqCodec.encode(payload), opts);
+    return resCodec.decode(msg.data);
   }
 
   function subscribeBytes(
@@ -331,45 +321,45 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
     onMessage: (msg: Msg) => void | Promise<void>,
     opts?: NatsSubscribeOptions,
   ): NatsSubscriptionHandle {
-    const conn = requireConnection()
-    const sub = conn.subscribe(subject, { queue: opts?.queue })
-    if (typeof opts?.max === 'number') sub.unsubscribe(opts.max)
+    const conn = requireConnection();
+    const sub = conn.subscribe(subject, { queue: opts?.queue });
+    if (typeof opts?.max === 'number') sub.unsubscribe(opts.max);
 
-    const abortController = new AbortController()
-    const signal = opts?.signal ?? abortController.signal
+    const abortController = new AbortController();
+    const signal = opts?.signal ?? abortController.signal;
 
-    ;(async () => {
+    (async () => {
       try {
         for await (const msg of sub) {
-          if (signal.aborted) break
-          await onMessage(msg)
+          if (signal.aborted) break;
+          await onMessage(msg);
         }
       } catch (e) {
-        emitStatus({ status: 'error', data: e })
+        emitStatus({ status: 'error', data: e });
       } finally {
         try {
-          sub.unsubscribe()
+          sub.unsubscribe();
         } catch {
           // ignore
         }
       }
-    })().catch((e) => emitStatus({ status: 'error', data: e }))
+    })().catch(e => emitStatus({ status: 'error', data: e }));
 
     return {
       subscription: sub,
       unsubscribe() {
         try {
-          abortController.abort()
+          abortController.abort();
         } catch {
           // ignore
         }
         try {
-          sub.unsubscribe()
+          sub.unsubscribe();
         } catch {
           // ignore
         }
       },
-    }
+    };
   }
 
   function subscribeString(
@@ -379,13 +369,13 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
   ): NatsSubscriptionHandle {
     return subscribeBytes(
       subject,
-      async (msg) => {
-        const nats = await importNats()
-        const sc = nats.StringCodec()
-        await onMessage(sc.decode(msg.data), msg)
+      async msg => {
+        const nats = await importNats();
+        const sc = nats.StringCodec();
+        await onMessage(sc.decode(msg.data), msg);
       },
       opts,
-    )
+    );
   }
 
   function subscribeJson<T>(
@@ -395,18 +385,18 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
   ): NatsSubscriptionHandle {
     return subscribeBytes(
       subject,
-      async (msg) => {
-        const nats = await importNats()
-        const jc = nats.JSONCodec<T>()
-        await onMessage(jc.decode(msg.data), msg)
+      async msg => {
+        const nats = await importNats();
+        const jc = nats.JSONCodec<T>();
+        await onMessage(jc.decode(msg.data), msg);
       },
       opts,
-    )
+    );
   }
 
   function onStatus(listener: (event: NatsStatusEvent) => void): () => void {
-    statusListeners.add(listener)
-    return () => statusListeners.delete(listener)
+    statusListeners.add(listener);
+    return () => statusListeners.delete(listener);
   }
 
   return {
@@ -423,5 +413,5 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
     subscribeString,
     subscribeJson,
     onStatus,
-  }
+  };
 }

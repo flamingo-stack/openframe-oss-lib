@@ -17,30 +17,26 @@ export interface TitleContentBlockProps {
 const spacingMap = {
   sm: 'space-y-1',
   md: 'space-y-2',
-  lg: 'space-y-4'
+  lg: 'space-y-4',
 };
 
 export function TitleContentBlock({
   title,
   content,
   titleColor = 'text-ods-text-secondary',
-  titleClassName = "text-h5 tracking-[-0.28px]",
-  contentClassName = "text-h2 tracking-[-0.64px] text-ods-text-primary",
+  titleClassName = 'text-h5 tracking-[-0.28px]',
+  contentClassName = 'text-h2 tracking-[-0.64px] text-ods-text-primary',
   containerClassName = '',
   titleAs: TitleElement = 'div',
   contentAs: ContentElement = 'h4',
-  spacing = 'md'
+  spacing = 'md',
 }: TitleContentBlockProps) {
   const titleClasses = `${titleClassName} ${titleColor}`;
-  
+
   return (
     <div className={`${spacingMap[spacing]} ${containerClassName}`}>
-      <TitleElement className={titleClasses}>
-        {title}
-      </TitleElement>
-      <ContentElement className={contentClassName}>
-        {content}
-      </ContentElement>
+      <TitleElement className={titleClasses}>{title}</TitleElement>
+      <ContentElement className={contentClassName}>{content}</ContentElement>
     </div>
   );
 }

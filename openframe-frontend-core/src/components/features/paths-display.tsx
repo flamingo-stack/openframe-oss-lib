@@ -1,45 +1,45 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { Copy } from 'lucide-react'
-import { Button } from '../ui/button'
-import { cn } from '../../utils/cn'
+import { Copy } from 'lucide-react';
+import React from 'react';
+import { cn } from '../../utils/cn';
+import { Button } from '../ui/button';
 
 export interface PathsDisplayProps {
   /**
    * Array of file/folder paths to display
    */
-  paths: readonly string[] | string[]
+  paths: readonly string[] | string[];
 
   /**
    * Callback when a path is copied
    */
-  onCopyPath?: (path: string) => void
+  onCopyPath?: (path: string) => void;
 
   /**
    * Optional title above the paths list
    */
-  title?: string
+  title?: string;
 
   /**
    * Optional description text
    */
-  description?: string
+  description?: string;
 
   /**
    * Additional CSS classes for the container
    */
-  className?: string
+  className?: string;
 
   /**
    * Whether to show copy buttons (default: true)
    */
-  showCopyButtons?: boolean
+  showCopyButtons?: boolean;
 
   /**
    * Size of the copy icon (default: 'w-5 h-5')
    */
-  copyIconSize?: string
+  copyIconSize?: string;
 }
 
 /**
@@ -78,40 +78,24 @@ export function PathsDisplay({
   description,
   className,
   showCopyButtons = true,
-  copyIconSize = 'w-5 h-5'
+  copyIconSize = 'w-5 h-5',
 }: PathsDisplayProps) {
   if (!paths || paths.length === 0) {
-    return null
+    return null;
   }
 
   return (
     <div className={cn('flex flex-col gap-3', className)}>
-      {title && (
-        <div className="text-ods-text-primary text-[16px] md:text-[18px]">
-          {title}
-        </div>
-      )}
-      {description && (
-        <div className="text-ods-text-secondary text-[14px] md:text-[16px]">
-          {description}
-        </div>
-      )}
+      {title && <div className="text-ods-text-primary text-[16px] md:text-[18px]">{title}</div>}
+      {description && <div className="text-ods-text-secondary text-[14px] md:text-[16px]">{description}</div>}
       <div className="bg-ods-bg border border-ods-border rounded-[6px] overflow-hidden">
-        {paths.map((path) => (
-          <div
-            key={path}
-            className="flex items-center justify-between p-4 border-b border-ods-border last:border-b-0"
-          >
+        {paths.map(path => (
+          <div key={path} className="flex items-center justify-between p-4 border-b border-ods-border last:border-b-0">
             <span className="text-ods-text-primary font-medium text-[14px] md:text-[16px] font-mono break-all">
               {path}
             </span>
             {showCopyButtons && onCopyPath && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onCopyPath(path)}
-                className="ml-4 shrink-0"
-              >
+              <Button variant="ghost" size="sm" onClick={() => onCopyPath(path)} className="ml-4 shrink-0">
                 <Copy className={copyIconSize} />
               </Button>
             )}
@@ -119,7 +103,7 @@ export function PathsDisplay({
         ))}
       </div>
     </div>
-  )
+  );
 }
 
 /**
@@ -131,24 +115,20 @@ export const OPENFRAME_PATHS = {
     'C:\\Program Files\\TacticalAgent',
     'C:\\ProgramData\\OpenFrame',
     'C:\\ProgramData\\TacticalRMM',
-    'C:\\Program Files\\Orbit'
+    'C:\\Program Files\\Orbit',
   ],
   darwin: [
     '/Library/LaunchDaemons/com.openframe.client.plist',
-    '/Library/Application Support/OpenFrame/meshcentral-agent/'
+    '/Library/Application Support/OpenFrame/meshcentral-agent/',
   ],
-  linux: [
-    '/opt/openframe/',
-    '/usr/local/bin/tacticalagent',
-    '/opt/tacrmm'
-  ]
-} as const
+  linux: ['/opt/openframe/', '/usr/local/bin/tacticalagent', '/opt/tacrmm'],
+} as const;
 
-export type OpenFramePathsPlatform = keyof typeof OPENFRAME_PATHS
+export type OpenFramePathsPlatform = keyof typeof OPENFRAME_PATHS;
 
 /**
  * Get OpenFrame paths for a specific platform
  */
 export function getOpenFramePaths(platform: OpenFramePathsPlatform): string[] {
-  return [...OPENFRAME_PATHS[platform]]
+  return [...OPENFRAME_PATHS[platform]];
 }

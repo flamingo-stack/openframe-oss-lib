@@ -1,19 +1,16 @@
-"use client"
+'use client';
 
-import React from 'react'
-import { Button } from '../ui/button'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight } from 'lucide-react';
+import React from 'react';
+import { Button } from '../ui/button';
 
 interface MoreAboutButtonProps {
-  onClick?: () => void
-  href?: string
-  className?: string
+  onClick?: () => void;
+  href?: string;
+  className?: string;
 }
 
-const MoreAboutButton: React.FC<MoreAboutButtonProps> = ({ 
-  href = "/openframe",
-  className = ""
-}) => {
+const MoreAboutButton: React.FC<MoreAboutButtonProps> = ({ href = '/openframe', className = '' }) => {
   return (
     <Button
       size="lg"
@@ -25,8 +22,8 @@ const MoreAboutButton: React.FC<MoreAboutButtonProps> = ({
     >
       Learn more
     </Button>
-  )
-}
+  );
+};
 
-export { MoreAboutButton }
-export default MoreAboutButton
+export { MoreAboutButton };
+export default MoreAboutButton;

@@ -1,10 +1,9 @@
-"use client"
+'use client';
 
-import * as React from "react";
-
-import { Loader2 } from "lucide-react";
-import { cn } from "../../utils/cn";
-import { FieldWrapper } from "./field-wrapper";
+import { Loader2 } from 'lucide-react';
+import * as React from 'react';
+import { cn } from '../../utils/cn';
+import { FieldWrapper } from './field-wrapper';
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   /** When true, renders red error border & ring */
@@ -22,29 +21,33 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
 }
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, invalid = false, startAdornment, endAdornment, label, error, loading = false, ...props }, ref) => {
-    const isInvalid = invalid || !!error
+  (
+    { className, type, invalid = false, startAdornment, endAdornment, label, error, loading = false, ...props },
+    ref,
+  ) => {
+    const isInvalid = invalid || !!error;
 
     const content = (
       <label
         data-invalid={isInvalid || undefined}
         className={cn(
           // Layout & spacing
-          "flex w-full items-center gap-2 rounded-[6px] border px-3 h-11 md:h-12 cursor-text",
+          'flex w-full items-center gap-2 rounded-[6px] border px-3 h-11 md:h-12 cursor-text',
           // Focus-within states
-          "has-[:focus-visible]:outline-none",
-          "group",
+          'has-[:focus-visible]:outline-none',
+          'group',
           // Animations & touch UX
-          "transition-colors duration-200",
+          'transition-colors duration-200',
           // Theme palette
-          "bg-ods-card border-ods-border has-[:focus]:border-ods-accent",
+          'bg-ods-card border-ods-border has-[:focus]:border-ods-accent',
           // Hover & active (not disabled)
-          !props.disabled && "hover:bg-ods-bg-hover hover:border-ods-border-hover active:bg-ods-bg-active active:border-ods-border-active",
+          !props.disabled &&
+            'hover:bg-ods-bg-hover hover:border-ods-border-hover active:bg-ods-bg-active active:border-ods-border-active',
           // Disabled
-          props.disabled && "!cursor-not-allowed bg-ods-bg",
+          props.disabled && '!cursor-not-allowed bg-ods-bg',
           // Invalid
-          isInvalid && "border-ods-error hover:border-ods-error has-[:focus]:border-ods-error",
-          className
+          isInvalid && 'border-ods-error hover:border-ods-error has-[:focus]:border-ods-error',
+          className,
         )}
       >
         {startAdornment && (
@@ -56,39 +59,37 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           type={type}
           className={cn(
             // Layout
-            "flex-1 min-w-0 bg-transparent border-none outline-none",
+            'flex-1 min-w-0 bg-transparent border-none outline-none',
             // Typography
             // "text-h4",
             // Colors
-            "text-ods-text-primary placeholder:text-ods-text-secondary",
+            'text-ods-text-primary placeholder:text-ods-text-secondary',
             // File input adjustments
-            "file:border-0 file:bg-transparent",
+            'file:border-0 file:bg-transparent',
             // Disabled
-            "disabled:cursor-not-allowed disabled:placeholder:text-ods-border",
+            'disabled:cursor-not-allowed disabled:placeholder:text-ods-border',
             // Touch
-            "touch-manipulation"
+            'touch-manipulation',
           )}
           ref={ref}
           {...props}
         />
-        {loading && (
-          <Loader2 className="animate-spin flex-shrink-0 text-ods-text-secondary size-4 md:size-6" />
-        )}
+        {loading && <Loader2 className="animate-spin flex-shrink-0 text-ods-text-secondary size-4 md:size-6" />}
         {!loading && endAdornment && (
           <span className="text-h6 flex-shrink-0 text-ods-text-secondary transition-colors duration-200 group-has-[:focus]:text-ods-accent group-data-[invalid]:text-ods-error [&_svg]:size-4 md:[&_svg]:size-6">
             {endAdornment}
           </span>
         )}
       </label>
-    )
+    );
 
     return (
       <FieldWrapper label={label} error={error}>
         {content}
       </FieldWrapper>
-    )
-  }
-)
-Input.displayName = "Input"
+    );
+  },
+);
+Input.displayName = 'Input';
 
 export { Input };

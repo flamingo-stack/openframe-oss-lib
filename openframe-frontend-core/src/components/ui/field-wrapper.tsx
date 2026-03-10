@@ -1,24 +1,24 @@
-"use client"
+'use client';
 
-import * as React from "react"
-import { cn } from "../../utils/cn"
+import * as React from 'react';
+import { cn } from '../../utils/cn';
 
 export interface FieldWrapperProps {
   /** Label text displayed above the field */
-  label?: string
+  label?: string;
   /** Error message displayed below the field. Space is always reserved to prevent layout shifts. */
-  error?: string
+  error?: string;
   /** Additional className for the outer wrapper */
-  className?: string
-  children: React.ReactNode
+  className?: string;
+  children: React.ReactNode;
 }
 
 const FieldWrapper = React.forwardRef<HTMLDivElement, FieldWrapperProps>(
   ({ label, error, className, children }, ref) => {
-    const hasChrome = label != null || error != null
+    const hasChrome = label != null || error != null;
 
     return (
-      <div ref={ref} className={cn(hasChrome ? "relative flex w-full flex-col" : "contents", className)}>
+      <div ref={ref} className={cn(hasChrome ? 'relative flex w-full flex-col' : 'contents', className)}>
         {label && (
           <label className="text-[14px] md:text-[18px] font-medium leading-5 md:leading-6 text-ods-text-primary mb-1">
             {label}
@@ -31,9 +31,9 @@ const FieldWrapper = React.forwardRef<HTMLDivElement, FieldWrapperProps>(
           </p>
         )}
       </div>
-    )
-  }
-)
-FieldWrapper.displayName = "FieldWrapper"
+    );
+  },
+);
+FieldWrapper.displayName = 'FieldWrapper';
 
-export { FieldWrapper }
+export { FieldWrapper };

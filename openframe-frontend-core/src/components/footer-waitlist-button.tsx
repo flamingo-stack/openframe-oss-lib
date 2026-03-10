@@ -34,12 +34,8 @@ export function FooterWaitlistButton({ className }: FooterWaitlistButtonProps) {
   }, [pathname, router]);
 
   return (
-    <Button 
-      onClick={handleClick} 
-      className={className}
-      leftIcon={<OpenFrameLogo />}
-    >
+    <Button onClick={handleClick} className={className} leftIcon={<OpenFrameLogo />}>
       Join Waitlist
     </Button>
   );
-} 
+}

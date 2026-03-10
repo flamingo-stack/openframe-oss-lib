@@ -1,4 +1,4 @@
-"use client"
+'use client';
 
 /**
  * OSTypeBadgeGroup Component
@@ -7,19 +7,19 @@
  * Used for showing supported platforms in scripts and other multi-OS contexts.
  */
 
-import React from 'react'
-import { OSTypeBadge } from './os-type-badge'
-import { cn } from '../../utils/cn'
+import React from 'react';
+import { cn } from '../../utils/cn';
+import { OSTypeBadge } from './os-type-badge';
 
 export interface OSTypeBadgeGroupProps {
   /** Array of OS type strings (case-insensitive, handles aliases) */
-  osTypes: string[]
+  osTypes: string[];
   /** Additional CSS classes */
-  className?: string
+  className?: string;
   /** Icon size class (default: w-4 h-4) */
-  iconSize?: string
+  iconSize?: string;
   /** Maximum number of badges to display before showing "+N more" */
-  maxDisplay?: number
+  maxDisplay?: number;
 }
 
 /**
@@ -31,39 +31,23 @@ export interface OSTypeBadgeGroupProps {
  * <OSTypeBadgeGroup osTypes={['macos', 'linux']} maxDisplay={2} />
  * ```
  */
-export function OSTypeBadgeGroup({
-  osTypes,
-  className = '',
-  iconSize = 'w-5 h-5',
-  maxDisplay
-}: OSTypeBadgeGroupProps) {
+export function OSTypeBadgeGroup({ osTypes, className = '', iconSize = 'w-5 h-5', maxDisplay }: OSTypeBadgeGroupProps) {
   if (!osTypes || osTypes.length === 0) {
-    return null
+    return null;
   }
 
-  const displayOsTypes = maxDisplay && osTypes.length > maxDisplay
-    ? osTypes.slice(0, maxDisplay)
-    : osTypes
+  const displayOsTypes = maxDisplay && osTypes.length > maxDisplay ? osTypes.slice(0, maxDisplay) : osTypes;
 
-  const remainingCount = maxDisplay && osTypes.length > maxDisplay
-    ? osTypes.length - maxDisplay
-    : 0
+  const remainingCount = maxDisplay && osTypes.length > maxDisplay ? osTypes.length - maxDisplay : 0;
 
   return (
     <div className={cn('flex items-center gap-2 flex-wrap', className)}>
       {displayOsTypes.map((osType, index) => (
-        <OSTypeBadge
-          key={`${osType}-${index}`}
-          osType={osType}
-          iconOnly
-          iconSize={iconSize}
-        />
+        <OSTypeBadge key={`${osType}-${index}`} osType={osType} iconOnly iconSize={iconSize} />
       ))}
       {remainingCount > 0 && (
-        <span className="text-ods-text-secondary text-sm font-medium">
-          +{remainingCount} more
-        </span>
+        <span className="text-ods-text-secondary text-sm font-medium">+{remainingCount} more</span>
       )}
     </div>
-  )
+  );
 }

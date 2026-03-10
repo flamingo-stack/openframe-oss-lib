@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface HouseWindowIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface HouseWindowIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function HouseWindowIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: HouseWindowIconProps) {
+export function HouseWindowIcon({ className = '', size = 24, color = 'currentColor', ...props }: HouseWindowIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface FileMusicIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface FileMusicIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function FileMusicIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: FileMusicIconProps) {
+export function FileMusicIcon({ className = '', size = 24, color = 'currentColor', ...props }: FileMusicIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

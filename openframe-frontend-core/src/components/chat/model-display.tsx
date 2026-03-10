@@ -1,17 +1,17 @@
-"use client";
+'use client';
 
 import React from 'react';
 import { cn } from '../../utils/cn';
 import { ClaudeIcon } from '../icons/claude-icon';
-import { OpenAiIcon } from '../icons/openai-icon';
 import { GoogleGeminiIcon } from '../icons/google-gemini-icon';
+import { OpenAiIcon } from '../icons/openai-icon';
 import type { ModelDisplayProps } from './types';
 
 const getProviderIcon = (provider?: string) => {
   if (!provider) return null;
-  
+
   const providerLower = provider.toLowerCase();
-  
+
   switch (providerLower) {
     case 'anthropic':
     case 'claude':
@@ -32,30 +32,16 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
   ({ className, provider, modelName, displayName, ...props }, ref) => {
     const icon = getProviderIcon(provider);
     const name = displayName || modelName;
-    
+
     return (
-      <div
-        ref={ref}
-        className={cn(
-          "flex items-center gap-1 text-ods-text-secondary",
-          "text-sm",
-          className
-        )}
-        {...props}
-      >
-        {icon && (
-          <span className="flex items-center justify-center">
-            {icon}
-          </span>
-        )}
-        <span className="font-dm-sans font-medium">
-          {name}
-        </span>
+      <div ref={ref} className={cn('flex items-center gap-1 text-ods-text-secondary', 'text-sm', className)} {...props}>
+        {icon && <span className="flex items-center justify-center">{icon}</span>}
+        <span className="font-dm-sans font-medium">{name}</span>
       </div>
     );
-  }
+  },
 );
 
-ModelDisplay.displayName = "ModelDisplay";
+ModelDisplay.displayName = 'ModelDisplay';
 
 export { ModelDisplay };

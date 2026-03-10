@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface DividerIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface DividerIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function DividerIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: DividerIconProps) {
+export function DividerIcon({ className = '', size = 24, color = 'currentColor', ...props }: DividerIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

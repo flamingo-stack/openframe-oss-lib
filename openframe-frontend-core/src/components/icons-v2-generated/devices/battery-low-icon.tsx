@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface BatteryLowIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface BatteryLowIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function BatteryLowIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: BatteryLowIconProps) {
+export function BatteryLowIcon({ className = '', size = 24, color = 'currentColor', ...props }: BatteryLowIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

@@ -16,43 +16,43 @@
 
   /* Mobile Spacing (Default) - base styles */
   --spacing-system-zero: 0rem;
-  --spacing-system-xxs: 0.25rem;   /* 4px */
-  --spacing-system-xs: 0.25rem;    /* 4px */
-  --spacing-system-xsf: 0.5rem;    /* 8px */
-  --spacing-system-s: 0.5rem;      /* 8px */
-  --spacing-system-sf: 0.75rem;    /* 12px */
-  --spacing-system-m: 0.75rem;     /* 12px */
-  --spacing-system-mf: 1rem;       /* 16px */
-  --spacing-system-l: 1rem;        /* 16px */
-  --spacing-system-lf: 1.5rem;     /* 24px */
-  --spacing-system-xl: 1.5rem;     /* 24px */
-  --spacing-system-xlf: 2.5rem;    /* 40px */
-  --spacing-system-xxl: 2.5rem;    /* 40px */
+  --spacing-system-xxs: 0.25rem; /* 4px */
+  --spacing-system-xs: 0.25rem; /* 4px */
+  --spacing-system-xsf: 0.5rem; /* 8px */
+  --spacing-system-s: 0.5rem; /* 8px */
+  --spacing-system-sf: 0.75rem; /* 12px */
+  --spacing-system-m: 0.75rem; /* 12px */
+  --spacing-system-mf: 1rem; /* 16px */
+  --spacing-system-l: 1rem; /* 16px */
+  --spacing-system-lf: 1.5rem; /* 24px */
+  --spacing-system-xl: 1.5rem; /* 24px */
+  --spacing-system-xlf: 2.5rem; /* 40px */
+  --spacing-system-xxl: 2.5rem; /* 40px */
 
   /* =================================================== */
   /* RESPONSIVE TYPOGRAPHY SYSTEM */
   /* =================================================== */
 
   /* Mobile Typography (Default) */
-  --font-size-h1-title: 2.5rem;           /* 40px */
-  --font-size-h2-sub-title: 1.5rem;       /* 24px */
-  --font-size-h3-body: 0.875rem;          /* 14px */
-  --font-size-h4-body: 0.875rem;          /* 14px */
-  --font-size-h5-caption: 0.75rem;        /* 12px */
-  --font-size-h6-caption: 0.75rem;        /* 12px */
+  --font-size-h1-title: 2.5rem; /* 40px */
+  --font-size-h2-sub-title: 1.5rem; /* 24px */
+  --font-size-h3-body: 0.875rem; /* 14px */
+  --font-size-h4-body: 0.875rem; /* 14px */
+  --font-size-h5-caption: 0.75rem; /* 12px */
+  --font-size-h6-caption: 0.75rem; /* 12px */
 
-  --font-line-space-h1-main-title: 2.5rem;    /* 40px */
-  --font-line-space-h2-sub-title: 2rem;       /* 32px */
-  --font-line-space-h3-body: 1.25rem;         /* 20px */
-  --font-line-space-h4-body: 1.25rem;         /* 20px */
-  --font-line-space-h5-caption: 1rem;         /* 16px */
-  --font-line-space-h6-caption: 1rem;         /* 16px */
+  --font-line-space-h1-main-title: 2.5rem; /* 40px */
+  --font-line-space-h2-sub-title: 2rem; /* 32px */
+  --font-line-space-h3-body: 1.25rem; /* 20px */
+  --font-line-space-h4-body: 1.25rem; /* 20px */
+  --font-line-space-h5-caption: 1rem; /* 16px */
+  --font-line-space-h6-caption: 1rem; /* 16px */
 
   /* =================================================== */
   /* RESPONSIVE ICON SYSTEM */
   /* =================================================== */
 
-  --icon-size-icon-size: 1rem;    /* 16px */
+  --icon-size-icon-size: 1rem; /* 16px */
 }
 
 /* =================================================== */
@@ -67,36 +67,36 @@
 
     /* Tablet Spacing */
     --spacing-system-zero: 0rem;
-    --spacing-system-xxs: 0.25rem;   /* 4px */
-    --spacing-system-xs: 0.5rem;     /* 8px */
-    --spacing-system-xsf: 0.5rem;    /* 8px */
-    --spacing-system-s: 0.75rem;     /* 12px */
-    --spacing-system-sf: 0.75rem;    /* 12px */
-    --spacing-system-m: 1rem;        /* 16px */
-    --spacing-system-mf: 1rem;       /* 16px */
-    --spacing-system-l: 1.5rem;      /* 24px */
-    --spacing-system-lf: 1.5rem;     /* 24px */
-    --spacing-system-xl: 2.5rem;     /* 40px */
-    --spacing-system-xlf: 2.5rem;    /* 40px */
-    --spacing-system-xxl: 3rem;      /* 48px */
+    --spacing-system-xxs: 0.25rem; /* 4px */
+    --spacing-system-xs: 0.5rem; /* 8px */
+    --spacing-system-xsf: 0.5rem; /* 8px */
+    --spacing-system-s: 0.75rem; /* 12px */
+    --spacing-system-sf: 0.75rem; /* 12px */
+    --spacing-system-m: 1rem; /* 16px */
+    --spacing-system-mf: 1rem; /* 16px */
+    --spacing-system-l: 1.5rem; /* 24px */
+    --spacing-system-lf: 1.5rem; /* 24px */
+    --spacing-system-xl: 2.5rem; /* 40px */
+    --spacing-system-xlf: 2.5rem; /* 40px */
+    --spacing-system-xxl: 3rem; /* 48px */
 
     /* Tablet Typography */
-    --font-size-h1-title: 3rem;             /* 48px */
-    --font-size-h2-sub-title: 2rem;         /* 32px */
-    --font-size-h3-body: 1.125rem;          /* 18px */
-    --font-size-h4-body: 1.125rem;          /* 18px */
-    --font-size-h5-caption: 0.875rem;       /* 14px */
-    --font-size-h6-caption: 0.875rem;       /* 14px */
+    --font-size-h1-title: 3rem; /* 48px */
+    --font-size-h2-sub-title: 2rem; /* 32px */
+    --font-size-h3-body: 1.125rem; /* 18px */
+    --font-size-h4-body: 1.125rem; /* 18px */
+    --font-size-h5-caption: 0.875rem; /* 14px */
+    --font-size-h6-caption: 0.875rem; /* 14px */
 
-    --font-line-space-h1-main-title: 3.5rem;    /* 56px */
-    --font-line-space-h2-sub-title: 2.5rem;     /* 40px */
-    --font-line-space-h3-body: 1.5rem;          /* 24px */
-    --font-line-space-h4-body: 1.5rem;          /* 24px */
-    --font-line-space-h5-caption: 1.25rem;      /* 20px */
-    --font-line-space-h6-caption: 1.25rem;      /* 20px */
+    --font-line-space-h1-main-title: 3.5rem; /* 56px */
+    --font-line-space-h2-sub-title: 2.5rem; /* 40px */
+    --font-line-space-h3-body: 1.5rem; /* 24px */
+    --font-line-space-h4-body: 1.5rem; /* 24px */
+    --font-line-space-h5-caption: 1.25rem; /* 20px */
+    --font-line-space-h6-caption: 1.25rem; /* 20px */
 
     /* Tablet Icons */
-    --icon-size-icon-size: 1.5rem;  /* 24px */
+    --icon-size-icon-size: 1.5rem; /* 24px */
   }
 }
 
@@ -112,35 +112,35 @@
 
     /* Desktop Spacing */
     --spacing-system-zero: 0rem;
-    --spacing-system-xxs: 0.25rem;   /* 4px */
-    --spacing-system-xs: 0.5rem;     /* 8px */
-    --spacing-system-xsf: 0.5rem;    /* 8px */
-    --spacing-system-s: 0.75rem;     /* 12px */
-    --spacing-system-sf: 0.75rem;    /* 12px */
-    --spacing-system-m: 1rem;        /* 16px */
-    --spacing-system-mf: 1rem;       /* 16px */
-    --spacing-system-l: 1.5rem;      /* 24px */
-    --spacing-system-lf: 1.5rem;     /* 24px */
-    --spacing-system-xl: 2.5rem;     /* 40px */
-    --spacing-system-xlf: 2.5rem;    /* 40px */
-    --spacing-system-xxl: 5rem;      /* 80px */
+    --spacing-system-xxs: 0.25rem; /* 4px */
+    --spacing-system-xs: 0.5rem; /* 8px */
+    --spacing-system-xsf: 0.5rem; /* 8px */
+    --spacing-system-s: 0.75rem; /* 12px */
+    --spacing-system-sf: 0.75rem; /* 12px */
+    --spacing-system-m: 1rem; /* 16px */
+    --spacing-system-mf: 1rem; /* 16px */
+    --spacing-system-l: 1.5rem; /* 24px */
+    --spacing-system-lf: 1.5rem; /* 24px */
+    --spacing-system-xl: 2.5rem; /* 40px */
+    --spacing-system-xlf: 2.5rem; /* 40px */
+    --spacing-system-xxl: 5rem; /* 80px */
 
     /* Desktop Typography */
-    --font-size-h1-title: 3.5rem;           /* 56px */
-    --font-size-h2-sub-title: 2rem;         /* 32px */
-    --font-size-h3-body: 1.125rem;          /* 18px */
-    --font-size-h4-body: 1.125rem;          /* 18px */
-    --font-size-h5-caption: 0.875rem;       /* 14px */
-    --font-size-h6-caption: 0.875rem;       /* 14px */
+    --font-size-h1-title: 3.5rem; /* 56px */
+    --font-size-h2-sub-title: 2rem; /* 32px */
+    --font-size-h3-body: 1.125rem; /* 18px */
+    --font-size-h4-body: 1.125rem; /* 18px */
+    --font-size-h5-caption: 0.875rem; /* 14px */
+    --font-size-h6-caption: 0.875rem; /* 14px */
 
-    --font-line-space-h1-main-title: 4rem;      /* 64px */
-    --font-line-space-h2-sub-title: 2.5rem;     /* 40px */
-    --font-line-space-h3-body: 1.5rem;          /* 24px */
-    --font-line-space-h4-body: 1.5rem;          /* 24px */
-    --font-line-space-h5-caption: 1.25rem;      /* 20px */
-    --font-line-space-h6-caption: 1.25rem;      /* 20px */
+    --font-line-space-h1-main-title: 4rem; /* 64px */
+    --font-line-space-h2-sub-title: 2.5rem; /* 40px */
+    --font-line-space-h3-body: 1.5rem; /* 24px */
+    --font-line-space-h4-body: 1.5rem; /* 24px */
+    --font-line-space-h5-caption: 1.25rem; /* 20px */
+    --font-line-space-h6-caption: 1.25rem; /* 20px */
 
     /* Desktop Icons */
-    --icon-size-icon-size: 1.5rem;  /* 24px */
+    --icon-size-icon-size: 1.5rem; /* 24px */
   }
 }

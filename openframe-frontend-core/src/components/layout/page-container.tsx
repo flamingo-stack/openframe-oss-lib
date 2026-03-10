@@ -1,11 +1,11 @@
-'use client'
+'use client';
 
-import { ChevronLeft } from 'lucide-react'
-import React from 'react'
-import { cn } from '../../utils/cn'
-import { Button } from '../ui/button'
-import { MoreActionsItem } from '../ui/more-actions-menu'
-import { PageActions, type PageActionButton } from '../ui/page-actions'
+import { ChevronLeft } from 'lucide-react';
+import React from 'react';
+import { cn } from '../../utils/cn';
+import { Button } from '../ui/button';
+import { MoreActionsItem } from '../ui/more-actions-menu';
+import { type PageActionButton, PageActions } from '../ui/page-actions';
 
 // Legacy interface for backward compatibility (layout version)
 interface LegacyPageContainerProps {
@@ -32,90 +32,101 @@ interface AdvancedPageContainerProps {
   /**
    * Page content
    */
-  children: React.ReactNode
+  children: React.ReactNode;
   /**
    * Page variant determines layout structure
    */
-  variant?: 'list' | 'detail' | 'form' | 'content'
+  variant?: 'list' | 'detail' | 'form' | 'content';
   /**
    * Page title (displayed as h1)
    */
-  title?: string
+  title?: string;
   /**
    * Subtitle or description (supports both string and ReactNode)
    */
-  subtitle?: string | React.ReactNode
+  subtitle?: string | React.ReactNode;
   /**
    * Back button configuration
    */
   backButton?: {
-    label?: string
-    onClick: () => void
-  }
+    label?: string;
+    onClick: () => void;
+  };
   /**
    * Header actions (buttons, controls, etc.)
    * Can be used together with or instead of `actions` prop
    */
-  headerActions?: React.ReactNode
+  headerActions?: React.ReactNode;
   /**
    * Page action buttons configuration
    * Automatically renders PageActions component with appropriate variant:
    * - 'list' variant → 'icon-buttons' (collapses to menu on mobile)
    * - 'detail'/'form' variants → 'primary-buttons' (fixed bottom on mobile)
    */
-  actions?: PageActionButton[]
+  actions?: PageActionButton[];
   /**
    * Override the automatically determined PageActions variant
    */
-  actionsVariant?: 'icon-buttons' | 'primary-buttons' | 'menu-primary'
+  actionsVariant?: 'icon-buttons' | 'primary-buttons' | 'menu-primary';
   /**
    * Page action menu items configuration
    */
-  menuActions?: MoreActionsItem[]
+  menuActions?: MoreActionsItem[];
   /**
    * Custom header content (overrides title/subtitle)
    */
-  headerContent?: React.ReactNode
+  headerContent?: React.ReactNode;
   /**
    * Container padding
    */
-  padding?: 'none' | 'sm' | 'md' | 'lg'
+  padding?: 'none' | 'sm' | 'md' | 'lg';
   /**
    * Container background
    */
-  background?: 'default' | 'card' | 'transparent'
+  background?: 'default' | 'card' | 'transparent';
   /**
    * Additional CSS classes for container
    */
-  className?: string
+  className?: string;
   /**
    * Additional CSS classes for content area
    */
-  contentClassName?: string
+  contentClassName?: string;
   /**
    * Whether to show the standard header section
    */
-  showHeader?: boolean
+  showHeader?: boolean;
 }
 
 // Union type that supports both interfaces
-export type PageContainerProps = LegacyPageContainerProps | AdvancedPageContainerProps
+export type PageContainerProps = LegacyPageContainerProps | AdvancedPageContainerProps;
 
 // Type guard to determine which interface is being used
 function isAdvancedProps(props: PageContainerProps): props is AdvancedPageContainerProps {
-  return 'variant' in props || 'title' in props || 'subtitle' in props || 'backButton' in props || 'headerActions' in props || 'headerContent' in props || 'showHeader' in props || 'contentClassName' in props || 'actions' in props || 'actionsVariant' in props
+  return (
+    'variant' in props ||
+    'title' in props ||
+    'subtitle' in props ||
+    'backButton' in props ||
+    'headerActions' in props ||
+    'headerContent' in props ||
+    'showHeader' in props ||
+    'contentClassName' in props ||
+    'actions' in props ||
+    'actionsVariant' in props
+  );
 }
 
 /**
  * Unified Page Container Component
- * 
+ *
  * Supports both legacy layout patterns and advanced UI patterns:
- * 
+ *
  * LEGACY USAGE (backward compatible):
  * <PageContainer backgroundClassName="bg-gray-100">
  *   <h1>Your Content</h1>
  * </PageContainer>
- * 
+ *
  * ADVANCED USAGE (new features):
  * <PageContainer variant="detail" title="Page Title" backButton={{onClick: () => {}}}>
  *   <div>Your Content</div>
@@ -123,9 +134,9 @@ function isAdvancedProps(props: PageContainerProps): props is AdvancedPageContai
  */
 export function PageContainer(props: PageContainerProps) {
   if (isAdvancedProps(props)) {
-    return renderAdvancedPageContainer(props)
+    return renderAdvancedPageContainer(props);
   } else {
-    return renderLegacyPageContainer(props)
+    return renderLegacyPageContainer(props);
   }
 }
 
@@ -139,21 +150,13 @@ function renderLegacyPageContainer({
   contentPadding,
   maxWidth = 'max-w-[1920px]',
   as: Component = 'section',
-  id
+  id,
 }: LegacyPageContainerProps) {
-  const content = (
-    <div className={cn(maxWidth, contentPadding, 'mx-auto', className)}>
-      {children}
-    </div>
-  );
+  const content = <div className={cn(maxWidth, contentPadding, 'mx-auto', className)}>{children}</div>;
 
   if (fullWidthBackground) {
     return (
-      <Component 
-        className={cn('w-full', backgroundClassName)} 
-        style={backgroundStyle}
-        id={id}
-      >
+      <Component className={cn('w-full', backgroundClassName)} style={backgroundStyle} id={id}>
         {content}
       </Component>
     );
@@ -185,51 +188,44 @@ function renderAdvancedPageContainer({
   background = 'transparent',
   className,
   contentClassName,
-  showHeader = true
+  showHeader = true,
 }: AdvancedPageContainerProps) {
-
   // Determine PageActions variant based on page variant
   const getActionsVariant = () => {
-    if (actionsVariant) return actionsVariant
+    if (actionsVariant) return actionsVariant;
     // List pages use icon-buttons (collapses to menu on mobile)
-    if (variant === 'list') return 'icon-buttons'
+    if (variant === 'list') return 'icon-buttons';
     // Detail/form pages use primary-buttons (fixed bottom on mobile)
-    return 'primary-buttons'
-  }
+    return 'primary-buttons';
+  };
 
   // Render actions component
   const renderActions = () => {
-    if (!actions || actions.length === 0) return null
-    return <PageActions variant={getActionsVariant()} actions={actions} menuActions={menuActions} />
-  }
+    if (!actions || actions.length === 0) return null;
+    return <PageActions variant={getActionsVariant()} actions={actions} menuActions={menuActions} />;
+  };
 
   // Check if we need bottom padding for mobile fixed actions
-  const needsBottomPadding = actions && actions.length > 0 && getActionsVariant() === 'primary-buttons'
-  
+  const needsBottomPadding = actions && actions.length > 0 && getActionsVariant() === 'primary-buttons';
+
   const paddingClasses = {
     none: '',
     sm: 'p-4',
     md: 'p-6',
-    lg: 'p-8'
-  }
+    lg: 'p-8',
+  };
 
   const backgroundClasses = {
     default: 'bg-ods-bg',
     card: 'bg-ods-card',
-    transparent: ''
-  }
+    transparent: '',
+  };
 
   const renderHeader = () => {
-    if (!showHeader) return null
-    
+    if (!showHeader) return null;
+
     if (headerContent) {
-      return (
-        <div className={cn(
-          "flex items-end justify-between gap-4"
-        )}>
-          {headerContent}
-        </div>
-      )
+      return <div className={cn('flex items-end justify-between gap-4')}>{headerContent}</div>;
     }
 
     if (variant === 'detail') {
@@ -250,17 +246,11 @@ function renderAdvancedPageContainer({
             )}
 
             {/* Title */}
-            {title && (
-              <h1 className="text-h2 tracking-[-0.64px] text-ods-text-primary">
-                {title}
-              </h1>
-            )}
+            {title && <h1 className="text-h2 tracking-[-0.64px] text-ods-text-primary">{title}</h1>}
 
             {/* Subtitle */}
             {subtitle && (
-              <div className="text-ods-text-secondary font-['DM_Sans'] font-medium text-[16px]">
-                {subtitle}
-              </div>
+              <div className="text-ods-text-secondary font-['DM_Sans'] font-medium text-[16px]">{subtitle}</div>
             )}
           </div>
 
@@ -272,22 +262,16 @@ function renderAdvancedPageContainer({
             </div>
           )}
         </div>
-      )
+      );
     }
 
     if (variant === 'list') {
       return (
         <div className="flex items-center justify-between md:flex-col md:items-start md:justify-start lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="flex flex-col gap-1 flex-1 min-w-0">
-            {title && (
-              <h1 className="text-h2 tracking-[-0.48px] text-ods-text-primary">
-                {title}
-              </h1>
-            )}
+            {title && <h1 className="text-h2 tracking-[-0.48px] text-ods-text-primary">{title}</h1>}
             {subtitle && (
-              <div className="text-ods-text-secondary font-['DM_Sans'] font-medium text-[16px]">
-                {subtitle}
-              </div>
+              <div className="text-ods-text-secondary font-['DM_Sans'] font-medium text-[16px]">{subtitle}</div>
             )}
           </div>
 
@@ -299,7 +283,7 @@ function renderAdvancedPageContainer({
             </div>
           )}
         </div>
-      )
+      );
     }
 
     if (variant === 'form') {
@@ -334,7 +318,7 @@ function renderAdvancedPageContainer({
             </div>
           )}
         </div>
-      )
+      );
     }
 
     // Default content header
@@ -342,15 +326,9 @@ function renderAdvancedPageContainer({
       <div className="flex items-center justify-between md:flex-col md:items-start md:justify-start lg:flex-row lg:items-center lg:justify-between gap-4">
         {(title || subtitle) && (
           <div className="flex flex-col gap-1 flex-1 min-w-0">
-            {title && (
-              <h1 className="text-h2 text-ods-text-primary">
-                {title}
-              </h1>
-            )}
+            {title && <h1 className="text-h2 text-ods-text-primary">{title}</h1>}
             {subtitle && (
-              <div className="text-ods-text-secondary font-['DM_Sans'] font-medium text-[16px]">
-                {subtitle}
-              </div>
+              <div className="text-ods-text-secondary font-['DM_Sans'] font-medium text-[16px]">{subtitle}</div>
             )}
           </div>
         )}
@@ -362,71 +340,69 @@ function renderAdvancedPageContainer({
           </div>
         )}
       </div>
-    )
-  }
+    );
+  };
 
   const getContainerClasses = () => {
-    const baseClasses = [
-      'flex flex-col w-full',
-      backgroundClasses[background],
-      paddingClasses[padding]
-    ]
+    const baseClasses = ['flex flex-col w-full', backgroundClasses[background], paddingClasses[padding]];
 
     switch (variant) {
       case 'list':
-        return cn(baseClasses, 'gap-4 md:gap-6', className)
+        return cn(baseClasses, 'gap-4 md:gap-6', className);
       case 'detail':
-        return cn(baseClasses, 'gap-4 md:gap-6', className)
+        return cn(baseClasses, 'gap-4 md:gap-6', className);
       case 'form':
-        return cn(baseClasses, 'gap-6 md:gap-10', className)
+        return cn(baseClasses, 'gap-6 md:gap-10', className);
       case 'content':
       default:
-        return cn(baseClasses, 'gap-4 md:gap-6', className)
+        return cn(baseClasses, 'gap-4 md:gap-6', className);
     }
-  }
+  };
 
   const getContentClasses = () => {
     // Add bottom padding on mobile when using primary-buttons variant (fixed bottom bar)
-    const mobilePadding = needsBottomPadding ? 'pb-28 md:pb-0' : ''
+    const mobilePadding = needsBottomPadding ? 'pb-28 md:pb-0' : '';
 
     switch (variant) {
       case 'detail':
-        return cn('flex-1 overflow-auto', mobilePadding, contentClassName)
+        return cn('flex-1 overflow-auto', mobilePadding, contentClassName);
       case 'list':
-        return cn('flex flex-col gap-4 md:gap-6', mobilePadding, contentClassName)
+        return cn('flex flex-col gap-4 md:gap-6', mobilePadding, contentClassName);
       case 'form':
-        return cn('flex flex-col gap-4 md:gap-10', mobilePadding, contentClassName)
+        return cn('flex flex-col gap-4 md:gap-10', mobilePadding, contentClassName);
       case 'content':
       default:
-        return cn('flex-1', mobilePadding, contentClassName)
+        return cn('flex-1', mobilePadding, contentClassName);
     }
-  }
+  };
 
   return (
     <div className={getContainerClasses()}>
       {renderHeader()}
-      
-      <div className={getContentClasses()}>
-        {children}
-      </div>
+
+      <div className={getContentClasses()}>{children}</div>
     </div>
-  )
+  );
 }
 
 // Convenience exports for common page types (advanced mode only)
-export const ListPageContainer = (props: Omit<AdvancedPageContainerProps, 'variant'>) => 
+export const ListPageContainer = (props: Omit<AdvancedPageContainerProps, 'variant'>) => (
   <PageContainer {...props} variant="list" />
+);
 
-export const DetailPageContainer = (props: Omit<AdvancedPageContainerProps, 'variant'>) => 
+export const DetailPageContainer = (props: Omit<AdvancedPageContainerProps, 'variant'>) => (
   <PageContainer {...props} variant="detail" />
+);
 
-export const FormPageContainer = (props: Omit<AdvancedPageContainerProps, 'variant'>) => 
+export const FormPageContainer = (props: Omit<AdvancedPageContainerProps, 'variant'>) => (
   <PageContainer {...props} variant="form" />
+);
 
-export const ContentPageContainer = (props: Omit<AdvancedPageContainerProps, 'variant'>) => 
+export const ContentPageContainer = (props: Omit<AdvancedPageContainerProps, 'variant'>) => (
   <PageContainer {...props} variant="content" />
+);
 
 // Re-export PageActionButton type for convenience
-export type { PageActionButton } from '../ui/page-actions'
+export type { PageActionButton } from '../ui/page-actions';
 
 export default PageContainer;

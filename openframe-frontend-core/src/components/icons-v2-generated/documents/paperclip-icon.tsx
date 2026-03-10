@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface PaperclipIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface PaperclipIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function PaperclipIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: PaperclipIconProps) {
+export function PaperclipIcon({ className = '', size = 24, color = 'currentColor', ...props }: PaperclipIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

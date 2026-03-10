@@ -7,12 +7,7 @@ interface SearchIconProps {
   className?: string;
 }
 
-export function SearchIcon({
-  width = 22,
-  height = 22,
-  className = '',
-  color = '#888888'
-}: SearchIconProps) {
+export function SearchIcon({ width = 22, height = 22, className = '', color = '#888888' }: SearchIconProps) {
   return (
     <svg
       width={width}

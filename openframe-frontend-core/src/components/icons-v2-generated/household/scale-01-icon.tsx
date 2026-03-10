@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface Scale01IconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface Scale01IconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function Scale01Icon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: Scale01IconProps) {
+export function Scale01Icon({ className = '', size = 24, color = 'currentColor', ...props }: Scale01IconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

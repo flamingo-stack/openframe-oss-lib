@@ -1,23 +1,23 @@
-'use client'
+'use client';
 
-import { useRouter } from 'next/navigation'
-import { cn } from '../../utils/cn'
-import { CircularProgress } from './circular-progress'
-import { InteractiveCard } from './interactive-card'
+import { useRouter } from 'next/navigation';
+import { cn } from '../../utils/cn';
+import { CircularProgress } from './circular-progress';
+import { InteractiveCard } from './interactive-card';
 
 interface DashboardInfoCardProps {
-  title: string
-  value: string | number
-  percentage?: number
-  showProgress?: boolean
-  progressColor?: string
-  className?: string
-  onClick?: () => void
+  title: string;
+  value: string | number;
+  percentage?: number;
+  showProgress?: boolean;
+  progressColor?: string;
+  className?: string;
+  onClick?: () => void;
   /**
    * Navigation URL (uses router.push for client-side navigation without prefetching)
    * If both href and onClick are provided, href takes precedence
    */
-  href?: string
+  href?: string;
 }
 
 export function DashboardInfoCard({
@@ -28,12 +28,10 @@ export function DashboardInfoCard({
   progressColor,
   className,
   onClick,
-  href
+  href,
 }: DashboardInfoCardProps) {
-  const router = href ? useRouter() : null
-  const formattedValue = typeof value === 'number'
-    ? value.toLocaleString()
-    : value
+  const router = useRouter();
+  const formattedValue = typeof value === 'number' ? value.toLocaleString() : value;
 
   // Card content (reused in both Link and InteractiveCard)
   const cardContent = (
@@ -41,38 +39,25 @@ export function DashboardInfoCard({
       {/* Content section */}
       <div className="flex-1 flex flex-col">
         {/* Title */}
-        <p className="text-h5 text-ods-text-secondary tracking-[-0.28px]">
-          {title}
-        </p>
+        <p className="text-h5 text-ods-text-secondary tracking-[-0.28px]">{title}</p>
 
         {/* Value and percentage */}
         <div className="flex items-center gap-2">
-          <p className="text-h2 text-ods-text-primary tracking-[-0.64px]">
-            {formattedValue}
-          </p>
-          {percentage !== undefined && (
-            <p className="text-h4 text-ods-text-secondary">
-              {percentage}%
-            </p>
-          )}
+          <p className="text-h2 text-ods-text-primary tracking-[-0.64px]">{formattedValue}</p>
+          {percentage !== undefined && <p className="text-h4 text-ods-text-secondary">{percentage}%</p>}
         </div>
       </div>
 
       {/* Progress indicator */}
-      {showProgress && percentage !== undefined && (
-        <CircularProgress
-          percentage={percentage}
-          color={progressColor}
-        />
-      )}
+      {showProgress && percentage !== undefined && <CircularProgress percentage={percentage} color={progressColor} />}
     </>
-  )
+  );
 
   const handleCardClick = () => {
     if (href && router) {
-      router.push(href)
+      router.push(href);
     }
-  }
+  };
 
   if (href) {
     return (
@@ -84,24 +69,21 @@ export function DashboardInfoCard({
           'hover:border-ods-accent',
           '[&:hover_h3]:text-ods-accent',
           '[&:hover_.text-ods-text-primary]:text-ods-accent',
-          className
+          className,
         )}
       >
         {cardContent}
       </InteractiveCard>
-    )
+    );
   }
 
   // Otherwise, render as InteractiveCard with onClick
   return (
     <InteractiveCard
       onClick={onClick}
-      className={cn(
-        'bg-ods-card border border-ods-border rounded-[6px] p-4 flex gap-3 items-center',
-        className
-      )}
+      className={cn('bg-ods-card border border-ods-border rounded-[6px] p-4 flex gap-3 items-center', className)}
     >
       {cardContent}
     </InteractiveCard>
-  )
+  );
 }

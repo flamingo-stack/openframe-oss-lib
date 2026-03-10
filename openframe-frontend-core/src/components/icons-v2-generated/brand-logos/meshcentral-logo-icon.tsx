@@ -1,14 +1,13 @@
-import type { SVGProps } from "react";
-export interface MeshcentralLogoIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface MeshcentralLogoIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
 export function MeshcentralLogoIcon({
-  className = "",
+  className = '',
   size = 24,
-  color = "currentColor",
+  color = 'currentColor',
   ...props
 }: MeshcentralLogoIconProps) {
   return (
@@ -21,19 +20,9 @@ export function MeshcentralLogoIcon({
       className={className}
       {...props}
     >
-      <rect
-        width={24}
-        height={24}
-        fill="url(#meshcentral-logo_svg__a)"
-        rx={4}
-      />
+      <rect width={24} height={24} fill="url(#meshcentral-logo_svg__a)" rx={4} />
       <defs>
-        <pattern
-          id="meshcentral-logo_svg__a"
-          width={1}
-          height={1}
-          patternContentUnits="objectBoundingBox"
-        >
+        <pattern id="meshcentral-logo_svg__a" width={1} height={1} patternContentUnits="objectBoundingBox">
           <use href="#meshcentral-logo_svg__b" transform="scale(.00463)" />
         </pattern>
         <image

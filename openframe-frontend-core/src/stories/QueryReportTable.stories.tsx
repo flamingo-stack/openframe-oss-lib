@@ -1,7 +1,7 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { Button } from '../components/ui/button'
-import { QueryReportTable } from '../components/ui/table/query-report-table'
-import type { QueryResultRow } from '../components/ui/table/query-report-table'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { Button } from '../components/ui/button';
+import type { QueryResultRow } from '../components/ui/table/query-report-table';
+import { QueryReportTable } from '../components/ui/table/query-report-table';
 
 const sampleData: QueryResultRow[] = [
   {
@@ -44,7 +44,7 @@ const sampleData: QueryResultRow[] = [
     memory_gb: 16,
     status: 'healthy',
   },
-]
+];
 
 const manyColumnsData: QueryResultRow[] = [
   {
@@ -95,7 +95,7 @@ const manyColumnsData: QueryResultRow[] = [
     last_patch: '2026-01-28',
     status: 'critical',
   },
-]
+];
 
 const meta = {
   title: 'UI/QueryReportTable',
@@ -127,10 +127,10 @@ const meta = {
       control: 'boolean',
     },
   },
-} satisfies Meta<typeof QueryReportTable>
+} satisfies Meta<typeof QueryReportTable>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 /**
  * Default table with auto-derived columns from data keys.
@@ -140,7 +140,7 @@ export const Default: Story = {
     title: 'Server Health Report',
     data: sampleData,
   },
-}
+};
 
 /**
  * Loading state with skeleton rows and columns.
@@ -153,7 +153,7 @@ export const Loading: Story = {
     skeletonRows: 8,
     skeletonColumns: 6,
   },
-}
+};
 
 /**
  * Empty state when no data is returned.
@@ -164,7 +164,7 @@ export const Empty: Story = {
     data: [],
     emptyMessage: 'No results matched your query',
   },
-}
+};
 
 /**
  * Custom column ordering — only listed keys appear first, remaining keys are appended.
@@ -175,7 +175,7 @@ export const CustomColumnOrder: Story = {
     data: sampleData,
     columnOrder: ['status', 'hostname', 'cpu_usage', 'memory_gb'],
   },
-}
+};
 
 /**
  * Wide column width for tables with long values.
@@ -186,7 +186,7 @@ export const WideColumns: Story = {
     data: sampleData,
     columnWidth: 240,
   },
-}
+};
 
 /**
  * Narrow column width for compact display.
@@ -197,7 +197,7 @@ export const NarrowColumns: Story = {
     data: sampleData,
     columnWidth: 110,
   },
-}
+};
 
 /**
  * Table with many columns — demonstrates horizontal scrolling and the right-edge gradient fade.
@@ -208,7 +208,7 @@ export const ManyColumns: Story = {
     data: manyColumnsData,
     columnWidth: 160,
   },
-}
+};
 
 /**
  * Export disabled — the CSV button is hidden.
@@ -219,7 +219,7 @@ export const NoExport: Story = {
     data: sampleData,
     showExport: false,
   },
-}
+};
 
 /**
  * Custom export filename and onExport callback.
@@ -231,7 +231,7 @@ export const CustomExport: Story = {
     exportFilename: 'server-health-2026-02',
     onExport: () => alert('CSV exported!'),
   },
-}
+};
 
 /**
  * Additional header actions rendered next to the Export button.
@@ -246,7 +246,7 @@ export const WithHeaderActions: Story = {
       </Button>
     ),
   },
-}
+};
 
 /**
  * Table with null values — displayed as dashes.
@@ -260,7 +260,7 @@ export const WithNullValues: Story = {
       { hostname: 'prod-db-01', ip_address: '10.0.2.5', cpu_usage: null, notes: null },
     ],
   },
-}
+};
 
 /**
  * Single row of data.
@@ -270,4 +270,4 @@ export const SingleRow: Story = {
     title: 'Single Result',
     data: [sampleData[0]],
   },
-}
+};

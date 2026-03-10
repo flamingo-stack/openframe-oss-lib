@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface CartPlusIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface CartPlusIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function CartPlusIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: CartPlusIconProps) {
+export function CartPlusIcon({ className = '', size = 24, color = 'currentColor', ...props }: CartPlusIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

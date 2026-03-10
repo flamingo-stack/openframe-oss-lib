@@ -1,8 +1,8 @@
-import React from "react"
+import React from 'react';
 
-export interface AlertTriangleIconProps extends React.SVGProps<SVGSVGElement> { }
+export interface AlertTriangleIconProps extends React.SVGProps<SVGSVGElement> {}
 
-export function AlertTriangleIcon({ className = "h-6 w-6", color = 'white', ...props }: AlertTriangleIconProps) {
+export function AlertTriangleIcon({ className = 'h-6 w-6', color = 'white', ...props }: AlertTriangleIconProps) {
   return (
     <svg
       width="24"
@@ -20,20 +20,8 @@ export function AlertTriangleIcon({ className = "h-6 w-6", color = 'white', ...p
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <path
-        d="M12 9V13"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M12 17H12.01"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <path d="M12 9V13" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12 17H12.01" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
-  )
+  );
 }

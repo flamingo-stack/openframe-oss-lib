@@ -67,15 +67,7 @@ export const SingleWithValue: Story = {
 export const SingleDisabled: Story = {
   render: function Render() {
     const [value, setValue] = useState<string | null>('startup');
-    return (
-      <Autocomplete
-        options={sampleOptions}
-        value={value}
-        onChange={setValue}
-        label="Disabled"
-        disabled
-      />
-    );
+    return <Autocomplete options={sampleOptions} value={value} onChange={setValue} label="Disabled" disabled />;
   },
 };
 
@@ -126,13 +118,7 @@ export const MultipleWithValues: Story = {
   render: function Render() {
     const [value, setValue] = useState<string[]>(['enterprise', 'startup', 'smb']);
     return (
-      <Autocomplete
-        multiple
-        options={sampleOptions}
-        value={value}
-        onChange={setValue}
-        placeholder="Add More..."
-      />
+      <Autocomplete multiple options={sampleOptions} value={value} onChange={setValue} placeholder="Add More..." />
     );
   },
 };
@@ -163,14 +149,7 @@ export const MultipleDisabled: Story = {
   render: function Render() {
     const [value, setValue] = useState<string[]>(['enterprise', 'startup']);
     return (
-      <Autocomplete
-        multiple
-        options={sampleOptions}
-        value={value}
-        onChange={setValue}
-        label="Disabled"
-        disabled
-      />
+      <Autocomplete multiple options={sampleOptions} value={value} onChange={setValue} label="Disabled" disabled />
     );
   },
 };
@@ -250,12 +229,14 @@ export const MultipleCustomOptionRender: Story = {
         placeholder="Search..."
         renderOption={(option, isSelected) => (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              backgroundColor: isSelected ? '#22c55e' : '#888'
-            }} />
+            <span
+              style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: isSelected ? '#22c55e' : '#888',
+              }}
+            />
             <span>{option.label}</span>
           </div>
         )}

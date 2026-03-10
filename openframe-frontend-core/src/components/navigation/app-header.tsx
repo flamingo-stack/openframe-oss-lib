@@ -1,36 +1,36 @@
-'use client'
+'use client';
 
-import { Bell } from 'lucide-react'
-import { useMdUp } from '../../hooks/ui/use-media-query'
-import { cn } from '../../utils/cn'
-import { LogOutIcon, OpenFrameLogo, OpenFrameText, UserIcon } from '../icons'
-import { Menu01Icon, SearchIcon, XmarkIcon } from '../icons-v2-generated'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, SquareAvatar } from '../ui'
-import { HeaderButton } from './header-button'
-import { HeaderGlobalSearch } from './header-global-search'
-import { HeaderOrganizationFilter } from './header-organization-filter'
+import { Bell } from 'lucide-react';
+import { useMdUp } from '../../hooks/ui/use-media-query';
+import { cn } from '../../utils/cn';
+import { LogOutIcon, OpenFrameLogo, OpenFrameText, UserIcon } from '../icons';
+import { Menu01Icon, SearchIcon, XmarkIcon } from '../icons-v2-generated';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, SquareAvatar } from '../ui';
+import { HeaderButton } from './header-button';
+import { HeaderGlobalSearch } from './header-global-search';
+import { HeaderOrganizationFilter } from './header-organization-filter';
 
 export interface AppHeaderProps {
-  showSearch?: boolean
-  onSearch?: (query: string) => void
-  showOrganizations?: boolean
-  organizations?: { id: string; name: string }[]
-  selectedOrgId?: string
-  onOrgChange?: (id: string) => void
-  showNotifications?: boolean
-  unreadCount?: number
+  showSearch?: boolean;
+  onSearch?: (query: string) => void;
+  showOrganizations?: boolean;
+  organizations?: { id: string; name: string }[];
+  selectedOrgId?: string;
+  onOrgChange?: (id: string) => void;
+  showNotifications?: boolean;
+  unreadCount?: number;
   // User block
-  showUser?: boolean
-  userName?: string
-  userEmail?: string
-  userAvatarUrl?: string | null
-  onProfile?: () => void
-  onLogout?: () => void
-  className?: string
+  showUser?: boolean;
+  userName?: string;
+  userEmail?: string;
+  userAvatarUrl?: string | null;
+  onProfile?: () => void;
+  onLogout?: () => void;
+  className?: string;
   /** Whether the mobile menu is open */
-  isMobileMenuOpen: boolean
+  isMobileMenuOpen: boolean;
   /** Callback to toggle mobile menu */
-  onToggleMobileMenu?: () => void
+  onToggleMobileMenu?: () => void;
 }
 
 export function AppHeader({
@@ -50,43 +50,46 @@ export function AppHeader({
   onLogout,
   className,
   isMobileMenuOpen,
-  onToggleMobileMenu
-}: AppHeaderProps) {  
-  const isMdUp = useMdUp() ?? false
-  
+  onToggleMobileMenu,
+}: AppHeaderProps) {
+  const isMdUp = useMdUp() ?? false;
+
   return (
     <header
       className={cn(
         'flex items-center w-full sticky top-0 z-40 border-b border-ods-border bg-ods-card h-12 md:h-14 divide-x divide-ods-border',
-        className
+        className,
       )}
     >
       {/* Mobile: Burger Menu Button */}
-      {!isMdUp && <HeaderButton
-        onClick={onToggleMobileMenu}
-        isActive={isMobileMenuOpen}
-        icon={isMobileMenuOpen ? <XmarkIcon className="w-4 h-4" /> : <Menu01Icon className="w-4 h-4" />}
-        aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
-        aria-expanded={isMobileMenuOpen}
-      />}
+      {!isMdUp && (
+        <HeaderButton
+          onClick={onToggleMobileMenu}
+          isActive={isMobileMenuOpen}
+          icon={isMobileMenuOpen ? <XmarkIcon className="w-4 h-4" /> : <Menu01Icon className="w-4 h-4" />}
+          aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
+          aria-expanded={isMobileMenuOpen}
+        />
+      )}
 
       {/* Mobile: Logo section */}
-      {!isMdUp && <div className="flex items-center gap-2 px-3 h-full flex-1">
-        <OpenFrameLogo
-          className="w-6 h-6 shrink-0"
-          upperPathColor="var(--color-text-primary)"
-          lowerPathColor="var(--color-accent-primary)"
-        />
-        <OpenFrameText textColor="var(--color-text-primary)" className="h-4" />
-      </div>}
+      {!isMdUp && (
+        <div className="flex items-center gap-2 px-3 h-full flex-1">
+          <OpenFrameLogo
+            className="w-6 h-6 shrink-0"
+            upperPathColor="var(--color-text-primary)"
+            lowerPathColor="var(--color-accent-primary)"
+          />
+          <OpenFrameText textColor="var(--color-text-primary)" className="h-4" />
+        </div>
+      )}
 
       {/* Desktop: Global Search */}
       {showSearch ? (
-        <HeaderGlobalSearch
-          onSubmit={onSearch}
-          className="hidden md:flex"
-        />
-      ) : <div className="hidden md:flex w-full" />}
+        <HeaderGlobalSearch onSubmit={onSearch} className="hidden md:flex" />
+      ) : (
+        <div className="hidden md:flex w-full" />
+      )}
 
       {/* Mobile: Search button */}
       {showSearch && (
@@ -110,14 +113,16 @@ export function AppHeader({
       {isMdUp && showUser && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <HeaderButton 
-              icon={<SquareAvatar
-                src={userAvatarUrl || undefined}
-                alt={userName || 'User'}
-                size="sm"
-                variant="round"
-                className="shrink-0 w-8 h-8 md:w-10 md:h-10"
-              />}
+            <HeaderButton
+              icon={
+                <SquareAvatar
+                  src={userAvatarUrl || undefined}
+                  alt={userName || 'User'}
+                  size="sm"
+                  variant="round"
+                  className="shrink-0 w-8 h-8 md:w-10 md:h-10"
+                />
+              }
               aria-label="User"
             />
           </DropdownMenuTrigger>
@@ -136,15 +141,9 @@ export function AppHeader({
               />
               <div className="flex-1 min-w-0">
                 {userName && (
-                  <div className="text-[18px] font-medium text-ods-text-primary truncate leading-6">
-                    {userName}
-                  </div>
+                  <div className="text-[18px] font-medium text-ods-text-primary truncate leading-6">{userName}</div>
                 )}
-                {userEmail && (
-                  <div className="text-[14px] text-ods-text-secondary truncate leading-5">
-                    {userEmail}
-                  </div>
-                )}
+                {userEmail && <div className="text-[14px] text-ods-text-secondary truncate leading-5">{userEmail}</div>}
               </div>
             </div>
 
@@ -189,7 +188,7 @@ export function AppHeader({
         />
       )}
     </header>
-  )
+  );
 }
 
-export default AppHeader
+export default AppHeader;

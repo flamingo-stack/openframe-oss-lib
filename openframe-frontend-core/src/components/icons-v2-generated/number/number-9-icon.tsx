@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface Number9IconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface Number9IconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function Number9Icon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: Number9IconProps) {
+export function Number9Icon({ className = '', size = 24, color = 'currentColor', ...props }: Number9IconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

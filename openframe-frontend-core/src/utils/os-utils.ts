@@ -4,9 +4,9 @@
  * Helper functions for working with OS types.
  */
 
-import React from 'react'
-import type { OSPlatformId } from './os-platforms'
-import { OSType, OSTypeDefinition, OS_TYPES, osLabels } from '../types/os.types'
+import React from 'react';
+import { OS_TYPES, OSType, OSTypeDefinition, osLabels } from '../types/os.types';
+import type { OSPlatformId } from './os-platforms';
 
 /**
  * Normalize OS type string to standard OSType enum
@@ -21,33 +21,35 @@ import { OSType, OSTypeDefinition, OS_TYPES, osLabels } from '../types/os.types'
  * normalizeOSType('Ubuntu') // 'LINUX'
  */
 export function normalizeOSType(osType?: string): OSType | undefined {
-  if (!osType) return undefined
+  if (!osType) return undefined;
 
-  const normalized = osType.toLowerCase().trim()
+  const normalized = osType.toLowerCase().trim();
 
   // Check for exact matches first, then partial matches
   // This prevents "win" from matching "darwin"
   for (const osTypeDef of OS_TYPES) {
     // Check for exact word match first
-    if (osTypeDef.aliases.some(alias => {
-      // Exact match
-      if (normalized === alias) return true
-      // Word boundary match (e.g., "mac" in "mac os" but not in "vmac")
-      const wordBoundaryRegex = new RegExp(`\\b${alias}\\b`, 'i')
-      return wordBoundaryRegex.test(osType)
-    })) {
-      return osTypeDef.id
+    if (
+      osTypeDef.aliases.some(alias => {
+        // Exact match
+        if (normalized === alias) return true;
+        // Word boundary match (e.g., "mac" in "mac os" but not in "vmac")
+        const wordBoundaryRegex = new RegExp(`\\b${alias}\\b`, 'i');
+        return wordBoundaryRegex.test(osType);
+      })
+    ) {
+      return osTypeDef.id;
     }
   }
 
   // Fallback to partial matching for version strings like "macOS 26.0.1"
   for (const osTypeDef of OS_TYPES) {
     if (osTypeDef.aliases.some(alias => normalized.includes(alias))) {
-      return osTypeDef.id
+      return osTypeDef.id;
     }
   }
 
-  return undefined
+  return undefined;
 }
 
 /**
@@ -57,10 +59,10 @@ export function normalizeOSType(osType?: string): OSType | undefined {
  * @returns Display label
  */
 export function getOSLabel(osType?: string): string {
-  if (!osType) return 'Unknown'
+  if (!osType) return 'Unknown';
 
-  const normalized = normalizeOSType(osType)
-  return normalized ? osLabels[normalized] : osType
+  const normalized = normalizeOSType(osType);
+  return normalized ? osLabels[normalized] : osType;
 }
 
 /**
@@ -70,13 +72,13 @@ export function getOSLabel(osType?: string): string {
  * @returns Icon component or undefined
  */
 export function getOSIcon(osType?: string): React.ComponentType<any> | undefined {
-  if (!osType) return undefined
+  if (!osType) return undefined;
 
-  const normalized = normalizeOSType(osType)
-  if (!normalized) return undefined
+  const normalized = normalizeOSType(osType);
+  if (!normalized) return undefined;
 
-  const osTypeDef = OS_TYPES.find(t => t.id === normalized)
-  return osTypeDef?.icon
+  const osTypeDef = OS_TYPES.find(t => t.id === normalized);
+  return osTypeDef?.icon;
 }
 
 /**
@@ -86,12 +88,12 @@ export function getOSIcon(osType?: string): React.ComponentType<any> | undefined
  * @returns Complete OS type definition or undefined
  */
 export function getOSTypeDefinition(osType?: string): OSTypeDefinition | undefined {
-  if (!osType) return undefined
+  if (!osType) return undefined;
 
-  const normalized = normalizeOSType(osType)
-  if (!normalized) return undefined
+  const normalized = normalizeOSType(osType);
+  if (!normalized) return undefined;
 
-  return OS_TYPES.find(t => t.id === normalized)
+  return OS_TYPES.find(t => t.id === normalized);
 }
 
 /**
@@ -101,8 +103,8 @@ export function getOSTypeDefinition(osType?: string): OSTypeDefinition | undefin
  * @returns Platform ID or undefined
  */
 export function getOSPlatformId(osType?: string): OSPlatformId | undefined {
-  const osTypeDef = getOSTypeDefinition(osType)
-  return osTypeDef?.platformId
+  const osTypeDef = getOSTypeDefinition(osType);
+  return osTypeDef?.platformId;
 }
 
 /**
@@ -117,9 +119,9 @@ export function getOSPlatformId(osType?: string): OSPlatformId | undefined {
  * isOSPlatform('Windows 10', 'windows') // true
  * isOSPlatform('Ubuntu', 'linux') // true
  */
-export function isOSPlatform(deviceOS?: string, targetPlatform?: OSPlatformId): boolean {
-  if (!deviceOS || !targetPlatform) return false
+export function isOSPlatform(deviceOs?: string, targetPlatform?: OSPlatformId): boolean {
+  if (!deviceOs || !targetPlatform) return false;
 
-  const platformId = getOSPlatformId(deviceOS)
-  return platformId === targetPlatform
+  const platformId = getOSPlatformId(deviceOs);
+  return platformId === targetPlatform;
 }

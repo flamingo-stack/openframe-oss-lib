@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface PauseCircleIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface PauseCircleIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function PauseCircleIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: PauseCircleIconProps) {
+export function PauseCircleIcon({ className = '', size = 24, color = 'currentColor', ...props }: PauseCircleIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

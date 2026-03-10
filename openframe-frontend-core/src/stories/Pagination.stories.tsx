@@ -116,9 +116,7 @@ export const Interactive: Story = {
     const [page, setPage] = useState(1);
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center' }}>
-        <p style={{ color: 'var(--ods-text-secondary)', fontSize: '14px' }}>
-          Current page: {page} of 10
-        </p>
+        <p style={{ color: 'var(--ods-text-secondary)', fontSize: '14px' }}>Current page: {page} of 10</p>
         <Pagination currentPage={page} totalPages={10} onPageChange={setPage} />
       </div>
     );
@@ -138,9 +136,7 @@ export const InteractiveManyPages: Story = {
     const [page, setPage] = useState(1);
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center' }}>
-        <p style={{ color: 'var(--ods-text-secondary)', fontSize: '14px' }}>
-          Current page: {page} of 50
-        </p>
+        <p style={{ color: 'var(--ods-text-secondary)', fontSize: '14px' }}>Current page: {page} of 50</p>
         <Pagination currentPage={page} totalPages={50} onPageChange={setPage} />
       </div>
     );
@@ -197,15 +193,21 @@ export const AllStates: Story = {
   render: () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       <div>
-        <p style={{ color: 'var(--ods-text-secondary)', fontSize: '12px', marginBottom: '8px' }}>First page (1 of 10)</p>
+        <p style={{ color: 'var(--ods-text-secondary)', fontSize: '12px', marginBottom: '8px' }}>
+          First page (1 of 10)
+        </p>
         <Pagination currentPage={1} totalPages={10} onPageChange={() => {}} />
       </div>
       <div>
-        <p style={{ color: 'var(--ods-text-secondary)', fontSize: '12px', marginBottom: '8px' }}>Middle page (5 of 10)</p>
+        <p style={{ color: 'var(--ods-text-secondary)', fontSize: '12px', marginBottom: '8px' }}>
+          Middle page (5 of 10)
+        </p>
         <Pagination currentPage={5} totalPages={10} onPageChange={() => {}} />
       </div>
       <div>
-        <p style={{ color: 'var(--ods-text-secondary)', fontSize: '12px', marginBottom: '8px' }}>Last page (10 of 10)</p>
+        <p style={{ color: 'var(--ods-text-secondary)', fontSize: '12px', marginBottom: '8px' }}>
+          Last page (10 of 10)
+        </p>
         <Pagination currentPage={10} totalPages={10} onPageChange={() => {}} />
       </div>
       <div>
@@ -213,7 +215,9 @@ export const AllStates: Story = {
         <Pagination currentPage={2} totalPages={3} onPageChange={() => {}} />
       </div>
       <div>
-        <p style={{ color: 'var(--ods-text-secondary)', fontSize: '12px', marginBottom: '8px' }}>Many pages (50 of 100)</p>
+        <p style={{ color: 'var(--ods-text-secondary)', fontSize: '12px', marginBottom: '8px' }}>
+          Many pages (50 of 100)
+        </p>
         <Pagination currentPage={50} totalPages={100} onPageChange={() => {}} />
       </div>
     </div>

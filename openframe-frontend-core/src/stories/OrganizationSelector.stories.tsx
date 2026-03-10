@@ -1,6 +1,6 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { useState } from 'react'
-import { OrganizationSelector, type OrganizationOption } from '../components/features/organization-selector'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
+import { type OrganizationOption, OrganizationSelector } from '../components/features/organization-selector';
 
 const sampleOrganizations: OrganizationOption[] = [
   { id: '1', organizationId: 'org-1', name: 'Acme Corporation', isDefault: true },
@@ -13,7 +13,7 @@ const sampleOrganizations: OrganizationOption[] = [
   { id: '8', organizationId: 'org-8', name: 'Cyberdyne Systems' },
   { id: '9', organizationId: 'org-9', name: 'Soylent Corp' },
   { id: '10', organizationId: 'org-10', name: 'Wonka Industries' },
-]
+];
 
 const meta = {
   title: 'Features/OrganizationSelector',
@@ -39,16 +39,16 @@ const meta = {
     },
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ width: 400 }}>
         <Story />
       </div>
     ),
   ],
-} satisfies Meta<typeof OrganizationSelector>
+} satisfies Meta<typeof OrganizationSelector>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
@@ -58,7 +58,7 @@ export const Default: Story = {
     placeholder: 'Choose organization',
     label: 'Organization',
   },
-}
+};
 
 export const WithSearch: Story = {
   args: {
@@ -69,7 +69,7 @@ export const WithSearch: Story = {
     label: 'Organization',
     searchable: true,
   },
-}
+};
 
 export const WithSearchInteractive: Story = {
   args: {
@@ -80,7 +80,7 @@ export const WithSearchInteractive: Story = {
     searchable: true,
   },
   render: () => {
-    const [value, setValue] = useState('')
+    const [value, setValue] = useState('');
     return (
       <OrganizationSelector
         organizations={sampleOrganizations}
@@ -90,9 +90,9 @@ export const WithSearchInteractive: Story = {
         placeholder="Choose organization"
         searchable
       />
-    )
+    );
   },
-}
+};
 
 export const Preselected: Story = {
   args: {
@@ -101,7 +101,7 @@ export const Preselected: Story = {
     onValueChange: () => {},
     label: 'Organization',
   },
-}
+};
 
 export const Loading: Story = {
   args: {
@@ -111,7 +111,7 @@ export const Loading: Story = {
     label: 'Organization',
     isLoading: true,
   },
-}
+};
 
 export const Disabled: Story = {
   args: {
@@ -121,7 +121,7 @@ export const Disabled: Story = {
     label: 'Organization',
     disabled: true,
   },
-}
+};
 
 export const FewItems: Story = {
   args: {
@@ -132,4 +132,4 @@ export const FewItems: Story = {
     searchable: true,
     searchPlaceholder: 'Filter...',
   },
-}
+};

@@ -1,6 +1,6 @@
 /* React-scroll active states (used in vendor-detail-content.tsx) */
 .nav-item-active::before {
-  content: '';
+  content: "";
   position: absolute;
   width: 4px;
   height: 24px;

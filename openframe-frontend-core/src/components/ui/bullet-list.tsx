@@ -22,7 +22,7 @@ export interface BulletListProps {
 const spacingMap = {
   sm: 'space-y-2',
   md: 'space-y-3',
-  lg: 'space-y-4'
+  lg: 'space-y-4',
 };
 
 export function BulletList({
@@ -33,11 +33,9 @@ export function BulletList({
   textClassName = "font-['DM_Sans'] font-medium text-[16px] md:text-[18px] leading-[24px] md:leading-[28px] text-ods-text-primary",
   itemClassName = 'flex items-start gap-3',
   containerClassName = '',
-  spacing = 'md'
+  spacing = 'md',
 }: BulletListProps) {
-  const normalizedItems = items.map(item =>
-    typeof item === 'string' ? { text: item, id: undefined } : item
-  );
+  const normalizedItems = items.map(item => (typeof item === 'string' ? { text: item, id: undefined } : item));
 
   return (
     <div className={`${spacingMap[spacing]} ${containerClassName}`}>
@@ -48,9 +46,7 @@ export function BulletList({
             <BulletIcon size={bulletSize} color={bulletColor} />
           </div>
           {/* </div> */}
-          <p className={textClassName}>
-            {item.text}
-          </p>
+          <p className={textClassName}>{item.text}</p>
         </div>
       ))}
     </div>

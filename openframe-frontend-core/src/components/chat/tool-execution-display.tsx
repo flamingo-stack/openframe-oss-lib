@@ -1,56 +1,56 @@
-"use client"
+'use client';
 
-import { useState, useEffect, forwardRef } from "react"
-import { cn } from "../../utils/cn"
-import { ToolIcon } from "../tool-icon"
-import { ChevronDown, ChevronRight, Loader2, CheckCircle2, XCircle, ArrowRightIcon } from "lucide-react"
-import { ToolType } from "../platform"
-import type { ToolExecutionDisplayProps } from "./types"
+import { ArrowRightIcon, CheckCircle2, ChevronDown, ChevronRight, Loader2, XCircle } from 'lucide-react';
+import { forwardRef, useEffect, useState } from 'react';
+import { cn } from '../../utils/cn';
+import { ToolType } from '../platform';
+import { ToolIcon } from '../tool-icon';
+import type { ToolExecutionDisplayProps } from './types';
 
 const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProps>(
   ({ className, message, isExpanded = false, onToggleExpand, ...props }, ref) => {
-    const [localExpanded, setLocalExpanded] = useState(isExpanded)
+    const [localExpanded, setLocalExpanded] = useState(isExpanded);
 
     useEffect(() => {
-      setLocalExpanded(isExpanded)
-    }, [isExpanded])
+      setLocalExpanded(isExpanded);
+    }, [isExpanded]);
 
     const handleToggle = () => {
       if (onToggleExpand) {
-        onToggleExpand()
+        onToggleExpand();
       } else {
-        setLocalExpanded(!localExpanded)
+        setLocalExpanded(!localExpanded);
       }
-    }
+    };
 
-    const isExecuting = message.type === "EXECUTING_TOOL"
-    const isExecuted = message.type === "EXECUTED_TOOL"
-    const expanded = onToggleExpand ? isExpanded : localExpanded
+    const isExecuting = message.type === 'EXECUTING_TOOL';
+    const isExecuted = message.type === 'EXECUTED_TOOL';
+    const expanded = onToggleExpand ? isExpanded : localExpanded;
 
-    const integratedToolType = message.integratedToolType || 'OPENFRAME'
+    const integratedToolType = message.integratedToolType || 'OPENFRAME';
 
     const formatToolName = (toolType: string) => {
-      return toolType?.replace(/_/g, ' ')
-    }
+      return toolType?.replace(/_/g, ' ');
+    };
 
     const formatParameters = (params: Record<string, any>) => {
       return Object.entries(params).map(([key, value]) => {
-        let displayValue = value
+        let displayValue = value;
         if (typeof value === 'object' && value !== null) {
-          displayValue = JSON.stringify(value, null, 2)
+          displayValue = JSON.stringify(value, null, 2);
         } else if (typeof value === 'string' && value.length > 100) {
-          displayValue = value.substring(0, 100) + '...'
+          displayValue = value.substring(0, 100) + '...';
         }
-        return { key, value: displayValue }
-      })
-    }
+        return { key, value: displayValue };
+      });
+    };
 
     return (
       <div
         ref={ref}
         className={cn(
-          "rounded-lg bg-ods-card border border-ods-border mb-2 overflow-hidden transition-all duration-200",
-          className
+          'rounded-lg bg-ods-card border border-ods-border mb-2 overflow-hidden transition-all duration-200',
+          className,
         )}
         {...props}
       >
@@ -63,11 +63,7 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
           <div className="flex items-center gap-3">
             {/* Expand/Collapse Icon */}
             <button className="p-0 w-5 h-5 flex items-center justify-center text-ods-text-secondary hover:text-ods-text-primary transition-colors flex-shrink-0">
-              {expanded ? (
-                <ChevronDown className="w-4 h-4" />
-              ) : (
-                <ChevronRight className="w-4 h-4" />
-              )}
+              {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
             </button>
 
             {/* Tool Icon */}
@@ -82,15 +78,9 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
 
             {/* Status Indicator */}
             <div className="flex-shrink-0">
-              {isExecuting && (
-                <Loader2 className="w-4 h-4 text-ods-info animate-spin" />
-              )}
-              {isExecuted && message.success === true && (
-                <CheckCircle2 className="w-4 h-4 text-ods-success" />
-              )}
-              {isExecuted && message.success === false && (
-                <XCircle className="w-4 h-4 text-ods-error" />
-              )}
+              {isExecuting && <Loader2 className="w-4 h-4 text-ods-info animate-spin" />}
+              {isExecuted && message.success === true && <CheckCircle2 className="w-4 h-4 text-ods-success" />}
+              {isExecuted && message.success === false && <XCircle className="w-4 h-4 text-ods-error" />}
             </div>
           </div>
 
@@ -102,10 +92,12 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
         </div>
 
         {/* Expanded Content */}
-        <div className={cn(
-          "overflow-hidden transition-all duration-300 ease-in-out border-t border-ods-border",
-          expanded ? "min-h-0 opacity-100" : "max-h-0 opacity-0"
-        )}>
+        <div
+          className={cn(
+            'overflow-hidden transition-all duration-300 ease-in-out border-t border-ods-border',
+            expanded ? 'min-h-0 opacity-100' : 'max-h-0 opacity-0',
+          )}
+        >
           <div className="px-4 pb-3">
             {/* Parameters Section (for executing) */}
             {isExecuting && message.parameters && Object.keys(message.parameters).length > 0 && (
@@ -148,15 +140,15 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
             {/* Result Section */}
             {isExecuted && message.result && (
               <div className="mt-3">
-                <h4 className="text-xs font-medium text-ods-text-secondary mb-2 uppercase tracking-wider">
-                  Result
-                </h4>
-                <div className={cn(
-                  "rounded-md p-3",
-                  message.success
-                    ? "bg-green-500/10 border border-green-500/20"
-                    : "bg-red-500/10 border border-red-500/20"
-                )}>
+                <h4 className="text-xs font-medium text-ods-text-secondary mb-2 uppercase tracking-wider">Result</h4>
+                <div
+                  className={cn(
+                    'rounded-md p-3',
+                    message.success
+                      ? 'bg-green-500/10 border border-green-500/20'
+                      : 'bg-red-500/10 border border-red-500/20',
+                  )}
+                >
                   <pre className="text-xs text-ods-text-primary font-mono whitespace-pre-wrap break-all">
                     {message.result}
                   </pre>
@@ -166,10 +158,10 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
           </div>
         </div>
       </div>
-    )
-  }
-)
+    );
+  },
+);
 
-ToolExecutionDisplay.displayName = "ToolExecutionDisplay"
+ToolExecutionDisplay.displayName = 'ToolExecutionDisplay';
 
-export { ToolExecutionDisplay }
+export { ToolExecutionDisplay };

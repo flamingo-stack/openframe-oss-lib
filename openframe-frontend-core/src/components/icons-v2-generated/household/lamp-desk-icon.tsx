@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface LampDeskIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface LampDeskIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function LampDeskIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: LampDeskIconProps) {
+export function LampDeskIcon({ className = '', size = 24, color = 'currentColor', ...props }: LampDeskIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

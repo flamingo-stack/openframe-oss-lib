@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface WatchPulseIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface WatchPulseIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function WatchPulseIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: WatchPulseIconProps) {
+export function WatchPulseIcon({ className = '', size = 24, color = 'currentColor', ...props }: WatchPulseIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

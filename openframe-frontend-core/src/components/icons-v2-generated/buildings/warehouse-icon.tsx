@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface WarehouseIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface WarehouseIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function WarehouseIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: WarehouseIconProps) {
+export function WarehouseIcon({ className = '', size = 24, color = 'currentColor', ...props }: WarehouseIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

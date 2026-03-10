@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface CallHangupIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface CallHangupIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function CallHangupIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: CallHangupIconProps) {
+export function CallHangupIcon({ className = '', size = 24, color = 'currentColor', ...props }: CallHangupIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

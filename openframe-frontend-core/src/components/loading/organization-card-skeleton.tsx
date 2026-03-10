@@ -1,26 +1,26 @@
-import type React from "react"
-import { cn } from "../../utils/cn"
-import { OrganizationIconSkeleton } from "./organization-icon-skeleton"
-import { TextSkeleton, MediaSkeleton, InteractiveSkeleton } from "./unified-skeleton"
+import type React from 'react';
+import { cn } from '../../utils/cn';
+import { OrganizationIconSkeleton } from './organization-icon-skeleton';
+import { InteractiveSkeleton, MediaSkeleton, TextSkeleton } from './unified-skeleton';
 
 export interface OrganizationCardSkeletonProps {
   /**
    * Additional CSS classes
    */
-  className?: string
+  className?: string;
 
   /**
    * Show footer stats area
    */
-  showFooter?: boolean
+  showFooter?: boolean;
 
   /**
    * Show description area
    */
-  showDescription?: boolean
+  showDescription?: boolean;
 
   /** Optional tailwind classes to override the card container background & border */
-  containerClassName?: string
+  containerClassName?: string;
 }
 
 /**
@@ -39,14 +39,14 @@ export function OrganizationCardSkeleton({
   className,
   containerClassName,
   showFooter = true,
-  showDescription = true
+  showDescription = true,
 }: OrganizationCardSkeletonProps) {
   return (
     <div
       className={cn(
-        containerClassName || "bg-ods-card border border-ods-border",
-        "rounded-lg overflow-hidden h-full flex flex-col",
-        className
+        containerClassName || 'bg-ods-card border border-ods-border',
+        'rounded-lg overflow-hidden h-full flex flex-col',
+        className,
       )}
       role="status"
       aria-label="Loading organization card"
@@ -112,7 +112,7 @@ export function OrganizationCardSkeleton({
         )}
       </div>
     </div>
-  )
+  );
 }
 
 /**
@@ -128,20 +128,17 @@ export function OrganizationCardSkeletonGrid({
   className,
   containerClassName,
   showFooter = true,
-  showDescription = true
+  showDescription = true,
 }: {
-  count?: number
-  className?: string
-  containerClassName?: string
-  showFooter?: boolean
-  showDescription?: boolean
+  count?: number;
+  className?: string;
+  containerClassName?: string;
+  showFooter?: boolean;
+  showDescription?: boolean;
 }) {
   return (
     <div
-      className={cn(
-        "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6",
-        className
-      )}
+      className={cn('grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6', className)}
       role="status"
       aria-label={`Loading ${count} organization cards`}
     >
@@ -154,5 +151,5 @@ export function OrganizationCardSkeletonGrid({
         />
       ))}
     </div>
-  )
+  );
 }

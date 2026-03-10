@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface ForwardIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface ForwardIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function ForwardIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: ForwardIconProps) {
+export function ForwardIcon({ className = '', size = 24, color = 'currentColor', ...props }: ForwardIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

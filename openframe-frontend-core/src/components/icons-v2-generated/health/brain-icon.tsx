@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface BrainIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface BrainIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function BrainIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: BrainIconProps) {
+export function BrainIcon({ className = '', size = 24, color = 'currentColor', ...props }: BrainIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

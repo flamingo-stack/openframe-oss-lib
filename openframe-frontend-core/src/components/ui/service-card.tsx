@@ -1,53 +1,53 @@
-'use client'
+'use client';
 
-import React, { useMemo, useState } from 'react'
-import { cn } from '../../utils/cn'
-import { CopyIcon, EyeIcon } from '../icons'
-import { ExternalLink } from 'lucide-react'
-import { OpenFrameLogo } from '../..'
+import { ExternalLink } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { OpenFrameLogo } from '../..';
+import { cn } from '../../utils/cn';
+import { CopyIcon, EyeIcon } from '../icons';
 
 export type ServiceCardRowAction = {
-  copy?: boolean
-  open?: boolean
-  reveal?: boolean
-}
+  copy?: boolean;
+  open?: boolean;
+  reveal?: boolean;
+};
 
 export type ServiceCardRow = {
-  label?: string
-  value: string
-  href?: string
-  copyValue?: string
-  isSecret?: boolean
-  monospace?: boolean
-  actions?: ServiceCardRowAction
-}
+  label?: string;
+  value: string;
+  href?: string;
+  copyValue?: string;
+  isSecret?: boolean;
+  monospace?: boolean;
+  actions?: ServiceCardRowAction;
+};
 
 export type ServiceCardTag = {
-  label: string
-}
+  label: string;
+};
 
 export interface ServiceCardProps {
-  title: string
-  subtitle?: string
-  icon?: React.ReactNode
-  tag?: ServiceCardTag
-  rows: ServiceCardRow[]
-  className?: string
+  title: string;
+  subtitle?: string;
+  icon?: React.ReactNode;
+  tag?: ServiceCardTag;
+  rows: ServiceCardRow[];
+  className?: string;
 }
 
 function MaskedValue({ value, isRevealed }: { value: string; isRevealed: boolean }) {
-  if (isRevealed) return <span>{value}</span>
-  return <span>{'•'.repeat(Math.min(value.length, 12))}</span>
+  if (isRevealed) return <span>{value}</span>;
+  return <span>{'•'.repeat(Math.min(value.length, 12))}</span>;
 }
 
 export function ServiceCard({ title, subtitle, icon, tag, rows, className }: ServiceCardProps) {
   const resolvedIcon = icon ?? (
-    <OpenFrameLogo 
+    <OpenFrameLogo
       className="w-10 h-10"
       lowerPathColor={'var(--color-accent-primary)'}
       upperPathColor={'var(--color-text-primary)'}
     />
-  )
+  );
 
   return (
     <div className={cn('bg-ods-card border border-ods-border rounded-lg p-6', className)}>
@@ -59,9 +59,7 @@ export function ServiceCard({ title, subtitle, icon, tag, rows, className }: Ser
           </div>
           <div className="min-w-0">
             <div className="text-xl font-semibold text-ods-text-primary truncate">{title}</div>
-            {subtitle && (
-              <div className="text-sm text-ods-text-secondary truncate">{subtitle}</div>
-            )}
+            {subtitle && <div className="text-sm text-ods-text-secondary truncate">{subtitle}</div>}
           </div>
         </div>
         {tag && (
@@ -78,31 +76,45 @@ export function ServiceCard({ title, subtitle, icon, tag, rows, className }: Ser
         ))}
       </div>
     </div>
-  )
+  );
 }
 
 function ServiceCardRowItem({ row }: { row: ServiceCardRow }) {
-  const [revealed, setRevealed] = useState(false)
-  const actions = useMemo<ServiceCardRowAction>(() => ({ copy: true, open: !!row.href, reveal: !!row.isSecret, ...row.actions }), [row])
+  const [revealed, setRevealed] = useState(false);
+  const actions = useMemo<ServiceCardRowAction>(
+    () => ({ copy: true, open: !!row.href, reveal: !!row.isSecret, ...row.actions }),
+    [row],
+  );
 
-  const displayValue = row.isSecret ? <MaskedValue value={row.value} isRevealed={revealed} /> : <span>{row.value}</span>
+  const displayValue = row.isSecret ? (
+    <MaskedValue value={row.value} isRevealed={revealed} />
+  ) : (
+    <span>{row.value}</span>
+  );
 
   const copyToClipboard = async () => {
-    const text = row.copyValue ?? row.value
-    try { await navigator.clipboard.writeText(text) } catch { /* no-op */ }
-  }
+    const text = row.copyValue ?? row.value;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      /* no-op */
+    }
+  };
 
   const openInNewTab = () => {
-    if (!row.href) return
-    window.open(row.href, '_blank', 'noopener,noreferrer')
-  }
+    if (!row.href) return;
+    window.open(row.href, '_blank', 'noopener,noreferrer');
+  };
 
   return (
     <div className="flex items-center gap-3 min-w-0">
-      {row.label && (
-        <div className="w-20 md:w-24 shrink-0 text-sm font-medium text-ods-text-primary">{row.label}</div>
-      )}
-      <div className={cn('flex-1 h-12 rounded-md border border-ods-border bg-ods-bg px-3 md:px-4 flex items-center justify-between min-w-0', row.monospace ? 'font-mono' : '')}>
+      {row.label && <div className="w-20 md:w-24 shrink-0 text-sm font-medium text-ods-text-primary">{row.label}</div>}
+      <div
+        className={cn(
+          'flex-1 h-12 rounded-md border border-ods-border bg-ods-bg px-3 md:px-4 flex items-center justify-between min-w-0',
+          row.monospace ? 'font-mono' : '',
+        )}
+      >
         <div className="truncate text-ods-text-primary min-w-0">{displayValue}</div>
         <div className="flex items-center gap-2 pl-3 flex-shrink-0">
           {actions.reveal && (
@@ -137,5 +149,5 @@ function ServiceCardRowItem({ row }: { row: ServiceCardRow }) {
         </div>
       </div>
     </div>
-  )
+  );
 }

@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface Filter03HrIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface Filter03HrIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function Filter03HrIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: Filter03HrIconProps) {
+export function Filter03HrIcon({ className = '', size = 24, color = 'currentColor', ...props }: Filter03HrIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

@@ -1,14 +1,13 @@
-import type { SVGProps } from "react";
-export interface CloudWeatherRain01IconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface CloudWeatherRain01IconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
 export function CloudWeatherRain01Icon({
-  className = "",
+  className = '',
   size = 24,
-  color = "currentColor",
+  color = 'currentColor',
   ...props
 }: CloudWeatherRain01IconProps) {
   return (

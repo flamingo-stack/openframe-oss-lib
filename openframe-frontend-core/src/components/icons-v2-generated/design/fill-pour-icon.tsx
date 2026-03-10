@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface FillPourIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface FillPourIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function FillPourIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: FillPourIconProps) {
+export function FillPourIcon({ className = '', size = 24, color = 'currentColor', ...props }: FillPourIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

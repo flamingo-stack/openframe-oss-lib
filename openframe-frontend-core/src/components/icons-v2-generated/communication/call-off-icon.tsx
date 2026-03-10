@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface CallOffIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface CallOffIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function CallOffIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: CallOffIconProps) {
+export function CallOffIcon({ className = '', size = 24, color = 'currentColor', ...props }: CallOffIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

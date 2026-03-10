@@ -1,5 +1,18 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { Bell, ChevronRight, Download, Heart, Menu, MessageSquare, Plus, Search, Settings, ShoppingCart, Trash2, X } from 'lucide-react';
+import {
+  Bell,
+  ChevronRight,
+  Download,
+  Heart,
+  Menu,
+  MessageSquare,
+  Plus,
+  Search,
+  Settings,
+  ShoppingCart,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { Button } from '../components/ui/button';
 
 const meta = {
@@ -37,7 +50,19 @@ const meta = {
     },
     size: {
       control: 'select',
-      options: ['sm', 'default', 'lg', 'icon', 'iconLg', 'touch', 'searchMobile', 'searchDesktop', 'none', 'section', 'sectionWrap'],
+      options: [
+        'sm',
+        'default',
+        'lg',
+        'icon',
+        'iconLg',
+        'touch',
+        'searchMobile',
+        'searchDesktop',
+        'none',
+        'section',
+        'sectionWrap',
+      ],
     },
     disabled: { control: 'boolean' },
     loading: { control: 'boolean' },
@@ -534,12 +559,36 @@ export const IconButtonsWithNumber: Story = {
   },
   render: () => (
     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-      <Button variant="outline" size="icon" centerIcon={<span style={{ fontSize: '16px', fontWeight: 'bold' }}>1</span>} />
-      <Button variant="outline" size="icon" centerIcon={<span style={{ fontSize: '16px', fontWeight: 'bold' }}>2</span>} />
-      <Button variant="outline" size="icon" centerIcon={<span style={{ fontSize: '16px', fontWeight: 'bold' }}>3</span>} />
-      <Button variant="primary" size="icon" centerIcon={<span style={{ fontSize: '16px', fontWeight: 'bold' }}>4</span>} />
-      <Button variant="ghost" size="icon" centerIcon={<span style={{ fontSize: '16px', fontWeight: 'bold' }}>5</span>} />
-      <Button variant="destructive" size="icon" centerIcon={<span style={{ fontSize: '16px', fontWeight: 'bold' }}>99</span>} />
+      <Button
+        variant="outline"
+        size="icon"
+        centerIcon={<span style={{ fontSize: '16px', fontWeight: 'bold' }}>1</span>}
+      />
+      <Button
+        variant="outline"
+        size="icon"
+        centerIcon={<span style={{ fontSize: '16px', fontWeight: 'bold' }}>2</span>}
+      />
+      <Button
+        variant="outline"
+        size="icon"
+        centerIcon={<span style={{ fontSize: '16px', fontWeight: 'bold' }}>3</span>}
+      />
+      <Button
+        variant="primary"
+        size="icon"
+        centerIcon={<span style={{ fontSize: '16px', fontWeight: 'bold' }}>4</span>}
+      />
+      <Button
+        variant="ghost"
+        size="icon"
+        centerIcon={<span style={{ fontSize: '16px', fontWeight: 'bold' }}>5</span>}
+      />
+      <Button
+        variant="destructive"
+        size="icon"
+        centerIcon={<span style={{ fontSize: '16px', fontWeight: 'bold' }}>99</span>}
+      />
     </div>
   ),
 };
@@ -553,10 +602,24 @@ export const IconButtonsLargeWithNumber: Story = {
   },
   render: () => (
     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-      <Button variant="outline" size="icon" className="!h-9 !w-9 md:!w-9">1</Button>
-      <Button variant="outline" size="iconLg" centerIcon={<span style={{ fontSize: '18px', fontWeight: 'bold' }}>2</span>} />
-      <Button variant="primary" size="iconLg" centerIcon={<span style={{ fontSize: '18px', fontWeight: 'bold' }}>10</span>} />
-      <Button variant="secondary" size="iconLg" centerIcon={<span style={{ fontSize: '18px', fontWeight: 'bold' }}>25</span>} />
+      <Button variant="outline" size="icon" className="!h-9 !w-9 md:!w-9">
+        1
+      </Button>
+      <Button
+        variant="outline"
+        size="iconLg"
+        centerIcon={<span style={{ fontSize: '18px', fontWeight: 'bold' }}>2</span>}
+      />
+      <Button
+        variant="primary"
+        size="iconLg"
+        centerIcon={<span style={{ fontSize: '18px', fontWeight: 'bold' }}>10</span>}
+      />
+      <Button
+        variant="secondary"
+        size="iconLg"
+        centerIcon={<span style={{ fontSize: '18px', fontWeight: 'bold' }}>25</span>}
+      />
     </div>
   ),
 };
@@ -570,10 +633,18 @@ export const IconButtonsWithIconAndNumber: Story = {
   },
   render: () => (
     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-      <Button variant="outline" size="default" leftIcon={<Bell />}>3</Button>
-      <Button variant="outline" size="default" leftIcon={<MessageSquare />}>12</Button>
-      <Button variant="primary" size="default" leftIcon={<ShoppingCart />}>5</Button>
-      <Button variant="ghost" size="default" leftIcon={<Heart />}>99</Button>
+      <Button variant="outline" size="default" leftIcon={<Bell />}>
+        3
+      </Button>
+      <Button variant="outline" size="default" leftIcon={<MessageSquare />}>
+        12
+      </Button>
+      <Button variant="primary" size="default" leftIcon={<ShoppingCart />}>
+        5
+      </Button>
+      <Button variant="ghost" size="default" leftIcon={<Heart />}>
+        99
+      </Button>
     </div>
   ),
 };
@@ -589,9 +660,15 @@ export const WithIconsShowcase: Story = {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '300px' }}>
       <Button leftIcon={<Plus />}>Add Item</Button>
       <Button rightIcon={<ChevronRight />}>Continue</Button>
-      <Button leftIcon={<Download />} rightIcon={<ChevronRight />}>Download All</Button>
-      <Button variant="destructive" leftIcon={<Trash2 />}>Delete</Button>
-      <Button variant="outline" leftIcon={<Search />}>Search</Button>
+      <Button leftIcon={<Download />} rightIcon={<ChevronRight />}>
+        Download All
+      </Button>
+      <Button variant="destructive" leftIcon={<Trash2 />}>
+        Delete
+      </Button>
+      <Button variant="outline" leftIcon={<Search />}>
+        Search
+      </Button>
     </div>
   ),
 };
@@ -608,7 +685,9 @@ export const StatesShowcase: Story = {
       <Button>Normal</Button>
       <Button disabled>Disabled</Button>
       <Button loading>Loading</Button>
-      <Button loading disabled>Loading Disabled</Button>
+      <Button loading disabled>
+        Loading Disabled
+      </Button>
     </div>
   ),
 };

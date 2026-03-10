@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface Expand02IconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface Expand02IconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function Expand02Icon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: Expand02IconProps) {
+export function Expand02Icon({ className = '', size = 24, color = 'currentColor', ...props }: Expand02IconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

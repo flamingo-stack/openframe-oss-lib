@@ -7,9 +7,9 @@
 
 import React from 'react';
 import {
+  AccessCodeConsumptionResponse,
   AccessCodeValidation,
   AccessCodeValidationResponse,
-  AccessCodeConsumptionResponse
 } from '../types/access-code-cohorts';
 
 /**
@@ -29,10 +29,7 @@ import {
  *   console.error(result.message);
  * }
  */
-export async function validateAccessCode(
-  email: string,
-  code: string
-): Promise<AccessCodeValidationResponse> {
+export async function validateAccessCode(email: string, code: string): Promise<AccessCodeValidationResponse> {
   try {
     const response = await fetch('/api/validate-access-code', {
       method: 'POST',
@@ -47,7 +44,7 @@ export async function validateAccessCode(
       throw new Error(error.error || 'Validation request failed');
     }
 
-    return await response.json() as AccessCodeValidationResponse;
+    return (await response.json()) as AccessCodeValidationResponse;
   } catch (error) {
     return {
       valid: false,
@@ -75,10 +72,7 @@ export async function validateAccessCode(
  *   console.warn('Failed to consume access code:', result.message);
  * }
  */
-export async function consumeAccessCode(
-  email: string,
-  code: string
-): Promise<AccessCodeConsumptionResponse> {
+export async function consumeAccessCode(email: string, code: string): Promise<AccessCodeConsumptionResponse> {
   try {
     const response = await fetch('/api/consume-access-code', {
       method: 'POST',
@@ -93,7 +87,7 @@ export async function consumeAccessCode(
       throw new Error(error.error || 'Consumption request failed');
     }
 
-    return await response.json() as AccessCodeConsumptionResponse;
+    return (await response.json()) as AccessCodeConsumptionResponse;
   } catch (error) {
     return {
       success: false,
@@ -125,7 +119,7 @@ export async function consumeAccessCode(
  */
 export async function validateAndConsumeAccessCode(
   email: string,
-  code: string
+  code: string,
 ): Promise<AccessCodeValidationResponse & { consumed?: boolean }> {
   // First validate
   const validation = await validateAccessCode(email, code);
@@ -209,4 +203,3 @@ export function useAccessCodeIntegration() {
     isProcessing: isValidating || isConsuming,
   };
 }
-

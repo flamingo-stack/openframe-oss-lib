@@ -1,39 +1,39 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { Button } from '../ui/button'
-import { cn } from '../../utils/cn'
+import React from 'react';
+import { cn } from '../../utils/cn';
+import { Button } from '../ui/button';
 
 export interface CommandBoxAction {
   /** Button label */
-  label: string
+  label: string;
   /** Click handler */
-  onClick: () => void
+  onClick: () => void;
   /** Button variant */
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost'
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
   /** Icon to display before the label */
-  icon?: React.ReactNode
+  icon?: React.ReactNode;
   /** Whether the button is disabled */
-  disabled?: boolean
+  disabled?: boolean;
   /** Whether the button is in loading state */
-  loading?: boolean
+  loading?: boolean;
 }
 
 export interface CommandBoxProps {
   /** The command text to display */
-  command: string
+  command: string;
   /** Title displayed above the command box */
-  title?: string
+  title?: string;
   /** Primary action button (displayed on the right) */
-  primaryAction?: CommandBoxAction
+  primaryAction?: CommandBoxAction;
   /** Secondary action button (displayed before primary) */
-  secondaryAction?: CommandBoxAction
+  secondaryAction?: CommandBoxAction;
   /** Additional CSS classes for the container */
-  className?: string
+  className?: string;
   /** Additional CSS classes for the command text */
-  commandClassName?: string
+  commandClassName?: string;
   /** Maximum lines to show (uses line-clamp, 0 for unlimited) */
-  maxLines?: number
+  maxLines?: number;
 }
 
 /**
@@ -77,7 +77,7 @@ const lineClampClasses: Record<number, string> = {
   4: 'line-clamp-4',
   5: 'line-clamp-5',
   6: 'line-clamp-6',
-}
+};
 
 export function CommandBox({
   command,
@@ -86,24 +86,20 @@ export function CommandBox({
   secondaryAction,
   className,
   commandClassName,
-  maxLines = 0
+  maxLines = 0,
 }: CommandBoxProps) {
   // Get static line-clamp class or undefined for unlimited
-  const lineClampClass = maxLines > 0 ? lineClampClasses[maxLines] : undefined
+  const lineClampClass = maxLines > 0 ? lineClampClasses[maxLines] : undefined;
 
   return (
     <div className={cn('flex flex-col gap-2', className)}>
-      {title && (
-        <div className="text-ods-text-primary text-[18px] font-medium">
-          {title}
-        </div>
-      )}
+      {title && <div className="text-ods-text-primary text-[18px] font-medium">{title}</div>}
       <div className="bg-ods-card border border-ods-border rounded-[6px] p-4">
         <div
           className={cn(
             'text-ods-text-primary font-mono text-[14px] md:text-[16px] leading-relaxed break-all',
             lineClampClass,
-            commandClassName
+            commandClassName,
           )}
         >
           {command}
@@ -138,5 +134,5 @@ export function CommandBox({
         )}
       </div>
     </div>
-  )
+  );
 }

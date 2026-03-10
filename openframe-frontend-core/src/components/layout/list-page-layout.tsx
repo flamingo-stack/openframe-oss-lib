@@ -1,31 +1,31 @@
-'use client'
+'use client';
 
-import React, { useEffect, useState } from 'react'
-import { useDebounce } from '../../hooks/ui/use-debounce'
-import { Filter02Icon, SearchIcon } from '../icons-v2-generated'
-import { Button, Input, PageError } from '../ui'
-import { MobileFilterModal, type FilterGroup, type SortConfig, type SortDirection } from '../ui/mobile-filter-sheet'
-import type { TableFilters } from '../ui/table/types'
-import { ListPageContainer, type PageActionButton } from './page-container'
+import React, { useEffect, useState } from 'react';
+import { useDebounce } from '../../hooks/ui/use-debounce';
+import { Filter02Icon, SearchIcon } from '../icons-v2-generated';
+import { Button, Input, PageError } from '../ui';
+import { type FilterGroup, MobileFilterModal, type SortConfig, type SortDirection } from '../ui/mobile-filter-sheet';
+import type { TableFilters } from '../ui/table/types';
+import { ListPageContainer, type PageActionButton } from './page-container';
 
 export interface ListPageLayoutProps {
-  title: string
-  headerActions?: React.ReactNode
-  actions?: PageActionButton[]
-  searchPlaceholder: string
-  searchValue: string
-  onSearch: (term: string) => void
-  children: React.ReactNode
-  error?: string | null
-  className?: string
-  padding?: 'none' | 'sm' | 'md' | 'lg'
-  background?: 'default' | 'card' | 'transparent'
-  mobileFilterGroups?: FilterGroup[]
-  onMobileFilterChange?: (filters: TableFilters) => void
-  currentMobileFilters?: TableFilters
-  mobileSortConfig?: SortConfig
-  onMobileSort?: (column: string, direction: SortDirection) => void
-  mobileFilterTitle?: string
+  title: string;
+  headerActions?: React.ReactNode;
+  actions?: PageActionButton[];
+  searchPlaceholder: string;
+  searchValue: string;
+  onSearch: (term: string) => void;
+  children: React.ReactNode;
+  error?: string | null;
+  className?: string;
+  padding?: 'none' | 'sm' | 'md' | 'lg';
+  background?: 'default' | 'card' | 'transparent';
+  mobileFilterGroups?: FilterGroup[];
+  onMobileFilterChange?: (filters: TableFilters) => void;
+  currentMobileFilters?: TableFilters;
+  mobileSortConfig?: SortConfig;
+  onMobileSort?: (column: string, direction: SortDirection) => void;
+  mobileFilterTitle?: string;
 }
 
 /**
@@ -102,30 +102,30 @@ export function ListPageLayout({
   currentMobileFilters,
   mobileSortConfig,
   onMobileSort,
-  mobileFilterTitle
+  mobileFilterTitle,
 }: ListPageLayoutProps) {
-  const [mobileFilterOpen, setMobileFilterOpen] = useState(false)
-  const [localSearchValue, setLocalSearchValue] = useState(searchValue)
-  const debouncedSearchValue = useDebounce(localSearchValue, 500)
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  const [localSearchValue, setLocalSearchValue] = useState(searchValue);
+  const debouncedSearchValue = useDebounce(localSearchValue, 500);
 
   // Sync local value when controlled value changes externally
   useEffect(() => {
-    setLocalSearchValue(searchValue)
-  }, [searchValue])
+    setLocalSearchValue(searchValue);
+  }, [searchValue]);
 
   // Call onSearch when debounced value changes
   useEffect(() => {
     if (debouncedSearchValue !== searchValue) {
-      onSearch(debouncedSearchValue)
+      onSearch(debouncedSearchValue);
     }
-  }, [debouncedSearchValue, onSearch, searchValue])
+  }, [debouncedSearchValue, onSearch, searchValue]);
 
   // Check if mobile filter is enabled (has filter groups or sort config)
-  const hasMobileFilter = (mobileFilterGroups && mobileFilterGroups.length > 0) ||
-    (mobileSortConfig && mobileSortConfig.columns.length > 0)
+  const hasMobileFilter =
+    (mobileFilterGroups && mobileFilterGroups.length > 0) || (mobileSortConfig && mobileSortConfig.columns.length > 0);
 
   if (error) {
-    return <PageError message={error} />
+    return <PageError message={error} />;
   }
 
   return (
@@ -141,7 +141,7 @@ export function ListPageLayout({
       <div className="flex gap-4 items-center w-full">
         <Input
           placeholder={searchPlaceholder}
-          onChange={(e) => setLocalSearchValue(e.target.value)}
+          onChange={e => setLocalSearchValue(e.target.value)}
           value={localSearchValue}
           className="flex-1"
           startAdornment={<SearchIcon className="w-4 h-4 md:w-6 md:h-6" />}
@@ -178,10 +178,10 @@ export function ListPageLayout({
       {/* Main Content - Table/Grid with filters */}
       {children}
     </ListPageContainer>
-  )
+  );
 }
 
 // Re-export PageActionButton type for convenience
-export type { PageActionButton } from './page-container'
+export type { PageActionButton } from './page-container';
 
-export default ListPageLayout
+export default ListPageLayout;

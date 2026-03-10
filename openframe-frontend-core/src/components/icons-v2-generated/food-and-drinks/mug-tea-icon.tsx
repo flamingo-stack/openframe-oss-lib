@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface MugTeaIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface MugTeaIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function MugTeaIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: MugTeaIconProps) {
+export function MugTeaIcon({ className = '', size = 24, color = 'currentColor', ...props }: MugTeaIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

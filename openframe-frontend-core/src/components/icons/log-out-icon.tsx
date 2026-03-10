@@ -1,14 +1,12 @@
-import React from 'react'
+import React from 'react';
 
 interface LogOutIconProps {
   color?: string;
-  className?: string
-  size?: number
+  className?: string;
+  size?: number;
 }
 
-export function LogOutIcon({ className = '', size = 20 ,
-  color = 'white'
-}:  LogOutIconProps) {
+export function LogOutIcon({ className = '', size = 20, color = 'white' }: LogOutIconProps) {
   return (
     <svg
       width={size}
@@ -26,7 +24,16 @@ export function LogOutIcon({ className = '', size = 20 ,
         strokeLinejoin="round"
       />
       <polyline points="16 17 21 12 16 7" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <line x1="21" y1="12" x2="9" y2="12" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <line
+        x1="21"
+        y1="12"
+        x2="9"
+        y2="12"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
-  )
+  );
 }

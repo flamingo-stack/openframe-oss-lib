@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface ThermometerIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface ThermometerIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function ThermometerIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: ThermometerIconProps) {
+export function ThermometerIcon({ className = '', size = 24, color = 'currentColor', ...props }: ThermometerIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

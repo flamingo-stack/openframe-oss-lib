@@ -5,9 +5,7 @@ interface FacebookIconProps {
   className?: string;
 }
 
-export function FacebookIcon({ className ,
-  color = 'white'
-}:  FacebookIconProps) {
+export function FacebookIcon({ className, color = 'white' }: FacebookIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

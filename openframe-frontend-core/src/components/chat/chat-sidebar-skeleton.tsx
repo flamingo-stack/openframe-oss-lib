@@ -1,10 +1,10 @@
-import * as React from "react"
-import { cn } from "../../utils/cn"
-import { Button } from "../ui/button"
-import { ChatPlusIcon } from "../icons-v2-generated"
+import * as React from 'react';
+import { cn } from '../../utils/cn';
+import { ChatPlusIcon } from '../icons-v2-generated';
+import { Button } from '../ui/button';
 
 interface DialogListItemSkeletonProps {
-  className?: string
+  className?: string;
 }
 
 const DialogListItemSkeleton = React.forwardRef<HTMLDivElement, DialogListItemSkeletonProps>(
@@ -13,11 +13,11 @@ const DialogListItemSkeleton = React.forwardRef<HTMLDivElement, DialogListItemSk
       <div
         ref={ref}
         className={cn(
-          "flex items-center gap-4 overflow-clip",
-          "px-4 py-3",
-          "border-b border-ods-border",
-          "bg-ods-card",
-          className
+          'flex items-center gap-4 overflow-clip',
+          'px-4 py-3',
+          'border-b border-ods-border',
+          'bg-ods-card',
+          className,
         )}
         {...props}
       >
@@ -30,20 +30,20 @@ const DialogListItemSkeleton = React.forwardRef<HTMLDivElement, DialogListItemSk
           {/* Timestamp skeleton */}
           <div className="h-4 w-32 bg-ods-border rounded animate-pulse" />
         </div>
-        
+
         {/* Right side chevron skeleton */}
         <div className="size-6 bg-ods-border rounded animate-pulse shrink-0" />
       </div>
-    )
-  }
-)
+    );
+  },
+);
 
-DialogListItemSkeleton.displayName = "DialogListItemSkeleton"
+DialogListItemSkeleton.displayName = 'DialogListItemSkeleton';
 
 interface ChatSidebarSkeletonProps {
-  className?: string
-  dialogCount?: number
-  showNewChatButton?: boolean
+  className?: string;
+  dialogCount?: number;
+  showNewChatButton?: boolean;
 }
 
 const ChatSidebarSkeleton = React.forwardRef<HTMLDivElement, ChatSidebarSkeletonProps>(
@@ -51,12 +51,7 @@ const ChatSidebarSkeleton = React.forwardRef<HTMLDivElement, ChatSidebarSkeleton
     return (
       <div
         ref={ref}
-        className={cn(
-          "w-80 h-full flex flex-col",
-          "bg-ods-bg",
-          "border-r border-ods-border",
-          className
-        )}
+        className={cn('w-80 h-full flex flex-col', 'bg-ods-bg', 'border-r border-ods-border', className)}
         {...props}
       >
         {/* Start New Chat Button */}
@@ -84,10 +79,10 @@ const ChatSidebarSkeleton = React.forwardRef<HTMLDivElement, ChatSidebarSkeleton
           </div>
         </div>
       </div>
-    )
-  }
-)
+    );
+  },
+);
 
-ChatSidebarSkeleton.displayName = "ChatSidebarSkeleton"
+ChatSidebarSkeleton.displayName = 'ChatSidebarSkeleton';
 
-export { ChatSidebarSkeleton, DialogListItemSkeleton }
+export { ChatSidebarSkeleton, DialogListItemSkeleton };

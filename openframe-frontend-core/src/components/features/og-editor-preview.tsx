@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { Input, Textarea, Label } from '../ui';
+import { Input, Label, Textarea } from '../ui';
 
 export interface OGEditorPreviewProps {
   // SEO fields
@@ -46,23 +46,19 @@ export function OGEditorPreview({
   OGImageUploadComponent,
   OGPreviewComponent,
   disabled = false,
-  className = ''
+  className = '',
 }: OGEditorPreviewProps) {
   return (
     <div className={`space-y-6 p-6 bg-ods-card border border-ods-border rounded-lg ${className}`}>
-      <h3 className="text-h5 text-ods-text-primary">
-        SEO & Open Graph
-      </h3>
+      <h3 className="text-h5 text-ods-text-primary">SEO & Open Graph</h3>
 
       {/* SEO Title & Keywords - Same Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">
-            SEO Title
-          </Label>
+          <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">SEO Title</Label>
           <Input
             value={seoTitle}
-            onChange={(e) => onSeoTitleChange(e.target.value)}
+            onChange={e => onSeoTitleChange(e.target.value)}
             disabled={disabled}
             placeholder="Enter SEO meta title..."
             className="bg-[#161616] border-ods-border text-ods-text-primary"
@@ -70,12 +66,10 @@ export function OGEditorPreview({
         </div>
 
         <div className="space-y-2">
-          <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">
-            SEO Keywords
-          </Label>
+          <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">SEO Keywords</Label>
           <Input
             value={seoKeywords}
-            onChange={(e) => onSeoKeywordsChange(e.target.value)}
+            onChange={e => onSeoKeywordsChange(e.target.value)}
             disabled={disabled}
             placeholder="Enter SEO keywords..."
             className="bg-[#161616] border-ods-border text-ods-text-primary"
@@ -86,12 +80,10 @@ export function OGEditorPreview({
       {/* SEO Description & OG Image - Same Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="space-y-2 flex flex-col h-full">
-          <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">
-            SEO Description
-          </Label>
+          <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">SEO Description</Label>
           <Textarea
             value={seoDescription}
-            onChange={(e) => onSeoDescriptionChange(e.target.value)}
+            onChange={e => onSeoDescriptionChange(e.target.value)}
             disabled={disabled}
             placeholder="Enter SEO meta description..."
             className="bg-[#161616] border-ods-border text-ods-text-primary flex-1 resize-none"
@@ -100,19 +92,13 @@ export function OGEditorPreview({
         </div>
 
         <div className="space-y-2 flex flex-col h-full">
-          <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">
-            OG Image
-          </Label>
-          <div className="flex-1">
-            {OGImageUploadComponent}
-          </div>
+          <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">OG Image</Label>
+          <div className="flex-1">{OGImageUploadComponent}</div>
         </div>
       </div>
 
       {/* OG Preview */}
-      <div className="pt-4 border-t border-ods-border">
-        {OGPreviewComponent}
-      </div>
+      <div className="pt-4 border-t border-ods-border">{OGPreviewComponent}</div>
     </div>
   );
 }

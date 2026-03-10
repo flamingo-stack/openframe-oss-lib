@@ -1,22 +1,22 @@
-"use client"
+'use client';
 
-import * as React from "react"
-import { PlusCircle, X } from "lucide-react"
-import { cn } from "../../utils/cn"
-import { Input } from "./input"
-import { Button } from "./button"
-import { Label } from "./label"
+import { PlusCircle, X } from 'lucide-react';
+import * as React from 'react';
+import { cn } from '../../utils/cn';
+import { Button } from './button';
+import { Input } from './input';
+import { Label } from './label';
 
 interface AllowedDomainsInputProps {
-  value: string[]
-  onChange: (domains: string[]) => void
-  onValidate?: (domain: string) => { valid: boolean; error?: string; cleanedDomain?: string }
-  label?: string
-  placeholder?: string
-  disabled?: boolean
-  error?: string | null
-  helperText?: string
-  className?: string
+  value: string[];
+  onChange: (domains: string[]) => void;
+  onValidate?: (domain: string) => { valid: boolean; error?: string; cleanedDomain?: string };
+  label?: string;
+  placeholder?: string;
+  disabled?: boolean;
+  error?: string | null;
+  helperText?: string;
+  className?: string;
 }
 
 const AllowedDomainsInput = React.forwardRef<HTMLDivElement, AllowedDomainsInputProps>(
@@ -25,71 +25,67 @@ const AllowedDomainsInput = React.forwardRef<HTMLDivElement, AllowedDomainsInput
       value,
       onChange,
       onValidate,
-      label = "Allowed Domains",
-      placeholder = "example.com",
+      label = 'Allowed Domains',
+      placeholder = 'example.com',
       disabled = false,
       error,
       helperText,
-      className
+      className,
     },
-    ref
+    ref,
   ) => {
-    const [inputValue, setInputValue] = React.useState("")
-    const [localError, setLocalError] = React.useState<string | null>(null)
-    const inputRef = React.useRef<HTMLInputElement>(null)
+    const [inputValue, setInputValue] = React.useState('');
+    const [localError, setLocalError] = React.useState<string | null>(null);
+    const inputRef = React.useRef<HTMLInputElement>(null);
 
-    const displayError = error || localError
+    const displayError = error || localError;
 
     const addDomain = () => {
-      const trimmedValue = inputValue.trim()
-      if (!trimmedValue) return
+      const trimmedValue = inputValue.trim();
+      if (!trimmedValue) return;
 
       // Validate if validator provided
       if (onValidate) {
-        const validation = onValidate(trimmedValue)
+        const validation = onValidate(trimmedValue);
         if (!validation.valid) {
-          setLocalError(validation.error || "Invalid domain")
-          return
+          setLocalError(validation.error || 'Invalid domain');
+          return;
         }
         // Use cleaned domain if provided
-        const domainToAdd = validation.cleanedDomain || trimmedValue
+        const domainToAdd = validation.cleanedDomain || trimmedValue;
         if (!value.includes(domainToAdd)) {
-          onChange([...value, domainToAdd])
-          setLocalError(null)
+          onChange([...value, domainToAdd]);
+          setLocalError(null);
         }
       } else {
         // No validation, just add if not duplicate
         if (!value.includes(trimmedValue)) {
-          onChange([...value, trimmedValue])
+          onChange([...value, trimmedValue]);
         }
       }
-      setInputValue("")
-    }
+      setInputValue('');
+    };
 
     const removeDomain = (index: number) => {
-      const newDomains = value.filter((_, i) => i !== index)
-      onChange(newDomains)
-    }
+      const newDomains = value.filter((_, i) => i !== index);
+      onChange(newDomains);
+    };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === "Enter") {
-        e.preventDefault()
-        addDomain()
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addDomain();
       }
-    }
+    };
 
     return (
-      <div ref={ref} className={cn("space-y-3", className)}>
+      <div ref={ref} className={cn('space-y-3', className)}>
         {label && <Label>{label}</Label>}
 
         {/* Existing domains */}
         {value.map((domain, index) => (
           <div key={index} className="flex items-center gap-2">
-            <Input
-              value={domain}
-              disabled
-              className="bg-[#212121] border-[#3a3a3a] rounded-[6px] flex-1"
-            />
+            <Input value={domain} disabled className="bg-[#212121] border-[#3a3a3a] rounded-[6px] flex-1" />
             <Button
               type="button"
               variant="ghost"
@@ -107,9 +103,9 @@ const AllowedDomainsInput = React.forwardRef<HTMLDivElement, AllowedDomainsInput
           <Input
             ref={inputRef}
             value={inputValue}
-            onChange={(e) => {
-              setInputValue(e.target.value)
-              setLocalError(null)
+            onChange={e => {
+              setInputValue(e.target.value);
+              setLocalError(null);
             }}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
@@ -122,8 +118,8 @@ const AllowedDomainsInput = React.forwardRef<HTMLDivElement, AllowedDomainsInput
         <button
           type="button"
           className={cn(
-            "flex items-center gap-2 py-2 text-ods-text-primary hover:text-ods-accent transition-colors",
-            disabled && "opacity-50 cursor-not-allowed"
+            'flex items-center gap-2 py-2 text-ods-text-primary hover:text-ods-accent transition-colors',
+            disabled && 'opacity-50 cursor-not-allowed',
           )}
           onClick={addDomain}
           disabled={disabled}
@@ -133,20 +129,16 @@ const AllowedDomainsInput = React.forwardRef<HTMLDivElement, AllowedDomainsInput
         </button>
 
         {/* Error message */}
-        {displayError && (
-          <p className="text-sm text-ods-error">{displayError}</p>
-        )}
+        {displayError && <p className="text-sm text-ods-error">{displayError}</p>}
 
         {/* Helper text */}
-        {helperText && !displayError && (
-          <p className="text-sm text-ods-text-secondary">{helperText}</p>
-        )}
+        {helperText && !displayError && <p className="text-sm text-ods-text-secondary">{helperText}</p>}
       </div>
-    )
-  }
-)
+    );
+  },
+);
 
-AllowedDomainsInput.displayName = "AllowedDomainsInput"
+AllowedDomainsInput.displayName = 'AllowedDomainsInput';
 
-export { AllowedDomainsInput }
-export type { AllowedDomainsInputProps }
+export { AllowedDomainsInput };
+export type { AllowedDomainsInputProps };

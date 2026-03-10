@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface AlphabetFIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface AlphabetFIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function AlphabetFIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: AlphabetFIconProps) {
+export function AlphabetFIcon({ className = '', size = 24, color = 'currentColor', ...props }: AlphabetFIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

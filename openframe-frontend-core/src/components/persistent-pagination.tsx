@@ -1,56 +1,56 @@
-"use client"
+'use client';
 
-import { ReactNode } from "react"
-import { cn } from "../utils/cn"
+import { ReactNode } from 'react';
+import { cn } from '../utils/cn';
 
 interface PersistentPaginationProps {
   /**
    * Whether pagination is currently in a loading state
    */
-  isLoading: boolean
+  isLoading: boolean;
   /**
    * The pagination component
    */
-  children: ReactNode
+  children: ReactNode;
   /**
    * Current page number
    */
-  currentPage: number
+  currentPage: number;
   /**
    * Total number of pages
    */
-  totalPages: number
+  totalPages: number;
   /**
    * Additional CSS classes
    */
-  className?: string
+  className?: string;
   /**
    * Disabled opacity (0-1)
    */
-  disabledOpacity?: number
+  disabledOpacity?: number;
   /**
    * Transition duration in milliseconds
    */
-  transitionDuration?: number
+  transitionDuration?: number;
   /**
    * Whether to show loading state in pagination
    */
-  showLoadingState?: boolean
+  showLoadingState?: boolean;
 }
 
 /**
  * PersistentPagination
- * 
+ *
  * A wrapper component that keeps pagination visible during loading states
  * but provides visual feedback that it's temporarily disabled.
- * 
+ *
  * Features:
  * - Maintains pagination visibility during content loading
  * - Disables interaction but preserves layout
  * - Shows current page context even when loading
  * - Provides accessibility support for loading states
  * - Smooth transitions between enabled/disabled states
- * 
+ *
  * Usage:
  * ```tsx
  * <PersistentPagination
@@ -76,16 +76,16 @@ export function PersistentPagination({
   // Removed condition that hides pagination completely
 
   return (
-    <div 
+    <div
       className={cn(
-        "relative transition-all ease-in-out",
-        "flex justify-center items-center",
-        isLoading && "pointer-events-none",
-        className
+        'relative transition-all ease-in-out',
+        'flex justify-center items-center',
+        isLoading && 'pointer-events-none',
+        className,
       )}
       style={{
         opacity: isLoading ? disabledOpacity : 1,
-        transitionDuration: `${transitionDuration}ms`
+        transitionDuration: `${transitionDuration}ms`,
       }}
       role="navigation"
       aria-label="Pagination"
@@ -94,23 +94,16 @@ export function PersistentPagination({
     >
       {/* Loading state announcement for screen readers */}
       {isLoading && (
-        <div 
-          className="sr-only" 
-          role="status" 
-          aria-live="polite"
-        >
+        <div className="sr-only" role="status" aria-live="polite">
           Pagination temporarily disabled while loading page {currentPage} of {totalPages}
         </div>
       )}
 
       {/* Pagination controls with disabled state */}
-      <div 
-        className={cn(
-          "relative transition-all ease-in-out",
-          isLoading && "cursor-not-allowed"
-        )}
+      <div
+        className={cn('relative transition-all ease-in-out', isLoading && 'cursor-not-allowed')}
         style={{
-          transitionDuration: `${transitionDuration}ms`
+          transitionDuration: `${transitionDuration}ms`,
         }}
         aria-hidden={isLoading}
       >
@@ -119,50 +112,46 @@ export function PersistentPagination({
 
       {/* REMOVED: Loading overlay - only card skeletons should show during loading */}
     </div>
-  )
+  );
 }
 
 /**
  * Hook for managing pagination loading states
  */
-export function usePaginationLoading(
-  isLoading: boolean,
-  currentPage: number,
-  totalPages: number
-) {
-  const shouldShowPagination = totalPages > 1 || isLoading
-  
+export function usePaginationLoading(isLoading: boolean, currentPage: number, totalPages: number) {
+  const shouldShowPagination = totalPages > 1 || isLoading;
+
   const paginationProps = {
     'aria-busy': isLoading,
     'data-loading': isLoading,
     'data-current-page': currentPage,
     'data-total-pages': totalPages,
-  }
+  };
 
   const getLoadingMessage = () => {
     if (isLoading) {
-      return `Loading page ${currentPage} of ${totalPages}`
+      return `Loading page ${currentPage} of ${totalPages}`;
     }
-    return `Page ${currentPage} of ${totalPages}`
-  }
+    return `Page ${currentPage} of ${totalPages}`;
+  };
 
   return {
     shouldShowPagination,
     paginationProps,
     getLoadingMessage,
-  }
+  };
 }
 
 /**
  * Enhanced pagination component that includes loading states
  */
 interface PersistentPaginationWrapperProps {
-  isLoading: boolean
-  currentPage: number
-  totalPages: number
-  onPageChange?: (page: number) => void
-  className?: string
-  variant?: 'vendor' | 'blog'
+  isLoading: boolean;
+  currentPage: number;
+  totalPages: number;
+  onPageChange?: (page: number) => void;
+  className?: string;
+  variant?: 'vendor' | 'blog';
 }
 
 export function PersistentPaginationWrapper({
@@ -171,37 +160,33 @@ export function PersistentPaginationWrapper({
   totalPages,
   onPageChange,
   className,
-  variant = 'vendor'
+  variant = 'vendor',
 }: PersistentPaginationWrapperProps) {
-  const { getLoadingMessage } = usePaginationLoading(
-    isLoading,
-    currentPage,
-    totalPages
-  )
+  const { getLoadingMessage: _getLoadingMessage } = usePaginationLoading(isLoading, currentPage, totalPages);
 
   // ALWAYS show pagination for predictable layout
   // For no results (totalPages = 0), show grayed out pagination
-  const hasResults = totalPages > 0
-  const displayTotalPages = hasResults ? totalPages : 1
-  const displayCurrentPage = hasResults ? currentPage : 1
+  const hasResults = totalPages > 0;
+  const displayTotalPages = hasResults ? totalPages : 1;
+  const displayCurrentPage = hasResults ? currentPage : 1;
   // Only disable during loading, but still show when no results (just grayed out)
-  const isPaginationDisabled = isLoading
-  const hasNoResults = !hasResults && !isLoading
+  const isPaginationDisabled = isLoading;
+  const hasNoResults = !hasResults && !isLoading;
 
   // Use UnifiedPagination directly from ui-kit instead of importing from consuming apps
   // Both Pagination and BlogPagination in multi-platform-hub are just wrappers around UnifiedPagination
-  const PaginationComponent = require('./unified-pagination').UnifiedPagination
+  const PaginationComponent = require('./unified-pagination').UnifiedPagination;
 
   return (
-    <div 
+    <div
       className={cn(
-        "relative transition-all ease-in-out flex justify-center items-center",
-        (isPaginationDisabled || hasNoResults) && "pointer-events-none",
-        className
+        'relative transition-all ease-in-out flex justify-center items-center',
+        (isPaginationDisabled || hasNoResults) && 'pointer-events-none',
+        className,
       )}
       style={{
         opacity: isPaginationDisabled ? 0.3 : hasNoResults ? 0.5 : 1,
-        transitionDuration: "300ms"
+        transitionDuration: '300ms',
       }}
       role="navigation"
       aria-label="Pagination"
@@ -211,26 +196,18 @@ export function PersistentPaginationWrapper({
     >
       {/* Loading/no results state announcement for screen readers */}
       {(isLoading || !hasResults) && (
-        <div 
-          className="sr-only" 
-          role="status" 
-          aria-live="polite"
-        >
-          {isLoading 
+        <div className="sr-only" role="status" aria-live="polite">
+          {isLoading
             ? `Pagination temporarily disabled while loading page ${displayCurrentPage} of ${displayTotalPages}`
-            : `No results available - pagination disabled`
-          }
+            : `No results available - pagination disabled`}
         </div>
       )}
 
       {/* Pagination controls with disabled state */}
-      <div 
-        className={cn(
-          "relative transition-all ease-in-out",
-          isPaginationDisabled && "cursor-not-allowed"
-        )}
+      <div
+        className={cn('relative transition-all ease-in-out', isPaginationDisabled && 'cursor-not-allowed')}
         style={{
-          transitionDuration: "300ms"
+          transitionDuration: '300ms',
         }}
         aria-hidden={isPaginationDisabled}
       >
@@ -243,5 +220,5 @@ export function PersistentPaginationWrapper({
 
       {/* REMOVED: Loading overlays - only card skeletons should show during loading */}
     </div>
-  )
-} 
+  );
+}

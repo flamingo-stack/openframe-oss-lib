@@ -25,18 +25,18 @@ export function getVendorLogo(vendor: VendorWithMedia): string | null {
   if (vendor.logo_url) {
     return fixSupabaseStorageUrl(vendor.logo_url);
   }
-  
+
   // Check for legacy logo field
   if (vendor.logo) {
     return fixSupabaseStorageUrl(vendor.logo);
   }
-  
+
   // Fallback to vendor_media array (from detailed API)
   const logoMedia = vendor.vendor_media?.find(m => m.media_type === 'logo');
   if (logoMedia?.media_url) {
     return fixSupabaseStorageUrl(logoMedia.media_url);
   }
-  
+
   return null;
 }
 
@@ -72,11 +72,11 @@ export function getVendorMediaGrouped(vendor: VendorWithMedia): {
   videos: string[];
 } {
   const media = vendor.vendor_media || [];
-  
+
   return {
     logos: media.filter(m => m.media_type === 'logo').map(m => fixSupabaseStorageUrl(m.media_url)),
     images: media.filter(m => m.media_type === 'image').map(m => fixSupabaseStorageUrl(m.media_url)),
-    videos: media.filter(m => m.media_type === 'video').map(m => fixSupabaseStorageUrl(m.media_url))
+    videos: media.filter(m => m.media_type === 'video').map(m => fixSupabaseStorageUrl(m.media_url)),
   };
 }
 
@@ -113,15 +113,15 @@ export function getVendorMediaCount(vendor: VendorWithMedia): {
   total: number;
 } {
   const media = vendor.vendor_media || [];
-  
+
   const logos = media.filter(m => m.media_type === 'logo').length;
   const images = media.filter(m => m.media_type === 'image').length;
   const videos = media.filter(m => m.media_type === 'video').length;
-  
+
   return {
     logos,
     images,
     videos,
-    total: media.length
+    total: media.length,
   };
 }

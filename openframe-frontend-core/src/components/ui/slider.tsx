@@ -1,7 +1,7 @@
-"use client"
+'use client';
 
-import * as React from "react"
-import { cn } from "../../utils/cn"
+import * as React from 'react';
+import { cn } from '../../utils/cn';
 
 interface SliderProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value'> {
   value?: number[];
@@ -22,10 +22,10 @@ const Slider = React.forwardRef<HTMLInputElement, SliderProps>(
       <input
         type="range"
         className={cn(
-          "flex h-5 w-full cursor-pointer appearance-none items-center rounded-lg bg-secondary outline-none",
-          "[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary",
-          "[&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:border-0",
-          className
+          'flex h-5 w-full cursor-pointer appearance-none items-center rounded-lg bg-secondary outline-none',
+          '[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary',
+          '[&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:border-0',
+          className,
         )}
         ref={ref}
         value={value[0]}
@@ -35,9 +35,9 @@ const Slider = React.forwardRef<HTMLInputElement, SliderProps>(
         step={step}
         {...props}
       />
-    )
-  }
-)
-Slider.displayName = "Slider"
+    );
+  },
+);
+Slider.displayName = 'Slider';
 
-export { Slider }
+export { Slider };

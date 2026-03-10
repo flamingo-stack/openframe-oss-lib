@@ -45,15 +45,15 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
     if (inverted) {
       // Inverted: high values = good (green), low values = bad (red)
       // For battery health: 100% = green, <30% = red
-      if (progress >= criticalThreshold) return "var(--ods-attention-green-success)"; // high = green
-      if (progress >= warningThreshold) return "var(--color-warning)"; // medium = warning
-      return "var(--ods-attention-red-error)"; // low = red
+      if (progress >= criticalThreshold) return 'var(--ods-attention-green-success)'; // high = green
+      if (progress >= warningThreshold) return 'var(--color-warning)'; // medium = warning
+      return 'var(--ods-attention-red-error)'; // low = red
     } else {
       // Normal: high values = bad (red), low values = good (green)
       // For disk usage: 100% = red, <70% = green
-      if (progress >= criticalThreshold) return "var(--ods-attention-red-error)"; // critical red
-      if (progress >= warningThreshold) return "var(--color-warning)"; // warning yellow
-      return "var(--ods-attention-green-success)"; // base green
+      if (progress >= criticalThreshold) return 'var(--ods-attention-red-error)'; // critical red
+      if (progress >= warningThreshold) return 'var(--color-warning)'; // warning yellow
+      return 'var(--ods-attention-green-success)'; // base green
     }
   };
 
@@ -67,9 +67,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
             width: `${segmentWidth}px`,
             height: `${height}px`,
             backgroundColor:
-              i < Math.round((progress / 100) * segmentCount)
-                ? getColor()
-                : "var(--ods-system-greys-soft-grey-action)", // unfilled segments
+              i < Math.round((progress / 100) * segmentCount) ? getColor() : 'var(--ods-system-greys-soft-grey-action)', // unfilled segments
           }}
         />
       ))}

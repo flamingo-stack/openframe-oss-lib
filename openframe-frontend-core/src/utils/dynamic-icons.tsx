@@ -8,40 +8,22 @@
  * NO runtime namespace tricks - real imported components.
  */
 
-import React from 'react';
-
-// UI Kit social platform icons
-import {
-  LinkedInIcon,
-  FacebookIcon,
-  InstagramIcon,
-  YouTubeIcon,
-  SlackIcon,
-  XLogo,
-} from '../components/icons';
-
 // Lucide icons (commonly used for social platforms)
-import {
-  Globe,
-  FileText,
-  PenSquare,
-  Github,
-  MessageCircle,
-  Send,
-  Video,
-  Twitter,
-} from 'lucide-react';
+import { FileText, Github, Globe, MessageCircle, PenSquare, Send, Twitter, Video } from 'lucide-react';
+import React from 'react';
+// UI Kit social platform icons
+import { FacebookIcon, InstagramIcon, LinkedInIcon, SlackIcon, XLogo, YouTubeIcon } from '../components/icons';
 
 // Type for icon size presets
 export type DynamicIconSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 // Size class mapping (Tailwind)
 const SIZE_CLASSES: Record<DynamicIconSize, string> = {
-  xs: 'w-3 h-3',    // 12px
-  sm: 'w-4 h-4',    // 16px
-  md: 'w-6 h-6',    // 24px
-  lg: 'w-8 h-8',    // 32px
-  xl: 'w-12 h-12',  // 48px
+  xs: 'w-3 h-3', // 12px
+  sm: 'w-4 h-4', // 16px
+  md: 'w-6 h-6', // 24px
+  lg: 'w-8 h-8', // 32px
+  xl: 'w-12 h-12', // 48px
 };
 
 /**
@@ -51,7 +33,9 @@ const ICON_COLORS: Record<string, { color?: string; fill?: string }> = {
   LinkedInIcon: { color: '#0A66C2' },
   FacebookIcon: { color: '#1877F2' },
   YouTubeIcon: { color: '#FF0000' },
-  OpenFrameLogo: { /* Uses component defaults */ },
+  OpenFrameLogo: {
+    /* Uses component defaults */
+  },
 };
 
 /**
@@ -69,13 +53,13 @@ const ICON_REGISTRY: Record<string, React.ComponentType<{ className?: string; co
 
   // Lucide icons (from lucide-react)
   Globe,
-  FileText,    // Blog Posts icon (internal-blogging)
-  PenSquare,   // Alternative blog icon
-  Github,      // GitHub platform
+  FileText, // Blog Posts icon (internal-blogging)
+  PenSquare, // Alternative blog icon
+  Github, // GitHub platform
   MessageCircle, // Discord platform
-  Send,        // Telegram platform
-  Video,       // TikTok platform
-  Twitter,     // Twitter/X platform
+  Send, // Telegram platform
+  Video, // TikTok platform
+  Twitter, // Twitter/X platform
 };
 
 /**
@@ -89,9 +73,8 @@ const ICON_REGISTRY: Record<string, React.ComponentType<{ className?: string; co
 export function getDynamicIcon(
   iconName: string | undefined | null,
   size: DynamicIconSize = 'md',
-  className?: string
+  className?: string,
 ): React.ReactNode {
-
   if (!iconName) {
     console.warn('[getDynamicIcon] No iconName provided, using Globe fallback');
     return <Globe className={SIZE_CLASSES[size]} />;
@@ -109,7 +92,10 @@ export function getDynamicIcon(
   }
 
   // Fallback
-  console.error(`[getDynamicIcon] Icon NOT found in registry: "${iconName}". Available icons:`, Object.keys(ICON_REGISTRY));
+  console.error(
+    `[getDynamicIcon] Icon NOT found in registry: "${iconName}". Available icons:`,
+    Object.keys(ICON_REGISTRY),
+  );
   return <Globe className={finalClassName} />;
 }
 

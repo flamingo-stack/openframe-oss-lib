@@ -140,32 +140,10 @@ export const AllVariants: Story = {
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', width: '400px' }}>
-        <TagsInput
-          value={tags1}
-          onChange={setTags1}
-          label="Default"
-          placeholder="Add a tag..."
-        />
-        <TagsInput
-          value={tags2}
-          onChange={setTags2}
-          label="With Initial Tags"
-          placeholder="Add technology..."
-        />
-        <TagsInput
-          value={tags3}
-          onChange={setTags3}
-          label="With Max Tags (3)"
-          placeholder="Add a tag..."
-          maxTags={3}
-        />
-        <TagsInput
-          value={tags4}
-          onChange={setTags4}
-          label="Disabled"
-          placeholder="Add a tag..."
-          disabled
-        />
+        <TagsInput value={tags1} onChange={setTags1} label="Default" placeholder="Add a tag..." />
+        <TagsInput value={tags2} onChange={setTags2} label="With Initial Tags" placeholder="Add technology..." />
+        <TagsInput value={tags3} onChange={setTags3} label="With Max Tags (3)" placeholder="Add a tag..." maxTags={3} />
+        <TagsInput value={tags4} onChange={setTags4} label="Disabled" placeholder="Add a tag..." disabled />
       </div>
     );
   },

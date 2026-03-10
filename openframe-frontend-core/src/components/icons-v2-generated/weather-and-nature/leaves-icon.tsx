@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface LeavesIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface LeavesIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function LeavesIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: LeavesIconProps) {
+export function LeavesIcon({ className = '', size = 24, color = 'currentColor', ...props }: LeavesIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

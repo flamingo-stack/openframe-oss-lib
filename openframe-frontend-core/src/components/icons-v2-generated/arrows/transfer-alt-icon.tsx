@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface TransferAltIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface TransferAltIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function TransferAltIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: TransferAltIconProps) {
+export function TransferAltIcon({ className = '', size = 24, color = 'currentColor', ...props }: TransferAltIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

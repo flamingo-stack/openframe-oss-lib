@@ -1,56 +1,56 @@
-"use client"
+'use client';
 
-import React from 'react'
-import { cn } from '../../utils/cn'
-import { Button } from '../ui/button'
-import { StatusBadge } from '../ui/status-badge'
+import React from 'react';
+import { cn } from '../../utils/cn';
+import { Button } from '../ui/button';
+import { StatusBadge } from '../ui/status-badge';
 
 export interface SectionItem {
-  id: string
-  title: string
-  subtitle?: string
-  description?: string
-  number?: string
-  disabled?: boolean
-  leftIcon?: React.ReactNode
+  id: string;
+  title: string;
+  subtitle?: string;
+  description?: string;
+  number?: string;
+  disabled?: boolean;
+  leftIcon?: React.ReactNode;
   badge?: {
-    text: string
-    variant?: 'card' | 'button'
-    colorScheme?: 'cyan' | 'pink' | 'yellow' | 'green' | 'purple' | 'default'
-  }
+    text: string;
+    variant?: 'card' | 'button';
+    colorScheme?: 'cyan' | 'pink' | 'yellow' | 'green' | 'purple' | 'default';
+  };
   screenshots?: {
-    src: string
-    alt: string
-    position: 'left' | 'center' | 'right'
-  }[]
+    src: string;
+    alt: string;
+    position: 'left' | 'center' | 'right';
+  }[];
 }
 
 export interface SectionSelectorProps {
-  sections: SectionItem[]
-  activeSection: string
-  onSectionChange: (sectionId: string) => void
-  disabled?: boolean
-  className?: string
-  buttonClassName?: string
-  activeButtonClassName?: string
-  layout?: 'vertical' | 'wrap'
-  buttonWidth?: 'auto' | 'full' | 'responsive'
-  minHeight?: string
-  showDescription?: boolean
+  sections: SectionItem[];
+  activeSection: string;
+  onSectionChange: (sectionId: string) => void;
+  disabled?: boolean;
+  className?: string;
+  buttonClassName?: string;
+  activeButtonClassName?: string;
+  layout?: 'vertical' | 'wrap';
+  buttonWidth?: 'auto' | 'full' | 'responsive';
+  minHeight?: string;
+  showDescription?: boolean;
 }
 
 // Button component for consistency
 const SectionButton: React.FC<{
-  section: SectionItem
-  isActive: boolean
-  disabled: boolean
-  onClick: () => void
-  layout: 'vertical' | 'wrap'
-  widthClasses: string
-  buttonClassName?: string
-  activeButtonClassName?: string
-  minHeight?: string
-  showDescription?: boolean
+  section: SectionItem;
+  isActive: boolean;
+  disabled: boolean;
+  onClick: () => void;
+  layout: 'vertical' | 'wrap';
+  widthClasses: string;
+  buttonClassName?: string;
+  activeButtonClassName?: string;
+  minHeight?: string;
+  showDescription?: boolean;
 }> = ({
   section,
   isActive,
@@ -61,11 +61,11 @@ const SectionButton: React.FC<{
   buttonClassName,
   activeButtonClassName,
   minHeight = layout === 'vertical' ? '96px' : '76px',
-  showDescription = true
+  showDescription = true,
 }) => {
-  const titleClasses = "font-['DM_Sans'] text-ods-text-primary"
-  const subtitleClasses = "font-['DM_Sans'] text-ods-text-secondary"
-  const numberClasses = "font-['DM_Sans'] font-bold text-ods-accent"
+  const titleClasses = "font-['DM_Sans'] text-ods-text-primary";
+  const subtitleClasses = "font-['DM_Sans'] text-ods-text-secondary";
+  const numberClasses = "font-['DM_Sans'] font-bold text-ods-accent";
 
   const isDisabled = section.disabled || disabled;
 
@@ -73,13 +73,15 @@ const SectionButton: React.FC<{
     <Button
       onClick={onClick}
       disabled={isDisabled}
-      variant={isActive ? "section-active" : "section"}
-      size={layout === 'vertical' ? "touch" : "sectionWrap"}
+      variant={isActive ? 'section-active' : 'section'}
+      size={layout === 'vertical' ? 'touch' : 'sectionWrap'}
       className={cn(
         widthClasses,
         buttonClassName,
         isActive && activeButtonClassName,
-        layout === 'vertical' ? '!h-auto !py-4 !px-4 !min-h-[80px]' : '!text-left !whitespace-normal !h-auto !min-h-[76px]'
+        layout === 'vertical'
+          ? '!h-auto !py-4 !px-4 !min-h-[80px]'
+          : '!text-left !whitespace-normal !h-auto !min-h-[76px]',
       )}
       style={{
         minHeight,
@@ -87,16 +89,14 @@ const SectionButton: React.FC<{
         WebkitTapHighlightColor: 'transparent',
         textAlign: 'left',
         justifyContent: 'flex-start',
-        alignItems: 'flex-start'
+        alignItems: 'flex-start',
       }}
     >
       {layout === 'vertical' ? (
         // Vertical layout with optional number prefix and leftIcon
         <div className="flex gap-3 items-start w-full">
           {section.leftIcon && (
-            <div className="shrink-0 text-ods-text-primary opacity-70 mt-0.5">
-              {section.leftIcon}
-            </div>
+            <div className="shrink-0 text-ods-text-primary opacity-70 mt-0.5">{section.leftIcon}</div>
           )}
           {section.number && (
             <span className={cn(numberClasses, 'text-lg tracking-[-0.36px] leading-[24px] shrink-0')}>
@@ -117,9 +117,7 @@ const SectionButton: React.FC<{
               )}
             </div>
             {section.description && showDescription && (
-              <p className={cn(subtitleClasses, 'text-sm mt-1 whitespace-normal break-words')}>
-                {section.description}
-              </p>
+              <p className={cn(subtitleClasses, 'text-sm mt-1 whitespace-normal break-words')}>{section.description}</p>
             )}
           </div>
         </div>
@@ -127,13 +125,14 @@ const SectionButton: React.FC<{
         // Wrap layout with title, subtitle, and optional leftIcon
         <div className="flex gap-3 items-start justify-start w-full h-full" style={{ textAlign: 'left' }}>
           {section.leftIcon && (
-            <div className="shrink-0 text-ods-text-primary opacity-70 mt-0.5">
-              {section.leftIcon}
-            </div>
+            <div className="shrink-0 text-ods-text-primary opacity-70 mt-0.5">{section.leftIcon}</div>
           )}
           <div className="flex flex-col items-start justify-start flex-1 gap-1">
             <div className="flex items-start gap-2 flex-wrap w-full">
-              <span className={cn(titleClasses, 'font-bold text-[18px] leading-[24px] tracking-[-0.36px]')} style={{ textAlign: 'left' }}>
+              <span
+                className={cn(titleClasses, 'font-bold text-[18px] leading-[24px] tracking-[-0.36px]')}
+                style={{ textAlign: 'left' }}
+              >
                 {section.title}
               </span>
               {section.badge && (
@@ -145,7 +144,10 @@ const SectionButton: React.FC<{
               )}
             </div>
             {section.subtitle && (
-              <div className={cn(subtitleClasses, 'font-medium text-[14px] leading-[20px] w-full')} style={{ textAlign: 'left' }}>
+              <div
+                className={cn(subtitleClasses, 'font-medium text-[14px] leading-[20px] w-full')}
+                style={{ textAlign: 'left' }}
+              >
                 {section.subtitle}
               </div>
             )}
@@ -153,8 +155,8 @@ const SectionButton: React.FC<{
         </div>
       )}
     </Button>
-  )
-}
+  );
+};
 
 export const SectionSelector: React.FC<SectionSelectorProps> = ({
   sections,
@@ -167,29 +169,29 @@ export const SectionSelector: React.FC<SectionSelectorProps> = ({
   layout = 'vertical',
   buttonWidth = 'auto',
   minHeight,
-  showDescription = true
+  showDescription = true,
 }) => {
   const containerClasses = cn(
     layout === 'wrap' ? 'flex flex-wrap gap-2 md:gap-4 lg:gap-6' : 'flex flex-col gap-2',
-    className
-  )
+    className,
+  );
 
   const getButtonWidthClasses = () => {
     switch (buttonWidth) {
       case 'full':
-        return 'w-full'
+        return 'w-full';
       case 'responsive':
-        return 'w-full md:w-[calc(50%-8px)] lg:w-auto'
+        return 'w-full md:w-[calc(50%-8px)] lg:w-auto';
       default:
-        return ''
+        return '';
     }
-  }
+  };
 
-  const widthClasses = getButtonWidthClasses()
+  const widthClasses = getButtonWidthClasses();
 
   return (
     <div className={containerClasses}>
-      {sections.map((section) => (
+      {sections.map(section => (
         <SectionButton
           key={section.id}
           section={section}
@@ -205,7 +207,7 @@ export const SectionSelector: React.FC<SectionSelectorProps> = ({
         />
       ))}
     </div>
-  )
-}
+  );
+};
 
-export default SectionSelector
+export default SectionSelector;

@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface LockIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface LockIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function LockIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: LockIconProps) {
+export function LockIcon({ className = '', size = 24, color = 'currentColor', ...props }: LockIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
