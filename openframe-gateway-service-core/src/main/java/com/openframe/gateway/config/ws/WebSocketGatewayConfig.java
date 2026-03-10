@@ -1,6 +1,5 @@
 package com.openframe.gateway.config.ws;
 
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
@@ -11,7 +10,6 @@ import org.springframework.context.annotation.Primary;
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.reactive.socket.client.WebSocketClient;
 import org.springframework.web.reactive.socket.server.WebSocketService;
 
 @Configuration
@@ -47,13 +45,6 @@ public class WebSocketGatewayConfig {
                         .path(NATS_API_WS_ENDPOINT_PATH)
                         .uri(natsWsUrl))
                 .build();
-    }
-
-    @Bean
-    @Primary
-    public WebSocketClient proxyCleanupWebSocketClient(
-            @Qualifier("reactorNettyWebSocketClient") WebSocketClient delegate) {
-        return new ProxySessionCleanupWebSocketClient(delegate);
     }
 
     @Bean
