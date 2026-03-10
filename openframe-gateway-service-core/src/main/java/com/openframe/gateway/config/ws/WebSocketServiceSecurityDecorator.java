@@ -39,25 +39,24 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
             return defaultWebSocketService.handleRequest(exchange, session -> {
                 sessionRegistry.put(session.getId(), new SessionInfo(Instant.now(), path));
 
-                Instant expiresAt;
                 try {
-                    expiresAt = requestJwtReader.getExpiration(exchange);
+                    Instant expiresAt = requestJwtReader.getExpiration(exchange);
+
+                    gatewayTrafficMetrics.webSocketOpened();
+
+                    long secondsUntilExpiration = Duration.between(Instant.now(), expiresAt).getSeconds();
+
+                    // Account for clock skew (same tolerance as Spring Security JwtTimestampValidator)
+                    long effectiveSeconds = secondsUntilExpiration + CLOCK_SKEW_SECONDS;
+
+                    Disposable disposable = scheduleSessionRemoveJob(session, effectiveSeconds);
+                    processSessionClosedEvent(session, path, disposable);
+                    return defaultWebSocketHandler.handle(session);
                 } catch (Exception e) {
                     log.warn("Failed to read JWT expiration for session {}, closing: {}", session.getId(), e.getMessage());
                     sessionRegistry.remove(session.getId());
                     return session.close();
                 }
-
-                gatewayTrafficMetrics.webSocketOpened();
-
-                long secondsUntilExpiration = Duration.between(Instant.now(), expiresAt).getSeconds();
-
-                // Account for clock skew (same tolerance as Spring Security JwtTimestampValidator)
-                long effectiveSeconds = secondsUntilExpiration + CLOCK_SKEW_SECONDS;
-
-                Disposable disposable = scheduleSessionRemoveJob(session, effectiveSeconds);
-                processSessionClosedEvent(session, path, disposable);
-                return defaultWebSocketHandler.handle(session);
             });
         } else {
             return defaultWebSocketService.handleRequest(exchange, defaultWebSocketHandler);
