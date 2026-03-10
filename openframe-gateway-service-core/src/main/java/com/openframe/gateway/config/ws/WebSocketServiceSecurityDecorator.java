@@ -113,13 +113,13 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                 .subscribe(
                         status -> {
                             SessionInfo info = sessionRegistry.remove(sessionId);
-                            long lifetimeMs = info != null
-                                    ? Duration.between(info.createdAt(), Instant.now()).toMillis()
+                            long lifetimeSec = info != null
+                                    ? Duration.between(info.createdAt(), Instant.now()).getSeconds()
                                     : -1;
                             String logSub = info != null ? info.sub() : sub;
                             if (loggingProperties.isDebugPath(path)) {
-                                log.info(LOG_PREFIX + "session closed code={} reason={} lifetimeMs={}",
-                                        sessionId, path, logSub, status.getCode(), status.getReason(), lifetimeMs);
+                                log.info(LOG_PREFIX + "session closed code={} reason={} lifetimeSec={}",
+                                        sessionId, path, logSub, status.getCode(), status.getReason(), lifetimeSec);
                             } else {
                                 log.info(LOG_PREFIX + "session closed code={} reason={}",
                                         sessionId, path, logSub, status.getCode(), status.getReason());

@@ -56,7 +56,7 @@ public class IntegrationController {
             @RequestBody(required = false) String body
     ) {
         String path = request.getPath().toString();
-        log.info("Proxying api request for tool: {}, path: {}", toolId, path);
+        log.debug("Proxying api request for tool: {}, path: {}", toolId, path);
         return restProxyService.proxyApiRequest(toolId, request, body);
     }
 
@@ -76,7 +76,7 @@ public class IntegrationController {
             @RequestBody(required = false) String body
     ) {
         String path = request.getPath().toString();
-        log.info("Proxying agent request for tool: {}, path: {}", toolId, path);
+        log.debug("Proxying agent request for tool: {}, path: {}", toolId, path);
         return restProxyService.proxyAgentRequest(toolId, request, body);
     }
 

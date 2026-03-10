@@ -98,7 +98,7 @@ public class BaseGlobalExceptionHandler {
     @ExceptionHandler(IllegalStateException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleIllegalState(IllegalStateException ex) {
-        log.warn("Conflict: {}", ex.getMessage());
+        log.debug("Conflict: {}", ex.getMessage());
         return ErrorResponse.of(ErrorCode.CONFLICT, ex.getMessage());
     }
 
