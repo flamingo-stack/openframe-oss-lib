@@ -32,7 +32,6 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
     private final WebSocketLoggingProperties loggingProperties;
 
     private final ConcurrentMap<String, SessionInfo> sessionRegistry = new ConcurrentHashMap<>();
-
     private record SessionInfo(Instant createdAt, String path, String sub) {}
 
     @Override
@@ -119,8 +118,8 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                             String logSub = info != null ? info.sub() : sub;
                             gatewayTrafficMetrics.webSocketClosed(sessionId, path, logSub);
                             if (loggingProperties.isDebugPath(path)) {
-                                log.info(LOG_PREFIX + "session closed code={} reason={} lifetimeSec={}",
-                                        sessionId, path, logSub, status.getCode(), status.getReason(), lifetimeSec);
+                                log.info(LOG_PREFIX + "session closed code={} reason={} lifetime={}",
+                                        sessionId, path, logSub, status.getCode(), status.getReason(), formatLifetime(lifetimeSec));
                             } else {
                                 log.info(LOG_PREFIX + "session closed code={} reason={}",
                                         sessionId, path, logSub, status.getCode(), status.getReason());
@@ -135,5 +134,17 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                             disposable.dispose();
                         }
                 );
+    }
+
+    private static String formatLifetime(long totalSeconds) {
+        if (totalSeconds < 0) {
+            return "-";
+        }
+        if (totalSeconds < 60) {
+            return totalSeconds + " sec";
+        }
+        long min = totalSeconds / 60;
+        long sec = totalSeconds % 60;
+        return sec == 0 ? min + " min" : min + " min " + sec + " sec";
     }
 }
