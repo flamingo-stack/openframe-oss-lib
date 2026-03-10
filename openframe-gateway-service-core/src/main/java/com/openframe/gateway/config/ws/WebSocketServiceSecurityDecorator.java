@@ -50,7 +50,7 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                 try {
                     Instant expiresAt = requestJwtReader.getExpiration(exchange);
 
-                    gatewayTrafficMetrics.webSocketOpened();
+                    gatewayTrafficMetrics.webSocketOpened(sessionId, path, sub);
                     if (debugPath) {
                         log.info(LOG_PREFIX + "session opened, scheduling JWT expiry close", sessionId, path, sub);
                     }
@@ -117,6 +117,7 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                                     ? Duration.between(info.createdAt(), Instant.now()).getSeconds()
                                     : -1;
                             String logSub = info != null ? info.sub() : sub;
+                            gatewayTrafficMetrics.webSocketClosed(sessionId, path, logSub);
                             if (loggingProperties.isDebugPath(path)) {
                                 log.info(LOG_PREFIX + "session closed code={} reason={} lifetimeSec={}",
                                         sessionId, path, logSub, status.getCode(), status.getReason(), lifetimeSec);
