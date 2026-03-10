@@ -6,7 +6,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.reactive.socket.CloseStatus;
 import org.springframework.web.reactive.socket.WebSocketHandler;
 import org.springframework.web.reactive.socket.WebSocketSession;
-import org.springframework.web.reactive.socket.adapter.ReactorNettyWebSocketSessionCloser;
 import org.springframework.web.reactive.socket.server.WebSocketService;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.Disposable;
@@ -47,7 +46,7 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                 } catch (Exception e) {
                     log.warn("Failed to read JWT expiration for session {}, closing: {}", session.getId(), e.getMessage());
                     sessionRegistry.remove(session.getId());
-                    return ReactorNettyWebSocketSessionCloser.closeGracefully(session, CloseStatus.POLICY_VIOLATION);
+                    return session.close();
                 }
 
                 gatewayTrafficMetrics.webSocketOpened();
@@ -71,7 +70,7 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                             if (session.isOpen()) {
                                 log.warn("Server session {} still open after handler completed, closing",
                                         session.getId());
-                                ReactorNettyWebSocketSessionCloser.closeGracefully(session, CloseStatus.GOING_AWAY)
+                                session.close(CloseStatus.GOING_AWAY)
                                         .subscribe(null, ex -> log.warn("Failed to close server session {}: {}",
                                                 session.getId(), ex.getMessage()));
                             }
@@ -99,7 +98,7 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
         return Mono.delay(Duration.ofSeconds(secondsUntilExpiration))
                 .flatMap(__ -> {
                     log.info("Executing session remove job: {}", sessionId);
-                    return ReactorNettyWebSocketSessionCloser.closeGracefully(session, CloseStatus.GOING_AWAY)
+                    return session.close()
                             .doOnSuccess(___ -> log.info("Closed session: {}", sessionId))
                             .doOnError(ex -> log.error("Failed to close session {}", sessionId, ex));
                 })
