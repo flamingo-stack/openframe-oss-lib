@@ -184,12 +184,12 @@ export function ReleaseDetailPage({
         <div className="flex flex-col md:flex-row md:items-end gap-4 w-full">
           <div className="flex-1 flex flex-col gap-2">
             {/* Title */}
-            <h1 className="font-['Azeret_Mono'] font-semibold text-[32px] md:text-[48px] lg:text-[56px] leading-tight tracking-[-1.12px] text-ods-text-primary">
+            <h1 className="text-h1 tracking-[-1.12px] text-ods-text-primary">
               {releaseTitle}
             </h1>
 
             {/* Version */}
-            <p className="font-['DM_Sans'] font-medium text-[18px] leading-[24px] text-ods-text-secondary">
+            <p className="text-h4 text-ods-text-secondary">
               Version: {releaseVersion}
             </p>
           </div>
@@ -213,7 +213,7 @@ export function ReleaseDetailPage({
           {/* Release Type */}
           <div className="bg-ods-card border-b md:border-b-0 md:border-r border-ods-border p-4 flex flex-col gap-3">
             <div className="flex flex-col gap-0">
-              <p className="font-['DM_Sans'] font-medium text-[18px] leading-[24px] text-ods-text-primary">
+              <p className="text-h4 text-ods-text-primary">
                 {releaseType.toLocaleUpperCase()}
               </p>
               <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
@@ -225,7 +225,7 @@ export function ReleaseDetailPage({
           {/* Release Status */}
           <div className="bg-ods-card border-b md:border-b-0 md:border-r border-ods-border p-4 flex flex-col gap-3">
             <div className="flex flex-col gap-0">
-              <p className="font-['DM_Sans'] font-medium text-[18px] leading-[24px] text-ods-text-primary">
+              <p className="text-h4 text-ods-text-primary">
                 {releaseStatus.toLocaleUpperCase()}
               </p>
               <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
@@ -237,7 +237,7 @@ export function ReleaseDetailPage({
           {/* Release Date */}
           <div className="bg-ods-card border-b md:border-b-0 md:border-r border-ods-border p-4 flex flex-col gap-3">
             <div className="flex flex-col gap-0">
-              <p className="font-['DM_Sans'] font-medium text-[18px] leading-[24px] text-ods-text-primary">
+              <p className="text-h4 text-ods-text-primary">
                 {formatReleaseDate(releaseDate)}
               </p>
               <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
@@ -256,7 +256,7 @@ export function ReleaseDetailPage({
               variant="round"
             />
             <div className="flex flex-col gap-0 flex-1 min-w-0">
-              <p className="font-['DM_Sans'] font-bold text-[18px] leading-[24px] tracking-[-0.36px] text-ods-text-primary truncate">
+              <p className="text-h3 tracking-[-0.36px] text-ods-text-primary truncate">
                 {author?.full_name || 'Unknown Author'}
               </p>
               <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
@@ -292,7 +292,7 @@ export function ReleaseDetailPage({
 
         {/* Summary */}
         {releaseSummary && (
-          <div className="font-['DM_Sans'] font-medium text-[18px] leading-[24px] text-ods-text-primary">
+          <div className="text-h4 text-ods-text-primary">
             <p>{releaseSummary}</p>
           </div>
         )}
@@ -312,7 +312,7 @@ export function ReleaseDetailPage({
 
         {/* Content */}
         {releaseContent && (
-          <div className="font-['DM_Sans'] font-medium text-[18px] leading-[24px] text-ods-text-primary">
+          <div className="text-h4 text-ods-text-primary">
             <MarkdownRenderer content={releaseContent} />
           </div>
         )}
@@ -359,7 +359,7 @@ export function ReleaseDetailPage({
         {/* Related Roadmap Items */}
         {RoadmapSection && (roadmapLoading || roadmapTasks.length > 0) && (
           <div className="space-y-4 w-full">
-            <p className="font-['Azeret_Mono'] font-medium text-[14px] leading-[20px] tracking-[-0.28px] uppercase text-ods-text-secondary">
+            <p className="text-h5 tracking-[-0.28px] text-ods-text-secondary">
               Related Roadmap Items
             </p>
             <RoadmapSection
@@ -379,7 +379,7 @@ export function ReleaseDetailPage({
         {/* Bug-fixes & Enhancements Section */}
         {DeliverySection && (deliveryLoading || (deliveryData && (deliveryData.completed.length > 0 || deliveryData.inProgress.length > 0))) && (
           <div className="w-full space-y-4">
-            <p className="font-['Azeret_Mono'] font-medium text-[14px] leading-[20px] tracking-[-0.28px] uppercase text-ods-text-secondary">
+            <p className="text-h5 tracking-[-0.28px] text-ods-text-secondary">
               Related Enhancements and Bug-fixes
             </p>
             <DeliverySection
@@ -392,7 +392,7 @@ export function ReleaseDetailPage({
         {/* Related Links */}
         {(githubReleases?.length || knowledgeBaseLinks?.length || migrationGuideUrl || documentationUrl) && (
           <div className="space-y-1 w-full">
-            <p className="font-['Azeret_Mono'] font-medium text-[14px] leading-[20px] tracking-[-0.28px] uppercase text-ods-text-secondary">
+            <p className="text-h5 tracking-[-0.28px] text-ods-text-secondary">
               Related Links
             </p>
             <Card className="bg-ods-card border-ods-border p-6">
@@ -403,14 +403,14 @@ export function ReleaseDetailPage({
                     {githubReleases.map((ghRelease) => (
                       <div key={ghRelease.id} className="flex items-start gap-1">
                         <GitHubIcon className="shrink-0" width={24} height={24} color="var(--color-text-secondary)" />
-                        <span className="font-['DM_Sans'] font-medium text-[18px] leading-[24px] text-ods-text-primary">
+                        <span className="text-h4 text-ods-text-primary">
                           Github Release
                         </span>
                         <a
                           href={ghRelease.github_release_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="font-['DM_Sans'] font-medium text-[18px] leading-[24px] text-[#ffc008] hover:underline"
+                          className="text-h4 text-[#ffc008] hover:underline"
                         >
                           {ghRelease.github_release_url.split('/').pop()}
                         </a>
@@ -429,12 +429,12 @@ export function ReleaseDetailPage({
                       return (
                         <div key={linkId} className="flex items-start gap-1">
                           <BookMarked className="h-6 w-6 text-ods-text-secondary shrink-0" />
-                          <span className="font-['DM_Sans'] font-medium text-[18px] leading-[24px] text-ods-text-primary">
+                          <span className="text-h4 text-ods-text-primary">
                             Knowledge Base
                           </span>
                           <Link
                             href={path.startsWith('http') ? path : `/knowledge-base${path.startsWith('/') ? '' : '/'}${path}`}
-                            className="font-['DM_Sans'] font-medium text-[18px] leading-[24px] text-[#ffc008] hover:underline"
+                            className="text-h4 text-[#ffc008] hover:underline"
                           >
                             {path.replace(/^\//, '').split('/').pop()?.replace(/-/g, ' ') || 'View Article'}
                           </Link>
@@ -453,7 +453,7 @@ export function ReleaseDetailPage({
                       href={migrationGuideUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="font-['DM_Sans'] font-medium text-[18px] leading-[24px] text-[#ffc008] hover:underline"
+                      className="text-h4 text-[#ffc008] hover:underline"
                     >
                       📖 Migration Guide
                     </a>
@@ -469,7 +469,7 @@ export function ReleaseDetailPage({
                       href={documentationUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="font-['DM_Sans'] font-medium text-[18px] leading-[24px] text-[#ffc008] hover:underline"
+                      className="text-h4 text-[#ffc008] hover:underline"
                     >
                       📚 Documentation
                     </a>

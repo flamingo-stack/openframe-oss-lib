@@ -21,7 +21,7 @@ export function AnnouncementBarSkeleton() {
           {/* Text content skeleton */}
           <div className="flex-1 min-w-0 space-y-1 md:space-y-2">
             <div className="h-[14px] md:h-[18px] bg-ods-border rounded w-3/4 max-w-md"></div>
-            <div className="h-[12px] md:h-[18px] bg-ods-border rounded w-full max-w-lg hidden sm:block"></div>
+            <div className="h-[12px] md:h-[18px] bg-ods-border rounded w-full max-w-lg hidden md:block"></div>
           </div>
           
           {/* Close button skeleton */}
@@ -82,16 +82,16 @@ export function HeroSkeleton() {
       }}
     >
       {/* Title skeleton */}
-      <TextSkeleton.Heading className="h-12 sm:h-16 md:h-20 lg:h-24 mb-4 md:mb-6 max-w-4xl w-full" />
+      <TextSkeleton.Heading className="h-12 md:h-20 lg:h-24 mb-4 md:mb-6 max-w-4xl w-full" />
       
       {/* Subtitle skeleton */}
       <div className="space-y-3 mb-8 md:mb-10 max-w-4xl w-full px-2">
-        <TextSkeleton.Body className="h-5 sm:h-6 md:h-7" />
-        <TextSkeleton.Body className="h-5 sm:h-6 md:h-7 w-3/4 mx-auto" />
+        <TextSkeleton.Body className="h-5 md:h-7" />
+        <TextSkeleton.Body className="h-5 md:h-7 w-3/4 mx-auto" />
       </div>
       
       {/* CTA Button skeleton */}
-      <InteractiveSkeleton.Button className="w-full sm:w-64 h-12" />
+      <InteractiveSkeleton.Button className="w-full md:w-64 h-12" />
     </section>
   )
 }
@@ -183,7 +183,7 @@ export function BreadcrumbSkeleton({ className }: PageLayoutSkeletonProps) {
  */
 export function ResultsHeaderSkeleton({ className }: PageLayoutSkeletonProps) {
   return (
-    <div className={cn("flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6", className)}>
+    <div className={cn("flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6", className)}>
       <div className="space-y-1">
         <TextSkeleton.Body className="w-48" />
         {/* <TextSkeleton.Caption className="w-32" /> */}
@@ -677,7 +677,7 @@ export function VendorGridSkeleton({ className }: PageLayoutSkeletonProps) {
       <CardSkeletonGrid 
         count={12}
         variant="vendor"
-        className="grid-cols-1 md:grid-cols-2 xl:grid-cols-3"
+        className="grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
       />
     </div>
   )

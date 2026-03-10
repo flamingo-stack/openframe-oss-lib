@@ -110,10 +110,10 @@ export function MobileNavPanel({ isOpen, config }: MobileNavPanelProps) {
           "fixed z-[9999] rounded-lg shadow-xl",
           config.className ? "" : "bg-ods-card border border-ods-border",
           // Responsive positioning and sizing - matching original working version
-          "right-2 left-2 sm:right-4 sm:left-auto sm:w-96 sm:max-w-[calc(100vw-2rem)]",
+          "right-2 left-2 md:left-auto",
           "md:right-6 md:w-[400px] md:max-w-[calc(100vw-3rem)]",
           // Height constraints with proper mobile spacing - increased top position
-          "top-20 max-h-[calc(100vh-130px)] sm:max-h-[calc(100vh-88px)]",
+          "top-20 max-h-[calc(100vh-130px)] md:max-h-[calc(100vh-88px)]",
           "flex flex-col",
           config.className || ""
         )}

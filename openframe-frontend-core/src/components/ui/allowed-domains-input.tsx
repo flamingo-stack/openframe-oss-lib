@@ -134,7 +134,7 @@ const AllowedDomainsInput = React.forwardRef<HTMLDivElement, AllowedDomainsInput
 
         {/* Error message */}
         {displayError && (
-          <p className="text-sm text-error">{displayError}</p>
+          <p className="text-sm text-ods-error">{displayError}</p>
         )}
 
         {/* Helper text */}

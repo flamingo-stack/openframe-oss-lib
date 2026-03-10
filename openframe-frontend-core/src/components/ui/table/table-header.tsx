@@ -69,7 +69,7 @@ export function TableHeader<T = any>({
   return (
     <div
       className={cn(
-        'hidden md:flex items-center gap-4 px-4 py-3 relative',
+        'hidden md:flex items-center gap-4 px-4 py-3 relative h-11',
         className
       )}
     >
@@ -109,7 +109,7 @@ export function TableHeader<T = any>({
               {isActionsColumn ? (
                 // Render total items count in actions column
                 totalItemsCount > 0 && (
-                  <span className="font-medium text-[12px] leading-[16px] text-text-secondary whitespace-nowrap">
+                  <span className="font-medium text-[12px] leading-[16px] text-ods-text-secondary whitespace-nowrap">
                     Showing {totalItemsCount} {totalItemsCount === 1 ? 'result' : 'results'}
                   </span>
                 )

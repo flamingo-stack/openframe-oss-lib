@@ -277,7 +277,7 @@ export function CardSkeletonGrid({
       className={cn(
         "grid gap-4 md:gap-6",
         // Responsive grid based on card type
-        variant === 'vendor' && "grid-cols-1 md:grid-cols-2 xl:grid-cols-3",
+        variant === 'vendor' && "grid-cols-1 md:grid-cols-2 lg:grid-cols-3",
         variant === 'blog' && "grid-cols-1 md:grid-cols-2",
         variant === 'category' && "grid-cols-1 md:grid-cols-2 lg:grid-cols-4",
         variant === 'alternative' && "grid-cols-1",

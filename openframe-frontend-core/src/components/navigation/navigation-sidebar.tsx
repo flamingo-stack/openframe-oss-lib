@@ -72,11 +72,11 @@ export function NavigationSidebar({ config }: NavigationSidebarProps) {
           "w-full flex items-center transition-all duration-200 relative",
           "p-4",
           // Hover and default states
-          !isActive && "hover:bg-bg-hover text-text-primary [&_svg]:fill-text-secondary",
+          !isActive && "hover:bg-ods-bg-hover text-ods-text-primary [&_svg]:fill-ods-text-secondary",
           // Active state
           isActive && [
-            "bg-[var(--ods-open-yellow-light)] text-accent-primary",
-            "[&_svg]:fill-accent-primary"
+            "bg-[var(--ods-open-yellow-light)] text-ods-accent",
+            "[&_svg]:fill-ods-accent"
           ],
           // Layout - proper centering in minimized mode
           isMinimized && !inOverlay
@@ -90,7 +90,7 @@ export function NavigationSidebar({ config }: NavigationSidebarProps) {
         {/* Active indicator */}
         {isActive && (
           <div
-            className="absolute left-0 top-0 bottom-0 w-1 bg-accent-primary"
+            className="absolute left-0 top-0 bottom-0 w-1 bg-ods-accent"
             aria-hidden="true"
           />
         )}
@@ -104,7 +104,7 @@ export function NavigationSidebar({ config }: NavigationSidebarProps) {
           )}
         >
           {cloneElement(item.icon as React.ReactElement<any>, {
-            color: isActive ? "text-accent-primary" : "text-text-secondary"
+            color: isActive ? "text-ods-accent" : "text-ods-text-secondary"
           })}
         </div>
 
@@ -112,7 +112,7 @@ export function NavigationSidebar({ config }: NavigationSidebarProps) {
         {shouldShowLabel && (
           <span
             className={cn(
-              "font-['DM_Sans'] font-medium text-[18px] leading-[24px]",
+              "text-h4",
               "flex-1 text-left truncate"
             )}
           >
@@ -145,7 +145,7 @@ export function NavigationSidebar({ config }: NavigationSidebarProps) {
   const renderSidebarContent = useCallback((inOverlay: boolean) => (
     <>
       {/* Header */}
-      <div className="flex items-center gap-2 p-4 h-14 border-b border-border-primary">
+      <div className="flex items-center gap-2 p-4 h-14 border-b border-ods-border">
         <div className="flex-shrink-0">
           <OpenFrameLogo
             className="w-6 h-6"
@@ -164,11 +164,11 @@ export function NavigationSidebar({ config }: NavigationSidebarProps) {
         {inOverlay && (
           <button
             onClick={() => setMobileMenuOpen(false)}
-            className="md:hidden p-2 hover:bg-bg-hover rounded-md transition-colors"
+            className="md:hidden p-2 hover:bg-ods-bg-hover rounded-md transition-colors"
             aria-label="Close menu"
           >
             <svg
-              className="w-5 h-5 text-text-primary"
+              className="w-5 h-5 text-ods-text-primary"
               fill="none"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -199,12 +199,12 @@ export function NavigationSidebar({ config }: NavigationSidebarProps) {
 
       {/* Toggle button footer */}
       {(isLgUp || inOverlay) && (
-        <div className="border-t border-border-primary">
+        <div className="border-t border-ods-border">
           <button
             onClick={inOverlay ? () => setMobileMenuOpen(false) : handleToggleMinimized}
             className={cn(
               "w-full flex items-center gap-2 p-4",
-              "hover:bg-bg-hover text-text-primary",
+              "hover:bg-ods-bg-hover text-ods-text-primary",
               "transition-colors duration-200",
               (!inOverlay && minimized) ? "justify-center" : "justify-start"
             )}
@@ -214,7 +214,7 @@ export function NavigationSidebar({ config }: NavigationSidebarProps) {
             {inOverlay ? (
               <>
                 <DoubleChevronIcon direction="left" className="w-6 h-6" />
-                <span className="font-['DM_Sans'] font-medium text-[18px] leading-[24px]">
+                <span className="text-h4">
                   Close Menu
                 </span>
               </>
@@ -223,7 +223,7 @@ export function NavigationSidebar({ config }: NavigationSidebarProps) {
             ) : (
               <>
                 <DoubleChevronIcon direction="left" className="w-6 h-6" />
-                <span className="font-['DM_Sans'] font-medium text-[18px] leading-[24px]">
+                <span className="text-h4">
                   Hide Menu
                 </span>
               </>
@@ -234,7 +234,7 @@ export function NavigationSidebar({ config }: NavigationSidebarProps) {
 
       {/* Custom footer */}
       {config.footer && (
-        <div className="border-t border-border-primary p-4">
+        <div className="border-t border-ods-border p-4">
           {config.footer}
         </div>
       )}
@@ -278,7 +278,7 @@ export function NavigationSidebar({ config }: NavigationSidebarProps) {
     <aside
       className={cn(
         "flex-col h-full hidden md:flex",
-        "bg-bg-card border-r border-border-primary",
+        "bg-ods-card border-r border-ods-border",
         transitionsEnabled && "transition-[width] duration-300",
         config.className
       )}

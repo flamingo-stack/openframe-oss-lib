@@ -13,6 +13,18 @@
         "success-hover": {
           "value": "#549c24",
           "type": "color"
+        },
+        "success-secondary": {
+          "value": "#2e461f",
+          "type": "color"
+        },
+        "success-secondary-hover": {
+          "value": "#385029",
+          "type": "color"
+        },
+        "success-secondary-action": {
+          "value": "#425a33",
+          "type": "color"
         }
       },
       "red": {
@@ -26,6 +38,44 @@
         },
         "error-hover": {
           "value": "#e95c5c",
+          "type": "color"
+        },
+        "error-secondary": {
+          "value": "#4a2121",
+          "type": "color"
+        },
+        "error-secondary-hover": {
+          "value": "#542b2b",
+          "type": "color"
+        },
+        "error-secondary-action": {
+          "value": "#5e3535",
+          "type": "color"
+        }
+      },
+      "yellow": {
+        "warning": {
+          "value": "#e1b32f",
+          "type": "color"
+        },
+        "warning-action": {
+          "value": "#cd9f1b",
+          "type": "color"
+        },
+        "warning-hover": {
+          "value": "#d7a925",
+          "type": "color"
+        },
+        "warning-secondary": {
+          "value": "#5a4d25",
+          "type": "color"
+        },
+        "warning-secondary-hover": {
+          "value": "#64572f",
+          "type": "color"
+        },
+        "warning-secondary-action": {
+          "value": "#6e6139",
           "type": "color"
         }
       }
@@ -42,6 +92,18 @@
         },
         "hover": {
           "value": "#54f0e6",
+          "type": "color"
+        },
+        "secondary": {
+          "value": "#058c83",
+          "type": "color"
+        },
+        "secondary-hover": {
+          "value": "#008279",
+          "type": "color"
+        },
+        "secondary-action": {
+          "value": "#00786f",
           "type": "color"
         },
         "dark": {
@@ -82,6 +144,18 @@
           "value": "#e94db1",
           "type": "color"
         },
+        "secondary": {
+          "value": "#792b5d",
+          "type": "color"
+        },
+        "secondary-hover": {
+          "value": "#6f2153",
+          "type": "color"
+        },
+        "secondary-action": {
+          "value": "#651749",
+          "type": "color"
+        },
         "dark": {
           "value": "#792b5d",
           "type": "color"
@@ -120,6 +194,18 @@
         },
         "hover": {
           "value": "#f5b600",
+          "type": "color"
+        },
+        "secondary": {
+          "value": "#7f6004",
+          "type": "color"
+        },
+        "secondary-hover": {
+          "value": "#755600",
+          "type": "color"
+        },
+        "secondary-action": {
+          "value": "#6b4c00",
           "type": "color"
         },
         "dark": {

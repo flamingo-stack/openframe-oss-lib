@@ -121,7 +121,7 @@ export function ResponsiveIconsBlock({ loading = false }: IconsBlockProps) {
   if (loading || iconGrid.length === 0) {
     return (
       <div
-        className="w-full h-[80px] sm:h-[96px] md:h-[112px] bg-[#1A1A1A] relative overflow-hidden"
+        className="w-full h-[80px] md:h-[112px] bg-[#1A1A1A] relative overflow-hidden"
         role="presentation"
         aria-hidden="true"
       >
@@ -133,7 +133,7 @@ export function ResponsiveIconsBlock({ loading = false }: IconsBlockProps) {
 
   return (
     <div
-      className="w-full h-[80px] sm:h-[96px] md:h-[112px] overflow-hidden bg-[#1A1A1A] relative z-10"
+      className="w-full h-[80px] md:h-[112px] overflow-hidden bg-[#1A1A1A] relative z-10"
       style={{ margin: 0, padding: 0 }}
       role="presentation"
       aria-hidden="true"
@@ -174,7 +174,7 @@ export function ResponsiveIconsBlock({ loading = false }: IconsBlockProps) {
                   <IconComponent
                     width={16}
                     height={16}
-                    className="text-[#666666] sm:w-5 sm:h-5"
+                    className="text-[#666666] md:w-5 md:h-5"
                     aria-hidden="true"
                   />
             </div>

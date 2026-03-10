@@ -93,7 +93,7 @@ export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) 
               style={{ maxHeight, transition: 'max-height 0.35s ease-in-out, opacity 0.35s ease-in-out', opacity: isOpen ? 1 : 0 }}
               className="overflow-hidden group-hover:bg-[#1E1E1E]/30"
             >
-              <div ref={ref} className="px-6 md:px-8 pb-6 text-ods-text-primary font-['DM_Sans'] font-medium text-[18px] leading-6">
+              <div ref={ref} className="px-6 md:px-8 pb-6 text-ods-text-primary text-h4">
                 {item.answer}
               </div>
             </div>

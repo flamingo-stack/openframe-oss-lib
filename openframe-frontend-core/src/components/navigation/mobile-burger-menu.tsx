@@ -259,7 +259,7 @@ export function MobileBurgerMenu({
               onClick={onLogout}
               className="w-full flex items-center gap-1 p-3 bg-ods-card border border-ods-border rounded-md hover:bg-ods-hover transition-colors"
             >
-              <Logout02Icon className="size-4 text-error" />
+              <Logout02Icon className="size-4 text-ods-error" />
               <span className="font-['DM_Sans'] font-medium text-sm leading-5 flex-1 text-left text-ods-text-primary">
                 Log Out
               </span>

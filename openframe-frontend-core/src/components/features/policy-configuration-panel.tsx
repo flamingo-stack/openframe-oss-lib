@@ -64,7 +64,7 @@ const PolicyRow: React.FC<{
             <Button 
               variant="outline"
               rightIcon={<ChevronDown className="h-6 w-6 text-ods-text-secondary" />}
-              className="sm:!text-sm bg-ods-card border border-ods-border rounded-md flex gap-2 items-center justify-between !px-2 py-2 w-[180px] hover:bg-ods-bg-hover transition-colors text-ods-text-primary h-auto"
+              className="md:!text-sm bg-ods-card border border-ods-border rounded-md flex gap-2 items-center justify-between !px-2 py-2 w-[180px] hover:bg-ods-bg-hover transition-colors text-ods-text-primary h-auto"
             >
               {getApprovalLevelLabel(policy.approvalLevel, editMode)}
             </Button>
@@ -139,7 +139,7 @@ const CategorySection: React.FC<{
 
         {/* Category Info */}
         <div className="flex-1 flex flex-col">
-          <p className="sm:!text-sm font-medium text-ods-text-primary">
+          <p className="md:!text-sm font-medium text-ods-text-primary">
             {category.name}
           </p>
           <p className="text-[14px] text-ods-text-secondary">
@@ -155,10 +155,10 @@ const CategorySection: React.FC<{
                 <Button
                   variant="outline"
                   rightIcon={<ChevronDown className="h-6 w-6 text-ods-text-secondary" />}
-                  className="sm:!text-sm bg-ods-card border border-ods-border rounded-md flex gap-2 items-center justify-between !px-2 py-2 w-[256px] hover:bg-ods-bg-hover transition-colors h-auto"
+                  className="md:!text-sm bg-ods-card border border-ods-border rounded-md flex gap-2 items-center justify-between !px-2 py-2 w-[256px] hover:bg-ods-bg-hover transition-colors h-auto"
                 >
                   <span className={cn(
-                    "sm:!text-sm font-medium",
+                    "md:!text-sm font-medium",
                     category.globalPermission 
                       ? "text-ods-text-primary" 
                       : "text-ods-text-secondary"
@@ -170,7 +170,7 @@ const CategorySection: React.FC<{
             <DropdownMenuContent align="end" className="w-[256px]">
               <DropdownMenuItem
                 onClick={() => onGlobalPermissionChange(category.id, undefined)}
-                className="sm:!text-sm"
+                className="md:!text-sm"
               >
                 Clear Global Permission
               </DropdownMenuItem>
@@ -178,7 +178,7 @@ const CategorySection: React.FC<{
                 <DropdownMenuItem
                   key={option.value}
                   onClick={() => onGlobalPermissionChange(category.id, option.value)}
-                  className="sm:!text-sm"
+                  className="md:!text-sm"
                 >
                   {option.label}
                 </DropdownMenuItem>
@@ -191,7 +191,7 @@ const CategorySection: React.FC<{
             className="px-3 py-2 w-[256px]"
             onClick={(e) => e.stopPropagation()}
           >
-            <span className="sm:!text-sm font-medium text-ods-text-primary">
+            <span className="md:!text-sm font-medium text-ods-text-primary">
               {getApprovalLevelLabel(category.globalPermission, editMode)}
             </span>
           </div>

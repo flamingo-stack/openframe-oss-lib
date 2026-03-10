@@ -31,7 +31,7 @@ export function ChangelogSectionsManager({
 }: ChangelogSectionsManagerProps) {
   return (
     <div className={`space-y-6 p-6 bg-ods-card border border-ods-border rounded-lg ${className}`}>
-      <h3 className="font-['Azeret_Mono'] text-[18px] font-semibold uppercase text-ods-text-primary">Changelog</h3>
+      <h3 className="text-h5 text-ods-text-primary">Changelog</h3>
 
       {/* Features Added */}
       <ChangelogManager

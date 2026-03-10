@@ -37,30 +37,6 @@ export {
   useContentLoading
 } from '../content-loading-container'
 
-export {
-  PersistentFilterControls,
-  PersistentSearchContainer,
-  PersistentSidebar,
-  PersistentMobileDropdown
-} from '../persistent-filter-controls'
-
-export {
-  PersistentPagination,
-  PersistentPaginationWrapper,
-  usePaginationLoading
-} from '../persistent-pagination'
-
-export {
-  useUnifiedFiltering,
-  vendorFilterConfig,
-  blogFilterConfig
-} from '../unified-filter-logic'
-
-export type {
-  FilterState,
-  FilterConfig
-} from '../unified-filter-logic'
-
 // Content skeleton components
 export {
   ParagraphSkeleton,

@@ -36,16 +36,13 @@ export function useMediaQuery(
  * Predefined breakpoints for common screen sizes
  */
 export const breakpoints = {
-  sm: "(min-width: 640px)",
-  md: "(min-width: 768px)",
-  lg: "(min-width: 1024px)",
-  xl: "(min-width: 1280px)",
-  "2xl": "(min-width: 1536px)",
+  md: "(min-width: 800px)",   // Tablet: 50rem
+  lg: "(min-width: 1280px)",  // Desktop: 80rem
 }
 
+/** @deprecated Use useMdUp instead */
 export function useSmUp(): boolean | undefined {
-  const matches = useMediaQuery(breakpoints.sm)
-  return matches === undefined ? undefined : matches
+  return useMdUp()
 }
 
 export function useMdUp(): boolean | undefined {
@@ -58,12 +55,3 @@ export function useLgUp(): boolean | undefined {
   return matches === undefined ? undefined : matches
 }
 
-export function useXlUp(): boolean | undefined {
-  const matches = useMediaQuery(breakpoints.xl)
-  return matches === undefined ? undefined : matches
-}
-
-export function use2xlUp(): boolean | undefined {
-  const matches = useMediaQuery(breakpoints["2xl"])
-  return matches === undefined ? undefined : matches
-}

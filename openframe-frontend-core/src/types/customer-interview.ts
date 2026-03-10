@@ -12,6 +12,7 @@ export interface VideoTeaser {
   thumbnail_url?: string // Optional thumbnail image URL for video preview. If not provided, video player will show first frame automatically.
   published?: boolean // Controls visibility on public preview page (default: false, admin must select)
   source?: 'manual' | 'ai_generated' // Track origin of teaser
+  created_at?: string // ISO timestamp for sorting (newer items first)
   // Duration auto-detected from video file
 }
 
@@ -44,6 +45,12 @@ export interface CustomerInterview {
   // Video content
   main_video_url: string | null
   teasers: VideoTeaser[] // JSONB array
+
+  // Highlight video (AI-generated summary video)
+  highlight_video_url?: string | null
+  highlight_video_thumbnail?: string | null
+  highlight_video_duration_ms?: number | null
+  highlight_video_source?: 'manual' | 'ai_generated' | null
 
   // Optional case study link
   case_study_id: number | null
@@ -82,6 +89,31 @@ export interface CustomerInterview {
   assemblyai_transcript_id?: string
   twelvelabs_video_id?: string
 
+  // Word-level transcript data for video processing
+  transcript_words_data?: Array<{
+    text: string
+    start: number  // milliseconds
+    end: number    // milliseconds
+    confidence: number
+    speaker?: string
+  }>
+
+  // Incentive mention exclusion ranges (computed during transcription)
+  incentive_excluded_ranges?: Array<{
+    start: number  // seconds
+    end: number    // seconds
+  }>
+
+  // Speaker identification mapping (computed during transcription)
+  // Maps AssemblyAI labels ("A", "B") to actual person info
+  speaker_mapping?: {
+    [label: string]: {
+      name: string
+      role: 'interviewer' | 'interviewee'
+      userId?: string
+    }
+  }
+
   // Timestamps
   created_at: string
   updated_at: string
@@ -109,6 +141,7 @@ export interface CreateCustomerInterviewData {
   transcript?: string // Markdown supported
   user_id?: string // Customer UUID
   main_video_url?: string
+  highlight_video_url?: string | null
   teasers?: VideoTeaser[]
   case_study_id?: number | null
   seo_title?: string

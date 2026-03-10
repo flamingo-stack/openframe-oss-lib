@@ -243,7 +243,7 @@ export function MobileFilterSheet({
         )}
       >
         <SheetHeader className="mb-4">
-          <SheetTitle className="text-2xl font-semibold text-ods-text-primary font-['Azeret_Mono'] tracking-[-0.48px]">
+          <SheetTitle className="text-h2 text-ods-text-primary tracking-[-0.48px]">
             {title}
           </SheetTitle>
         </SheetHeader>
@@ -251,7 +251,7 @@ export function MobileFilterSheet({
         <div className="flex flex-col gap-4">
           {sortConfig && sortConfig.columns.length > 0 && (
             <div className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-ods-text-secondary uppercase tracking-[-0.24px] font-['Azeret_Mono']">
+              <span className="text-h5 text-ods-text-secondary tracking-[-0.24px]">
                 {sortConfig.title || 'Sort By'}
               </span>
               <div className="rounded-[6px] border border-ods-border overflow-hidden">
@@ -274,7 +274,7 @@ export function MobileFilterSheet({
 
             return (
               <div key={group.id} className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-ods-text-secondary uppercase tracking-[-0.24px] font-['Azeret_Mono']">
+                <span className="text-h5 text-ods-text-secondary tracking-[-0.24px]">
                   {group.title}
                 </span>
                 <div className="rounded-[6px] border border-ods-border overflow-hidden">
@@ -426,7 +426,7 @@ export function MobileFilterModal({
       )}
     >
       <ModalHeader className="px-6 py-6 border-b-0">
-        <ModalTitle className="text-2xl font-semibold text-ods-text-primary font-['Azeret_Mono'] tracking-[-0.48px]">
+        <ModalTitle className="text-h2 text-ods-text-primary tracking-[-0.48px]">
           {title}
         </ModalTitle>
       </ModalHeader>
@@ -434,7 +434,7 @@ export function MobileFilterModal({
       <ModalContent className="px-6 flex flex-col gap-4 overflow-y-auto min-h-0">
         {sortConfig && sortConfig.columns.length > 0 && (
           <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-ods-text-secondary uppercase tracking-[-0.24px] font-['Azeret_Mono']">
+            <span className="text-h5 text-ods-text-secondary tracking-[-0.24px]">
               {sortConfig.title || 'Sort By'}
             </span>
             <div className="rounded-[6px] border border-ods-border overflow-hidden">
@@ -457,7 +457,7 @@ export function MobileFilterModal({
 
           return (
             <div key={group.id} className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-ods-text-secondary uppercase tracking-[-0.24px] font-['Azeret_Mono']">
+              <span className="text-h5 text-ods-text-secondary tracking-[-0.24px]">
                 {group.title}
               </span>
               <div className="rounded-[6px] border border-ods-border overflow-hidden">

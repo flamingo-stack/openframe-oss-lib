@@ -13,6 +13,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
@@ -31,6 +32,9 @@ public class InvitationRegistrationController {
 
     private final InvitationRegistrationService invitationRegistrationService;
     private final SsoInvitationService ssoInvitationService;
+
+    @Value("${openframe.auth.error-url}")
+    private String authErrorUrl;
 
     @PostMapping(path = "/accept", consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(OK)
@@ -56,7 +60,7 @@ public class InvitationRegistrationController {
         } catch (Exception e) {
             log.error("SSO invitation accept failed: {}", e.getMessage(), e);
             String msg = URLEncoder.encode(e.getMessage() != null ? e.getMessage() : "Invitation acceptance failed. Please try again.", StandardCharsets.UTF_8);
-            httpResponse.sendRedirect(httpRequest.getContextPath() + "/auth/error?error=" + msg);
+            httpResponse.sendRedirect(authErrorUrl + "?error=" + msg);
         }
     }
 }

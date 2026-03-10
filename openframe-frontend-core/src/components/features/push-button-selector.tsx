@@ -64,7 +64,7 @@ function PushButtonSelectorError({ message, title }: { message: string; title?: 
   return (
     <div className="space-y-3">
       {title && (
-        <h3 className="font-['Azeret_Mono'] text-[16px] font-semibold text-ods-text-primary uppercase">
+        <h3 className="text-h5 text-ods-text-primary">
           {title}
         </h3>
       )}
@@ -140,7 +140,7 @@ export function PushButtonSelector({
   return (
     <div className={`space-y-4 ${className}`}>
       {title && (
-        <h3 className="font-['Azeret_Mono'] text-[16px] font-semibold text-ods-text-primary uppercase">
+        <h3 className="text-h5 text-ods-text-primary">
           {title}
         </h3>
       )}
