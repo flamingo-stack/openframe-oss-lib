@@ -140,6 +140,7 @@ export interface CreateCustomerInterviewData {
   transcript?: string // Markdown supported
   user_id?: string // Customer UUID
   main_video_url?: string
+  highlight_video_url?: string | null
   teasers?: VideoTeaser[]
   case_study_id?: number | null
   seo_title?: string

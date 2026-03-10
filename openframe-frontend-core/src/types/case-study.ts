@@ -5,6 +5,7 @@ import type { PlatformRecord } from './platform'
 import type { BlogTag } from './blog'
 import type { MSP } from './stack'
 import type { UserProfile } from './user'
+import type { VideoTeaser, CustomerInterview } from './customer-interview'
 
 export interface CaseStudy {
   id: number
@@ -23,7 +24,14 @@ export interface CaseStudy {
   results: string | null
 
   // Testimonial video (text testimonials come from MSP profile)
-  testimonial_video_url: string | null
+  testimonial_video_url: string | null // YouTube URL (preferred when both exist)
+  uploaded_video_url: string | null // Uploaded video file URL (fallback when no YouTube)
+
+  // Video enhancement fields
+  video_source_type: 'youtube' | 'uploaded' | null // Deprecated - use URL detection instead
+  video_source: 'manual' | 'ai_generated' | null // Video origin: manual (user uploaded/entered) or ai_generated (rolled from interview)
+  video_bites: VideoTeaser[] // Array of video clips from interviews or manually added
+  customer_interview_id: number | null // Linked customer interview for bidirectional relationship
 
   // SEO
   seo_title: string | null
@@ -49,6 +57,7 @@ export interface CaseStudy {
   user?: UserProfile // Populated user data (includes msp_id)
   msp?: MSP // Populated MSP data via user.msp_id - includes industry, company_size, testimonials, etc.
   author?: UserProfile // Article author
+  customer_interview?: CustomerInterview // Linked customer interview
   case_study_platforms?: Array<{
     platform_id: string
     is_featured: boolean
@@ -69,7 +78,14 @@ export interface CreateCaseStudyData {
   challenge?: string
   solution?: string
   results?: string
-  testimonial_video_url?: string
+  testimonial_video_url?: string // YouTube URL
+  uploaded_video_url?: string // Uploaded video file URL
+  // Video enhancement fields
+  video_source_type?: 'youtube' | 'uploaded' // Deprecated
+  video_source?: 'manual' | 'ai_generated'
+  video_bites?: VideoTeaser[]
+  customer_interview_id?: number | null
+  // SEO
   seo_title?: string
   seo_description?: string
   seo_keywords?: string
