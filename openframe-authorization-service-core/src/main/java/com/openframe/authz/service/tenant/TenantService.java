@@ -37,7 +37,6 @@ public class TenantService {
                 .name(tenantName)
                 .domain(domain)
                 .status(TenantStatus.ACTIVE)
-                .plan(TenantPlan.FREE)
                 .build();
 
         Tenant savedTenant = tenantRepository.save(tenant);
