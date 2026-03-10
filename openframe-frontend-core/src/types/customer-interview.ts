@@ -45,6 +45,12 @@ export interface CustomerInterview {
   main_video_url: string | null
   teasers: VideoTeaser[] // JSONB array
 
+  // Highlight video (AI-generated summary video)
+  highlight_video_url?: string | null
+  highlight_video_thumbnail?: string | null
+  highlight_video_duration_ms?: number | null
+  highlight_video_source?: 'manual' | 'ai_generated' | null
+
   // Optional case study link
   case_study_id: number | null
 
@@ -81,6 +87,31 @@ export interface CustomerInterview {
   // External API Tracking
   assemblyai_transcript_id?: string
   twelvelabs_video_id?: string
+
+  // Word-level transcript data for video processing
+  transcript_words_data?: Array<{
+    text: string
+    start: number  // milliseconds
+    end: number    // milliseconds
+    confidence: number
+    speaker?: string
+  }>
+
+  // Incentive mention exclusion ranges (computed during transcription)
+  incentive_excluded_ranges?: Array<{
+    start: number  // seconds
+    end: number    // seconds
+  }>
+
+  // Speaker identification mapping (computed during transcription)
+  // Maps AssemblyAI labels ("A", "B") to actual person info
+  speaker_mapping?: {
+    [label: string]: {
+      name: string
+      role: 'interviewer' | 'interviewee'
+      userId?: string
+    }
+  }
 
   // Timestamps
   created_at: string
