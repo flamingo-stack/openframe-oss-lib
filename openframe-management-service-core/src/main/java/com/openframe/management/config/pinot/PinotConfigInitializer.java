@@ -77,7 +77,6 @@ public class PinotConfigInitializer {
                 log.error("Failed to deploy Pinot configuration for {}", config.getName(), e);
             }
         }
-
         log.info("Pinot configuration deployment completed");
     }
 
