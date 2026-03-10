@@ -12,6 +12,7 @@ export interface VideoTeaser {
   thumbnail_url?: string // Optional thumbnail image URL for video preview. If not provided, video player will show first frame automatically.
   published?: boolean // Controls visibility on public preview page (default: false, admin must select)
   source?: 'manual' | 'ai_generated' // Track origin of teaser
+  created_at?: string // ISO timestamp for sorting (newer items first)
   // Duration auto-detected from video file
 }
 
