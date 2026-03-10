@@ -52,9 +52,10 @@ public class WebSocketGatewayConfig {
     public WebSocketService webSocketServiceDecorator(
             RequestJwtClaimsReader requestJwtClaimsReader,
             WebSocketService defaultWebSocketService,
-            GatewayTrafficMetrics gatewayTrafficMetrics
+            GatewayTrafficMetrics gatewayTrafficMetrics,
+            WebSocketLoggingProperties webSocketLoggingProperties
     ) {
-        return new WebSocketServiceSecurityDecorator(defaultWebSocketService, requestJwtClaimsReader, gatewayTrafficMetrics);
+        return new WebSocketServiceSecurityDecorator(defaultWebSocketService, requestJwtClaimsReader, gatewayTrafficMetrics, webSocketLoggingProperties);
     }
 
 
