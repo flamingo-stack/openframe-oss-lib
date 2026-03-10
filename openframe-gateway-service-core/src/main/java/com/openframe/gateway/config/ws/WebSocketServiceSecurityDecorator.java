@@ -125,6 +125,9 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                                 log.info(LOG_PREFIX + "session closed code={} reason={}",
                                         sessionId, path, logSub, status.getCode(), status.getReason());
                             }
+                            if (loggingProperties.isDebugPath(path)) {
+                                log.info(LOG_PREFIX + "disposed session remove job (client closed first)", sessionId, path, logSub);
+                            }
                             disposable.dispose();
                         },
                         ex -> {
