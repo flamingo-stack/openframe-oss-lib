@@ -51,7 +51,7 @@ public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Orde
                     String endpointPrefix = getEndpointPrefix();
                     URI proxyUri = proxyUrlResolver.resolve(toolId, toolUrl.getUrl(), toolUrl.getPort(), requestUri, endpointPrefix);
 
-                    log.info("Proxy web socket request: {}", proxyUri);
+                    log.debug("Proxy web socket request: {}", proxyUri);
 
                     exchange.getAttributes()
                             .put(ServerWebExchangeUtils.GATEWAY_REQUEST_URL_ATTR, proxyUri);

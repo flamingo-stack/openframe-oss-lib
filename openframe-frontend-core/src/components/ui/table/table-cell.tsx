@@ -19,7 +19,9 @@ export function TableCell({ children, align = 'left', className, width }: TableC
   return (
     <div className={cn('flex flex-col overflow-hidden', getAlignment(), width || 'flex-1 min-w-0', className)}>
       {typeof children === 'string' || typeof children === 'number' ? (
-        <span className="text-h4 text-[var(--ods-system-greys-white)] truncate">{children}</span>
+        <span className="text-h4 text-ods-text-primary truncate">
+          {children}
+        </span>
       ) : (
         children
       )}
