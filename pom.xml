@@ -40,6 +40,7 @@
     <modules>
         <module>openframe-exception</module>
         <module>openframe-core</module>
+        <module>openframe-core-crypto</module>
         <module>openframe-data-mongo</module>
         <module>openframe-data-redis</module>
         <module>openframe-notification-mail</module>
@@ -92,6 +93,11 @@
             <dependency>
                 <groupId>com.openframe.oss</groupId>
                 <artifactId>openframe-core</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openframe.oss</groupId>
+                <artifactId>openframe-core-crypto</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
