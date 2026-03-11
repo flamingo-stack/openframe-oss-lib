@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface GoogleIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface GoogleIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function GoogleIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: GoogleIconProps) {
+export function GoogleIcon({ className = '', size = 24, color = 'currentColor', ...props }: GoogleIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

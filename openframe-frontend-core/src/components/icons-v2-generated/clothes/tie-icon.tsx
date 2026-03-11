@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface TieIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface TieIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function TieIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: TieIconProps) {
+export function TieIcon({ className = '', size = 24, color = 'currentColor', ...props }: TieIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

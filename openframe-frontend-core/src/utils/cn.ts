@@ -1,5 +1,5 @@
-import { clsx, type ClassValue } from "clsx"
-import { extendTailwindMerge } from "tailwind-merge"
+import { type ClassValue, clsx } from 'clsx';
+import { extendTailwindMerge } from 'tailwind-merge';
 
 const twMerge = extendTailwindMerge<'ods-typography'>({
   extend: {
@@ -7,13 +7,13 @@ const twMerge = extendTailwindMerge<'ods-typography'>({
       'ods-typography': ['text-h1', 'text-h2', 'text-h3', 'text-h4', 'text-h5', 'text-h6'],
     },
   },
-})
+});
 
 /**
  * Combine class names with Tailwind's merge utility
  */
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
 /**
@@ -25,20 +25,20 @@ export function cn(...inputs: ClassValue[]) {
 export function formatDate(
   date: Date | string,
   options: Intl.DateTimeFormatOptions = {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
   },
 ): string {
-  const dateObj = typeof date === "string" ? new Date(date) : date
-  
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+
   // Check if the date is valid
   if (isNaN(dateObj.getTime())) {
-    console.warn("Invalid date provided to formatDate:", date)
-    return "Invalid Date"
+    console.warn('Invalid date provided to formatDate:', date);
+    return 'Invalid Date';
   }
-  
-  return dateObj.toLocaleDateString("en-US", options)
+
+  return dateObj.toLocaleDateString('en-US', options);
 }
 
 /**
@@ -47,7 +47,7 @@ export function formatDate(
  * @returns Formatted number string
  */
 export function formatNumber(num: number): string {
-  return num.toLocaleString()
+  return num.toLocaleString();
 }
 
 /**
@@ -56,11 +56,11 @@ export function formatNumber(num: number): string {
  * @param currency - The currency code
  * @returns Formatted price string
  */
-export function formatPrice(price: number, currency = "USD"): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
+export function formatPrice(price: number, currency = 'USD'): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
     currency,
-  }).format(price)
+  }).format(price);
 }
 
 /**
@@ -70,15 +70,15 @@ export function formatPrice(price: number, currency = "USD"): string {
  * @returns Formatted bytes string
  */
 export function formatBytes(bytes: number, decimals = 2): string {
-  if (bytes === 0) return "0 Bytes"
+  if (bytes === 0) return '0 Bytes';
 
-  const k = 1024
-  const dm = decimals < 0 ? 0 : decimals
-  const sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
 
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
 
-  return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i]
+  return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
 /**
@@ -127,52 +127,60 @@ function getPlatformProductionUrl(platform: string): string {
  * @returns Array of all unique base domains (with and without wildcard)
  */
 export function getAllPlatformBaseDomains(): string[] {
-  if (typeof window === 'undefined') return []
+  if (typeof window === 'undefined') return [];
 
-  const hostname = window.location.hostname
+  const hostname = window.location.hostname;
 
   // Case 1: LOCALHOST DEBUG - no domains needed
-  if (hostname === 'localhost' ||
-      hostname === '127.0.0.1' ||
-      hostname.startsWith('127.')) {
-    return []
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('127.')) {
+    return [];
   }
 
   // Case 2: VERCEL PREVIEW - use vercel.app domain
-  const isVercelPreview = process.env.VERCEL_ENV === 'preview' ||
-                         process.env.NEXT_PUBLIC_VERCEL_ENV === 'preview' ||
-                         hostname.includes('.vercel.app')
+  const isVercelPreview =
+    process.env.VERCEL_ENV === 'preview' ||
+    process.env.NEXT_PUBLIC_VERCEL_ENV === 'preview' ||
+    hostname.includes('.vercel.app');
 
   if (isVercelPreview) {
-    return ['.vercel.app', 'vercel.app']
+    return ['.vercel.app', 'vercel.app'];
   }
 
   // Case 3: PRODUCTION - extract from ALL platforms using getPlatformProductionUrl
   // Platform identifiers match switch cases in getPlatformProductionUrl
   const platformIdentifiers = [
-    'marketing-hub', 'product-hub', 'revenue-hub', 'people-hub', 'admin-hub',
-    'openmsp', 'flamingo', 'tmcg', 'flamingo-teaser', 'openframe', 'universal'
-  ]
+    'marketing-hub',
+    'product-hub',
+    'revenue-hub',
+    'people-hub',
+    'admin-hub',
+    'openmsp',
+    'flamingo',
+    'tmcg',
+    'flamingo-teaser',
+    'openframe',
+    'universal',
+  ];
 
-  const baseDomains = new Set<string>()
+  const baseDomains = new Set<string>();
 
   platformIdentifiers.forEach(platform => {
     try {
-      const url = getPlatformProductionUrl(platform)
-      const urlHostname = new URL(url).hostname
-      const parts = urlHostname.split('.')
+      const url = getPlatformProductionUrl(platform);
+      const urlHostname = new URL(url).hostname;
+      const parts = urlHostname.split('.');
 
       if (parts.length >= 2) {
-        const baseDomain = parts.slice(-2).join('.')
-        baseDomains.add(`.${baseDomain}`) // Wildcard
-        baseDomains.add(baseDomain) // Non-wildcard
+        const baseDomain = parts.slice(-2).join('.');
+        baseDomains.add(`.${baseDomain}`); // Wildcard
+        baseDomains.add(baseDomain); // Non-wildcard
       }
     } catch (error) {
-      console.warn('[Platform Domains] Failed to parse URL for platform:', platform, error)
+      console.warn('[Platform Domains] Failed to parse URL for platform:', platform, error);
     }
-  })
+  });
 
-  return Array.from(baseDomains)
+  return Array.from(baseDomains);
 }
 
 /**
@@ -208,21 +216,21 @@ export function getAllPlatformBaseDomains(): string[] {
 export function getBaseUrl(platform?: string): string {
   // In development, always use localhost (regardless of platform)
   if (process.env.NODE_ENV !== 'production') {
-    return process.env.NEXT_PUBLIC_DEV_URL || 'http://localhost:3000'
+    return process.env.NEXT_PUBLIC_DEV_URL || 'http://localhost:3000';
   }
 
   // If platform is specified, return its production URL with env variable override support
   if (platform) {
-    return getPlatformProductionUrl(platform)
+    return getPlatformProductionUrl(platform);
   }
 
   // Production: Use Vercel domain if available
   if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
-    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
   }
 
   // Production fallback: Use canonical www domain to avoid Google "Page with redirect" issue.
   // openmsp.ai redirects to www.openmsp.ai, so we set the base URL to the
   // final destination to ensure canonical URLs do not require a redirect.
-  return 'https://www.openmsp.ai'
+  return 'https://www.openmsp.ai';
 }

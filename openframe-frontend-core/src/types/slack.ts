@@ -106,4 +106,4 @@ export interface SlackMessageSendRequest {
   channelId: string;
   attachments?: SlackAttachment[];
   replyTo?: string; // For threading
-} 
+}

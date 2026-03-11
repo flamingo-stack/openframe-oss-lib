@@ -1,70 +1,79 @@
-import * as React from "react"
-import { cn } from "../../utils/cn"
-import { SquareAvatar as Avatar } from "../ui/square-avatar"
-import { Button } from "../ui/button"
-import { PlusCircleIcon } from "../plus-circle-icon"
-import type { ConnectionIndicatorProps, ChatContainerProps, ChatHeaderProps } from "./types"
+import * as React from 'react';
+import { cn } from '../../utils/cn';
+import { PlusCircleIcon } from '../plus-circle-icon';
+import { Button } from '../ui/button';
+import { SquareAvatar as Avatar } from '../ui/square-avatar';
+import type { ChatContainerProps, ChatHeaderProps, ConnectionIndicatorProps } from './types';
 
 const ConnectionIndicator: React.FC<ConnectionIndicatorProps> = ({ status }) => {
   const getStatusStyles = () => {
     switch (status) {
       case 'connected':
-        return 'bg-green-500'
+        return 'bg-green-500';
       case 'connecting':
-        return 'bg-yellow-500 animate-pulse'
+        return 'bg-yellow-500 animate-pulse';
       case 'disconnected':
-        return 'bg-red-500'
+        return 'bg-red-500';
       default:
-        return 'bg-gray-500'
+        return 'bg-gray-500';
     }
-  }
+  };
 
   return (
     <div className="flex items-center">
-      <div 
-        className={cn(
-          "w-2 h-2 rounded-full",
-          getStatusStyles()
-        )}
+      <div
+        className={cn('w-2 h-2 rounded-full', getStatusStyles())}
         aria-label={`Connection status: ${status}`}
         title={status === 'connected' ? 'Connected' : status === 'connecting' ? 'Connecting...' : 'Disconnected'}
       />
     </div>
-  )
-}
+  );
+};
 
-const ChatContainer = React.forwardRef<HTMLDivElement, ChatContainerProps>(
-  ({ className, children, ...props }, ref) => {
-    return (
-      <div
-        ref={ref}
-        className={cn(
-          "flex h-screen w-full flex-col",
-          "bg-ods-bg text-ods-text-primary",
-          "px-4 md:px-6 lg:px-8 pt-10 pb-8",
-          className
-        )}
-        {...props}
-      >
-        {children}
-      </div>
-    )
-  }
-)
+const ChatContainer = React.forwardRef<HTMLDivElement, ChatContainerProps>(({ className, children, ...props }, ref) => {
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        'flex h-screen w-full flex-col',
+        'bg-ods-bg text-ods-text-primary',
+        'px-4 md:px-6 lg:px-8 pt-10 pb-8',
+        className,
+      )}
+      {...props}
+    >
+      {children}
+    </div>
+  );
+});
 
-ChatContainer.displayName = "ChatContainer"
+ChatContainer.displayName = 'ChatContainer';
 
 const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
-  ({ className, userName = 'Grace "Fae" Meadows', userTitle = "Your Personal Assistant", userAvatar, onSettingsClick, onNewChat, showNewChat = false, connectionStatus = 'disconnected', serverUrl = null, ...props }, ref) => {
+  (
+    {
+      className,
+      userName = 'Grace "Fae" Meadows',
+      userTitle = 'Your Personal Assistant',
+      userAvatar,
+      onSettingsClick,
+      onNewChat,
+      showNewChat = false,
+      connectionStatus = 'disconnected',
+      serverUrl = null,
+      ...props
+    },
+    ref,
+  ) => {
     return (
       <div
         ref={ref}
         className={cn(
-          "relative mx-auto w-full max-w-3xl",
-          "flex items-center justify-between gap-4 px-6 py-5",
-          "rounded-2xl bg-ods-card shadow-[0_18px_48px_rgba(0,0,0,0.45)]",
-          "ring-1 ring-black/20",
-          className
+          'relative mx-auto w-full max-w-3xl',
+          'flex items-center justify-between gap-4 px-6 py-5',
+          'rounded-2xl bg-ods-card shadow-[0_18px_48px_rgba(0,0,0,0.45)]',
+          'ring-1 ring-black/20',
+          className,
         )}
         {...props}
       >
@@ -94,54 +103,38 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
             onClick={onNewChat}
             variant="ghost"
             size="sm"
-            leftIcon={<PlusCircleIcon className="w-5 h-5" whiteOverlay/>}
+            leftIcon={<PlusCircleIcon className="w-5 h-5" whiteOverlay />}
             className="text-ods-text-primary hover:bg-ods-bg-hover"
           >
             New Chat
           </Button>
         )}
       </div>
-    )
-  }
-)
-ChatHeader.displayName = "ChatHeader"
+    );
+  },
+);
+ChatHeader.displayName = 'ChatHeader';
 
 const ChatContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, children, ...props }, ref) => {
     return (
-      <div
-        ref={ref}
-        className={cn(
-          "flex-1 flex flex-col min-h-0",
-          className
-        )}
-        {...props}
-      >
+      <div ref={ref} className={cn('flex-1 flex flex-col min-h-0', className)} {...props}>
         {children}
       </div>
-    )
-  }
-)
-ChatContent.displayName = "ChatContent"
+    );
+  },
+);
+ChatContent.displayName = 'ChatContent';
 
 const ChatFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, children, ...props }, ref) => {
     return (
-      <div
-        ref={ref}
-        className={cn(
-          "w-full px-0 pb-0 pt-2 md:px-0 flex-shrink-0",
-          className
-        )}
-        {...props}
-      >
-        <div className="mx-auto w-full max-w-3xl">
-          {children}
-        </div>
+      <div ref={ref} className={cn('w-full px-0 pb-0 pt-2 md:px-0 flex-shrink-0', className)} {...props}>
+        <div className="mx-auto w-full max-w-3xl">{children}</div>
       </div>
-    )
-  }
-)
-ChatFooter.displayName = "ChatFooter"
+    );
+  },
+);
+ChatFooter.displayName = 'ChatFooter';
 
-export { ChatContainer, ChatHeader, ChatContent, ChatFooter }
+export { ChatContainer, ChatHeader, ChatContent, ChatFooter };

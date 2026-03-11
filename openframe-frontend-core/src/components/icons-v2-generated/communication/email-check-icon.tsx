@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface EmailCheckIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface EmailCheckIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function EmailCheckIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: EmailCheckIconProps) {
+export function EmailCheckIcon({ className = '', size = 24, color = 'currentColor', ...props }: EmailCheckIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

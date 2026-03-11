@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface ToothIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface ToothIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function ToothIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: ToothIconProps) {
+export function ToothIcon({ className = '', size = 24, color = 'currentColor', ...props }: ToothIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

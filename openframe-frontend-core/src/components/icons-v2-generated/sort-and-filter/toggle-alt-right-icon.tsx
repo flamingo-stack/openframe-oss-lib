@@ -1,14 +1,13 @@
-import type { SVGProps } from "react";
-export interface ToggleAltRightIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface ToggleAltRightIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
 export function ToggleAltRightIcon({
-  className = "",
+  className = '',
   size = 24,
-  color = "currentColor",
+  color = 'currentColor',
   ...props
 }: ToggleAltRightIconProps) {
   return (

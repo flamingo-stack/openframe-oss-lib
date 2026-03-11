@@ -6,23 +6,23 @@
  */
 
 import {
-  getIntrospectionQuery,
   buildClientSchema,
-  IntrospectionQuery,
-  GraphQLSchema,
   GraphQLInputObjectType,
   GraphQLInputType,
-  isInputObjectType
-} from 'graphql'
-import { VariableDefinition, JSType } from './graphql-parser'
+  GraphQLSchema,
+  getIntrospectionQuery,
+  IntrospectionQuery,
+  isInputObjectType,
+} from 'graphql';
+import { JSType, VariableDefinition } from './graphql-parser';
 
 /**
  * Schema cache structure stored in localStorage
  */
 interface SchemaCache {
-  schema: IntrospectionQuery
-  timestamp: number
-  version: string
+  schema: IntrospectionQuery;
+  timestamp: number;
+  version: string;
 }
 
 /**
@@ -32,10 +32,10 @@ interface SchemaCache {
  * Fetches schema once per session and caches for 24 hours.
  */
 export class GraphQLIntrospector {
-  private schema: GraphQLSchema | null = null
-  private cacheKey = 'graphql-schema-cache-v1'
-  private cacheDuration = 24 * 60 * 60 * 1000  // 24 hours
-  private schemaVersion = '1.0.0'
+  private schema: GraphQLSchema | null = null;
+  private cacheKey = 'graphql-schema-cache-v1';
+  private cacheDuration = 24 * 60 * 60 * 1000; // 24 hours
+  private schemaVersion = '1.0.0';
 
   /**
    * Fetch GraphQL schema via introspection query
@@ -50,20 +50,16 @@ export class GraphQLIntrospector {
    *   { 'Authorization': 'Bearer token123' }
    * )
    */
-  async fetchSchema(
-    endpoint: string,
-    headers: Record<string, string> = {},
-    skipCache = false
-  ): Promise<void> {
+  async fetchSchema(endpoint: string, headers: Record<string, string> = {}, skipCache = false): Promise<void> {
     // Check cache first (unless skipped)
     if (!skipCache) {
-      const cached = this.loadFromCache()
+      const cached = this.loadFromCache();
       if (cached && Date.now() - cached.timestamp < this.cacheDuration) {
         try {
-          this.schema = buildClientSchema(cached.schema)
-          return
+          this.schema = buildClientSchema(cached.schema);
+          return;
         } catch (error) {
-          console.warn('[Introspector] Failed to build schema from cache:', error)
+          console.warn('[Introspector] Failed to build schema from cache:', error);
           // Continue to fetch fresh schema
         }
       }
@@ -75,33 +71,33 @@ export class GraphQLIntrospector {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...headers
+          ...headers,
         },
         body: JSON.stringify({
-          query: getIntrospectionQuery()
-        })
-      })
+          query: getIntrospectionQuery(),
+        }),
+      });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const { data, errors } = await response.json()
+      const { data, errors } = await response.json();
 
       if (errors) {
-        throw new Error(`GraphQL errors: ${JSON.stringify(errors)}`)
+        throw new Error(`GraphQL errors: ${JSON.stringify(errors)}`);
       }
 
       if (!data) {
-        throw new Error('No data returned from introspection query')
+        throw new Error('No data returned from introspection query');
       }
 
       // Build and cache schema
-      this.schema = buildClientSchema(data)
-      this.saveToCache(data)
+      this.schema = buildClientSchema(data);
+      this.saveToCache(data);
     } catch (error) {
-      console.error('[Introspector] Failed to fetch schema:', error)
-      throw error
+      console.error('[Introspector] Failed to fetch schema:', error);
+      throw error;
     }
   }
 
@@ -120,53 +116,53 @@ export class GraphQLIntrospector {
    */
   getInputTypeFields(typeName: string): Record<string, VariableDefinition> {
     if (!this.schema) {
-      return {}
+      return {};
     }
 
-    const type = this.schema.getType(typeName)
+    const type = this.schema.getType(typeName);
 
     if (!type || !isInputObjectType(type)) {
-      return {}
+      return {};
     }
 
-    const fields: Record<string, VariableDefinition> = {}
-    const typeFields = type.getFields()
+    const fields: Record<string, VariableDefinition> = {};
+    const typeFields = type.getFields();
 
     for (const [fieldName, field] of Object.entries(typeFields)) {
-      const fieldType = this.unwrapType(field.type)
+      const fieldType = this.unwrapType(field.type);
 
       fields[fieldName] = {
         name: fieldName,
         type: this.mapGraphQLTypeToJS(fieldType.typeName),
         required: fieldType.isNonNull,
         isArray: fieldType.isList,
-        graphqlTypeName: fieldType.typeName
-      }
+        graphqlTypeName: fieldType.typeName,
+      };
     }
 
-    return fields
+    return fields;
   }
 
   /**
    * Check if a type exists in the schema
    */
   hasType(typeName: string): boolean {
-    if (!this.schema) return false
-    return this.schema.getType(typeName) !== undefined
+    if (!this.schema) return false;
+    return this.schema.getType(typeName) !== undefined;
   }
 
   /**
    * Get the schema (if loaded)
    */
   getSchema(): GraphQLSchema | null {
-    return this.schema
+    return this.schema;
   }
 
   /**
    * Check if schema is loaded
    */
   isLoaded(): boolean {
-    return this.schema !== null
+    return this.schema !== null;
   }
 
   /**
@@ -174,8 +170,8 @@ export class GraphQLIntrospector {
    */
   clearCache(): void {
     try {
-      localStorage.removeItem(this.cacheKey)
-      this.schema = null
+      localStorage.removeItem(this.cacheKey);
+      this.schema = null;
     } catch {
       // Ignore storage errors
     }
@@ -186,36 +182,36 @@ export class GraphQLIntrospector {
    * Handles NonNull and List wrappers
    */
   private unwrapType(type: GraphQLInputType): {
-    typeName: string
-    isNonNull: boolean
-    isList: boolean
+    typeName: string;
+    isNonNull: boolean;
+    isList: boolean;
   } {
-    let typeName = ''
-    let isNonNull = false
-    let isList = false
-    let current: any = type
+    let typeName = '';
+    let isNonNull = false;
+    let isList = false;
+    let current: any = type;
 
     // Unwrap NonNull wrapper
     if (current.toString().endsWith('!')) {
-      isNonNull = true
-      current = 'ofType' in current ? current.ofType : current
+      isNonNull = true;
+      current = 'ofType' in current ? current.ofType : current;
     }
 
     // Check for List wrapper
     if (current.toString().startsWith('[')) {
-      isList = true
-      current = 'ofType' in current ? current.ofType : current
+      isList = true;
+      current = 'ofType' in current ? current.ofType : current;
     }
 
     // Handle inner NonNull (e.g., [String!])
     if (current.toString().endsWith('!')) {
-      current = 'ofType' in current ? current.ofType : current
+      current = 'ofType' in current ? current.ofType : current;
     }
 
     // Get base type name
-    typeName = current.name || current.toString().replace(/[[\]!]/g, '')
+    typeName = current.name || current.toString().replace(/[[\]!]/g, '');
 
-    return { typeName, isNonNull, isList }
+    return { typeName, isNonNull, isList };
   }
 
   /**
@@ -223,14 +219,14 @@ export class GraphQLIntrospector {
    */
   private mapGraphQLTypeToJS(graphqlType: string): JSType {
     const typeMap: Record<string, JSType> = {
-      'String': 'string',
-      'Int': 'number',
-      'Float': 'number',
-      'Boolean': 'boolean',
-      'ID': 'string'
-    }
+      String: 'string',
+      Int: 'number',
+      Float: 'number',
+      Boolean: 'boolean',
+      ID: 'string',
+    };
 
-    return typeMap[graphqlType] || 'object'
+    return typeMap[graphqlType] || 'object';
   }
 
   /**
@@ -238,20 +234,20 @@ export class GraphQLIntrospector {
    */
   private loadFromCache(): SchemaCache | null {
     try {
-      const cached = localStorage.getItem(this.cacheKey)
-      if (!cached) return null
+      const cached = localStorage.getItem(this.cacheKey);
+      if (!cached) return null;
 
-      const parsed = JSON.parse(cached) as SchemaCache
+      const parsed = JSON.parse(cached) as SchemaCache;
 
       // Validate cache version
       if (parsed.version !== this.schemaVersion) {
-        return null
+        return null;
       }
 
-      return parsed
+      return parsed;
     } catch (error) {
-      console.warn('[Introspector] Failed to load cache:', error)
-      return null
+      console.warn('[Introspector] Failed to load cache:', error);
+      return null;
     }
   }
 
@@ -263,12 +259,12 @@ export class GraphQLIntrospector {
       const cache: SchemaCache = {
         schema,
         timestamp: Date.now(),
-        version: this.schemaVersion
-      }
+        version: this.schemaVersion,
+      };
 
-      localStorage.setItem(this.cacheKey, JSON.stringify(cache))
+      localStorage.setItem(this.cacheKey, JSON.stringify(cache));
     } catch (error) {
-      console.warn('[Introspector] Failed to save cache:', error)
+      console.warn('[Introspector] Failed to save cache:', error);
       // Ignore storage errors (e.g., quota exceeded)
     }
   }
@@ -288,4 +284,4 @@ export class GraphQLIntrospector {
  * // Get input type fields
  * const fields = introspector.getInputTypeFields('LogFilterInput')
  */
-export const introspector = new GraphQLIntrospector()
+export const introspector = new GraphQLIntrospector();

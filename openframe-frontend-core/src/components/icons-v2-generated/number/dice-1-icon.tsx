@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface Dice1IconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface Dice1IconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function Dice1Icon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: Dice1IconProps) {
+export function Dice1Icon({ className = '', size = 24, color = 'currentColor', ...props }: Dice1IconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

@@ -3,7 +3,7 @@
  * Normalized link management for vendors
  */
 
-export type VendorLinkType = 
+export type VendorLinkType =
   | 'website'
   | 'github_repo'
   | 'docs'
@@ -86,12 +86,12 @@ export interface VendorWithLinks {
   last_updated?: string | null;
   openframe_recommendation?: boolean | null;
   price?: string | null;
-  
+
   // Legacy link columns (actual columns that exist in database)
   website?: string | null;
   repository?: string | null;
   other_link?: string | null;
-  
+
   // New normalized links
   vendor_links?: VendorLink[];
 }
@@ -104,4 +104,4 @@ export interface VendorLinkFallback {
   title?: string;
   type: VendorLinkType;
   source: 'new' | 'legacy'; // Track where the link came from
-} 
+}

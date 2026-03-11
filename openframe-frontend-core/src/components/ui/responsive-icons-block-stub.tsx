@@ -6,9 +6,5 @@ export interface ResponsiveIconsBlockProps {
 }
 
 export function ResponsiveIconsBlock({ children, className }: ResponsiveIconsBlockProps) {
-  return (
-    <div className={className}>
-      {children}
-    </div>
-  );
+  return <div className={className}>{children}</div>;
 }

@@ -1,7 +1,7 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { useState } from 'react'
-import { OSPlatformSelector } from '../components/features/os-platform-selector'
-import type { OSPlatformId } from '../utils/os-platforms'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
+import { OSPlatformSelector } from '../components/features/os-platform-selector';
+import type { OSPlatformId } from '../utils/os-platforms';
 
 const meta = {
   title: 'Features/OSPlatformSelector',
@@ -10,7 +10,8 @@ const meta = {
     layout: 'centered',
     docs: {
       description: {
-        component: 'A tab-style selector for choosing operating system platform. Supports disabled states with badges and consistent ODS styling.',
+        component:
+          'A tab-style selector for choosing operating system platform. Supports disabled states with badges and consistent ODS styling.',
       },
     },
   },
@@ -38,10 +39,10 @@ const meta = {
       description: 'Additional CSS classes for the container',
     },
   },
-} satisfies Meta<typeof OSPlatformSelector>
+} satisfies Meta<typeof OSPlatformSelector>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 /**
  * Interactive wrapper for stories that need state management.
@@ -50,11 +51,11 @@ const InteractiveSelector = ({
   initialValue = 'darwin',
   ...props
 }: Omit<React.ComponentProps<typeof OSPlatformSelector>, 'value' | 'onValueChange'> & {
-  initialValue?: OSPlatformId
+  initialValue?: OSPlatformId;
 }) => {
-  const [value, setValue] = useState<OSPlatformId>(initialValue)
-  return <OSPlatformSelector value={value} onValueChange={setValue} {...props} />
-}
+  const [value, setValue] = useState<OSPlatformId>(initialValue);
+  return <OSPlatformSelector value={value} onValueChange={setValue} {...props} />;
+};
 
 /**
  * Default OSPlatformSelector with macOS selected.
@@ -64,8 +65,8 @@ export const Default: Story = {
     value: 'darwin',
     onValueChange: () => {},
   },
-  render: (args) => <InteractiveSelector initialValue={args.value} />,
-}
+  render: args => <InteractiveSelector initialValue={args.value} />,
+};
 
 /**
  * Selector with a label.
@@ -76,8 +77,8 @@ export const WithLabel: Story = {
     label: 'Select Platform',
     onValueChange: () => {},
   },
-  render: (args) => <InteractiveSelector initialValue={args.value} label={args.label} />,
-}
+  render: args => <InteractiveSelector initialValue={args.value} label={args.label} />,
+};
 
 /**
  * Selector with Windows selected.
@@ -87,8 +88,8 @@ export const WindowsSelected: Story = {
     value: 'windows',
     onValueChange: () => {},
   },
-  render: (args) => <InteractiveSelector initialValue={args.value} />,
-}
+  render: args => <InteractiveSelector initialValue={args.value} />,
+};
 
 /**
  * Selector with Linux selected.
@@ -98,8 +99,8 @@ export const LinuxSelected: Story = {
     value: 'linux',
     onValueChange: () => {},
   },
-  render: (args) => <InteractiveSelector initialValue={args.value} />,
-}
+  render: args => <InteractiveSelector initialValue={args.value} />,
+};
 
 /**
  * Selector with Linux disabled.
@@ -110,10 +111,8 @@ export const WithDisabledPlatform: Story = {
     disabledPlatforms: ['linux'],
     onValueChange: () => {},
   },
-  render: (args) => (
-    <InteractiveSelector initialValue={args.value} disabledPlatforms={args.disabledPlatforms} />
-  ),
-}
+  render: args => <InteractiveSelector initialValue={args.value} disabledPlatforms={args.disabledPlatforms} />,
+};
 
 /**
  * Selector with custom options including a "Coming Soon" badge.
@@ -124,7 +123,7 @@ export const WithBadge: Story = {
     onValueChange: () => {},
   },
   render: () => {
-    const [value, setValue] = useState<OSPlatformId>('darwin')
+    const [value, setValue] = useState<OSPlatformId>('darwin');
     return (
       <OSPlatformSelector
         value={value}
@@ -136,9 +135,9 @@ export const WithBadge: Story = {
           { platformId: 'linux', disabled: true, badge: { text: 'Coming Soon', colorScheme: 'cyan' } },
         ]}
       />
-    )
+    );
   },
-}
+};
 
 /**
  * Selector with multiple disabled platforms and badges.
@@ -149,7 +148,7 @@ export const MultipleBadges: Story = {
     onValueChange: () => {},
   },
   render: () => {
-    const [value, setValue] = useState<OSPlatformId>('windows')
+    const [value, setValue] = useState<OSPlatformId>('windows');
     return (
       <OSPlatformSelector
         value={value}
@@ -161,9 +160,9 @@ export const MultipleBadges: Story = {
           { platformId: 'linux', disabled: true, badge: { text: 'Coming Soon', colorScheme: 'cyan' } },
         ]}
       />
-    )
+    );
   },
-}
+};
 
 /**
  * Selector with larger icons.
@@ -174,8 +173,8 @@ export const LargeIcons: Story = {
     iconSize: 'w-6 h-6',
     onValueChange: () => {},
   },
-  render: (args) => <InteractiveSelector initialValue={args.value} iconSize={args.iconSize} />,
-}
+  render: args => <InteractiveSelector initialValue={args.value} iconSize={args.iconSize} />,
+};
 
 /**
  * Selector with smaller icons.
@@ -186,8 +185,8 @@ export const SmallIcons: Story = {
     iconSize: 'w-4 h-4',
     onValueChange: () => {},
   },
-  render: (args) => <InteractiveSelector initialValue={args.value} iconSize={args.iconSize} />,
-}
+  render: args => <InteractiveSelector initialValue={args.value} iconSize={args.iconSize} />,
+};
 
 /**
  * Full width selector in a container.
@@ -198,15 +197,11 @@ export const FullWidth: Story = {
     onValueChange: () => {},
   },
   render: () => {
-    const [value, setValue] = useState<OSPlatformId>('darwin')
+    const [value, setValue] = useState<OSPlatformId>('darwin');
     return (
       <div style={{ width: '500px' }}>
-        <OSPlatformSelector
-          value={value}
-          onValueChange={setValue}
-          label="Select Your Operating System"
-        />
+        <OSPlatformSelector value={value} onValueChange={setValue} label="Select Your Operating System" />
       </div>
-    )
+    );
   },
-}
+};

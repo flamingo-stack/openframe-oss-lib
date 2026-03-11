@@ -10,22 +10,19 @@
  * ```
  */
 
-import React from 'react'
-import { CustomExternalLinkIcon } from '../icons'
-import { cn } from '../../utils/cn'
+import React from 'react';
+import { cn } from '../../utils/cn';
+import { CustomExternalLinkIcon } from '../icons';
 
 export interface CveLinkProps {
   /** CVE ID (e.g., "CVE-2024-1234") */
-  cveId: string
+  cveId: string;
   /** Additional CSS classes */
-  className?: string
+  className?: string;
 }
 
-export const CveLink: React.FC<CveLinkProps> = ({
-  cveId,
-  className
-}) => {
-  const nistUrl = `https://nvd.nist.gov/vuln/detail/${cveId}`
+export const CveLink: React.FC<CveLinkProps> = ({ cveId, className }) => {
+  const nistUrl = `https://nvd.nist.gov/vuln/detail/${cveId}`;
 
   return (
     <a
@@ -34,13 +31,13 @@ export const CveLink: React.FC<CveLinkProps> = ({
       rel="noopener noreferrer"
       className={cn(
         'inline-flex items-center gap-2 font-medium text-[18px] leading-[20px] text-ods-text-primary font-mono hover:text-ods-accent transition-colors group',
-        className
+        className,
       )}
     >
       <span>{cveId}</span>
       <CustomExternalLinkIcon className="w-4 h-4 text-ods-text-secondary group-hover:text-ods-accent transition-colors" />
     </a>
-  )
-}
+  );
+};
 
-CveLink.displayName = 'CveLink'
+CveLink.displayName = 'CveLink';

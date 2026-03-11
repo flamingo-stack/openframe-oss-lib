@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { ArrayEntryManager } from './array-entry-manager';
 import { ExternalLink } from 'lucide-react';
+import { ArrayEntryManager } from './array-entry-manager';
 
 export interface GitHubReleaseLink {
   github_release_url: string; // Full GitHub release URL
@@ -14,11 +14,7 @@ interface GitHubReleasesManagerProps {
   className?: string;
 }
 
-export function GitHubReleasesManager({
-  releases,
-  onChange,
-  className = ''
-}: GitHubReleasesManagerProps) {
+export function GitHubReleasesManager({ releases, onChange, className = '' }: GitHubReleasesManagerProps) {
   return (
     <ArrayEntryManager
       title="GitHub Releases"

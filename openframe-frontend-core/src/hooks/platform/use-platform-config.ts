@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import type { SelectableOption } from '../../components/features';
 import type { PlatformConfig, PlatformOption } from '../../types/platform';
 import { transformPlatformConfigsToOptions } from '../../utils/platform-config';
-import type { SelectableOption } from '../../components/features';
 
 export interface UsePlatformConfigResult {
   platforms: PlatformConfig[];
   platformOptions: PlatformOption[];
-  selectableOptions: SelectableOption[];  // Rich options with icons and colors
+  selectableOptions: SelectableOption[]; // Rich options with icons and colors
   isLoading: boolean;
   error: Error | null;
 }
@@ -19,7 +19,7 @@ let fetchPromise: Promise<PlatformConfig[]> | null = null;
  * Custom hook to fetch platform configurations from API
  * Provides both full platform configs and simplified options for dropdowns
  * Heavily cached to prevent excessive API calls - should only call once per session
- * 
+ *
  * NOTE: This hook is designed to work without react-query dependency
  */
 export function usePlatformConfig(): UsePlatformConfigResult {
@@ -51,7 +51,7 @@ export function usePlatformConfig(): UsePlatformConfigResult {
 
     // Start a new fetch
     console.log('🔧 Fetching platform configurations from API (should only happen once)');
-    
+
     fetchPromise = fetch('/api/config/platforms')
       .then(response => {
         if (!response.ok) {
@@ -79,14 +79,14 @@ export function usePlatformConfig(): UsePlatformConfigResult {
         fetchPromise = null;
       });
   }, []);
-  
+
   // Create options for dropdowns with "All Platforms" option
   const platformOptions: PlatformOption[] = [
     { value: 'all', label: 'All Platforms' },
     ...platforms.map((platform: PlatformConfig) => ({
       value: platform.value,
-      label: platform.label
-    }))
+      label: platform.label,
+    })),
   ];
 
   // Create rich selectable options with icons and colors
@@ -97,7 +97,7 @@ export function usePlatformConfig(): UsePlatformConfigResult {
     platformOptions,
     selectableOptions,
     isLoading,
-    error
+    error,
   };
 }
 
@@ -115,4 +115,4 @@ export function usePlatformByValue(value: string): PlatformConfig | undefined {
 export function useValidatePlatform(value: string): boolean {
   const { platforms } = usePlatformConfig();
   return platforms.some(platform => platform.value === value);
-} 
+}

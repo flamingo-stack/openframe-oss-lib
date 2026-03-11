@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import * as React from "react"
+import * as React from 'react';
 import { createContext, useContext } from 'react';
 import { useDynamicTheming } from '../../hooks/use-dynamic-theming';
 
@@ -16,11 +16,7 @@ const DynamicThemeContext = createContext<DynamicThemeContextType | null>(null);
 export function DynamicThemeProvider({ children }: { children: React.ReactNode }) {
   const themeState = useDynamicTheming();
 
-  return (
-    <DynamicThemeContext.Provider value={themeState}>
-      {children}
-    </DynamicThemeContext.Provider>
-  );
+  return <DynamicThemeContext.Provider value={themeState}>{children}</DynamicThemeContext.Provider>;
 }
 
 export function useDynamicTheme() {

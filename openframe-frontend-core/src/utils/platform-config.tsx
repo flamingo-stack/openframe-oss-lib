@@ -1,7 +1,7 @@
-import React from 'react';
-import { OpenmspLogo, FlamingoLogo, OpenFrameLogo, MiamiCyberGangLogoFaceOnly } from '../components/icons';
 import { Globe } from 'lucide-react';
+import React from 'react';
 import type { SelectableOption } from '../components/features';
+import { FlamingoLogo, MiamiCyberGangLogoFaceOnly, OpenFrameLogo, OpenmspLogo } from '../components/icons';
 import type { PlatformConfig } from '../types/platform';
 
 // Platform icons mapping with consistent colors matching app theme
@@ -14,22 +14,22 @@ export const platformIcons = {
   'product-hub': <FlamingoLogo className="h-5 w-5" fill="#5EA62E" />,
   'revenue-hub': <FlamingoLogo className="h-5 w-5" fill="#FFC008" />,
   'people-hub': <FlamingoLogo className="h-5 w-5" fill="#5EFAF0" />,
-  tmcg: <MiamiCyberGangLogoFaceOnly  className="h-5 w-5" />,
-  universal: <Globe className="h-5 w-5 text-[#10B981]" />
+  tmcg: <MiamiCyberGangLogoFaceOnly className="h-5 w-5" />,
+  universal: <Globe className="h-5 w-5 text-ods-success" />,
 };
 
 // Platform colors mapping
 export const platformColors = {
-  openmsp: 'bg-[#3B82F6]',
-  openframe: 'bg-[#8B5CF6]',
-  flamingo: 'bg-[#EC4899]',
-  'flamingo-teaser': 'bg-[#F59E0B]',
-  'marketing-hub': 'bg-[#F357BB]',
-  'product-hub': 'bg-[#5EA62E]',
-  'revenue-hub': 'bg-[#FFC008]',
-  'people-hub': 'bg-[#5EFAF0]',
-  tmcg: 'bg-[#FF6B6B]',
-  universal: 'bg-[#10B981]'
+  openmsp: 'bg-ods-info',
+  openframe: 'bg-ods-link-visited',
+  flamingo: 'bg-ods-flamingo-pink',
+  'flamingo-teaser': 'bg-ods-warning',
+  'marketing-hub': 'bg-ods-flamingo-pink',
+  'product-hub': 'bg-ods-success',
+  'revenue-hub': 'bg-ods-open-yellow',
+  'people-hub': 'bg-ods-flamingo-cyan',
+  tmcg: 'bg-ods-error',
+  universal: 'bg-ods-success',
 };
 
 // Platform display names for consistent naming across the app
@@ -40,18 +40,20 @@ export const platformDisplayNames = {
   'flamingo-teaser': 'Flamingo Teaser',
   'admin-hub': 'Admin Hub',
   tmcg: 'TMCG',
-  universal: 'Universal'
+  universal: 'Universal',
 };
 
 // Platform descriptions for consistent messaging across the app
 export const platformDescriptions = {
-  openmsp: 'Comprehensive directory and comparison platform for managed service providers (MSPs) and technology vendors. Reduce vendor costs and discover open-source alternatives.',
+  openmsp:
+    'Comprehensive directory and comparison platform for managed service providers (MSPs) and technology vendors. Reduce vendor costs and discover open-source alternatives.',
   openframe: 'AI-driven open-source security operations center (SOC) and endpoint detection platform for MSPs.',
-  flamingo: 'AI-driven open-source OS for MSPs. Swap bloated vendor tools for open ones. Automate the boring crap. Take your margin back.',
+  flamingo:
+    'AI-driven open-source OS for MSPs. Swap bloated vendor tools for open ones. Automate the boring crap. Take your margin back.',
   'flamingo-teaser': 'Preview of Flamingo - the AI-driven open-source OS for MSPs.',
   'admin-hub': 'Administrative interface for managing Flamingo platform services and configurations.',
   tmcg: 'The Miami Cyber Gang - A cybersecurity community focused on education and collaboration.',
-  universal: 'Cross-platform universal content.'
+  universal: 'Cross-platform universal content.',
 };
 
 // Platform slogans for branding consistency
@@ -62,7 +64,7 @@ export const platformSlogans = {
   'flamingo-teaser': 'Coming Soon: Open-Source OS for MSPs',
   'admin-hub': 'Manage Your Platform',
   tmcg: 'Miami Cyber Community',
-  universal: 'Universal Platform'
+  universal: 'Universal Platform',
 };
 
 // Platform hex colors for default configuration
@@ -73,7 +75,7 @@ export const platformHexColors = {
   universal: '#FFC008',
   'admin-hub': '#FFC008',
   'flamingo-teaser': '#F59E0B',
-  tmcg: '#FF6B6B'
+  tmcg: '#FF6B6B',
 };
 
 // Platform icon names for default configuration
@@ -84,7 +86,7 @@ export const platformIconNames = {
   universal: 'globe',
   'admin-hub': 'flamingo-logo',
   'flamingo-teaser': 'flamingo-logo',
-  tmcg: 'tmcg-logo'
+  tmcg: 'tmcg-logo',
 };
 
 /**
@@ -103,12 +105,12 @@ export function getDefaultIconForPlatform(platformName: string): string {
 
 export function transformPlatformConfigsToOptions(platformConfigs: PlatformConfig[]): SelectableOption[] {
   return platformConfigs.map((platform: PlatformConfig) => ({
-    id: platform.id,                    // Database UUID for matching
-    name: platform.name,                // Platform name enum
+    id: platform.id, // Database UUID for matching
+    name: platform.name, // Platform name enum
     displayName: platform.display_name, // Human-readable name
     description: platform.description,
     icon: platformIcons[platform.name as keyof typeof platformIcons] || platformIcons.universal,
-    color: platformColors[platform.name as keyof typeof platformColors] || platformColors.universal
+    color: platformColors[platform.name as keyof typeof platformColors] || platformColors.universal,
   }));
 }
 
@@ -151,13 +153,20 @@ export function getPlatformSlogan(platformName: string): string {
  * Get small platform icon for filter buttons with white colors (4x4 size)
  */
 export function getSmallPlatformIcon(platformName: string): React.ReactNode {
-  const className = "h-4 w-4 flex-shrink-0";
+  const className = 'h-4 w-4 flex-shrink-0';
 
   switch (platformName) {
     case 'openframe':
       return <OpenFrameLogo className={className} lowerPathColor="#FFC008" upperPathColor="#ffffff" />;
     case 'openmsp':
-      return <OpenmspLogo className={className} frontBubbleColor="#f1f1f1" innerFrontBubbleColor="#000000" backBubbleColor="#FFC008" />;
+      return (
+        <OpenmspLogo
+          className={className}
+          frontBubbleColor="#f1f1f1"
+          innerFrontBubbleColor="#000000"
+          backBubbleColor="#FFC008"
+        />
+      );
     case 'flamingo':
     case 'flamingo-teaser':
       return <FlamingoLogo className={`${className}`} fill="#EC4899" />;
@@ -180,7 +189,7 @@ export function getSmallPlatformIcon(platformName: string): React.ReactNode {
 /**
  * Get platform icon for admin/selector components (standard 6x6 size)
  */
-export function getPlatformIconComponent(platformName: string, className: string = "h-6 w-6"): React.ReactNode {
+export function getPlatformIconComponent(platformName: string, className: string = 'h-6 w-6'): React.ReactNode {
   switch (platformName) {
     case 'openframe':
       return <OpenFrameLogo className={className} />;

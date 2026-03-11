@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface Collapse01IconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface Collapse01IconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function Collapse01Icon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: Collapse01IconProps) {
+export function Collapse01Icon({ className = '', size = 24, color = 'currentColor', ...props }: Collapse01IconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

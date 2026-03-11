@@ -11,20 +11,20 @@
 export function formatDate(
   date: Date | string,
   options: Intl.DateTimeFormatOptions = {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
   },
 ): string {
-  const dateObj = typeof date === "string" ? new Date(date) : date
-  
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+
   // Check if the date is valid
   if (isNaN(dateObj.getTime())) {
-    console.warn("Invalid date provided to formatDate:", date)
-    return "Invalid Date"
+    console.warn('Invalid date provided to formatDate:', date);
+    return 'Invalid Date';
   }
-  
-  return dateObj.toLocaleDateString("en-US", options)
+
+  return dateObj.toLocaleDateString('en-US', options);
 }
 
 /**
@@ -33,7 +33,7 @@ export function formatDate(
  * @returns Formatted number string
  */
 export function formatNumber(num: number): string {
-  return num.toLocaleString()
+  return num.toLocaleString();
 }
 
 /**
@@ -42,11 +42,11 @@ export function formatNumber(num: number): string {
  * @param currency - The currency code
  * @returns Formatted price string
  */
-export function formatPrice(price: number, currency = "USD"): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
+export function formatPrice(price: number, currency = 'USD'): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
     currency,
-  }).format(price)
+  }).format(price);
 }
 
 /**
@@ -56,15 +56,15 @@ export function formatPrice(price: number, currency = "USD"): string {
  * @returns Formatted bytes string
  */
 export function formatBytes(bytes: number, decimals = 2): string {
-  if (bytes === 0) return "0 Bytes"
+  if (bytes === 0) return '0 Bytes';
 
-  const k = 1024
-  const dm = decimals < 0 ? 0 : decimals
-  const sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
 
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
 
-  return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i]
+  return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
 /**
@@ -73,29 +73,29 @@ export function formatBytes(bytes: number, decimals = 2): string {
  * @returns Formatted number string (e.g., "1K", "2M", "3B")
  */
 export function formatLargeNumber(num: number): string {
-  if (num === 0) return "0"
-  
+  if (num === 0) return '0';
+
   // Handle negative numbers
-  const isNegative = num < 0
-  const absNum = Math.abs(num)
-  
-  let result: string
-  
+  const isNegative = num < 0;
+  const absNum = Math.abs(num);
+
+  let result: string;
+
   if (absNum >= 1_000_000_000) {
     // Billions
-    result = `${Math.floor(absNum / 1_000_000_000)}B`
+    result = `${Math.floor(absNum / 1_000_000_000)}B`;
   } else if (absNum >= 1_000_000) {
     // Millions
-    result = `${Math.floor(absNum / 1_000_000)}M`
+    result = `${Math.floor(absNum / 1_000_000)}M`;
   } else if (absNum >= 1_000) {
     // Thousands
-    result = `${Math.floor(absNum / 1_000)}K`
+    result = `${Math.floor(absNum / 1_000)}K`;
   } else {
     // Less than 1000, show as-is
-    result = Math.floor(absNum).toString()
+    result = Math.floor(absNum).toString();
   }
-  
-  return isNegative ? `-${result}` : result
+
+  return isNegative ? `-${result}` : result;
 }
 
 /**

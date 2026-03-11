@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface ShieldWifiIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface ShieldWifiIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function ShieldWifiIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: ShieldWifiIconProps) {
+export function ShieldWifiIcon({ className = '', size = 24, color = 'currentColor', ...props }: ShieldWifiIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

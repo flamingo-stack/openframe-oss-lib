@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface Sort91DownIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface Sort91DownIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function Sort91DownIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: Sort91DownIconProps) {
+export function Sort91DownIcon({ className = '', size = 24, color = 'currentColor', ...props }: Sort91DownIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

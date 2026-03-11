@@ -9,7 +9,8 @@ const meta = {
     layout: 'centered',
     docs: {
       description: {
-        component: 'Displays a badge for shell/script types with appropriate icon and label. Supports all Tactical RMM shell types.',
+        component:
+          'Displays a badge for shell/script types with appropriate icon and label. Supports all Tactical RMM shell types.',
       },
     },
   },
@@ -17,15 +18,7 @@ const meta = {
   argTypes: {
     shellType: {
       control: 'select',
-      options: [
-        'POWERSHELL',
-        'CMD',
-        'BASH',
-        'PYTHON',
-        'NUSHELL',
-        'DENO',
-        'SHELL'
-      ] as ShellType[],
+      options: ['POWERSHELL', 'CMD', 'BASH', 'PYTHON', 'NUSHELL', 'DENO', 'SHELL'] as ShellType[],
       description: 'The type of shell to display',
     },
     className: {

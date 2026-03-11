@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface ZoomInIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface ZoomInIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function ZoomInIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: ZoomInIconProps) {
+export function ZoomInIcon({ className = '', size = 24, color = 'currentColor', ...props }: ZoomInIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Modal, Button } from './index';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Image from 'next/image';
+import { useEffect, useState } from 'react';
+import { Button, Modal } from './index';
 
 interface ImageGalleryModalProps {
   images: string[];
@@ -17,12 +17,7 @@ interface ImageGalleryModalProps {
  * Reusable component extracted from TMCG event detail page
  * Features: Keyboard navigation, prev/next buttons, image counter
  */
-export function ImageGalleryModal({
-  images,
-  isOpen,
-  onClose,
-  initialIndex = 0,
-}: ImageGalleryModalProps) {
+export function ImageGalleryModal({ images, isOpen, onClose, initialIndex = 0 }: ImageGalleryModalProps) {
   const [selectedImageIndex, setSelectedImageIndex] = useState(initialIndex);
 
   // Reset to initial index when modal opens
@@ -71,16 +66,12 @@ export function ImageGalleryModal({
         document.removeEventListener('keydown', handleKeyPress);
       };
     }
-  }, [isOpen, selectedImageIndex, images.length]);
+  }, [isOpen, goToNextImage, goToPreviousImage, onClose]);
 
   if (!isOpen || images.length === 0) return null;
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      className="max-w-[95vw]"
-    >
+    <Modal isOpen={isOpen} onClose={onClose} className="max-w-[95vw]">
       <div className="relative flex items-center justify-center bg-black rounded-lg">
         {/* Navigation Buttons */}
         {images.length > 1 && (
@@ -121,7 +112,7 @@ export function ImageGalleryModal({
               sizes="90vw"
               priority={true}
               unoptimized
-              onError={(e) => {
+              onError={e => {
                 // Handle HEIC and other unsupported formats
                 const target = e.target as HTMLImageElement;
                 const imageUrl = images[selectedImageIndex];
@@ -131,7 +122,8 @@ export function ImageGalleryModal({
                 const parent = target.parentElement;
                 if (parent && !parent.querySelector('.image-error')) {
                   const errorDiv = document.createElement('div');
-                  errorDiv.className = 'image-error flex flex-col items-center justify-center text-white text-center px-8';
+                  errorDiv.className =
+                    'image-error flex flex-col items-center justify-center text-white text-center px-8';
                   errorDiv.innerHTML = `
                     <p class="text-xl mb-4">${isHeic ? 'HEIC format not supported in browser' : 'Failed to load image'}</p>
                     <a href="${imageUrl}" download class="px-4 py-2 bg-white/10 hover:bg-white/20 rounded border border-white/20 transition-colors">

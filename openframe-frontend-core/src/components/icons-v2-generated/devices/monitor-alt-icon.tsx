@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface MonitorAltIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface MonitorAltIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function MonitorAltIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: MonitorAltIconProps) {
+export function MonitorAltIcon({ className = '', size = 24, color = 'currentColor', ...props }: MonitorAltIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

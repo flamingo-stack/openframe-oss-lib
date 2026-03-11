@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface BookTextIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface BookTextIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function BookTextIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: BookTextIconProps) {
+export function BookTextIcon({ className = '', size = 24, color = 'currentColor', ...props }: BookTextIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

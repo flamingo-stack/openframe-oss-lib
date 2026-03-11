@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface CallXmarkIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface CallXmarkIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function CallXmarkIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: CallXmarkIconProps) {
+export function CallXmarkIcon({ className = '', size = 24, color = 'currentColor', ...props }: CallXmarkIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

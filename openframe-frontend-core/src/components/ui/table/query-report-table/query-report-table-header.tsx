@@ -1,52 +1,39 @@
-'use client'
+'use client';
 
-import { useRef, useState, useCallback } from 'react'
-import { cn } from '../../../../utils/cn'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '../../tooltip'
-import type { QueryReportTableHeaderProps } from './types'
+import { useCallback, useRef, useState } from 'react';
+import { cn } from '../../../../utils/cn';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../tooltip';
+import type { QueryReportTableHeaderProps } from './types';
 
 export function QueryReportTableHeader({
   columns,
   columnWidth,
   variant = 'default',
-  className
+  className,
 }: QueryReportTableHeaderProps) {
-  const isCompact = variant === 'compact'
+  const isCompact = variant === 'compact';
 
   return (
     <div
-      className={cn(
-        'flex items-center gap-4 px-4',
-        isCompact ? 'py-2 border-b border-ods-border' : 'py-3',
-        className
-      )}
+      className={cn('flex items-center gap-4 px-4', isCompact ? 'py-2 border-b border-ods-border' : 'py-3', className)}
     >
-      {columns.map((column) => (
-        <TruncatedHeaderCell
-          key={column}
-          value={column}
-          width={columnWidth}
-        />
+      {columns.map(column => (
+        <TruncatedHeaderCell key={column} value={column} width={columnWidth} />
       ))}
     </div>
-  )
+  );
 }
 
 function TruncatedHeaderCell({ value, width }: { value: string; width: number }) {
-  const textRef = useRef<HTMLDivElement>(null)
-  const [isTruncated, setIsTruncated] = useState(false)
+  const textRef = useRef<HTMLDivElement>(null);
+  const [isTruncated, setIsTruncated] = useState(false);
 
   const checkTruncation = useCallback(() => {
-    const el = textRef.current
+    const el = textRef.current;
     if (el) {
-      setIsTruncated(el.scrollWidth > el.clientWidth)
+      setIsTruncated(el.scrollWidth > el.clientWidth);
     }
-  }, [])
+  }, []);
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -65,5 +52,5 @@ function TruncatedHeaderCell({ value, width }: { value: string; width: number })
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
-  )
+  );
 }

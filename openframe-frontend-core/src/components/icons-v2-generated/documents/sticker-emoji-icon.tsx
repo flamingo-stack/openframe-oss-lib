@@ -1,14 +1,13 @@
-import type { SVGProps } from "react";
-export interface StickerEmojiIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface StickerEmojiIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
 export function StickerEmojiIcon({
-  className = "",
+  className = '',
   size = 24,
-  color = "currentColor",
+  color = 'currentColor',
   ...props
 }: StickerEmojiIconProps) {
   return (

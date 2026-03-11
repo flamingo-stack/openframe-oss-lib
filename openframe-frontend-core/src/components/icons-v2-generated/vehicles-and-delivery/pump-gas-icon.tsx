@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface PumpGasIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface PumpGasIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function PumpGasIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: PumpGasIconProps) {
+export function PumpGasIcon({ className = '', size = 24, color = 'currentColor', ...props }: PumpGasIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

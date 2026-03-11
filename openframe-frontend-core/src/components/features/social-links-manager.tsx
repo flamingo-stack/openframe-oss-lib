@@ -1,25 +1,9 @@
-"use client";
+'use client';
 
+import { Facebook, Globe, Instagram, MessageCircle, Music, Send, Trash2, User, Youtube } from 'lucide-react';
 import { useState } from 'react';
-import {
-  LinkedInIcon,
-  GitHubIcon,
-  XLogo,
-  RedditIcon,
-  SlackIcon,
-  WhatsAppIcon
-} from '../icons';
-import {
-  Button,
-  Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Label
-} from '../ui';
-import { Trash2, User, Globe, Youtube, Instagram, Facebook, MessageCircle, Send, Music } from 'lucide-react';
+import { GitHubIcon, LinkedInIcon, RedditIcon, SlackIcon, WhatsAppIcon, XLogo } from '../icons';
+import { Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui';
 
 export interface SocialLink {
   platform: string;
@@ -68,7 +52,7 @@ export function SocialLinksManager({
   links,
   onChange,
   platforms = defaultPlatforms,
-  className = ''
+  className = '',
 }: SocialLinksManagerProps) {
   const addLink = () => {
     const firstPlatform = platforms[0]?.name || 'website';
@@ -99,36 +83,36 @@ export function SocialLinksManager({
         const Icon = getIcon(link, platform);
 
         return (
-          <div key={index} className="flex items-center gap-3 p-3 bg-ods-bg-secondary rounded-lg border border-ods-border">
-            <div className="w-8 h-8 flex items-center justify-center">
-              {Icon}
-            </div>
+          <div
+            key={index}
+            className="flex items-center gap-3 p-3 bg-ods-bg-secondary rounded-lg border border-ods-border"
+          >
+            <div className="w-8 h-8 flex items-center justify-center">{Icon}</div>
 
             <div className="flex-1 grid grid-cols-2 gap-3">
               <div>
-                <Select
-                  value={link.platform}
-                  onValueChange={(value) => updateLink(index, 'platform', value)}
-                >
+                <Select value={link.platform} onValueChange={value => updateLink(index, 'platform', value)}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {platforms.map(p => (
-                      <SelectItem key={p.name} value={p.name}>{p.display_name}</SelectItem>
+                      <SelectItem key={p.name} value={p.name}>
+                        {p.display_name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
               <Input
-                placeholder={platform?.placeholder || "Profile URL"}
+                placeholder={platform?.placeholder || 'Profile URL'}
                 value={link.url}
-                onChange={(e) => updateLink(index, 'url', e.target.value)}
-                onKeyDown={(e) => {
+                onChange={e => updateLink(index, 'url', e.target.value)}
+                onKeyDown={e => {
                   if (e.key === 'Enter') {
-                    e.preventDefault()
-                    e.stopPropagation()
+                    e.preventDefault();
+                    e.stopPropagation();
                   }
                 }}
               />

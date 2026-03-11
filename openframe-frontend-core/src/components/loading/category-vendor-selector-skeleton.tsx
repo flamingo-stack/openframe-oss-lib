@@ -1,11 +1,11 @@
-import React from 'react'
-import { cn } from "../../utils/cn"
-import { TextSkeleton, UnifiedSkeleton } from './unified-skeleton'
+import React from 'react';
+import { cn } from '../../utils/cn';
+import { TextSkeleton, UnifiedSkeleton } from './unified-skeleton';
 
 interface CategoryVendorSelectorSkeletonProps {
   /** number of subcategory blocks to render */
-  subcategories?: number
-  className?: string
+  subcategories?: number;
+  className?: string;
 }
 
 export function CategoryVendorSelectorSkeleton({ subcategories = 3, className }: CategoryVendorSelectorSkeletonProps) {
@@ -37,5 +37,5 @@ export function CategoryVendorSelectorSkeleton({ subcategories = 3, className }:
         ))}
       </div>
     </div>
-  )
-} 
+  );
+}

@@ -1,7 +1,7 @@
-import * as React from 'react';
 import * as AccordionPrimitive from '@radix-ui/react-accordion';
+import * as React from 'react';
+import { cn } from '../utils/cn';
 import { ChevronButton } from './ui/chevron-button';
-import { cn } from "../utils/cn";
 
 // --- SmoothAccordion -----------------------------------------------------------------
 // Wrapper that re-exports AccordionPrimitive.Root for convenience
@@ -12,47 +12,39 @@ export const SmoothAccordionItem = React.forwardRef<
   React.ElementRef<typeof AccordionPrimitive.Item>,
   React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Item>
 >(({ className, ...props }, ref) => (
-  <AccordionPrimitive.Item
-    ref={ref}
-    className={cn('border-0', className)}
-    {...props}
-  />
+  <AccordionPrimitive.Item ref={ref} className={cn('border-0', className)} {...props} />
 ));
 SmoothAccordionItem.displayName = 'SmoothAccordionItem';
 
 // --- SmoothAccordionTrigger -----------------------------------------------------------
-interface SmoothAccordionTriggerProps
-  extends React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Trigger> {
+interface SmoothAccordionTriggerProps extends React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Trigger> {
   label: React.ReactNode;
   className?: string;
 }
 
-export const SmoothAccordionTrigger = React.forwardRef<
-  HTMLButtonElement,
-  SmoothAccordionTriggerProps
->(({ label, className, ...props }, ref) => (
-  <AccordionPrimitive.Header className="flex">
-    <AccordionPrimitive.Trigger
-      ref={ref}
-      className={cn(
-        'group flex w-full items-center justify-between px-6 md:px-8 py-6 text-left hover:no-underline focus:outline-none transition-colors duration-200 ease-in-out',
-        className,
-      )}
-      {...props}
-    >
-      <span className="text-h3 text-ods-text-primary">
-        {label}
-      </span>
-      <ChevronButton
-        size="md"
-        isExpanded={false}
-        backgroundColor="transparent"
-        borderColor="#3A3A3A"
-        className="transition-transform duration-300 ease-in-out group-data-[state=open]:rotate-180"
-      />
-    </AccordionPrimitive.Trigger>
-  </AccordionPrimitive.Header>
-));
+export const SmoothAccordionTrigger = React.forwardRef<HTMLButtonElement, SmoothAccordionTriggerProps>(
+  ({ label, className, ...props }, ref) => (
+    <AccordionPrimitive.Header className="flex">
+      <AccordionPrimitive.Trigger
+        ref={ref}
+        className={cn(
+          'group flex w-full items-center justify-between px-6 md:px-8 py-6 text-left hover:no-underline focus:outline-none transition-colors duration-200 ease-in-out',
+          className,
+        )}
+        {...props}
+      >
+        <span className="text-h3 text-ods-text-primary">{label}</span>
+        <ChevronButton
+          size="md"
+          isExpanded={false}
+          backgroundColor="transparent"
+          borderColor="#3A3A3A"
+          className="transition-transform duration-300 ease-in-out group-data-[state=open]:rotate-180"
+        />
+      </AccordionPrimitive.Trigger>
+    </AccordionPrimitive.Header>
+  ),
+);
 SmoothAccordionTrigger.displayName = 'SmoothAccordionTrigger';
 
 // --- SmoothAccordionContent -----------------------------------------------------------
@@ -79,7 +71,7 @@ export const SmoothAccordionContent = React.forwardRef<
 
   React.useEffect(() => {
     updateHeight();
-  }, [updateHeight, children]);
+  }, [updateHeight]);
 
   // ResizeObserver for dynamic content
   React.useEffect(() => {
@@ -89,7 +81,7 @@ export const SmoothAccordionContent = React.forwardRef<
     return () => ro.disconnect();
   }, [updateHeight]);
 
-  const isOpen = (props as any)["data-state"] === "open";
+  const isOpen = (props as any)['data-state'] === 'open';
 
   return (
     <AccordionPrimitive.Content
@@ -121,4 +113,4 @@ export const SmoothAccordionContent = React.forwardRef<
     </AccordionPrimitive.Content>
   );
 });
-SmoothAccordionContent.displayName = 'SmoothAccordionContent'; 
+SmoothAccordionContent.displayName = 'SmoothAccordionContent';

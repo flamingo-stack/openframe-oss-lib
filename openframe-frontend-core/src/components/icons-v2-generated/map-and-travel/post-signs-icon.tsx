@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface PostSignsIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface PostSignsIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function PostSignsIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: PostSignsIconProps) {
+export function PostSignsIcon({ className = '', size = 24, color = 'currentColor', ...props }: PostSignsIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

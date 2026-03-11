@@ -1,86 +1,82 @@
-"use client"
+'use client';
 
-import * as React from "react"
-import { X, Plus } from "lucide-react"
-import { Input } from "./input"
-import { Button } from "./button"
-import { Badge } from "./badge"
-import { cn } from "../../utils/cn"
+import { Plus, X } from 'lucide-react';
+import * as React from 'react';
+import { cn } from '../../utils/cn';
+import { Badge } from './badge';
+import { Button } from './button';
+import { Input } from './input';
 
 interface TagsInputProps {
-  value: string[]
-  onChange: (tags: string[]) => void
-  placeholder?: string
-  className?: string
-  disabled?: boolean
-  maxTags?: number
-  inputClassName?: string
-  badgeClassName?: string
-  label?: string
+  value: string[];
+  onChange: (tags: string[]) => void;
+  placeholder?: string;
+  className?: string;
+  disabled?: boolean;
+  maxTags?: number;
+  inputClassName?: string;
+  badgeClassName?: string;
+  label?: string;
 }
 
 export function TagsInput({
   value = [],
   onChange,
-  placeholder = "Add a tag...",
+  placeholder = 'Add a tag...',
   className,
   disabled = false,
   maxTags,
   inputClassName,
   badgeClassName,
-  label
+  label,
 }: TagsInputProps) {
-  const [inputValue, setInputValue] = React.useState("")
+  const [inputValue, setInputValue] = React.useState('');
 
   const handleAddTag = () => {
-    const trimmedValue = inputValue.trim()
-    
-    if (!trimmedValue) return
-    
+    const trimmedValue = inputValue.trim();
+
+    if (!trimmedValue) return;
+
     // Check if tag already exists
     if (value.includes(trimmedValue)) {
-      setInputValue("")
-      return
+      setInputValue('');
+      return;
     }
-    
+
     // Check max tags limit
     if (maxTags && value.length >= maxTags) {
-      return
+      return;
     }
-    
-    onChange([...value, trimmedValue])
-    setInputValue("")
-  }
+
+    onChange([...value, trimmedValue]);
+    setInputValue('');
+  };
 
   const handleRemoveTag = (tagToRemove: string) => {
-    onChange(value.filter(tag => tag !== tagToRemove))
-  }
+    onChange(value.filter(tag => tag !== tagToRemove));
+  };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      e.preventDefault()
-      handleAddTag()
+      e.preventDefault();
+      handleAddTag();
     }
-  }
+  };
 
   return (
-    <div className={cn("space-y-2", className)}>
-      {label && (
-        <label className="font-['DM_Sans'] text-[16px] font-medium text-ods-text-primary">
-          {label}
-        </label>
-      )}
-      
+    <div className={cn('space-y-2', className)}>
+      {label && <label className="font-['DM_Sans'] text-[16px] font-medium text-ods-text-primary">{label}</label>}
+
       <div className="flex items-center gap-2">
         <Input
           value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
+          onChange={e => setInputValue(e.target.value)}
           onKeyPress={handleKeyPress}
           placeholder={placeholder}
           disabled={disabled || (maxTags ? value.length >= maxTags : false)}
           className={cn(
-            "flex-1 bg-[#161616] border-ods-border text-ods-text-primary",
-            inputClassName
+            'flex-1 bg-ods-bg border-ods-border text-ods-text-primary',
+            inputClassName,
           )}
         />
         <Button
@@ -93,17 +89,11 @@ export function TagsInput({
           Add
         </Button>
       </div>
-      
+
       {value.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {value.map((tag) => (
-            <Badge
-              key={tag}
-              className={cn(
-                "pl-2 pr-1 py-1 flex items-center gap-1",
-                badgeClassName
-              )}
-            >
+          {value.map(tag => (
+            <Badge key={tag} className={cn('pl-2 pr-1 py-1 flex items-center gap-1', badgeClassName)}>
               {tag}
               {!disabled && (
                 <button
@@ -119,12 +109,12 @@ export function TagsInput({
           ))}
         </div>
       )}
-      
+
       {maxTags && (
         <p className="text-xs text-ods-text-secondary">
           {value.length}/{maxTags} tags
         </p>
       )}
     </div>
-  )
+  );
 }

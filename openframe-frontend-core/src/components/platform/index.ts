@@ -1,4 +1,4 @@
-"use client"
+'use client';
 
 /**
  * Platform Components
@@ -7,25 +7,20 @@
  * software inventory, and system information display.
  */
 
-export { SoftwareInfo } from './SoftwareInfo'
-export type { SoftwareInfoProps } from './SoftwareInfo'
+export type { ShellType } from '../../types/shell.types';
+export type { ToolType } from '../../types/tool.types';
+export type { CveLinkProps } from './CveLink';
+export { CveLink } from './CveLink';
+export type { ScriptArgument, ScriptArgumentsProps } from './ScriptArguments';
+export { ScriptArguments } from './ScriptArguments';
+export type { ScriptAuthor, ScriptInfoSectionProps } from './ScriptInfoSection';
+export { ScriptInfoSection } from './ScriptInfoSection';
+export type { ShellTypeBadgeProps } from './ShellTypeBadge';
 
-export { SoftwareSourceBadge } from './SoftwareSourceBadge'
-export type { SoftwareSourceBadgeProps, SoftwareSource } from './SoftwareSourceBadge'
-
-export { CveLink } from './CveLink'
-export type { CveLinkProps } from './CveLink'
-
-export { ToolBadge } from './ToolBadge'
-export type { ToolBadgeProps } from './ToolBadge'
-export type { ToolType } from '../../types/tool.types'
-
-export { ShellTypeBadge } from './ShellTypeBadge'
-export type { ShellTypeBadgeProps } from './ShellTypeBadge'
-export type { ShellType } from '../../types/shell.types'
-
-export { ScriptInfoSection } from './ScriptInfoSection'
-export type { ScriptInfoSectionProps, ScriptAuthor } from './ScriptInfoSection'
-
-export { ScriptArguments } from './ScriptArguments'
-export type { ScriptArgumentsProps, ScriptArgument } from './ScriptArguments'
+export { ShellTypeBadge } from './ShellTypeBadge';
+export type { SoftwareInfoProps } from './SoftwareInfo';
+export { SoftwareInfo } from './SoftwareInfo';
+export type { SoftwareSource, SoftwareSourceBadgeProps } from './SoftwareSourceBadge';
+export { SoftwareSourceBadge } from './SoftwareSourceBadge';
+export type { ToolBadgeProps } from './ToolBadge';
+export { ToolBadge } from './ToolBadge';

@@ -1,14 +1,13 @@
-import type { SVGProps } from "react";
-export interface ChartBar01VerIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface ChartBar01VerIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
 export function ChartBar01VerIcon({
-  className = "",
+  className = '',
   size = 24,
-  color = "currentColor",
+  color = 'currentColor',
   ...props
 }: ChartBar01VerIconProps) {
   return (

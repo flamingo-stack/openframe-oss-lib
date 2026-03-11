@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { fn } from 'storybook/test';
 import { ComputerMouseIcon, ShareIcon, TrashBlankIcon } from '../components/icons-v2-generated';
 import { MoreActionsMenu } from '../components/ui/more-actions-menu';
+
 const meta = {
   title: 'UI/MoreActionsMenu',
   component: MoreActionsMenu,
@@ -9,7 +10,8 @@ const meta = {
     layout: 'centered',
     docs: {
       description: {
-        component: 'Compact, reusable menu triggered by an ellipsis icon button. Built on top of Radix DropdownMenu used in the UI Kit.',
+        component:
+          'Compact, reusable menu triggered by an ellipsis icon button. Built on top of Radix DropdownMenu used in the UI Kit.',
       },
     },
   },
@@ -42,8 +44,10 @@ const meta = {
     },
   },
   decorators: [
-    (Story) => (
-      <div style={{ padding: '4rem', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+    Story => (
+      <div
+        style={{ padding: '4rem', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}
+      >
         <Story />
       </div>
     ),

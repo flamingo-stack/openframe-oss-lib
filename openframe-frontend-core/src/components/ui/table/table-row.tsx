@@ -1,12 +1,12 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { cn } from '../../../utils/cn'
-import { Checkbox } from '../checkbox'
-import { TableCell } from './table-cell'
-import { ROW_HEIGHT_DESKTOP } from './table-skeleton'
-import type { TableRowProps } from './types'
-import { getHideClasses } from './utils'
+import React from 'react';
+import { cn } from '../../../utils/cn';
+import { Checkbox } from '../checkbox';
+import { TableCell } from './table-cell';
+import { ROW_HEIGHT_DESKTOP } from './table-skeleton';
+import type { TableRowProps } from './types';
+import { getHideClasses } from './utils';
 
 export function TableRow<T = any>({
   item,
@@ -16,49 +16,49 @@ export function TableRow<T = any>({
   index,
   selectable,
   selected,
-  onSelect
+  onSelect,
 }: TableRowProps<T>) {
   const handleRowClick = (e: React.MouseEvent) => {
-    const target = e.target as HTMLElement
+    const target = e.target as HTMLElement;
     if (target.closest('[data-no-row-click]')) {
-      return
+      return;
     }
 
     if (onClick) {
-      onClick(item)
+      onClick(item);
     }
-  }
+  };
 
   const handleSelect = () => {
     if (onSelect) {
-      onSelect(item)
+      onSelect(item);
     }
-  }
+  };
 
-  const getCellValue = (column: typeof columns[0]): React.ReactNode => {
+  const getCellValue = (column: (typeof columns)[0]): React.ReactNode => {
     if (column.renderCell) {
-      return column.renderCell(item, column)
+      return column.renderCell(item, column);
     }
 
     // Access nested properties using dot notation
-    const keys = column.key.split('.')
-    let value: any = item
+    const keys = column.key.split('.');
+    let value: any = item;
     for (const key of keys) {
-      value = value?.[key]
+      value = value?.[key];
     }
 
     if (value === null || value === undefined) {
-      return '-'
+      return '-';
     }
     if (typeof value === 'boolean') {
-      return value ? 'Yes' : 'No'
+      return value ? 'Yes' : 'No';
     }
     if (typeof value === 'object') {
-      return JSON.stringify(value)
+      return JSON.stringify(value);
     }
 
-    return String(value)
-  }
+    return String(value);
+  };
 
   return (
     <div
@@ -81,7 +81,7 @@ export function TableRow<T = any>({
           </div>
         )}
 
-        {columns.map((column) => (
+        {columns.map(column => (
           <TableCell
             key={column.key}
             align={column.align}
@@ -93,5 +93,5 @@ export function TableRow<T = any>({
         ))}
       </div>
     </div>
-  )
+  );
 }

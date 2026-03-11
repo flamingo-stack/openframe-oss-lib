@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface VolumeMinusIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface VolumeMinusIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function VolumeMinusIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: VolumeMinusIconProps) {
+export function VolumeMinusIcon({ className = '', size = 24, color = 'currentColor', ...props }: VolumeMinusIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

@@ -1,23 +1,21 @@
-"use client"
+'use client';
 
 import React from 'react';
-import { cn } from "../utils/cn";
+import { cn } from '../utils/cn';
 import { SquareAvatar } from './square-avatar';
 
-interface MSPDisplayProps {
+interface MspDisplayProps {
   name: string;
   logoUrl?: string | null;
   size?: number; // avatar size in px (square)
   className?: string;
 }
 
-export function MSPDisplay({ name, logoUrl, size = 40, className }: MSPDisplayProps) {
+export function MSPDisplay({ name, logoUrl, size = 40, className }: MspDisplayProps) {
   return (
     <div className={cn('flex items-center gap-2 min-w-0', className)}>
       <SquareAvatar src={logoUrl ?? undefined} fallbackName={name} size={size} />
-      <h2 className="truncate pl-2">
-        {name}
-      </h2>
+      <h2 className="truncate pl-2">{name}</h2>
     </div>
   );
-} 
+}

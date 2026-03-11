@@ -1,11 +1,11 @@
-"use client";
+'use client';
 
-import { useState } from 'react';
-import { Input, Textarea, Label, Button, Badge } from '../ui';
-import { ConfidenceBadge } from '../features';
-import { Globe, ExternalLink, Upload, X, Loader2, Sparkles } from 'lucide-react';
-import { cn } from '../../utils';
+import { ExternalLink, Globe, Loader2, Sparkles, Upload, X } from 'lucide-react';
 import Image from 'next/image';
+import { useState } from 'react';
+import { cn } from '../../utils';
+import { ConfidenceBadge } from '../features';
+import { Badge, Button, Input, Label, Textarea } from '../ui';
 
 export interface SEOEditorPreviewProps {
   // SEO fields - must be strings (not undefined)
@@ -62,7 +62,7 @@ export function SEOEditorPreview({
   aiConfidenceSeoKeywords,
   domain = 'openmsp.ai',
   disabled = false,
-  className = ''
+  className = '',
 }: SEOEditorPreviewProps) {
   const [imageError, setImageError] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -94,51 +94,38 @@ export function SEOEditorPreview({
 
   return (
     <div className={cn('space-y-6 p-6 bg-ods-card border border-ods-border rounded-lg', className)}>
-      <h3 className="text-h5 text-ods-text-primary">
-        SEO & Open Graph
-      </h3>
+      <h3 className="text-h5 text-ods-text-primary">SEO & Open Graph</h3>
 
       {/* SEO Title & Keywords - Same Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">
-              SEO Title
-            </Label>
+            <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">SEO Title</Label>
             {aiConfidenceSeoTitle !== undefined && (
               <>
                 <Badge variant="secondary" className="flex items-center gap-1">
                   <Sparkles className="h-3 w-3" />
                   AI Generated
                 </Badge>
-                <ConfidenceBadge
-                  confidence={aiConfidenceSeoTitle}
-                  showLabel={true}
-                  showPercentage={true}
-                  size="sm"
-                />
+                <ConfidenceBadge confidence={aiConfidenceSeoTitle} showLabel={true} showPercentage={true} size="sm" />
               </>
             )}
           </div>
           <Input
             value={seoTitle || ''}
-            onChange={(e) => onSeoTitleChange(e.target.value)}
+            onChange={e => onSeoTitleChange(e.target.value)}
             disabled={disabled}
             placeholder="Enter SEO meta title..."
             className="bg-ods-bg border-ods-border text-ods-text-primary"
           />
           {!seoTitle && title && (
-            <p className="text-[11px] text-ods-accent font-['DM_Sans']">
-              Auto-populated from title
-            </p>
+            <p className="text-[11px] text-ods-accent font-['DM_Sans']">Auto-populated from title</p>
           )}
         </div>
 
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">
-              SEO Keywords
-            </Label>
+            <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">SEO Keywords</Label>
             {aiConfidenceSeoKeywords !== undefined && (
               <>
                 <Badge variant="secondary" className="flex items-center gap-1">
@@ -156,7 +143,7 @@ export function SEOEditorPreview({
           </div>
           <Input
             value={seoKeywords || ''}
-            onChange={(e) => onSeoKeywordsChange(e.target.value)}
+            onChange={e => onSeoKeywordsChange(e.target.value)}
             disabled={disabled}
             placeholder="Enter SEO keywords..."
             className="bg-ods-bg border-ods-border text-ods-text-primary"
@@ -168,9 +155,7 @@ export function SEOEditorPreview({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="space-y-2 flex flex-col h-full">
           <div className="flex items-center gap-2">
-            <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">
-              SEO Description
-            </Label>
+            <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">SEO Description</Label>
             {aiConfidenceSeoDescription !== undefined && (
               <>
                 <Badge variant="secondary" className="flex items-center gap-1">
@@ -188,23 +173,19 @@ export function SEOEditorPreview({
           </div>
           <Textarea
             value={seoDescription || ''}
-            onChange={(e) => onSeoDescriptionChange(e.target.value)}
+            onChange={e => onSeoDescriptionChange(e.target.value)}
             disabled={disabled}
             placeholder="Enter SEO meta description..."
             className="bg-ods-bg border-ods-border text-ods-text-primary flex-1 resize-none"
             rows={6}
           />
           {!seoDescription && summary && (
-            <p className="text-[11px] text-ods-accent font-['DM_Sans']">
-              Auto-populated from summary
-            </p>
+            <p className="text-[11px] text-ods-accent font-['DM_Sans']">Auto-populated from summary</p>
           )}
         </div>
 
         <div className="space-y-2 flex flex-col h-full">
-          <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">
-            OG Image
-          </Label>
+          <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">OG Image</Label>
 
           {/* OG Image Upload/Display */}
           <div className="flex-1 relative">
@@ -273,9 +254,7 @@ export function SEOEditorPreview({
           </div>
 
           {!ogImageUrl && featuredImage && (
-            <p className="text-[11px] text-ods-accent font-['DM_Sans']">
-              Using featured image
-            </p>
+            <p className="text-[11px] text-ods-accent font-['DM_Sans']">Using featured image</p>
           )}
         </div>
       </div>
@@ -284,9 +263,7 @@ export function SEOEditorPreview({
       <div className="pt-4 border-t border-ods-border">
         <div className="flex items-center gap-2 mb-3">
           <Globe className="w-4 h-4 text-ods-text-secondary" />
-          <span className="font-['DM_Sans'] text-[12px] font-medium text-ods-text-secondary">
-            Social Media Preview
-          </span>
+          <span className="font-['DM_Sans'] text-[12px] font-medium text-ods-text-secondary">Social Media Preview</span>
         </div>
 
         {/* OG Card Preview */}
@@ -336,19 +313,13 @@ export function SEOEditorPreview({
         {/* Fallback Indicators */}
         <div className="space-y-1 mt-3">
           {!seoTitle.trim() && title && (
-            <p className="font-['DM_Sans'] text-[11px] text-ods-accent">
-              • Using title as SEO title
-            </p>
+            <p className="font-['DM_Sans'] text-[11px] text-ods-accent">• Using title as SEO title</p>
           )}
           {!seoDescription.trim() && summary && (
-            <p className="font-['DM_Sans'] text-[11px] text-ods-accent">
-              • Using summary as SEO description
-            </p>
+            <p className="font-['DM_Sans'] text-[11px] text-ods-accent">• Using summary as SEO description</p>
           )}
           {!ogImageUrl.trim() && featuredImage.trim() && (
-            <p className="font-['DM_Sans'] text-[11px] text-ods-accent">
-              • Using featured image as OG image
-            </p>
+            <p className="font-['DM_Sans'] text-[11px] text-ods-accent">• Using featured image as OG image</p>
           )}
         </div>
       </div>

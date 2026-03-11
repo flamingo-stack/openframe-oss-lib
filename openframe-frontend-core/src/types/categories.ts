@@ -10,7 +10,7 @@ export interface Category {
   slug: string;
 }
 
-// Legacy category interface for backward compatibility  
+// Legacy category interface for backward compatibility
 export interface CategoryCardProps {
   category: {
     name: string;
@@ -47,4 +47,4 @@ export interface RealCategoryCardProps {
 export interface CategoryWithStats extends RealCategory {
   vendorCount: number;
   subcategoryCount: number;
-} 
+}

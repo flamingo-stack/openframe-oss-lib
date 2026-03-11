@@ -1,7 +1,7 @@
-"use client"
+'use client';
 
 import React from 'react';
-import { cn } from "../utils/cn";
+import { cn } from '../utils/cn';
 
 interface MetricValueProps {
   value: string | number;
@@ -15,11 +15,14 @@ interface MetricValueProps {
  */
 export function MetricValue({ value, label, className }: MetricValueProps) {
   return (
-    <div className={cn('flex items-end gap-2 whitespace-nowrap font-["DM_Sans"] text-lg leading-[24px] text-ods-text-primary', className)}>
+    <div
+      className={cn(
+        'flex items-end gap-2 whitespace-nowrap font-["DM_Sans"] text-lg leading-[24px] text-ods-text-primary',
+        className,
+      )}
+    >
       {value}
-      <span className="text-sm text-ods-text-secondary">
-        {label}
-      </span>
+      <span className="text-sm text-ods-text-secondary">{label}</span>
     </div>
   );
-} 
+}

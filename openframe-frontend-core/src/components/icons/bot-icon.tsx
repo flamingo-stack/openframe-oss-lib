@@ -1,10 +1,10 @@
-import React from "react"
+import React from 'react';
 
 export interface BotIconProps extends React.SVGProps<SVGSVGElement> {
   color?: string;
 }
 
-export function BotIcon({ className = "h-6 w-6", color = 'white', ...props }: BotIconProps) {
+export function BotIcon({ className = 'h-6 w-6', color = 'white', ...props }: BotIconProps) {
   return (
     <svg
       width="24"
@@ -60,5 +60,5 @@ export function BotIcon({ className = "h-6 w-6", color = 'white', ...props }: Bo
       <circle cx="10" cy="10.5" r="0.5" fill={color} />
       <circle cx="14" cy="10.5" r="0.5" fill={color} />
     </svg>
-  )
+  );
 }

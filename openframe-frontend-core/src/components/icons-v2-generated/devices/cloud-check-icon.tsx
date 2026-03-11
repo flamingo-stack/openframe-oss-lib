@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface CloudCheckIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface CloudCheckIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function CloudCheckIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: CloudCheckIconProps) {
+export function CloudCheckIcon({ className = '', size = 24, color = 'currentColor', ...props }: CloudCheckIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

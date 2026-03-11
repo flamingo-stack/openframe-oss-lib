@@ -1,14 +1,13 @@
-import type { SVGProps } from "react";
-export interface MessageEllipsisIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface MessageEllipsisIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
 export function MessageEllipsisIcon({
-  className = "",
+  className = '',
   size = 24,
-  color = "currentColor",
+  color = 'currentColor',
   ...props
 }: MessageEllipsisIconProps) {
   return (

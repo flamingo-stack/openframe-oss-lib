@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface PlusAltIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface PlusAltIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function PlusAltIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: PlusAltIconProps) {
+export function PlusAltIcon({ className = '', size = 24, color = 'currentColor', ...props }: PlusAltIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

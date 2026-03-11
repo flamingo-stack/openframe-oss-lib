@@ -1,14 +1,13 @@
-import type { SVGProps } from "react";
-export interface AuthentikLogoIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface AuthentikLogoIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
 export function AuthentikLogoIcon({
-  className = "",
+  className = '',
   size = 24,
-  color = "currentColor",
+  color = 'currentColor',
   ...props
 }: AuthentikLogoIconProps) {
   return (
@@ -33,10 +32,7 @@ export function AuthentikLogoIcon({
         fill="#FD4B2D"
         d="M21.465 5.43H7.22c.287-.44.675-.8 1.129-1.05A3.1 3.1 0 0 1 9.824 4h9.036a3.1 3.1 0 0 1 1.476.38c.454.25.842.61 1.13 1.05Zm.513 1.43H6.703a3.25 3.25 0 0 1 .514-1.43h14.246c.281.427.458.918.515 1.43"
       />
-      <path
-        fill="#FD4B2D"
-        d="M22 7.23v1.06h-5.221v-.277h-4.875v.278H6.683V7.23q0-.186.02-.371H21.98q.021.185.02.37Z"
-      />
+      <path fill="#FD4B2D" d="M22 7.23v1.06h-5.221v-.277h-4.875v.278H6.683V7.23q0-.186.02-.371H21.98q.021.185.02.37Z" />
       <path
         fill="#FD4B2D"
         d="M11.905 8.29H6.683v1.431h5.222v-1.43ZM22 8.29h-5.223v1.431h5.222v-1.43ZM11.905 9.722H6.683v1.43h5.222zm10.095 0h-5.223v1.43h5.222z"

@@ -27,6 +27,6 @@ export function getStructuredPricingSummary(_vendor: any): StructuredPricingSumm
     ranges: [{ min: 0, max: 100, currency: 'USD', model: 'per month', unit: 'user' }],
     primaryModel: 'subscription',
     hasFreeTier: false,
-    classification: 'commercial'
+    classification: 'commercial',
   };
 }

@@ -15,8 +15,8 @@ export interface Announcement {
   icon_png_url?: string;
   /** Extra props for the main bar/icon */
   icon_svg_props?: Record<string, any>;
-  platform_id: string;  // Foreign key to platforms table
-  platform?: PlatformRecord;  // Joined platform data
+  platform_id: string; // Foreign key to platforms table
+  platform?: PlatformRecord; // Joined platform data
   is_active: boolean;
   // CTA (Call-To-Action) fields
   cta_enabled?: boolean;
@@ -62,7 +62,7 @@ export interface CreateAnnouncementData {
   icon_png_url?: string;
   /** Extra props for the main bar/icon */
   icon_svg_props?: Record<string, any>;
-  platform_id: string;  // Foreign key to platforms table
+  platform_id: string; // Foreign key to platforms table
   is_active?: boolean;
   // CTA (Call-To-Action) fields
   cta_enabled?: boolean;
@@ -86,7 +86,7 @@ export interface UpdateAnnouncementData {
   icon_png_url?: string;
   /** Extra props for the main bar/icon */
   icon_svg_props?: Record<string, any>;
-  platform_id?: string;  // Foreign key to platforms table
+  platform_id?: string; // Foreign key to platforms table
   is_active?: boolean;
   // CTA (Call-To-Action) fields
   cta_enabled?: boolean;
@@ -126,7 +126,7 @@ export interface AnnouncementFormData {
   icon_type: IconType;
   icon_svg_name: string;
   icon_png_file?: File;
-  platform_id: string;  // Foreign key to platforms table
+  platform_id: string; // Foreign key to platforms table
   is_active: boolean;
   // CTA (Call-To-Action) fields
   cta_enabled: boolean;
@@ -145,7 +145,7 @@ export interface AnnouncementFormData {
 
 // API Query Parameters
 export interface GetAnnouncementsOptions {
-  platform?: PlatformFilter;  // Changed from Platform to PlatformFilter to include 'all'
+  platform?: PlatformFilter; // Changed from Platform to PlatformFilter to include 'all'
   is_active?: boolean;
   page?: number;
   pageSize?: number;
@@ -268,16 +268,16 @@ export interface SvgIcon {
 export const AVAILABLE_SVG_ICONS: SvgIcon[] = [
   // OpenFrame Logo Options
   { name: 'openframe-logo', label: 'OpenFrame Logo', component: null as any },
-  
+
   // Platform Logos
   { name: 'openmsp-logo', label: 'OpenMSP Logo', component: null as any },
   { name: 'flamingo-logo', label: 'Flamingo Logo', component: null as any },
-  
+
   // Lucide Icons
   { name: 'megaphone', label: 'Megaphone', component: null as any },
   { name: 'bell', label: 'Bell', component: null as any },
   { name: 'info', label: 'Information', component: null as any },
   { name: 'star', label: 'Star', component: null as any },
   { name: 'rocket', label: 'Rocket', component: null as any },
-  { name: 'package', label: 'Package', component: null as any }
-]; 
+  { name: 'package', label: 'Package', component: null as any },
+];

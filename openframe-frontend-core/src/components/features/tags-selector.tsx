@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
+import { Loader2, Plus, Search, X } from 'lucide-react';
 import { useState } from 'react';
-import { Search, X, Plus, Loader2 } from 'lucide-react';
-import { Button } from '../ui';
 import { cn } from '../../utils';
+import { Button } from '../ui';
 
 interface Tag {
   id: number;
@@ -40,12 +40,12 @@ export function TagsSelector({
   onTagsChange,
   onCreateTag,
   maxTags = 10,
-  placeholder = "Search tags...",
+  placeholder = 'Search tags...',
   className,
   disabled = false,
-  allowCreate = true
+  allowCreate = true,
 }: TagsSelectorProps) {
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
 
@@ -80,9 +80,8 @@ export function TagsSelector({
   };
 
   const getFilteredTagsForAutocomplete = () => {
-    return availableTags.filter(tag =>
-      !selectedTagIds.includes(tag.id) &&
-      tag.name.toLowerCase().includes(searchQuery.toLowerCase())
+    return availableTags.filter(
+      tag => !selectedTagIds.includes(tag.id) && tag.name.toLowerCase().includes(searchQuery.toLowerCase()),
     );
   };
 
@@ -99,7 +98,7 @@ export function TagsSelector({
   const filteredTags = getFilteredTagsForAutocomplete();
 
   return (
-    <div className={cn("space-y-2", className)}>
+    <div className={cn('space-y-2', className)}>
       <div className="relative">
         {/* Search Icon */}
         <div className="absolute top-3 left-3 flex items-center pointer-events-none z-10">
@@ -107,14 +106,16 @@ export function TagsSelector({
         </div>
 
         {/* Input Container with Chips Inside */}
-        <div className={cn(
-          "w-full bg-ods-bg border border-ods-border rounded-lg",
-          "focus-within:ring-2 focus-within:ring-ods-accent focus-within:border-ods-accent",
-          "transition-all duration-200 flex flex-wrap items-center gap-1.5 p-2 pl-10 min-h-[42px]",
-          disabled && "opacity-50 cursor-not-allowed"
-        )}>
+        <div
+          className={cn(
+            'w-full bg-ods-bg border border-ods-border rounded-lg',
+            'focus-within:ring-2 focus-within:ring-ods-accent focus-within:border-ods-accent',
+            'transition-all duration-200 flex flex-wrap items-center gap-1.5 p-2 pl-10 min-h-[42px]',
+            disabled && 'opacity-50 cursor-not-allowed',
+          )}
+        >
           {/* Selected Tag Chips Inside Search Bar */}
-          {getSelectedTags().map((tag) => (
+          {getSelectedTags().map(tag => (
             <span
               key={tag.id}
               className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-ods-accent text-ods-bg text-xs font-medium font-['DM_Sans']"
@@ -125,7 +126,7 @@ export function TagsSelector({
                   variant="ghost"
                   size="none"
                   type="button"
-                  onClick={(e) => {
+                  onClick={e => {
                     e.preventDefault();
                     e.stopPropagation();
                     handleTagRemove(tag.id);
@@ -143,7 +144,7 @@ export function TagsSelector({
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => {
+            onChange={e => {
               setSearchQuery(e.target.value);
               setShowDropdown(true);
             }}
@@ -155,17 +156,23 @@ export function TagsSelector({
             onBlur={() => {
               setTimeout(() => setShowDropdown(false), 200);
             }}
-            onKeyDown={(e) => {
+            onKeyDown={e => {
               if (e.key === 'Enter' && canCreateNewTag) {
                 e.preventDefault();
                 handleCreateTag();
               }
             }}
-            placeholder={selectedTagIds.length >= maxTags ? "Maximum tags reached" : selectedTagIds.length === 0 ? placeholder : "Add more..."}
+            placeholder={
+              selectedTagIds.length >= maxTags
+                ? 'Maximum tags reached'
+                : selectedTagIds.length === 0
+                  ? placeholder
+                  : 'Add more...'
+            }
             disabled={disabled || selectedTagIds.length >= maxTags}
             className={cn(
               "flex-1 min-w-[100px] bg-transparent border-none outline-none text-ods-text-primary placeholder:text-ods-text-secondary text-[14px] font-['DM_Sans'] leading-[1.4em] py-1 focus:outline-none focus:ring-0 focus:border-0",
-              selectedTagIds.length >= maxTags && "cursor-not-allowed opacity-50"
+              selectedTagIds.length >= maxTags && 'cursor-not-allowed opacity-50',
             )}
           />
 
@@ -176,7 +183,7 @@ export function TagsSelector({
               size="none"
               type="button"
               onClick={() => {
-                setSearchQuery("");
+                setSearchQuery('');
                 setShowDropdown(false);
               }}
               centerIcon={<X className="w-3 h-3" />}
@@ -210,7 +217,7 @@ export function TagsSelector({
               {/* Existing Tags */}
               {filteredTags.length > 0 ? (
                 <div className="flex flex-wrap gap-1.5">
-                  {filteredTags.map((tag) => (
+                  {filteredTags.map(tag => (
                     <Button
                       key={tag.id}
                       variant="outline"
@@ -227,7 +234,7 @@ export function TagsSelector({
               ) : !canCreateNewTag ? (
                 <div className="py-4 px-4 text-center w-full">
                   <p className="text-ods-text-secondary text-sm font-['DM_Sans']">
-                    {searchQuery.trim() ? `No tags found for "${searchQuery}"` : "No tags available"}
+                    {searchQuery.trim() ? `No tags found for "${searchQuery}"` : 'No tags available'}
                   </p>
                 </div>
               ) : null}
@@ -242,9 +249,7 @@ export function TagsSelector({
           {selectedTagIds.length} / {maxTags} tags selected
         </div>
         {selectedTagIds.length >= maxTags && (
-          <span className="text-[11px] text-[--ods-attention-red-error] font-['DM_Sans']">
-            (Maximum reached)
-          </span>
+          <span className="text-[11px] text-[--ods-attention-red-error] font-['DM_Sans']">(Maximum reached)</span>
         )}
       </div>
     </div>

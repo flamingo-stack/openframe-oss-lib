@@ -1,6 +1,6 @@
+import { RealCategory } from './categories';
 import { UserProfile } from './user';
 import { Vendor, VendorPricing } from './vendor';
-import { RealCategory } from './categories';
 
 // Selection source enum – indicates whether the vendor selection was AI-generated or manually selected
 export type SelectionSource = 'ai' | 'manual' | 'placeholder' | 'unknown';
@@ -11,6 +11,7 @@ export type SelectionSource = 'ai' | 'manual' | 'placeholder' | 'unknown';
 export type StackVendorType = 'current' | 'alternative';
 
 // MSP (Managed Service Provider) interface
+// biome-ignore lint/style/useNamingConvention: MSP is a well-known industry acronym
 export interface MSP {
   id: string;
   name: string;
@@ -162,12 +163,7 @@ export interface StackTemplate {
 }
 
 // Export types for external use
-export type {
-  UserProfile,
-  Vendor,
-  VendorPricing,
-  RealCategory
-};
+export type { UserProfile, Vendor, VendorPricing, RealCategory };
 
 // Cost calculation interfaces (use slugs for identification)
 export interface StackCostCalculation {
@@ -182,7 +178,7 @@ export interface StackCostCalculation {
   margin_increase_percentage: number;
   monthly_savings: number;
   annual_savings: number;
-  
+
   // Breakdown by category
   category_breakdowns: CategoryCostBreakdown[];
 }
@@ -195,7 +191,7 @@ export interface CategoryCostBreakdown {
 
   savings: number;
   savings_percentage: number;
-  
+
   // Subcategory details
   subcategory_breakdowns: SubcategoryCostBreakdown[];
 }
@@ -326,4 +322,4 @@ export interface StackVendorFilterOptions {
   max_price?: number;
   sort_by?: 'openmsp_score' | 'github_stars' | 'pricing' | 'name';
   sort_order?: 'asc' | 'desc';
-} 
+}

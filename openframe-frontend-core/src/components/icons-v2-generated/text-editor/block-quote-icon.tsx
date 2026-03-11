@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface BlockQuoteIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface BlockQuoteIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function BlockQuoteIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: BlockQuoteIconProps) {
+export function BlockQuoteIcon({ className = '', size = 24, color = 'currentColor', ...props }: BlockQuoteIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

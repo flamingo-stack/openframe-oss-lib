@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface FileEditIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface FileEditIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function FileEditIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: FileEditIconProps) {
+export function FileEditIcon({ className = '', size = 24, color = 'currentColor', ...props }: FileEditIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

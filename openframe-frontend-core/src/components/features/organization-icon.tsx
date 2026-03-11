@@ -1,9 +1,9 @@
-'use client'
+'use client';
 
-import React from 'react'
-import Image from 'next/image'
-import { cn } from "../../utils/cn"
-import { useAuthenticatedImage, type AuthenticatedImageConfig } from '../../hooks/use-authenticated-image'
+import Image from 'next/image';
+import React from 'react';
+import { type AuthenticatedImageConfig, useAuthenticatedImage } from '../../hooks/use-authenticated-image';
+import { cn } from '../../utils/cn';
 
 export interface OrganizationIconProps {
   /**
@@ -12,12 +12,12 @@ export interface OrganizationIconProps {
    * - API path (starts with '/api/')
    * - Full URL (starts with 'http://' or 'https://')
    */
-  imageUrl?: string | null
+  imageUrl?: string | null;
 
   /**
    * Organization name for fallback initials and alt text
    */
-  organizationName: string
+  organizationName: string;
 
   /**
    * Size variant (matching VendorIcon sizes)
@@ -28,22 +28,22 @@ export interface OrganizationIconProps {
    * - l: 56px (w-14 h-14)
    * - xl: 64px (w-16 h-16) - for detail views
    */
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'l' | 'xl'
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'l' | 'xl';
 
   /**
    * Additional CSS classes
    */
-  className?: string
+  className?: string;
 
   /**
    * Show background container (default: true)
    */
-  showBackground?: boolean
+  showBackground?: boolean;
 
   /**
    * Background style variant (default: 'dark')
    */
-  backgroundStyle?: 'dark' | 'light' | 'white'
+  backgroundStyle?: 'dark' | 'light' | 'white';
 }
 
 /**
@@ -55,8 +55,8 @@ const sizeClasses = {
   md: 'w-10 h-10',
   lg: 'w-12 h-12',
   l: 'w-14 h-14',
-  xl: 'w-16 h-16'
-}
+  xl: 'w-16 h-16',
+};
 
 /**
  * Image size mapping matching VendorIcon exactly
@@ -67,17 +67,17 @@ const imageSizeMap = {
   md: { width: 32, height: 32 },
   lg: { width: 40, height: 40 },
   l: { width: 38, height: 38 },
-  xl: { width: 40, height: 40 }
-}
+  xl: { width: 40, height: 40 },
+};
 
 /**
  * Background style classes matching VendorIcon exactly
  */
 const backgroundClasses = {
-  dark: 'bg-[#161616] border border-ods-border',
+  dark: 'bg-ods-bg border border-ods-border',
   light: 'bg-ods-card border border-ods-border',
-  white: 'bg-white border border-[#E5E5E5]'
-}
+  white: 'bg-white border border-ods-border',
+};
 
 /**
  * OrganizationIcon - Reusable component for displaying organization logos
@@ -130,10 +130,10 @@ export function OrganizationIcon({
   showBackground = true,
   backgroundStyle = 'dark',
 }: OrganizationIconProps) {
-  const { width, height } = imageSizeMap[size]
+  const { width, height } = imageSizeMap[size];
 
   // Generate fallback initials (first 2 letters, matching VendorIcon)
-  const initials = organizationName?.substring(0, 2) || '??'
+  const initials = organizationName?.substring(0, 2) || '??';
 
   // Container classes matching VendorIcon exactly
   const containerClasses = cn(
@@ -141,16 +141,18 @@ export function OrganizationIcon({
     'rounded-lg flex items-center justify-center flex-shrink-0 relative',
     showBackground && backgroundClasses[backgroundStyle],
     !showBackground && 'overflow-hidden',
-    className
-  )
+    className,
+  );
 
   return (
     <div className={containerClasses}>
-      <div className={cn(
-        'flex items-center justify-center text-xs font-medium uppercase',
-        imageUrl && 'hidden',
-        backgroundStyle === 'white' ? 'text-ods-text-primary' : 'text-ods-text-secondary'
-      )}>
+      <div
+        className={cn(
+          'flex items-center justify-center text-xs font-medium uppercase',
+          imageUrl && 'hidden',
+          backgroundStyle === 'white' ? 'text-ods-text-primary' : 'text-ods-text-secondary',
+        )}
+      >
         {initials}
       </div>
       {imageUrl && (
@@ -159,17 +161,14 @@ export function OrganizationIcon({
           alt={`${initials}`}
           width={width}
           height={height}
-          className={cn(
-            'absolute object-contain',
-            showBackground ? 'p-1' : 'w-full h-full'
-          )}
-          onError={(e) => {
-            e.currentTarget.style.display = 'none'
-            const el = e.currentTarget.previousElementSibling as HTMLElement
-            if (el) el.classList.remove('hidden')
+          className={cn('absolute object-contain', showBackground ? 'p-1' : 'w-full h-full')}
+          onError={e => {
+            e.currentTarget.style.display = 'none';
+            const el = e.currentTarget.previousElementSibling as HTMLElement;
+            if (el) el.classList.remove('hidden');
           }}
         />
       )}
     </div>
-  )
+  );
 }

@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
 import React from 'react';
-import { Button } from '../ui/button';
-import { getSmallPlatformIcon } from '../../utils/platform-config';
 import type { PlatformConfig } from '../../types/platform';
+import { getSmallPlatformIcon } from '../../utils/platform-config';
+import { Button } from '../ui/button';
 
 // Platform icons are now unified in platform-config utils
 
@@ -22,24 +22,24 @@ export function PlatformFilterComponent({
   platforms = [],
   className = '',
   showIcons = true,
-  size = 'sm'
+  size = 'sm',
 }: PlatformFilterComponentProps) {
   return (
     <div className={`flex items-center gap-2 flex-wrap ${className}`}>
       <Button
         type="button"
-        variant={selectedPlatform === 'all' ? "primary" : "outline"}
+        variant={selectedPlatform === 'all' ? 'primary' : 'outline'}
         size={size}
         onClick={() => onPlatformChange('all')}
         className="text-h3"
       >
         All Platforms
       </Button>
-      {platforms.map((platform) => (
+      {platforms.map(platform => (
         <Button
           key={platform.value}
           type="button"
-          variant={selectedPlatform === platform.value ? "primary" : "outline"}
+          variant={selectedPlatform === platform.value ? 'primary' : 'outline'}
           size={size}
           onClick={() => onPlatformChange(platform.value)}
           leftIcon={showIcons ? getSmallPlatformIcon(platform.value) : undefined}

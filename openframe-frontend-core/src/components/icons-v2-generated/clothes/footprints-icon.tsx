@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface FootprintsIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface FootprintsIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function FootprintsIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: FootprintsIconProps) {
+export function FootprintsIcon({ className = '', size = 24, color = 'currentColor', ...props }: FootprintsIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

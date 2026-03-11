@@ -1,21 +1,15 @@
-"use client"
+'use client';
 
-import * as React from "react"
-import { Video, Image, FileText, Archive, CheckSquare, BookOpen, FileType } from "lucide-react"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./select"
+import { Archive, BookOpen, CheckSquare, FileText, FileType, Image, Video } from 'lucide-react';
+import * as React from 'react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select';
 
-export type ResourceMediaType = 'video' | 'png' | 'jpg' | 'svg' | 'document' | 'pdf' | 'zip' | 'guide' | 'checklist'
+export type ResourceMediaType = 'video' | 'png' | 'jpg' | 'svg' | 'document' | 'pdf' | 'zip' | 'guide' | 'checklist';
 
 interface MediaTypeOption {
-  value: ResourceMediaType
-  label: string
-  icon: React.ReactNode
+  value: ResourceMediaType;
+  label: string;
+  icon: React.ReactNode;
 }
 
 const mediaTypeOptions: MediaTypeOption[] = [
@@ -28,44 +22,38 @@ const mediaTypeOptions: MediaTypeOption[] = [
   { value: 'zip', label: 'ZIP Archive', icon: <Archive className="h-4 w-4" /> },
   { value: 'guide', label: 'Guide', icon: <BookOpen className="h-4 w-4" /> },
   { value: 'checklist', label: 'Checklist', icon: <CheckSquare className="h-4 w-4" /> },
-]
+];
 
 interface MediaTypeSelectorProps {
-  value?: ResourceMediaType
-  onValueChange?: (value: ResourceMediaType) => void
-  placeholder?: string
-  className?: string
-  disabled?: boolean
+  value?: ResourceMediaType;
+  onValueChange?: (value: ResourceMediaType) => void;
+  placeholder?: string;
+  className?: string;
+  disabled?: boolean;
 }
 
 export function MediaTypeSelector({
   value,
   onValueChange,
-  placeholder = "Select media type",
+  placeholder = 'Select media type',
   className,
-  disabled
+  disabled,
 }: MediaTypeSelectorProps) {
   // Force re-render with key to ensure Select updates
   const [key, setKey] = React.useState(0);
-  
+
   React.useEffect(() => {
     // Force re-render when value changes
     setKey(prev => prev + 1);
-  }, [value]);
-  
+  }, []);
+
   return (
-    <Select 
-      key={key}
-      value={value || undefined} 
-      onValueChange={onValueChange} 
-      disabled={disabled}
-      defaultValue={value}
-    >
+    <Select key={key} value={value || undefined} onValueChange={onValueChange} disabled={disabled} defaultValue={value}>
       <SelectTrigger className={className}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
-        {mediaTypeOptions.map((option) => (
+        {mediaTypeOptions.map(option => (
           <SelectItem key={option.value} value={option.value}>
             <div className="flex items-center gap-2">
               {option.icon}
@@ -75,5 +63,5 @@ export function MediaTypeSelector({
         ))}
       </SelectContent>
     </Select>
-  )
+  );
 }

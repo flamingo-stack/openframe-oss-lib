@@ -5,9 +5,7 @@ interface YouTubeIconProps {
   className?: string;
 }
 
-export function YouTubeIcon({ className ,
-  color = 'white'
-}:  YouTubeIconProps) {
+export function YouTubeIcon({ className, color = 'white' }: YouTubeIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

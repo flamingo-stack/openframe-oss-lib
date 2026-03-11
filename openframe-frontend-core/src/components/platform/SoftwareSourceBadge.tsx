@@ -32,15 +32,10 @@
  * ```
  */
 
-import React from 'react'
-import { Button } from '../ui/button'
-import {
-  PackageIcon,
-  WindowsIcon,
-  MacOSIcon,
-  LinuxIcon
-} from '../icons'
-import { cn } from '../../utils/common'
+import React from 'react';
+import { cn } from '../../utils/common';
+import { LinuxIcon, MacOSIcon, PackageIcon, WindowsIcon } from '../icons';
+import { Button } from '../ui/button';
 
 export type SoftwareSource =
   | 'apps'
@@ -60,13 +55,13 @@ export type SoftwareSource =
   | 'portage_packages'
   | 'chocolatey_packages'
   | 'programs'
-  | 'pkg_packages'
+  | 'pkg_packages';
 
 export interface SoftwareSourceBadgeProps {
   /** Software source type from Fleet MDM */
-  source: SoftwareSource
+  source: SoftwareSource;
   /** Additional CSS classes */
-  className?: string
+  className?: string;
 }
 
 /**
@@ -90,26 +85,17 @@ const sourceConfig: Record<SoftwareSource, { label: string; icon: React.ReactNod
   portage_packages: { label: 'Portage', icon: <LinuxIcon className="w-4 h-4" /> },
   chocolatey_packages: { label: 'Chocolatey', icon: <WindowsIcon className="w-4 h-4" /> },
   programs: { label: 'Windows', icon: <WindowsIcon className="w-4 h-4" /> },
-  pkg_packages: { label: 'PKG', icon: <PackageIcon className="w-4 h-4" /> }
-}
+  pkg_packages: { label: 'PKG', icon: <PackageIcon className="w-4 h-4" /> },
+};
 
-export const SoftwareSourceBadge: React.FC<SoftwareSourceBadgeProps> = ({
-  source,
-  className
-}) => {
-  const config = sourceConfig[source] || { label: source, icon: <PackageIcon className="w-4 h-4" /> }
+export const SoftwareSourceBadge: React.FC<SoftwareSourceBadgeProps> = ({ source, className }) => {
+  const config = sourceConfig[source] || { label: source, icon: <PackageIcon className="w-4 h-4" /> };
 
   return (
-    <Button
-      variant="table-display"
-      size="none"
-      leftIcon={config.icon}
-      className={cn(className)}
-      alignment='left'
-    >
+    <Button variant="table-display" size="none" leftIcon={config.icon} className={cn(className)} alignment="left">
       {config.label}
     </Button>
-  )
-}
+  );
+};
 
-SoftwareSourceBadge.displayName = 'SoftwareSourceBadge'
+SoftwareSourceBadge.displayName = 'SoftwareSourceBadge';

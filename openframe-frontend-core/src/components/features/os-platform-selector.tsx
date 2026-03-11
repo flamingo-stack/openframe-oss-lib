@@ -1,38 +1,38 @@
-'use client'
+'use client';
 
-import { OS_TYPES } from '../../types/os.types'
-import { cn } from '../../utils/cn'
-import type { OSPlatformId } from '../../utils/os-platforms'
-import { StatusBadge } from '../ui/status-badge'
-import { OSTypeBadge } from './os-type-badge'
+import { OS_TYPES } from '../../types/os.types';
+import { cn } from '../../utils/cn';
+import type { OSPlatformId } from '../../utils/os-platforms';
+import { StatusBadge } from '../ui/status-badge';
+import { OSTypeBadge } from './os-type-badge';
 
 export interface PlatformSelectorOption {
   /** Platform ID (windows, darwin, linux) */
-  platformId: OSPlatformId
+  platformId: OSPlatformId;
   /** Whether this option is disabled */
-  disabled?: boolean
+  disabled?: boolean;
   /** Optional badge to show (e.g., "Coming Soon") */
   badge?: {
-    text: string
-    colorScheme?: 'cyan' | 'green' | 'yellow' | 'purple' | 'pink' | 'success' | 'error' | 'warning' | 'default'
-  }
+    text: string;
+    colorScheme?: 'cyan' | 'green' | 'yellow' | 'purple' | 'pink' | 'success' | 'error' | 'warning' | 'default';
+  };
 }
 
 export interface OSPlatformSelectorProps {
   /** Currently selected platform */
-  value: OSPlatformId
+  value: OSPlatformId;
   /** Callback when platform selection changes */
-  onValueChange: (platform: OSPlatformId) => void
+  onValueChange: (platform: OSPlatformId) => void;
   /** Label displayed above the selector */
-  label?: string
+  label?: string;
   /** Custom platform options (defaults to all OS_TYPES) */
-  options?: PlatformSelectorOption[]
+  options?: PlatformSelectorOption[];
   /** Disabled platforms (simple array alternative to custom options) */
-  disabledPlatforms?: OSPlatformId[]
+  disabledPlatforms?: OSPlatformId[];
   /** Additional CSS classes for the container */
-  className?: string
+  className?: string;
   /** Icon size for the OS badges */
-  iconSize?: string
+  iconSize?: string;
 }
 
 /**
@@ -77,36 +77,30 @@ export function OSPlatformSelector({
   options,
   disabledPlatforms = [],
   className,
-  iconSize = 'w-5 h-5'
+  iconSize = 'w-5 h-5',
 }: OSPlatformSelectorProps) {
   // Build options from OS_TYPES if not provided
-  const platformOptions: PlatformSelectorOption[] = options || OS_TYPES.map(os => ({
-    platformId: os.platformId,
-    disabled: disabledPlatforms.includes(os.platformId)
-  }))
+  const platformOptions: PlatformSelectorOption[] =
+    options ||
+    OS_TYPES.map(os => ({
+      platformId: os.platformId,
+      disabled: disabledPlatforms.includes(os.platformId),
+    }));
 
   return (
     <div className={cn('flex flex-col gap-2', className)}>
-      {label && (
-        <div className="text-ods-text-primary text-[18px] font-medium">
-          {label}
-        </div>
-      )}
+      {label && <div className="text-ods-text-primary text-[18px] font-medium">{label}</div>}
       <div className="flex w-full bg-ods-bg border border-ods-border rounded-[6px] p-1 gap-1">
-        {platformOptions.map((option) => {
-          const osType = OS_TYPES.find(os => os.platformId === option.platformId)
-          if (!osType) return null
+        {platformOptions.map(option => {
+          const osType = OS_TYPES.find(os => os.platformId === option.platformId);
+          if (!osType) return null;
 
-          const selected = value === option.platformId
-          const isDisabled = option.disabled
+          const selected = value === option.platformId;
+          const isDisabled = option.disabled;
 
           const badgeElement = option.badge ? (
-            <StatusBadge
-              text={option.badge.text}
-              variant="button"
-              colorScheme={option.badge.colorScheme || 'cyan'}
-            />
-          ) : undefined
+            <StatusBadge text={option.badge.text} variant="button" colorScheme={option.badge.colorScheme || 'cyan'} />
+          ) : undefined;
 
           return (
             <div
@@ -125,13 +119,13 @@ export function OSPlatformSelector({
                     ? 'bg-transparent text-ods-text-secondary opacity-50 cursor-not-allowed'
                     : selected
                       ? 'bg-ods-accent text-ods-text-on-accent hover:bg-ods-accent-hover cursor-pointer'
-                      : 'bg-transparent text-ods-text-primary hover:bg-ods-bg-hover cursor-pointer'
+                      : 'bg-transparent text-ods-text-primary hover:bg-ods-bg-hover cursor-pointer',
                 )}
               />
             </div>
-          )
+          );
         })}
       </div>
     </div>
-  )
+  );
 }

@@ -1,20 +1,20 @@
-"use client";
+'use client';
 
-import { Button, Badge } from "../ui";
 import { Check } from 'lucide-react';
 import React from 'react';
+import { Badge, Button } from '../ui';
 
 export interface SelectableOption {
-  id: string;              // Selection ID (UUID for platforms, value for others)
-  name: string;            // Primary identifier (platform enum or item name)
-  displayName?: string;    // Optional display name (for platforms)
+  id: string; // Selection ID (UUID for platforms, value for others)
+  name: string; // Primary identifier (platform enum or item name)
+  displayName?: string; // Optional display name (for platforms)
   description?: string;
   isActive?: boolean;
   createdAt?: string;
   updatedAt?: string;
   icon?: React.ReactNode;
   color?: string;
-  disabled?: boolean;      // If true, option is shown grayed out and not selectable
+  disabled?: boolean; // If true, option is shown grayed out and not selectable
 }
 
 interface PushButtonSelectorProps {
@@ -36,9 +36,7 @@ interface PushButtonSelectorProps {
 function PushButtonSelectorSkeleton({ count = 3, hasTitle }: { count?: number; hasTitle?: boolean }) {
   return (
     <div className="space-y-3">
-      {hasTitle && (
-        <div className="h-5 w-20 bg-ods-bg-secondary rounded animate-pulse" />
-      )}
+      {hasTitle && <div className="h-5 w-20 bg-ods-bg-secondary rounded animate-pulse" />}
       <div className="space-y-3">
         {[...Array(count)].map((_, i) => (
           <div key={i} className="p-4 rounded-lg border border-ods-border bg-ods-bg-secondary animate-pulse">
@@ -63,15 +61,9 @@ function PushButtonSelectorSkeleton({ count = 3, hasTitle }: { count?: number; h
 function PushButtonSelectorError({ message, title }: { message: string; title?: string }) {
   return (
     <div className="space-y-3">
-      {title && (
-        <h3 className="text-h5 text-ods-text-primary">
-          {title}
-        </h3>
-      )}
+      {title && <h3 className="text-h5 text-ods-text-primary">{title}</h3>}
       <div className="p-4 bg-ods-attention-red-error-secondary border border-ods-attention-red-error/30 rounded-lg">
-        <div className="font-['DM_Sans'] text-[14px] text-ods-attention-red-error">
-          ⚠️ {message}
-        </div>
+        <div className="font-['DM_Sans'] text-[14px] text-ods-attention-red-error">⚠️ {message}</div>
       </div>
     </div>
   );
@@ -89,9 +81,8 @@ export function PushButtonSelector({
   optional = false,
   isLoading = false,
   error = null,
-  skeletonCount = 3
+  skeletonCount = 3,
 }: PushButtonSelectorProps) {
-
   // LOADING STATE
   if (isLoading) {
     return (
@@ -111,9 +102,8 @@ export function PushButtonSelector({
   }
 
   // VALIDATION: Only filter invalid selectedIds if options are loaded
-  const validSelectedIds = options.length > 0
-    ? selectedIds.filter(id => options.some(option => option.id === id))
-    : selectedIds; // Keep all IDs if options not loaded yet
+  const validSelectedIds =
+    options.length > 0 ? selectedIds.filter(id => options.some(option => option.id === id)) : selectedIds; // Keep all IDs if options not loaded yet
 
   // Dev warning for debugging (only when options are loaded)
   if (process.env.NODE_ENV === 'development' && options.length > 0 && validSelectedIds.length !== selectedIds.length) {
@@ -139,11 +129,7 @@ export function PushButtonSelector({
 
   return (
     <div className={`space-y-4 ${className}`}>
-      {title && (
-        <h3 className="text-h5 text-ods-text-primary">
-          {title}
-        </h3>
-      )}
+      {title && <h3 className="text-h5 text-ods-text-primary">{title}</h3>}
 
       <div className="space-y-3">
         {options.map(option => {
@@ -154,11 +140,12 @@ export function PushButtonSelector({
               key={option.id}
               className={`
                 p-4 rounded-lg border transition-all duration-200 group
-                ${option.disabled
-                  ? 'cursor-not-allowed opacity-40 bg-ods-card border-ods-border'
-                  : isSelected
-                    ? 'cursor-pointer bg-ods-bg-secondary border-ods-accent shadow-sm'
-                    : 'cursor-pointer bg-ods-bg-primary border-ods-border hover:border-ods-border-hover hover:bg-ods-bg-hover'
+                ${
+                  option.disabled
+                    ? 'cursor-not-allowed opacity-40 bg-ods-card border-ods-border'
+                    : isSelected
+                      ? 'cursor-pointer bg-ods-bg-secondary border-ods-accent shadow-sm'
+                      : 'cursor-pointer bg-ods-bg-primary border-ods-border hover:border-ods-border-hover hover:bg-ods-bg-hover'
                 }
               `}
               onClick={() => !option.disabled && toggleSelection(option.id)}
@@ -166,7 +153,9 @@ export function PushButtonSelector({
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   {option.icon && (
-                    <div className={`flex-shrink-0 transition-transform duration-200 ${isSelected ? 'scale-110' : 'group-hover:scale-105'}`}>
+                    <div
+                      className={`flex-shrink-0 transition-transform duration-200 ${isSelected ? 'scale-110' : 'group-hover:scale-105'}`}
+                    >
                       {option.icon}
                     </div>
                   )}
@@ -183,16 +172,17 @@ export function PushButtonSelector({
                 </div>
 
                 {/* Selection Indicator */}
-                <div className={`
+                <div
+                  className={`
                   flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-all duration-200
-                  ${isSelected
-                    ? 'bg-ods-accent border-ods-accent scale-110'
-                    : 'border-ods-border group-hover:border-ods-border-hover'
+                  ${
+                    isSelected
+                      ? 'bg-ods-accent border-ods-accent scale-110'
+                      : 'border-ods-border group-hover:border-ods-border-hover'
                   }
-                `}>
-                  {isSelected && (
-                    <Check className="w-4 h-4 text-ods-text-primary font-bold" strokeWidth={3} />
-                  )}
+                `}
+                >
+                  {isSelected && <Check className="w-4 h-4 text-ods-text-primary font-bold" strokeWidth={3} />}
                 </div>
               </div>
             </div>
@@ -224,11 +214,7 @@ export function PushButtonSelector({
       )}
 
       {/* Help Text */}
-      {helpText && (
-        <div className="text-[12px] text-ods-text-secondary font-['DM_Sans']">
-          {helpText}
-        </div>
-      )}
+      {helpText && <div className="text-[12px] text-ods-text-secondary font-['DM_Sans']">{helpText}</div>}
 
       {/* Empty State Warning */}
       {validSelectedIds.length === 0 && title && !optional && (

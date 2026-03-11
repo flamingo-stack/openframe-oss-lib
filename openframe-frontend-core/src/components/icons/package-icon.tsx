@@ -1,8 +1,8 @@
-import React from "react"
+import React from 'react';
 
-export interface PackageIconProps extends React.SVGProps<SVGSVGElement> { }
+export interface PackageIconProps extends React.SVGProps<SVGSVGElement> {}
 
-export function PackageIcon({ className = "h-6 w-6", color = 'white', ...props }: PackageIconProps) {
+export function PackageIcon({ className = 'h-6 w-6', color = 'white', ...props }: PackageIconProps) {
   return (
     <svg
       width="24"
@@ -35,5 +35,5 @@ export function PackageIcon({ className = "h-6 w-6", color = 'white', ...props }
         strokeLinejoin="round"
       />
     </svg>
-  )
+  );
 }

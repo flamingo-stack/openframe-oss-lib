@@ -1,9 +1,9 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { useState } from 'react'
-import { fn } from 'storybook/test'
-import { Button } from '../components/ui/button'
-import { MobileFilterModal, type FilterGroup, type SortConfig } from '../components/ui/mobile-filter-sheet'
-import type { TableFilters } from '../components/ui/table/types'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
+import { fn } from 'storybook/test';
+import { Button } from '../components/ui/button';
+import { type FilterGroup, MobileFilterModal, type SortConfig } from '../components/ui/mobile-filter-sheet';
+import type { TableFilters } from '../components/ui/table/types';
 
 const meta = {
   title: 'UI/MobileFilterModal',
@@ -36,10 +36,10 @@ const meta = {
       description: 'Text for apply button',
     },
   },
-} satisfies Meta<typeof MobileFilterModal>
+} satisfies Meta<typeof MobileFilterModal>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 const defaultFilterGroups: FilterGroup[] = [
   {
@@ -52,11 +52,11 @@ const defaultFilterGroups: FilterGroup[] = [
       { id: 'decommissioned', label: 'Decommissioned', count: 175 },
     ],
   },
-]
+];
 
 const defaultCurrentFilters: TableFilters = {
-  statuses: ['active', 'inactive', 'decommissioned']
-}
+  statuses: ['active', 'inactive', 'decommissioned'],
+};
 
 /**
  * Default MobileFilterModal with status filters (matching Figma design).
@@ -72,25 +72,25 @@ export const Default: Story = {
     resetButtonText: 'Reset Filters',
     applyButtonText: 'Apply Filters',
   },
-}
+};
 
 /**
  * Interactive example with state management.
  */
 export const Interactive: Story = {
   render: function InteractiveStory() {
-    const [isOpen, setIsOpen] = useState(false)
-    const [currentFilters, setCurrentFilters] = useState<TableFilters>(defaultCurrentFilters)
+    const [isOpen, setIsOpen] = useState(false);
+    const [currentFilters, setCurrentFilters] = useState<TableFilters>(defaultCurrentFilters);
 
     const handleFilterChange = (filters: TableFilters) => {
-      setCurrentFilters(filters)
-      setIsOpen(false)
-      console.log('Applied filters:', filters)
-    }
+      setCurrentFilters(filters);
+      setIsOpen(false);
+      console.log('Applied filters:', filters);
+    };
 
     const getActiveFilterCount = () => {
-      return Object.values(currentFilters).flat().length
-    }
+      return Object.values(currentFilters).flat().length;
+    };
 
     return (
       <div className="flex flex-col items-center gap-4">
@@ -105,7 +105,7 @@ export const Interactive: Story = {
           onFilterChange={handleFilterChange}
         />
       </div>
-    )
+    );
   },
   args: {
     isOpen: false,
@@ -114,7 +114,7 @@ export const Interactive: Story = {
     onFilterChange: fn(),
     onClose: fn(),
   },
-}
+};
 
 /**
  * Multiple filter groups example.
@@ -192,12 +192,12 @@ export const MultipleGroups: Story = {
       locations: ['usa'],
       departments: ['hr'],
       roles: ['admin'],
-      permissions: ['read']
+      permissions: ['read'],
     },
     onFilterChange: fn(),
     onClose: fn(),
   },
-}
+};
 
 /**
  * Without counts - simple filter list.
@@ -218,12 +218,12 @@ export const WithoutCounts: Story = {
       },
     ],
     currentFilters: {
-      visibility: ['public', 'internal']
+      visibility: ['public', 'internal'],
     },
     onFilterChange: fn(),
     onClose: fn(),
   },
-}
+};
 
 const defaultSortConfig: SortConfig = {
   columns: [
@@ -233,7 +233,7 @@ const defaultSortConfig: SortConfig = {
   ],
   sortBy: 'name',
   sortDirection: 'asc',
-}
+};
 
 /**
  * With sorting options.
@@ -249,7 +249,7 @@ export const WithSorting: Story = {
     sortConfig: defaultSortConfig,
     onSort: fn(),
   },
-}
+};
 
 /**
  * Sorting only - no filters.
@@ -265,17 +265,17 @@ export const SortingOnly: Story = {
     sortConfig: defaultSortConfig,
     onSort: fn(),
   },
-}
+};
 
 /**
  * Interactive example with sorting and filters.
  */
 export const InteractiveWithSorting: Story = {
   render: function InteractiveWithSortingStory() {
-    const [isOpen, setIsOpen] = useState(false)
-    const [currentFilters, setCurrentFilters] = useState<TableFilters>(defaultCurrentFilters)
-    const [sortBy, setSortBy] = useState<string>('name')
-    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+    const [isOpen, setIsOpen] = useState(false);
+    const [currentFilters, setCurrentFilters] = useState<TableFilters>(defaultCurrentFilters);
+    const [sortBy, setSortBy] = useState<string>('name');
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
     const sortConfig: SortConfig = {
       columns: [
@@ -285,23 +285,23 @@ export const InteractiveWithSorting: Story = {
       ],
       sortBy,
       sortDirection,
-    }
+    };
 
     const handleFilterChange = (filters: TableFilters) => {
-      setCurrentFilters(filters)
-      setIsOpen(false)
-      console.log('Applied filters:', filters)
-      console.log('Applied sort:', sortBy, sortDirection)
-    }
+      setCurrentFilters(filters);
+      setIsOpen(false);
+      console.log('Applied filters:', filters);
+      console.log('Applied sort:', sortBy, sortDirection);
+    };
 
     const handleSort = (column: string, direction: 'asc' | 'desc') => {
-      setSortBy(column)
-      setSortDirection(direction)
-    }
+      setSortBy(column);
+      setSortDirection(direction);
+    };
 
     const getActiveFilterCount = () => {
-      return Object.values(currentFilters).flat().length
-    }
+      return Object.values(currentFilters).flat().length;
+    };
 
     return (
       <div className="flex flex-col items-center gap-4">
@@ -321,7 +321,7 @@ export const InteractiveWithSorting: Story = {
           onSort={handleSort}
         />
       </div>
-    )
+    );
   },
   args: {
     isOpen: false,
@@ -330,4 +330,4 @@ export const InteractiveWithSorting: Story = {
     onFilterChange: fn(),
     onClose: fn(),
   },
-}
+};

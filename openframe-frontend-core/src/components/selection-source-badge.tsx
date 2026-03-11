@@ -1,7 +1,7 @@
-"use client"
+'use client';
 
 import React from 'react';
-import { cn } from "../utils/cn";
+import { cn } from '../utils/cn';
 import { VendorTag } from './vendor-tag';
 
 export type SelectionSourceType = 'ai' | 'manual' | 'placeholder';
@@ -20,7 +20,7 @@ export function SelectionSourceBadge({ source, hidden = false }: SelectionSource
   if (!source) {
     return null;
   }
-  
+
   return (
     <VendorTag
       key={`source-${source}`}
@@ -29,4 +29,4 @@ export function SelectionSourceBadge({ source, hidden = false }: SelectionSource
       hidden={hidden}
     />
   );
-} 
+}

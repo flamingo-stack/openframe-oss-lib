@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface HotdogIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface HotdogIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function HotdogIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: HotdogIconProps) {
+export function HotdogIcon({ className = '', size = 24, color = 'currentColor', ...props }: HotdogIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

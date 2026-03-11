@@ -1,14 +1,13 @@
-import type { SVGProps } from "react";
-export interface Sparkle02BlinkIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface Sparkle02BlinkIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
 export function Sparkle02BlinkIcon({
-  className = "",
+  className = '',
   size = 24,
-  color = "currentColor",
+  color = 'currentColor',
   ...props
 }: Sparkle02BlinkIconProps) {
   return (

@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface BasketCheckIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface BasketCheckIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function BasketCheckIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: BasketCheckIconProps) {
+export function BasketCheckIcon({ className = '', size = 24, color = 'currentColor', ...props }: BasketCheckIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

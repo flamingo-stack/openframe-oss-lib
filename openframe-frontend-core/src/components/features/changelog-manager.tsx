@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import { Button, Input, Textarea, Label } from '../ui';
-import { Trash2, Plus, ChevronDown, ChevronUp } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import type { ChangelogEntry } from '../../types/product-release';
+import { Button, Input, Label, Textarea } from '../ui';
 
 interface ChangelogManagerProps {
   title: string;
@@ -19,7 +19,7 @@ export function ChangelogManager({
   entries,
   onChange,
   className = '',
-  expandAll = false
+  expandAll = false,
 }: ChangelogManagerProps) {
   const [expandedIndices, setExpandedIndices] = useState<Set<number>>(new Set());
 
@@ -28,12 +28,12 @@ export function ChangelogManager({
     if (expandAll && entries.length > 0) {
       setExpandedIndices(new Set(entries.map((_, i) => i)));
     }
-  }, [expandAll, entries.length]);
+  }, [expandAll, entries.length, entries.map]);
 
   const addEntry = () => {
     const newEntry: ChangelogEntry = {
       title: '',
-      description: ''
+      description: '',
     };
     onChange([...entries, newEntry]);
     // Expand the newly added entry
@@ -74,9 +74,7 @@ export function ChangelogManager({
   return (
     <div className={`space-y-3 ${className}`}>
       <div className="flex items-center justify-between">
-        <Label className="text-[14px] text-ods-text-primary">
-          {title}
-        </Label>
+        <Label className="text-[14px] text-ods-text-primary">{title}</Label>
         <Button
           type="button"
           variant="outline"
@@ -139,9 +137,9 @@ export function ChangelogManager({
                   <Input
                     placeholder="e.g., New dark mode theme support"
                     value={entry.title}
-                    onChange={(e) => updateEntry(index, 'title', e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
-                    className="bg-[#161616]"
+                    onChange={e => updateEntry(index, 'title', e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && e.preventDefault()}
+                    className="bg-ods-bg"
                   />
                 </div>
 
@@ -151,9 +149,9 @@ export function ChangelogManager({
                   <Textarea
                     placeholder="Detailed explanation of the change..."
                     value={entry.description || ''}
-                    onChange={(e) => updateEntry(index, 'description', e.target.value)}
+                    onChange={e => updateEntry(index, 'description', e.target.value)}
                     rows={2}
-                    className="bg-[#161616]"
+                    className="bg-ods-bg"
                   />
                 </div>
               </div>

@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
 import { useState } from 'react';
-import { Button } from "../ui/button";
-import { MicrosoftIcon, GoogleLogo, SlackIcon, GitHubIcon } from "../icons";
+import { GitHubIcon, GoogleLogo, MicrosoftIcon, SlackIcon } from '../icons';
+import { Button } from '../ui/button';
 
 interface ProviderButtonProps {
   provider: 'microsoft' | 'google' | 'slack' | 'github';

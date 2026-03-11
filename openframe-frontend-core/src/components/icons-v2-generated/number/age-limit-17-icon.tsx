@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface AgeLimit17IconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface AgeLimit17IconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function AgeLimit17Icon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: AgeLimit17IconProps) {
+export function AgeLimit17Icon({ className = '', size = 24, color = 'currentColor', ...props }: AgeLimit17IconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

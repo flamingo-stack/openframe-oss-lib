@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface PlaneAltIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface PlaneAltIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function PlaneAltIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: PlaneAltIconProps) {
+export function PlaneAltIcon({ className = '', size = 24, color = 'currentColor', ...props }: PlaneAltIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

@@ -5,9 +5,9 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync,
 import { basename, dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const rootDir = join(__dirname, '..');
+const Filename = fileURLToPath(import.meta.url);
+const Dirname = dirname(Filename);
+const rootDir = join(Dirname, '..');
 
 const ICONS_V2_DIR = join(rootDir, 'src/components/icons-v2');
 const OUTPUT_DIR = join(rootDir, 'src/components/icons-v2-generated');
@@ -16,7 +16,7 @@ const OUTPUT_DIR = join(rootDir, 'src/components/icons-v2-generated');
 function toPascalCase(str) {
   return str
     .split(/[-\s]+/)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join('');
 }
 
@@ -27,7 +27,7 @@ function toKebabCase(str) {
 
 // Get all category directories
 function getCategories() {
-  return readdirSync(ICONS_V2_DIR).filter((item) => {
+  return readdirSync(ICONS_V2_DIR).filter(item => {
     const itemPath = join(ICONS_V2_DIR, item);
     return statSync(itemPath).isDirectory() && !item.startsWith('.');
   });
@@ -44,8 +44,8 @@ function getOriginalSvgNames(categoryPath) {
     if (/^\d/.test(name)) {
       throw new Error(
         `Invalid icon name: "${name}" starts with a number. ` +
-        `Icon names cannot start with numbers as they would generate invalid JavaScript/TypeScript identifiers. ` +
-        `Please rename the file to start with a letter (e.g., "point-100" instead of "100-point").`
+          `Icon names cannot start with numbers as they would generate invalid JavaScript/TypeScript identifiers. ` +
+          `Please rename the file to start with a letter (e.g., "point-100" instead of "100-point").`,
       );
     }
   }
@@ -111,9 +111,10 @@ function processGeneratedCategory(categoryPath, originalNames) {
   exports.sort((a, b) => a.componentName.localeCompare(b.componentName));
 
   // Generate index.ts
-  const indexContent = exports
-    .map(({ componentName, kebabName }) => `export { ${componentName} } from './${kebabName}-icon';`)
-    .join('\n') + '\n';
+  const indexContent =
+    exports
+      .map(({ componentName, kebabName }) => `export { ${componentName} } from './${kebabName}-icon';`)
+      .join('\n') + '\n';
 
   writeFileSync(join(categoryPath, 'index.ts'), indexContent);
 
@@ -149,10 +150,10 @@ for (const category of categories) {
 
   // Run SVGR for entire category at once
   try {
-    execSync(
-      `npx @svgr/cli --config-file svgr.config.cjs --out-dir "${outputPath}" -- "${inputPath}"`,
-      { cwd: rootDir, stdio: 'pipe' }
-    );
+    execSync(`npx @svgr/cli --config-file svgr.config.cjs --out-dir "${outputPath}" -- "${inputPath}"`, {
+      cwd: rootDir,
+      stdio: 'pipe',
+    });
 
     // Post-process generated files
     const count = processGeneratedCategory(outputPath, originalNames);
@@ -165,8 +166,8 @@ for (const category of categories) {
 
 // Generate root index.ts
 const categoryExports = categories
-  .filter((cat) => existsSync(join(OUTPUT_DIR, cat, 'index.ts')))
-  .map((cat) => `export * from './${cat}';`)
+  .filter(cat => existsSync(join(OUTPUT_DIR, cat, 'index.ts')))
+  .map(cat => `export * from './${cat}';`)
   .join('\n');
 
 writeFileSync(join(OUTPUT_DIR, 'index.ts'), categoryExports + '\n');

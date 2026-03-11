@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface AzureAdLogoIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface AzureAdLogoIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function AzureAdLogoIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: AzureAdLogoIconProps) {
+export function AzureAdLogoIcon({ className = '', size = 24, color = 'currentColor', ...props }: AzureAdLogoIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

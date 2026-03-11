@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface CodeAIIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface CodeAIIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function CodeAIIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: CodeAIIconProps) {
+export function CodeAIIcon({ className = '', size = 24, color = 'currentColor', ...props }: CodeAIIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

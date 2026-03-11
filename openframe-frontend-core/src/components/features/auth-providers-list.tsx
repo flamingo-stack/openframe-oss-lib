@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { ProviderButton } from './provider-button';
 
@@ -23,13 +23,13 @@ interface AuthProvidersListProps {
   orientation?: 'vertical' | 'horizontal';
 }
 
-export function AuthProvidersList({ 
+export function AuthProvidersList({
   enabledProviders,
   onProviderClick,
   loading = false,
   showDivider = true,
-  dividerText = "or",
-  orientation = "vertical"
+  dividerText = 'or',
+  orientation = 'vertical',
 }: AuthProvidersListProps) {
   if (!enabledProviders.length) {
     return null;
@@ -55,11 +55,11 @@ export function AuthProvidersList({
           </div>
         </div>
       )}
-      
+
       <div className={`${orientation === 'horizontal' ? 'flex gap-2' : 'space-y-2'}`}>
         {enabledProviders
           .filter(provider => provider.enabled)
-          .map((provider) => (
+          .map(provider => (
             <ProviderButton
               key={provider.provider}
               provider={provider.provider as 'microsoft' | 'google' | 'slack' | 'github'}

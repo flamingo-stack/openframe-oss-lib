@@ -1,7 +1,15 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { fn } from 'storybook/test'
-import { ColorsIcon, PlusCircleIcon, PlayCircleIcon, CheckCircleIcon, PenEditIcon, CalendarDaysIcon, VialIcon } from '../components/icons-v2-generated'
-import { PageActions } from '../components/ui/page-actions'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { fn } from 'storybook/test';
+import {
+  CalendarDaysIcon,
+  CheckCircleIcon,
+  ColorsIcon,
+  PenEditIcon,
+  PlayCircleIcon,
+  PlusCircleIcon,
+  VialIcon,
+} from '../components/icons-v2-generated';
+import { PageActions } from '../components/ui/page-actions';
 
 const meta = {
   title: 'UI/PageActions',
@@ -44,16 +52,16 @@ Use with \`PageContainer\` headerActions prop for consistent page layouts.
     },
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ padding: '2rem', backgroundColor: 'var(--ods-bg)', minHeight: '200px' }}>
         <Story />
       </div>
     ),
   ],
-} satisfies Meta<typeof PageActions>
+} satisfies Meta<typeof PageActions>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 /**
  * Icon buttons variant - used for list pages like Scripts.
@@ -75,7 +83,7 @@ export const IconButtons: Story = {
       },
     ],
   },
-}
+};
 
 /**
  * Primary buttons variant - used for form/detail pages.
@@ -97,7 +105,7 @@ export const PrimaryButtons: Story = {
       },
     ],
   },
-}
+};
 
 /**
  * Primary buttons with icons
@@ -120,7 +128,7 @@ export const PrimaryButtonsWithIcons: Story = {
       },
     ],
   },
-}
+};
 
 /**
  * Single primary button
@@ -137,7 +145,7 @@ export const SinglePrimaryButton: Story = {
       },
     ],
   },
-}
+};
 
 /**
  * Single icon button - shows as icon on mobile instead of collapsing to menu
@@ -156,11 +164,12 @@ export const SingleIconButton: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'When there is only one action in icon-buttons variant, it displays as an icon button on mobile instead of collapsing to a MoreActionsMenu.',
+        story:
+          'When there is only one action in icon-buttons variant, it displays as an icon button on mobile instead of collapsing to a MoreActionsMenu.',
       },
     },
   },
-}
+};
 
 /**
  * Icon buttons with three actions
@@ -186,7 +195,7 @@ export const ThreeIconButtons: Story = {
       },
     ],
   },
-}
+};
 
 /**
  * With disabled and loading states
@@ -209,7 +218,7 @@ export const WithStates: Story = {
       },
     ],
   },
-}
+};
 
 /**
  * Small gap between buttons
@@ -231,7 +240,7 @@ export const SmallGap: Story = {
       },
     ],
   },
-}
+};
 
 /**
  * Large gap between buttons
@@ -253,7 +262,7 @@ export const LargeGap: Story = {
       },
     ],
   },
-}
+};
 
 /**
  * Menu + primary variant - shows MoreActionsMenu ("...") + primary button on desktop.
@@ -288,7 +297,7 @@ export const MenuPrimary: Story = {
       },
     ],
   },
-}
+};
 
 /**
  * Menu + primary with a single menu action
@@ -312,7 +321,7 @@ export const MenuPrimarySingleAction: Story = {
       },
     ],
   },
-}
+};
 
 /**
  * Menu + primary with loading state on the primary button
@@ -341,7 +350,7 @@ export const MenuPrimaryLoading: Story = {
       },
     ],
   },
-}
+};
 
 /**
  * Mobile-only actions with `showOnlyMobile` — some actions appear only on mobile.
@@ -377,7 +386,7 @@ export const MobileOnlyActions: Story = {
       },
     },
   },
-}
+};
 
 /**
  * Primary buttons with a mobile-only action.
@@ -403,9 +412,8 @@ export const PrimaryButtonsMobileOnly: Story = {
   parameters: {
     docs: {
       description: {
-        story:
-          'The "Delete" button only appears in the mobile bottom bar. On desktop only "Save Changes" is shown.',
+        story: 'The "Delete" button only appears in the mobile bottom bar. On desktop only "Save Changes" is shown.',
       },
     },
   },
-}
+};

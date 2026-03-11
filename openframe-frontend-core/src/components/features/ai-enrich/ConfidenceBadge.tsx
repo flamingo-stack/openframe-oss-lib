@@ -1,28 +1,28 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { cn } from '../../../utils/cn'
+import React from 'react';
+import { cn } from '../../../utils/cn';
 import {
-  getConfidenceLevel,
-  getConfidenceLabel,
-  getConfidenceBorderClass,
-  getConfidenceTextClass,
   getConfidenceBgClass,
-} from '../../../utils/confidence-helpers'
+  getConfidenceBorderClass,
+  getConfidenceLabel,
+  getConfidenceLevel,
+  getConfidenceTextClass,
+} from '../../../utils/confidence-helpers';
 
 export interface ConfidenceBadgeProps {
-  confidence?: number
-  showLabel?: boolean
-  showPercentage?: boolean
-  size?: 'sm' | 'md' | 'lg'
-  className?: string
+  confidence?: number;
+  showLabel?: boolean;
+  showPercentage?: boolean;
+  size?: 'sm' | 'md' | 'lg';
+  className?: string;
 }
 
 const sizeStyles = {
   sm: 'text-xs px-1.5 py-0.5',
   md: 'text-sm px-2 py-1',
   lg: 'text-base px-3 py-1.5',
-}
+};
 
 export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({
   confidence,
@@ -31,16 +31,16 @@ export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({
   size = 'sm',
   className,
 }) => {
-  const level = getConfidenceLevel(confidence)
+  const level = getConfidenceLevel(confidence);
 
   if (level === 'none') {
-    return null
+    return null;
   }
 
-  const label = getConfidenceLabel(confidence)
-  const borderClass = getConfidenceBorderClass(confidence)
-  const textClass = getConfidenceTextClass(confidence)
-  const bgClass = getConfidenceBgClass(confidence)
+  const label = getConfidenceLabel(confidence);
+  const borderClass = getConfidenceBorderClass(confidence);
+  const textClass = getConfidenceTextClass(confidence);
+  const bgClass = getConfidenceBgClass(confidence);
 
   return (
     <span
@@ -50,13 +50,11 @@ export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({
         borderClass,
         textClass,
         bgClass,
-        className
+        className,
       )}
     >
       {showLabel && <span>{label}</span>}
-      {showPercentage && confidence !== undefined && (
-        <span className="opacity-75">({confidence}%)</span>
-      )}
+      {showPercentage && confidence !== undefined && <span className="opacity-75">({confidence}%)</span>}
     </span>
-  )
-}
+  );
+};

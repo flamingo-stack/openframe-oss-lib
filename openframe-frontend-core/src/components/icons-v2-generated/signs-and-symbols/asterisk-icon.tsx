@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface AsteriskIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface AsteriskIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function AsteriskIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: AsteriskIconProps) {
+export function AsteriskIcon({ className = '', size = 24, color = 'currentColor', ...props }: AsteriskIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

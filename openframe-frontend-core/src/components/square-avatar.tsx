@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
 import React from 'react';
-import { cn } from "../utils/cn";
+import { cn } from '../utils/cn';
 import { getProxiedImageUrl } from '../utils/image-proxy';
 
 interface SquareAvatarProps {
@@ -25,7 +25,7 @@ export function SquareAvatar({ src, fallbackName = '', size = 56, fullWidth = fa
     if (!fallbackName) return '';
     return fallbackName
       .split(' ')
-      .map((n) => n.charAt(0))
+      .map(n => n.charAt(0))
       .join('')
       .slice(0, 2)
       .toUpperCase();
@@ -46,13 +46,10 @@ export function SquareAvatar({ src, fallbackName = '', size = 56, fullWidth = fa
         // eslint-disable-next-line @next/next/no-img-element
         <img src={getProxiedImageUrl(src) || src} alt="Avatar" className="object-cover w-full h-full" />
       ) : (
-        <span className={cn(
-          "font-['DM_Sans'] text-ods-text-primary font-bold",
-          fullWidth ? 'text-4xl' : 'text-lg'
-        )}>
+        <span className={cn("font-['DM_Sans'] text-ods-text-primary font-bold", fullWidth ? 'text-4xl' : 'text-lg')}>
           {initials}
         </span>
       )}
     </div>
   );
-} 
+}

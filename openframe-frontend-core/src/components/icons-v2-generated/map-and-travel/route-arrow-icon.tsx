@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface RouteArrowIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface RouteArrowIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function RouteArrowIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: RouteArrowIconProps) {
+export function RouteArrowIcon({ className = '', size = 24, color = 'currentColor', ...props }: RouteArrowIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

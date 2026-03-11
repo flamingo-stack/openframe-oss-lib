@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface StrawberryIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface StrawberryIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function StrawberryIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: StrawberryIconProps) {
+export function StrawberryIcon({ className = '', size = 24, color = 'currentColor', ...props }: StrawberryIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface CameraOffIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface CameraOffIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function CameraOffIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: CameraOffIconProps) {
+export function CameraOffIcon({ className = '', size = 24, color = 'currentColor', ...props }: CameraOffIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

@@ -28,7 +28,7 @@ export { UserMinusIcon } from './user-minus-icon';
 export { UserPlusIcon } from './user-plus-icon';
 export { UserSearchIcon } from './user-search-icon';
 export { UserSettingsIcon } from './user-settings-icon';
+export { UserXmarkIcon } from './user-xmark-icon';
 export { UsersGroupIcon } from './users-group-icon';
 export { UsersIcon } from './users-icon';
 export { UsersPlusIcon } from './users-plus-icon';
-export { UserXmarkIcon } from './user-xmark-icon';

@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface SkateBootsIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface SkateBootsIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function SkateBootsIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: SkateBootsIconProps) {
+export function SkateBootsIcon({ className = '', size = 24, color = 'currentColor', ...props }: SkateBootsIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

@@ -1,14 +1,13 @@
-import type { SVGProps } from "react";
-export interface AlphabetZSquareIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface AlphabetZSquareIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
 export function AlphabetZSquareIcon({
-  className = "",
+  className = '',
   size = 24,
-  color = "currentColor",
+  color = 'currentColor',
   ...props
 }: AlphabetZSquareIconProps) {
   return (

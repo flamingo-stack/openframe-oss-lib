@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface Number7IconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface Number7IconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function Number7Icon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: Number7IconProps) {
+export function Number7Icon({ className = '', size = 24, color = 'currentColor', ...props }: Number7IconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

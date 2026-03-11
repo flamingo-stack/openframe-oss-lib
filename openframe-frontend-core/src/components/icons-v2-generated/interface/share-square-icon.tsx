@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface ShareSquareIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface ShareSquareIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function ShareSquareIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: ShareSquareIconProps) {
+export function ShareSquareIcon({ className = '', size = 24, color = 'currentColor', ...props }: ShareSquareIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

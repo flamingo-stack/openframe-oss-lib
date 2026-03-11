@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface CallMinusIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface CallMinusIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function CallMinusIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: CallMinusIconProps) {
+export function CallMinusIcon({ className = '', size = 24, color = 'currentColor', ...props }: CallMinusIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

@@ -1,16 +1,16 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { Button } from '../components/ui/button'
-import { Table, type TableColumn } from '../components/ui/table'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { Button } from '../components/ui/button';
+import { Table, type TableColumn } from '../components/ui/table';
 
 interface User {
-  id: string
-  name: string
-  email: string
-  role: string
-  status: 'active' | 'inactive' | 'pending'
-  department: string
-  lastLogin: string
-  createdAt: string
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  status: 'active' | 'inactive' | 'pending';
+  department: string;
+  lastLogin: string;
+  createdAt: string;
 }
 
 const sampleUsers: User[] = [
@@ -22,7 +22,7 @@ const sampleUsers: User[] = [
     status: 'active',
     department: 'Engineering',
     lastLogin: '2024-01-20',
-    createdAt: '2023-01-15'
+    createdAt: '2023-01-15',
   },
   {
     id: '2',
@@ -32,7 +32,7 @@ const sampleUsers: User[] = [
     status: 'active',
     department: 'Engineering',
     lastLogin: '2024-01-19',
-    createdAt: '2023-03-22'
+    createdAt: '2023-03-22',
   },
   {
     id: '3',
@@ -42,7 +42,7 @@ const sampleUsers: User[] = [
     status: 'inactive',
     department: 'Design',
     lastLogin: '2024-01-10',
-    createdAt: '2023-06-10'
+    createdAt: '2023-06-10',
   },
   {
     id: '4',
@@ -52,7 +52,7 @@ const sampleUsers: User[] = [
     status: 'active',
     department: 'Product',
     lastLogin: '2024-01-20',
-    createdAt: '2023-02-18'
+    createdAt: '2023-02-18',
   },
   {
     id: '5',
@@ -62,9 +62,9 @@ const sampleUsers: User[] = [
     status: 'pending',
     department: 'Engineering',
     lastLogin: '2024-01-18',
-    createdAt: '2024-01-01'
-  }
-]
+    createdAt: '2024-01-01',
+  },
+];
 
 const meta = {
   title: 'UI/Table',
@@ -73,15 +73,16 @@ const meta = {
     layout: 'padded',
     docs: {
       description: {
-        component: 'A responsive table component with support for sorting, filtering, selection, and responsive column visibility using Tailwind breakpoints.'
-      }
-    }
+        component:
+          'A responsive table component with support for sorting, filtering, selection, and responsive column visibility using Tailwind breakpoints.',
+      },
+    },
   },
-  tags: ['autodocs']
-} satisfies Meta<typeof Table<User>>
+  tags: ['autodocs'],
+} satisfies Meta<typeof Table<User>>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 /**
  * Basic table with all columns visible on all screen sizes.
@@ -93,11 +94,11 @@ export const Basic: Story = {
       { key: 'name', label: 'Name' },
       { key: 'email', label: 'Email' },
       { key: 'role', label: 'Role' },
-      { key: 'status', label: 'Status' }
+      { key: 'status', label: 'Status' },
     ] as TableColumn<User>[],
-    rowKey: 'id'
-  }
-}
+    rowKey: 'id',
+  },
+};
 
 /**
  * Table demonstrating responsive column visibility with hideAt property.
@@ -122,22 +123,23 @@ export const ResponsiveColumns: Story = {
       { key: 'lastLogin', label: 'Last Login', hideAt: 'lg' },
     ] as TableColumn<User>[],
     rowKey: 'id',
-    renderRowActions: (item) => (
+    renderRowActions: _item => (
       <div>
         <Button variant="outline" size="sm">
           Edit
         </Button>
       </div>
-    )
+    ),
   },
   parameters: {
     docs: {
       description: {
-        story: 'This example demonstrates progressive disclosure of information. The most important columns (Name, Email) are always visible, while additional details appear as screen size increases. Try resizing your browser window to see the columns show/hide at different breakpoints.'
-      }
-    }
-  }
-}
+        story:
+          'This example demonstrates progressive disclosure of information. The most important columns (Name, Email) are always visible, while additional details appear as screen size increases. Try resizing your browser window to see the columns show/hide at different breakpoints.',
+      },
+    },
+  },
+};
 
 /**
  * Table with multiple breakpoint hiding for specific columns.
@@ -150,18 +152,19 @@ export const MultipleBreakpoints: Story = {
       { key: 'id', label: 'ID', hideAt: ['md', 'lg'], width: 'w-20' },
       { key: 'name', label: 'Name', width: 'min-w-[150px]' },
       { key: 'email', label: 'Email', width: 'min-w-[200px]' },
-      { key: 'role', label: 'Role', width: 'min-w-[120px]' }
+      { key: 'role', label: 'Role', width: 'min-w-[120px]' },
     ] as TableColumn<User>[],
-    rowKey: 'id'
+    rowKey: 'id',
   },
   parameters: {
     docs: {
       description: {
-        story: 'The ID column uses hideAt with an array of breakpoints, making it visible on sm (640px+), hidden on md and lg, then visible again on xl (1280px+) and 2xl (1536px+).'
-      }
-    }
-  }
-}
+        story:
+          'The ID column uses hideAt with an array of breakpoints, making it visible on sm (640px+), hidden on md and lg, then visible again on xl (1280px+) and 2xl (1536px+).',
+      },
+    },
+  },
+};
 
 /**
  * Loading state with skeleton rows.
@@ -173,13 +176,13 @@ export const Loading: Story = {
       { key: 'name', label: 'Name' },
       { key: 'email', label: 'Email' },
       { key: 'role', label: 'Role', hideAt: 'md' },
-      { key: 'status', label: 'Status', hideAt: 'lg' }
+      { key: 'status', label: 'Status', hideAt: 'lg' },
     ] as TableColumn<User>[],
     rowKey: 'id',
     loading: true,
-    skeletonRows: 5
-  }
-}
+    skeletonRows: 5,
+  },
+};
 
 /**
  * Empty state.
@@ -191,12 +194,12 @@ export const Empty: Story = {
       { key: 'name', label: 'Name' },
       { key: 'email', label: 'Email' },
       { key: 'role', label: 'Role' },
-      { key: 'status', label: 'Status' }
+      { key: 'status', label: 'Status' },
     ] as TableColumn<User>[],
     rowKey: 'id',
-    emptyMessage: 'No users found'
-  }
-}
+    emptyMessage: 'No users found',
+  },
+};
 
 /**
  * Table with row selection enabled.
@@ -208,13 +211,13 @@ export const Selectable: Story = {
       { key: 'name', label: 'Name' },
       { key: 'email', label: 'Email' },
       { key: 'role', label: 'Role', hideAt: 'md' },
-      { key: 'status', label: 'Status', hideAt: 'lg' }
+      { key: 'status', label: 'Status', hideAt: 'lg' },
     ] as TableColumn<User>[],
     rowKey: 'id',
     selectable: true,
-    selectedRows: []
-  }
-}
+    selectedRows: [],
+  },
+};
 
 /**
  * Table with sortable columns.
@@ -226,13 +229,13 @@ export const Sortable: Story = {
       { key: 'name', label: 'Name', sortable: true },
       { key: 'email', label: 'Email', sortable: true },
       { key: 'role', label: 'Role', sortable: true, hideAt: 'md' },
-      { key: 'status', label: 'Status', sortable: true, hideAt: 'lg' }
+      { key: 'status', label: 'Status', sortable: true, hideAt: 'lg' },
     ] as TableColumn<User>[],
     rowKey: 'id',
     sortBy: 'name',
-    sortDirection: 'asc'
-  }
-}
+    sortDirection: 'asc',
+  },
+};
 
 /**
  * Table with clickable rows.
@@ -244,11 +247,11 @@ export const Clickable: Story = {
       { key: 'name', label: 'Name' },
       { key: 'email', label: 'Email' },
       { key: 'role', label: 'Role', hideAt: 'md' },
-      { key: 'status', label: 'Status', hideAt: 'lg' }
+      { key: 'status', label: 'Status', hideAt: 'lg' },
     ] as TableColumn<User>[],
-    rowKey: 'id'
-  }
-}
+    rowKey: 'id',
+  },
+};
 
 /**
  * Mobile-first responsive table.
@@ -262,18 +265,19 @@ export const MobileFirst: Story = {
       { key: 'status', label: 'Status', hideAt: 'sm' },
       { key: 'email', label: 'Email', hideAt: 'md', width: 'min-w-[200px]' },
       { key: 'role', label: 'Role', hideAt: 'lg', width: 'min-w-[120px]' },
-      { key: 'department', label: 'Department', hideAt: 'xl', width: 'min-w-[130px]' }
+      { key: 'department', label: 'Department', hideAt: 'xl', width: 'min-w-[130px]' },
     ] as TableColumn<User>[],
-    rowKey: 'id'
+    rowKey: 'id',
   },
   parameters: {
     docs: {
       description: {
-        story: 'This table starts with just the Name column on very small screens and progressively reveals more columns as the viewport grows.'
-      }
-    }
-  }
-}
+        story:
+          'This table starts with just the Name column on very small screens and progressively reveals more columns as the viewport grows.',
+      },
+    },
+  },
+};
 
 /**
  * Tablet-optimized table that shows only sortable/filterable columns on tablet (768px-1024px).
@@ -295,23 +299,24 @@ export const TabletOptimized: Story = {
         filterOptions: [
           { id: 'active', label: 'Active', value: 'active' },
           { id: 'inactive', label: 'Inactive', value: 'inactive' },
-          { id: 'pending', label: 'Pending', value: 'pending' }
-        ]
+          { id: 'pending', label: 'Pending', value: 'pending' },
+        ],
       },
-      { key: 'department', label: 'Department', width: 'min-w-[130px]' }
+      { key: 'department', label: 'Department', width: 'min-w-[130px]' },
     ] as TableColumn<User>[],
     rowKey: 'id',
     sortBy: 'name',
     sortDirection: 'asc',
-    onFilterChange: (filters) => {
-      console.log(filters)
-    }
+    onFilterChange: filters => {
+      console.log(filters);
+    },
   },
   parameters: {
     docs: {
       description: {
-        story: 'On tablet screens (768px-1024px), only columns with sorting or filtering enabled are visible in the header. This reduces visual clutter while keeping interactive columns accessible. Resize to tablet width to see the effect.'
-      }
-    }
-  }
-}
+        story:
+          'On tablet screens (768px-1024px), only columns with sorting or filtering enabled are visible in the header. This reduces visual clutter while keeping interactive columns accessible. Resize to tablet width to see the effect.',
+      },
+    },
+  },
+};

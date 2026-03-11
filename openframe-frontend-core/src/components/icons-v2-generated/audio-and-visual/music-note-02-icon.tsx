@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface MusicNote02IconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface MusicNote02IconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function MusicNote02Icon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: MusicNote02IconProps) {
+export function MusicNote02Icon({ className = '', size = 24, color = 'currentColor', ...props }: MusicNote02IconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

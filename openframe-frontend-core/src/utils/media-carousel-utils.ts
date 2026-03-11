@@ -13,7 +13,7 @@ export function processMediaItems(items: any[]): MediaItem[] {
     type: item.type || 'image',
     url: item.url || '',
     alt: item.alt || '',
-    caption: item.caption || ''
+    caption: item.caption || '',
   }));
 }
 

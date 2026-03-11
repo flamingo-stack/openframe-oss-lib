@@ -6,80 +6,80 @@
  * them to the canonical ToolType used throughout the platform.
  */
 
-import { ToolType, toolLabels } from '../types/tool.types'
+import { ToolType, toolLabels } from '../types/tool.types';
 
 /**
  * Map of common tool name variants to canonical ToolType
  */
 const toolAliasMap: Record<string, ToolType> = {
   // Tactical RMM
-  'TACTICAL': 'TACTICAL_RMM',
-  'TACTICAL_RMM': 'TACTICAL_RMM',
+  TACTICAL: 'TACTICAL_RMM',
+  TACTICAL_RMM: 'TACTICAL_RMM',
   'TACTICAL-RMM': 'TACTICAL_RMM',
-  'TACTICALRMM': 'TACTICAL_RMM',
-  'tactical': 'TACTICAL_RMM',
-  'tactical_rmm': 'TACTICAL_RMM',
+  TACTICALRMM: 'TACTICAL_RMM',
+  tactical: 'TACTICAL_RMM',
+  tactical_rmm: 'TACTICAL_RMM',
   'tactical-rmm': 'TACTICAL_RMM',
-  'tacticalrmm': 'TACTICAL_RMM',
+  tacticalrmm: 'TACTICAL_RMM',
   'tacticalrmm-agent': 'TACTICAL_RMM',
 
   // Fleet MDM
-  'FLEET': 'FLEET_MDM',
-  'FLEET_MDM': 'FLEET_MDM',
+  FLEET: 'FLEET_MDM',
+  FLEET_MDM: 'FLEET_MDM',
   'FLEET-MDM': 'FLEET_MDM',
-  'FLEETMDM': 'FLEET_MDM',
-  'fleet': 'FLEET_MDM',
-  'fleet_mdm': 'FLEET_MDM',
+  FLEETMDM: 'FLEET_MDM',
+  fleet: 'FLEET_MDM',
+  fleet_mdm: 'FLEET_MDM',
   'fleet-mdm': 'FLEET_MDM',
-  'fleetmdm': 'FLEET_MDM',
+  fleetmdm: 'FLEET_MDM',
   'fleetmdm-agent': 'FLEET_MDM',
 
   // MeshCentral
-  'MESHCENTRAL': 'MESHCENTRAL',
-  'MESH': 'MESHCENTRAL',
-  'MESH_CENTRAL': 'MESHCENTRAL',
+  MESHCENTRAL: 'MESHCENTRAL',
+  MESH: 'MESHCENTRAL',
+  MESH_CENTRAL: 'MESHCENTRAL',
   'MESH-CENTRAL': 'MESHCENTRAL',
-  'mesh': 'MESHCENTRAL',
-  'meshcentral': 'MESHCENTRAL',
-  'mesh_central': 'MESHCENTRAL',
+  mesh: 'MESHCENTRAL',
+  meshcentral: 'MESHCENTRAL',
+  mesh_central: 'MESHCENTRAL',
   'mesh-central': 'MESHCENTRAL',
   'meshcentral-agent': 'MESHCENTRAL',
 
   // Authentik
-  'AUTHENTIK': 'AUTHENTIK',
-  'authentik': 'AUTHENTIK',
+  AUTHENTIK: 'AUTHENTIK',
+  authentik: 'AUTHENTIK',
 
   // OpenFrame
-  'OPENFRAME': 'OPENFRAME',
-  'openframe': 'OPENFRAME',
-  'OPEN_FRAME': 'OPENFRAME',
+  OPENFRAME: 'OPENFRAME',
+  openframe: 'OPENFRAME',
+  OPEN_FRAME: 'OPENFRAME',
   'OPEN-FRAME': 'OPENFRAME',
-  'open_frame': 'OPENFRAME',
+  open_frame: 'OPENFRAME',
   'open-frame': 'OPENFRAME',
 
   // OpenFrame Chat
-  'OPENFRAME_CHAT': 'OPENFRAME_CHAT',
+  OPENFRAME_CHAT: 'OPENFRAME_CHAT',
   'OPENFRAME-CHAT': 'OPENFRAME_CHAT',
-  'OPENFRAMECHAT': 'OPENFRAME_CHAT',
-  'openframe_chat': 'OPENFRAME_CHAT',
+  OPENFRAMECHAT: 'OPENFRAME_CHAT',
+  openframe_chat: 'OPENFRAME_CHAT',
   'openframe-chat': 'OPENFRAME_CHAT',
-  'openframechat': 'OPENFRAME_CHAT',
+  openframechat: 'OPENFRAME_CHAT',
 
   // OpenFrame Client
-  'OPENFRAME_CLIENT': 'OPENFRAME_CLIENT',
+  OPENFRAME_CLIENT: 'OPENFRAME_CLIENT',
   'OPENFRAME-CLIENT': 'OPENFRAME_CLIENT',
-  'OPENFRAMECLIENT': 'OPENFRAME_CLIENT',
-  'openframe_client': 'OPENFRAME_CLIENT',
+  OPENFRAMECLIENT: 'OPENFRAME_CLIENT',
+  openframe_client: 'OPENFRAME_CLIENT',
   'openframe-client': 'OPENFRAME_CLIENT',
-  'openframeclient': 'OPENFRAME_CLIENT',
+  openframeclient: 'OPENFRAME_CLIENT',
 
   // OSQUERY
-  'OSQUERY': 'OSQUERY',
+  OSQUERY: 'OSQUERY',
 
   // System
-  'SYSTEM': 'SYSTEM',
-  'system': 'SYSTEM',
-}
+  SYSTEM: 'SYSTEM',
+  system: 'SYSTEM',
+};
 
 /**
  * Normalizes a tool name string to the canonical ToolType.
@@ -94,21 +94,21 @@ const toolAliasMap: Record<string, ToolType> = {
  * normalizeToolType('unknown') // => undefined
  */
 export function normalizeToolType(input?: string): ToolType | undefined {
-  if (!input) return undefined
+  if (!input) return undefined;
 
   // Try exact match first
-  const exact = toolAliasMap[input]
-  if (exact) return exact
+  const exact = toolAliasMap[input];
+  if (exact) return exact;
 
   // Try uppercase
-  const upper = input.toUpperCase()
-  if (toolAliasMap[upper]) return toolAliasMap[upper]
+  const upper = input.toUpperCase();
+  if (toolAliasMap[upper]) return toolAliasMap[upper];
 
   // Try lowercase
-  const lower = input.toLowerCase()
-  if (toolAliasMap[lower]) return toolAliasMap[lower]
+  const lower = input.toLowerCase();
+  if (toolAliasMap[lower]) return toolAliasMap[lower];
 
-  return undefined
+  return undefined;
 }
 
 /**
@@ -123,7 +123,7 @@ export function normalizeToolType(input?: string): ToolType | undefined {
  * normalizeToolTypeWithFallback('unknown') // => 'SYSTEM'
  */
 export function normalizeToolTypeWithFallback(input?: string): ToolType {
-  return normalizeToolType(input) ?? 'SYSTEM'
+  return normalizeToolType(input) ?? 'SYSTEM';
 }
 
 /**
@@ -139,14 +139,14 @@ export function normalizeToolTypeWithFallback(input?: string): ToolType {
  * toToolLabel('unknown') // => 'unknown'
  */
 export function toToolLabel(input?: string): string {
-  if (!input) return ''
+  if (!input) return '';
 
-  const toolType = normalizeToolType(input)
+  const toolType = normalizeToolType(input);
   if (toolType) {
-    return toolLabels[toolType]
+    return toolLabels[toolType];
   }
 
-  return input
+  return input;
 }
 
 /**
@@ -161,7 +161,7 @@ export function toToolLabel(input?: string): string {
  * isValidToolType('unknown') // => false
  */
 export function isValidToolType(input?: string): boolean {
-  return normalizeToolType(input) !== undefined
+  return normalizeToolType(input) !== undefined;
 }
 
 /**
@@ -174,12 +174,12 @@ export function isValidToolType(input?: string): boolean {
 export function getToolTypeAliases(toolType: ToolType): string[] {
   return Object.entries(toolAliasMap)
     .filter(([_, value]) => value === toolType)
-    .map(([key]) => key)
+    .map(([key]) => key);
 }
 
 /**
  * Get display label for a tool type
  */
 export function getToolLabel(toolType: ToolType): string {
-  return toolLabels[toolType] || toolType
+  return toolLabels[toolType] || toolType;
 }

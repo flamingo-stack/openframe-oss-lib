@@ -1,293 +1,253 @@
-"use client"
+'use client';
 
-import { cloneElement, useCallback, useLayoutEffect, useMemo, useState } from 'react'
-import { useLocalStorage } from '../../hooks/ui/use-local-storage'
-import { useLgUp } from '../../hooks/ui/use-media-query'
-import { NavigationSidebarConfig, NavigationSidebarItem } from '../../types/navigation'
-import { cn } from '../../utils'
-import { DoubleChevronIcon, OpenFrameLogo, OpenFrameText } from '../icons'
+import { cloneElement, useCallback, useLayoutEffect, useMemo, useState } from 'react';
+import { useLocalStorage } from '../../hooks/ui/use-local-storage';
+import { useLgUp } from '../../hooks/ui/use-media-query';
+import { NavigationSidebarConfig, NavigationSidebarItem } from '../../types/navigation';
+import { cn } from '../../utils';
+import { DoubleChevronIcon, OpenFrameLogo, OpenFrameText } from '../icons';
 
 // Constants
-const MINIMIZED_WIDTH = 56 // 3.5rem = 56px
-const EXPANDED_WIDTH = 224 // 14rem = 224px
-const STORAGE_KEY = 'of.navigationSidebar.minimized'
+const MINIMIZED_WIDTH = 56; // 3.5rem = 56px
+const EXPANDED_WIDTH = 224; // 14rem = 224px
+const STORAGE_KEY = 'of.navigationSidebar.minimized';
 
 export interface NavigationSidebarProps {
-  config: NavigationSidebarConfig
+  config: NavigationSidebarConfig;
 }
 
 export function NavigationSidebar({ config }: NavigationSidebarProps) {
-
-  const isLgUp = useLgUp() ?? false
+  const isLgUp = useLgUp() ?? false;
 
   // Initialize minimized state based on tablet mode or config
   // useLocalStorage will read from localStorage first, then fall back to this value
-  const [minimized, setMinimized] = useLocalStorage<boolean>(
-    STORAGE_KEY,
-    !isLgUp || (config.minimized ?? false)
-  )
+  const [minimized, setMinimized] = useLocalStorage<boolean>(STORAGE_KEY, !isLgUp || (config.minimized ?? false));
 
   // Enable transitions only after the correct width is painted
-  const [transitionsEnabled, setTransitionsEnabled] = useState(false)
+  const [transitionsEnabled, setTransitionsEnabled] = useState(false);
 
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleToggleMinimized = useCallback(() => {
     if (!isLgUp) {
-      setMobileMenuOpen(prev => !prev)
+      setMobileMenuOpen(prev => !prev);
     } else {
-      setMinimized(prev => !prev)
-      config.onToggleMinimized?.()
+      setMinimized(prev => !prev);
+      config.onToggleMinimized?.();
     }
-  }, [isLgUp, setMinimized, config])
+  }, [isLgUp, setMinimized, config]);
 
-  const handleItemClick = useCallback((item: NavigationSidebarItem, event?: React.MouseEvent) => {
-    event?.stopPropagation()
+  const handleItemClick = useCallback(
+    (item: NavigationSidebarItem, event?: React.MouseEvent) => {
+      event?.stopPropagation();
 
-    // Close mobile menu on navigation
-    if (!isLgUp && mobileMenuOpen) {
-      setMobileMenuOpen(false)
-    }
+      // Close mobile menu on navigation
+      if (!isLgUp && mobileMenuOpen) {
+        setMobileMenuOpen(false);
+      }
 
-    if (item.onClick) {
-      item.onClick()
-    } else if (item.path) {
-      config.onNavigate?.(item.path)
-    }
-  }, [config, isLgUp, mobileMenuOpen])
+      if (item.onClick) {
+        item.onClick();
+      } else if (item.path) {
+        config.onNavigate?.(item.path);
+      }
+    },
+    [config, isLgUp, mobileMenuOpen],
+  );
 
-  const renderNavigationItem = useCallback((
-    item: NavigationSidebarItem,
-    inOverlay: boolean
-  ) => {
-    const isActive = item.isActive ?? false
-    const isMinimized = !isLgUp && !inOverlay ? true : minimized
-    const shouldShowLabel = !isLgUp ? inOverlay : (inOverlay || !minimized)
+  const renderNavigationItem = useCallback(
+    (item: NavigationSidebarItem, inOverlay: boolean) => {
+      const isActive = item.isActive ?? false;
+      const isMinimized = !isLgUp && !inOverlay ? true : minimized;
+      const shouldShowLabel = !isLgUp ? inOverlay : inOverlay || !minimized;
 
-    return (
-      <button
-        key={item.id}
-        onClick={(event) => handleItemClick(item, event)}
-        className={cn(
-          "w-full flex items-center transition-all duration-200 relative",
-          "p-4",
-          // Hover and default states
-          !isActive && "hover:bg-ods-bg-hover text-ods-text-primary [&_svg]:fill-ods-text-secondary",
-          // Active state
-          isActive && [
-            "bg-[var(--ods-open-yellow-light)] text-ods-accent",
-            "[&_svg]:fill-ods-accent"
-          ],
-          // Layout - proper centering in minimized mode
-          isMinimized && !inOverlay
-            ? "justify-center"
-            : "justify-start gap-2"
-        )}
-        title={isMinimized && !inOverlay ? item.label : undefined}
-        aria-label={item.label}
-        aria-current={isActive ? 'page' : undefined}
-      >
-        {/* Active indicator */}
-        {isActive && (
-          <div
-            className="absolute left-0 top-0 bottom-0 w-1 bg-ods-accent"
-            aria-hidden="true"
-          />
-        )}
-
-        {/* Icon container - fixed size for consistent centering */}
-        <div
+      return (
+        <button
+          key={item.id}
+          onClick={event => handleItemClick(item, event)}
           className={cn(
-            "flex items-center justify-center",
-            "flex-shrink-0",
-            "transition-colors duration-200"
+            'w-full flex items-center transition-all duration-200 relative',
+            'p-4',
+            // Hover and default states
+            !isActive && 'hover:bg-ods-bg-hover text-ods-text-primary [&_svg]:fill-ods-text-secondary',
+            // Active state
+            isActive && ['bg-ods-open-yellow-light text-ods-accent', '[&_svg]:fill-ods-accent'],
+            // Layout - proper centering in minimized mode
+            isMinimized && !inOverlay ? 'justify-center' : 'justify-start gap-2',
           )}
+          title={isMinimized && !inOverlay ? item.label : undefined}
+          aria-label={item.label}
+          aria-current={isActive ? 'page' : undefined}
         >
-          {cloneElement(item.icon as React.ReactElement<any>, {
-            color: isActive ? "text-ods-accent" : "text-ods-text-secondary"
-          })}
-        </div>
+          {/* Active indicator */}
+          {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-ods-accent" aria-hidden="true" />}
 
-        {/* Label - only render when needed */}
-        {shouldShowLabel && (
-          <span
-            className={cn(
-              "text-h4",
-              "flex-1 text-left truncate"
-            )}
-          >
-            {item.label}
-          </span>
-        )}
+          {/* Icon container - fixed size for consistent centering */}
+          <div className={cn('flex items-center justify-center', 'flex-shrink-0', 'transition-colors duration-200')}>
+            {cloneElement(item.icon as React.ReactElement<any>, {
+              color: isActive ? 'text-ods-accent' : 'text-ods-text-secondary',
+            })}
+          </div>
 
-        {/* Badge - only show with label */}
-        {item.badge && shouldShowLabel && (
-          <span
-            className={cn(
-              "text-sm flex-shrink-0",
-              "transition-colors duration-200",
-              isActive ? "text-[#ffc008]" : "text-[#888888]"
-            )}
-          >
-            {item.badge}
-          </span>
-        )}
-      </button>
-    )
-  }, [minimized, isLgUp, handleItemClick])
+          {/* Label - only render when needed */}
+          {shouldShowLabel && <span className={cn('text-h4', 'flex-1 text-left truncate')}>{item.label}</span>}
+
+          {/* Badge - only show with label */}
+          {item.badge && shouldShowLabel && (
+            <span
+              className={cn(
+                'text-sm flex-shrink-0',
+                'transition-colors duration-200',
+                isActive ? 'text-ods-open-yellow' : 'text-ods-text-secondary',
+              )}
+            >
+              {item.badge}
+            </span>
+          )}
+        </button>
+      );
+    },
+    [minimized, isLgUp, handleItemClick],
+  );
 
   // Memoize items separation
-  const { primaryItems, secondaryItems } = useMemo(() => ({
-    primaryItems: config.items.filter(item => item.section !== 'secondary'),
-    secondaryItems: config.items.filter(item => item.section === 'secondary')
-  }), [config.items])
+  const { primaryItems, secondaryItems } = useMemo(
+    () => ({
+      primaryItems: config.items.filter(item => item.section !== 'secondary'),
+      secondaryItems: config.items.filter(item => item.section === 'secondary'),
+    }),
+    [config.items],
+  );
 
-  const renderSidebarContent = useCallback((inOverlay: boolean) => (
-    <>
-      {/* Header */}
-      <div className="flex items-center gap-2 p-4 h-14 border-b border-ods-border">
-        <div className="flex-shrink-0">
-          <OpenFrameLogo
-            className="w-6 h-6"
-            upperPathColor="var(--color-text-primary)"
-            lowerPathColor="var(--color-accent-primary)"
-          />
+  const renderSidebarContent = useCallback(
+    (inOverlay: boolean) => (
+      <>
+        {/* Header */}
+        <div className="flex items-center gap-2 p-4 h-14 border-b border-ods-border">
+          <div className="flex-shrink-0">
+            <OpenFrameLogo
+              className="w-6 h-6"
+              upperPathColor="var(--color-text-primary)"
+              lowerPathColor="var(--color-accent-primary)"
+            />
+          </div>
+
+          {(inOverlay || !minimized) && (
+            <div className="flex-1 overflow-hidden">
+              <OpenFrameText textColor="var(--color-text-primary)" />
+            </div>
+          )}
+
+          {/* Mobile close button */}
+          {inOverlay && (
+            <button
+              onClick={() => setMobileMenuOpen(false)}
+              className="md:hidden p-2 hover:bg-ods-bg-hover rounded-md transition-colors"
+              aria-label="Close menu"
+            >
+              <svg
+                className="w-5 h-5 text-ods-text-primary"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
         </div>
 
-        {(inOverlay || !minimized) && (
-          <div className="flex-1 overflow-hidden">
-            <OpenFrameText textColor="var(--color-text-primary)" />
+        {/* Navigation items */}
+        <div className="flex-1 flex flex-col justify-between py-4">
+          {/* Primary section */}
+          <nav className="flex flex-col" aria-label="Primary navigation">
+            {primaryItems.map(item => renderNavigationItem(item, inOverlay))}
+          </nav>
+
+          {/* Secondary section */}
+          {secondaryItems.length > 0 && (
+            <nav className="flex flex-col" aria-label="Secondary navigation">
+              {secondaryItems.map(item => renderNavigationItem(item, inOverlay))}
+            </nav>
+          )}
+        </div>
+
+        {/* Toggle button footer */}
+        {(isLgUp || inOverlay) && (
+          <div className="border-t border-ods-border">
+            <button
+              onClick={inOverlay ? () => setMobileMenuOpen(false) : handleToggleMinimized}
+              className={cn(
+                'w-full flex items-center gap-2 p-4',
+                'hover:bg-ods-bg-hover text-ods-text-primary',
+                'transition-colors duration-200',
+                !inOverlay && minimized ? 'justify-center' : 'justify-start',
+              )}
+              title={inOverlay ? 'Close Menu' : minimized ? 'Expand Menu' : 'Hide Menu'}
+              aria-label={inOverlay ? 'Close Menu' : minimized ? 'Expand Menu' : 'Hide Menu'}
+            >
+              {inOverlay ? (
+                <>
+                  <DoubleChevronIcon direction="left" className="w-6 h-6" />
+                  <span className="text-h4">Close Menu</span>
+                </>
+              ) : minimized ? (
+                <DoubleChevronIcon direction="right" className="w-6 h-6" />
+              ) : (
+                <>
+                  <DoubleChevronIcon direction="left" className="w-6 h-6" />
+                  <span className="text-h4">Hide Menu</span>
+                </>
+              )}
+            </button>
           </div>
         )}
 
-        {/* Mobile close button */}
-        {inOverlay && (
-          <button
-            onClick={() => setMobileMenuOpen(false)}
-            className="md:hidden p-2 hover:bg-ods-bg-hover rounded-md transition-colors"
-            aria-label="Close menu"
-          >
-            <svg
-              className="w-5 h-5 text-ods-text-primary"
-              fill="none"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        )}
-      </div>
-
-      {/* Navigation items */}
-      <div className="flex-1 flex flex-col justify-between py-4">
-        {/* Primary section */}
-        <nav className="flex flex-col" aria-label="Primary navigation">
-          {primaryItems.map(item => renderNavigationItem(item, inOverlay))}
-        </nav>
-
-        {/* Secondary section */}
-        {secondaryItems.length > 0 && (
-          <nav className="flex flex-col" aria-label="Secondary navigation">
-            {secondaryItems.map(item => renderNavigationItem(item, inOverlay))}
-          </nav>
-        )}
-      </div>
-
-      {/* Toggle button footer */}
-      {(isLgUp || inOverlay) && (
-        <div className="border-t border-ods-border">
-          <button
-            onClick={inOverlay ? () => setMobileMenuOpen(false) : handleToggleMinimized}
-            className={cn(
-              "w-full flex items-center gap-2 p-4",
-              "hover:bg-ods-bg-hover text-ods-text-primary",
-              "transition-colors duration-200",
-              (!inOverlay && minimized) ? "justify-center" : "justify-start"
-            )}
-            title={inOverlay ? "Close Menu" : (minimized ? "Expand Menu" : "Hide Menu")}
-            aria-label={inOverlay ? "Close Menu" : (minimized ? "Expand Menu" : "Hide Menu")}
-          >
-            {inOverlay ? (
-              <>
-                <DoubleChevronIcon direction="left" className="w-6 h-6" />
-                <span className="text-h4">
-                  Close Menu
-                </span>
-              </>
-            ) : minimized ? (
-              <DoubleChevronIcon direction="right" className="w-6 h-6" />
-            ) : (
-              <>
-                <DoubleChevronIcon direction="left" className="w-6 h-6" />
-                <span className="text-h4">
-                  Hide Menu
-                </span>
-              </>
-            )}
-          </button>
-        </div>
-      )}
-
-      {/* Custom footer */}
-      {config.footer && (
-        <div className="border-t border-ods-border p-4">
-          {config.footer}
-        </div>
-      )}
-    </>
-  ), [
-    minimized,
-    primaryItems,
-    secondaryItems,
-    renderNavigationItem,
-    isLgUp,
-    handleToggleMinimized,
-    config.footer
-  ])
+        {/* Custom footer */}
+        {config.footer && <div className="border-t border-ods-border p-4">{config.footer}</div>}
+      </>
+    ),
+    [minimized, primaryItems, secondaryItems, renderNavigationItem, isLgUp, handleToggleMinimized, config.footer],
+  );
 
   const sidebarWidth = useMemo(() => {
     // Use minimized width as default during SSR to prevent layout shift
     if (isLgUp === undefined) {
-      return `${MINIMIZED_WIDTH}px`
+      return `${MINIMIZED_WIDTH}px`;
     }
-    return !isLgUp
-      ? `${MINIMIZED_WIDTH}px`
-      : minimized
-        ? `${MINIMIZED_WIDTH}px`
-        : `${EXPANDED_WIDTH}px`
-  }, [isLgUp, minimized])
+    return !isLgUp ? `${MINIMIZED_WIDTH}px` : minimized ? `${MINIMIZED_WIDTH}px` : `${EXPANDED_WIDTH}px`;
+  }, [isLgUp, minimized]);
 
   // Don't render content until we know the screen size to prevent flashing
-  const isHydrated = isLgUp !== undefined
+  const isHydrated = isLgUp !== undefined;
 
   useLayoutEffect(() => {
     if (isHydrated && !transitionsEnabled) {
       // Wait for next frame to ensure width is painted before enabling transitions
       const id = requestAnimationFrame(() => {
-        setTransitionsEnabled(true)
-      })
-      return () => cancelAnimationFrame(id)
+        setTransitionsEnabled(true);
+      });
+      return () => cancelAnimationFrame(id);
     }
-  }, [isHydrated, transitionsEnabled])
+  }, [isHydrated, transitionsEnabled]);
 
   return (
     <aside
       className={cn(
-        "flex-col h-full hidden md:flex",
-        "bg-ods-card border-r border-ods-border",
-        transitionsEnabled && "transition-[width] duration-300",
-        config.className
+        'flex-col h-full hidden md:flex',
+        'bg-ods-card border-r border-ods-border',
+        transitionsEnabled && 'transition-[width] duration-300',
+        config.className,
       )}
       style={{
-        width: sidebarWidth
+        width: sidebarWidth,
       }}
       aria-label="Main navigation sidebar"
     >
       {isHydrated && renderSidebarContent(false)}
     </aside>
-  )
+  );
 }

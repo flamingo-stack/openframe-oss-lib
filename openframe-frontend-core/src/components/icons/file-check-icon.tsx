@@ -1,8 +1,8 @@
-import React from "react"
+import React from 'react';
 
-export interface FileCheckIconProps extends React.SVGProps<SVGSVGElement> { }
+export interface FileCheckIconProps extends React.SVGProps<SVGSVGElement> {}
 
-export function FileCheckIcon({ className = "h-6 w-6", color = 'white', ...props }: FileCheckIconProps) {
+export function FileCheckIcon({ className = 'h-6 w-6', color = 'white', ...props }: FileCheckIconProps) {
   return (
     <svg
       width="24"
@@ -20,20 +20,8 @@ export function FileCheckIcon({ className = "h-6 w-6", color = 'white', ...props
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <path
-        d="M14 2V8H20"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M9 16L10.5 17.5L15 13"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <path d="M14 2V8H20" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M9 16L10.5 17.5L15 13" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
-  )
+  );
 }

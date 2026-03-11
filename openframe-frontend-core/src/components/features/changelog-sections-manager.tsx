@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { ChangelogManager } from './changelog-manager';
 import type { ChangelogEntry } from '../../types/product-release';
+import { ChangelogManager } from './changelog-manager';
 
 interface ChangelogSectionsManagerProps {
   featuresAdded: ChangelogEntry[];
@@ -27,7 +27,7 @@ export function ChangelogSectionsManager({
   onImprovementsChange,
   onBreakingChangesChange,
   className = '',
-  expandAll = false
+  expandAll = false,
 }: ChangelogSectionsManagerProps) {
   return (
     <div className={`space-y-6 p-6 bg-ods-card border border-ods-border rounded-lg ${className}`}>
@@ -42,12 +42,7 @@ export function ChangelogSectionsManager({
       />
 
       {/* Bugs Fixed */}
-      <ChangelogManager
-        title="Bugs Fixed"
-        entries={bugsFixed}
-        onChange={onBugsFixedChange}
-        expandAll={expandAll}
-      />
+      <ChangelogManager title="Bugs Fixed" entries={bugsFixed} onChange={onBugsFixedChange} expandAll={expandAll} />
 
       {/* Improvements */}
       <ChangelogManager

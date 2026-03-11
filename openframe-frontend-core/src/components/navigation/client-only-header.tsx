@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Header, HeaderConfig } from './header';
 import { HeaderSkeleton } from './header-skeleton';
 
@@ -15,7 +15,7 @@ export function ClientOnlyHeader({ config, skeleton }: ClientOnlyHeaderProps) {
   useEffect(() => {
     setIsClient(true);
   }, []);
-  
+
   if (!isClient) {
     // Return custom skeleton or default skeleton while client-side JavaScript loads
     return skeleton || <HeaderSkeleton config={config} />;

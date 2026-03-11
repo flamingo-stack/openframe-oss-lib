@@ -14,7 +14,7 @@ export function BrandAssociationGrid({
   items,
   columns = 2,
   className = '',
-  cardClassName = 'bg-ods-card border border-ods-border rounded-lg p-0 overflow-hidden'
+  cardClassName = 'bg-ods-card border border-ods-border rounded-lg p-0 overflow-hidden',
 }: BrandAssociationGridProps) {
   const gridCols = columns === 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-3';
   const itemsPerRow = columns;
@@ -22,22 +22,22 @@ export function BrandAssociationGrid({
 
   const getBorderClasses = (isLastRow: boolean, isLastInRow: boolean, globalIndex: number) => {
     let classes = '';
-    
+
     // Right border - responsive logic
     if (!isLastInRow) {
       // On mobile (1 column), never show right border
       // On desktop (2/3 columns), show right border except for last in row
       classes += ' md:border-r border-ods-border';
     }
-    
+
     // Bottom border logic
     const isLastItem = globalIndex === items.length - 1;
-    
+
     // Mobile: bottom border for all except last item
     if (!isLastItem) {
       classes += ' border-b border-ods-border';
     }
-    
+
     // Desktop: override mobile border, show bottom border for all rows except last
     if (!isLastRow) {
       classes += ' md:border-b border-ods-border';
@@ -45,7 +45,7 @@ export function BrandAssociationGrid({
       // Last row on desktop - remove bottom border
       classes += ' md:border-b-0';
     }
-    
+
     return classes;
   };
 
@@ -63,13 +63,7 @@ export function BrandAssociationGrid({
               const isLastInRow = itemIndex === rowItems.length - 1;
               const borderClasses = getBorderClasses(isLastRow, isLastInRow, globalIndex);
 
-              return (
-                <BrandAssociationCard
-                  key={globalIndex}
-                  item={item}
-                  className={borderClasses}
-                />
-              );
+              return <BrandAssociationCard key={globalIndex} item={item} className={borderClasses} />;
             })}
           </div>
         );

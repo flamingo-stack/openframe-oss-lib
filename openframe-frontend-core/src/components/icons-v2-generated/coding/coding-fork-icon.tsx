@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface CodingForkIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface CodingForkIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function CodingForkIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: CodingForkIconProps) {
+export function CodingForkIcon({ className = '', size = 24, color = 'currentColor', ...props }: CodingForkIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

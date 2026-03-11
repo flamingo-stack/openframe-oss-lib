@@ -5,8 +5,8 @@
  * Handles type coercion, nested paths, and array parameters.
  */
 
-import { FlattenedParam, shouldIncludeInUrl } from './flatten-schema'
-import { JSType } from './graphql-parser'
+import { FlattenedParam, shouldIncludeInUrl } from './flatten-schema';
+import { JSType } from './graphql-parser';
 
 /**
  * Convert URL search params to GraphQL variables
@@ -33,33 +33,34 @@ import { JSType } from './graphql-parser'
  */
 export function urlParamsToVariables(
   searchParams: URLSearchParams,
-  schema: Record<string, FlattenedParam>
+  schema: Record<string, FlattenedParam>,
 ): Record<string, any> {
-  const variables: Record<string, any> = {}
+  const variables: Record<string, any> = {};
 
   for (const [paramName, paramConfig] of Object.entries(schema)) {
     // Read value from URL
-    const rawValue = paramConfig.type === 'array' || paramConfig.isArray
-      ? searchParams.getAll(paramName)
-      : searchParams.get(paramName)
+    const rawValue =
+      paramConfig.type === 'array' || paramConfig.isArray
+        ? searchParams.getAll(paramName)
+        : searchParams.get(paramName);
 
     // Skip if no value in URL
     if (!rawValue || (Array.isArray(rawValue) && rawValue.length === 0)) {
       // Use default value if available
       if (paramConfig.defaultValue !== undefined) {
-        setNestedValue(variables, paramConfig.graphqlPath, paramConfig.defaultValue)
+        setNestedValue(variables, paramConfig.graphqlPath, paramConfig.defaultValue);
       }
-      continue
+      continue;
     }
 
     // Coerce value to correct type
-    const value = coerceValue(rawValue, paramConfig.type)
+    const value = coerceValue(rawValue, paramConfig.type);
 
     // Set value at nested path
-    setNestedValue(variables, paramConfig.graphqlPath, value)
+    setNestedValue(variables, paramConfig.graphqlPath, value);
   }
 
-  return variables
+  return variables;
 }
 
 /**
@@ -83,17 +84,17 @@ export function urlParamsToVariables(
  */
 export function variablesToUrlParams(
   variables: Record<string, any>,
-  schema: Record<string, FlattenedParam>
+  schema: Record<string, FlattenedParam>,
 ): URLSearchParams {
-  const params = new URLSearchParams()
+  const params = new URLSearchParams();
 
   for (const [paramName, paramConfig] of Object.entries(schema)) {
     // Get value from nested path
-    const value = getNestedValue(variables, paramConfig.graphqlPath)
+    const value = getNestedValue(variables, paramConfig.graphqlPath);
 
     // Skip if should not include in URL
     if (!shouldIncludeInUrl(value, paramConfig)) {
-      continue
+      continue;
     }
 
     // Add to URL params
@@ -101,16 +102,16 @@ export function variablesToUrlParams(
       // Array: Use repeated params (e.g., ?tag=foo&tag=bar)
       value.forEach(v => {
         if (v !== null && v !== undefined && v !== '') {
-          params.append(paramName, String(v))
+          params.append(paramName, String(v));
         }
-      })
+      });
     } else {
       // Single value: Use set
-      params.set(paramName, String(value))
+      params.set(paramName, String(value));
     }
   }
 
-  return params
+  return params;
 }
 
 /**
@@ -123,25 +124,25 @@ export function variablesToUrlParams(
 export function coerceValue(value: string | string[], type: JSType): any {
   // Array handling
   if (Array.isArray(value)) {
-    return value.map(v => coerceValue(v, type === 'array' ? 'string' : type))
+    return value.map(v => coerceValue(v, type === 'array' ? 'string' : type));
   }
 
   // Type coercion for single values
   switch (type) {
     case 'number':
-      const num = parseFloat(value)
-      return isNaN(num) ? null : num
+      const num = parseFloat(value);
+      return isNaN(num) ? null : num;
 
     case 'boolean':
-      return value === 'true' || value === '1'
+      return value === 'true' || value === '1';
 
     case 'array':
       // Single value treated as array with one element
-      return [value]
+      return [value];
 
     case 'string':
     default:
-      return value
+      return value;
   }
 }
 
@@ -159,21 +160,21 @@ export function coerceValue(value: string | string[], type: JSType): any {
  * // Result: { filter: { severity: ['error'] } }
  */
 export function setNestedValue(obj: any, path: string, value: any): void {
-  const parts = path.split('.')
-  let current = obj
+  const parts = path.split('.');
+  let current = obj;
 
   // Navigate/create intermediate objects
   for (let i = 0; i < parts.length - 1; i++) {
-    const part = parts[i]
+    const part = parts[i];
     if (!(part in current) || typeof current[part] !== 'object') {
-      current[part] = {}
+      current[part] = {};
     }
-    current = current[part]
+    current = current[part];
   }
 
   // Set final value
-  const lastPart = parts[parts.length - 1]
-  current[lastPart] = value
+  const lastPart = parts[parts.length - 1];
+  current[lastPart] = value;
 }
 
 /**
@@ -191,8 +192,8 @@ export function setNestedValue(obj: any, path: string, value: any): void {
  */
 export function getNestedValue(obj: any, path: string): any {
   return path.split('.').reduce((current, key) => {
-    return current?.[key]
-  }, obj)
+    return current?.[key];
+  }, obj);
 }
 
 /**
@@ -208,18 +209,18 @@ export function getNestedValue(obj: any, path: string): any {
 export function mergeVariables(
   currentVariables: Record<string, any>,
   updates: Record<string, any>,
-  schema: Record<string, FlattenedParam>
+  schema: Record<string, FlattenedParam>,
 ): Record<string, any> {
-  const merged = { ...currentVariables }
+  const merged = { ...currentVariables };
 
   for (const [paramName, value] of Object.entries(updates)) {
-    const paramConfig = schema[paramName]
-    if (!paramConfig) continue
+    const paramConfig = schema[paramName];
+    if (!paramConfig) continue;
 
-    setNestedValue(merged, paramConfig.graphqlPath, value)
+    setNestedValue(merged, paramConfig.graphqlPath, value);
   }
 
-  return merged
+  return merged;
 }
 
 /**
@@ -233,19 +234,19 @@ export function mergeVariables(
 export function clearParams(
   variables: Record<string, any>,
   paramNames: string[],
-  schema: Record<string, FlattenedParam>
+  schema: Record<string, FlattenedParam>,
 ): Record<string, any> {
-  const cleared = { ...variables }
+  const cleared = { ...variables };
 
   for (const paramName of paramNames) {
-    const paramConfig = schema[paramName]
-    if (!paramConfig) continue
+    const paramConfig = schema[paramName];
+    if (!paramConfig) continue;
 
     // Set to undefined (will be excluded from URL)
-    setNestedValue(cleared, paramConfig.graphqlPath, undefined)
+    setNestedValue(cleared, paramConfig.graphqlPath, undefined);
   }
 
-  return cleared
+  return cleared;
 }
 
 /**
@@ -257,32 +258,27 @@ export function clearParams(
  * @param schema - Flattened parameter schema
  * @returns Validation errors (empty array if valid)
  */
-export function validateVariables(
-  variables: Record<string, any>,
-  schema: Record<string, FlattenedParam>
-): string[] {
-  const errors: string[] = []
+export function validateVariables(variables: Record<string, any>, schema: Record<string, FlattenedParam>): string[] {
+  const errors: string[] = [];
 
   for (const [paramName, paramConfig] of Object.entries(schema)) {
-    const value = getNestedValue(variables, paramConfig.graphqlPath)
+    const value = getNestedValue(variables, paramConfig.graphqlPath);
 
     // Check required parameters
     if (paramConfig.required && (value === null || value === undefined)) {
-      errors.push(`Required parameter "${paramName}" is missing`)
+      errors.push(`Required parameter "${paramName}" is missing`);
     }
 
     // Check type consistency
     if (value !== null && value !== undefined) {
-      const actualType = Array.isArray(value) ? 'array' : typeof value
-      const expectedType = paramConfig.type === 'array' ? 'array' : paramConfig.type
+      const actualType = Array.isArray(value) ? 'array' : typeof value;
+      const expectedType = paramConfig.type === 'array' ? 'array' : paramConfig.type;
 
       if (actualType !== expectedType && actualType !== 'object') {
-        errors.push(
-          `Parameter "${paramName}" has wrong type: expected ${expectedType}, got ${actualType}`
-        )
+        errors.push(`Parameter "${paramName}" has wrong type: expected ${expectedType}, got ${actualType}`);
       }
     }
   }
 
-  return errors
+  return errors;
 }

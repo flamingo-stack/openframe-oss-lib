@@ -1,23 +1,23 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { InteractiveCard } from '../../ui/interactive-card'
-import { ChevronRight } from 'lucide-react'
-import { cn } from '../../../utils/cn'
+import { ChevronRight } from 'lucide-react';
+import React from 'react';
+import { cn } from '../../../utils/cn';
+import { InteractiveCard } from '../../ui/interactive-card';
 
 export interface ProductReleaseCardProps {
   /** Release title */
-  title: string
+  title: string;
   /** Release summary/description */
-  summary?: string | null
+  summary?: string | null;
   /** Version string (e.g., "1.2.0") */
-  version: string
+  version: string;
   /** Formatted date string for display */
-  formattedDate: string
+  formattedDate: string;
   /** Click handler for navigation */
-  onClick?: () => void
+  onClick?: () => void;
   /** Additional CSS classes */
-  className?: string
+  className?: string;
 }
 
 export function ProductReleaseCard({
@@ -26,7 +26,7 @@ export function ProductReleaseCard({
   version,
   formattedDate,
   onClick,
-  className
+  className,
 }: ProductReleaseCardProps) {
   return (
     <InteractiveCard
@@ -38,30 +38,24 @@ export function ProductReleaseCard({
         'items-start md:items-center',
         'gap-3 md:gap-4',
         'p-4',
-        className
+        className,
       )}
     >
       {/* Left column - content */}
       <div className="flex-1 w-full md:w-auto min-w-0 flex flex-col justify-center gap-2">
         <div className="min-h-[48px] flex items-center">
-          <h3 className="text-h3 text-ods-text-primary tracking-[-0.36px] line-clamp-2">
-            {title}
-          </h3>
+          <h3 className="text-h3 text-ods-text-primary tracking-[-0.36px] line-clamp-2">{title}</h3>
         </div>
-        <p className="text-h4 text-ods-text-secondary line-clamp-3">
-          {summary || '\u00A0'}
-        </p>
+        <p className="text-h4 text-ods-text-secondary line-clamp-3">{summary || '\u00A0'}</p>
       </div>
 
       {/* Right column - version + date */}
       <div
         className="flex items-center gap-2 w-full md:w-auto justify-start md:justify-end shrink-0"
-        onClick={(e) => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
       >
         <div className="w-[200px] flex flex-col justify-center gap-2">
-          <p className="text-h3 text-ods-text-primary tracking-[-0.36px] truncate">
-            {version}
-          </p>
+          <p className="text-h3 text-ods-text-primary tracking-[-0.36px] truncate">{version}</p>
           <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary truncate">
             {formattedDate}
           </p>
@@ -72,5 +66,5 @@ export function ProductReleaseCard({
         </div>
       </div>
     </InteractiveCard>
-  )
+  );
 }

@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface PrinterIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface PrinterIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function PrinterIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: PrinterIconProps) {
+export function PrinterIcon({ className = '', size = 24, color = 'currentColor', ...props }: PrinterIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

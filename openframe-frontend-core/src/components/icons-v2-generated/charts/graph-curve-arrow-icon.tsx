@@ -1,14 +1,13 @@
-import type { SVGProps } from "react";
-export interface GraphCurveArrowIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface GraphCurveArrowIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
 export function GraphCurveArrowIcon({
-  className = "",
+  className = '',
   size = 24,
-  color = "currentColor",
+  color = 'currentColor',
   ...props
 }: GraphCurveArrowIconProps) {
   return (

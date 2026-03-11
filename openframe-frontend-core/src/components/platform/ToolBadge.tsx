@@ -12,33 +12,30 @@
  * ```
  */
 
-import React from 'react'
-import { ToolType } from '../../types/tool.types'
-import { getToolLabel } from '../../utils/tool-utils'
-import { cn } from '../../utils/cn'
-import { ToolIcon } from '../tool-icon'
+import React from 'react';
+import { ToolType } from '../../types/tool.types';
+import { cn } from '../../utils/cn';
+import { getToolLabel } from '../../utils/tool-utils';
+import { ToolIcon } from '../tool-icon';
 
-export type { ToolType } from '../../types/tool.types'
+export type { ToolType } from '../../types/tool.types';
 
 export interface ToolBadgeProps {
   /** Tool type */
-  toolType: ToolType
+  toolType: ToolType;
   /** Additional CSS classes */
-  className?: string
+  className?: string;
 }
 
-export const ToolBadge: React.FC<ToolBadgeProps> = ({
-  toolType,
-  className
-}) => {
-  const label = getToolLabel(toolType)
+export const ToolBadge: React.FC<ToolBadgeProps> = ({ toolType, className }) => {
+  const label = getToolLabel(toolType);
 
   return (
-    <div className={cn("flex items-center gap-1", className)}>
+    <div className={cn('flex items-center gap-1', className)}>
       <ToolIcon toolType={toolType} className="[&_svg]:w-4 [&_svg]:h-4" />
       <span className="text-ods-text-primary text-[14px] leading-[20px] md:text-[18px] md:leading-[24px]">{label}</span>
     </div>
-  )
-}
+  );
+};
 
-ToolBadge.displayName = 'ToolBadge'
+ToolBadge.displayName = 'ToolBadge';

@@ -1,18 +1,18 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { cn } from '../../../utils/cn'
-import { SparklesIcon } from '../../icons/sparkles-icon'
-import { AIEnrichButton } from './AIEnrichButton'
-import { AIWarningsSection } from './AIWarningsSection'
-import { Button } from '../../ui/button'
-import { Badge } from '../../ui/badge'
-import { CheckCircle, AlertCircle, Loader2, X } from 'lucide-react'
+import { AlertCircle, CheckCircle, Loader2, X } from 'lucide-react';
+import React from 'react';
+import { cn } from '../../../utils/cn';
+import { SparklesIcon } from '../../icons/sparkles-icon';
+import { Badge } from '../../ui/badge';
+import { Button } from '../../ui/button';
+import { AIEnrichButton } from './AIEnrichButton';
+import { AIWarningsSection } from './AIWarningsSection';
 
 export interface ConfidenceField {
-  label: string
-  key: string
-  confidence?: number
+  label: string;
+  key: string;
+  confidence?: number;
 }
 
 /**
@@ -21,55 +21,55 @@ export interface ConfidenceField {
  */
 export interface AIRequiredField {
   /** Form field key (e.g., 'version', 'email') */
-  key: string
+  key: string;
   /** Display label (e.g., 'Version', 'Email') */
-  label: string
+  label: string;
   /** Current state - is field filled? */
-  isFilled: boolean
+  isFilled: boolean;
 }
 
 export interface AIEnrichSectionProps {
   // Button state
-  onEnrich: () => void
-  loading?: boolean
-  disabled?: boolean
-  canEnrich?: boolean
+  onEnrich: () => void;
+  loading?: boolean;
+  disabled?: boolean;
+  canEnrich?: boolean;
 
   // Status
-  status?: 'idle' | 'loading' | 'success' | 'error'
-  statusMessage?: string
-  overallConfidence?: number
+  status?: 'idle' | 'loading' | 'success' | 'error';
+  statusMessage?: string;
+  overallConfidence?: number;
 
   // Warnings
-  warnings?: string[]
+  warnings?: string[];
 
   // Confidence fields to display (optional - shown as simple list)
-  confidenceFields?: ConfidenceField[]
+  confidenceFields?: ConfidenceField[];
 
   // Required fields for AI enrichment - displays missing fields when disabled
-  requiredFields?: AIRequiredField[]
+  requiredFields?: AIRequiredField[];
 
   // Custom content (like created tags info)
-  children?: React.ReactNode
+  children?: React.ReactNode;
 
   // Actions
-  onClear?: () => void
-  showClearButton?: boolean
-  onCancel?: () => void
-  showCancel?: boolean
-  isCancelling?: boolean
+  onClear?: () => void;
+  showClearButton?: boolean;
+  onCancel?: () => void;
+  showCancel?: boolean;
+  isCancelling?: boolean;
 
   // Labels
-  title?: string
-  description?: string
-  buttonLabel?: string
-  loadingLabel?: string
-  disabledMessage?: string
+  title?: string;
+  description?: string;
+  buttonLabel?: string;
+  loadingLabel?: string;
+  disabledMessage?: string;
 
   // Styling
-  variant?: 'default' | 'compact'
-  className?: string
-  icon?: React.ReactNode
+  variant?: 'default' | 'compact';
+  className?: string;
+  icon?: React.ReactNode;
 }
 
 export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
@@ -98,32 +98,26 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
   className,
   icon,
 }) => {
-  const hasResults = status === 'success' || status === 'error'
-  const shouldDisable = disabled || !canEnrich
+  const hasResults = status === 'success' || status === 'error';
+  const shouldDisable = disabled || !canEnrich;
 
   // Get list of unfilled required fields for display
-  const unfilledFields = requiredFields?.filter(f => !f.isFilled) || []
+  const unfilledFields = requiredFields?.filter(f => !f.isFilled) || [];
 
   return (
     <div
       className={cn(
         'rounded-lg bg-ods-card border border-ods-border',
         variant === 'default' ? 'p-6 space-y-4' : 'p-4 space-y-3',
-        className
+        className,
       )}
     >
       {/* Row 1: Icon + Title + Description */}
       <div className="flex items-center gap-3">
         {icon || <SparklesIcon size={20} className="text-ods-text-secondary" />}
         <div className="flex-1">
-          <h3 className="text-h5 text-ods-text-primary">
-            {title}
-          </h3>
-          {description && (
-            <p className="text-ods-text-secondary text-sm font-['DM_Sans'] mt-1">
-              {description}
-            </p>
-          )}
+          <h3 className="text-h5 text-ods-text-primary">{title}</h3>
+          {description && <p className="text-ods-text-secondary text-sm font-['DM_Sans'] mt-1">{description}</p>}
         </div>
       </div>
 
@@ -161,9 +155,7 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
       {/* Disabled message with unfilled fields */}
       {shouldDisable && !loading && (
         <div className="space-y-2">
-          <p className="text-ods-text-secondary text-sm font-['DM_Sans']">
-            {disabledMessage}
-          </p>
+          <p className="text-ods-text-secondary text-sm font-['DM_Sans']">{disabledMessage}</p>
           {unfilledFields.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {unfilledFields.map(field => (
@@ -184,9 +176,7 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
       {loading && statusMessage && (
         <div className="flex items-center gap-3 p-3 rounded-lg bg-ods-card-secondary">
           <Loader2 className="h-5 w-5 text-ods-accent animate-spin" />
-          <span className="text-sm text-ods-text-primary font-['DM_Sans']">
-            {statusMessage}
-          </span>
+          <span className="text-sm text-ods-text-primary font-['DM_Sans']">{statusMessage}</span>
         </div>
       )}
 
@@ -194,19 +184,23 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
       {hasResults && (
         <div className="space-y-4">
           {/* Status indicator - simple and clean */}
-          <div className={cn(
-            'flex items-center gap-3 p-3 rounded-lg',
-            status === 'success' ? 'bg-[--ods-attention-green-success]/10' : 'bg-[--ods-attention-red-error]/10'
-          )}>
+          <div
+            className={cn(
+              'flex items-center gap-3 p-3 rounded-lg',
+              status === 'success' ? 'bg-[--ods-attention-green-success]/10' : 'bg-[--ods-attention-red-error]/10',
+            )}
+          >
             {status === 'success' ? (
               <CheckCircle className="h-5 w-5 text-[--ods-attention-green-success]" />
             ) : (
               <AlertCircle className="h-5 w-5 text-[--ods-attention-red-error]" />
             )}
-            <span className={cn(
-              'text-sm font-medium',
-              status === 'success' ? 'text-[--ods-attention-green-success]' : 'text-[--ods-attention-red-error]'
-            )}>
+            <span
+              className={cn(
+                'text-sm font-medium',
+                status === 'success' ? 'text-[--ods-attention-green-success]' : 'text-[--ods-attention-red-error]',
+              )}
+            >
               {statusMessage || (status === 'success' ? 'Enrichment complete' : 'Enrichment failed')}
             </span>
             {overallConfidence !== undefined && status === 'success' && (
@@ -217,25 +211,19 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
           </div>
 
           {/* Warnings */}
-          {warnings && warnings.length > 0 && (
-            <AIWarningsSection warnings={warnings} />
-          )}
+          {warnings && warnings.length > 0 && <AIWarningsSection warnings={warnings} />}
 
           {/* Custom children content (like created tags info) */}
           {children}
 
           {/* Clear button */}
           {showClearButton && onClear && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onClear}
-            >
+            <Button variant="outline" size="sm" onClick={onClear}>
               Clear Results
             </Button>
           )}
         </div>
       )}
     </div>
-  )
-}
+  );
+};

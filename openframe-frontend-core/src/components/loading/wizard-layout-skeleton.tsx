@@ -1,10 +1,10 @@
-import React from 'react'
-import { cn } from "../../utils/cn"
-import { UnifiedSkeleton, TextSkeleton } from './unified-skeleton'
+import React from 'react';
+import { cn } from '../../utils/cn';
+import { TextSkeleton, UnifiedSkeleton } from './unified-skeleton';
 
 interface WizardLayoutSkeletonProps {
-  steps?: number
-  className?: string
+  steps?: number;
+  className?: string;
 }
 
 export function WizardLayoutSkeleton({ steps = 6, className }: WizardLayoutSkeletonProps) {
@@ -29,5 +29,5 @@ export function WizardLayoutSkeleton({ steps = 6, className }: WizardLayoutSkele
         <UnifiedSkeleton className="h-10 w-32 rounded" />
       </div>
     </div>
-  )
-} 
+  );
+}

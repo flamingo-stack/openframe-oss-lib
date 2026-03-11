@@ -4,21 +4,21 @@
  */
 
 import {
-  MESSAGE_TYPE,
-  OWNER_TYPE,
   type HistoricalMessage,
-  type ProcessedMessage,
-  type MessageProcessingOptions,
+  MESSAGE_TYPE,
   type MessageData,
-} from '../types'
-import { MessageSegmentAccumulator, createMessageSegmentAccumulator } from './message-segment-accumulator'
+  type MessageProcessingOptions,
+  OWNER_TYPE,
+  type ProcessedMessage,
+} from '../types';
+import { createMessageSegmentAccumulator, MessageSegmentAccumulator } from './message-segment-accumulator';
 
 /**
  * Result type for historical message processing
  */
 export interface ProcessHistoricalMessagesResult {
-  messages: ProcessedMessage[]
-  escalatedApprovals: Map<string, { command: string; explanation?: string; approvalType: string }>
+  messages: ProcessedMessage[];
+  escalatedApprovals: Map<string, { command: string; explanation?: string; approvalType: string }>;
 }
 
 /**
@@ -26,7 +26,7 @@ export interface ProcessHistoricalMessagesResult {
  */
 export function processHistoricalMessages(
   messages: HistoricalMessage[],
-  options: MessageProcessingOptions = {}
+  options: MessageProcessingOptions = {},
 ): ProcessHistoricalMessagesResult {
   const {
     assistantName = 'Fae',
@@ -37,22 +37,22 @@ export function processHistoricalMessages(
     chatTypeFilter,
     approvalStatuses = {},
     displayApprovalTypes,
-  } = options
+  } = options;
 
-  const processedMessages: ProcessedMessage[] = []
-  const accumulator = createMessageSegmentAccumulator({ onApprove, onReject })
-  const escalatedApprovals = new Map<string, { command: string; explanation?: string; approvalType: string }>()
-  
-  let currentAssistantId: string | null = null
-  let currentAssistantTimestamp: Date | null = null
-  let lastAssistantId: string | null = null
+  const processedMessages: ProcessedMessage[] = [];
+  const accumulator = createMessageSegmentAccumulator({ onApprove, onReject });
+  const escalatedApprovals = new Map<string, { command: string; explanation?: string; approvalType: string }>();
+
+  let currentAssistantId: string | null = null;
+  let currentAssistantTimestamp: Date | null = null;
+  let lastAssistantId: string | null = null;
 
   /**
    * Flush the current assistant message to processedMessages.
    * Uses the LAST message ID in the group for stable React keys across page boundaries.
    */
   const flushAssistantMessage = () => {
-    const idToUse = lastAssistantId || currentAssistantId
+    const idToUse = lastAssistantId || currentAssistantId;
     if (idToUse && accumulator.hasContent()) {
       processedMessages.push({
         id: idToUse,
@@ -62,31 +62,30 @@ export function processHistoricalMessages(
         assistantType,
         timestamp: currentAssistantTimestamp || new Date(),
         avatar: assistantAvatar,
-      })
-      accumulator.resetSegments()
-      currentAssistantId = null
-      currentAssistantTimestamp = null
-      lastAssistantId = null
+      });
+      accumulator.resetSegments();
+      currentAssistantId = null;
+      currentAssistantTimestamp = null;
+      lastAssistantId = null;
     }
-  }
+  };
 
   messages.forEach((msg, index) => {
     // Filter by chat type if specified
-    if (chatTypeFilter && msg.chatType !== chatTypeFilter) return
+    if (chatTypeFilter && msg.chatType !== chatTypeFilter) return;
 
     const messageDataArray = Array.isArray(msg.messageData)
       ? msg.messageData
       : msg.messageData
-      ? [msg.messageData]
-      : []
+        ? [msg.messageData]
+        : [];
 
-    const isUserMessage =
-      msg.owner?.type === OWNER_TYPE.CLIENT || msg.owner?.type === OWNER_TYPE.ADMIN
+    const isUserMessage = msg.owner?.type === OWNER_TYPE.CLIENT || msg.owner?.type === OWNER_TYPE.ADMIN;
 
     if (isUserMessage) {
-      flushAssistantMessage()
+      flushAssistantMessage();
 
-      messageDataArray.forEach((data) => {
+      messageDataArray.forEach(data => {
         if (data.type === MESSAGE_TYPE.TEXT && 'text' in data && data.text) {
           processedMessages.push({
             id: msg.id,
@@ -94,36 +93,35 @@ export function processHistoricalMessages(
             content: data.text,
             name: msg.owner?.type === OWNER_TYPE.ADMIN ? 'Admin' : 'You',
             timestamp: new Date(msg.createdAt),
-          })
+          });
         }
-      })
+      });
     } else {
       if (!currentAssistantId) {
-        currentAssistantId = msg.id
-        currentAssistantTimestamp = new Date(msg.createdAt)
+        currentAssistantId = msg.id;
+        currentAssistantTimestamp = new Date(msg.createdAt);
       }
-      lastAssistantId = msg.id
+      lastAssistantId = msg.id;
 
-      messageDataArray.forEach((data) => {
-        processMessageData(data, accumulator, approvalStatuses, { displayApprovalTypes }, escalatedApprovals)
-      })
+      messageDataArray.forEach(data => {
+        processMessageData(data, accumulator, approvalStatuses, { displayApprovalTypes }, escalatedApprovals);
+      });
 
       // Check if we should flush (next message is from user or last message)
-      const nextMsg = messages[index + 1]
-      const isLastMessage = index === messages.length - 1
+      const nextMsg = messages[index + 1];
+      const isLastMessage = index === messages.length - 1;
       const nextIsFromUser =
-        nextMsg &&
-        (nextMsg.owner?.type === OWNER_TYPE.CLIENT || nextMsg.owner?.type === OWNER_TYPE.ADMIN)
+        nextMsg && (nextMsg.owner?.type === OWNER_TYPE.CLIENT || nextMsg.owner?.type === OWNER_TYPE.ADMIN);
 
       if (isLastMessage || nextIsFromUser) {
-        flushAssistantMessage()
+        flushAssistantMessage();
       }
     }
-  })
+  });
 
-  flushAssistantMessage()
+  flushAssistantMessage();
 
-  const pendingApprovalSegments = accumulator.flushPendingApprovals()
+  const pendingApprovalSegments = accumulator.flushPendingApprovals();
   if (pendingApprovalSegments.length > 0) {
     processedMessages.push({
       id: `pending-approvals-${Date.now()}`,
@@ -133,13 +131,13 @@ export function processHistoricalMessages(
       assistantType,
       timestamp: new Date(),
       avatar: assistantAvatar,
-    })
+    });
   }
 
   return {
     messages: processedMessages,
-    escalatedApprovals: escalatedApprovals
-  }
+    escalatedApprovals: escalatedApprovals,
+  };
 }
 
 /**
@@ -150,15 +148,15 @@ function processMessageData(
   accumulator: MessageSegmentAccumulator,
   approvalStatuses: Record<string, string>,
   options: MessageProcessingOptions = {},
-  escalatedApprovals?: Map<string, { command: string; explanation?: string; approvalType: string }>
+  escalatedApprovals?: Map<string, { command: string; explanation?: string; approvalType: string }>,
 ): void {
-  const { displayApprovalTypes } = options
+  const { displayApprovalTypes } = options;
   switch (data.type) {
     case MESSAGE_TYPE.TEXT:
       if ('text' in data && data.text) {
-        accumulator.appendText(data.text)
+        accumulator.appendText(data.text);
       }
-      break
+      break;
 
     case MESSAGE_TYPE.EXECUTING_TOOL:
       if ('integratedToolType' in data) {
@@ -170,9 +168,9 @@ function processMessageData(
             toolFunction: data.toolFunction || '',
             parameters: data.parameters,
           },
-        })
+        });
       }
-      break
+      break;
 
     case MESSAGE_TYPE.EXECUTED_TOOL:
       if ('integratedToolType' in data) {
@@ -186,73 +184,66 @@ function processMessageData(
             result: data.result,
             success: data.success,
           },
-        })
+        });
       }
-      break
+      break;
 
     case MESSAGE_TYPE.APPROVAL_REQUEST:
       if ('approvalRequestId' in data && data.approvalRequestId) {
-        const approvalType = data.approvalType || 'CLIENT'
+        const approvalType = data.approvalType || 'CLIENT';
 
         if (!displayApprovalTypes || displayApprovalTypes.includes(approvalType)) {
           accumulator.trackApprovalRequest(data.approvalRequestId, {
             command: data.command || '',
             explanation: data.explanation,
             approvalType,
-          })
+          });
         } else {
           escalatedApprovals?.set(data.approvalRequestId, {
             command: data.command || '',
             explanation: data.explanation,
             approvalType,
-          })
+          });
         }
       }
-      break
+      break;
 
     case MESSAGE_TYPE.APPROVAL_RESULT:
       if ('approvalRequestId' in data && data.approvalRequestId) {
-        const existingStatus = approvalStatuses[data.approvalRequestId]
-        const status = existingStatus || (data.approved ? 'approved' : 'rejected')
-        const escalatedData = escalatedApprovals?.get(data.approvalRequestId)
+        const existingStatus = approvalStatuses[data.approvalRequestId];
+        const status = existingStatus || (data.approved ? 'approved' : 'rejected');
+        const escalatedData = escalatedApprovals?.get(data.approvalRequestId);
 
         if (escalatedData) {
           accumulator.trackApprovalRequest(data.approvalRequestId, {
             command: escalatedData.command,
             explanation: escalatedData.explanation,
             approvalType: escalatedData.approvalType,
-          })
-          escalatedApprovals?.delete(data.approvalRequestId)
+          });
+          escalatedApprovals?.delete(data.approvalRequestId);
         }
-        
-        accumulator.processApprovalResult(
-          data.approvalRequestId,
-          status === 'approved',
-          data.approvalType || 'USER'
-        )
+
+        accumulator.processApprovalResult(data.approvalRequestId, status === 'approved', data.approvalType || 'USER');
       }
-      break
+      break;
 
     case MESSAGE_TYPE.ERROR:
       if ('error' in data) {
-        let message: string | undefined
+        let message: string | undefined;
         if ('details' in data && data?.details) {
           try {
-            message = JSON.parse(data.details)?.error?.message
+            message = JSON.parse(data.details)?.error?.message;
           } catch {
-            message = data.details
+            message = data.details;
           }
         }
-        accumulator.addError(
-          data.error || 'An error occurred',
-          message
-        )
+        accumulator.addError(data.error || 'An error occurred', message);
       }
-      break
+      break;
 
     default:
       // Unknown message type - ignore
-      break
+      break;
   }
 }
 
@@ -262,22 +253,22 @@ function processMessageData(
  */
 export function extractErrorMessages(
   messages: HistoricalMessage[],
-  options: MessageProcessingOptions = {}
+  options: MessageProcessingOptions = {},
 ): ProcessedMessage[] {
-  const { assistantName = 'Fae', assistantType = 'fae', assistantAvatar, chatTypeFilter } = options
+  const { assistantName = 'Fae', assistantType = 'fae', assistantAvatar, chatTypeFilter } = options;
 
-  const errorMessages: ProcessedMessage[] = []
+  const errorMessages: ProcessedMessage[] = [];
 
-  messages.forEach((msg) => {
-    if (chatTypeFilter && msg.chatType !== chatTypeFilter) return
+  messages.forEach(msg => {
+    if (chatTypeFilter && msg.chatType !== chatTypeFilter) return;
 
     const messageDataArray = Array.isArray(msg.messageData)
       ? msg.messageData
       : msg.messageData
-      ? [msg.messageData]
-      : []
+        ? [msg.messageData]
+        : [];
 
-    messageDataArray.forEach((data) => {
+    messageDataArray.forEach(data => {
       if (data.type === MESSAGE_TYPE.ERROR) {
         errorMessages.push({
           id: `${msg.id}-error`,
@@ -287,12 +278,12 @@ export function extractErrorMessages(
           assistantType,
           timestamp: new Date(msg.createdAt),
           avatar: assistantAvatar,
-        })
+        });
       }
-    })
-  })
+    });
+  });
 
-  return errorMessages
+  return errorMessages;
 }
 
 /**
@@ -300,20 +291,29 @@ export function extractErrorMessages(
  */
 export function processHistoricalMessagesWithErrors(
   messages: HistoricalMessage[],
-  options: MessageProcessingOptions = {}
+  options: MessageProcessingOptions = {},
 ): ProcessHistoricalMessagesResult {
-  const { chatTypeFilter, assistantName = 'Fae', assistantType = 'fae', assistantAvatar, onApprove, onReject, approvalStatuses = {}, displayApprovalTypes } = options
+  const {
+    chatTypeFilter,
+    assistantName = 'Fae',
+    assistantType = 'fae',
+    assistantAvatar,
+    onApprove,
+    onReject,
+    approvalStatuses = {},
+    displayApprovalTypes,
+  } = options;
 
-  const processedMessages: ProcessedMessage[] = []
-  const accumulator = createMessageSegmentAccumulator({ onApprove, onReject })
-  const escalatedApprovals = new Map<string, { command: string; explanation?: string; approvalType: string }>()
+  const processedMessages: ProcessedMessage[] = [];
+  const accumulator = createMessageSegmentAccumulator({ onApprove, onReject });
+  const escalatedApprovals = new Map<string, { command: string; explanation?: string; approvalType: string }>();
 
-  let currentAssistantId: string | null = null
-  let currentAssistantTimestamp: Date | null = null
-  let lastAssistantId: string | null = null
+  let currentAssistantId: string | null = null;
+  let currentAssistantTimestamp: Date | null = null;
+  let lastAssistantId: string | null = null;
 
   const flushAssistantMessage = () => {
-    const idToUse = lastAssistantId || currentAssistantId
+    const idToUse = lastAssistantId || currentAssistantId;
     if (idToUse && accumulator.hasContent()) {
       processedMessages.push({
         id: idToUse,
@@ -323,30 +323,29 @@ export function processHistoricalMessagesWithErrors(
         assistantType,
         timestamp: currentAssistantTimestamp || new Date(),
         avatar: assistantAvatar,
-      })
-      accumulator.resetSegments()
-      currentAssistantId = null
-      currentAssistantTimestamp = null
-      lastAssistantId = null
+      });
+      accumulator.resetSegments();
+      currentAssistantId = null;
+      currentAssistantTimestamp = null;
+      lastAssistantId = null;
     }
-  }
+  };
 
   messages.forEach((msg, index) => {
-    if (chatTypeFilter && msg.chatType !== chatTypeFilter) return
+    if (chatTypeFilter && msg.chatType !== chatTypeFilter) return;
 
     const messageDataArray = Array.isArray(msg.messageData)
       ? msg.messageData
       : msg.messageData
-      ? [msg.messageData]
-      : []
+        ? [msg.messageData]
+        : [];
 
-    const isUserMessage =
-      msg.owner?.type === OWNER_TYPE.CLIENT || msg.owner?.type === OWNER_TYPE.ADMIN
+    const isUserMessage = msg.owner?.type === OWNER_TYPE.CLIENT || msg.owner?.type === OWNER_TYPE.ADMIN;
 
     if (isUserMessage) {
-      flushAssistantMessage()
+      flushAssistantMessage();
 
-      messageDataArray.forEach((data) => {
+      messageDataArray.forEach(data => {
         if (data.type === MESSAGE_TYPE.TEXT && 'text' in data && data.text) {
           processedMessages.push({
             id: msg.id,
@@ -354,35 +353,34 @@ export function processHistoricalMessagesWithErrors(
             content: data.text,
             name: msg.owner?.type === OWNER_TYPE.ADMIN ? 'Admin' : 'You',
             timestamp: new Date(msg.createdAt),
-          })
+          });
         }
-      })
+      });
     } else {
       if (!currentAssistantId) {
-        currentAssistantId = msg.id
-        currentAssistantTimestamp = new Date(msg.createdAt)
+        currentAssistantId = msg.id;
+        currentAssistantTimestamp = new Date(msg.createdAt);
       }
-      lastAssistantId = msg.id
+      lastAssistantId = msg.id;
 
-      messageDataArray.forEach((data) => {
-        processMessageData(data, accumulator, approvalStatuses, { displayApprovalTypes }, escalatedApprovals)
-      })
+      messageDataArray.forEach(data => {
+        processMessageData(data, accumulator, approvalStatuses, { displayApprovalTypes }, escalatedApprovals);
+      });
 
-      const nextMsg = messages[index + 1]
-      const isLastMessage = index === messages.length - 1
+      const nextMsg = messages[index + 1];
+      const isLastMessage = index === messages.length - 1;
       const nextIsFromUser =
-        nextMsg &&
-        (nextMsg.owner?.type === OWNER_TYPE.CLIENT || nextMsg.owner?.type === OWNER_TYPE.ADMIN)
+        nextMsg && (nextMsg.owner?.type === OWNER_TYPE.CLIENT || nextMsg.owner?.type === OWNER_TYPE.ADMIN);
 
       if (isLastMessage || nextIsFromUser) {
-        flushAssistantMessage()
+        flushAssistantMessage();
       }
     }
-  })
+  });
 
-  flushAssistantMessage()
+  flushAssistantMessage();
 
-  const pendingApprovalSegments = accumulator.flushPendingApprovals()
+  const pendingApprovalSegments = accumulator.flushPendingApprovals();
   if (pendingApprovalSegments.length > 0) {
     processedMessages.push({
       id: `pending-approvals-${Date.now()}`,
@@ -392,11 +390,11 @@ export function processHistoricalMessagesWithErrors(
       assistantType,
       timestamp: new Date(),
       avatar: assistantAvatar,
-    })
+    });
   }
 
   return {
     messages: processedMessages,
-    escalatedApprovals: escalatedApprovals
-  }
+    escalatedApprovals: escalatedApprovals,
+  };
 }

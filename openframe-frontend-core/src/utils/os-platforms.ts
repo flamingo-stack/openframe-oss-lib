@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import { WindowsIcon, LinuxIcon, MacOSIcon } from '../components/icons';
+import { LinuxIcon, MacOSIcon, WindowsIcon } from '../components/icons';
 
 // OS-level platforms (Windows, Linux, MacOS)
 
@@ -14,9 +14,7 @@ export interface OSPlatformOption {
 export const OS_PLATFORMS: OSPlatformOption[] = [
   { id: 'windows', name: 'Windows', icon: WindowsIcon },
   { id: 'linux', name: 'Linux', icon: LinuxIcon },
-  { id: 'darwin', name: 'MacOS', icon: MacOSIcon }
+  { id: 'darwin', name: 'MacOS', icon: MacOSIcon },
 ];
 
 export const DEFAULT_OS_PLATFORM: OSPlatformId = 'windows';
-
-

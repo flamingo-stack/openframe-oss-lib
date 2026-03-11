@@ -1,32 +1,32 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { ChevronLeft, ChevronRight, RotateCcw, Home } from 'lucide-react'
-import { cn } from '../../utils/cn'
-import { Button } from './button'
+import { ChevronLeft, ChevronRight, Home, RotateCcw } from 'lucide-react';
+import React from 'react';
+import { cn } from '../../utils/cn';
+import { Button } from './button';
 
 export interface CursorPaginationProps {
-  hasNextPage: boolean
-  hasPreviousPage?: boolean
-  isFirstPage?: boolean
-  startCursor?: string | null
-  endCursor?: string | null
-  
-  currentCount?: number
-  totalCount?: number | null
-  itemName?: string
-  
-  loading?: boolean
-  
-  onNext?: (cursor: string) => void
-  onPrevious?: (cursor: string) => void
-  onReset?: () => void
-  
-  className?: string
-  showInfo?: boolean
-  compact?: boolean
-  resetButtonLabel?: string
-  resetButtonIcon?: 'home' | 'rotate'
+  hasNextPage: boolean;
+  hasPreviousPage?: boolean;
+  isFirstPage?: boolean;
+  startCursor?: string | null;
+  endCursor?: string | null;
+
+  currentCount?: number;
+  totalCount?: number | null;
+  itemName?: string;
+
+  loading?: boolean;
+
+  onNext?: (cursor: string) => void;
+  onPrevious?: (cursor: string) => void;
+  onReset?: () => void;
+
+  className?: string;
+  showInfo?: boolean;
+  compact?: boolean;
+  resetButtonLabel?: string;
+  resetButtonIcon?: 'home' | 'rotate';
 }
 
 export function CursorPagination({
@@ -46,55 +46,47 @@ export function CursorPagination({
   showInfo = true,
   compact = false,
   resetButtonLabel = 'First',
-  resetButtonIcon = 'home'
+  resetButtonIcon = 'home',
 }: CursorPaginationProps) {
   const handleNext = () => {
     if (hasNextPage && endCursor && onNext) {
-      onNext(endCursor)
+      onNext(endCursor);
     }
-  }
+  };
 
   const handlePrevious = () => {
     if (hasPreviousPage && startCursor && onPrevious) {
-      onPrevious(startCursor)
+      onPrevious(startCursor);
     }
-  }
-  
+  };
+
   const handleReset = () => {
     if (onReset) {
-      onReset()
+      onReset();
     }
-  }
-  
-  const ResetIcon = resetButtonIcon === 'rotate' ? RotateCcw : Home
+  };
+
+  const ResetIcon = resetButtonIcon === 'rotate' ? RotateCcw : Home;
 
   const getDisplayText = () => {
-    if (!showInfo || !currentCount) return null
+    if (!showInfo || !currentCount) return null;
 
     if (totalCount) {
-      return `Showing ${currentCount} of ${totalCount} ${itemName}`
+      return `Showing ${currentCount} of ${totalCount} ${itemName}`;
     } else if (hasNextPage) {
-      return `Showing ${currentCount}+ ${itemName}`
+      return `Showing ${currentCount}+ ${itemName}`;
     } else {
-      return `Showing ${currentCount} ${itemName}`
+      return `Showing ${currentCount} ${itemName}`;
     }
-  }
+  };
 
-  const displayText = getDisplayText()
+  const displayText = getDisplayText();
 
   return (
-    <div 
-      className={cn(
-        'flex items-center justify-between gap-4',
-        compact ? 'py-2' : 'py-3',
-        className
-      )}
-    >
+    <div className={cn('flex items-center justify-between gap-4', compact ? 'py-2' : 'py-3', className)}>
       {/* Info text */}
       {showInfo && (
-        <div className="text-sm text-[#888888]">
-          {displayText || <span>&nbsp;</span>}
-        </div>
+        <div className="text-sm text-ods-text-secondary">{displayText || <span>&nbsp;</span>}</div>
       )}
 
       {/* Navigation buttons */}
@@ -105,24 +97,21 @@ export function CursorPagination({
             size={compact ? 'sm' : 'default'}
             onClick={handleReset}
             disabled={isFirstPage || loading}
-            className={cn(
-              compact && 'h-8 px-3'
-            )}
+            className={cn(compact && 'h-8 px-3')}
             leftIcon={<ResetIcon className="h-4 w-4" />}
             aria-label="Go to first page"
           >
             <span className={compact ? 'hidden md:inline' : ''}>{resetButtonLabel}</span>
           </Button>
         ) : (
-          hasPreviousPage !== undefined && onPrevious && (
+          hasPreviousPage !== undefined &&
+          onPrevious && (
             <Button
               variant="outline"
               size={compact ? 'sm' : 'default'}
               onClick={handlePrevious}
               disabled={!hasPreviousPage || loading}
-              className={cn(
-                compact && 'h-8 px-3'
-              )}
+              className={cn(compact && 'h-8 px-3')}
               leftIcon={<ChevronLeft className="h-4 w-4" />}
               aria-label="Go to previous page"
             >
@@ -136,9 +125,7 @@ export function CursorPagination({
           size={compact ? 'sm' : 'default'}
           onClick={handleNext}
           disabled={!hasNextPage || loading}
-          className={cn(
-            compact && 'h-8 px-3'
-          )}
+          className={cn(compact && 'h-8 px-3')}
           rightIcon={<ChevronRight className="h-4 w-4" />}
           aria-label="Go to next page"
         >
@@ -146,7 +133,7 @@ export function CursorPagination({
         </Button>
       </div>
     </div>
-  )
+  );
 }
 
 export function CursorPaginationSimple({
@@ -157,8 +144,11 @@ export function CursorPaginationSimple({
   onPrevious,
   onReset,
   loading = false,
-  className
-}: Pick<CursorPaginationProps, 'hasNextPage' | 'hasPreviousPage' | 'isFirstPage' | 'onNext' | 'onPrevious' | 'onReset' | 'loading' | 'className'>) {
+  className,
+}: Pick<
+  CursorPaginationProps,
+  'hasNextPage' | 'hasPreviousPage' | 'isFirstPage' | 'onNext' | 'onPrevious' | 'onReset' | 'loading' | 'className'
+>) {
   return (
     <div className={cn('flex items-center gap-1', className)}>
       {onReset ? (
@@ -172,7 +162,8 @@ export function CursorPaginationSimple({
           aria-label="First"
         />
       ) : (
-        hasPreviousPage !== undefined && onPrevious && (
+        hasPreviousPage !== undefined &&
+        onPrevious && (
           <Button
             variant="ghost"
             size="icon"
@@ -184,7 +175,7 @@ export function CursorPaginationSimple({
           />
         )
       )}
-      
+
       <Button
         variant="ghost"
         size="icon"
@@ -195,5 +186,5 @@ export function CursorPaginationSimple({
         aria-label="Next"
       />
     </div>
-  )
+  );
 }

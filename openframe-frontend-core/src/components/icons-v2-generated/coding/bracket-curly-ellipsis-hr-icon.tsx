@@ -1,14 +1,13 @@
-import type { SVGProps } from "react";
-export interface BracketCurlyEllipsisHrIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface BracketCurlyEllipsisHrIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
 export function BracketCurlyEllipsisHrIcon({
-  className = "",
+  className = '',
   size = 24,
-  color = "currentColor",
+  color = 'currentColor',
   ...props
 }: BracketCurlyEllipsisHrIconProps) {
   return (

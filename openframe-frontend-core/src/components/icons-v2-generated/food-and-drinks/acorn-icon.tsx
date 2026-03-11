@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface AcornIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface AcornIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function AcornIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: AcornIconProps) {
+export function AcornIcon({ className = '', size = 24, color = 'currentColor', ...props }: AcornIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface Refresh02VrIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface Refresh02VrIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function Refresh02VrIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: Refresh02VrIconProps) {
+export function Refresh02VrIcon({ className = '', size = 24, color = 'currentColor', ...props }: Refresh02VrIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

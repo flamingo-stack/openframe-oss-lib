@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface BreadLongIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface BreadLongIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function BreadLongIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: BreadLongIconProps) {
+export function BreadLongIcon({ className = '', size = 24, color = 'currentColor', ...props }: BreadLongIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

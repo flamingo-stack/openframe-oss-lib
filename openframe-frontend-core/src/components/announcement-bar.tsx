@@ -1,27 +1,16 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { Button } from './ui/button';
-import { renderSvgIcon } from './icon-utils';
-import {
-  setStoredAnnouncement,
-  getStoredAnnouncement,
-  clearStoredAnnouncement,
-} from '../utils/announcement-storage';
+import { useCallback, useEffect, useState } from 'react';
 import { Announcement } from '../types/announcement';
+import { clearStoredAnnouncement, getStoredAnnouncement, setStoredAnnouncement } from '../utils/announcement-storage';
 import { getAppType } from '../utils/app-config';
+import { renderSvgIcon } from './icon-utils';
+import { Button } from './ui/button';
 
 // Helper that defers to renderSvgIcon so we don't need local icon imports
-const getSvgIcon = (
-  name: string,
-  size: 'main' | 'cta' = 'main',
-  extra: Record<string, any> = {}
-) => {
-  const cls =
-    size === 'cta'
-      ? 'relative shrink-0 w-3 h-3 md:w-4 md:h-4'
-      : 'relative shrink-0 w-6 h-6 md:w-8 md:h-8';
+const getSvgIcon = (name: string, size: 'main' | 'cta' = 'main', extra: Record<string, any> = {}) => {
+  const cls = size === 'cta' ? 'relative shrink-0 w-3 h-3 md:w-4 md:h-4' : 'relative shrink-0 w-6 h-6 md:w-8 md:h-8';
   return renderSvgIcon(name, { className: cls, ...extra });
 };
 
@@ -33,17 +22,17 @@ export function AnnouncementBar() {
   const platform = getAppType();
 
   // Helper to determine dismissal key for localStorage
-  const getDismissKey = (id: string) => `${platform}-announcement-${id}-dismissed`;
-  
+  const getDismissKey = useCallback((id: string) => `${platform}-announcement-${id}-dismissed`, [platform]);
+
   // Helper to get platform-specific cache key
-  const getCacheKey = () => `${platform}-announcement-cache`;
+  const getCacheKey = useCallback(() => `${platform}-announcement-cache`, [platform]);
 
   // Fetch active announcement from API and update state + LS
-  const fetchActiveAnnouncement = async () => {
+  const fetchActiveAnnouncement = useCallback(async () => {
     try {
       // Server-side platform injection - no URL parameter needed
       const response = await fetch(`/api/announcements/active`);
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data.announcement) {
@@ -59,7 +48,7 @@ export function AnnouncementBar() {
           // No announcement available - clean up localStorage and hide bar
           setAnnouncement(null);
           setIsVisible(false);
-          
+
           // Use utility function to properly clear platform-specific announcement data
           clearStoredAnnouncement(getCacheKey());
         }
@@ -68,7 +57,7 @@ export function AnnouncementBar() {
         console.error(`❌ [${platform.toUpperCase()}] Error fetching announcement: ${response.status}`);
         setAnnouncement(null);
         setIsVisible(false);
-        
+
         // Clear stale data on network errors too
         clearStoredAnnouncement(getCacheKey());
       }
@@ -76,11 +65,11 @@ export function AnnouncementBar() {
       console.error('Error fetching active announcement:', error);
       setAnnouncement(null);
       setIsVisible(false);
-      
+
       // Clear stale data on exceptions too
       clearStoredAnnouncement(getCacheKey());
     }
-  };
+  }, [getCacheKey, getDismissKey, platform]);
 
   // Initial load: use cached announcement synchronously for instant paint
   useEffect(() => {
@@ -97,7 +86,7 @@ export function AnnouncementBar() {
     // Schedule refresh every 5 minutes
     const interval = setInterval(fetchActiveAnnouncement, 300_000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchActiveAnnouncement, getCacheKey, getDismissKey]);
 
   // helpers
   const handleDismiss = () => {
@@ -127,11 +116,7 @@ export function AnnouncementBar() {
       );
     }
 
-    return getSvgIcon(
-      announcement.icon_svg_name || 'openframe-logo',
-      'main',
-      announcement.icon_svg_props ?? {}
-    );
+    return getSvgIcon(announcement.icon_svg_name || 'openframe-logo', 'main', announcement.icon_svg_props ?? {});
   };
 
   // If no announcement or dismissed => render nothing
@@ -145,11 +130,11 @@ export function AnnouncementBar() {
     >
       <div className="flex items-center w-full max-w-full">
         {/* Mobile: Clickable content area, Desktop: Regular content */}
-        <div 
+        <div
           className={`flex flex-row gap-2 md:gap-4 items-center pl-4 md:pl-6 py-1.5 md:py-2 flex-1 min-w-0 ${
             announcement.cta_enabled && announcement.cta_url ? 'md:cursor-default cursor-pointer' : ''
           }`}
-          onClick={(e) => {
+          onClick={e => {
             // Only handle click on mobile (< 768px) and if CTA is enabled
             if (window.innerWidth < 768 && announcement.cta_enabled && announcement.cta_url) {
               e.preventDefault();
@@ -160,10 +145,10 @@ export function AnnouncementBar() {
           {renderIcon()}
 
           <div className="flex-1 min-w-0 max-w-full">
-            <p className="font-body font-bold text-[14px] md:text-[18px] leading-tight tracking-tight mb-0 text-[#1A1A1A] truncate">
+            <p className="font-body font-bold text-[14px] md:text-[18px] leading-tight tracking-tight mb-0 text-ods-text-on-accent truncate">
               {announcement.title}
             </p>
-            <p className="font-body text-[12px] md:text-[18px] leading-tight hidden md:block text-[#1A1A1A] truncate">
+            <p className="font-body text-[12px] md:text-[18px] leading-tight hidden md:block text-ods-text-on-accent truncate">
               {announcement.description}
             </p>
           </div>
@@ -177,11 +162,7 @@ export function AnnouncementBar() {
                 size="sm"
                 leftIcon={
                   announcement.cta_show_icon && announcement.cta_icon
-                    ? getSvgIcon(
-                        announcement.cta_icon,
-                        'cta',
-                        announcement.cta_icon_props ?? {}
-                      )
+                    ? getSvgIcon(announcement.cta_icon, 'cta', announcement.cta_icon_props ?? {})
                     : undefined
                 }
                 className="transition-opacity hover:opacity-90 text-xs md:text-sm whitespace-nowrap"
@@ -199,15 +180,15 @@ export function AnnouncementBar() {
 
         {/* Dismiss button - always visible */}
         <button
-          onClick={(e) => {
+          onClick={e => {
             e.stopPropagation(); // Prevent triggering the mobile CTA click
             handleDismiss();
           }}
-          className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center hover:bg-[#1A1A1A]/10 focus:outline-none focus:ring-2 focus:ring-[#1A1A1A] mr-2 md:mr-4"
+          className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center hover:bg-ods-text-on-accent/10 focus:outline-none focus:ring-2 focus:ring-ods-text-on-accent mr-2 md:mr-4"
           aria-label="Dismiss announcement"
           type="button"
         >
-          <X className="w-4 h-4 text-[#1A1A1A]" strokeWidth={2} />
+          <X className="w-4 h-4 text-ods-text-on-accent" strokeWidth={2} />
         </button>
       </div>
     </div>

@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface CloudXmarkIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface CloudXmarkIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function CloudXmarkIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: CloudXmarkIconProps) {
+export function CloudXmarkIcon({ className = '', size = 24, color = 'currentColor', ...props }: CloudXmarkIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

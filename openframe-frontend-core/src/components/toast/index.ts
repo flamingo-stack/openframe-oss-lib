@@ -1,3 +1,4 @@
 // Toast system using Sonner
-export { Toaster } from '../sonner'
-export { toast as sonnerToast } from 'sonner'
+
+export { toast as sonnerToast } from 'sonner';
+export { Toaster } from '../sonner';

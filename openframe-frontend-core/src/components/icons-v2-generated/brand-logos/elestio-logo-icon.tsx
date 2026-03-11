@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface ElestioLogoIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface ElestioLogoIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function ElestioLogoIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: ElestioLogoIconProps) {
+export function ElestioLogoIcon({ className = '', size = 24, color = 'currentColor', ...props }: ElestioLogoIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -29,7 +23,7 @@ export function ElestioLogoIcon({
         y={2}
         maskUnits="userSpaceOnUse"
         style={{
-          maskType: "alpha",
+          maskType: 'alpha',
         }}
       >
         <path

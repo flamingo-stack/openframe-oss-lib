@@ -1,4 +1,4 @@
-"use client"
+'use client';
 
 /**
  * OSTypeBadge Component
@@ -7,25 +7,25 @@
  * Automatically normalizes OS type strings from various sources.
  */
 
-import React from 'react'
-import { cn } from '../../utils/cn'
-import { getOSIcon, getOSLabel, normalizeOSType } from '../../utils/os-utils'
+import React from 'react';
+import { cn } from '../../utils/cn';
+import { getOSIcon, getOSLabel, normalizeOSType } from '../../utils/os-utils';
 
 export interface OSTypeBadgeProps {
   /** OS type string (case-insensitive, handles aliases) */
-  osType?: string
+  osType?: string;
   /** Additional CSS classes */
-  className?: string
+  className?: string;
   /** Show only icon (no label) */
-  iconOnly?: boolean
+  iconOnly?: boolean;
   /** Icon size class (default: w-4 h-4) */
-  iconSize?: string
+  iconSize?: string;
   /** Show label only (no icon) */
-  labelOnly?: boolean
+  labelOnly?: boolean;
   /** Icon color */
-  iconColor?: string
+  iconColor?: string;
   /** Right icon */
-  rightIcon?: React.ReactNode
+  rightIcon?: React.ReactNode;
 }
 
 /**
@@ -45,44 +45,41 @@ export const OSTypeBadge: React.FC<OSTypeBadgeProps> = ({
   iconSize = 'w-4 h-4',
   iconColor = '#888888',
   labelOnly = false,
-  rightIcon = null
+  rightIcon = null,
 }) => {
   if (!osType) {
-    return labelOnly ? (
-      <span className={cn('text-ods-text-secondary', className)}>Unknown</span>
-    ) : null
+    return labelOnly ? <span className={cn('text-ods-text-secondary', className)}>Unknown</span> : null;
   }
 
-  const normalized = normalizeOSType(osType)
-  if (!normalized && !labelOnly) return null
+  const normalized = normalizeOSType(osType);
+  if (!normalized && !labelOnly) return null;
 
-  const label = getOSLabel(osType)
-  const IconComponent = getOSIcon(osType)
+  const label = getOSLabel(osType);
+  const IconComponent = getOSIcon(osType);
 
   if (iconOnly && IconComponent) {
-    return (
-      <IconComponent className={cn(iconSize, 'text-ods-text-secondary', className)} />
-    )
+    return <IconComponent className={cn(iconSize, 'text-ods-text-secondary', className)} />;
   }
 
   if (labelOnly) {
-    return (
-      <span className={cn('text-ods-text-primary', className)}>
-        {label}
-      </span>
-    )
+    return <span className={cn('text-ods-text-primary', className)}>{label}</span>;
   }
 
   return (
-    <div className={cn("flex items-center gap-1 text-ods-text-primary text-[14px] leading-[20px] md:text-[18px] md:leading-[24px]", className)}>
+    <div
+      className={cn(
+        'flex items-center gap-1 text-ods-text-primary text-[14px] leading-[20px] md:text-[18px] md:leading-[24px]',
+        className,
+      )}
+    >
       {IconComponent && <IconComponent className={iconSize} color={iconColor} />}
       {label}
       {rightIcon && rightIcon}
     </div>
-  )
-}
+  );
+};
 
-OSTypeBadge.displayName = 'OSTypeBadge'
+OSTypeBadge.displayName = 'OSTypeBadge';
 
 /**
  * OSTypeIcon - Displays only the OS icon
@@ -94,25 +91,14 @@ OSTypeBadge.displayName = 'OSTypeBadge'
  * ```
  */
 export const OSTypeIcon: React.FC<{
-  osType?: string
-  size?: string
-  className?: string
-}> = ({
-  osType,
-  size = 'w-4 h-4',
-  className = ''
-}) => {
-  return (
-    <OSTypeBadge
-      osType={osType}
-      iconOnly
-      iconSize={size}
-      className={className}
-    />
-  )
-}
+  osType?: string;
+  size?: string;
+  className?: string;
+}> = ({ osType, size = 'w-4 h-4', className = '' }) => {
+  return <OSTypeBadge osType={osType} iconOnly iconSize={size} className={className} />;
+};
 
-OSTypeIcon.displayName = 'OSTypeIcon'
+OSTypeIcon.displayName = 'OSTypeIcon';
 
 /**
  * OSTypeLabel - Displays only the OS label
@@ -124,19 +110,10 @@ OSTypeIcon.displayName = 'OSTypeIcon'
  * ```
  */
 export const OSTypeLabel: React.FC<{
-  osType?: string
-  className?: string
-}> = ({
-  osType,
-  className = ''
-}) => {
-  return (
-    <OSTypeBadge
-      osType={osType}
-      labelOnly
-      className={className}
-    />
-  )
-}
+  osType?: string;
+  className?: string;
+}> = ({ osType, className = '' }) => {
+  return <OSTypeBadge osType={osType} labelOnly className={className} />;
+};
 
-OSTypeLabel.displayName = 'OSTypeLabel'
+OSTypeLabel.displayName = 'OSTypeLabel';

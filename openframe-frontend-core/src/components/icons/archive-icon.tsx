@@ -1,10 +1,10 @@
-import React from "react"
+import React from 'react';
 
 export interface ArchiveIconProps extends React.SVGProps<SVGSVGElement> {
   color?: string;
 }
 
-export function ArchiveIcon({ className = "h-6 w-6", color = 'white', ...props }: ArchiveIconProps) {
+export function ArchiveIcon({ className = 'h-6 w-6', color = 'white', ...props }: ArchiveIconProps) {
   return (
     <svg
       width="24"
@@ -20,5 +20,5 @@ export function ArchiveIcon({ className = "h-6 w-6", color = 'white', ...props }
         fill={color}
       />
     </svg>
-  )
+  );
 }

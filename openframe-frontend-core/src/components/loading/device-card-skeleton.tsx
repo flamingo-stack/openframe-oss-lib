@@ -1,12 +1,12 @@
-import type React from "react"
-import { cn } from "../../utils/cn"
-import { OrganizationIconSkeleton } from "./organization-icon-skeleton"
+import type React from 'react';
+import { cn } from '../../utils/cn';
+import { OrganizationIconSkeleton } from './organization-icon-skeleton';
 
 export interface DeviceCardSkeletonProps {
   /**
    * Additional CSS classes
    */
-  className?: string
+  className?: string;
 }
 
 /**
@@ -22,17 +22,14 @@ export interface DeviceCardSkeletonProps {
 export function DeviceCardSkeleton({ className }: DeviceCardSkeletonProps) {
   return (
     <div
-      className={cn(
-        "bg-ods-card rounded-[6px] border border-ods-border h-full",
-        className
-      )}
+      className={cn('bg-ods-card rounded-[6px] border border-ods-border h-full', className)}
       role="status"
       aria-label="Loading device card"
     >
       {/* Row 1: Device icon + Device name + More button */}
       <div className="flex gap-4 items-center px-4 py-3">
         {/* Device type icon (8x8 container) */}
-        <div className="w-8 h-8 bg-[#161616] border border-ods-border rounded-[6px] flex items-center justify-center flex-shrink-0">
+        <div className="w-8 h-8 bg-ods-bg border border-ods-border rounded-[6px] flex items-center justify-center flex-shrink-0">
           <div className="w-4 h-4 bg-ods-border rounded animate-pulse" />
         </div>
 
@@ -70,7 +67,7 @@ export function DeviceCardSkeleton({ className }: DeviceCardSkeletonProps) {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 /**
@@ -82,19 +79,10 @@ export function DeviceCardSkeleton({ className }: DeviceCardSkeletonProps) {
  * - Desktop (lg): 3 columns
  * - Large (xl): 4 columns
  */
-export function DeviceCardSkeletonGrid({
-  count = 12,
-  className
-}: {
-  count?: number
-  className?: string
-}) {
+export function DeviceCardSkeletonGrid({ count = 12, className }: { count?: number; className?: string }) {
   return (
     <div
-      className={cn(
-        "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4",
-        className
-      )}
+      className={cn('grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4', className)}
       role="status"
       aria-label={`Loading ${count} device cards`}
     >
@@ -102,5 +90,5 @@ export function DeviceCardSkeletonGrid({
         <DeviceCardSkeleton key={index} />
       ))}
     </div>
-  )
+  );
 }

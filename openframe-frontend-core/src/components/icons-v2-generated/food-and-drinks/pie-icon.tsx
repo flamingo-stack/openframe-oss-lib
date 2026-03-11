@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface PieIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface PieIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function PieIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: PieIconProps) {
+export function PieIcon({ className = '', size = 24, color = 'currentColor', ...props }: PieIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface PencilIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface PencilIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function PencilIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: PencilIconProps) {
+export function PencilIcon({ className = '', size = 24, color = 'currentColor', ...props }: PencilIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

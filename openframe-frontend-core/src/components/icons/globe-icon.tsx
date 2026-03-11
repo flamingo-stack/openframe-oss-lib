@@ -5,9 +5,7 @@ interface GlobeIconProps {
   className?: string;
 }
 
-export function GlobeIcon({ className ,
-  color = 'white'
-}:  GlobeIconProps) {
+export function GlobeIcon({ className, color = 'white' }: GlobeIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

@@ -3,7 +3,7 @@
   position: relative;
   width: 100%;
   height: 100%;
-  background: #1A1A1A;
+  background: #1a1a1a;
 }
 
 .reactEasyCrop_Image,
@@ -36,7 +36,7 @@
 }
 
 .reactEasyCrop_CropAreaGrid::before {
-  content: '';
+  content: "";
   box-sizing: border-box;
   position: absolute;
   border: 1px solid rgba(255, 255, 255, 0.4);
@@ -47,7 +47,7 @@
 }
 
 .reactEasyCrop_CropAreaGrid::after {
-  content: '';
+  content: "";
   box-sizing: border-box;
   position: absolute;
   border: 1px solid rgba(255, 255, 255, 0.4);

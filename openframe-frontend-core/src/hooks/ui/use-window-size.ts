@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState } from "react"
+import { useLayoutEffect, useState } from 'react';
 
 /**
  * Hook to get window dimensions
@@ -8,29 +8,29 @@ export function useWindowSize() {
   const [windowSize, setWindowSize] = useState({
     width: 0,
     height: 0,
-  })
-  const [isClient, setIsClient] = useState(false)
+  });
+  const [isClient, setIsClient] = useState(false);
 
   useLayoutEffect(() => {
-    setIsClient(true)
-    if (!isClient) return
+    setIsClient(true);
+    if (!isClient) return;
 
     const handleResize = () => {
       setWindowSize({
         width: window.innerWidth,
         height: window.innerHeight,
-      })
-    }
+      });
+    };
 
     // Set initial size
-    handleResize()
+    handleResize();
 
     // Add event listener
-    window.addEventListener("resize", handleResize)
+    window.addEventListener('resize', handleResize);
 
     // Remove event listener on cleanup
-    return () => window.removeEventListener("resize", handleResize)
-  }, [isClient])
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isClient]);
 
-  return windowSize
+  return windowSize;
 }

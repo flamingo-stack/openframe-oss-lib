@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface MessagePlusIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface MessagePlusIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function MessagePlusIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: MessagePlusIconProps) {
+export function MessagePlusIcon({ className = '', size = 24, color = 'currentColor', ...props }: MessagePlusIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

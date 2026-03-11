@@ -1,15 +1,15 @@
-"use client";
+'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import { CheckCircle, Github, Moon, PlusCircle, Sun } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  VendorDirectoryIcon,
-  OpenSourceIcon,
   CommunityHubIcon,
-  VendorsIcon,
   CommunityIcon,
   CompareIcon,
+  OpenSourceIcon,
+  VendorDirectoryIcon,
+  VendorsIcon,
 } from './icons-stub';
-import { Sun, Moon, CheckCircle, Github, PlusCircle } from 'lucide-react';
 
 // Map lucide icons
 const SunIcon = Sun;
@@ -40,26 +40,28 @@ const availableIcons = [
   CheckCircleIcon,
   GitHubIcon,
   PlusCircleIcon,
-  OpenmspLogo
+  OpenmspLogo,
 ];
 
 export function ResponsiveIconsBlock({ loading = false }: IconsBlockProps) {
   const [columns, setColumns] = useState(24);
-  const [iconGrid, setIconGrid] = useState<Array<Array<React.ComponentType<{ width?: number; height?: number; className?: string }>>>>([]);
-  const [iconsLoaded, setIconsLoaded] = useState(false);
+  const [iconGrid, setIconGrid] = useState<
+    Array<Array<React.ComponentType<{ width?: number; height?: number; className?: string }>>>
+  >([]);
+  const [_iconsLoaded, setIconsLoaded] = useState(false);
   const randomSeedRef = useRef<number>(0);
 
   useEffect(() => {
     function calculateColumns() {
-        const cols = Math.ceil(window.innerWidth / 56) + 4;
-        setColumns(cols);
+      const cols = Math.ceil(window.innerWidth / 56) + 4;
+      setColumns(cols);
     }
 
     calculateColumns();
     window.addEventListener('resize', calculateColumns);
-    
+
     setIconsLoaded(true);
-    
+
     return () => window.removeEventListener('resize', calculateColumns);
   }, []);
 
@@ -121,19 +123,19 @@ export function ResponsiveIconsBlock({ loading = false }: IconsBlockProps) {
   if (loading || iconGrid.length === 0) {
     return (
       <div
-        className="w-full h-[80px] md:h-[112px] bg-[#1A1A1A] relative overflow-hidden"
+        className="w-full h-[80px] md:h-[112px] bg-ods-text-on-accent relative overflow-hidden"
         role="presentation"
         aria-hidden="true"
       >
         {/* subtle pulse bar */}
-        <div className="absolute inset-0 animate-pulse bg-[#2A2A2A]/60" />
+        <div className="absolute inset-0 animate-pulse bg-ods-bg-secondary/60" />
       </div>
     );
   }
 
   return (
     <div
-      className="w-full h-[80px] md:h-[112px] overflow-hidden bg-[#1A1A1A] relative z-10"
+      className="w-full h-[80px] md:h-[112px] overflow-hidden bg-ods-text-on-accent relative z-10"
       style={{ margin: 0, padding: 0 }}
       role="presentation"
       aria-hidden="true"
@@ -171,16 +173,16 @@ export function ResponsiveIconsBlock({ loading = false }: IconsBlockProps) {
               }}
               role="presentation"
             >
-                  <IconComponent
-                    width={16}
-                    height={16}
-                    className="text-[#666666] md:w-5 md:h-5"
-                    aria-hidden="true"
-                  />
+              <IconComponent
+                width={16}
+                height={16}
+                className="text-ods-text-muted md:w-5 md:h-5"
+                aria-hidden="true"
+              />
             </div>
           );
         })}
       </div>
     </div>
   );
-} 
+}

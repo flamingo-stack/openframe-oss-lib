@@ -1,14 +1,13 @@
-import type { SVGProps } from "react";
-export interface SignalBroadcast02IconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface SignalBroadcast02IconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
 export function SignalBroadcast02Icon({
-  className = "",
+  className = '',
   size = 24,
-  color = "currentColor",
+  color = 'currentColor',
   ...props
 }: SignalBroadcast02IconProps) {
   return (

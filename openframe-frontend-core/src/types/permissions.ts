@@ -1,4 +1,4 @@
-import { ToolType } from "./tool.types";
+import { ToolType } from './tool.types';
 
 export type ApprovalLevel = 'ALLOW' | 'ASK_USER' | 'ASK_TECHNICIAN' | 'DENY';
 

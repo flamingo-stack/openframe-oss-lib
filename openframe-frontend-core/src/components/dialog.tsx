@@ -1,72 +1,62 @@
-"use client"
+'use client';
 
-import * as React from "react"
-import { X } from "lucide-react"
+import { X } from 'lucide-react';
+import * as React from 'react';
 
-import { cn } from "../utils/cn"
+import { cn } from '../utils/cn';
 
 interface DialogProps {
-  open?: boolean
-  onOpenChange?: (open: boolean) => void
-  children: React.ReactNode
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  children: React.ReactNode;
 }
 
 const Dialog: React.FC<DialogProps> = ({ open, onOpenChange, children }) => {
   console.log('Dialog render - open:', open);
-  if (!open) return null
-  
+  if (!open) return null;
+
   return (
-    <div 
+    <div
       className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm"
       onClick={() => onOpenChange?.(false)}
       style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999 }}
     >
       {children}
     </div>
-  )
-}
+  );
+};
 
-const DialogTrigger = React.forwardRef<
-  HTMLButtonElement,
-  React.ButtonHTMLAttributes<HTMLButtonElement>
->(({ children, ...props }, ref) => (
-  <button ref={ref} {...props}>
-    {children}
-  </button>
-))
-DialogTrigger.displayName = "DialogTrigger"
+const DialogTrigger = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement>>(
+  ({ children, ...props }, ref) => (
+    <button ref={ref} {...props}>
+      {children}
+    </button>
+  ),
+);
+DialogTrigger.displayName = 'DialogTrigger';
 
 const DialogPortal: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  return <>{children}</>
-}
+  return <>{children}</>;
+};
 
-const DialogClose = React.forwardRef<
-  HTMLButtonElement,
-  React.ButtonHTMLAttributes<HTMLButtonElement>
->(({ children, ...props }, ref) => (
-  <button ref={ref} {...props}>
-    {children}
-  </button>
-))
-DialogClose.displayName = "DialogClose"
+const DialogClose = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement>>(
+  ({ children, ...props }, ref) => (
+    <button ref={ref} {...props}>
+      {children}
+    </button>
+  ),
+);
+DialogClose.displayName = 'DialogClose';
 
-const DialogOverlay = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn(
-      "fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm",
-      className,
-    )}
-    {...props}
-  />
-))
-DialogOverlay.displayName = "DialogOverlay"
+const DialogOverlay = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => (
+    <div ref={ref} className={cn('fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm', className)} {...props} />
+  ),
+);
+DialogOverlay.displayName = 'DialogOverlay';
 
 interface DialogContentProps extends React.HTMLAttributes<HTMLDivElement> {
-  onCloseClick?: () => void
+  onCloseClick?: () => void;
 }
 
 const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
@@ -76,23 +66,23 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
       <div
         ref={ref}
         className={cn(
-          "fixed left-[50%] top-[50%] z-[10000] grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border border-gray-300 bg-white p-6 shadow-lg rounded-lg",
+          'fixed left-[50%] top-[50%] z-[10000] grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border border-gray-300 bg-white p-6 shadow-lg rounded-lg',
           className,
         )}
-        style={{ 
-          position: 'fixed', 
-          left: '50%', 
-          top: '50%', 
-          transform: 'translate(-50%, -50%)', 
+        style={{
+          position: 'fixed',
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
           zIndex: 10000,
           backgroundColor: 'white',
-          border: '2px solid gray'
+          border: '2px solid gray',
         }}
-        onClick={(e) => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
         {...props}
       >
         {children}
-        <button 
+        <button
           onClick={onCloseClick}
           type="button"
           className="absolute right-4 top-4 rounded-sm opacity-70 text-gray-500 transition-opacity hover:opacity-100 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
@@ -101,40 +91,36 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
           <span className="sr-only">Close</span>
         </button>
       </div>
-    )
-  }
-)
-DialogContent.displayName = "DialogContent"
+    );
+  },
+);
+DialogContent.displayName = 'DialogContent';
 
 const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("flex flex-col space-y-1.5 text-center md:text-left", className)} {...props} />
-)
-DialogHeader.displayName = "DialogHeader"
+  <div className={cn('flex flex-col space-y-1.5 text-center md:text-left', className)} {...props} />
+);
+DialogHeader.displayName = 'DialogHeader';
 
 const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("flex flex-col-reverse md:flex-row md:justify-end md:space-x-2", className)} {...props} />
-)
-DialogFooter.displayName = "DialogFooter"
+  <div className={cn('flex flex-col-reverse md:flex-row md:justify-end md:space-x-2', className)} {...props} />
+);
+DialogFooter.displayName = 'DialogFooter';
 
-const DialogTitle = React.forwardRef<
-  HTMLHeadingElement,
-  React.HTMLAttributes<HTMLHeadingElement>
->(({ className, ...props }, ref) => (
-  <h2
-    ref={ref}
-    className={cn("text-lg font-semibold leading-none tracking-tight text-black", className)}
-    {...props}
-  />
-))
-DialogTitle.displayName = "DialogTitle"
+const DialogTitle = React.forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTMLHeadingElement>>(
+  ({ className, ...props }, ref) => (
+    <h2
+      ref={ref}
+      className={cn('text-lg font-semibold leading-none tracking-tight text-black', className)}
+      {...props}
+    />
+  ),
+);
+DialogTitle.displayName = 'DialogTitle';
 
-const DialogDescription = React.forwardRef<
-  HTMLParagraphElement,
-  React.HTMLAttributes<HTMLParagraphElement>
->(({ className, ...props }, ref) => (
-  <p ref={ref} className={cn("text-sm text-gray-600", className)} {...props} />
-))
-DialogDescription.displayName = "DialogDescription"
+const DialogDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement>>(
+  ({ className, ...props }, ref) => <p ref={ref} className={cn('text-sm text-gray-600', className)} {...props} />,
+);
+DialogDescription.displayName = 'DialogDescription';
 
 export {
   Dialog,
@@ -147,4 +133,4 @@ export {
   DialogFooter,
   DialogTitle,
   DialogDescription,
-}
+};

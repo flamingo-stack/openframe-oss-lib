@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface Refresh02HrIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface Refresh02HrIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function Refresh02HrIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: Refresh02HrIconProps) {
+export function Refresh02HrIcon({ className = '', size = 24, color = 'currentColor', ...props }: Refresh02HrIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

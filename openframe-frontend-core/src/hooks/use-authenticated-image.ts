@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react';
 
 /**
  * Configuration for single image fetching
@@ -6,51 +6,51 @@ import { useEffect, useState, useRef } from 'react'
  */
 export interface AuthenticatedImageConfig {
   /** Base URL for tenant-specific API calls (e.g., 'https://tenant.openframe.dev' or '') */
-  tenantHostUrl?: string
+  tenantHostUrl?: string;
   /** Enable dev mode with Bearer token from localStorage */
-  enableDevMode?: boolean
+  enableDevMode?: boolean;
   /** localStorage key for access token (default: 'of_access_token') */
-  accessTokenKey?: string
+  accessTokenKey?: string;
 }
 
 /**
  * Global configuration for authenticated image fetching
  * Shared with useBatchImages for consistency
  */
-let globalImageConfig: AuthenticatedImageConfig = {}
+let globalImageConfig: AuthenticatedImageConfig = {};
 
 /**
  * Global cache for authenticated images
  * Stores blob URLs by cache key
  */
 interface ImageCacheEntry {
-  blobUrl: string
-  timestamp: number
-  refCount: number
+  blobUrl: string;
+  timestamp: number;
+  refCount: number;
 }
 
-const imageCache = new Map<string, ImageCacheEntry>()
-const pendingRequests = new Map<string, Promise<string | undefined>>()
+const imageCache = new Map<string, ImageCacheEntry>();
+const pendingRequests = new Map<string, Promise<string | undefined>>();
 
 /**
  * Cache cleanup interval (5 minutes)
  */
-const CACHE_CLEANUP_INTERVAL = 5 * 60 * 1000
+const CACHE_CLEANUP_INTERVAL = 5 * 60 * 1000;
 
 /**
  * Cache entry max age (30 minutes)
  */
-const CACHE_MAX_AGE = 30 * 60 * 1000
+const CACHE_MAX_AGE = 30 * 60 * 1000;
 
 /**
  * Clean up expired cache entries
  */
 function cleanupImageCache() {
-  const now = Date.now()
+  const now = Date.now();
   for (const [key, entry] of imageCache.entries()) {
     if (entry.refCount === 0 && now - entry.timestamp > CACHE_MAX_AGE) {
-      URL.revokeObjectURL(entry.blobUrl)
-      imageCache.delete(key)
+      URL.revokeObjectURL(entry.blobUrl);
+      imageCache.delete(key);
     }
   }
 }
@@ -59,7 +59,7 @@ function cleanupImageCache() {
  * Periodic cache cleanup
  */
 if (typeof window !== 'undefined') {
-  setInterval(cleanupImageCache, CACHE_CLEANUP_INTERVAL)
+  setInterval(cleanupImageCache, CACHE_CLEANUP_INTERVAL);
 }
 
 /**
@@ -79,7 +79,7 @@ if (typeof window !== 'undefined') {
  * ```
  */
 export function configureAuthenticatedImage(config: AuthenticatedImageConfig): void {
-  globalImageConfig = { ...globalImageConfig, ...config }
+  globalImageConfig = { ...globalImageConfig, ...config };
 }
 
 /**
@@ -89,8 +89,8 @@ function getImageConfig(): Required<AuthenticatedImageConfig> {
   return {
     tenantHostUrl: globalImageConfig.tenantHostUrl || '',
     enableDevMode: globalImageConfig.enableDevMode ?? false,
-    accessTokenKey: globalImageConfig.accessTokenKey || 'of_access_token'
-  }
+    accessTokenKey: globalImageConfig.accessTokenKey || 'of_access_token',
+  };
 }
 
 /**
@@ -132,116 +132,116 @@ function getImageConfig(): Required<AuthenticatedImageConfig> {
 export function useAuthenticatedImage(
   imageUrl?: string | null,
   refreshKey?: string | number,
-  config?: AuthenticatedImageConfig
+  config?: AuthenticatedImageConfig,
 ): {
-  imageUrl: string | undefined
-  isLoading: boolean
-  error: string | null
+  imageUrl: string | undefined;
+  isLoading: boolean;
+  error: string | null;
 } {
-  const [fetchedImageUrl, setFetchedImageUrl] = useState<string | undefined>()
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const currentCacheKeyRef = useRef<string | null>(null)
+  const [fetchedImageUrl, setFetchedImageUrl] = useState<string | undefined>();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const currentCacheKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!imageUrl) {
-      setFetchedImageUrl(undefined)
-      setIsLoading(false)
-      setError(null)
-      
+      setFetchedImageUrl(undefined);
+      setIsLoading(false);
+      setError(null);
+
       if (currentCacheKeyRef.current) {
-        const entry = imageCache.get(currentCacheKeyRef.current)
+        const entry = imageCache.get(currentCacheKeyRef.current);
         if (entry) {
-          entry.refCount--
+          entry.refCount--;
         }
-        currentCacheKeyRef.current = null
+        currentCacheKeyRef.current = null;
       }
-      return
+      return;
     }
 
     const { tenantHostUrl, enableDevMode, accessTokenKey } = {
       ...getImageConfig(),
-      ...config
-    }
+      ...config,
+    };
 
     // Construct full image URL
-    let fullImageUrl: string
+    let fullImageUrl: string;
     if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-      fullImageUrl = imageUrl
+      fullImageUrl = imageUrl;
     } else if (imageUrl.startsWith('/api/')) {
-      fullImageUrl = `${tenantHostUrl}${imageUrl}`
+      fullImageUrl = `${tenantHostUrl}${imageUrl}`;
     } else if (imageUrl.startsWith('/')) {
-      fullImageUrl = `${tenantHostUrl}/api${imageUrl}`
+      fullImageUrl = `${tenantHostUrl}/api${imageUrl}`;
     } else {
-      fullImageUrl = `${tenantHostUrl}/api/${imageUrl}`
+      fullImageUrl = `${tenantHostUrl}/api/${imageUrl}`;
     }
 
     // Create cache key (use refreshKey if provided, otherwise no cache buster for caching)
-    const cacheKey = refreshKey ? `${fullImageUrl}?v=${refreshKey}` : fullImageUrl
-    
+    const cacheKey = refreshKey ? `${fullImageUrl}?v=${refreshKey}` : fullImageUrl;
+
     if (currentCacheKeyRef.current && currentCacheKeyRef.current !== cacheKey) {
-      const prevEntry = imageCache.get(currentCacheKeyRef.current)
+      const prevEntry = imageCache.get(currentCacheKeyRef.current);
       if (prevEntry) {
-        prevEntry.refCount--
+        prevEntry.refCount--;
       }
     }
-    
-    currentCacheKeyRef.current = cacheKey
 
-    const cachedEntry = imageCache.get(cacheKey)
+    currentCacheKeyRef.current = cacheKey;
+
+    const cachedEntry = imageCache.get(cacheKey);
     if (cachedEntry) {
-      cachedEntry.refCount++
-      cachedEntry.timestamp = Date.now()
-      
-      setFetchedImageUrl(cachedEntry.blobUrl)
-      setIsLoading(false)
-      setError(null)
-      return
+      cachedEntry.refCount++;
+      cachedEntry.timestamp = Date.now();
+
+      setFetchedImageUrl(cachedEntry.blobUrl);
+      setIsLoading(false);
+      setError(null);
+      return;
     }
 
-    const pendingRequest = pendingRequests.get(cacheKey)
+    const pendingRequest = pendingRequests.get(cacheKey);
     if (pendingRequest) {
-      setIsLoading(true)
-      setError(null)
-      
+      setIsLoading(true);
+      setError(null);
+
       pendingRequest
         .then(blobUrl => {
           if (blobUrl) {
-            const entry = imageCache.get(cacheKey)
+            const entry = imageCache.get(cacheKey);
             if (entry) {
-              entry.refCount++
-              setFetchedImageUrl(blobUrl)
+              entry.refCount++;
+              setFetchedImageUrl(blobUrl);
             }
           }
-          setIsLoading(false)
+          setIsLoading(false);
         })
         .catch(err => {
-          setError(err instanceof Error ? err.message : 'Failed to fetch image')
-          setIsLoading(false)
-        })
-      return
+          setError(err instanceof Error ? err.message : 'Failed to fetch image');
+          setIsLoading(false);
+        });
+      return;
     }
 
-    setIsLoading(true)
-    setError(null)
+    setIsLoading(true);
+    setError(null);
 
-    const requestUrl = refreshKey ? cacheKey : `${fullImageUrl}?t=${Date.now()}`
+    const requestUrl = refreshKey ? cacheKey : `${fullImageUrl}?t=${Date.now()}`;
 
     // Prepare headers
     const headers: Record<string, string> = {
-      'Accept': 'image/*',
+      Accept: 'image/*',
       'Cache-Control': 'no-cache, no-store, must-revalidate',
-      'Pragma': 'no-cache'
-    }
+      Pragma: 'no-cache',
+    };
 
     // Add Bearer token in dev mode
     if (enableDevMode) {
       try {
-        const accessToken = localStorage.getItem(accessTokenKey)
+        const accessToken = localStorage.getItem(accessTokenKey);
         if (accessToken) {
-          headers['Authorization'] = `Bearer ${accessToken}`
+          headers.Authorization = `Bearer ${accessToken}`;
         }
-      } catch (error) {
+      } catch (_error) {
         // Silently continue without token
       }
     }
@@ -249,51 +249,50 @@ export function useAuthenticatedImage(
     const fetchPromise = fetch(requestUrl, {
       method: 'GET',
       credentials: 'include', // Include cookies for authentication
-      headers
+      headers,
     })
       .then(response => {
         if (!response.ok) {
-          throw new Error(`Failed to fetch image: ${response.status}`)
+          throw new Error(`Failed to fetch image: ${response.status}`);
         }
-        return response.blob()
+        return response.blob();
       })
       .then(blob => {
-        const objectUrl = URL.createObjectURL(blob)
-        
+        const objectUrl = URL.createObjectURL(blob);
+
         imageCache.set(cacheKey, {
           blobUrl: objectUrl,
           timestamp: Date.now(),
-          refCount: 1
-        })
-        
-        setFetchedImageUrl(objectUrl)
-        setIsLoading(false)
-        return objectUrl
+          refCount: 1,
+        });
+
+        setFetchedImageUrl(objectUrl);
+        setIsLoading(false);
+        return objectUrl;
       })
       .catch(err => {
-        setError(err instanceof Error ? err.message : 'Failed to fetch image')
-        setFetchedImageUrl(undefined)
-        setIsLoading(false)
-        throw err
+        setError(err instanceof Error ? err.message : 'Failed to fetch image');
+        setFetchedImageUrl(undefined);
+        setIsLoading(false);
+        throw err;
       })
       .finally(() => {
-        pendingRequests.delete(cacheKey)
-      })
+        pendingRequests.delete(cacheKey);
+      });
 
-    pendingRequests.set(cacheKey, fetchPromise)
-
-  }, [imageUrl, refreshKey, config])
+    pendingRequests.set(cacheKey, fetchPromise);
+  }, [imageUrl, refreshKey, config]);
 
   useEffect(() => {
     return () => {
       if (currentCacheKeyRef.current) {
-        const entry = imageCache.get(currentCacheKeyRef.current)
+        const entry = imageCache.get(currentCacheKeyRef.current);
         if (entry) {
-          entry.refCount--
+          entry.refCount--;
         }
       }
-    }
-  }, [])
+    };
+  }, []);
 
-  return { imageUrl: fetchedImageUrl, isLoading, error }
+  return { imageUrl: fetchedImageUrl, isLoading, error };
 }

@@ -86,14 +86,14 @@
   /* Social Platform Brand Colors
      These are official third-party brand colors that must remain exact
      for proper brand recognition per platform guidelines. */
-  --social-slack: #4A154B;
-  --social-linkedin: #0A66C2;
-  --social-facebook: #1877F2;
-  --social-instagram-orange: #F58529;
-  --social-instagram-pink: #DD2A7B;
-  --social-instagram-purple: #8134AF;
-  --social-youtube: #FF0000;
-  --social-twitter: #1DA1F2;
+  --social-slack: #4a154b;
+  --social-linkedin: #0a66c2;
+  --social-facebook: #1877f2;
+  --social-instagram-orange: #f58529;
+  --social-instagram-pink: #dd2a7b;
+  --social-instagram-purple: #8134af;
+  --social-youtube: #ff0000;
+  --social-twitter: #1da1f2;
 }
 
 /* -------------------------------------------------- */
@@ -174,7 +174,6 @@
   /* Adaptive Current Color (Platform-Specific) */
   --ods-current: var(--color-text-primary); /* Default to primary text */
 }
-
 
 [data-app-type="openframe"] {
   /* OpenFrame uses yellow buttons for auth flows, cyan for general accents */
@@ -363,4 +362,4 @@
   --info: var(--color-info);
   --disabled: var(--color-disabled);
   --focus: var(--color-focus-ring);
-} 
+}

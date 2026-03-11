@@ -1,14 +1,13 @@
-import type { SVGProps } from "react";
-export interface ChevronSquareLeftIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface ChevronSquareLeftIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
 export function ChevronSquareLeftIcon({
-  className = "",
+  className = '',
   size = 24,
-  color = "currentColor",
+  color = 'currentColor',
   ...props
 }: ChevronSquareLeftIconProps) {
   return (

@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface GripHrIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface GripHrIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function GripHrIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: GripHrIconProps) {
+export function GripHrIcon({ className = '', size = 24, color = 'currentColor', ...props }: GripHrIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

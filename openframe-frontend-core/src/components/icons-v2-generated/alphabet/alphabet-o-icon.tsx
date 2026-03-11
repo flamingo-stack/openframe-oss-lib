@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface AlphabetOIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface AlphabetOIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function AlphabetOIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: AlphabetOIconProps) {
+export function AlphabetOIcon({ className = '', size = 24, color = 'currentColor', ...props }: AlphabetOIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

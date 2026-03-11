@@ -1,4 +1,6 @@
 export { AgeLimit0Icon } from './age-limit-0-icon';
+export { AgeLimit3Icon } from './age-limit-3-icon';
+export { AgeLimit6Icon } from './age-limit-6-icon';
 export { AgeLimit10Icon } from './age-limit-10-icon';
 export { AgeLimit12Icon } from './age-limit-12-icon';
 export { AgeLimit13Icon } from './age-limit-13-icon';
@@ -6,8 +8,6 @@ export { AgeLimit16Icon } from './age-limit-16-icon';
 export { AgeLimit17Icon } from './age-limit-17-icon';
 export { AgeLimit18Icon } from './age-limit-18-icon';
 export { AgeLimit21Icon } from './age-limit-21-icon';
-export { AgeLimit3Icon } from './age-limit-3-icon';
-export { AgeLimit6Icon } from './age-limit-6-icon';
 export { Dice1Icon } from './dice-1-icon';
 export { Dice2Icon } from './dice-2-icon';
 export { Dice3Icon } from './dice-3-icon';

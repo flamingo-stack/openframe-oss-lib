@@ -1,28 +1,28 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { InteractiveCard } from '../../ui/interactive-card'
-import { Button } from '../../ui/button'
-import { StatusBadge } from '../../ui/status-badge'
-import { cn } from '../../../utils/cn'
+import React from 'react';
+import { cn } from '../../../utils/cn';
+import { Button } from '../../ui/button';
+import { InteractiveCard } from '../../ui/interactive-card';
+import { StatusBadge } from '../../ui/status-badge';
 
 export interface OnboardingStepCardProps {
   step: {
-    id: string
-    title: string
-    description: string
-    actionIcon: (color?: string) => React.ReactNode
-    actionText: string
-    completedText: string
-    onAction: () => void | Promise<void>
-    onSkip?: () => void
-  }
-  isCompleted: boolean
-  isSkipped: boolean
-  isCheckingCompletion: boolean
-  onAction: () => void | Promise<void>
-  onSkip: () => void
-  className?: string
+    id: string;
+    title: string;
+    description: string;
+    actionIcon: (color?: string) => React.ReactNode;
+    actionText: string;
+    completedText: string;
+    onAction: () => void | Promise<void>;
+    onSkip?: () => void;
+  };
+  isCompleted: boolean;
+  isSkipped: boolean;
+  isCheckingCompletion: boolean;
+  onAction: () => void | Promise<void>;
+  onSkip: () => void;
+  className?: string;
 }
 
 export function OnboardingStepCard({
@@ -32,24 +32,24 @@ export function OnboardingStepCard({
   isCheckingCompletion,
   onAction,
   onSkip,
-  className
+  className,
 }: OnboardingStepCardProps) {
-  const [isProcessing, setIsProcessing] = React.useState(false)
+  const [isProcessing, setIsProcessing] = React.useState(false);
 
   const handleAction = async (e: React.MouseEvent) => {
-    e.stopPropagation()
-    setIsProcessing(true)
+    e.stopPropagation();
+    setIsProcessing(true);
     try {
-      await onAction()
+      await onAction();
     } finally {
-      setIsProcessing(false)
+      setIsProcessing(false);
     }
-  }
+  };
 
   const handleSkip = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    onSkip()
-  }
+    e.stopPropagation();
+    onSkip();
+  };
 
   return (
     <InteractiveCard
@@ -61,21 +61,22 @@ export function OnboardingStepCard({
         'items-start md:items-center',
         'gap-3 md:gap-4',
         'px-4 py-4 md:py-0',
-        className
+        className,
       )}
     >
       {/* Left column - content */}
       <div className="flex-1 w-full md:w-auto min-w-0 flex flex-col justify-center gap-1">
-        <h3 className="text-h4 text-ods-text-primary truncate">
-          {step.title}
-        </h3>
+        <h3 className="text-h4 text-ods-text-primary truncate">{step.title}</h3>
         <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary truncate h-[20px]">
           {step.description}
         </p>
       </div>
 
       {/* Right column - action buttons, completed badge, or skipped badge */}
-      <div className="flex items-center gap-2 w-full md:w-auto justify-start md:justify-end shrink-0" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="flex items-center gap-2 w-full md:w-auto justify-start md:justify-end shrink-0"
+        onClick={e => e.stopPropagation()}
+      >
         {isCheckingCompletion ? (
           <>
             <div className="h-[32px] w-[100px] bg-ods-border rounded-[6px] animate-pulse" />
@@ -83,11 +84,7 @@ export function OnboardingStepCard({
           </>
         ) : isCompleted ? (
           <>
-            <StatusBadge
-              text="COMPLETED"
-              variant="card"
-              colorScheme="success"
-            />
+            <StatusBadge text="COMPLETED" variant="card" colorScheme="success" />
             <Button
               variant="outline"
               onClick={handleAction}
@@ -99,18 +96,11 @@ export function OnboardingStepCard({
           </>
         ) : isSkipped ? (
           <>
-            <StatusBadge
-              text="SKIPPED"
-              variant="card"
-              colorScheme="default"
-            />
+            <StatusBadge text="SKIPPED" variant="card" colorScheme="default" />
           </>
         ) : (
           <>
-            <Button
-              variant="outline"
-              onClick={handleSkip}
-            >
+            <Button variant="outline" onClick={handleSkip}>
               Skip Step
             </Button>
             <Button
@@ -125,5 +115,5 @@ export function OnboardingStepCard({
         )}
       </div>
     </InteractiveCard>
-  )
+  );
 }

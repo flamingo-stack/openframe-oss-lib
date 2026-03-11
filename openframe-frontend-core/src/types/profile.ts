@@ -128,4 +128,4 @@ export interface ProfileLoadingState {
   favorites: boolean;
   comments: boolean;
   activities: boolean;
-} 
+}

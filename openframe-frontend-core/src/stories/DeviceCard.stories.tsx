@@ -1,5 +1,5 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { DeviceCard, type Device } from '../components/ui/device-card'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { type Device, DeviceCard } from '../components/ui/device-card';
 
 const meta = {
   title: 'UI/DeviceCard',
@@ -7,7 +7,8 @@ const meta = {
   parameters: {
     docs: {
       description: {
-        component: 'A card component for displaying device information including name, OS type, organization, status, and custom actions.',
+        component:
+          'A card component for displaying device information including name, OS type, organization, status, and custom actions.',
       },
     },
   },
@@ -30,10 +31,10 @@ const meta = {
       description: 'Callback when device card is clicked',
     },
   },
-} satisfies Meta<typeof DeviceCard>
+} satisfies Meta<typeof DeviceCard>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 const baseDevice: Device = {
   id: '1',
@@ -42,7 +43,7 @@ const baseDevice: Device = {
   organization: 'Engineering Team',
   status: 'active',
   lastSeen: new Date().toISOString(),
-}
+};
 
 /**
  * Default device card with basic information.
@@ -51,7 +52,7 @@ export const Default: Story = {
   args: {
     device: baseDevice,
   },
-}
+};
 
 /**
  * Windows device.
@@ -66,7 +67,7 @@ export const WindowsDevice: Story = {
       organization: 'Sales Team',
     },
   },
-}
+};
 
 /**
  * Linux device.
@@ -81,7 +82,7 @@ export const LinuxDevice: Story = {
       organization: 'DevOps',
     },
   },
-}
+};
 
 /**
  * Device with tags.
@@ -93,7 +94,7 @@ export const WithTags: Story = {
       tags: ['Production', 'Critical', 'Monitored'],
     },
   },
-}
+};
 
 /**
  * Device with custom action buttons.
@@ -109,7 +110,7 @@ export const WithCustomActions: Story = {
       ],
     },
   },
-}
+};
 
 /**
  * Device without more button.
@@ -121,7 +122,7 @@ export const NoMoreButton: Story = {
       moreButton: { visible: false },
     },
   },
-}
+};
 
 /**
  * Clickable device card.
@@ -129,9 +130,9 @@ export const NoMoreButton: Story = {
 export const Clickable: Story = {
   args: {
     device: baseDevice,
-    onDeviceClick: (device) => console.log('Device clicked:', device),
+    onDeviceClick: device => console.log('Device clicked:', device),
   },
-}
+};
 
 /**
  * Device with inline details button.
@@ -145,15 +146,13 @@ export const WithDetailsButton: Story = {
         visible: true,
         component: (
           <div className="bg-ods-card box-border flex gap-2 items-center justify-center px-4 py-3 rounded-[6px] border border-ods-border cursor-pointer hover:bg-ods-bg-hover transition-colors">
-            <span className="text-h3 text-ods-text-primary tracking-[-0.36px]">
-              Details
-            </span>
+            <span className="text-h3 text-ods-text-primary tracking-[-0.36px]">Details</span>
           </div>
         ),
       },
     },
   },
-}
+};
 
 /**
  * Device with status badge.
@@ -163,7 +162,7 @@ export const WithStatusBadge: Story = {
     device: baseDevice,
     statusTag: { label: 'Online', variant: 'success' },
   },
-}
+};
 
 /**
  * Device with warning status badge.
@@ -176,7 +175,7 @@ export const WithWarningStatus: Story = {
     },
     statusTag: { label: 'Warning', variant: 'warning' },
   },
-}
+};
 
 /**
  * Device with offline status.
@@ -190,7 +189,7 @@ export const OfflineDevice: Story = {
     },
     statusTag: { label: 'Offline', variant: 'grey' },
   },
-}
+};
 
 /**
  * Minimal device card with just name and OS.
@@ -205,7 +204,7 @@ export const Minimal: Story = {
       moreButton: { visible: false },
     },
   },
-}
+};
 
 /**
  * Device with all information.
@@ -232,17 +231,15 @@ export const FullyLoaded: Story = {
         visible: true,
         component: (
           <div className="bg-ods-card box-border flex gap-2 items-center justify-center px-4 py-3 rounded-[6px] border border-ods-border cursor-pointer hover:bg-ods-bg-hover transition-colors">
-            <span className="text-h3 text-ods-text-primary tracking-[-0.36px]">
-              Details
-            </span>
+            <span className="text-h3 text-ods-text-primary tracking-[-0.36px]">Details</span>
           </div>
         ),
       },
     },
     statusTag: { label: 'Healthy', variant: 'success' },
-    onDeviceClick: (device) => console.log('Device clicked:', device),
+    onDeviceClick: device => console.log('Device clicked:', device),
   },
-}
+};
 
 /**
  * Multiple device cards in a grid.
@@ -290,4 +287,4 @@ export const CardGrid: Story = {
       </div>
     ),
   ],
-}
+};

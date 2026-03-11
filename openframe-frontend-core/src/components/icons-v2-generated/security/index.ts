@@ -1,10 +1,10 @@
 export { AuditIcon } from './audit-icon';
 export { BannedIcon } from './banned-icon';
 export { FingerprintIcon } from './fingerprint-icon';
-export { KeyholeCircleIcon } from './keyhole-circle-icon';
-export { KeyholeSquareIcon } from './keyhole-square-icon';
 export { KeyIcon } from './key-icon';
 export { KeySkeletonIcon } from './key-skeleton-icon';
+export { KeyholeCircleIcon } from './keyhole-circle-icon';
+export { KeyholeSquareIcon } from './keyhole-square-icon';
 export { LockAltIcon } from './lock-alt-icon';
 export { LockCheckIcon } from './lock-check-icon';
 export { LockCircleIcon } from './lock-circle-icon';

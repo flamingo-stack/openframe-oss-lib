@@ -1,16 +1,10 @@
-import type { SVGProps } from "react";
-export interface CallPauseIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+import type { SVGProps } from 'react';
+export interface CallPauseIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function CallPauseIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: CallPauseIconProps) {
+export function CallPauseIcon({ className = '', size = 24, color = 'currentColor', ...props }: CallPauseIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
