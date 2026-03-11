@@ -4,7 +4,7 @@ import com.openframe.api.dto.AgentRegistrationSecretResponse;
 import com.openframe.api.exception.AgentRegistrationSecretNotFoundException;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.service.AgentRegistrationSecretGenerator;
-import com.openframe.core.service.EncryptionService;
+import com.openframe.core.encryption.service.EncryptionService;
 import com.openframe.data.document.agent.AgentRegistrationSecret;
 import com.openframe.data.repository.agent.AgentRegistrationSecretRepository;
 import lombok.RequiredArgsConstructor;

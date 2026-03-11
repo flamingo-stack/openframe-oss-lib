@@ -1,4 +1,4 @@
-package com.openframe.core.service;
+package com.openframe.core.encryption.service;
 
 import com.openframe.core.exception.EncryptionException;
 import com.openframe.core.exception.ErrorCode;
@@ -25,7 +25,7 @@ public class EncryptionService {
         if (salt == null || salt.length() < 16) {
             throw new IllegalArgumentException("Encryption salt must be at least 16 characters (hex-encoded)");
         }
-        
+
         try {
             this.textEncryptor = Encryptors.text(password, salt);
             log.info("Client secret encryption service initialized with Spring Security Crypto");
@@ -114,4 +114,4 @@ public class EncryptionService {
             throw new EncryptionException(ErrorCode.DECRYPTION_FAILED, "Failed to decrypt client secret", e);
         }
     }
-} 
+}

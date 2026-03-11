@@ -2,7 +2,7 @@ package com.openframe.api.mapper;
 
 import com.openframe.api.dto.SSOConfigRequest;
 import com.openframe.api.dto.SSOConfigResponse;
-import com.openframe.core.service.EncryptionService;
+import com.openframe.core.encryption.service.EncryptionService;
 import com.openframe.data.document.sso.SSOConfig;
 import org.springframework.stereotype.Component;
 

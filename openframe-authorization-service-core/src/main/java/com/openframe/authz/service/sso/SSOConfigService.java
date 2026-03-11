@@ -1,6 +1,6 @@
 package com.openframe.authz.service.sso;
 
-import com.openframe.core.service.EncryptionService;
+import com.openframe.core.encryption.service.EncryptionService;
 import com.openframe.data.document.sso.SSOConfig;
 import com.openframe.data.document.tenant.SSOPerTenantConfig;
 import com.openframe.data.repository.tenant.SSOPerTenantConfigRepository;
