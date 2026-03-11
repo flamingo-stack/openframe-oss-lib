@@ -1,11 +1,10 @@
 package com.openframe.gateway.config.ws;
 
+import com.openframe.gateway.metrics.GatewayTrafficMetrics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.reactive.socket.CloseStatus;
 import org.springframework.web.reactive.socket.WebSocketHandler;
 import org.springframework.web.reactive.socket.WebSocketSession;
-import org.springframework.web.reactive.socket.adapter.ReactorNettyWebSocketSessionCloser;
 import org.springframework.web.reactive.socket.server.WebSocketService;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.Disposable;
@@ -23,13 +22,17 @@ import static com.openframe.gateway.config.ws.WebSocketGatewayConfig.*;
 @Slf4j
 public class WebSocketServiceSecurityDecorator implements WebSocketService {
 
+    private static final String LOG_PREFIX = "Debug ws sessionId={} path={} sub={} | ";
+
     public static final long CLOCK_SKEW_SECONDS = 60; // align with Spring Security default skew
 
     private final WebSocketService defaultWebSocketService;
     private final RequestJwtClaimsReader requestJwtReader;
-    private final ConcurrentMap<String, SessionInfo> sessionRegistry = new ConcurrentHashMap<>();
+    private final GatewayTrafficMetrics gatewayTrafficMetrics;
+    private final WebSocketLoggingProperties loggingProperties;
 
-    private record SessionInfo(Instant createdAt, String path) {}
+    private final ConcurrentMap<String, SessionInfo> sessionRegistry = new ConcurrentHashMap<>();
+    private record SessionInfo(Instant createdAt, String path, String sub) {}
 
     @Override
     public Mono<Void> handleRequest(ServerWebExchange exchange, WebSocketHandler defaultWebSocketHandler) {
@@ -37,41 +40,31 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
 
         if (isSecuredEndpoint(path)) {
             return defaultWebSocketService.handleRequest(exchange, session -> {
-                sessionRegistry.put(session.getId(), new SessionInfo(Instant.now(), path));
+                String sessionId = session.getId();
+                String sub = requestJwtReader.getSubject(exchange).orElse("-");
+                boolean debugPath = loggingProperties.isDebugPath(path);
 
-                Instant expiresAt;
+                sessionRegistry.put(sessionId, new SessionInfo(Instant.now(), path, sub));
+
                 try {
-                    expiresAt = requestJwtReader.getExpiration(exchange);
+                    Instant expiresAt = requestJwtReader.getExpiration(exchange);
+
+                    gatewayTrafficMetrics.webSocketOpened(sessionId, path, sub);
+                    if (debugPath) {
+                        log.info(LOG_PREFIX + "session opened, scheduling JWT expiry close", sessionId, path, sub);
+                    }
+
+                    long secondsUntilExpiration = Duration.between(Instant.now(), expiresAt).getSeconds();
+                    long effectiveSeconds = secondsUntilExpiration + CLOCK_SKEW_SECONDS;
+
+                    Disposable disposable = scheduleSessionRemoveJob(session, path, sub, debugPath, effectiveSeconds);
+                    processSessionClosedEvent(session, path, sub, disposable);
+                    return defaultWebSocketHandler.handle(session);
                 } catch (Exception e) {
-                    log.warn("Failed to read JWT expiration for session {}, closing: {}", session.getId(), e.getMessage());
-                    sessionRegistry.remove(session.getId());
-                    return ReactorNettyWebSocketSessionCloser.closeGracefully(session, CloseStatus.POLICY_VIOLATION);
+                    log.warn(LOG_PREFIX + "JWT expiration read failed, closing: {}", sessionId, path, sub, e.getMessage(), e);
+                    sessionRegistry.remove(sessionId);
+                    return session.close();
                 }
-
-                long secondsUntilExpiration = Duration.between(Instant.now(), expiresAt).getSeconds();
-
-                // Account for clock skew (same tolerance as Spring Security JwtTimestampValidator)
-                long effectiveSeconds = secondsUntilExpiration + CLOCK_SKEW_SECONDS;
-
-                Disposable disposable = scheduleSessionRemoveJob(session, effectiveSeconds);
-                processSessionClosedEvent(session, path);
-                return defaultWebSocketHandler.handle(session)
-                        .doFinally(signal -> {
-                            SessionInfo info = sessionRegistry.remove(session.getId());
-                            long lifetimeMs = info != null
-                                    ? Duration.between(info.createdAt(), Instant.now()).toMillis()
-                                    : -1;
-                            log.info("Session {} handler completed | path={} | signal={} | lifetime={}ms",
-                                    session.getId(), path, signal, lifetimeMs);
-                            if (session.isOpen()) {
-                                log.warn("Server session {} still open after handler completed, closing",
-                                        session.getId());
-                                ReactorNettyWebSocketSessionCloser.closeGracefully(session, CloseStatus.GOING_AWAY)
-                                        .subscribe(null, ex -> log.warn("Failed to close server session {}: {}",
-                                                session.getId(), ex.getMessage()));
-                            }
-                            disposable.dispose();
-                        });
             });
         } else {
             return defaultWebSocketService.handleRequest(exchange, defaultWebSocketHandler);
@@ -88,26 +81,70 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                 .anyMatch(path::startsWith);
     }
 
-    private Disposable scheduleSessionRemoveJob(WebSocketSession session, long secondsUntilExpiration) {
+    private Disposable scheduleSessionRemoveJob(WebSocketSession session, String path, String sub, boolean debugPath, long secondsUntilExpiration) {
         String sessionId = session.getId();
-        log.info("Scheduling session remove job: {} - {} seconds", sessionId, secondsUntilExpiration);
+        if (debugPath) {
+            log.info(LOG_PREFIX + "scheduling session remove job in {}s", sessionId, path, sub, secondsUntilExpiration);
+        }
         return Mono.delay(Duration.ofSeconds(secondsUntilExpiration))
                 .flatMap(__ -> {
-                    log.info("Executing session remove job: {}", sessionId);
-                    return ReactorNettyWebSocketSessionCloser.closeGracefully(session, CloseStatus.GOING_AWAY)
-                            .doOnSuccess(___ -> log.info("Closed session: {}", sessionId))
-                            .doOnError(ex -> log.error("Failed to close session {}", sessionId, ex));
+                    if (debugPath) {
+                        log.info(LOG_PREFIX + "executing session remove job (JWT expiry)", sessionId, path, sub);
+                    }
+                    return session.close()
+                            .doOnSuccess(___ -> {
+                                if (debugPath) {
+                                    log.info(LOG_PREFIX + "closed by session remove job", sessionId, path, sub);
+                                }
+                            })
+                            .doOnError(ex -> log.error(LOG_PREFIX + "session remove job close failed: {}", sessionId, path, sub, ex.getMessage(), ex));
                 })
-                .subscribe();
+                .subscribe(
+                        null,
+                        ex -> log.error(LOG_PREFIX + "session remove job failed", sessionId, path, sub, ex),
+                        () -> { }
+                );
     }
 
-    private void processSessionClosedEvent(WebSocketSession session, String path) {
+    private void processSessionClosedEvent(WebSocketSession session, String path, String sub, Disposable disposable) {
+        String sessionId = session.getId();
         session.closeStatus()
                 .subscribe(
-                        status -> log.info("Session {} close status | path={} | code={} | reason={}",
-                                session.getId(), path, status.getCode(), status.getReason()),
-                        ex -> log.debug("Error observing close status for session {}: {}",
-                                session.getId(), ex.getMessage())
+                        status -> {
+                            SessionInfo info = sessionRegistry.remove(sessionId);
+                            long lifetimeSec = info != null
+                                    ? Duration.between(info.createdAt(), Instant.now()).getSeconds()
+                                    : -1;
+                            String logSub = info != null ? info.sub() : sub;
+                            gatewayTrafficMetrics.webSocketClosed(sessionId, path, logSub);
+                            if (loggingProperties.isDebugPath(path)) {
+                                log.info(LOG_PREFIX + "session closed code={} reason={} lifetime={}",
+                                        sessionId, path, logSub, status.getCode(), status.getReason(), formatLifetime(lifetimeSec));
+                            } else {
+                                log.info(LOG_PREFIX + "session closed code={} reason={}",
+                                        sessionId, path, logSub, status.getCode(), status.getReason());
+                            }
+                            if (loggingProperties.isDebugPath(path)) {
+                                log.info(LOG_PREFIX + "disposed session remove job (client closed first)", sessionId, path, logSub);
+                            }
+                            disposable.dispose();
+                        },
+                        ex -> {
+                            log.warn(LOG_PREFIX + "closeStatus observation error: {}", sessionId, path, sub, ex.getMessage(), ex);
+                            disposable.dispose();
+                        }
                 );
+    }
+
+    private static String formatLifetime(long totalSeconds) {
+        if (totalSeconds < 0) {
+            return "-";
+        }
+        if (totalSeconds < 60) {
+            return totalSeconds + " sec";
+        }
+        long min = totalSeconds / 60;
+        long sec = totalSeconds % 60;
+        return sec == 0 ? min + " min" : min + " min " + sec + " sec";
     }
 }
