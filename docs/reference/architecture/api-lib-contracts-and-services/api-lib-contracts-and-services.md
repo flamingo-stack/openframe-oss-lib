@@ -166,7 +166,9 @@ Defines possible filter constraints:
 - deviceTypes
 - osTypes
 - organizationIds
-- tagNames
+- tagKeys
+- tagValues
+- tagTypes
 
 ### DeviceFilters
 
@@ -178,7 +180,8 @@ DeviceFilters
  ├─ deviceTypes (with count)
  ├─ osTypes (with count)
  ├─ organizationIds (with count)
- ├─ tags (with count)
+ ├─ tagKeys (with count)
+ ├─ tagTypes (with count)
  └─ filteredCount
 ```
 

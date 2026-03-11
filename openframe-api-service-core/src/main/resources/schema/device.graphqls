@@ -9,6 +9,52 @@ extend type Query {
     ): DeviceConnection!
 
     device(machineId: String!): Machine
+
+    # Tag key queries
+    tags(organizationId: String!, types: [TagType!]): [Tag!]!
+    tag(tagId: ID!): Tag
+
+    # Tag value options for filter UI (returns distinct values for a tag key with device counts)
+    tagValueOptions(tagKey: String!): [DeviceFilterOption!]!
+}
+
+extend type Mutation {
+    # Tag key CRUD
+    createTag(input: CreateTagInput!): Tag!
+    updateTag(tagId: ID!, input: UpdateTagInput!): Tag!
+    deleteTag(tagId: ID!): Boolean!
+
+    # Device creation
+    createDevice(input: CreateDeviceInput!): Machine!
+
+    # Device tag assignment
+    assignTagToDevice(machineId: String!, input: AssignTagInput!): DeviceTag!
+    batchAssignTagsToDevice(machineId: String!, input: BatchAssignTagsInput!): [DeviceTag!]!
+    updateDeviceTagValues(machineId: String!, tagId: String!, input: UpdateDeviceTagValuesInput!): DeviceTag!
+    removeTagFromDevice(machineId: String!, tagId: String!): Boolean!
+
+    # Bulk operations
+    bulkAssignTag(input: BulkAssignTagInput!): Boolean!
+    bulkRemoveTag(input: BulkRemoveTagInput!): Boolean!
+}
+
+enum TagType {
+    CUSTOM
+    SYSTEM
+    CATEGORY
+}
+
+# Tag key definition (not tied to a device)
+type Tag {
+    id: ID!
+    key: String!
+    type: TagType!
+    description: String
+    color: String
+    values: [String!]
+    organizationId: String!
+    createdAt: Instant
+    createdBy: String
 }
 
 type DeviceFilters {
@@ -16,7 +62,8 @@ type DeviceFilters {
     deviceTypes: [DeviceFilterOption!]!
     osTypes: [DeviceFilterOption!]!
     organizationIds: [DeviceFilterOption!]!
-    tags: [TagFilterOption!]!
+    tagKeys: [TagFilterOption!]!
+    tagTypes: [DeviceFilterOption!]!
     filteredCount: Int!
 }
 
@@ -37,7 +84,71 @@ input DeviceFilterInput {
     deviceTypes: [DeviceType!]
     osTypes: [String!]
     organizationIds: [String!]
-    tagNames: [String!]
+    tagKeys: [String!]
+    tagValues: [String!]
+    tagTypes: [TagType!]
+}
+
+# --- Tag CRUD inputs ---
+
+input CreateTagInput {
+    key: String!
+    type: TagType
+    description: String
+    color: String
+    values: [String!]
+    organizationId: String!
+}
+
+input UpdateTagInput {
+    description: String
+    color: String
+    type: TagType
+    values: [String!]
+}
+
+# --- Device creation input ---
+
+input CreateDeviceInput {
+    organizationId: String!
+    displayName: String
+    hostname: String
+    type: DeviceType
+    osType: String!
+    tags: [DeviceTagInput!]
+}
+
+input DeviceTagInput {
+    key: String!
+    values: [String!]
+}
+
+# --- Device tag assignment inputs ---
+
+input AssignTagInput {
+    tagId: String
+    key: String
+    values: [String!]
+}
+
+input BatchAssignTagsInput {
+    tags: [AssignTagInput!]!
+}
+
+input BulkAssignTagInput {
+    machineIds: [String!]!
+    tagId: String
+    key: String
+    values: [String!]
+}
+
+input BulkRemoveTagInput {
+    machineIds: [String!]!
+    tagId: String!
+}
+
+input UpdateDeviceTagValuesInput {
+    values: [String!]
 }
 
 type Machine {
@@ -63,19 +174,21 @@ type Machine {
     timezone: String
     registeredAt: Instant
     updatedAt: Instant
-    tags: [Tag]
+    tags: [DeviceTag]
     toolConnections: [ToolConnection]
     installedAgents: [InstalledAgent]
 }
 
-type Tag {
-    id: ID!
-    name: String!
+# Tag as assigned to a device (key + values)
+type DeviceTag {
+    tagId: String!
+    key: String!
+    type: TagType!
     description: String
     color: String
-    organizationId: String!
-    createdAt: Instant!
-    createdBy: String!
+    values: [String!]!
+    createdAt: Instant
+    createdBy: String
 }
 
 enum DeviceStatus {
@@ -84,7 +197,7 @@ enum DeviceStatus {
     INACTIVE
     MAINTENANCE
     DECOMMISSIONED,
-    ONLINE, 
+    ONLINE,
     OFFLINE,
     DELETED,
     ARCHIVED

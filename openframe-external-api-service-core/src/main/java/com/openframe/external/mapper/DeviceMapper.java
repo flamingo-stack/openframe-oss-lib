@@ -3,7 +3,7 @@ package com.openframe.external.mapper;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.device.*;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.tool.Tag;
+import com.openframe.data.document.tool.TagType;
 import com.openframe.external.dto.device.*;
 import com.openframe.external.dto.shared.SortCriteria;
 import com.openframe.api.dto.shared.SortInput;
@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
 @Component
 public class DeviceMapper extends BaseRestMapper {
 
-    public DeviceResponse toDeviceResponse(Machine machine, List<Tag> tags) {
+    public DeviceResponse toDeviceResponse(Machine machine, List<DeviceTag> deviceTags) {
         return DeviceResponse.builder()
                 .id(machine.getId())
                 .machineId(machine.getMachineId())
@@ -39,7 +39,7 @@ public class DeviceMapper extends BaseRestMapper {
                 .timezone(machine.getTimezone())
                 .registeredAt(machine.getRegisteredAt())
                 .updatedAt(machine.getUpdatedAt())
-                .tags(toTagResponses(tags))
+                .tags(toDeviceTagResponses(deviceTags))
                 .build();
     }
 
@@ -47,7 +47,7 @@ public class DeviceMapper extends BaseRestMapper {
         List<DeviceResponse> deviceResponses = queryResult.getItems().stream()
                 .map(machine -> toDeviceResponse(machine, List.of()))
                 .collect(Collectors.toList());
-        
+
         return DevicesResponse.builder()
                 .devices(deviceResponses)
                 .pageInfo(toRestPageInfo(queryResult.getPageInfo()))
@@ -55,22 +55,48 @@ public class DeviceMapper extends BaseRestMapper {
                 .build();
     }
 
-    public DevicesResponse toDevicesResponseWithTags(CountedGenericQueryResult<Machine> queryResult, List<List<Tag>> tagsPerMachine) {
+    public DevicesResponse toDevicesResponseWithDeviceTags(
+            CountedGenericQueryResult<Machine> queryResult,
+            List<List<DeviceTag>> deviceTagsPerMachine) {
         List<Machine> devices = queryResult.getItems();
-        
+
         List<DeviceResponse> deviceResponses = java.util.stream.IntStream.range(0, devices.size())
                 .mapToObj(i -> {
                     Machine machine = devices.get(i);
-                    List<Tag> tags = i < tagsPerMachine.size() ? tagsPerMachine.get(i) : List.of();
-                    return toDeviceResponse(machine, tags);
+                    List<DeviceTag> deviceTags = i < deviceTagsPerMachine.size()
+                            ? deviceTagsPerMachine.get(i) : List.of();
+                    return toDeviceResponse(machine, deviceTags);
                 })
                 .collect(Collectors.toList());
-        
+
         return DevicesResponse.builder()
-                .devices(deviceResponses)  
+                .devices(deviceResponses)
                 .pageInfo(toRestPageInfo(queryResult.getPageInfo()))
                 .filteredCount(queryResult.getFilteredCount())
                 .build();
+    }
+
+    public DeviceTagResponse toDeviceTagResponse(DeviceTag deviceTag) {
+        return DeviceTagResponse.builder()
+                .tagId(deviceTag.getTagId())
+                .key(deviceTag.getKey())
+                .type(deviceTag.getType())
+                .description(deviceTag.getDescription())
+                .color(deviceTag.getColor())
+                .values(deviceTag.getValues() != null ? deviceTag.getValues() : List.of())
+                .organizationId(deviceTag.getOrganizationId())
+                .createdAt(deviceTag.getCreatedAt())
+                .createdBy(deviceTag.getCreatedBy())
+                .build();
+    }
+
+    private List<DeviceTagResponse> toDeviceTagResponses(List<DeviceTag> deviceTags) {
+        if (deviceTags == null) {
+            return List.of();
+        }
+        return deviceTags.stream()
+                .map(this::toDeviceTagResponse)
+                .collect(Collectors.toList());
     }
 
     public DeviceFilterResponse toDeviceFilterResponse(DeviceFilters filters) {
@@ -79,42 +105,34 @@ public class DeviceMapper extends BaseRestMapper {
                 .deviceTypes(toDeviceFilterOptions(filters.getDeviceTypes()))
                 .osTypes(toDeviceFilterOptions(filters.getOsTypes()))
                 .organizationIds(toDeviceFilterOptions(filters.getOrganizationIds()))
-                .tags(toTagFilterOptions(filters.getTags()))
+                .tagKeys(toTagFilterOptions(filters.getTagKeys()))
+                .tagTypes(toDeviceFilterOptions(filters.getTagTypes()))
                 .filteredCount(filters.getFilteredCount())
                 .build();
     }
-
-    private List<TagResponse> toTagResponses(List<Tag> tags) {
-        return tags.stream()
-                .map(this::toTagResponse)
-                .collect(Collectors.toList());
-    }
-
-    private TagResponse toTagResponse(Tag tag) {
-        return TagResponse.builder()
-                .id(tag.getId())
-                .name(tag.getName())
-                .description(tag.getDescription())
-                .color(tag.getColor())
-                .organizationId(tag.getOrganizationId())
-                .createdAt(tag.getCreatedAt())
-                .createdBy(tag.getCreatedBy())
-                .build();
-    }
-
 
     public DeviceFilterOptions toDeviceFilterOptions(DeviceFilterCriteria criteria) {
         if (criteria == null) {
             return DeviceFilterOptions.builder().build();
         }
-        
-        return DeviceFilterOptions.builder()
+
+        DeviceFilterOptions.DeviceFilterOptionsBuilder builder = DeviceFilterOptions.builder()
                 .statuses(criteria.getStatuses())
                 .deviceTypes(criteria.getDeviceTypes())
                 .osTypes(criteria.getOsTypes())
                 .organizationIds(criteria.getOrganizationIds())
-                .tagNames(criteria.getTagNames())
-                .build();
+                .tagKeys(criteria.getTagKeys())
+                .tagValues(criteria.getTagValues());
+
+        // Convert tagTypes from String to TagType enum
+        if (criteria.getTagTypes() != null) {
+            List<TagType> tagTypes = criteria.getTagTypes().stream()
+                    .map(TagType::valueOf)
+                    .collect(Collectors.toList());
+            builder.tagTypes(tagTypes);
+        }
+
+        return builder.build();
     }
 
 
@@ -143,17 +161,17 @@ public class DeviceMapper extends BaseRestMapper {
                         .build())
                 .collect(Collectors.toList());
     }
-    
+
     public SortInput toSortInput(SortCriteria criteria) {
         if (criteria == null) {
             return null;
         }
-        
+
         SortInput sortInput = new SortInput();
         sortInput.setField(criteria.getField());
-        sortInput.setDirection(SortDirection.ASC.name().equalsIgnoreCase(criteria.getDirection()) ? 
+        sortInput.setDirection(SortDirection.ASC.name().equalsIgnoreCase(criteria.getDirection()) ?
             SortDirection.ASC : SortDirection.DESC);
-        
+
         return sortInput;
     }
-} 
+}

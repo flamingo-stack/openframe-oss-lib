@@ -115,7 +115,7 @@ class MachineTagEventAspectTest {
         // Arrange
         Tag tag = new Tag();
         tag.setId("tag-1");
-        tag.setName("test-tag");
+        tag.setKey("test-tag");
         tag.setColor("#FF0000");
 
         when(proceedingJoinPoint.proceed()).thenReturn(tag);
@@ -133,7 +133,7 @@ class MachineTagEventAspectTest {
     void testAroundTagSave_NewTag() throws Throwable {
         // Arrange
         Tag tag = new Tag();
-        tag.setName("new-tag");
+        tag.setKey("new-tag");
         tag.setColor("#FF0000");
         // Note: No ID set, so this is a new tag
 
@@ -153,12 +153,12 @@ class MachineTagEventAspectTest {
         // Arrange
         Tag tag1 = new Tag();
         tag1.setId("tag-1");
-        tag1.setName("test-tag-1");
+        tag1.setKey("test-tag-1");
         tag1.setColor("#FF0000");
 
         Tag tag2 = new Tag();
         tag2.setId("tag-2");
-        tag2.setName("test-tag-2");
+        tag2.setKey("test-tag-2");
         tag2.setColor("#00FF00");
 
         List<Tag> tags = Arrays.asList(tag1, tag2);
@@ -181,11 +181,11 @@ class MachineTagEventAspectTest {
         // Arrange
         Tag existingTag = new Tag();
         existingTag.setId("tag-1");
-        existingTag.setName("existing-tag");
+        existingTag.setKey("existing-tag");
         existingTag.setColor("#FF0000");
 
         Tag newTag = new Tag();
-        newTag.setName("new-tag");
+        newTag.setKey("new-tag");
         newTag.setColor("#00FF00");
 
         List<Tag> tags = Arrays.asList(existingTag, newTag);
@@ -207,11 +207,11 @@ class MachineTagEventAspectTest {
     void testAroundTagSaveAll_NewTagsOnly() throws Throwable {
         // Arrange
         Tag newTag1 = new Tag();
-        newTag1.setName("new-tag-1");
+        newTag1.setKey("new-tag-1");
         newTag1.setColor("#FF0000");
 
         Tag newTag2 = new Tag();
-        newTag2.setName("new-tag-2");
+        newTag2.setKey("new-tag-2");
         newTag2.setColor("#00FF00");
 
         List<Tag> tags = Arrays.asList(newTag1, newTag2);
@@ -227,6 +227,72 @@ class MachineTagEventAspectTest {
         verify(machineTagEventService, never()).processTagSave(any(Tag.class));
         assertEquals(results, result);
     }
+
+    // --- Delete interception tests ---
+
+    @Test
+    void testMachineTagDelete_DelegatesToServiceBeforeProceed() throws Throwable {
+        // Arrange
+        String machineId = "machine-1";
+        String tagId = "tag-1";
+        when(proceedingJoinPoint.proceed()).thenReturn(null);
+
+        // Act
+        machineTagEventAspect.aroundMachineTagDelete(proceedingJoinPoint, machineId, tagId);
+
+        // Assert - service called before proceed
+        var inOrder = inOrder(machineTagEventService, proceedingJoinPoint);
+        inOrder.verify(machineTagEventService).processMachineTagDelete(machineId, tagId);
+        inOrder.verify(proceedingJoinPoint).proceed();
+    }
+
+    @Test
+    void testMachineTagDeleteByTagId_DelegatesToServiceBeforeProceed() throws Throwable {
+        // Arrange
+        String tagId = "tag-1";
+        when(proceedingJoinPoint.proceed()).thenReturn(null);
+
+        // Act
+        machineTagEventAspect.aroundMachineTagDeleteByTagId(proceedingJoinPoint, tagId);
+
+        // Assert - service called before proceed
+        var inOrder = inOrder(machineTagEventService, proceedingJoinPoint);
+        inOrder.verify(machineTagEventService).processMachineTagDeleteByTagId(tagId);
+        inOrder.verify(proceedingJoinPoint).proceed();
+    }
+
+    @Test
+    void testMachineTagDelete_ProceedsEvenWhenServiceThrows() throws Throwable {
+        // Arrange
+        String machineId = "machine-1";
+        String tagId = "tag-1";
+        doThrow(new RuntimeException("Kafka error"))
+                .when(machineTagEventService).processMachineTagDelete(machineId, tagId);
+        when(proceedingJoinPoint.proceed()).thenReturn(null);
+
+        // Act - should not throw
+        machineTagEventAspect.aroundMachineTagDelete(proceedingJoinPoint, machineId, tagId);
+
+        // Assert - delete still proceeds despite service error
+        verify(proceedingJoinPoint, times(1)).proceed();
+    }
+
+    @Test
+    void testMachineTagDeleteByTagId_ProceedsEvenWhenServiceThrows() throws Throwable {
+        // Arrange
+        String tagId = "tag-1";
+        doThrow(new RuntimeException("Kafka error"))
+                .when(machineTagEventService).processMachineTagDeleteByTagId(tagId);
+        when(proceedingJoinPoint.proceed()).thenReturn(null);
+
+        // Act - should not throw
+        machineTagEventAspect.aroundMachineTagDeleteByTagId(proceedingJoinPoint, tagId);
+
+        // Assert - delete still proceeds despite service error
+        verify(proceedingJoinPoint, times(1)).proceed();
+    }
+
+    // --- Existing error handling tests ---
 
     @Test
     void testErrorHandling_MachineSave() {
@@ -268,7 +334,7 @@ class MachineTagEventAspectTest {
         // Arrange
         Tag tag = new Tag();
         tag.setId("tag-1");
-        tag.setName("test-tag");
+        tag.setKey("test-tag");
         tag.setColor("#FF0000");
         
         when(proceedingJoinPoint.proceed()).thenThrow(new RuntimeException("Database error"));

@@ -18,7 +18,9 @@
       "deviceType",
       "osType",
       "organizationId",
-      "tags"
+      "tags",
+      "tagKeyValues",
+      "tagTypes"
     ],
 
     "streamConfigs": {
@@ -35,6 +37,20 @@
   "fieldConfigList": [
     {
       "name": "tags",
+      "encodingType": "DICTIONARY",
+      "properties": {
+        "maxMultiValueEntries": 50
+      }
+    },
+    {
+      "name": "tagKeyValues",
+      "encodingType": "DICTIONARY",
+      "properties": {
+        "maxMultiValueEntries": 50
+      }
+    },
+    {
+      "name": "tagTypes",
       "encodingType": "DICTIONARY",
       "properties": {
         "maxMultiValueEntries": 50

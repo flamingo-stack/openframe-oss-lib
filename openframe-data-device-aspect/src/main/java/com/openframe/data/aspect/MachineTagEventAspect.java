@@ -104,6 +104,36 @@ public class MachineTagEventAspect {
     }
 
     /**
+     * Intercepts MachineTag repository deleteByMachineIdAndTagId operations.
+     * Uses @Around to capture affected machineId BEFORE the delete, then re-syncs to Pinot.
+     */
+    @Around("execution(* com.openframe.data.repository.device.MachineTagRepository.deleteByMachineIdAndTagId(..)) && args(machineId, tagId)")
+    public Object aroundMachineTagDelete(ProceedingJoinPoint joinPoint, String machineId, String tagId) throws Throwable {
+        try {
+            log.debug("MachineTag delete operation detected for machineId={}, tagId={}", machineId, tagId);
+            machineTagEventService.processMachineTagDelete(machineId, tagId);
+        } catch (Exception e) {
+            log.error("Error in pre-delete processing for machineId={}, tagId={}: {}", machineId, tagId, e.getMessage(), e);
+        }
+        return joinPoint.proceed();
+    }
+
+    /**
+     * Intercepts MachineTag repository deleteByTagId operations.
+     * Uses @Around to capture all affected machineIds BEFORE the delete, then re-syncs to Pinot.
+     */
+    @Around("execution(* com.openframe.data.repository.device.MachineTagRepository.deleteByTagId(..)) && args(tagId)")
+    public Object aroundMachineTagDeleteByTagId(ProceedingJoinPoint joinPoint, String tagId) throws Throwable {
+        try {
+            log.debug("MachineTag deleteByTagId operation detected for tagId={}", tagId);
+            machineTagEventService.processMachineTagDeleteByTagId(tagId);
+        } catch (Exception e) {
+            log.error("Error in pre-delete processing for tagId={}: {}", tagId, e.getMessage(), e);
+        }
+        return joinPoint.proceed();
+    }
+
+    /**
      * Intercepts Tag repository save operations using @Around advice.
      * Captures original state before save and processes after successful save.
      */

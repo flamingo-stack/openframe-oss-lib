@@ -38,33 +38,83 @@ public class DeviceFilterService {
                 filters.getDeviceTypes().stream().map(Enum::name).toList() : emptyList();
         List<String> osTypes = filters != null ? filters.getOsTypes() : emptyList();
         List<String> organizationIds = filters != null ? filters.getOrganizationIds() : emptyList();
-        List<String> tagNames = filters != null ? filters.getTagNames() : emptyList();
+        List<String> tagKeys = filters != null ? filters.getTagKeys() : emptyList();
+        List<String> tagKeyValues = buildTagKeyValuesFilter(filters);
+        List<String> tagTypes = filters != null && filters.getTagTypes() != null ?
+                filters.getTagTypes().stream().map(Enum::name).toList() : emptyList();
 
         CompletableFuture<Map<String, Integer>> statusesFuture = CompletableFuture.supplyAsync(() ->
-                pinotDeviceRepository.getStatusFilterOptions(statuses, deviceTypes, osTypes, organizationIds, tagNames));
+                pinotDeviceRepository.getStatusFilterOptions(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, tagTypes));
         CompletableFuture<Map<String, Integer>> deviceTypesFuture = CompletableFuture.supplyAsync(() ->
-                pinotDeviceRepository.getDeviceTypeFilterOptions(statuses, deviceTypes, osTypes, organizationIds, tagNames));
+                pinotDeviceRepository.getDeviceTypeFilterOptions(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, tagTypes));
         CompletableFuture<Map<String, Integer>> osTypesFuture = CompletableFuture.supplyAsync(() ->
-                pinotDeviceRepository.getOsTypeFilterOptions(statuses, deviceTypes, osTypes, organizationIds, tagNames));
+                pinotDeviceRepository.getOsTypeFilterOptions(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, tagTypes));
         CompletableFuture<Map<String, Integer>> organizationsFuture = CompletableFuture.supplyAsync(() ->
-                pinotDeviceRepository.getOrganizationFilterOptions(statuses, deviceTypes, osTypes, organizationIds, tagNames));
-        CompletableFuture<Map<String, Integer>> tagsFuture = CompletableFuture.supplyAsync(() ->
-                pinotDeviceRepository.getTagFilterOptions(statuses, deviceTypes, osTypes, organizationIds, tagNames));
+                pinotDeviceRepository.getOrganizationFilterOptions(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, tagTypes));
+        CompletableFuture<Map<String, Integer>> tagKeysFuture = CompletableFuture.supplyAsync(() ->
+                pinotDeviceRepository.getTagKeyFilterOptions(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, tagTypes));
+        CompletableFuture<Map<String, Integer>> tagTypesFuture = CompletableFuture.supplyAsync(() ->
+                pinotDeviceRepository.getTagTypeFilterOptions(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, tagTypes));
         CompletableFuture<Integer> filteredCountFuture = CompletableFuture.supplyAsync(() ->
-                pinotDeviceRepository.getFilteredDeviceCount(statuses, deviceTypes, osTypes, organizationIds, tagNames));
+                pinotDeviceRepository.getFilteredDeviceCount(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, tagTypes));
 
         return CompletableFuture.allOf(
                         statusesFuture, deviceTypesFuture, osTypesFuture,
-                        organizationsFuture, tagsFuture, filteredCountFuture)
+                        organizationsFuture, tagKeysFuture,
+                        tagTypesFuture, filteredCountFuture)
                 .thenApply(v -> DeviceFilters.builder()
                         .statuses(convertMapToFilterOptions(statusesFuture.join()))
                         .deviceTypes(convertMapToFilterOptions(deviceTypesFuture.join()))
                         .osTypes(convertMapToFilterOptions(osTypesFuture.join()))
                         .organizationIds(convertMapToOrganizationFilterOptions(organizationsFuture.join()))
-                        .tags(convertMapToTagFilterOptions(tagsFuture.join()))
+                        .tagKeys(convertMapToTagFilterOptions(tagKeysFuture.join()))
+                        .tagTypes(convertMapToFilterOptions(tagTypesFuture.join()))
                         .filteredCount(filteredCountFuture.join())
                         .build()
                 );
+    }
+
+    /**
+     * Builds the tagKeyValues filter list for Pinot queries.
+     * Combines tagKeys and tagValues from DeviceFilterOptions into "key:value" format.
+     * If only tagValues are provided (no tagKeys), passes them as-is for partial matching.
+     */
+    private List<String> buildTagKeyValuesFilter(DeviceFilterOptions filters) {
+        if (filters == null) {
+            return emptyList();
+        }
+
+        List<String> tagKeys = filters.getTagKeys();
+        List<String> tagValues = filters.getTagValues();
+
+        boolean hasKeys = tagKeys != null && !tagKeys.isEmpty();
+        boolean hasValues = tagValues != null && !tagValues.isEmpty();
+
+        if (!hasKeys && !hasValues) {
+            return emptyList();
+        }
+
+        if (hasKeys && hasValues) {
+            // Build cross-product of key:value pairs for Pinot filtering
+            List<String> keyValues = new ArrayList<>();
+            for (String key : tagKeys) {
+                for (String value : tagValues) {
+                    keyValues.add(key + ":" + value);
+                }
+            }
+            return keyValues;
+        }
+
+        // If only values without keys, search for any key with those values
+        if (hasValues) {
+            // Pass values as partial match patterns - the Pinot column stores "key:value"
+            // Without knowing the key, we can't construct exact matches.
+            // This case is handled at the MongoDB level in DeviceService.resolveTagFilterToMachineIds
+            return emptyList();
+        }
+
+        // If only keys without values, the tagKeys filter in buildWhereClause handles this
+        return emptyList();
     }
 
     private List<DeviceFilterOption> convertMapToFilterOptions(Map<String, Integer> repositoryOptions) {

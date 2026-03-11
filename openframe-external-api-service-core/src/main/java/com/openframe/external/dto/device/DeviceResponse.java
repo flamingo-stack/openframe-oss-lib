@@ -81,6 +81,6 @@ public class DeviceResponse {
     @Schema(description = "Last update timestamp")
     private Instant updatedAt;
 
-    @Schema(description = "Associated tags")
-    private List<TagResponse> tags;
+    @Schema(description = "Tags assigned to this device with key-value data")
+    private List<DeviceTagResponse> tags;
 } 
