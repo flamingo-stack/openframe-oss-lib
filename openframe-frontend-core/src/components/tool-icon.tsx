@@ -71,7 +71,7 @@ export const ToolIcon = React.forwardRef<HTMLDivElement, ToolIconProps>(({ toolT
   return (
     <div
       ref={ref}
-      className={cn('inline-flex items-center justify-center shrink-0 text-[#888888]', className)}
+      className={cn('inline-flex items-center justify-center shrink-0 text-[var(--ods-system-greys-grey)]', className)}
       style={{ width: size, height: size, color: '#888888' }}
       aria-label={`${toolType} icon`}
     >

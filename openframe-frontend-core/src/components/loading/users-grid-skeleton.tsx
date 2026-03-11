@@ -9,8 +9,8 @@ export function UsersGridSkeleton({ rows = 10, className }: Props) {
   const skeletonRows = Array.from({ length: rows });
   return (
     <div className={cn('overflow-x-auto rounded-lg border border-ods-border bg-ods-card animate-pulse', className)}>
-      <table className="min-w-full divide-y divide-[#3A3A3A]">
-        <thead className="bg-[#2A2A2A]">
+      <table className="min-w-full divide-y divide-[var(--ods-system-greys-soft-grey)]">
+        <thead className="bg-[var(--ods-system-greys-background-action)]">
           <tr>
             {['Name', 'Email', 'Role', 'Created', 'Last Sign-In'].map(h => (
               <th
@@ -22,7 +22,7 @@ export function UsersGridSkeleton({ rows = 10, className }: Props) {
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#3A3A3A]">
+        <tbody className="divide-y divide-[var(--ods-system-greys-soft-grey)]">
           {skeletonRows.map((_, idx) => (
             <tr key={idx}>
               {Array.from({ length: 5 }).map((__, cell) => (

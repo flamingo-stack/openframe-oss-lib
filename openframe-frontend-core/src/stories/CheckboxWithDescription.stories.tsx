@@ -143,7 +143,7 @@ export const Controlled: Story = {
           checked={checked}
           onCheckedChange={setChecked}
         />
-        <span className="text-xs text-[#888]">Checked: {checked ? 'true' : 'false'}</span>
+        <span className="text-xs text-[var(--ods-system-greys-grey)]">Checked: {checked ? 'true' : 'false'}</span>
       </div>
     );
   },

@@ -181,8 +181,8 @@ export function EmptyState({
             onClick={smartCta.action}
             className={
               ctaVariant === 'primary'
-                ? "w-full bg-[#FFC008] text-black hover:bg-[#FFC008]/90 transition-all duration-150 font-['DM_Sans'] font-medium"
-                : "w-full bg-transparent border border-ods-border text-ods-text-primary hover:border-[#FFC008] hover:text-ods-accent transition-all duration-150 font-['DM_Sans'] font-medium"
+                ? "w-full bg-[var(--ods-open-yellow-base)] text-black hover:bg-[var(--ods-open-yellow-base)]/90 transition-all duration-150 font-['DM_Sans'] font-medium"
+                : "w-full bg-transparent border border-ods-border text-ods-text-primary hover:border-[var(--ods-open-yellow-base)] hover:text-ods-accent transition-all duration-150 font-['DM_Sans'] font-medium"
             }
           >
             {smartCta.text}

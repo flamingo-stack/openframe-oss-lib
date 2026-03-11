@@ -51,7 +51,12 @@ function FaqAccordionItem({
   const { ref, maxHeight } = useMeasuredHeight(isOpen);
 
   return (
-    <div className={cn('group transition-colors hover:bg-[#1E1E1E]', isOpen ? 'bg-[#161616]' : 'bg-transparent')}>
+    <div
+      className={cn(
+        'group transition-colors hover:bg-[var(--ods-system-greys-background-hover)]',
+        isOpen ? 'bg-[var(--ods-system-greys-background)]' : 'bg-transparent',
+      )}
+    >
       {/* Header */}
       <div
         role="button"
@@ -78,7 +83,7 @@ function FaqAccordionItem({
           transition: 'max-height 0.35s ease-in-out, opacity 0.35s ease-in-out',
           opacity: isOpen ? 1 : 0,
         }}
-        className="overflow-hidden group-hover:bg-[#1E1E1E]/30"
+        className="overflow-hidden group-hover:bg-[var(--ods-system-greys-background-hover)]/30"
       >
         <div ref={ref} className="px-6 md:px-8 pb-6 text-ods-text-primary text-h4">
           {item.answer}
@@ -101,7 +106,7 @@ export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) 
   };
 
   return (
-    <div className="rounded-3xl border border-ods-border divide-y divide-[#3A3A3A] bg-ods-card overflow-hidden">
+    <div className="rounded-3xl border border-ods-border divide-y divide-[var(--ods-system-greys-soft-grey)] bg-ods-card overflow-hidden">
       {items.map(item => (
         <FaqAccordionItem key={item.id} item={item} isOpen={openSet.has(item.id)} onToggle={toggle} />
       ))}

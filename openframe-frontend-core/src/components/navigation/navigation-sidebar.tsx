@@ -98,7 +98,7 @@ export function NavigationSidebar({ config }: NavigationSidebarProps) {
               className={cn(
                 'text-sm flex-shrink-0',
                 'transition-colors duration-200',
-                isActive ? 'text-[#ffc008]' : 'text-[#888888]',
+                isActive ? 'text-[var(--ods-open-yellow-base)]' : 'text-[var(--ods-system-greys-grey)]',
               )}
             >
               {item.badge}

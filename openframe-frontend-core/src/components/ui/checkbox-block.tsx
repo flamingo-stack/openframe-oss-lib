@@ -26,12 +26,12 @@ const CheckboxBlock = React.forwardRef<React.ElementRef<typeof CheckboxPrimitive
         'flex items-center gap-3 rounded-[6px] border px-3 w-full',
         description ? 'h-16' : 'h-11 md:h-12',
         // Theme palette
-        'bg-[#212121] border-[#3a3a3a]',
+        'bg-[var(--ods-system-greys-black)] border-[var(--ods-system-greys-soft-grey)]',
         // Interactive states
         'cursor-pointer transition-colors duration-200',
         'hover:border-ods-accent/30',
         // Disabled state
-        disabled && 'opacity-50 cursor-not-allowed hover:border-[#3a3a3a]',
+        disabled && 'opacity-50 cursor-not-allowed hover:border-[var(--ods-system-greys-soft-grey)]',
         className,
       )}
     >
@@ -46,18 +46,18 @@ const CheckboxBlock = React.forwardRef<React.ElementRef<typeof CheckboxPrimitive
           // Size
           'h-6 w-6 shrink-0',
           // Shape & border
-          'rounded-[6px] border-2 border-[#888]',
+          'rounded-[6px] border-2 border-[var(--ods-system-greys-grey)]',
           // Background
-          'bg-[#212121]',
+          'bg-[var(--ods-system-greys-black)]',
           // Focus states
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent focus-visible:ring-offset-2 focus-visible:ring-offset-[#212121]',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ods-system-greys-black)]',
           // Disabled state
           'disabled:cursor-not-allowed',
           // Checked state
           'data-[state=checked]:bg-ods-accent data-[state=checked]:border-ods-accent',
         )}
       >
-        <CheckboxPrimitive.Indicator className="flex items-center justify-center text-[#212121]">
+        <CheckboxPrimitive.Indicator className="flex items-center justify-center text-[var(--ods-system-greys-black)]">
           <CheckIcon className="h-4 w-4" strokeWidth={3} />
         </CheckboxPrimitive.Indicator>
       </CheckboxPrimitive.Root>

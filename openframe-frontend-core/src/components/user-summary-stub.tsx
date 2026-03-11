@@ -47,9 +47,9 @@ const getAuthProviderIcon = (provider: string) => {
       return <Image src="/icons/microsoft-logo.svg" alt="Microsoft" width={16} height={16} className="w-4 h-4" />;
     case 'slack':
     case 'slack_oidc':
-      return <div className="w-4 h-4 bg-[#888888] rounded-full" />; // Slack icon stub
+      return <div className="w-4 h-4 bg-[var(--ods-system-greys-grey)] rounded-full" />; // Slack icon stub
     default:
-      return <div className="w-4 h-4 bg-[#888888] rounded-full" />;
+      return <div className="w-4 h-4 bg-[var(--ods-system-greys-grey)] rounded-full" />;
   }
 };
 
@@ -100,7 +100,7 @@ export function UserSummary({
                 unoptimized
               />
             ) : (
-              <div className="flex items-center justify-center h-full w-full bg-[#FFC008] text-[#161616] font-['Azeret_Mono'] font-bold">
+              <div className="flex items-center justify-center h-full w-full bg-[var(--ods-open-yellow-base)] text-[var(--ods-system-greys-background)] font-['Azeret_Mono'] font-bold">
                 {name
                   .split(' ')
                   .map((n: string) => n.charAt(0))
@@ -110,7 +110,7 @@ export function UserSummary({
             )}
           </div>
           {mspPreview && mspPreview.logoUrl && (
-            <div className="absolute -bottom-1 -right-1 size-6 rounded-full bg-[#FAFAFA] ring-1 ring-[#161616] overflow-hidden flex items-center justify-center select-none z-10">
+            <div className="absolute -bottom-1 -right-1 size-6 rounded-full bg-[var(--ods-system-greys-white)] ring-1 ring-[var(--ods-system-greys-background)] overflow-hidden flex items-center justify-center select-none z-10">
               <img
                 src={getProxiedImageUrl(mspPreview.logoUrl) ?? mspPreview.logoUrl}
                 alt={mspPreview.name || 'MSP'}
@@ -156,7 +156,7 @@ export function UserSummary({
 
           {/* MSP logo badge (show only when MSP exists) */}
           {mspPreview && (
-            <div className="absolute -bottom-1 -right-1 size-10 rounded-full bg-[#FAFAFA] ring-2 ring-[#161616] overflow-hidden flex items-center justify-center select-none">
+            <div className="absolute -bottom-1 -right-1 size-10 rounded-full bg-[var(--ods-system-greys-white)] ring-2 ring-[var(--ods-system-greys-background)] overflow-hidden flex items-center justify-center select-none">
               {mspPreview.logoUrl ? (
                 <Image
                   src={getProxiedImageUrl(mspPreview.logoUrl) ?? mspPreview.logoUrl}
@@ -166,7 +166,7 @@ export function UserSummary({
                   unoptimized
                 />
               ) : (
-                <span className="text-[#161616] font-['Azeret_Mono'] text-sm font-bold">
+                <span className="text-[var(--ods-system-greys-background)] font-['Azeret_Mono'] text-sm font-bold">
                   {mspPreview.name?.charAt(0).toUpperCase() || '?'}
                 </span>
               )}

@@ -145,8 +145,8 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick, isNested = false
   const itemClasses = `
     flex items-center gap-2 px-3 py-3 cursor-pointer transition-colors
     bg-ods-card
-    ${item.disabled ? 'text-ods-text-secondary cursor-not-allowed' : 'text-ods-text-primary hover:bg-[#2b2b2b]'}
-    ${showSubmenu && item.type === 'submenu' ? 'bg-[#2b2b2b]' : ''}
+    ${item.disabled ? 'text-ods-text-secondary cursor-not-allowed' : 'text-ods-text-primary hover:bg-[var(--ods-system-greys-black-hover)]'}
+    ${showSubmenu && item.type === 'submenu' ? 'bg-[var(--ods-system-greys-black-hover)]' : ''}
     ${!isNested ? 'border-b border-ods-border' : ''}
     ${item.showExternalLinkOnHover && item.href ? 'group' : ''}
   `;
@@ -179,7 +179,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick, isNested = false
           <div
             className={`
             w-6 h-6 flex items-center justify-center rounded-md transition-colors
-            ${item.checked ? 'bg-[#ffc008]' : 'border-2 border-ods-border bg-transparent'}
+            ${item.checked ? 'bg-[var(--ods-open-yellow-base)]' : 'border-2 border-ods-border bg-transparent'}
           `}
           >
             {item.checked && <Check className="w-4 h-4 text-black" strokeWidth={3} />}
@@ -197,7 +197,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick, isNested = false
         ReactDom.createPortal(
           <div
             ref={submenuRef}
-            className="fixed z-[9999] min-w-[256px] bg-[#161616] border border-ods-border rounded-md shadow-xl overflow-hidden"
+            className="fixed z-[9999] min-w-[256px] bg-[var(--ods-system-greys-background)] border border-ods-border rounded-md shadow-xl overflow-hidden"
             style={{
               top: `${submenuPosition.top}px`,
               left: `${submenuPosition.left}px`,
@@ -224,7 +224,9 @@ const GroupSeparator: React.FC = () => <div className="bg-ods-system-greys-soft-
 
 export const ActionsMenu: React.FC<ActionsMenuProps> = ({ groups, className = '', onItemClick }) => {
   return (
-    <div className={`relative min-w-[256px] bg-[#161616] border border-ods-border rounded-md shadow-lg ${className}`}>
+    <div
+      className={`relative min-w-[256px] bg-[var(--ods-system-greys-background)] border border-ods-border rounded-md shadow-lg ${className}`}
+    >
       {groups.map((group, groupIndex) => (
         <React.Fragment key={groupIndex}>
           {group.items.map((item, itemIndex) => (

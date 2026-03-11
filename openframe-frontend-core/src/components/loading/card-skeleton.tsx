@@ -72,7 +72,7 @@ function VendorCardContent({ showActions, showMetadata }: { showActions: boolean
       {/* Header Section - Row layout matching actual VendorCard */}
       <div className="flex items-start gap-3 w-full">
         {/* Logo Frame - 60px width fixed, matching actual structure */}
-        <div className="w-[60px] h-[60px] bg-[#161616] border border-ods-border rounded-lg p-2 flex items-center justify-center flex-shrink-0">
+        <div className="w-[60px] h-[60px] bg-[var(--ods-system-greys-background)] border border-ods-border rounded-lg p-2 flex items-center justify-center flex-shrink-0">
           <MediaSkeleton.Avatar size="sm" className="w-11 h-11" />
         </div>
 
@@ -112,7 +112,7 @@ function VendorCardContent({ showActions, showMetadata }: { showActions: boolean
 
         {/* Tag Section - Contained within card boundaries */}
         <div className="flex-shrink-0">
-          <div className="flex items-center gap-1.5 bg-[#161616] border border-ods-border rounded px-2.5 py-1.5">
+          <div className="flex items-center gap-1.5 bg-[var(--ods-system-greys-background)] border border-ods-border rounded px-2.5 py-1.5">
             <div className="w-4 h-4 bg-ods-border rounded-sm flex items-center justify-center flex-shrink-0">
               <MediaSkeleton.Icon size="sm" className="w-2.5 h-2.5" />
             </div>
@@ -131,7 +131,7 @@ function BlogCardContent({ showActions, showMetadata }: { showActions: boolean; 
   return (
     <>
       {/* Image Section - 16:9 aspect ratio container */}
-      <div className="blog-card-image-container relative w-full aspect-[16/9] overflow-hidden bg-[#161616]">
+      <div className="blog-card-image-container relative w-full aspect-[16/9] overflow-hidden bg-[var(--ods-system-greys-background)]">
         <MediaSkeleton.CardImage />
       </div>
 
@@ -177,10 +177,10 @@ function BlogCardContent({ showActions, showMetadata }: { showActions: boolean; 
               </div>
 
               {/* Date and reading time section - matches BlogMeta right side */}
-              <div className="flex items-center gap-3 text-[#767676] shrink-0">
+              <div className="flex items-center gap-3 text-[var(--ods-system-greys-grey-action)] shrink-0">
                 <TextSkeleton.Caption className="w-12" />
                 {/* Separator dot */}
-                <div className="w-1 h-1 bg-[#767676] rounded-full"></div>
+                <div className="w-1 h-1 bg-[var(--ods-system-greys-grey-action)] rounded-full"></div>
                 <TextSkeleton.Caption className="w-16" />
               </div>
             </div>

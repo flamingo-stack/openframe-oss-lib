@@ -39,39 +39,39 @@ const sizeClasses = {
 
 const platformColors = {
   openmsp: {
-    bg: 'bg-[#FFC008]/10',
-    border: 'border-[#FFC008]/30',
-    text: 'text-[#FFC008]',
+    bg: 'bg-[var(--ods-open-yellow-base)]/10',
+    border: 'border-[var(--ods-open-yellow-base)]/30',
+    text: 'text-[var(--ods-open-yellow-base)]',
   },
   flamingo: {
-    bg: 'bg-[#FF006E]/10',
-    border: 'border-[#FF006E]/30',
-    text: 'text-[#FF006E]',
+    bg: 'bg-[var(--ods-flamingo-pink-base)]/10',
+    border: 'border-[var(--ods-flamingo-pink-base)]/30',
+    text: 'text-[var(--ods-flamingo-pink-base)]',
   },
   'flamingo-teaser': {
-    bg: 'bg-[#FF006E]/10',
-    border: 'border-[#FF006E]/30',
-    text: 'text-[#FF006E]',
+    bg: 'bg-[var(--ods-flamingo-pink-base)]/10',
+    border: 'border-[var(--ods-flamingo-pink-base)]/30',
+    text: 'text-[var(--ods-flamingo-pink-base)]',
   },
   openframe: {
-    bg: 'bg-[#00D9D9]/10',
-    border: 'border-[#00D9D9]/30',
-    text: 'text-[#00D9D9]',
+    bg: 'bg-[var(--ods-flamingo-cyan-base)]/10',
+    border: 'border-[var(--ods-flamingo-cyan-base)]/30',
+    text: 'text-[var(--ods-flamingo-cyan-base)]',
   },
   'admin-hub': {
-    bg: 'bg-[#8B5CF6]/10',
-    border: 'border-[#8B5CF6]/30',
-    text: 'text-[#8B5CF6]',
+    bg: 'bg-[var(--color-link-visited)]/10',
+    border: 'border-[var(--color-link-visited)]/30',
+    text: 'text-[var(--color-link-visited)]',
   },
   tmcg: {
-    bg: 'bg-[#F357BB]/10',
-    border: 'border-[#F357BB]/30',
-    text: 'text-[#F357BB]',
+    bg: 'bg-[var(--ods-flamingo-pink-base)]/10',
+    border: 'border-[var(--ods-flamingo-pink-base)]/30',
+    text: 'text-[var(--ods-flamingo-pink-base)]',
   },
   universal: {
-    bg: 'bg-[#6B7280]/10',
-    border: 'border-[#6B7280]/30',
-    text: 'text-[#6B7280]',
+    bg: 'bg-[var(--ods-system-greys-grey)]/10',
+    border: 'border-[var(--ods-system-greys-grey)]/30',
+    text: 'text-[var(--ods-system-greys-grey)]',
   },
 };
 

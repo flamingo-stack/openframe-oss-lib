@@ -28,7 +28,9 @@ interface InfoCardProps {
 
 export function InfoCard({ data, className = '' }: InfoCardProps) {
   return (
-    <div className={`bg-[#212121] border border-[#3a3a3a] rounded-[6px] p-4 flex flex-col ${className}`}>
+    <div
+      className={`bg-[var(--ods-system-greys-black)] border border-[var(--ods-system-greys-soft-grey)] rounded-[6px] p-4 flex flex-col ${className}`}
+    >
       {/* Title */}
       {data.title && (
         <div className="flex flex-col justify-center shrink-0 mb-3">
@@ -40,7 +42,9 @@ export function InfoCard({ data, className = '' }: InfoCardProps) {
       )}
 
       {/* Subtitle */}
-      {data.subtitle && <div className="text-h4 text-[#888888] truncate mb-3">{data.subtitle}</div>}
+      {data.subtitle && (
+        <div className="text-h4 text-[var(--ods-system-greys-grey)] truncate mb-3">{data.subtitle}</div>
+      )}
 
       {/* Info items */}
       <div className="flex flex-col gap-2">
@@ -51,17 +55,19 @@ export function InfoCard({ data, className = '' }: InfoCardProps) {
             <React.Fragment key={index}>
               {values.map((val, valIndex) => (
                 <div key={`${index}-${valIndex}`} className="flex gap-2 items-center w-full">
-                  <span className="text-h4 text-[#fafafa] whitespace-nowrap">{valIndex === 0 ? item.label : ''}</span>
-                  <div className="flex-1 h-px bg-[#3a3a3a]" />
+                  <span className="text-h4 text-[var(--ods-system-greys-white)] whitespace-nowrap">
+                    {valIndex === 0 ? item.label : ''}
+                  </span>
+                  <div className="flex-1 h-px bg-[var(--ods-system-greys-soft-grey)]" />
                   <div className="flex items-center gap-2 max-w-[60%]">
-                    <span className="text-h4 text-[#fafafa] truncate select-text" title={val}>
+                    <span className="text-h4 text-[var(--ods-system-greys-white)] truncate select-text" title={val}>
                       {val}
                     </span>
                     {item.copyable && (
                       <button
                         type="button"
                         onClick={() => navigator.clipboard?.writeText(val)}
-                        className="text-[#888888] hover:text-[#fafafa] transition-colors"
+                        className="text-[var(--ods-system-greys-grey)] hover:text-[var(--ods-system-greys-white)] transition-colors"
                         aria-label={`Copy ${item.label} ${valIndex + 1}`}
                       >
                         <CopyIcon className="w-4 h-4" />

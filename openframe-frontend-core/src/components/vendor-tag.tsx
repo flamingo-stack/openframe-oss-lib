@@ -29,7 +29,7 @@ export interface VendorTagProps {
 export function VendorTag({ type, text, className = '', hidden = false, size = 'md', accentColor }: VendorTagProps) {
   // Base classes for the tag container
   const baseClasses = cn(
-    'flex items-center gap-1.5 bg-[#161616] border border-ods-border rounded whitespace-nowrap',
+    'flex items-center gap-1.5 bg-[var(--ods-system-greys-background)] border border-ods-border rounded whitespace-nowrap',
     size === 'sm' ? 'px-2 py-1' : 'px-2.5 py-1.5',
   );
 
@@ -74,7 +74,7 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
               className="w-4 h-4 bg-ods-accent rounded-sm flex items-center justify-center flex-shrink-0"
               style={accentColor ? { backgroundColor: accentColor } : undefined}
             >
-              <OpenSourceIcon width={10} height={10} className="text-[#1A1A1A]" />
+              <OpenSourceIcon width={10} height={10} className="text-[var(--color-text-on-accent)]" />
             </div>
           ),
         };
@@ -92,7 +92,7 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
           text: text || 'Free',
           icon: (
             <div className="w-4 h-4 bg-ods-accent rounded-sm flex items-center justify-center flex-shrink-0">
-              <span className="text-[#1A1A1A] text-[8px] font-bold">$</span>
+              <span className="text-[var(--color-text-on-accent)] text-[8px] font-bold">$</span>
             </div>
           ),
         };
@@ -101,7 +101,7 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
           text: text || 'Freemium',
           icon: (
             <div className="w-4 h-4 bg-ods-accent rounded-sm flex items-center justify-center flex-shrink-0">
-              <span className="text-[#1A1A1A] text-[8px] font-bold">$</span>
+              <span className="text-[var(--color-text-on-accent)] text-[8px] font-bold">$</span>
             </div>
           ),
         };
@@ -119,7 +119,7 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
           text: text || 'Enterprise',
           icon: (
             <div className="w-4 h-4 bg-ods-accent rounded-sm flex items-center justify-center flex-shrink-0">
-              <span className="text-[#1A1A1A] text-[8px] font-bold">E</span>
+              <span className="text-[var(--color-text-on-accent)] text-[8px] font-bold">E</span>
             </div>
           ),
         };
@@ -128,7 +128,7 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
           text: text || 'Recommended',
           icon: (
             <div className="w-4 h-4 bg-ods-accent rounded-sm flex items-center justify-center flex-shrink-0">
-              <span className="text-[#1A1A1A] text-[8px] font-bold">★</span>
+              <span className="text-[var(--color-text-on-accent)] text-[8px] font-bold">★</span>
             </div>
           ),
         };
@@ -141,7 +141,7 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
             text: 'Open Source',
             icon: (
               <div className="w-4 h-4 bg-ods-accent rounded-sm flex items-center justify-center flex-shrink-0">
-                <OpenSourceIcon width={10} height={10} className="text-[#1A1A1A]" />
+                <OpenSourceIcon width={10} height={10} className="text-[var(--color-text-on-accent)]" />
               </div>
             ),
           };
@@ -171,7 +171,7 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
             text: text || 'Classification',
             icon: (
               <div className="w-4 h-4 bg-ods-accent rounded-sm flex items-center justify-center flex-shrink-0">
-                <span className="text-[#1A1A1A] text-[8px] font-bold">C</span>
+                <span className="text-[var(--color-text-on-accent)] text-[8px] font-bold">C</span>
               </div>
             ),
           };

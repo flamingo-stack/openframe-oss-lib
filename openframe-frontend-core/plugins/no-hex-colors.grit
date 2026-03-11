@@ -1,0 +1,16 @@
+language js
+
+or {
+  `$val` where {
+    $val <: r"[\"']#[0-9a-fA-F]{3,8}[\"']",
+    not $val <: within `<svg $attrs>$body</svg>` ,
+    not $val <: within `<path $attrs />` ,
+    register_diagnostic(span=$val, message="No hardcoded hex colors. Use ODS design tokens instead (e.g., text-ods-accent, bg-ods-bg-secondary).", severity="warn")
+  },
+  `$val` where {
+    $val <: r".*\[#[0-9a-fA-F]{3,8}\].*",
+    not $val <: within `<svg $attrs>$body</svg>` ,
+    not $val <: within `<path $attrs />` ,
+    register_diagnostic(span=$val, message="No hardcoded hex colors in Tailwind classes. Use CSS variables instead (e.g., bg-[var(--ods-...)]).")
+  }
+}

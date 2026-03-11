@@ -134,8 +134,8 @@ export function Table<T = any>({
     <div className={cn('flex flex-col gap-1 w-full', containerClassName)}>
       {/* Toolbar for bulk actions */}
       {showToolbar && bulkActions && selectedRows.length > 0 && (
-        <div className="flex items-center justify-between bg-[#212121] border border-[#3a3a3a] rounded-[6px] p-3 mb-2">
-          <span className="text-[#888888] text-sm">
+        <div className="flex items-center justify-between bg-[var(--ods-system-greys-black)] border border-[var(--ods-system-greys-soft-grey)] rounded-[6px] p-3 mb-2">
+          <span className="text-[var(--ods-system-greys-grey)] text-sm">
             {selectedRows.length} item{selectedRows.length !== 1 ? 's' : ''} selected
           </span>
           <div className="flex gap-2">
@@ -146,7 +146,7 @@ export function Table<T = any>({
                 disabled={action.requiresSelection && selectedRows.length === 0}
                 className={cn(
                   'px-3 py-1.5 text-sm rounded border transition-colors',
-                  'bg-[#212121] border-[#3a3a3a] hover:bg-[#2a2a2a] text-[#fafafa]',
+                  'bg-[var(--ods-system-greys-black)] border-[var(--ods-system-greys-soft-grey)] hover:bg-[var(--ods-system-greys-background-action)] text-[var(--ods-system-greys-white)]',
                   action.className,
                 )}
               >
@@ -235,12 +235,12 @@ export function Table<T = any>({
           compact={cursorPagination.compact}
           resetButtonLabel={cursorPagination.resetButtonLabel}
           resetButtonIcon={cursorPagination.resetButtonIcon}
-          className={cn('border-t border-[#3a3a3a] pt-3 mt-2', paginationClassName)}
+          className={cn('border-t border-[var(--ods-system-greys-soft-grey)] pt-3 mt-2', paginationClassName)}
         />
       )}
 
       {pagePagination && !cursorPagination && data.length > 0 && (
-        <div className={cn('border-t border-[#3a3a3a] pt-3 mt-2', paginationClassName)}>
+        <div className={cn('border-t border-[var(--ods-system-greys-soft-grey)] pt-3 mt-2', paginationClassName)}>
           <Pagination
             currentPage={pagePagination.currentPage}
             totalPages={pagePagination.totalPages}

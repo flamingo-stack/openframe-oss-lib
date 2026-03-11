@@ -15,21 +15,21 @@ export const platformIcons = {
   'revenue-hub': <FlamingoLogo className="h-5 w-5" fill="#FFC008" />,
   'people-hub': <FlamingoLogo className="h-5 w-5" fill="#5EFAF0" />,
   tmcg: <MiamiCyberGangLogoFaceOnly className="h-5 w-5" />,
-  universal: <Globe className="h-5 w-5 text-[#10B981]" />,
+  universal: <Globe className="h-5 w-5 text-[var(--color-success)]" />,
 };
 
 // Platform colors mapping
 export const platformColors = {
-  openmsp: 'bg-[#3B82F6]',
-  openframe: 'bg-[#8B5CF6]',
-  flamingo: 'bg-[#EC4899]',
-  'flamingo-teaser': 'bg-[#F59E0B]',
-  'marketing-hub': 'bg-[#F357BB]',
-  'product-hub': 'bg-[#5EA62E]',
-  'revenue-hub': 'bg-[#FFC008]',
-  'people-hub': 'bg-[#5EFAF0]',
-  tmcg: 'bg-[#FF6B6B]',
-  universal: 'bg-[#10B981]',
+  openmsp: 'bg-[var(--color-info)]',
+  openframe: 'bg-[var(--color-link-visited)]',
+  flamingo: 'bg-[var(--ods-flamingo-pink-base)]',
+  'flamingo-teaser': 'bg-[var(--color-warning)]',
+  'marketing-hub': 'bg-[var(--ods-flamingo-pink-base)]',
+  'product-hub': 'bg-[var(--color-success)]',
+  'revenue-hub': 'bg-[var(--ods-open-yellow-base)]',
+  'people-hub': 'bg-[var(--ods-flamingo-cyan-base)]',
+  tmcg: 'bg-[var(--color-error)]',
+  universal: 'bg-[var(--color-success)]',
 };
 
 // Platform display names for consistent naming across the app

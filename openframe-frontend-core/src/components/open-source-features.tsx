@@ -11,9 +11,9 @@ interface FeatureCardProps {
 
 const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description }) => {
   return (
-    <div className="bg-ods-card border border-ods-border rounded-3xl p-6 flex flex-col gap-6 h-full hover:bg-[#252525] transition-colors duration-200">
+    <div className="bg-ods-card border border-ods-border rounded-3xl p-6 flex flex-col gap-6 h-full hover:bg-[var(--ods-system-greys-background-hover)] transition-colors duration-200">
       {/* Icon Container */}
-      <div className="w-12 h-12 bg-[#161616] border border-ods-border rounded flex items-center justify-center">
+      <div className="w-12 h-12 bg-[var(--ods-system-greys-background)] border border-ods-border rounded flex items-center justify-center">
         <div className="w-6 h-6 text-ods-text-secondary">{icon}</div>
       </div>
 
@@ -52,7 +52,7 @@ const OpenSourceFeatures: React.FC = () => {
   ];
 
   return (
-    <section className="w-full bg-[#161616] py-12 md:py-16 lg:py-20">
+    <section className="w-full bg-[var(--ods-system-greys-background)] py-12 md:py-16 lg:py-20">
       <div className="w-full max-w-[1920px] mx-auto px-6 md:px-20">
         {/* Section Title */}
         <div className="flex flex-col items-center gap-10">

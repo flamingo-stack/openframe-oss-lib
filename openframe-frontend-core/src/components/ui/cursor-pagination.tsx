@@ -85,7 +85,9 @@ export function CursorPagination({
   return (
     <div className={cn('flex items-center justify-between gap-4', compact ? 'py-2' : 'py-3', className)}>
       {/* Info text */}
-      {showInfo && <div className="text-sm text-[#888888]">{displayText || <span>&nbsp;</span>}</div>}
+      {showInfo && (
+        <div className="text-sm text-[var(--ods-system-greys-grey)]">{displayText || <span>&nbsp;</span>}</div>
+      )}
 
       {/* Navigation buttons */}
       <div className="flex items-center gap-2">

@@ -56,13 +56,13 @@ export function TableHeader<T = any>({
     const isActive = sortBy === columnKey;
 
     if (!isActive) {
-      return <SwitchVrIcon className="w-4 h-4 text-[#888888]" />;
+      return <SwitchVrIcon className="w-4 h-4 text-[var(--ods-system-greys-grey)]" />;
     }
 
     return sortDirection === 'asc' ? (
-      <Arrow01UpIcon className="w-4 h-4 text-[#FFD951]" />
+      <Arrow01UpIcon className="w-4 h-4 text-[var(--ods-open-yellow-dark)]" />
     ) : (
-      <Arrow01DownIcon className="w-4 h-4 text-[#FFD951]" />
+      <Arrow01DownIcon className="w-4 h-4 text-[var(--ods-open-yellow-dark)]" />
     );
   };
 
@@ -76,7 +76,7 @@ export function TableHeader<T = any>({
           <Checkbox
             checked={allSelected || (someSelected && !allSelected) ? true : false}
             onCheckedChange={onSelectAll}
-            className="border-[#3a3a3a]"
+            className="border-[var(--ods-system-greys-soft-grey)]"
           />
         </div>
       )}
@@ -115,7 +115,7 @@ export function TableHeader<T = any>({
                 <div
                   className={cn(
                     'flex gap-2 items-center',
-                    column.sortable && 'cursor-pointer hover:text-[#fafafa] transition-colors',
+                    column.sortable && 'cursor-pointer hover:text-[var(--ods-system-greys-white)] transition-colors',
                   )}
                   onClick={() => handleSort(column)}
                 >
@@ -123,7 +123,7 @@ export function TableHeader<T = any>({
                     column.renderHeader()
                   ) : (
                     <>
-                      <span className="font-medium text-[12px] leading-[16px] text-[#888888] uppercase">
+                      <span className="font-medium text-[12px] leading-[16px] text-[var(--ods-system-greys-grey)] uppercase">
                         {column.label}
                       </span>
                       {getSortIcon(column)}
@@ -139,8 +139,8 @@ export function TableHeader<T = any>({
                         className={cn(
                           'p-0.5 rounded transition-all duration-200 cursor-pointer',
                           (filters?.[column.key]?.length || 0) > 0
-                            ? 'bg-[#FFD951] hover:bg-[#FFD951]/80'
-                            : 'hover:bg-[#2a2a2a]',
+                            ? 'bg-[var(--ods-open-yellow-dark)] hover:bg-[var(--ods-open-yellow-dark)]/80'
+                            : 'hover:bg-[var(--ods-system-greys-background-action)]',
                         )}
                         aria-label={`Filter by ${column.label}`}
                       >
@@ -148,8 +148,8 @@ export function TableHeader<T = any>({
                           className={cn(
                             'w-4 h-4 transition-colors',
                             (filters?.[column.key]?.length || 0) > 0
-                              ? 'text-[#161616]'
-                              : 'text-[#888888] hover:text-[#fafafa]',
+                              ? 'text-[var(--ods-system-greys-background)]'
+                              : 'text-[var(--ods-system-greys-grey)] hover:text-[var(--ods-system-greys-white)]',
                           )}
                         />
                       </div>

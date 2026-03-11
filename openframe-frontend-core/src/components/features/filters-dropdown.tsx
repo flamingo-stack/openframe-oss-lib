@@ -70,8 +70,8 @@ const FilterCheckbox: React.FC<{
       onClick={() => onChange(!checked)}
       className={cn(
         'relative h-[24px] w-[24px] rounded-[6px] transition-all duration-150 shrink-0',
-        checked ? 'bg-[#ffc008]' : 'bg-[#212121]',
-        !checked && 'border-2 border-[#3a3a3a]',
+        checked ? 'bg-[var(--ods-open-yellow-base)]' : 'bg-[var(--ods-system-greys-black)]',
+        !checked && 'border-2 border-[var(--ods-system-greys-soft-grey)]',
         disabled && 'opacity-50 cursor-not-allowed',
         className,
       )}
@@ -84,7 +84,7 @@ const FilterCheckbox: React.FC<{
             viewBox="0 0 14 10"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
-            className="text-[#212121]"
+            className="text-[var(--ods-system-greys-black)]"
           >
             <path
               d="M1 5L5 9L13 1"
@@ -312,13 +312,13 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
           onClick={() => setIsOpen(!isOpen)}
           className={cn(
             'font-mono font-medium text-xs uppercase tracking-[-0.24px]',
-            'text-[#888888] hover:text-[#fafafa] transition-colors',
+            'text-[var(--ods-system-greys-grey)] hover:text-[var(--ods-system-greys-white)] transition-colors',
             'flex items-center gap-2',
           )}
         >
           {triggerLabel}
           {getActiveFiltersCount() > 0 && (
-            <span className="bg-[#ffc008] text-[#212121] px-1.5 py-0.5 rounded text-[10px] font-bold">
+            <span className="bg-[var(--ods-open-yellow-base)] text-[var(--ods-system-greys-black)] px-1.5 py-0.5 rounded text-[10px] font-bold">
               {getActiveFiltersCount()}
             </span>
           )}
@@ -345,7 +345,7 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
               : undefined
           }
         >
-          <div className="bg-[#161616] rounded-[6px] border border-[#3a3a3a] p-4 shadow-xl">
+          <div className="bg-[var(--ods-system-greys-background)] rounded-[6px] border border-[var(--ods-system-greys-soft-grey)] p-4 shadow-xl">
             {sections.map((section, sectionIndex) => {
               const sectionSelection = selectedFilters[section.id] || [];
               const allSelected = section.options.every(opt => sectionSelection.includes(opt.id));
@@ -354,13 +354,13 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
                 <div key={section.id} className={cn('space-y-2', sectionIndex > 0 && 'mt-4')}>
                   {/* Section Header */}
                   <div className="flex items-center justify-between">
-                    <h3 className="font-['Azeret_Mono'] font-medium text-xs uppercase tracking-[-0.24px] text-[#888888]">
+                    <h3 className="font-['Azeret_Mono'] font-medium text-xs uppercase tracking-[-0.24px] text-[var(--ods-system-greys-grey)]">
                       {section.title}
                     </h3>
                     {section.allowSelectAll && section.type === 'checkbox' && (
                       <button
                         onClick={() => handleSelectAll(section.id, section)}
-                        className="font-['DM_Sans'] font-medium text-[14px] text-[#888888] hover:text-[#fafafa] underline transition-colors"
+                        className="font-['DM_Sans'] font-medium text-[14px] text-[var(--ods-system-greys-grey)] hover:text-[var(--ods-system-greys-white)] underline transition-colors"
                       >
                         {allSelected ? 'Deselect All' : 'Select All'}
                       </button>
@@ -368,7 +368,7 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
                   </div>
 
                   {/* Options Container */}
-                  <div className="bg-[#161616] rounded-[6px] border border-[#3a3a3a] overflow-hidden">
+                  <div className="bg-[var(--ods-system-greys-background)] rounded-[6px] border border-[var(--ods-system-greys-soft-grey)] overflow-hidden">
                     {section.options.map((option, index) => {
                       // Handle separator type
                       if (option.type === 'separator') {
@@ -385,9 +385,11 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
                           key={`${section.id}-${option.id}-${index}`}
                           className={cn(
                             'flex items-center gap-2 px-2 py-2',
-                            isSelected ? 'bg-[#212121]' : 'bg-[#161616]',
-                            !isLast && 'border-b border-[#3a3a3a]',
-                            'hover:bg-[#212121] transition-colors min-h-[40px]',
+                            isSelected
+                              ? 'bg-[var(--ods-system-greys-black)]'
+                              : 'bg-[var(--ods-system-greys-background)]',
+                            !isLast && 'border-b border-[var(--ods-system-greys-soft-grey)]',
+                            'hover:bg-[var(--ods-system-greys-black)] transition-colors min-h-[40px]',
                           )}
                         >
                           <FilterCheckbox
@@ -398,7 +400,7 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
                             onClick={() => handleToggleOption(section.id, option.id, section.type)}
                             className="flex-1 text-left"
                           >
-                            <span className="font-['DM_Sans'] font-medium text-[14px] text-[#fafafa] leading-[20px]">
+                            <span className="font-['DM_Sans'] font-medium text-[14px] text-[var(--ods-system-greys-white)] leading-[20px]">
                               {option.label}
                             </span>
                           </button>
@@ -414,13 +416,13 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
             <div className="flex gap-3 mt-4">
               <button
                 onClick={handleReset}
-                className="flex-1 bg-[#212121] border border-[#3a3a3a] text-[#fafafa] font-['DM_Sans'] font-bold text-[14px] py-2 px-4 rounded-[6px] hover:bg-[#2a2a2a] transition-colors h-10"
+                className="flex-1 bg-[var(--ods-system-greys-black)] border border-[var(--ods-system-greys-soft-grey)] text-[var(--ods-system-greys-white)] font-['DM_Sans'] font-bold text-[14px] py-2 px-4 rounded-[6px] hover:bg-[var(--ods-system-greys-background-action)] transition-colors h-10"
               >
                 Reset
               </button>
               <button
                 onClick={handleApply}
-                className="flex-1 bg-[#ffc008] text-[#212121] font-['DM_Sans'] font-bold text-[14px] py-2 px-4 rounded-[6px] hover:bg-[#e6ac07] transition-colors h-10"
+                className="flex-1 bg-[var(--ods-open-yellow-base)] text-[var(--ods-system-greys-black)] font-['DM_Sans'] font-bold text-[14px] py-2 px-4 rounded-[6px] hover:bg-[var(--ods-open-yellow-action)] transition-colors h-10"
               >
                 Apply
               </button>

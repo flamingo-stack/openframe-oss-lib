@@ -30,7 +30,7 @@ export function VendorDisplayButton({ vendor, onClick, variant = 'default', exte
     return (
       <button
         onClick={handleClick}
-        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#1A1A1A] border border-[#2A2A2A] hover:border-[#FFC008]/50 transition-colors"
+        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--color-text-on-accent)] border border-[var(--ods-system-greys-background-action)] hover:border-[var(--ods-open-yellow-base)]/50 transition-colors"
       >
         {logoUrl ? (
           <div className="w-5 h-5 rounded overflow-hidden flex-shrink-0">
@@ -43,8 +43,10 @@ export function VendorDisplayButton({ vendor, onClick, variant = 'default', exte
             />
           </div>
         ) : (
-          <div className="w-5 h-5 rounded bg-[#2A2A2A] flex items-center justify-center flex-shrink-0">
-            <span className="text-[#666666] text-[10px] font-medium">{vendor.title.charAt(0).toUpperCase()}</span>
+          <div className="w-5 h-5 rounded bg-[var(--ods-system-greys-background-action)] flex items-center justify-center flex-shrink-0">
+            <span className="text-[var(--ods-system-greys-grey-action)] text-[10px] font-medium">
+              {vendor.title.charAt(0).toUpperCase()}
+            </span>
           </div>
         )}
         <span className="text-sm font-medium text-white">{vendor.title}</span>
@@ -56,7 +58,7 @@ export function VendorDisplayButton({ vendor, onClick, variant = 'default', exte
   return (
     <button
       onClick={handleClick}
-      className="flex items-center gap-2 bg-ods-card border border-ods-border rounded-lg py-2 px-3 hover:border-[#FFC008] transition-colors max-w-full overflow-hidden"
+      className="flex items-center gap-2 bg-ods-card border border-ods-border rounded-lg py-2 px-3 hover:border-[var(--ods-open-yellow-base)] transition-colors max-w-full overflow-hidden"
     >
       {getVendorLogo(vendor) ? (
         <div className="w-8 h-8 bg-ods-card border border-ods-border rounded-lg flex items-center justify-center flex-shrink-0">

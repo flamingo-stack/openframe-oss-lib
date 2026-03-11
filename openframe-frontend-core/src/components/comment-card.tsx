@@ -79,7 +79,7 @@ export function CommentCard({
 
   return (
     <div
-      className="bg-ods-card border border-ods-border rounded-lg p-4 hover:border-[#FFC008] transition-all group overflow-hidden w-full max-w-full box-border"
+      className="bg-ods-card border border-ods-border rounded-lg p-4 hover:border-[var(--ods-open-yellow-base)] transition-all group overflow-hidden w-full max-w-full box-border"
       style={{ maxWidth: '100%', wordBreak: 'break-word' }}
     >
       {/* Comment Header */}

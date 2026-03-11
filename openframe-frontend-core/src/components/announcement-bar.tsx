@@ -1,7 +1,7 @@
 'use client';
 
 import { X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Announcement } from '../types/announcement';
 import { clearStoredAnnouncement, getStoredAnnouncement, setStoredAnnouncement } from '../utils/announcement-storage';
 import { getAppType } from '../utils/app-config';
@@ -22,13 +22,13 @@ export function AnnouncementBar() {
   const platform = getAppType();
 
   // Helper to determine dismissal key for localStorage
-  const getDismissKey = (id: string) => `${platform}-announcement-${id}-dismissed`;
+  const getDismissKey = useCallback((id: string) => `${platform}-announcement-${id}-dismissed`, [platform]);
 
   // Helper to get platform-specific cache key
-  const getCacheKey = () => `${platform}-announcement-cache`;
+  const getCacheKey = useCallback(() => `${platform}-announcement-cache`, [platform]);
 
   // Fetch active announcement from API and update state + LS
-  const fetchActiveAnnouncement = async () => {
+  const fetchActiveAnnouncement = useCallback(async () => {
     try {
       // Server-side platform injection - no URL parameter needed
       const response = await fetch(`/api/announcements/active`);
@@ -69,7 +69,7 @@ export function AnnouncementBar() {
       // Clear stale data on exceptions too
       clearStoredAnnouncement(getCacheKey());
     }
-  };
+  }, [getCacheKey, getDismissKey, platform]);
 
   // Initial load: use cached announcement synchronously for instant paint
   useEffect(() => {
@@ -145,10 +145,10 @@ export function AnnouncementBar() {
           {renderIcon()}
 
           <div className="flex-1 min-w-0 max-w-full">
-            <p className="font-body font-bold text-[14px] md:text-[18px] leading-tight tracking-tight mb-0 text-[#1A1A1A] truncate">
+            <p className="font-body font-bold text-[14px] md:text-[18px] leading-tight tracking-tight mb-0 text-[var(--color-text-on-accent)] truncate">
               {announcement.title}
             </p>
-            <p className="font-body text-[12px] md:text-[18px] leading-tight hidden md:block text-[#1A1A1A] truncate">
+            <p className="font-body text-[12px] md:text-[18px] leading-tight hidden md:block text-[var(--color-text-on-accent)] truncate">
               {announcement.description}
             </p>
           </div>
@@ -184,11 +184,11 @@ export function AnnouncementBar() {
             e.stopPropagation(); // Prevent triggering the mobile CTA click
             handleDismiss();
           }}
-          className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center hover:bg-[#1A1A1A]/10 focus:outline-none focus:ring-2 focus:ring-[#1A1A1A] mr-2 md:mr-4"
+          className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center hover:bg-[var(--color-text-on-accent)]/10 focus:outline-none focus:ring-2 focus:ring-[var(--color-text-on-accent)] mr-2 md:mr-4"
           aria-label="Dismiss announcement"
           type="button"
         >
-          <X className="w-4 h-4 text-[#1A1A1A]" strokeWidth={2} />
+          <X className="w-4 h-4 text-[var(--color-text-on-accent)]" strokeWidth={2} />
         </button>
       </div>
     </div>

@@ -10,22 +10,22 @@ export function TableEmptyState({ message = 'No data available', icon, action, c
   return (
     <div
       className={cn(
-        'flex flex-col items-center justify-center py-12 px-4 rounded-[6px] bg-[#212121] border border-[#3a3a3a]',
+        'flex flex-col items-center justify-center py-12 px-4 rounded-[6px] bg-[var(--ods-system-greys-black)] border border-[var(--ods-system-greys-soft-grey)]',
         className,
       )}
     >
       {/* Icon */}
-      <div className="mb-4 text-[#888888]">{icon || <FileX2 className="w-12 h-12" />}</div>
+      <div className="mb-4 text-[var(--ods-system-greys-grey)]">{icon || <FileX2 className="w-12 h-12" />}</div>
 
       {/* Message */}
-      <p className="text-h4 text-[#888888] text-center mb-6">{message}</p>
+      <p className="text-h4 text-[var(--ods-system-greys-grey)] text-center mb-6">{message}</p>
 
       {/* Action Button */}
       {action && (
         <Button
           variant="outline"
           onClick={action.onClick}
-          className="bg-[#212121] border-[#3a3a3a] hover:bg-[#2a2a2a] text-[#fafafa]"
+          className="bg-[var(--ods-system-greys-black)] border-[var(--ods-system-greys-soft-grey)] hover:bg-[var(--ods-system-greys-background-action)] text-[var(--ods-system-greys-white)]"
         >
           {action.label}
         </Button>

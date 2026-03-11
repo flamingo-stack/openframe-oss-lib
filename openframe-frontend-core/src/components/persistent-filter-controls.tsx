@@ -96,7 +96,7 @@ export function PersistentFilterControls({
       {/* Visual loading indicator */}
       {isLoading && (
         <div className="absolute top-2 right-2 z-10" role="status" aria-label="Loading filters">
-          <div className="w-4 h-4 border-2 border-ods-border border-t-[#FFC008] rounded-full animate-spin" />
+          <div className="w-4 h-4 border-2 border-ods-border border-t-[var(--ods-open-yellow-base)] rounded-full animate-spin" />
         </div>
       )}
     </div>

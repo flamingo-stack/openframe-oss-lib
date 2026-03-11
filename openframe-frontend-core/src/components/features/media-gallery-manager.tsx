@@ -127,7 +127,7 @@ export function MediaGalleryManager({
       return (
         <Card
           key={index}
-          className="relative group border-ods-border hover:border-[#FFC008]/30 transition-colors"
+          className="relative group border-ods-border hover:border-[var(--ods-open-yellow-base)]/30 transition-colors"
           draggable
           onDragStart={() => handleDragStart(index)}
           onDragOver={handleDragOver}
@@ -157,7 +157,7 @@ export function MediaGalleryManager({
           </div>
 
           {/* Media Content */}
-          <div className="aspect-video relative bg-[#1A1A1A] rounded-lg overflow-hidden">
+          <div className="aspect-video relative bg-[var(--color-text-on-accent)] rounded-lg overflow-hidden">
             {mediaItem.media_type === 'video' || mediaItem.media_type === 'demo' ? (
               <video src={mediaItem.media_url} className="w-full h-full object-cover" controls preload="metadata" />
             ) : (
@@ -192,7 +192,7 @@ export function MediaGalleryManager({
   const content = (
     <div className={`space-y-6 ${className}`}>
       {/* Upload Section */}
-      <div className="border-2 border-dashed border-ods-border rounded-lg p-6 text-center hover:border-[#FFC008]/50 transition-colors">
+      <div className="border-2 border-dashed border-ods-border rounded-lg p-6 text-center hover:border-[var(--ods-open-yellow-base)]/50 transition-colors">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 rounded-full bg-ods-card flex items-center justify-center">
             {isUploading ? (

@@ -394,11 +394,11 @@ export function ReleaseDetailPage({
                           href={ghRelease.github_release_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-h4 text-[#ffc008] hover:underline"
+                          className="text-h4 text-[var(--ods-open-yellow-base)] hover:underline"
                         >
                           {ghRelease.github_release_url.split('/').pop()}
                         </a>
-                        <ExternalLink className="h-6 w-6 text-[#ffc008] shrink-0" />
+                        <ExternalLink className="h-6 w-6 text-[var(--ods-open-yellow-base)] shrink-0" />
                       </div>
                     ))}
                   </>
@@ -420,11 +420,11 @@ export function ReleaseDetailPage({
                                 ? path
                                 : `/knowledge-base${path.startsWith('/') ? '' : '/'}${path}`
                             }
-                            className="text-h4 text-[#ffc008] hover:underline"
+                            className="text-h4 text-[var(--ods-open-yellow-base)] hover:underline"
                           >
                             {path.replace(/^\//, '').split('/').pop()?.replace(/-/g, ' ') || 'View Article'}
                           </Link>
-                          <ExternalLink className="h-6 w-6 text-[#ffc008] shrink-0" />
+                          <ExternalLink className="h-6 w-6 text-[var(--ods-open-yellow-base)] shrink-0" />
                         </div>
                       );
                     })}
@@ -439,11 +439,11 @@ export function ReleaseDetailPage({
                       href={migrationGuideUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-h4 text-[#ffc008] hover:underline"
+                      className="text-h4 text-[var(--ods-open-yellow-base)] hover:underline"
                     >
                       📖 Migration Guide
                     </a>
-                    <ExternalLink className="h-6 w-6 text-[#ffc008] shrink-0" />
+                    <ExternalLink className="h-6 w-6 text-[var(--ods-open-yellow-base)] shrink-0" />
                   </div>
                 )}
 
@@ -455,11 +455,11 @@ export function ReleaseDetailPage({
                       href={documentationUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-h4 text-[#ffc008] hover:underline"
+                      className="text-h4 text-[var(--ods-open-yellow-base)] hover:underline"
                     >
                       📚 Documentation
                     </a>
-                    <ExternalLink className="h-6 w-6 text-[#ffc008] shrink-0" />
+                    <ExternalLink className="h-6 w-6 text-[var(--ods-open-yellow-base)] shrink-0" />
                   </div>
                 )}
               </div>

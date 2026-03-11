@@ -139,7 +139,7 @@ export function ChangelogManager({
                     value={entry.title}
                     onChange={e => updateEntry(index, 'title', e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && e.preventDefault()}
-                    className="bg-[#161616]"
+                    className="bg-[var(--ods-system-greys-background)]"
                   />
                 </div>
 
@@ -151,7 +151,7 @@ export function ChangelogManager({
                     value={entry.description || ''}
                     onChange={e => updateEntry(index, 'description', e.target.value)}
                     rows={2}
-                    className="bg-[#161616]"
+                    className="bg-[var(--ods-system-greys-background)]"
                   />
                 </div>
               </div>

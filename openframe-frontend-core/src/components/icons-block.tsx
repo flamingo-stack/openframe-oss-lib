@@ -123,19 +123,19 @@ export function ResponsiveIconsBlock({ loading = false }: IconsBlockProps) {
   if (loading || iconGrid.length === 0) {
     return (
       <div
-        className="w-full h-[80px] md:h-[112px] bg-[#1A1A1A] relative overflow-hidden"
+        className="w-full h-[80px] md:h-[112px] bg-[var(--color-text-on-accent)] relative overflow-hidden"
         role="presentation"
         aria-hidden="true"
       >
         {/* subtle pulse bar */}
-        <div className="absolute inset-0 animate-pulse bg-[#2A2A2A]/60" />
+        <div className="absolute inset-0 animate-pulse bg-[var(--ods-system-greys-background-action)]/60" />
       </div>
     );
   }
 
   return (
     <div
-      className="w-full h-[80px] md:h-[112px] overflow-hidden bg-[#1A1A1A] relative z-10"
+      className="w-full h-[80px] md:h-[112px] overflow-hidden bg-[var(--color-text-on-accent)] relative z-10"
       style={{ margin: 0, padding: 0 }}
       role="presentation"
       aria-hidden="true"
@@ -173,7 +173,12 @@ export function ResponsiveIconsBlock({ loading = false }: IconsBlockProps) {
               }}
               role="presentation"
             >
-              <IconComponent width={16} height={16} className="text-[#666666] md:w-5 md:h-5" aria-hidden="true" />
+              <IconComponent
+                width={16}
+                height={16}
+                className="text-[var(--ods-system-greys-grey-action)] md:w-5 md:h-5"
+                aria-hidden="true"
+              />
             </div>
           );
         })}

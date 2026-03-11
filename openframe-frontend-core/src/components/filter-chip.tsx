@@ -44,17 +44,17 @@ export function FilterChip({
   const variantClasses = {
     // Legacy variants (for backward compatibility)
     selected:
-      'bg-[#2A2A2A] text-[#E8E8E8] border border-[#FFC008] hover:bg-ods-border hover:border-[#FFD951] focus:ring-[#FFC008] focus:ring-offset-[#161616]',
+      'bg-[var(--ods-system-greys-background-action)] text-[var(--color-border-default)] border border-[var(--ods-open-yellow-base)] hover:bg-ods-border hover:border-[var(--ods-open-yellow-dark)] focus:ring-[var(--ods-open-yellow-base)] focus:ring-offset-[var(--ods-system-greys-background)]',
     unselected:
-      'bg-[#2A2A2A] text-[#CCCCCC] border border-[#4A4A4A] hover:bg-ods-border hover:border-[#5A5A5A] hover:text-ods-text-primary focus:ring-[#4A4A4A] focus:ring-offset-[#161616]',
-    info: 'bg-ods-border text-[#CCCCCC] border border-[#5A5A5A] cursor-default hover:scale-100 hover:shadow-none focus:ring-[#5A5A5A] focus:ring-offset-[#161616]',
+      'bg-[var(--ods-system-greys-background-action)] text-[var(--ods-system-greys-grey)] border border-[var(--ods-system-greys-soft-grey-hover)] hover:bg-ods-border hover:border-[var(--ods-system-greys-soft-grey-action)] hover:text-ods-text-primary focus:ring-[var(--ods-system-greys-soft-grey-hover)] focus:ring-offset-[var(--ods-system-greys-background)]',
+    info: 'bg-ods-border text-[var(--ods-system-greys-grey)] border border-[var(--ods-system-greys-soft-grey-action)] cursor-default hover:scale-100 hover:shadow-none focus:ring-[var(--ods-system-greys-soft-grey-action)] focus:ring-offset-[var(--ods-system-greys-background)]',
 
     // New subtle selected variants - same backgrounds/text, only border colors different
     category:
-      'bg-[#2A2A2A] text-[#E8E8E8] border border-[#FFC008]/40 hover:bg-ods-border hover:border-[#FFC008]/60 hover:text-ods-text-primary focus:ring-[#FFC008]/40 focus:ring-offset-[#161616]',
+      'bg-[var(--ods-system-greys-background-action)] text-[var(--color-border-default)] border border-[var(--ods-open-yellow-base)]/40 hover:bg-ods-border hover:border-[var(--ods-open-yellow-base)]/60 hover:text-ods-text-primary focus:ring-[var(--ods-open-yellow-base)]/40 focus:ring-offset-[var(--ods-system-greys-background)]',
     subcategory:
-      'bg-[#2A2A2A] text-[#E8E8E8] border border-[#FFC008]/60 hover:bg-ods-border hover:border-[#FFC008]/80 hover:text-ods-text-primary focus:ring-[#FFC008]/60 focus:ring-offset-[#161616]',
-    tag: 'bg-[#2A2A2A] text-ods-text-primary border border-[#FFC008]/20 hover:bg-ods-border hover:border-[#FFC008]/30 hover:text-ods-text-primary focus:ring-[#FFC008]/20 focus:ring-offset-[#161616]',
+      'bg-[var(--ods-system-greys-background-action)] text-[var(--color-border-default)] border border-[var(--ods-open-yellow-base)]/60 hover:bg-ods-border hover:border-[var(--ods-open-yellow-base)]/80 hover:text-ods-text-primary focus:ring-[var(--ods-open-yellow-base)]/60 focus:ring-offset-[var(--ods-system-greys-background)]',
+    tag: 'bg-[var(--ods-system-greys-background-action)] text-ods-text-primary border border-[var(--ods-open-yellow-base)]/20 hover:bg-ods-border hover:border-[var(--ods-open-yellow-base)]/30 hover:text-ods-text-primary focus:ring-[var(--ods-open-yellow-base)]/20 focus:ring-offset-[var(--ods-system-greys-background)]',
   };
 
   return (
@@ -96,12 +96,12 @@ export function FilterChip({
             'transition-all duration-200 shrink-0',
             'group-hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-1',
             variant === 'category'
-              ? 'hover:bg-[#4A4A4A] text-[#E8E8E8] focus:ring-[#E8E8E8] focus:ring-offset-[#2A2A2A]'
+              ? 'hover:bg-[var(--ods-system-greys-soft-grey-hover)] text-[var(--color-border-default)] focus:ring-[var(--color-border-default)] focus:ring-offset-[var(--ods-system-greys-background-action)]'
               : variant === 'subcategory'
-                ? 'hover:bg-[#4A4A4A] text-[#E8E8E8] focus:ring-[#E8E8E8] focus:ring-offset-[#2A2A2A]'
+                ? 'hover:bg-[var(--ods-system-greys-soft-grey-hover)] text-[var(--color-border-default)] focus:ring-[var(--color-border-default)] focus:ring-offset-[var(--ods-system-greys-background-action)]'
                 : variant === 'tag'
-                  ? 'hover:bg-[#4A4A4A] text-[#E8E8E8] focus:ring-[#E8E8E8] focus:ring-offset-[#2A2A2A]'
-                  : 'hover:bg-[#4A4A4A] text-[#E8E8E8] focus:ring-[#E8E8E8] focus:ring-offset-[#2A2A2A]',
+                  ? 'hover:bg-[var(--ods-system-greys-soft-grey-hover)] text-[var(--color-border-default)] focus:ring-[var(--color-border-default)] focus:ring-offset-[var(--ods-system-greys-background-action)]'
+                  : 'hover:bg-[var(--ods-system-greys-soft-grey-hover)] text-[var(--color-border-default)] focus:ring-[var(--color-border-default)] focus:ring-offset-[var(--ods-system-greys-background-action)]',
             disabled && 'opacity-50 cursor-not-allowed hover:scale-100',
           )}
           aria-label={`Remove ${label} filter`}

@@ -74,7 +74,10 @@ export function TagsInput({
           onKeyPress={handleKeyPress}
           placeholder={placeholder}
           disabled={disabled || (maxTags ? value.length >= maxTags : false)}
-          className={cn('flex-1 bg-[#161616] border-ods-border text-ods-text-primary', inputClassName)}
+          className={cn(
+            'flex-1 bg-[var(--ods-system-greys-background)] border-ods-border text-ods-text-primary',
+            inputClassName,
+          )}
         />
         <Button
           type="button"

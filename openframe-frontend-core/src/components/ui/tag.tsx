@@ -21,15 +21,15 @@ const tagVariants = cva(
         ],
         success: [
           'bg-[var(--ods-attention-green-success-secondary)] text-[var(--ods-attention-green-success)]',
-          'hover:bg-[#385029] active:bg-[#425a33]',
+          'hover:bg-[var(--ods-attention-green-success-secondary-hover)] active:bg-[var(--ods-attention-green-success-secondary-action)]',
         ],
         warning: [
           'bg-[var(--ods-attention-yellow-warning-secondary)] text-[var(--ods-attention-yellow-warning)]',
-          'hover:bg-[#544729] active:bg-[#5e5133]',
+          'hover:bg-[var(--ods-open-yellow-secondary)] active:bg-[var(--ods-open-yellow-secondary-action)]',
         ],
         error: [
           'bg-[var(--ods-attention-red-error-secondary)] text-[var(--ods-attention-red-error)]',
-          'hover:bg-[#542b2b] active:bg-[#5e3535]',
+          'hover:bg-[var(--ods-attention-red-error-secondary-hover)] active:bg-[var(--ods-attention-red-error-secondary-action)]',
         ],
         critical: [
           'bg-[var(--ods-attention-red-error)] text-[var(--ods-attention-red-error-secondary)]',
