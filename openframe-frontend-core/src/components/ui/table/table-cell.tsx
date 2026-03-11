@@ -31,7 +31,7 @@ export function TableCell({
       )}
     >
       {typeof children === 'string' || typeof children === 'number' ? (
-        <span className="text-h4 text-[#fafafa] truncate">
+        <span className="text-h4 text-ods-text-primary truncate">
           {children}
         </span>
       ) : (

@@ -12,7 +12,7 @@ export type { TableDescriptionCellProps } from './table-description-cell'
 export type { TableTimestampCellProps } from './table-timestamp-cell'
 export type {
   BulkAction, CursorPagination, FilterOption,
-  FilterSection, PagePagination, RowAction, TableCardSkeletonProps, TableCellProps, TableColumn, TableEmptyStateProps, TableFilters,
+  FilterSection, InfiniteScrollConfig, PagePagination, RowAction, TableCardSkeletonProps, TableCellProps, TableColumn, TableEmptyStateProps, TableFilters,
   TableHeaderProps, TableProps, TableRowProps, TailwindBreakpoint
 } from './types'
 

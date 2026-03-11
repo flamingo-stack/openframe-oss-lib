@@ -24,6 +24,8 @@ export function TableHeader<T = any>({
   someSelected,
   onSelectAll,
   totalItemsCount,
+  stickyHeader,
+  stickyHeaderOffset,
 }: TableHeaderProps<T>) {
   const getAlignment = (align?: 'left' | 'center' | 'right') => {
     switch (align) {
@@ -56,12 +58,12 @@ export function TableHeader<T = any>({
     const isActive = sortBy === columnKey
     
     if (!isActive) {
-      return <SwitchVrIcon className="w-4 h-4 text-[#888888]" />
+      return <SwitchVrIcon className="w-4 h-4 text-ods-text-secondary" />
     }
     
     return sortDirection === 'asc' 
-      ? <Arrow01UpIcon className="w-4 h-4 text-[#FFD951]" />
-      : <Arrow01DownIcon className="w-4 h-4 text-[#FFD951]" />
+      ? <Arrow01UpIcon className="w-4 h-4 text-ods-accent" />
+      : <Arrow01DownIcon className="w-4 h-4 text-ods-accent" />
   }
 
   const isLgUp = useLgUp() ?? false
@@ -70,6 +72,7 @@ export function TableHeader<T = any>({
     <div
       className={cn(
         'hidden md:flex items-center gap-4 px-4 py-3 relative h-11',
+        stickyHeader && `sticky z-10 bg-ods-bg ${stickyHeaderOffset || 'top-0'}`,
         className
       )}
     >
@@ -79,7 +82,7 @@ export function TableHeader<T = any>({
             <Checkbox
               checked={allSelected || (someSelected && !allSelected) ? true : false}
               onCheckedChange={onSelectAll}
-              className="border-[#3a3a3a]"
+              className="border-ods-border"
             />
           </div>
         )}
@@ -118,7 +121,7 @@ export function TableHeader<T = any>({
                   <div
                     className={cn(
                       'flex gap-2 items-center',
-                      column.sortable && 'cursor-pointer hover:text-[#fafafa] transition-colors'
+                      column.sortable && 'cursor-pointer hover:text-ods-text-primary transition-colors'
                     )}
                     onClick={() => handleSort(column)}
                   >
@@ -126,7 +129,7 @@ export function TableHeader<T = any>({
                       column.renderHeader()
                     ) : (
                       <>
-                        <span className="font-medium text-[12px] leading-[16px] text-[#888888] uppercase">
+                        <span className="font-medium text-[12px] leading-[16px] text-ods-text-secondary uppercase">
                           {column.label}
                         </span>
                         {getSortIcon(column)}
@@ -142,8 +145,8 @@ export function TableHeader<T = any>({
                           className={cn(
                             "p-0.5 rounded transition-all duration-200 cursor-pointer",
                             (filters?.[column.key]?.length || 0) > 0
-                              ? "bg-[#FFD951] hover:bg-[#FFD951]/80"
-                              : "hover:bg-[#2a2a2a]"
+                              ? "bg-ods-accent hover:bg-ods-accent/80"
+                              : "hover:bg-ods-bg-active"
                           )}
                           aria-label={`Filter by ${column.label}`}
                         >
@@ -151,8 +154,8 @@ export function TableHeader<T = any>({
                             className={cn(
                               "w-4 h-4 transition-colors",
                               (filters?.[column.key]?.length || 0) > 0
-                                ? "text-[#161616]"
-                                : "text-[#888888] hover:text-[#fafafa]"
+                                ? "text-ods-text-on-accent"
+                                : "text-ods-text-secondary hover:text-ods-text-primary"
                             )}
                           />
                         </div>

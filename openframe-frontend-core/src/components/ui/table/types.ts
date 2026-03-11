@@ -66,6 +66,13 @@ export interface PagePagination {
   onPageChange: (page: number) => void
 }
 
+export interface InfiniteScrollConfig {
+  hasNextPage: boolean
+  isFetchingNextPage: boolean
+  onLoadMore: () => void
+  skeletonRows?: number
+}
+
 export interface TableProps<T = any> {
   // Data
   data: T[]
@@ -78,16 +85,16 @@ export interface TableProps<T = any> {
 
   // Skeleton configuration
   skeletonRows?: number // Number of skeleton rows to show when loading (default: 10)
-  
+
   // Styling
   className?: string
   containerClassName?: string
   headerClassName?: string
   rowClassName?: string | ((item: T, index: number) => string)
-  
+
   // Interactions
   onRowClick?: (item: T) => void
-  
+
   // Row Actions
   rowActions?: RowAction<T>[]
   // Custom renderer for the actions area (e.g., kebab/dots menu)
@@ -98,26 +105,34 @@ export interface TableProps<T = any> {
   sortDirection?: 'asc' | 'desc'
   onSort?: (column: string, direction: 'asc' | 'desc') => void
   defaultSort?: { column: string; direction: 'asc' | 'desc' }
-  
+
   // Filtering
   filters?: TableFilters
   onFilterChange?: (filters: TableFilters) => void
   showFilters?: boolean
-  
+
   // Selection
   selectable?: boolean
   selectedRows?: T[]
   onSelectionChange?: (selected: T[]) => void
   selectAllLabel?: string
-  
+
   // Bulk Actions
   bulkActions?: BulkAction<T>[]
   showToolbar?: boolean
-  
+
   // Pagination - supports both cursor and page-based
   cursorPagination?: CursorPagination
   pagePagination?: PagePagination
   paginationClassName?: string
+
+  // Infinite scroll - auto-loads next page when scrolling near bottom
+  infiniteScroll?: InfiniteScrollConfig
+
+  // Sticky header - keeps column headers visible while scrolling
+  stickyHeader?: boolean
+  /** Tailwind top class for sticky header offset, e.g. "top-[72px]" */
+  stickyHeaderOffset?: string
 }
 
 export interface BulkAction<T = any> {
@@ -154,6 +169,9 @@ export interface TableHeaderProps<T = any> {
   someSelected?: boolean
   onSelectAll?: () => void
   totalItemsCount: number
+  // Sticky
+  stickyHeader?: boolean
+  stickyHeaderOffset?: string
 }
 
 export interface TableRowProps<T = any> {
