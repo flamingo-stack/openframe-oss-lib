@@ -32,6 +32,13 @@ export interface VideoClip {
   thumbnail_url?: string
 }
 
+export interface CustomerInterviewConfig {
+  /** Target duration in seconds for AI-generated highlight video (default: 180) */
+  highlight_target_duration_seconds?: number
+  /** Skip subtitle burning during highlight video generation */
+  skipSubtitleBurning?: boolean
+}
+
 export interface CustomerInterview {
   id: number
   title: string
@@ -114,6 +121,9 @@ export interface CustomerInterview {
     }
   }
 
+  /** Per-interview configuration options (JSONB) */
+  config?: CustomerInterviewConfig
+
   // Timestamps
   created_at: string
   updated_at: string
@@ -154,6 +164,7 @@ export interface CreateCustomerInterviewData {
   author_id: string
   platforms: string[] // Array of platform IDs (UUIDs)
   featured_platform?: string // Platform ID for featured
+  config?: CustomerInterviewConfig
 }
 
 export type UpdateCustomerInterviewData = Partial<CreateCustomerInterviewData>
