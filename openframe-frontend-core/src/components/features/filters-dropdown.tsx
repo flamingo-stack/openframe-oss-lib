@@ -70,8 +70,8 @@ const FilterCheckbox: React.FC<{
       onClick={() => onChange(!checked)}
       className={cn(
         'relative h-[24px] w-[24px] rounded-[6px] transition-all duration-150 shrink-0',
-        checked ? 'bg-[var(--ods-open-yellow-base)]' : 'bg-[var(--ods-system-greys-black)]',
-        !checked && 'border-2 border-[var(--ods-system-greys-soft-grey)]',
+        checked ? 'bg-ods-open-yellow' : 'bg-ods-card',
+        !checked && 'border-2 border-ods-border',
         disabled && 'opacity-50 cursor-not-allowed',
         className,
       )}
@@ -84,7 +84,7 @@ const FilterCheckbox: React.FC<{
             viewBox="0 0 14 10"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
-            className="text-[var(--ods-system-greys-black)]"
+            className="text-ods-card"
           >
             <path
               d="M1 5L5 9L13 1"
@@ -312,13 +312,13 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
           onClick={() => setIsOpen(!isOpen)}
           className={cn(
             'font-mono font-medium text-xs uppercase tracking-[-0.24px]',
-            'text-[var(--ods-system-greys-grey)] hover:text-[var(--ods-system-greys-white)] transition-colors',
+            'text-ods-text-secondary hover:text-ods-text-primary transition-colors',
             'flex items-center gap-2',
           )}
         >
           {triggerLabel}
           {getActiveFiltersCount() > 0 && (
-            <span className="bg-[var(--ods-open-yellow-base)] text-[var(--ods-system-greys-black)] px-1.5 py-0.5 rounded text-[10px] font-bold">
+            <span className="bg-ods-open-yellow text-ods-card px-1.5 py-0.5 rounded text-[10px] font-bold">
               {getActiveFiltersCount()}
             </span>
           )}
@@ -345,7 +345,7 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
               : undefined
           }
         >
-          <div className="bg-[var(--ods-system-greys-background)] rounded-[6px] border border-[var(--ods-system-greys-soft-grey)] p-4 shadow-xl">
+          <div className="bg-ods-bg rounded-[6px] border border-ods-border p-4 shadow-xl">
             {sections.map((section, sectionIndex) => {
               const sectionSelection = selectedFilters[section.id] || [];
               const allSelected = section.options.every(opt => sectionSelection.includes(opt.id));
@@ -354,13 +354,13 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
                 <div key={section.id} className={cn('space-y-2', sectionIndex > 0 && 'mt-4')}>
                   {/* Section Header */}
                   <div className="flex items-center justify-between">
-                    <h3 className="font-['Azeret_Mono'] font-medium text-xs uppercase tracking-[-0.24px] text-[var(--ods-system-greys-grey)]">
+                    <h3 className="font-['Azeret_Mono'] font-medium text-xs uppercase tracking-[-0.24px] text-ods-text-secondary">
                       {section.title}
                     </h3>
                     {section.allowSelectAll && section.type === 'checkbox' && (
                       <button
                         onClick={() => handleSelectAll(section.id, section)}
-                        className="font-['DM_Sans'] font-medium text-[14px] text-[var(--ods-system-greys-grey)] hover:text-[var(--ods-system-greys-white)] underline transition-colors"
+                        className="font-['DM_Sans'] font-medium text-[14px] text-ods-text-secondary hover:text-ods-text-primary underline transition-colors"
                       >
                         {allSelected ? 'Deselect All' : 'Select All'}
                       </button>
@@ -368,7 +368,7 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
                   </div>
 
                   {/* Options Container */}
-                  <div className="bg-[var(--ods-system-greys-background)] rounded-[6px] border border-[var(--ods-system-greys-soft-grey)] overflow-hidden">
+                  <div className="bg-ods-bg rounded-[6px] border border-ods-border overflow-hidden">
                     {section.options.map((option, index) => {
                       // Handle separator type
                       if (option.type === 'separator') {
@@ -386,10 +386,10 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
                           className={cn(
                             'flex items-center gap-2 px-2 py-2',
                             isSelected
-                              ? 'bg-[var(--ods-system-greys-black)]'
-                              : 'bg-[var(--ods-system-greys-background)]',
-                            !isLast && 'border-b border-[var(--ods-system-greys-soft-grey)]',
-                            'hover:bg-[var(--ods-system-greys-black)] transition-colors min-h-[40px]',
+                              ? 'bg-ods-card'
+                              : 'bg-ods-bg',
+                            !isLast && 'border-b border-ods-border',
+                            'hover:bg-ods-card transition-colors min-h-[40px]',
                           )}
                         >
                           <FilterCheckbox
@@ -400,7 +400,7 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
                             onClick={() => handleToggleOption(section.id, option.id, section.type)}
                             className="flex-1 text-left"
                           >
-                            <span className="font-['DM_Sans'] font-medium text-[14px] text-[var(--ods-system-greys-white)] leading-[20px]">
+                            <span className="font-['DM_Sans'] font-medium text-[14px] text-ods-text-primary leading-[20px]">
                               {option.label}
                             </span>
                           </button>
@@ -416,13 +416,13 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
             <div className="flex gap-3 mt-4">
               <button
                 onClick={handleReset}
-                className="flex-1 bg-[var(--ods-system-greys-black)] border border-[var(--ods-system-greys-soft-grey)] text-[var(--ods-system-greys-white)] font-['DM_Sans'] font-bold text-[14px] py-2 px-4 rounded-[6px] hover:bg-[var(--ods-system-greys-background-action)] transition-colors h-10"
+                className="flex-1 bg-ods-card border border-ods-border text-ods-text-primary font-['DM_Sans'] font-bold text-[14px] py-2 px-4 rounded-[6px] hover:bg-ods-bg-secondary transition-colors h-10"
               >
                 Reset
               </button>
               <button
                 onClick={handleApply}
-                className="flex-1 bg-[var(--ods-open-yellow-base)] text-[var(--ods-system-greys-black)] font-['DM_Sans'] font-bold text-[14px] py-2 px-4 rounded-[6px] hover:bg-[var(--ods-open-yellow-action)] transition-colors h-10"
+                className="flex-1 bg-ods-open-yellow text-ods-card font-['DM_Sans'] font-bold text-[14px] py-2 px-4 rounded-[6px] hover:bg-ods-open-yellow-active transition-colors h-10"
               >
                 Apply
               </button>

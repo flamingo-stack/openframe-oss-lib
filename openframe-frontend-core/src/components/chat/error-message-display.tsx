@@ -13,7 +13,7 @@ const ErrorMessageDisplay = forwardRef<HTMLDivElement, ErrorMessageDisplayProps>
       <div
         ref={ref}
         className={cn(
-          'bg-[var(--ods-attention-red-error-secondary)] border border-ods-error rounded-[6px] p-3 mb-2 flex items-start gap-3',
+          'bg-ods-error-secondary border border-ods-error rounded-[6px] p-3 mb-2 flex items-start gap-3',
           className,
         )}
         {...props}

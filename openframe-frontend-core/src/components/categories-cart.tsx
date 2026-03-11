@@ -18,7 +18,7 @@ export function CategoriesCart({
   return (
     <Link
       href={`/vendors?category=${category.slug}`}
-      className={`block bg-ods-card border border-ods-border rounded-lg p-3 md:p-4 pb-4 md:pb-6 hover:border-[var(--ods-open-yellow-base)] transition-colors group relative ${className}`}
+      className={`block bg-ods-card border border-ods-border rounded-lg p-3 md:p-4 pb-4 md:pb-6 hover:border-ods-open-yellow transition-colors group relative ${className}`}
     >
       <div className="flex flex-col gap-4 md:gap-6">
         {/* Vendor Icons Grid */}
@@ -47,14 +47,14 @@ export function CategoriesCart({
                       key={index}
                       className="w-8 h-8 md:w-10 md:h-10 bg-ods-border rounded flex items-center justify-center opacity-30 flex-shrink-0"
                     >
-                      <div className="w-4 h-4 md:w-6 md:h-6 bg-[var(--ods-system-greys-grey)] rounded-sm" />
+                      <div className="w-4 h-4 md:w-6 md:h-6 bg-ods-text-secondary rounded-sm" />
                     </div>
                   ))}
           </div>
 
           {/* Gradient overlays for fade effect */}
-          <div className="absolute inset-y-0 left-0 w-4 md:w-6 bg-gradient-to-r from-[var(--ods-system-greys-black)] to-transparent pointer-events-none" />
-          <div className="absolute inset-y-0 right-0 w-4 md:w-6 bg-gradient-to-l from-[var(--ods-system-greys-black)] to-transparent pointer-events-none" />
+          <div className="absolute inset-y-0 left-0 w-4 md:w-6 bg-gradient-to-r from-ods-card to-transparent pointer-events-none" />
+          <div className="absolute inset-y-0 right-0 w-4 md:w-6 bg-gradient-to-l from-ods-card to-transparent pointer-events-none" />
         </div>
 
         {/* Category Information - Updated to use real data */}
@@ -75,7 +75,7 @@ export function CategoriesCart({
 
             {/* Arrow Button */}
             <div
-              className="flex items-center justify-center w-10 h-10 md:w-12 md:h-12 bg-transparent border border-ods-border rounded-md group-hover:bg-[var(--ods-open-yellow-base)] transition-colors flex-shrink-0"
+              className="flex items-center justify-center w-10 h-10 md:w-12 md:h-12 bg-transparent border border-ods-border rounded-md group-hover:bg-ods-open-yellow transition-colors flex-shrink-0"
               aria-label={`View ${category.name} category`}
             >
               <ChevronRight className="w-5 h-5 md:w-6 md:h-6 text-ods-text-primary group-hover:text-black transition-colors" />

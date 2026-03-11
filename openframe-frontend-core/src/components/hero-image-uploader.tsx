@@ -162,7 +162,7 @@ export function HeroImageUploader({
         </div>
       ) : (
         <div
-          className={`w-full h-full border-2 border-dashed ${uploading ? 'border-[var(--ods-open-yellow-base)]' : 'border-ods-border hover:border-[var(--ods-open-yellow-base)]'} rounded-lg flex flex-col items-center justify-center cursor-pointer bg-[var(--color-text-on-accent)]`}
+          className={`w-full h-full border-2 border-dashed ${uploading ? 'border-ods-open-yellow' : 'border-ods-border hover:border-ods-open-yellow'} rounded-lg flex flex-col items-center justify-center cursor-pointer bg-ods-text-on-accent`}
           style={{ height: heightStyle }}
           onClick={openDialog}
         >
@@ -177,7 +177,7 @@ export function HeroImageUploader({
               <span className="text-ods-text-secondary font-['DM_Sans'] text-[14px] mt-1">
                 Click to upload or drag and drop
               </span>
-              <span className="text-[var(--ods-system-greys-grey-action)] font-['DM_Sans'] text-[12px]">
+              <span className="text-ods-text-muted font-['DM_Sans'] text-[12px]">
                 PNG, JPEG, WebP, GIF up to 5MB
               </span>
             </>

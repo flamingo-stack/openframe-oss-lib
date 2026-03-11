@@ -29,7 +29,7 @@ interface InfoCardProps {
 export function InfoCard({ data, className = '' }: InfoCardProps) {
   return (
     <div
-      className={`bg-[var(--ods-system-greys-black)] border border-[var(--ods-system-greys-soft-grey)] rounded-[6px] p-4 flex flex-col ${className}`}
+      className={`bg-ods-card border border-ods-border rounded-[6px] p-4 flex flex-col ${className}`}
     >
       {/* Title */}
       {data.title && (
@@ -43,7 +43,7 @@ export function InfoCard({ data, className = '' }: InfoCardProps) {
 
       {/* Subtitle */}
       {data.subtitle && (
-        <div className="text-h4 text-[var(--ods-system-greys-grey)] truncate mb-3">{data.subtitle}</div>
+        <div className="text-h4 text-ods-text-secondary truncate mb-3">{data.subtitle}</div>
       )}
 
       {/* Info items */}
@@ -55,19 +55,19 @@ export function InfoCard({ data, className = '' }: InfoCardProps) {
             <React.Fragment key={index}>
               {values.map((val, valIndex) => (
                 <div key={`${index}-${valIndex}`} className="flex gap-2 items-center w-full">
-                  <span className="text-h4 text-[var(--ods-system-greys-white)] whitespace-nowrap">
+                  <span className="text-h4 text-ods-text-primary whitespace-nowrap">
                     {valIndex === 0 ? item.label : ''}
                   </span>
-                  <div className="flex-1 h-px bg-[var(--ods-system-greys-soft-grey)]" />
+                  <div className="flex-1 h-px bg-ods-bg-surface" />
                   <div className="flex items-center gap-2 max-w-[60%]">
-                    <span className="text-h4 text-[var(--ods-system-greys-white)] truncate select-text" title={val}>
+                    <span className="text-h4 text-ods-text-primary truncate select-text" title={val}>
                       {val}
                     </span>
                     {item.copyable && (
                       <button
                         type="button"
                         onClick={() => navigator.clipboard?.writeText(val)}
-                        className="text-[var(--ods-system-greys-grey)] hover:text-[var(--ods-system-greys-white)] transition-colors"
+                        className="text-ods-text-secondary hover:text-ods-text-primary transition-colors"
                         aria-label={`Copy ${item.label} ${valIndex + 1}`}
                       >
                         <CopyIcon className="w-4 h-4" />

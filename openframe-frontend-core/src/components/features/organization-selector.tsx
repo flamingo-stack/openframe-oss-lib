@@ -295,7 +295,7 @@ export function OrganizationSelector({
           className={cn(
             'flex w-full items-center justify-between rounded-lg border border-ods-border p-2',
             'text-[14px] md:text-[18px] font-medium',
-            'bg-[var(--ods-system-greys-background)] text-ods-text-primary',
+            'bg-ods-bg text-ods-text-primary',
             'hover:border-ods-accent/30 focus:border-ods-accent',
             'focus:outline-none focus:ring-1 focus:ring-ods-accent/20 focus:ring-offset-0',
             'disabled:cursor-not-allowed disabled:opacity-50',
@@ -325,7 +325,7 @@ export function OrganizationSelector({
           <div
             ref={dropdownRef}
             className={cn(
-              'absolute z-[9999] mt-1 w-full rounded-lg border border-ods-border bg-[var(--ods-system-greys-background)] text-ods-text-primary shadow-md',
+              'absolute z-[9999] mt-1 w-full rounded-lg border border-ods-border bg-ods-bg text-ods-text-primary shadow-md',
               'animate-in fade-in-0 zoom-in-95 slide-in-from-top-2',
             )}
           >

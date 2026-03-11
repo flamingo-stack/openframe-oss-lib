@@ -71,7 +71,7 @@ export function NavigationSidebar({ config }: NavigationSidebarProps) {
             // Hover and default states
             !isActive && 'hover:bg-ods-bg-hover text-ods-text-primary [&_svg]:fill-ods-text-secondary',
             // Active state
-            isActive && ['bg-[var(--ods-open-yellow-light)] text-ods-accent', '[&_svg]:fill-ods-accent'],
+            isActive && ['bg-ods-open-yellow-light text-ods-accent', '[&_svg]:fill-ods-accent'],
             // Layout - proper centering in minimized mode
             isMinimized && !inOverlay ? 'justify-center' : 'justify-start gap-2',
           )}
@@ -98,7 +98,7 @@ export function NavigationSidebar({ config }: NavigationSidebarProps) {
               className={cn(
                 'text-sm flex-shrink-0',
                 'transition-colors duration-200',
-                isActive ? 'text-[var(--ods-open-yellow-base)]' : 'text-[var(--ods-system-greys-grey)]',
+                isActive ? 'text-ods-open-yellow' : 'text-ods-text-secondary',
               )}
             >
               {item.badge}

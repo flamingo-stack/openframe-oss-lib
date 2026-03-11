@@ -136,7 +136,7 @@ export function VendorCompactCard({
       <div className={cn('flex items-center gap-3 min-w-0 flex-1', contentClassName)}>
         {isEmptyState ? (
           // Empty state icon with same containerization as VendorIcon
-          <div className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 bg-[var(--ods-system-greys-background)] border border-ods-border">
+          <div className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 bg-ods-bg border border-ods-border">
             <OpenmspLogo
               className="w-6 h-6"
               innerFrontBubbleColor="#0f0f0f"
@@ -158,8 +158,8 @@ export function VendorCompactCard({
               className={cn(
                 "font-['DM_Sans'] text-[18px] font-medium leading-tight bg-transparent border-none outline-none w-full",
                 isEmptyState
-                  ? 'text-ods-text-secondary placeholder-[var(--ods-system-greys-grey)]'
-                  : 'text-ods-text-primary placeholder-[var(--ods-system-greys-grey)]',
+                  ? 'text-ods-text-secondary placeholder-ods-text-secondary'
+                  : 'text-ods-text-primary placeholder-ods-text-secondary',
               )}
               placeholder={vendor.title}
               autoFocus

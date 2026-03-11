@@ -154,7 +154,7 @@ export const MediaCarousel = memo(function MediaCarousel({
                 <div>
                   <p class="text-ods-text-primary text-sm mb-2">Video format not supported</p>
                   <a href="${item.src}" target="_blank" rel="noopener noreferrer" 
-                     class="text-ods-accent hover:text-[var(--ods-open-yellow-base)] text-sm">
+                     class="text-ods-accent hover:text-ods-open-yellow text-sm">
                     Open Video Directly
                   </a>
                 </div>
@@ -327,7 +327,7 @@ export const MediaCarousel = memo(function MediaCarousel({
               <div>
                 <p class="text-ods-text-primary text-sm mb-2">Video could not be loaded</p>
                 <a href="${item.src}" target="_blank" rel="noopener noreferrer" 
-                   class="text-ods-accent hover:text-[var(--ods-open-yellow-base)] text-sm">
+                   class="text-ods-accent hover:text-ods-open-yellow text-sm">
                   Open Video Directly
                 </a>
               </div>
@@ -406,8 +406,8 @@ export const MediaCarousel = memo(function MediaCarousel({
           'relative flex-shrink-0 overflow-hidden transition-all duration-200',
           'w-20 h-20 md:w-24 md:h-24 rounded-lg border-2',
           isActive
-            ? 'border-[var(--ods-open-yellow-base)] ring-2 ring-[var(--ods-open-yellow-base)]/20'
-            : 'border-ods-border hover:border-[var(--ods-system-greys-grey)]',
+            ? 'border-ods-open-yellow ring-2 ring-ods-open-yellow/20'
+            : 'border-ods-border hover:border-ods-text-secondary',
         )}
       >
         <img
@@ -430,7 +430,7 @@ export const MediaCarousel = memo(function MediaCarousel({
 
         {/* Active indicator */}
         {isActive && (
-          <div className="absolute bottom-1 right-1 w-2 h-2 bg-[var(--ods-open-yellow-base)] rounded-full" />
+          <div className="absolute bottom-1 right-1 w-2 h-2 bg-ods-open-yellow rounded-full" />
         )}
       </button>
     );
@@ -457,7 +457,7 @@ export const MediaCarousel = memo(function MediaCarousel({
       <div
         ref={carouselRef}
         className={cn(
-          'relative bg-[var(--ods-system-greys-background)] border border-ods-border rounded-2xl overflow-hidden group w-full',
+          'relative bg-ods-bg border border-ods-border rounded-2xl overflow-hidden group w-full',
           getAspectRatioClass(),
         )}
         onTouchStart={onTouchStart}

@@ -29,7 +29,7 @@ export function DeviceCardSkeleton({ className }: DeviceCardSkeletonProps) {
       {/* Row 1: Device icon + Device name + More button */}
       <div className="flex gap-4 items-center px-4 py-3">
         {/* Device type icon (8x8 container) */}
-        <div className="w-8 h-8 bg-[var(--ods-system-greys-background)] border border-ods-border rounded-[6px] flex items-center justify-center flex-shrink-0">
+        <div className="w-8 h-8 bg-ods-bg border border-ods-border rounded-[6px] flex items-center justify-center flex-shrink-0">
           <div className="w-4 h-4 bg-ods-border rounded animate-pulse" />
         </div>
 

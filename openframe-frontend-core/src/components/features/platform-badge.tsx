@@ -39,39 +39,39 @@ const sizeClasses = {
 
 const platformColors = {
   openmsp: {
-    bg: 'bg-[var(--ods-open-yellow-base)]/10',
-    border: 'border-[var(--ods-open-yellow-base)]/30',
-    text: 'text-[var(--ods-open-yellow-base)]',
+    bg: 'bg-ods-open-yellow/10',
+    border: 'border-ods-open-yellow/30',
+    text: 'text-ods-open-yellow',
   },
   flamingo: {
-    bg: 'bg-[var(--ods-flamingo-pink-base)]/10',
-    border: 'border-[var(--ods-flamingo-pink-base)]/30',
-    text: 'text-[var(--ods-flamingo-pink-base)]',
+    bg: 'bg-ods-flamingo-pink/10',
+    border: 'border-ods-flamingo-pink/30',
+    text: 'text-ods-flamingo-pink',
   },
   'flamingo-teaser': {
-    bg: 'bg-[var(--ods-flamingo-pink-base)]/10',
-    border: 'border-[var(--ods-flamingo-pink-base)]/30',
-    text: 'text-[var(--ods-flamingo-pink-base)]',
+    bg: 'bg-ods-flamingo-pink/10',
+    border: 'border-ods-flamingo-pink/30',
+    text: 'text-ods-flamingo-pink',
   },
   openframe: {
-    bg: 'bg-[var(--ods-flamingo-cyan-base)]/10',
-    border: 'border-[var(--ods-flamingo-cyan-base)]/30',
-    text: 'text-[var(--ods-flamingo-cyan-base)]',
+    bg: 'bg-ods-flamingo-cyan/10',
+    border: 'border-ods-flamingo-cyan/30',
+    text: 'text-ods-flamingo-cyan',
   },
   'admin-hub': {
-    bg: 'bg-[var(--color-link-visited)]/10',
-    border: 'border-[var(--color-link-visited)]/30',
-    text: 'text-[var(--color-link-visited)]',
+    bg: 'bg-ods-link-visited/10',
+    border: 'border-ods-link-visited/30',
+    text: 'text-ods-link-visited',
   },
   tmcg: {
-    bg: 'bg-[var(--ods-flamingo-pink-base)]/10',
-    border: 'border-[var(--ods-flamingo-pink-base)]/30',
-    text: 'text-[var(--ods-flamingo-pink-base)]',
+    bg: 'bg-ods-flamingo-pink/10',
+    border: 'border-ods-flamingo-pink/30',
+    text: 'text-ods-flamingo-pink',
   },
   universal: {
-    bg: 'bg-[var(--ods-system-greys-grey)]/10',
-    border: 'border-[var(--ods-system-greys-grey)]/30',
-    text: 'text-[var(--ods-system-greys-grey)]',
+    bg: 'bg-ods-text-secondary/10',
+    border: 'border-ods-text-secondary/30',
+    text: 'text-ods-text-secondary',
   },
 };
 

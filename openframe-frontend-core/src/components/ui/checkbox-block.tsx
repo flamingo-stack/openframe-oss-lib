@@ -26,12 +26,12 @@ const CheckboxBlock = React.forwardRef<React.ElementRef<typeof CheckboxPrimitive
         'flex items-center gap-3 rounded-[6px] border px-3 w-full',
         description ? 'h-16' : 'h-11 md:h-12',
         // Theme palette
-        'bg-[var(--ods-system-greys-black)] border-[var(--ods-system-greys-soft-grey)]',
+        'bg-ods-card border-ods-border',
         // Interactive states
         'cursor-pointer transition-colors duration-200',
         'hover:border-ods-accent/30',
         // Disabled state
-        disabled && 'opacity-50 cursor-not-allowed hover:border-[var(--ods-system-greys-soft-grey)]',
+        disabled && 'opacity-50 cursor-not-allowed hover:border-ods-border',
         className,
       )}
     >
@@ -46,18 +46,18 @@ const CheckboxBlock = React.forwardRef<React.ElementRef<typeof CheckboxPrimitive
           // Size
           'h-6 w-6 shrink-0',
           // Shape & border
-          'rounded-[6px] border-2 border-[var(--ods-system-greys-grey)]',
+          'rounded-[6px] border-2 border-ods-text-secondary',
           // Background
-          'bg-[var(--ods-system-greys-black)]',
+          'bg-ods-card',
           // Focus states
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ods-system-greys-black)]',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent focus-visible:ring-offset-2 focus-visible:ring-offset-ods-card',
           // Disabled state
           'disabled:cursor-not-allowed',
           // Checked state
           'data-[state=checked]:bg-ods-accent data-[state=checked]:border-ods-accent',
         )}
       >
-        <CheckboxPrimitive.Indicator className="flex items-center justify-center text-[var(--ods-system-greys-black)]">
+        <CheckboxPrimitive.Indicator className="flex items-center justify-center text-ods-card">
           <CheckIcon className="h-4 w-4" strokeWidth={3} />
         </CheckboxPrimitive.Indicator>
       </CheckboxPrimitive.Root>

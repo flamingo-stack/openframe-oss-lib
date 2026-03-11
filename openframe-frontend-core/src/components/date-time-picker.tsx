@@ -25,7 +25,7 @@ const inputClassName = cn(
   'disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation',
   // Admin theme colors
   'bg-ods-card border-ods-border text-ods-text-primary',
-  'placeholder:text-[var(--ods-system-greys-grey-action)] focus-visible:ring-[var(--ods-open-yellow-base)]',
+  'placeholder:text-ods-text-muted focus-visible:ring-ods-open-yellow',
   'md:text-sm text-base', // Mobile zoom prevention
 );
 

@@ -51,7 +51,7 @@ export const SelectButton = React.forwardRef<HTMLButtonElement, SelectButtonProp
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus',
           'disabled:pointer-events-none disabled:opacity-50',
           selected
-            ? 'bg-[var(--ods-open-yellow-light)] border-ods-accent hover:bg-[var(--ods-open-yellow-light-hover)] active:bg-[var(--ods-open-yellow-light-action)]'
+            ? 'bg-ods-open-yellow-light border-ods-accent hover:bg-ods-open-yellow-light-hover active:bg-ods-open-yellow-light-action'
             : 'bg-ods-card border-ods-border hover:bg-ods-bg-hover hover:border-ods-accent active:bg-ods-bg-active active:border-ods-accent',
           className,
         )}

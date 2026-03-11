@@ -102,7 +102,7 @@ export const Controlled: Story = {
             Controlled checkbox
           </label>
         </div>
-        <span className="text-xs text-[var(--ods-system-greys-grey)]">Checked: {checked ? 'true' : 'false'}</span>
+        <span className="text-xs text-ods-text-secondary">Checked: {checked ? 'true' : 'false'}</span>
       </div>
     );
   },

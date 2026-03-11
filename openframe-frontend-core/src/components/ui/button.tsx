@@ -58,16 +58,16 @@ const buttonVariants = cva(
         info: 'bg-ods-info text-ods-text-on-dark hover:bg-ods-info-hover active:bg-ods-info-active focus-visible:ring-2 focus-visible:ring-ods-focus disabled:bg-ods-disabled disabled:text-ods-text-disabled',
         // Flamingo primary variant - pink background with black text
         'flamingo-primary':
-          'bg-[var(--ods-flamingo-pink-base)] text-[var(--ods-system-greys-black)] hover:bg-[var(--ods-flamingo-pink-hover)] active:bg-[var(--ods-flamingo-pink-active)] focus-visible:ring-2 focus-visible:ring-ods-focus disabled:bg-ods-disabled disabled:text-ods-text-disabled',
+          'bg-ods-flamingo-pink text-ods-card hover:bg-ods-flamingo-pink-hover active:bg-ods-flamingo-pink-active focus-visible:ring-2 focus-visible:ring-ods-focus disabled:bg-ods-disabled disabled:text-ods-text-disabled',
         // Flamingo secondary variant - dark background with border
         'flamingo-secondary':
-          'bg-[var(--ods-system-greys-black)] border border-[var(--ods-system-greys-soft-grey)] text-[var(--ods-system-greys-white)] hover:border-[var(--ods-system-greys-grey)] hover:bg-[var(--ods-system-greys-dark-grey)] active:bg-[var(--ods-system-greys-grey)] focus-visible:ring-2 focus-visible:ring-ods-focus disabled:bg-ods-disabled disabled:text-ods-text-disabled',
+          'bg-ods-card border border-ods-border text-ods-text-primary hover:border-ods-text-secondary hover:bg-ods-bg-hover active:bg-ods-text-secondary focus-visible:ring-2 focus-visible:ring-ods-focus disabled:bg-ods-disabled disabled:text-ods-text-disabled',
         // Footer link variant - minimal spacing, left-aligned, no gap
         'footer-link':
           '!gap-0 !p-0 !h-auto bg-transparent text-ods-text-primary hover:text-ods-accent-primary transition-colors justify-start font-body font-medium !text-md md:!text-md leading-[1.33] mb-1',
         // Filter variant - for category/filter buttons in sidebars
         filter:
-          "w-full justify-start text-[16px] py-3 px-2 font-medium font-['DM_Sans'] rounded-lg h-12 transition-all duration-150 leading-[1.33em] bg-ods-card border border-ods-border hover:bg-[var(--ods-system-greys-background-action)] text-ods-text-primary text-left",
+          "w-full justify-start text-[16px] py-3 px-2 font-medium font-['DM_Sans'] rounded-lg h-12 transition-all duration-150 leading-[1.33em] bg-ods-card border border-ods-border hover:bg-ods-bg-secondary text-ods-text-primary text-left",
         'filter-active':
           "w-full justify-start text-[16px] py-3 px-2 font-medium font-['DM_Sans'] rounded-lg h-12 transition-all duration-150 leading-[1.33em] bg-ods-border border border-ods-border text-ods-text-primary text-left relative",
         // Section selector variant - for feature/section selection buttons

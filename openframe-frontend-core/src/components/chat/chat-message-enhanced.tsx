@@ -96,8 +96,8 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                 isUser
                   ? 'text-ods-text-secondary'
                   : assistantType === 'mingo'
-                    ? 'text-[var(--ods-flamingo-cyan-base)]'
-                    : 'text-[var(--ods-flamingo-pink-base)]',
+                    ? 'text-ods-flamingo-cyan'
+                    : 'text-ods-flamingo-pink',
               )}
             >
               {name || (isUser ? 'User' : assistantType === 'mingo' ? 'Mingo' : 'Fae')}:

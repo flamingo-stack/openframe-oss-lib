@@ -19,11 +19,11 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(({ className, type,
         // File input adjustments
         'ring-offset-background file:border-0 file:bg-transparent file:text-[14px] md:file:text-[18px] file:font-medium',
         // Focus & disabled states
-        'placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--ods-open-yellow-base)]/20 focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50',
+        'placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ods-open-yellow/20 focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50',
         // Animations & touch UX
         'transition-colors duration-200 touch-manipulation',
         // Admin theme palette (matches VendorSelector)
-        'bg-[var(--ods-system-greys-background)] border-ods-border text-ods-text-primary placeholder:text-ods-text-secondary hover:border-[var(--ods-open-yellow-base)]/30 focus:border-[var(--ods-open-yellow-base)]',
+        'bg-ods-bg border-ods-border text-ods-text-primary placeholder:text-ods-text-secondary hover:border-ods-open-yellow/30 focus:border-ods-open-yellow',
         // Ensure proper cursor/stacking
         'cursor-text relative z-10',
         invalid && 'border-red-500 focus-visible:ring-red-500',

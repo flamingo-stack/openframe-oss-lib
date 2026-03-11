@@ -11,19 +11,15 @@ export function TableEmptyState({ message = 'No data available', icon, action, c
     <div
       className={cn(
         'flex flex-col items-center justify-center py-12 px-4 rounded-[6px] bg-ods-card border border-ods-border',
-        className
+        className,
       )}
     >
       {/* Icon */}
-      <div className="mb-4 text-ods-text-secondary">
-        {icon || <FileX2 className="w-12 h-12" />}
-      </div>
-      
+      <div className="mb-4 text-ods-text-secondary">{icon || <FileX2 className="w-12 h-12" />}</div>
+
       {/* Message */}
-      <p className="text-h4 text-ods-text-secondary text-center mb-6">
-        {message}
-      </p>
-      
+      <p className="text-h4 text-ods-text-secondary text-center mb-6">{message}</p>
+
       {/* Action Button */}
       {action && (
         <Button

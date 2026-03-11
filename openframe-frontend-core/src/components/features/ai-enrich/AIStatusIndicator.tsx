@@ -26,8 +26,8 @@ const statusConfig = {
     label: 'Ready',
   },
   loading: {
-    color: 'text-[var(--ods-flamingo-cyan-base)]',
-    bgColor: 'bg-[var(--ods-flamingo-cyan-base)]/10',
+    color: 'text-ods-flamingo-cyan',
+    bgColor: 'bg-ods-flamingo-cyan/10',
     label: 'Processing...',
   },
   success: {

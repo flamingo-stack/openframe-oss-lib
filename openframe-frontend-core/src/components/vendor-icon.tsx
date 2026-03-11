@@ -38,9 +38,9 @@ const imageSizeMap = {
 };
 
 const backgroundClasses = {
-  dark: 'bg-[var(--ods-system-greys-background)] border border-ods-border',
+  dark: 'bg-ods-bg border border-ods-border',
   light: 'bg-ods-card border border-ods-border',
-  white: 'bg-white border border-[var(--color-border-default)]',
+  white: 'bg-white border border-ods-border',
 };
 
 /**
@@ -79,7 +79,7 @@ export function VendorIcon({
         <div
           className={cn(
             'flex items-center justify-center text-xs font-medium uppercase',
-            backgroundStyle === 'white' ? 'text-[var(--ods-system-greys-soft-grey)]' : 'text-ods-text-secondary',
+            backgroundStyle === 'white' ? 'text-ods-text-disabled' : 'text-ods-text-secondary',
           )}
         >
           {vendor.title?.substring(0, 2) || '??'}

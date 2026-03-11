@@ -27,7 +27,7 @@ const LogCard: React.FC<{
       <div
         className={cn(
           'box-border flex gap-3 items-start py-2 px-1 relative rounded w-full',
-          'hover:bg-[var(--ods-system-greys-background-action)]/50 transition-colors cursor-pointer',
+          'hover:bg-ods-bg-secondary/50 transition-colors cursor-pointer',
         )}
         onClick={onClick}
         role="button"
@@ -44,7 +44,7 @@ const LogCard: React.FC<{
         <div className="flex-1 min-w-0 space-y-1">
           <p className="font-['DM_Sans'] font-medium text-[14px] leading-5 text-white">{log.title}</p>
           <div className="flex items-center gap-2">
-            <p className="font-['Azeret_Mono'] font-normal text-[13px] leading-4 text-[var(--ods-system-greys-grey)] uppercase tracking-wider">
+            <p className="font-['Azeret_Mono'] font-normal text-[13px] leading-4 text-ods-text-secondary uppercase tracking-wider">
               {formatTimestamp(log.timestamp)}
             </p>
             {log.toolType && <ToolIcon toolType={log.toolType} size={16} />}
@@ -54,7 +54,7 @@ const LogCard: React.FC<{
 
       {showConnector && !isLast && (
         <div
-          className="absolute bg-[var(--ods-system-greys-soft-grey)] left-[15px] w-[2px]"
+          className="absolute bg-ods-bg-surface left-[15px] w-[2px]"
           style={{
             top: '28px',
             bottom: '-10px',
@@ -98,14 +98,14 @@ export const LogsList = React.forwardRef<HTMLDivElement, LogsListProps>(
         <div
           ref={ref}
           className={cn(
-            'bg-[var(--color-text-on-accent)] border border-[var(--ods-system-greys-background-action)] rounded-lg p-4',
+            'bg-ods-text-on-accent border border-ods-bg-secondary rounded-lg p-4',
             'flex items-center justify-center',
             getContainerClasses(),
             className,
           )}
           style={getContainerStyles()}
         >
-          <div className="text-[var(--ods-system-greys-grey-action)] text-sm font-['DM_Sans']">Loading logs...</div>
+          <div className="text-ods-text-muted text-sm font-['DM_Sans']">Loading logs...</div>
         </div>
       );
     }
@@ -115,14 +115,14 @@ export const LogsList = React.forwardRef<HTMLDivElement, LogsListProps>(
         <div
           ref={ref}
           className={cn(
-            'bg-[var(--color-text-on-accent)] border border-[var(--ods-system-greys-background-action)] rounded-lg p-4',
+            'bg-ods-text-on-accent border border-ods-bg-secondary rounded-lg p-4',
             'flex items-center justify-center',
             getContainerClasses(),
             className,
           )}
           style={getContainerStyles()}
         >
-          <div className="text-[var(--ods-system-greys-grey-action)] text-sm font-['DM_Sans']">{emptyMessage}</div>
+          <div className="text-ods-text-muted text-sm font-['DM_Sans']">{emptyMessage}</div>
         </div>
       );
     }

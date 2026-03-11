@@ -53,8 +53,8 @@ function FaqAccordionItem({
   return (
     <div
       className={cn(
-        'group transition-colors hover:bg-[var(--ods-system-greys-background-hover)]',
-        isOpen ? 'bg-[var(--ods-system-greys-background)]' : 'bg-transparent',
+        'group transition-colors hover:bg-ods-bg-secondary-hover',
+        isOpen ? 'bg-ods-bg' : 'bg-transparent',
       )}
     >
       {/* Header */}
@@ -83,7 +83,7 @@ function FaqAccordionItem({
           transition: 'max-height 0.35s ease-in-out, opacity 0.35s ease-in-out',
           opacity: isOpen ? 1 : 0,
         }}
-        className="overflow-hidden group-hover:bg-[var(--ods-system-greys-background-hover)]/30"
+        className="overflow-hidden group-hover:bg-ods-bg-secondary-hover/30"
       >
         <div ref={ref} className="px-6 md:px-8 pb-6 text-ods-text-primary text-h4">
           {item.answer}
@@ -106,7 +106,7 @@ export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) 
   };
 
   return (
-    <div className="rounded-3xl border border-ods-border divide-y divide-[var(--ods-system-greys-soft-grey)] bg-ods-card overflow-hidden">
+    <div className="rounded-3xl border border-ods-border divide-y divide-ods-divider bg-ods-card overflow-hidden">
       {items.map(item => (
         <FaqAccordionItem key={item.id} item={item} isOpen={openSet.has(item.id)} onToggle={toggle} />
       ))}

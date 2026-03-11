@@ -15,7 +15,7 @@ const MoreAboutButton: React.FC<MoreAboutButtonProps> = ({ href = '/openframe', 
     <Button
       size="lg"
       variant="ghost"
-      className={`text-[var(--ods-open-yellow-base)] flex-shrink-0 ${className}`}
+      className={`text-ods-open-yellow flex-shrink-0 ${className}`}
       rightIcon={<ArrowRight className="w-6 h-6" />}
       href={href}
       openInNewTab={!!href}

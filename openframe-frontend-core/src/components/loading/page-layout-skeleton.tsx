@@ -12,7 +12,7 @@ interface PageLayoutSkeletonProps {
  */
 export function AnnouncementBarSkeleton() {
   return (
-    <div className="bg-[var(--ods-system-greys-background-action)] relative w-full animate-pulse">
+    <div className="bg-ods-bg-secondary relative w-full animate-pulse">
       <div className="flex flex-row items-center relative w-full">
         <div className="box-border flex flex-row gap-4 md:gap-6 items-center justify-start pl-4 md:pl-6 pr-12 md:pr-16 py-3 md:py-4 relative w-full">
           {/* Logo skeleton */}
@@ -40,7 +40,7 @@ export function HeaderSkeleton() {
     <header className="sticky top-0 z-40 w-full flex items-center justify-between border-b border-ods-border bg-ods-card backdrop-blur-sm bg-ods-card/95 px-4 md:px-[80px] py-3 md:py-[12px] animate-pulse">
       {/* Left: Logo skeleton */}
       <div className="flex items-center justify-start flex-1 min-w-0">
-        <div className="w-[110px] h-[26px] md:w-[137px] md:h-8 bg-[var(--ods-system-greys-background-action)] rounded"></div>
+        <div className="w-[110px] h-[26px] md:w-[137px] md:h-8 bg-ods-bg-secondary rounded"></div>
       </div>
 
       {/* Center: Navigation skeleton - hidden on mobile, visible on desktop */}
@@ -298,7 +298,7 @@ export function ArticleLayoutSkeleton({ className }: PageLayoutSkeletonProps) {
  */
 export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProps) {
   return (
-    <main className={cn('bg-[var(--ods-system-greys-background)] min-h-screen', className)}>
+    <main className={cn('bg-ods-bg min-h-screen', className)}>
       <div className="max-w-[1920px] mx-auto px-6 md:px-20 py-6 md:py-10">
         {/* Breadcrumb */}
         <BreadcrumbSkeleton className="mb-6" />
@@ -316,15 +316,15 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
                 <div className="flex flex-col gap-3">
                   <div className="flex flex-col gap-2">
                     {/* Large title skeleton */}
-                    <div className="h-12 md:h-16 lg:h-20 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-80 max-w-full"></div>
+                    <div className="h-12 md:h-16 lg:h-20 bg-ods-bg-secondary rounded animate-pulse w-80 max-w-full"></div>
                     {/* Category text */}
-                    <div className="h-5 md:h-6 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-32"></div>
+                    <div className="h-5 md:h-6 bg-ods-bg-secondary rounded animate-pulse w-32"></div>
                   </div>
 
                   {/* Pricing tags */}
                   <div className="flex items-center gap-2">
-                    <div className="h-8 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-20"></div>
-                    <div className="h-8 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-16"></div>
+                    <div className="h-8 bg-ods-bg-secondary rounded animate-pulse w-20"></div>
+                    <div className="h-8 bg-ods-bg-secondary rounded animate-pulse w-16"></div>
                   </div>
                 </div>
               </div>
@@ -332,7 +332,7 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
               {/* Vendor Image Display Skeleton */}
               <div className="w-full h-[300px] md:h-[400px] lg:h-[500px] bg-ods-card border border-ods-border rounded-lg animate-pulse mb-2"></div>
               <div className="text-center">
-                <div className="h-4 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-24 mx-auto"></div>
+                <div className="h-4 bg-ods-bg-secondary rounded animate-pulse w-24 mx-auto"></div>
               </div>
             </div>
 
@@ -352,10 +352,10 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
                 <div className="border border-ods-border rounded-lg overflow-hidden">
                   {/* Header */}
                   <div className="bg-ods-card p-4 flex items-center gap-3">
-                    <div className="w-8 h-8 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse"></div>
+                    <div className="w-8 h-8 bg-ods-bg-secondary rounded animate-pulse"></div>
                     <div className="flex flex-col gap-1">
-                      <div className="h-4 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-20"></div>
-                      <div className="h-6 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-12"></div>
+                      <div className="h-4 bg-ods-bg-secondary rounded animate-pulse w-20"></div>
+                      <div className="h-6 bg-ods-bg-secondary rounded animate-pulse w-12"></div>
                     </div>
                   </div>
 
@@ -363,10 +363,10 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
                   <div className="p-4 space-y-3">
                     {Array.from({ length: 4 }).map((_, i) => (
                       <div key={i} className="flex items-center gap-3">
-                        <div className="w-6 h-6 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse"></div>
+                        <div className="w-6 h-6 bg-ods-bg-secondary rounded animate-pulse"></div>
                         <div className="flex items-end gap-1">
-                          <div className="h-4 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-12"></div>
-                          <div className="h-3 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-8"></div>
+                          <div className="h-4 bg-ods-bg-secondary rounded animate-pulse w-12"></div>
+                          <div className="h-3 bg-ods-bg-secondary rounded animate-pulse w-8"></div>
                         </div>
                       </div>
                     ))}
@@ -384,11 +384,11 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
 
             {/* Alternatives Container */}
             <div className="flex flex-col gap-6 mb-20">
-              <div className="h-8 md:h-10 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-48"></div>
+              <div className="h-8 md:h-10 bg-ods-bg-secondary rounded animate-pulse w-48"></div>
 
               {/* Open Source Alternatives */}
               <div className="flex flex-col gap-4">
-                <div className="h-5 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-48"></div>
+                <div className="h-5 bg-ods-bg-secondary rounded animate-pulse w-48"></div>
                 <div className="flex flex-wrap gap-2">
                   {Array.from({ length: 6 }).map((_, i) => (
                     <div
@@ -401,7 +401,7 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
 
               {/* Commercial Alternatives */}
               <div className="flex flex-col gap-4">
-                <div className="h-5 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-52"></div>
+                <div className="h-5 bg-ods-bg-secondary rounded animate-pulse w-52"></div>
                 <div className="flex flex-wrap gap-2">
                   {Array.from({ length: 4 }).map((_, i) => (
                     <div
@@ -415,28 +415,28 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
 
             {/* About Section */}
             <div className="flex flex-col gap-6 mb-20">
-              <div className="h-8 md:h-10 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-64"></div>
+              <div className="h-8 md:h-10 bg-ods-bg-secondary rounded animate-pulse w-64"></div>
 
               <div className="bg-ods-card border border-ods-border rounded-lg p-6 md:p-8">
                 <div className="space-y-4">
-                  <div className="h-6 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse"></div>
-                  <div className="h-6 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse"></div>
-                  <div className="h-6 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-5/6"></div>
-                  <div className="h-6 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-4/5"></div>
+                  <div className="h-6 bg-ods-bg-secondary rounded animate-pulse"></div>
+                  <div className="h-6 bg-ods-bg-secondary rounded animate-pulse"></div>
+                  <div className="h-6 bg-ods-bg-secondary rounded animate-pulse w-5/6"></div>
+                  <div className="h-6 bg-ods-bg-secondary rounded animate-pulse w-4/5"></div>
                 </div>
               </div>
             </div>
 
             {/* Key Features Section */}
             <div className="flex flex-col gap-6 mb-20">
-              <div className="h-8 md:h-10 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-72"></div>
+              <div className="h-8 md:h-10 bg-ods-bg-secondary rounded animate-pulse w-72"></div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <div key={i} className="bg-ods-card border border-ods-border rounded-lg p-4 flex gap-4">
-                    <div className="w-12 h-12 bg-[var(--ods-system-greys-background-action)] rounded flex-shrink-0 animate-pulse"></div>
+                    <div className="w-12 h-12 bg-ods-bg-secondary rounded flex-shrink-0 animate-pulse"></div>
                     <div className="flex-1 space-y-2">
-                      <div className="h-5 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-3/4"></div>
-                      <div className="h-4 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse"></div>
+                      <div className="h-5 bg-ods-bg-secondary rounded animate-pulse w-3/4"></div>
+                      <div className="h-4 bg-ods-bg-secondary rounded animate-pulse"></div>
                     </div>
                   </div>
                 ))}
@@ -445,30 +445,30 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
 
             {/* Pros and Cons Section */}
             <div className="flex flex-col gap-6 mb-20">
-              <div className="h-8 md:h-10 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-80"></div>
+              <div className="h-8 md:h-10 bg-ods-bg-secondary rounded animate-pulse w-80"></div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Pros Column */}
                 <div className="flex flex-col gap-6">
-                  <div className="h-5 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-16"></div>
+                  <div className="h-5 bg-ods-bg-secondary rounded animate-pulse w-16"></div>
                   {Array.from({ length: 3 }).map((_, i) => (
                     <div key={i} className="bg-ods-card border border-ods-border rounded-lg p-4 flex gap-3">
-                      <div className="w-12 h-12 bg-[var(--ods-system-greys-background)] border border-ods-border rounded flex-shrink-0 animate-pulse"></div>
+                      <div className="w-12 h-12 bg-ods-bg border border-ods-border rounded flex-shrink-0 animate-pulse"></div>
                       <div className="flex-1 space-y-2">
-                        <div className="h-5 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-2/3"></div>
-                        <div className="h-4 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse"></div>
+                        <div className="h-5 bg-ods-bg-secondary rounded animate-pulse w-2/3"></div>
+                        <div className="h-4 bg-ods-bg-secondary rounded animate-pulse"></div>
                       </div>
                     </div>
                   ))}
                 </div>
                 {/* Cons Column */}
                 <div className="flex flex-col gap-6">
-                  <div className="h-5 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-16"></div>
+                  <div className="h-5 bg-ods-bg-secondary rounded animate-pulse w-16"></div>
                   {Array.from({ length: 3 }).map((_, i) => (
                     <div key={i} className="bg-ods-card border border-ods-border rounded-lg p-4 flex gap-3">
-                      <div className="w-12 h-12 bg-[var(--ods-system-greys-background)] border border-ods-border rounded flex-shrink-0 animate-pulse"></div>
+                      <div className="w-12 h-12 bg-ods-bg border border-ods-border rounded flex-shrink-0 animate-pulse"></div>
                       <div className="flex-1 space-y-2">
-                        <div className="h-5 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-2/3"></div>
-                        <div className="h-4 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse"></div>
+                        <div className="h-5 bg-ods-bg-secondary rounded animate-pulse w-2/3"></div>
+                        <div className="h-4 bg-ods-bg-secondary rounded animate-pulse"></div>
                       </div>
                     </div>
                   ))}
@@ -478,67 +478,67 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
 
             {/* Alternatives Section */}
             <div className="flex flex-col gap-6 mb-20">
-              <div className="h-8 md:h-10 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-72"></div>
+              <div className="h-8 md:h-10 bg-ods-bg-secondary rounded animate-pulse w-72"></div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <div key={i} className="bg-ods-card border border-ods-border rounded-lg p-6 space-y-4">
                     {/* Header */}
                     <div className="flex items-start gap-4">
-                      <div className="w-16 h-16 bg-[var(--ods-system-greys-background)] border border-ods-border rounded-lg animate-pulse flex-shrink-0"></div>
+                      <div className="w-16 h-16 bg-ods-bg border border-ods-border rounded-lg animate-pulse flex-shrink-0"></div>
                       <div className="flex-1 space-y-2">
-                        <div className="h-6 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-3/4"></div>
-                        <div className="h-4 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-1/2"></div>
+                        <div className="h-6 bg-ods-bg-secondary rounded animate-pulse w-3/4"></div>
+                        <div className="h-4 bg-ods-bg-secondary rounded animate-pulse w-1/2"></div>
                       </div>
-                      <div className="h-6 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-20"></div>
+                      <div className="h-6 bg-ods-bg-secondary rounded animate-pulse w-20"></div>
                     </div>
 
                     {/* Description */}
                     <div className="space-y-2">
-                      <div className="h-4 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse"></div>
-                      <div className="h-4 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-5/6"></div>
-                      <div className="h-4 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-4/5"></div>
+                      <div className="h-4 bg-ods-bg-secondary rounded animate-pulse"></div>
+                      <div className="h-4 bg-ods-bg-secondary rounded animate-pulse w-5/6"></div>
+                      <div className="h-4 bg-ods-bg-secondary rounded animate-pulse w-4/5"></div>
                     </div>
 
                     {/* Footer */}
                     <div className="flex items-center justify-between pt-2 border-t border-ods-border">
-                      <div className="h-4 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-16"></div>
-                      <div className="h-4 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-20"></div>
+                      <div className="h-4 bg-ods-bg-secondary rounded animate-pulse w-16"></div>
+                      <div className="h-4 bg-ods-bg-secondary rounded animate-pulse w-20"></div>
                     </div>
                   </div>
                 ))}
               </div>
               {/* Show All Button */}
-              <div className="h-12 bg-[var(--ods-system-greys-background-action)] rounded-md animate-pulse"></div>
+              <div className="h-12 bg-ods-bg-secondary rounded-md animate-pulse"></div>
             </div>
 
             {/* Comments Section */}
             <div className="flex flex-col gap-6 mb-20">
-              <div className="h-8 md:h-10 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-64"></div>
+              <div className="h-8 md:h-10 bg-ods-bg-secondary rounded animate-pulse w-64"></div>
 
               {/* Comment Form Skeleton */}
               <div className="space-y-3">
                 <div className="flex gap-3">
-                  <div className="flex-1 bg-[var(--ods-system-greys-background)] border border-ods-border rounded-lg overflow-hidden">
+                  <div className="flex-1 bg-ods-bg border border-ods-border rounded-lg overflow-hidden">
                     {/* Title Section */}
                     <div className="border-b border-ods-border p-3">
-                      <div className="h-3 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-8 mb-2"></div>
-                      <div className="h-6 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-full"></div>
+                      <div className="h-3 bg-ods-bg-secondary rounded animate-pulse w-8 mb-2"></div>
+                      <div className="h-6 bg-ods-bg-secondary rounded animate-pulse w-full"></div>
                     </div>
 
                     {/* Description Section */}
                     <div className="p-3">
-                      <div className="h-3 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-16 mb-2"></div>
+                      <div className="h-3 bg-ods-bg-secondary rounded animate-pulse w-16 mb-2"></div>
                       <div className="space-y-2">
-                        <div className="h-4 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-full"></div>
-                        <div className="h-4 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-3/4"></div>
-                        <div className="h-4 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-1/2"></div>
+                        <div className="h-4 bg-ods-bg-secondary rounded animate-pulse w-full"></div>
+                        <div className="h-4 bg-ods-bg-secondary rounded animate-pulse w-3/4"></div>
+                        <div className="h-4 bg-ods-bg-secondary rounded animate-pulse w-1/2"></div>
                       </div>
                     </div>
                   </div>
 
                   {/* Send Button */}
                   <div className="flex items-stretch">
-                    <div className="h-[120px] w-20 bg-[var(--ods-system-greys-background-action)] rounded-lg animate-pulse"></div>
+                    <div className="h-[120px] w-20 bg-ods-bg-secondary rounded-lg animate-pulse"></div>
                   </div>
                 </div>
               </div>
@@ -552,22 +552,22 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
                       <div className="flex items-center gap-2">
                         {/* User Info */}
                         <div className="flex items-center gap-2 bg-ods-card border border-ods-border rounded-lg py-2 px-3">
-                          <div className="w-8 h-8 bg-[var(--ods-system-greys-background-action)] rounded-lg animate-pulse"></div>
-                          <div className="h-4 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-20"></div>
+                          <div className="w-8 h-8 bg-ods-bg-secondary rounded-lg animate-pulse"></div>
+                          <div className="h-4 bg-ods-bg-secondary rounded animate-pulse w-20"></div>
                         </div>
 
                         {/* Timestamp */}
-                        <div className="h-4 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-12"></div>
+                        <div className="h-4 bg-ods-bg-secondary rounded animate-pulse w-12"></div>
                       </div>
                     </div>
 
                     {/* Comment Content */}
                     <div className="space-y-2">
-                      <div className="h-6 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-2/3"></div>
+                      <div className="h-6 bg-ods-bg-secondary rounded animate-pulse w-2/3"></div>
                       <div className="space-y-1">
-                        <div className="h-4 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-full"></div>
-                        <div className="h-4 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-4/5"></div>
-                        <div className="h-4 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-3/5"></div>
+                        <div className="h-4 bg-ods-bg-secondary rounded animate-pulse w-full"></div>
+                        <div className="h-4 bg-ods-bg-secondary rounded animate-pulse w-4/5"></div>
+                        <div className="h-4 bg-ods-bg-secondary rounded animate-pulse w-3/5"></div>
                       </div>
                     </div>
                   </div>
@@ -592,10 +592,10 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
               <div className="border border-ods-border rounded-lg overflow-hidden">
                 {/* Header */}
                 <div className="bg-ods-card p-4 flex items-center gap-3">
-                  <div className="w-8 h-8 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse"></div>
+                  <div className="w-8 h-8 bg-ods-bg-secondary rounded animate-pulse"></div>
                   <div className="flex flex-col gap-1">
-                    <div className="h-4 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-20"></div>
-                    <div className="h-6 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-12"></div>
+                    <div className="h-4 bg-ods-bg-secondary rounded animate-pulse w-20"></div>
+                    <div className="h-6 bg-ods-bg-secondary rounded animate-pulse w-12"></div>
                   </div>
                 </div>
 
@@ -603,10 +603,10 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
                 <div className="p-4 space-y-3">
                   {Array.from({ length: 4 }).map((_, i) => (
                     <div key={i} className="flex items-center gap-3">
-                      <div className="w-6 h-6 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse"></div>
+                      <div className="w-6 h-6 bg-ods-bg-secondary rounded animate-pulse"></div>
                       <div className="flex items-end gap-1">
-                        <div className="h-4 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-12"></div>
-                        <div className="h-3 bg-[var(--ods-system-greys-background-action)] rounded animate-pulse w-8"></div>
+                        <div className="h-4 bg-ods-bg-secondary rounded animate-pulse w-12"></div>
+                        <div className="h-3 bg-ods-bg-secondary rounded animate-pulse w-8"></div>
                       </div>
                     </div>
                   ))}
@@ -687,39 +687,39 @@ export function VendorGridSkeleton({ className }: PageLayoutSkeletonProps) {
 export function SlackCommunitySkeleton() {
   return (
     <section
-      className="w-full bg-[var(--ods-system-greys-background)] px-4 md:px-20 lg:px-20 py-12 md:py-20"
+      className="w-full bg-ods-bg px-4 md:px-20 lg:px-20 py-12 md:py-20"
       aria-label="Slack Community Loading"
     >
       {/* Frame 651 Container */}
       <div className="w-full flex flex-col gap-4 md:gap-6">
         {/* Title Skeleton */}
         <div className="w-full">
-          <div className="h-8 md:h-12 lg:h-14 bg-[var(--ods-system-greys-background-action)] rounded-lg animate-pulse max-w-md"></div>
+          <div className="h-8 md:h-12 lg:h-14 bg-ods-bg-secondary rounded-lg animate-pulse max-w-md"></div>
         </div>
 
         {/* Content Area - Channel List + Chat Interface */}
         <div className="w-full flex flex-col lg:flex-row lg:justify-end lg:items-start gap-4 md:gap-6 min-w-0">
           {/* Channel List Skeleton */}
-          <div className="w-full lg:w-[290px] lg:max-w-[290px] bg-[var(--ods-system-greys-background)] border border-ods-border rounded flex flex-col flex-shrink-0 overflow-hidden animate-pulse">
+          <div className="w-full lg:w-[290px] lg:max-w-[290px] bg-ods-bg border border-ods-border rounded flex flex-col flex-shrink-0 overflow-hidden animate-pulse">
             <div className="p-4 space-y-4">
               {/* Header */}
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
-                  <div className="h-4 bg-[var(--ods-system-greys-background-action)] rounded w-24"></div>
-                  <div className="h-3 bg-[var(--ods-system-greys-background-action)] rounded w-16"></div>
+                  <div className="h-4 bg-ods-bg-secondary rounded w-24"></div>
+                  <div className="h-3 bg-ods-bg-secondary rounded w-16"></div>
                 </div>
-                <div className="h-3 bg-[var(--ods-system-greys-background-action)] rounded w-32"></div>
+                <div className="h-3 bg-ods-bg-secondary rounded w-32"></div>
               </div>
 
               {/* Channels */}
               <div className="flex flex-col gap-1">
-                <div className="h-3 bg-[var(--ods-system-greys-background-action)] rounded w-16 mb-2"></div>
+                <div className="h-3 bg-ods-bg-secondary rounded w-16 mb-2"></div>
                 {Array.from({ length: 5 }).map((_, i) => (
                   <div key={i} className="flex items-center gap-2 px-2 py-3 min-h-[48px]">
-                    <div className="w-4 h-4 bg-[var(--ods-system-greys-background-action)] rounded"></div>
+                    <div className="w-4 h-4 bg-ods-bg-secondary rounded"></div>
                     <div className="flex-1">
-                      <div className="h-3 bg-[var(--ods-system-greys-background-action)] rounded w-24 mb-1"></div>
-                      <div className="h-2 bg-[var(--ods-system-greys-background-action)] rounded w-16"></div>
+                      <div className="h-3 bg-ods-bg-secondary rounded w-24 mb-1"></div>
+                      <div className="h-2 bg-ods-bg-secondary rounded w-16"></div>
                     </div>
                   </div>
                 ))}
@@ -729,12 +729,12 @@ export function SlackCommunitySkeleton() {
               <div className="border-t border-ods-border pt-3 mt-2">
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <div className="h-3 bg-[var(--ods-system-greys-background-action)] rounded w-16"></div>
-                    <div className="h-3 bg-[var(--ods-system-greys-background-action)] rounded w-8"></div>
+                    <div className="h-3 bg-ods-bg-secondary rounded w-16"></div>
+                    <div className="h-3 bg-ods-bg-secondary rounded w-8"></div>
                   </div>
                   <div className="flex justify-between">
-                    <div className="h-3 bg-[var(--ods-system-greys-background-action)] rounded w-20"></div>
-                    <div className="h-3 bg-[var(--ods-system-greys-background-action)] rounded w-8"></div>
+                    <div className="h-3 bg-ods-bg-secondary rounded w-20"></div>
+                    <div className="h-3 bg-ods-bg-secondary rounded w-8"></div>
                   </div>
                 </div>
               </div>
@@ -744,25 +744,25 @@ export function SlackCommunitySkeleton() {
           {/* Chat Interface Skeleton */}
           <div className="flex-1 min-h-[450px] h-[450px] md:min-h-[500px] md:h-[500px] lg:min-h-[600px] lg:h-[600px] bg-ods-card border border-ods-border rounded-lg flex flex-col min-w-0 animate-pulse">
             {/* Header */}
-            <div className="flex items-center justify-between p-4 md:p-6 border-b border-ods-border bg-[var(--ods-system-greys-background)] h-[56px] md:h-[60px] flex-shrink-0">
+            <div className="flex items-center justify-between p-4 md:p-6 border-b border-ods-border bg-ods-bg h-[56px] md:h-[60px] flex-shrink-0">
               <div className="flex items-center gap-2">
-                <div className="h-3 md:h-4 bg-[var(--ods-system-greys-background-action)] rounded w-3 md:w-4"></div>
-                <div className="h-3 md:h-4 bg-[var(--ods-system-greys-background-action)] rounded w-24 md:w-32"></div>
+                <div className="h-3 md:h-4 bg-ods-bg-secondary rounded w-3 md:w-4"></div>
+                <div className="h-3 md:h-4 bg-ods-bg-secondary rounded w-24 md:w-32"></div>
               </div>
-              <div className="h-3 bg-[var(--ods-system-greys-background-action)] rounded w-12 md:w-16"></div>
+              <div className="h-3 bg-ods-bg-secondary rounded w-12 md:w-16"></div>
             </div>
 
             {/* Messages */}
-            <div className="flex-1 bg-[var(--ods-system-greys-background)] p-4 md:p-6 space-y-3 md:space-y-4 overflow-hidden min-h-[280px] md:min-h-[320px] lg:min-h-[420px]">
+            <div className="flex-1 bg-ods-bg p-4 md:p-6 space-y-3 md:space-y-4 overflow-hidden min-h-[280px] md:min-h-[320px] lg:min-h-[420px]">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="flex gap-2 md:gap-3">
-                  <div className="w-10 h-10 md:w-12 md:h-12 bg-[var(--ods-system-greys-background-action)] rounded-lg flex-shrink-0"></div>
+                  <div className="w-10 h-10 md:w-12 md:h-12 bg-ods-bg-secondary rounded-lg flex-shrink-0"></div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <div className="h-3 bg-[var(--ods-system-greys-background-action)] rounded w-16 md:w-20"></div>
-                      <div className="h-3 bg-[var(--ods-system-greys-background-action)] rounded w-12 md:w-16"></div>
+                      <div className="h-3 bg-ods-bg-secondary rounded w-16 md:w-20"></div>
+                      <div className="h-3 bg-ods-bg-secondary rounded w-12 md:w-16"></div>
                     </div>
-                    <div className="h-3 md:h-4 bg-[var(--ods-system-greys-background-action)] rounded w-full"></div>
+                    <div className="h-3 md:h-4 bg-ods-bg-secondary rounded w-full"></div>
                   </div>
                 </div>
               ))}
@@ -771,7 +771,7 @@ export function SlackCommunitySkeleton() {
             {/* Input Area */}
             <div className="p-4 md:p-6 border-t border-ods-border bg-ods-card h-[72px] md:h-[80px] flex-shrink-0">
               <div className="flex items-end gap-3 justify-center md:justify-end">
-                <div className="h-10 md:h-12 bg-[var(--ods-system-greys-background-action)] rounded-lg w-28 md:w-32"></div>
+                <div className="h-10 md:h-12 bg-ods-bg-secondary rounded-lg w-28 md:w-32"></div>
               </div>
             </div>
           </div>

@@ -145,10 +145,10 @@ export function AnnouncementBar() {
           {renderIcon()}
 
           <div className="flex-1 min-w-0 max-w-full">
-            <p className="font-body font-bold text-[14px] md:text-[18px] leading-tight tracking-tight mb-0 text-[var(--color-text-on-accent)] truncate">
+            <p className="font-body font-bold text-[14px] md:text-[18px] leading-tight tracking-tight mb-0 text-ods-text-on-accent truncate">
               {announcement.title}
             </p>
-            <p className="font-body text-[12px] md:text-[18px] leading-tight hidden md:block text-[var(--color-text-on-accent)] truncate">
+            <p className="font-body text-[12px] md:text-[18px] leading-tight hidden md:block text-ods-text-on-accent truncate">
               {announcement.description}
             </p>
           </div>
@@ -184,11 +184,11 @@ export function AnnouncementBar() {
             e.stopPropagation(); // Prevent triggering the mobile CTA click
             handleDismiss();
           }}
-          className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center hover:bg-[var(--color-text-on-accent)]/10 focus:outline-none focus:ring-2 focus:ring-[var(--color-text-on-accent)] mr-2 md:mr-4"
+          className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center hover:bg-ods-text-on-accent/10 focus:outline-none focus:ring-2 focus:ring-ods-text-on-accent mr-2 md:mr-4"
           aria-label="Dismiss announcement"
           type="button"
         >
-          <X className="w-4 h-4 text-[var(--color-text-on-accent)]" strokeWidth={2} />
+          <X className="w-4 h-4 text-ods-text-on-accent" strokeWidth={2} />
         </button>
       </div>
     </div>

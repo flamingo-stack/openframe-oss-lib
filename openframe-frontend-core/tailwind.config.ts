@@ -116,6 +116,12 @@ const config: Config = {
           'bg-hover': 'var(--color-bg-hover)',
           'bg-active': 'var(--color-bg-active)',
           'bg-surface': 'var(--color-bg-surface)',
+          'bg-surface-hover': 'var(--ods-system-greys-soft-grey-hover)',
+          'bg-surface-active': 'var(--ods-system-greys-soft-grey-action)',
+          'bg-secondary': 'var(--ods-system-greys-background-action)',
+          'bg-secondary-hover': 'var(--ods-system-greys-background-hover)',
+          'bg-inverted': 'var(--color-bg-inverted)',
+          'bg-backdrop': 'var(--color-bg-backdrop)',
           'card-hover': 'var(--color-bg-hover)',
           divider: 'var(--color-divider)',
 
@@ -125,6 +131,8 @@ const config: Config = {
             hover: 'var(--color-border-hover)',
             active: 'var(--color-border-active)',
             focus: 'var(--color-border-focus)',
+            subtle: 'var(--color-border-subtle)',
+            strong: 'var(--color-border-strong)',
           },
 
           // Text
@@ -137,6 +145,8 @@ const config: Config = {
             disabled: 'var(--color-text-disabled)',
             'on-accent': 'var(--color-text-on-accent)',
             'on-dark': 'var(--color-text-on-dark)',
+            inverted: 'var(--color-text-inverted)',
+            placeholder: 'var(--color-text-placeholder)',
           },
 
           // Accent
@@ -193,6 +203,44 @@ const config: Config = {
 
           // Adaptive platform color
           current: 'var(--ods-current)',
+
+          // Brand: Flamingo Pink (platform-specific)
+          'flamingo-pink': {
+            DEFAULT: 'var(--ods-flamingo-pink-base)',
+            hover: 'var(--ods-flamingo-pink-hover)',
+            active: 'var(--ods-flamingo-pink-action)',
+            secondary: 'var(--ods-flamingo-pink-secondary)',
+          },
+
+          // Brand: Flamingo Cyan extended
+          'flamingo-cyan': {
+            DEFAULT: 'var(--ods-flamingo-cyan-base)',
+            hover: 'var(--ods-flamingo-cyan-hover)',
+            active: 'var(--ods-flamingo-cyan-action)',
+            secondary: 'var(--ods-flamingo-cyan-secondary)',
+          },
+
+          // Brand: Open Yellow extended variants
+          'open-yellow': {
+            DEFAULT: 'var(--ods-open-yellow-base)',
+            hover: 'var(--ods-open-yellow-hover)',
+            active: 'var(--ods-open-yellow-action)',
+            light: 'var(--ods-open-yellow-light)',
+            'light-hover': 'var(--ods-open-yellow-light-hover)',
+            'light-action': 'var(--ods-open-yellow-light-action)',
+            dark: 'var(--ods-open-yellow-dark)',
+            secondary: 'var(--ods-open-yellow-secondary)',
+            'secondary-action': 'var(--ods-open-yellow-secondary-action)',
+          },
+
+          // Social platform brand colors
+          social: {
+            slack: 'var(--social-slack)',
+            linkedin: 'var(--social-linkedin)',
+            facebook: 'var(--social-facebook)',
+            youtube: 'var(--social-youtube)',
+            twitter: 'var(--social-twitter)',
+          },
         },
       },
       // Custom breakpoints (aligned with ODS responsive tokens from Figma)

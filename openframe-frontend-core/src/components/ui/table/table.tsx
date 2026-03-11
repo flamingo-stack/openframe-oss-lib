@@ -1,15 +1,15 @@
-'use client'
+'use client';
 
-import { type ReactNode, useEffect, useRef } from 'react'
-import { cn } from '../../../utils/cn'
-import { Pagination } from '../../pagination'
-import { Button } from '../button'
-import { CursorPagination } from '../cursor-pagination'
-import { TableEmptyState } from './table-empty-state'
-import { TableHeader } from './table-header'
-import { TableRow } from './table-row'
-import { ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE, TableCardSkeleton } from './table-skeleton'
-import type { RowAction, TableColumn, TableProps } from './types'
+import { type ReactNode, useEffect, useRef } from 'react';
+import { cn } from '../../../utils/cn';
+import { Pagination } from '../../pagination';
+import { Button } from '../button';
+import { CursorPagination } from '../cursor-pagination';
+import { TableEmptyState } from './table-empty-state';
+import { TableHeader } from './table-header';
+import { TableRow } from './table-row';
+import { ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE, TableCardSkeleton } from './table-skeleton';
+import type { RowAction, TableColumn, TableProps } from './types';
 
 /**
  * Injects a synthetic actions column into the columns array when row actions exist
@@ -134,26 +134,26 @@ export function Table<T = any>({
   const someSelected = selectedRows.length > 0 && selectedRows.length < data.length;
 
   // Infinite scroll: IntersectionObserver on sentinel div
-  const sentinelRef = useRef<HTMLDivElement>(null)
-  const onLoadMoreRef = useRef(infiniteScroll?.onLoadMore)
-  onLoadMoreRef.current = infiniteScroll?.onLoadMore
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const onLoadMoreRef = useRef(infiniteScroll?.onLoadMore);
+  onLoadMoreRef.current = infiniteScroll?.onLoadMore;
 
   useEffect(() => {
-    if (!infiniteScroll?.hasNextPage || infiniteScroll.isFetchingNextPage) return
-    const sentinel = sentinelRef.current
-    if (!sentinel) return
+    if (!infiniteScroll?.hasNextPage || infiniteScroll.isFetchingNextPage) return;
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
 
     const observer = new IntersectionObserver(
-      (entries) => {
+      entries => {
         if (entries[0]?.isIntersecting) {
-          onLoadMoreRef.current?.()
+          onLoadMoreRef.current?.();
         }
       },
       { rootMargin: '200px' },
-    )
-    observer.observe(sentinel)
-    return () => observer.disconnect()
-  }, [infiniteScroll?.hasNextPage, infiniteScroll?.isFetchingNextPage])
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [infiniteScroll?.hasNextPage, infiniteScroll?.isFetchingNextPage]);
 
   return (
     <div className={cn('flex flex-col gap-1 w-full', containerClassName)}>
@@ -170,9 +170,9 @@ export function Table<T = any>({
                 onClick={() => action.onClick(selectedRows)}
                 disabled={action.requiresSelection && selectedRows.length === 0}
                 className={cn(
-                  "px-3 py-1.5 text-sm rounded border transition-colors",
-                  "bg-ods-card border-ods-border hover:bg-ods-bg-active text-ods-text-primary",
-                  action.className
+                  'px-3 py-1.5 text-sm rounded border transition-colors',
+                  'bg-ods-card border-ods-border hover:bg-ods-bg-active text-ods-text-primary',
+                  action.className,
                 )}
               >
                 {action.icon}
@@ -235,22 +235,21 @@ export function Table<T = any>({
               />
             )}
             {/* Infinite scroll: sentinel element */}
-            {infiniteScroll?.hasNextPage && (
-              <div ref={sentinelRef} className="h-1" aria-hidden="true" />
-            )}
+            {infiniteScroll?.hasNextPage && <div ref={sentinelRef} className="h-1" aria-hidden="true" />}
             {/* Invisible placeholder rows to maintain consistent table height (disabled for infinite scroll) */}
-            {!infiniteScroll && Array.from({ length: Math.max(0, skeletonRows - data.length) }).map((_, index) => (
-              <div
-                key={`placeholder-${index}`}
-                className="relative rounded-[6px] overflow-hidden pointer-events-none"
-                aria-hidden="true"
-              >
-                {/* Desktop placeholder - invisible but takes up space */}
-                <div className={cn('hidden md:flex items-center gap-4 px-4 py-0', ROW_HEIGHT_DESKTOP)} />
-                {/* Mobile placeholder - invisible but takes up space */}
-                <div className={cn('flex md:hidden gap-3 items-center justify-start px-3 py-0', ROW_HEIGHT_MOBILE)} />
-              </div>
-            ))}
+            {!infiniteScroll &&
+              Array.from({ length: Math.max(0, skeletonRows - data.length) }).map((_, index) => (
+                <div
+                  key={`placeholder-${index}`}
+                  className="relative rounded-[6px] overflow-hidden pointer-events-none"
+                  aria-hidden="true"
+                >
+                  {/* Desktop placeholder - invisible but takes up space */}
+                  <div className={cn('hidden md:flex items-center gap-4 px-4 py-0', ROW_HEIGHT_DESKTOP)} />
+                  {/* Mobile placeholder - invisible but takes up space */}
+                  <div className={cn('flex md:hidden gap-3 items-center justify-start px-3 py-0', ROW_HEIGHT_MOBILE)} />
+                </div>
+              ))}
           </>
         )}
       </div>
@@ -274,18 +273,12 @@ export function Table<T = any>({
           compact={cursorPagination.compact}
           resetButtonLabel={cursorPagination.resetButtonLabel}
           resetButtonIcon={cursorPagination.resetButtonIcon}
-          className={cn(
-            'border-t border-ods-border pt-3 mt-2',
-            paginationClassName
-          )}
+          className={cn('border-t border-ods-border pt-3 mt-2', paginationClassName)}
         />
       )}
 
       {!infiniteScroll && pagePagination && !cursorPagination && data.length > 0 && (
-        <div className={cn(
-          'border-t border-ods-border pt-3 mt-2',
-          paginationClassName
-        )}>
+        <div className={cn('border-t border-ods-border pt-3 mt-2', paginationClassName)}>
           <Pagination
             currentPage={pagePagination.currentPage}
             totalPages={pagePagination.totalPages}

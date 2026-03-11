@@ -176,7 +176,7 @@ function DatePickerCalendar({
       hasCompleteRange ? '!rounded-r-[6px] !rounded-l-none' : '!rounded-[6px]',
     ),
     range_middle:
-      'range-middle !bg-[var(--ods-open-yellow-light)] !text-ods-card !font-medium !rounded-none hover:!bg-[var(--ods-open-yellow-light)]',
+      'range-middle !bg-ods-open-yellow-light !text-ods-card !font-medium !rounded-none hover:!bg-ods-open-yellow-light',
   };
 
   const [month, setMonth] = React.useState<Date>(

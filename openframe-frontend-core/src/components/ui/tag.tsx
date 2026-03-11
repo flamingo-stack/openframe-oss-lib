@@ -11,33 +11,33 @@ const tagVariants = cva(
     variants: {
       variant: {
         primary: [
-          'bg-[var(--ods-open-yellow-base)] text-[var(--ods-system-greys-black)]',
-          'hover:bg-[var(--ods-open-yellow-hover)] active:bg-[var(--ods-open-yellow-action)]',
+          'bg-ods-open-yellow text-ods-card',
+          'hover:bg-ods-open-yellow-hover active:bg-ods-open-yellow-active',
         ],
         outline: [
-          'bg-[var(--ods-system-greys-black)] text-[var(--ods-system-greys-white)] border border-[var(--ods-system-greys-soft-grey)]',
-          'hover:bg-[var(--ods-system-greys-black-hover)] hover:border-[var(--ods-system-greys-soft-grey-hover)]',
-          'active:bg-[var(--ods-system-greys-black-action)] active:border-[var(--ods-system-greys-soft-grey-action)]',
+          'bg-ods-card text-ods-text-primary border border-ods-border',
+          'hover:bg-ods-bg-hover hover:border-ods-border-hover',
+          'active:bg-ods-bg-active active:border-ods-border-active',
         ],
         success: [
-          'bg-[var(--ods-attention-green-success-secondary)] text-[var(--ods-attention-green-success)]',
-          'hover:bg-[var(--ods-attention-green-success-secondary-hover)] active:bg-[var(--ods-attention-green-success-secondary-action)]',
+          'bg-ods-success-secondary text-ods-success',
+          'hover:bg-ods-success-secondary-hover active:bg-ods-success-secondary-active',
         ],
         warning: [
-          'bg-[var(--ods-attention-yellow-warning-secondary)] text-[var(--ods-attention-yellow-warning)]',
-          'hover:bg-[var(--ods-open-yellow-secondary)] active:bg-[var(--ods-open-yellow-secondary-action)]',
+          'bg-ods-warning-secondary text-ods-warning',
+          'hover:bg-ods-open-yellow-secondary active:bg-ods-open-yellow-secondary-action',
         ],
         error: [
-          'bg-[var(--ods-attention-red-error-secondary)] text-[var(--ods-attention-red-error)]',
-          'hover:bg-[var(--ods-attention-red-error-secondary-hover)] active:bg-[var(--ods-attention-red-error-secondary-action)]',
+          'bg-ods-error-secondary text-ods-error',
+          'hover:bg-ods-error-secondary-hover active:bg-ods-error-secondary-active',
         ],
         critical: [
-          'bg-[var(--ods-attention-red-error)] text-[var(--ods-attention-red-error-secondary)]',
-          'hover:bg-[var(--ods-attention-red-error-hover)] active:bg-[var(--ods-attention-red-error-action)]',
+          'bg-ods-error text-ods-error-secondary',
+          'hover:bg-ods-error-hover active:bg-ods-error-active',
         ],
         grey: [
-          'bg-[var(--ods-system-greys-soft-grey)] text-[var(--ods-system-greys-grey)]',
-          'hover:bg-[var(--ods-system-greys-soft-grey-hover)] active:bg-[var(--ods-system-greys-soft-grey-action)]',
+          'bg-ods-bg-surface text-ods-text-secondary',
+          'hover:bg-ods-bg-surface-hover active:bg-ods-bg-surface-active',
         ],
       },
     },

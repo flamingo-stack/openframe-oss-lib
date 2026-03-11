@@ -88,7 +88,7 @@ const AllowedDomainsInput = React.forwardRef<HTMLDivElement, AllowedDomainsInput
             <Input
               value={domain}
               disabled
-              className="bg-[var(--ods-system-greys-black)] border-[var(--ods-system-greys-soft-grey)] rounded-[6px] flex-1"
+              className="bg-ods-card border-ods-border rounded-[6px] flex-1"
             />
             <Button
               type="button"
@@ -114,7 +114,7 @@ const AllowedDomainsInput = React.forwardRef<HTMLDivElement, AllowedDomainsInput
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             disabled={disabled}
-            className="bg-[var(--ods-system-greys-black)] border-[var(--ods-system-greys-soft-grey)] rounded-[6px] flex-1"
+            className="bg-ods-card border-ods-border rounded-[6px] flex-1"
           />
         </div>
 
@@ -128,7 +128,7 @@ const AllowedDomainsInput = React.forwardRef<HTMLDivElement, AllowedDomainsInput
           onClick={addDomain}
           disabled={disabled}
         >
-          <PlusCircle className="h-5 w-5 text-[var(--ods-system-greys-grey)]" />
+          <PlusCircle className="h-5 w-5 text-ods-text-secondary" />
           <span className="font-['DM_Sans'] font-bold text-base">Add Domain</span>
         </button>
 

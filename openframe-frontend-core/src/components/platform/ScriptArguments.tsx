@@ -125,7 +125,7 @@ export const ScriptArguments: React.FC<ScriptArgumentsProps> = ({
                 onChange={e => handleValueChange(arg.id, e.target.value)}
                 placeholder={valuePlaceholder}
                 disabled={disabled}
-                className={cn(!arg.value && 'placeholder:text-[var(--ods-system-greys-grey)]')}
+                className={cn(!arg.value && 'placeholder:text-ods-text-secondary')}
               />
             </div>
             <Button

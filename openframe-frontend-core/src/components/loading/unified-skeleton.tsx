@@ -42,7 +42,7 @@ export function UnifiedSkeleton({
   'aria-label': ariaLabel,
   ...props
 }: UnifiedSkeletonProps) {
-  const baseClasses = 'bg-[var(--ods-system-greys-background-action)]';
+  const baseClasses = 'bg-ods-bg-secondary';
 
   const variantClasses = {
     default: 'rounded-md',

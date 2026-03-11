@@ -122,7 +122,7 @@ export function ReleaseMediaManager({ media, onChange, onUpload, className = '' 
   return (
     <div className={`space-y-4 ${className}`}>
       {/* Upload Section */}
-      <div className="border-2 border-dashed border-ods-border rounded-lg p-6 text-center hover:border-[var(--ods-open-yellow-base)]/50 transition-colors">
+      <div className="border-2 border-dashed border-ods-border rounded-lg p-6 text-center hover:border-ods-open-yellow/50 transition-colors">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 rounded-full bg-ods-card flex items-center justify-center">
             {uploadingIndex !== null ? (
@@ -176,7 +176,7 @@ export function ReleaseMediaManager({ media, onChange, onUpload, className = '' 
                 onDragStart={handleDragStart(index)}
                 onDragOver={handleDragOver}
                 onDrop={handleDrop(index)}
-                className="relative group border border-ods-border rounded-lg overflow-hidden hover:border-[var(--ods-open-yellow-base)]/30 transition-colors bg-ods-bg-secondary"
+                className="relative group border border-ods-border rounded-lg overflow-hidden hover:border-ods-open-yellow/30 transition-colors bg-ods-bg-secondary"
               >
                 {/* Drag Handle */}
                 <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity cursor-move z-10">
@@ -199,7 +199,7 @@ export function ReleaseMediaManager({ media, onChange, onUpload, className = '' 
 
                 {/* Media Preview */}
                 {item.media_url && (
-                  <div className="aspect-video relative bg-[var(--color-text-on-accent)]">
+                  <div className="aspect-video relative bg-ods-text-on-accent">
                     {item.media_type === 'video' || item.media_type === 'demo' ? (
                       <video src={item.media_url} className="w-full h-full object-cover" controls preload="metadata" />
                     ) : (
@@ -215,7 +215,7 @@ export function ReleaseMediaManager({ media, onChange, onUpload, className = '' 
                 )}
 
                 {item._uploading && (
-                  <div className="aspect-video bg-[var(--color-text-on-accent)] flex items-center justify-center">
+                  <div className="aspect-video bg-ods-text-on-accent flex items-center justify-center">
                     <div className="flex flex-col items-center gap-2">
                       <Loader2 className="h-8 w-8 animate-spin text-ods-accent" />
                       <span className="text-sm text-ods-text-secondary">Uploading...</span>
@@ -232,7 +232,7 @@ export function ReleaseMediaManager({ media, onChange, onUpload, className = '' 
                       onValueChange={(value: any) => updateMedia(index, 'media_type', value)}
                       disabled={item._uploading}
                     >
-                      <SelectTrigger className="bg-[var(--ods-system-greys-background)] h-8 text-xs">
+                      <SelectTrigger className="bg-ods-bg h-8 text-xs">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-ods-card">
@@ -249,7 +249,7 @@ export function ReleaseMediaManager({ media, onChange, onUpload, className = '' 
                     value={item.title}
                     onChange={e => updateMedia(index, 'title', e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && e.preventDefault()}
-                    className="bg-[var(--ods-system-greys-background)] h-8 text-xs"
+                    className="bg-ods-bg h-8 text-xs"
                     disabled={item._uploading}
                   />
                 </div>

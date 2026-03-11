@@ -10,7 +10,7 @@ export function CategoryCardSkeleton({ className }: CategoryCardSkeletonProps) {
   return (
     <article
       className={cn(
-        'bg-[var(--color-text-on-accent)] border border-[var(--ods-system-greys-soft-grey-hover)] rounded-[12px] p-8 flex flex-col min-w-0 box-border',
+        'bg-ods-text-on-accent border border-ods-border-hover rounded-[12px] p-8 flex flex-col min-w-0 box-border',
         className,
       )}
       role="status"
