@@ -3,7 +3,7 @@ package com.openframe.client.service.validator;
 import com.openframe.client.exception.AgentRegistrationSecretValidationErrorException;
 import com.openframe.client.exception.AgentRegistrationSecretValidationException;
 import com.openframe.core.exception.ErrorCode;
-import com.openframe.core.encryption.service.EncryptionService;
+import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.agent.AgentRegistrationSecret;
 import com.openframe.data.repository.agent.AgentRegistrationSecretRepository;
 import lombok.RequiredArgsConstructor;

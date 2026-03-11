@@ -20,7 +20,7 @@
         </dependency>
         <dependency>
             <groupId>com.openframe.oss</groupId>
-            <artifactId>openframe-core-encryption</artifactId>
+            <artifactId>openframe-core-crypto</artifactId>
         </dependency>
         <dependency>
             <groupId>com.openframe.oss</groupId>

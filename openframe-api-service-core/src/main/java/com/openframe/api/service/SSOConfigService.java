@@ -7,7 +7,7 @@ import com.openframe.api.dto.SSOConfigStatusResponse;
 import com.openframe.api.dto.SSOProviderInfo;
 import com.openframe.api.mapper.SSOConfigMapper;
 import com.openframe.api.service.processor.SSOConfigProcessor;
-import com.openframe.core.encryption.service.EncryptionService;
+import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.sso.SSOConfig;
 import com.openframe.data.repository.sso.SSOConfigRepository;
 import jakarta.validation.Valid;

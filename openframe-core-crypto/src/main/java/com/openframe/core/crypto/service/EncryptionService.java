@@ -1,4 +1,4 @@
-package com.openframe.core.encryption.service;
+package com.openframe.core.crypto.service;
 
 import com.openframe.core.exception.EncryptionException;
 import com.openframe.core.exception.ErrorCode;

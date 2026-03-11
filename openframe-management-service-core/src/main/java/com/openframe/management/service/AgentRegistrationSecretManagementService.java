@@ -1,7 +1,7 @@
 package com.openframe.management.service;
 
 import com.openframe.core.service.AgentRegistrationSecretGenerator;
-import com.openframe.core.encryption.service.EncryptionService;
+import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.agent.AgentRegistrationSecret;
 import com.openframe.data.repository.agent.AgentRegistrationSecretRepository;
 import lombok.RequiredArgsConstructor;
