@@ -170,7 +170,7 @@ export function TabNavigation({
                 </div>
 
                 <span className={cn(
-                  "font-['DM_Sans'] font-medium text-[18px] leading-6 whitespace-nowrap transition-colors",
+                  "text-h4 whitespace-nowrap transition-colors",
                   isActive ? 'text-ods-text-primary' : 'text-ods-text-secondary'
                 )}>
                   {tab.label}

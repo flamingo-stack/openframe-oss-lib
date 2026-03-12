@@ -163,7 +163,7 @@ export function AnnouncementBar() {
             <p className="font-body font-bold text-[14px] md:text-[18px] leading-tight tracking-tight mb-0 text-[#1A1A1A] truncate">
               {announcement.title}
             </p>
-            <p className="font-body text-[12px] md:text-[18px] leading-tight hidden sm:block text-[#1A1A1A] truncate">
+            <p className="font-body text-[12px] md:text-[18px] leading-tight hidden md:block text-[#1A1A1A] truncate">
               {announcement.description}
             </p>
           </div>

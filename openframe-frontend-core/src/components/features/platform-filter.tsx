@@ -31,7 +31,7 @@ export function PlatformFilterComponent({
         variant={selectedPlatform === 'all' ? "primary" : "outline"}
         size={size}
         onClick={() => onPlatformChange('all')}
-        className="font-['DM_Sans'] text-[16px] md:text-[18px] font-bold"
+        className="text-h3"
       >
         All Platforms
       </Button>
@@ -43,7 +43,7 @@ export function PlatformFilterComponent({
           size={size}
           onClick={() => onPlatformChange(platform.value)}
           leftIcon={showIcons ? getSmallPlatformIcon(platform.value) : undefined}
-          className="font-['DM_Sans'] text-[16px] md:text-[18px] font-bold"
+          className="text-h3"
         >
           {platform.label}
         </Button>

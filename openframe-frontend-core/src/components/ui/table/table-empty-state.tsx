@@ -15,17 +15,17 @@ export function TableEmptyState({
   return (
     <div
       className={cn(
-        'flex flex-col items-center justify-center py-12 px-4 rounded-[6px] bg-[#212121] border border-[#3a3a3a]',
+        'flex flex-col items-center justify-center py-12 px-4 rounded-[6px] bg-ods-card border border-ods-border',
         className
       )}
     >
       {/* Icon */}
-      <div className="mb-4 text-[#888888]">
+      <div className="mb-4 text-ods-text-secondary">
         {icon || <FileX2 className="w-12 h-12" />}
       </div>
       
       {/* Message */}
-      <p className="font-['DM_Sans'] font-medium text-[18px] leading-[24px] text-[#888888] text-center mb-6">
+      <p className="text-h4 text-ods-text-secondary text-center mb-6">
         {message}
       </p>
       
@@ -34,7 +34,7 @@ export function TableEmptyState({
         <Button
           variant="outline"
           onClick={action.onClick}
-          className="bg-[#212121] border-[#3a3a3a] hover:bg-[#2a2a2a] text-[#fafafa]"
+          className="bg-ods-card border-ods-border hover:bg-ods-bg-active text-ods-text-primary"
         >
           {action.label}
         </Button>

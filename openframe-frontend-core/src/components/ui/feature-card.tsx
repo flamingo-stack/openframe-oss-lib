@@ -153,7 +153,7 @@ export function FeatureCardGrid({
                       </div>
                     )}
 
-                    <h3 className="font-['Azeret_Mono'] font-semibold text-[28px] md:text-[32px] leading-[1.25] tracking-[-0.64px] text-ods-text-primary whitespace-pre-line">
+                    <h3 className="text-h2 tracking-[-0.64px] text-ods-text-primary whitespace-pre-line">
                       {item.title}
                     </h3>
 

@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
@@ -34,6 +35,9 @@ public class TenantRegistrationController {
     private final TenantRegistrationService registrationService;
     private final SsoTenantRegistrationService ssoRegistrationService;
 
+    @Value("${openframe.auth.error-url}")
+    private String authErrorUrl;
+
     @PostMapping(path = "/register", consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(OK)
     public Tenant register(
@@ -55,7 +59,7 @@ public class TenantRegistrationController {
         } catch (Exception e) {
             log.error("SSO registration init failed: {}", e.getMessage(), e);
             String msg = URLEncoder.encode(e.getMessage() != null ? e.getMessage() : "Registration failed. Please try again.", StandardCharsets.UTF_8);
-            httpResponse.sendRedirect(httpRequest.getContextPath() + "/auth/error?error=" + msg);
+            httpResponse.sendRedirect(authErrorUrl + "?error=" + msg);
         }
     }
 

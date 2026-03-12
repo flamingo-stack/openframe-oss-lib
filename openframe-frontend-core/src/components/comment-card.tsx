@@ -140,7 +140,7 @@ export function CommentCard({
       <div className="space-y-2 w-full max-w-full overflow-hidden" style={{ maxWidth: '100%', wordBreak: 'break-word' }}>
         {comment.title && (
           <div className={compact ? "h-[20px] flex items-center" : "h-[24px] flex items-center"}>
-            <h4 className="font-['DM_Sans'] font-bold text-lg leading-[1.33] tracking-[-0.02em] text-ods-text-primary group-hover:text-ods-accent transition-colors line-clamp-1" style={{ 
+            <h4 className="text-h3 tracking-[-0.02em] text-ods-text-primary group-hover:text-ods-accent transition-colors line-clamp-1" style={{ 
               wordBreak: 'break-word', 
               overflowWrap: 'break-word', 
               maxWidth: '100%',
@@ -155,7 +155,7 @@ export function CommentCard({
           </div>
         )}
         <div className={compact ? "h-[60px] flex items-center" : "h-[72px] flex items-center"}>
-          <p className="font-['DM_Sans'] font-medium text-lg leading-[1.33] text-ods-text-primary line-clamp-3" style={{ 
+          <p className="text-h4 text-ods-text-primary line-clamp-3" style={{ 
             wordBreak: 'break-word', 
             overflowWrap: 'break-word', 
             maxWidth: '100%',

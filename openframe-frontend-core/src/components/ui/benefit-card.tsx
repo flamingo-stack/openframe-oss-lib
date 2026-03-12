@@ -36,8 +36,8 @@ export const BenefitCard: React.FC<BenefitCardProps> = ({
     },
     'auth-figma': {
       container: "bg-transparent p-6",
-      title: "font-body font-bold text-[18px] text-ods-text-primary leading-6 tracking-[-0.36px]",
-      description: "font-body font-medium text-[18px] text-ods-text-secondary leading-6"
+      title: "text-h3 text-ods-text-primary tracking-[-0.36px]",
+      description: "text-h4 text-ods-text-secondary"
     }
   }
   

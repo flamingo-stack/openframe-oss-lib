@@ -1,6 +1,5 @@
 package com.openframe.gateway.config.ws;
 
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
@@ -8,9 +7,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
+import com.openframe.gateway.metrics.GatewayTrafficMetrics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.reactive.socket.client.WebSocketClient;
 import org.springframework.web.reactive.socket.server.WebSocketService;
 
 @Configuration
@@ -50,18 +49,13 @@ public class WebSocketGatewayConfig {
 
     @Bean
     @Primary
-    public WebSocketClient proxyCleanupWebSocketClient(
-            @Qualifier("reactorNettyWebSocketClient") WebSocketClient delegate) {
-        return new ProxySessionCleanupWebSocketClient(delegate);
-    }
-
-    @Bean
-    @Primary
     public WebSocketService webSocketServiceDecorator(
             RequestJwtClaimsReader requestJwtClaimsReader,
-            WebSocketService defaultWebSocketService
+            WebSocketService defaultWebSocketService,
+            GatewayTrafficMetrics gatewayTrafficMetrics,
+            WebSocketLoggingProperties webSocketLoggingProperties
     ) {
-        return new WebSocketServiceSecurityDecorator(defaultWebSocketService, requestJwtClaimsReader);
+        return new WebSocketServiceSecurityDecorator(defaultWebSocketService, requestJwtClaimsReader, gatewayTrafficMetrics, webSocketLoggingProperties);
     }
 
 

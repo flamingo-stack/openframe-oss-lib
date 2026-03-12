@@ -173,7 +173,7 @@ public class RestProxyService {
                     .timeout(Duration.ofSeconds(60))
                     .map(ResponseEntity::ok)
                     .onErrorResume(this::buildErrorResponse)
-                    .doOnSuccess(response -> log.info("Successfully proxied request to {}", tool.getName()))
+                    .doOnSuccess(response -> log.debug("Successfully proxied request to {}", tool.getName()))
                     .doOnError(error -> log.error("Failed to proxy request to {}: {}", tool.getName(),
                             error.getMessage()));
         } catch (Exception e) {

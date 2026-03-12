@@ -48,6 +48,10 @@ public class RequestSpecHelper {
         return cookies.get();
     }
 
+    public static void clearCookies() {
+        cookies.remove();
+    }
+
     public static void setEnableLogging(boolean enabled) {
         enableLogging = enabled;
     }

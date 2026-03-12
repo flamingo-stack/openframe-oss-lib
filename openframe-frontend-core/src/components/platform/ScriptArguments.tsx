@@ -146,7 +146,7 @@ export const ScriptArguments: React.FC<ScriptArgumentsProps> = ({
               onClick={() => handleDelete(arg.id)}
               disabled={disabled}
               aria-label="Delete argument"
-              centerIcon={<Trash2 className="size-4 sm:size-6 " color="var(--ods-attention-red-error)" />}
+              centerIcon={<Trash2 className="size-4 md:size-6 " color="var(--ods-attention-red-error)" />}
             />
           </div>
         </div>

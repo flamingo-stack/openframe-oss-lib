@@ -23,7 +23,7 @@ export function FileManagerBreadcrumb({
           <button
             onClick={() => onItemClick?.(item.path)}
             className={cn(
-              'px-1 py-0.5 rounded hover:bg-ods-bg-secondary transition-colors',
+              'shrink-0 px-1 py-0.5 rounded hover:bg-ods-bg-secondary transition-colors',
               'text-ods-text-primary hover:text-ods-accent text-left break-all',
               index === items.length - 1 && 'font-medium'
             )}

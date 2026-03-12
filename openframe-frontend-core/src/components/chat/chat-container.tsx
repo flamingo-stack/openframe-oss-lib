@@ -41,7 +41,7 @@ const ChatContainer = React.forwardRef<HTMLDivElement, ChatContainerProps>(
         className={cn(
           "flex h-screen w-full flex-col",
           "bg-ods-bg text-ods-text-primary",
-          "px-4 sm:px-6 lg:px-8 pt-10 pb-8",
+          "px-4 md:px-6 lg:px-8 pt-10 pb-8",
           className
         )}
         {...props}
@@ -130,7 +130,7 @@ const ChatFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDiv
       <div
         ref={ref}
         className={cn(
-          "w-full px-0 pb-0 pt-2 sm:px-0 flex-shrink-0",
+          "w-full px-0 pb-0 pt-2 md:px-0 flex-shrink-0",
           className
         )}
         {...props}

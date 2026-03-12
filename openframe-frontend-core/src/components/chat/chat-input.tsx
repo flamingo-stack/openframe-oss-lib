@@ -69,7 +69,7 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             )}
           >
             <ChatTypingIndicator size="sm" dotClassName="bg-ods-text-primary" />
-            <p className="font-['DM_Sans'] font-medium text-[18px] leading-[24px] text-ods-text-secondary">
+            <p className="text-h4 text-ods-text-secondary">
               Waiting for Technician Response
             </p>
           </div>
