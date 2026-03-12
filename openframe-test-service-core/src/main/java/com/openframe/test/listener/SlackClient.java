@@ -26,6 +26,14 @@ public class SlackClient {
         this.webHookUrl = webHookUrl;
     }
 
+    public SlackClient(String botToken, String channelId) {
+        this(botToken, channelId, null);
+    }
+
+    public SlackClient(String webHookUrl) {
+        this(null, null, webHookUrl);
+    }
+
     public void postMessage(String text) {
         if (isBotConfigured()) {
             postMessageViaBot(text);
