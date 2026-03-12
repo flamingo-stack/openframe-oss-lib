@@ -39,8 +39,8 @@
   --font-h5-family: var(--font-family-heading);
   --font-h5-weight: var(--font-weight-medium);
 
-  /* h6 - captions: Azeret Mono semibold */
-  --font-h6-family: var(--font-family-heading);
+  /* h6 - captions: DM Sans medium */
+  --font-h6-family: var(--font-family-body);
   --font-h6-weight: var(--font-weight-medium);
 
   /* =================================================== */

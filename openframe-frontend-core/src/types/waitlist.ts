@@ -67,6 +67,7 @@ export interface CreateWaitlistEntry {
   email: string;
   name?: string;
   company?: string;
+  phone?: string;
   user_id?: string | null;
   platform_id: string;
   referral_source?: string;
