@@ -25,6 +25,8 @@ public interface MachineRepository extends MongoRepository<Machine, String>, Cus
     
     List<Machine> findByStatusIn(Collection<DeviceStatus> statuses);
 
+    long countByStatusIn(Collection<DeviceStatus> statuses);
+
     List<Machine> findByStatusInAndRegisteredAtBefore(Collection<DeviceStatus> statuses, Instant before);
 
     List<Machine> findByStatusAndLastSeenBefore(DeviceStatus status, Instant threshold);

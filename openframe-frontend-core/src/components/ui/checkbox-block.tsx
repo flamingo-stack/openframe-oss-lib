@@ -27,7 +27,7 @@ const CheckboxBlock = React.forwardRef<
     className={cn(
       // Layout & spacing
       "flex items-center gap-3 rounded-[6px] border px-3 w-full",
-      description ? "h-16" : "h-11 sm:h-12",
+      description ? "h-16" : "h-11 md:h-12",
       // Theme palette
       "bg-[#212121] border-[#3a3a3a]",
       // Interactive states

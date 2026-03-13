@@ -169,7 +169,7 @@ export function VendorCompactCard({
           ) : (
             <h3
               className={cn(
-                "font-['DM_Sans'] text-[18px] md:text-[18px] font-medium leading-tight truncate whitespace-nowrap max-w-[120px] sm:max-w-[140px] md:max-w-[160px] lg:max-w-[180px] xl:max-w-[220px]",
+                "font-['DM_Sans'] text-[18px] md:text-[18px] font-medium leading-tight truncate whitespace-nowrap max-w-[120px] md:max-w-[160px] lg:max-w-[220px]",
                 isEmptyState ? "text-ods-text-secondary" : "text-ods-text-primary"
               )}
               title={vendor.title}

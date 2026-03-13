@@ -83,7 +83,7 @@ export type AutocompleteProps<T = string> = AutocompleteSingleProps<T> | Autocom
 // Shared container styles matching Input component
 const containerStyles = cn(
   // Layout & spacing
-  "flex items-center gap-2 rounded-[6px] border px-3 min-h-11 sm:min-h-12 cursor-text flex-wrap py-1",
+  "flex items-center gap-2 rounded-[6px] border px-3 min-h-11 md:min-h-12 cursor-text flex-wrap py-1",
   // Focus-within states
   "focus-within:outline-none",
   // Animations
@@ -334,7 +334,7 @@ function AutocompleteInner<T = string>(
           {/* Start Adornment */}
           {startAdornment && (
             <span className={cn(
-              "flex-shrink-0 text-ods-text-secondary transition-colors duration-200 [&_svg]:size-4 sm:[&_svg]:size-6",
+              "flex-shrink-0 text-ods-text-secondary transition-colors duration-200 [&_svg]:size-4 md:[&_svg]:size-6",
               isOpen && !isInvalid && "text-ods-accent",
               isInvalid && "text-ods-error"
             )}>
@@ -464,7 +464,7 @@ function AutocompleteInner<T = string>(
                       role="option"
                       aria-selected={isSelected}
                       className={cn(
-                        "flex items-center h-11 sm:h-12 px-4 cursor-pointer transition-colors border-b border-ods-border last:border-b-0",
+                        "flex items-center h-11 md:h-12 px-4 cursor-pointer transition-colors border-b border-ods-border last:border-b-0",
                         "text-[18px] font-medium leading-6",
                         isHighlighted && "bg-ods-bg-surface",
                         isSelected ? "text-ods-accent" : "text-ods-text-primary",

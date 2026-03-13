@@ -1,5 +1,13 @@
 import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { extendTailwindMerge } from "tailwind-merge"
+
+const twMerge = extendTailwindMerge<'ods-typography'>({
+  extend: {
+    classGroups: {
+      'ods-typography': ['text-h1', 'text-h2', 'text-h3', 'text-h4', 'text-h5', 'text-h6'],
+    },
+  },
+})
 
 /**
  * Combine class names with Tailwind's merge utility
@@ -91,17 +99,17 @@ function getPlatformProductionUrl(platform: string): string {
     case 'openmsp':
       return process.env.NEXT_PUBLIC_PLATFORM_URL || 'https://www.openmsp.ai';
     case 'flamingo':
-      return process.env.NEXT_PUBLIC_FLAMINGO_URL || 'https://flamingo.run';
+      return process.env.NEXT_PUBLIC_FLAMINGO_URL || 'https://www.flamingo.run';
     case 'tmcg':
-      return process.env.NEXT_PUBLIC_TMCG_URL || 'https://tmcg.miami';
+      return process.env.NEXT_PUBLIC_TMCG_URL || 'https://www.tmcg.miami';
     case 'flamingo-teaser':
-      return process.env.NEXT_PUBLIC_TEASER_URL || 'https://flamingo.cx';
+      return process.env.NEXT_PUBLIC_TEASER_URL || 'https://www.flamingo.cx';
     case 'openframe':
       return process.env.NEXT_PUBLIC_OPENFRAME_URL || 'https://openframe.ai';
     case 'universal':
-      return process.env.NEXT_PUBLIC_FLAMINGO_URL || 'https://flamingo.run';
+      return process.env.NEXT_PUBLIC_FLAMINGO_URL || 'https://www.flamingo.run';
     default:
-      return process.env.NEXT_PUBLIC_FLAMINGO_URL || 'https://flamingo.run';
+      return process.env.NEXT_PUBLIC_FLAMINGO_URL || 'https://www.flamingo.run';
   }
 }
 

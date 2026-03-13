@@ -40,7 +40,7 @@ export const SmoothAccordionTrigger = React.forwardRef<
       )}
       {...props}
     >
-      <span className="font-['DM_Sans'] font-bold text-[18px] leading-6 text-ods-text-primary">
+      <span className="text-h3 text-ods-text-primary">
         {label}
       </span>
       <ChevronButton

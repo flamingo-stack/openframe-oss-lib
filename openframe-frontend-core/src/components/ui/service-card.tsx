@@ -100,9 +100,9 @@ function ServiceCardRowItem({ row }: { row: ServiceCardRow }) {
   return (
     <div className="flex items-center gap-3 min-w-0">
       {row.label && (
-        <div className="w-20 sm:w-24 shrink-0 text-sm font-medium text-ods-text-primary">{row.label}</div>
+        <div className="w-20 md:w-24 shrink-0 text-sm font-medium text-ods-text-primary">{row.label}</div>
       )}
-      <div className={cn('flex-1 h-12 rounded-md border border-ods-border bg-ods-bg px-3 sm:px-4 flex items-center justify-between min-w-0', row.monospace ? 'font-mono' : '')}>
+      <div className={cn('flex-1 h-12 rounded-md border border-ods-border bg-ods-bg px-3 md:px-4 flex items-center justify-between min-w-0', row.monospace ? 'font-mono' : '')}>
         <div className="truncate text-ods-text-primary min-w-0">{displayValue}</div>
         <div className="flex items-center gap-2 pl-3 flex-shrink-0">
           {actions.reveal && (

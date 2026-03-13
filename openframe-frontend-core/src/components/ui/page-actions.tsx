@@ -210,7 +210,7 @@ function MenuPrimaryVariant({
                 variant="outline"
                 className="flex-1"
                 aria-label="More actions"
-                centerIcon={<Ellipsis01Icon size={24} className="text-text-primary" />}
+                centerIcon={<Ellipsis01Icon size={24} className="text-ods-text-primary" />}
               />
             </DropdownMenuTrigger>
             <DropdownMenuContent

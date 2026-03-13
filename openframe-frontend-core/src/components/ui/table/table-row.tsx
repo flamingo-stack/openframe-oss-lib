@@ -63,8 +63,8 @@ export function TableRow<T = any>({
   return (
     <div
       className={cn(
-        'relative rounded-[6px] bg-[#212121] border border-[#3a3a3a] overflow-hidden',
-        onClick && 'cursor-pointer hover:bg-[#2a2a2a] transition-colors',
+        'relative rounded-[6px] bg-ods-card border border-ods-border overflow-hidden',
+        onClick && 'cursor-pointer hover:bg-ods-bg-active transition-colors',
         typeof className === 'function' ? className(item, index) : className
       )}
       onClick={handleRowClick}
@@ -76,7 +76,7 @@ export function TableRow<T = any>({
             <Checkbox
               checked={selected}
               onCheckedChange={handleSelect}
-              className="border-[#3a3a3a]"
+              className="border-ods-border"
             />
           </div>
         )}

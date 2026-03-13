@@ -171,7 +171,7 @@ export function OnboardingWalkthrough({
     <div className={cn('w-full space-y-4', className)}>
       {/* Header - responsive: stacks on mobile */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 md:gap-0">
-        <h2 className="font-['Azeret_Mono'] font-semibold text-[24px] leading-[32px] tracking-[-0.48px] text-ods-text-primary">
+        <h2 className="text-h2 tracking-[-0.48px] text-ods-text-primary">
           Get Started
         </h2>
 

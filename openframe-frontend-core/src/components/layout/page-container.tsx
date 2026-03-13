@@ -251,7 +251,7 @@ function renderAdvancedPageContainer({
 
             {/* Title */}
             {title && (
-              <h1 className="font-['Azeret_Mono'] font-semibold text-[24px] sm:text-[32px] leading-[32px] sm:leading-[40px] tracking-[-0.48px] sm:tracking-[-0.64px] text-ods-text-primary">
+              <h1 className="text-h2 tracking-[-0.64px] text-ods-text-primary">
                 {title}
               </h1>
             )}
@@ -280,7 +280,7 @@ function renderAdvancedPageContainer({
         <div className="flex items-center justify-between md:flex-col md:items-start md:justify-start lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="flex flex-col gap-1 flex-1 min-w-0">
             {title && (
-              <h1 className="font-['Azeret_Mono'] font-semibold text-[24px] leading-[32px] tracking-[-0.48px] text-ods-text-primary">
+              <h1 className="text-h2 tracking-[-0.48px] text-ods-text-primary">
                 {title}
               </h1>
             )}
@@ -343,7 +343,7 @@ function renderAdvancedPageContainer({
         {(title || subtitle) && (
           <div className="flex flex-col gap-1 flex-1 min-w-0">
             {title && (
-              <h1 className="font-['Azeret_Mono'] font-semibold text-[24px] leading-[32px] tracking-[-0.48px] text-ods-text-primary">
+              <h1 className="text-h2 text-ods-text-primary">
                 {title}
               </h1>
             )}

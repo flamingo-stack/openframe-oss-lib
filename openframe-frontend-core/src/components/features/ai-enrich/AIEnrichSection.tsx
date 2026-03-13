@@ -116,7 +116,7 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
       <div className="flex items-center gap-3">
         {icon || <SparklesIcon size={20} className="text-ods-text-secondary" />}
         <div className="flex-1">
-          <h3 className="font-['Azeret_Mono'] text-[18px] font-semibold uppercase text-ods-text-primary">
+          <h3 className="text-h5 text-ods-text-primary">
             {title}
           </h3>
           {description && (

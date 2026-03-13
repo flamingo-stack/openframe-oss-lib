@@ -1,7 +1,7 @@
 package com.openframe.authz.keys;
 
 import com.nimbusds.jose.jwk.RSAKey;
-import com.openframe.core.service.EncryptionService;
+import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.tenant.TenantKey;
 import com.openframe.data.repository.tenant.TenantKeyRepository;
 import lombok.RequiredArgsConstructor;

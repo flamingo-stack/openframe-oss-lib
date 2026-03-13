@@ -31,7 +31,7 @@ const SelectTrigger = React.forwardRef<
       data-invalid={isInvalid || undefined}
       className={cn(
         // Layout & spacing - match Input
-        "flex w-full items-center justify-between gap-2 rounded-[6px] border px-3 h-11 sm:h-12 outline-none",
+        "flex w-full items-center justify-between gap-2 rounded-[6px] border px-3 h-11 md:h-12 outline-none",
         // Typography - match Input exactly
         "text-[18px] font-medium leading-6",
         // Theme palette - match Input exactly
@@ -150,7 +150,7 @@ const SelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      "flex w-full cursor-pointer select-none items-center justify-between h-11 sm:h-12 px-4 border-b border-ods-border last:border-b-0",
+      "flex w-full cursor-pointer select-none items-center justify-between h-11 md:h-12 px-4 border-b border-ods-border last:border-b-0",
       // Typography - match trigger
       "text-[18px] font-medium leading-6 whitespace-nowrap",
       // Hover state with visible background change

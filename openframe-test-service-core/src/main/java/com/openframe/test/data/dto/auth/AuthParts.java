@@ -1,5 +1,6 @@
 package com.openframe.test.data.dto.auth;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Builder;
 import lombok.Data;
 
@@ -7,6 +8,7 @@ import java.util.Map;
 
 @Data
 @Builder
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class AuthParts {
     private String email;
     private String password;

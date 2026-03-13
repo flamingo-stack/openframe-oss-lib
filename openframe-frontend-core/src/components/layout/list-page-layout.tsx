@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import { cn } from '../../utils/cn'
 import { useDebounce } from '../../hooks/ui/use-debounce'
 import { Filter02Icon, SearchIcon } from '../icons-v2-generated'
 import { Button, Input, PageError } from '../ui'
@@ -26,6 +27,7 @@ export interface ListPageLayoutProps {
   mobileSortConfig?: SortConfig
   onMobileSort?: (column: string, direction: SortDirection) => void
   mobileFilterTitle?: string
+  stickyHeader?: boolean
 }
 
 /**
@@ -102,7 +104,8 @@ export function ListPageLayout({
   currentMobileFilters,
   mobileSortConfig,
   onMobileSort,
-  mobileFilterTitle
+  mobileFilterTitle,
+  stickyHeader = false,
 }: ListPageLayoutProps) {
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false)
   const [localSearchValue, setLocalSearchValue] = useState(searchValue)
@@ -138,13 +141,17 @@ export function ListPageLayout({
       className={className}
     >
       {/* Search Bar with Mobile Filter Button */}
-      <div className="flex gap-4 items-center w-full">
+      <div className={cn(
+        'flex gap-4 items-center',
+        !stickyHeader && 'w-full',
+        stickyHeader && 'sticky -top-4 md:-top-6 z-20 bg-ods-bg -mx-4 md:-mx-6 px-4 md:px-6 -mt-4 md:-mt-6 pt-4 md:pt-6 pb-2'
+      )}>
         <Input
           placeholder={searchPlaceholder}
           onChange={(e) => setLocalSearchValue(e.target.value)}
           value={localSearchValue}
           className="flex-1"
-          startAdornment={<SearchIcon className="w-4 h-4 sm:w-6 sm:h-6" />}
+          startAdornment={<SearchIcon className="w-4 h-4 md:w-6 md:h-6" />}
         />
 
         {/* Mobile Filter Button - only visible on mobile when filter is enabled */}

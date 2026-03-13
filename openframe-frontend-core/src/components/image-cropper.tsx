@@ -189,7 +189,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({
       {/* Cropper container */}
       <div
         className={cn(
-          "relative w-full aspect-square sm:aspect-video rounded-md overflow-hidden",
+          "relative w-full aspect-square md:aspect-video rounded-md overflow-hidden",
           checkerBg,
         )}
       >

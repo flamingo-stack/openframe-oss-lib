@@ -18,26 +18,26 @@ export function FileManagerActionBar({
   className 
 }: FileManagerActionBarProps) {
   return (
-    <div className={cn('flex items-center gap-2 flex-wrap', className)}>
+    <div className={cn('flex items-center gap-4 flex-wrap md:justify-end', className)}>
       <Button
         variant="outline"
         size="sm"
         onClick={onNewFolder}
-        leftIcon={<FolderPlus className="h-3 w-3" />}
-        className="!text-xs !px-2 !py-1 !h-7"
+        leftIcon={<FolderPlus className="h-4 w-4" />}
+        fullWidthOnMobile={false}
       >
-        NEW FOLDER
+        New Folder
       </Button>
-      
+
       <Button
         variant="outline"
         size="sm"
         onClick={onCopy}
         disabled={!hasSelection}
-        leftIcon={<Copy className="h-3 w-3" />}
-        className="!text-xs !px-2 !py-1 !h-7"
+        leftIcon={<Copy className="h-4 w-4" />}
+        fullWidthOnMobile={false}
       >
-        COPY
+        Copy
       </Button>
 
       <Button
@@ -45,41 +45,41 @@ export function FileManagerActionBar({
         size="sm"
         onClick={onCut}
         disabled={!hasSelection}
-        leftIcon={<Scissors className="h-3 w-3" />}
-        className="!text-xs !px-2 !py-1 !h-7"
+        leftIcon={<Scissors className="h-4 w-4" />}
+        fullWidthOnMobile={false}
       >
-        CUT
+        Cut
       </Button>
-      
+
       <Button
         variant="outline"
         size="sm"
         onClick={onPaste}
         disabled={!canPaste}
-        leftIcon={<Clipboard className="h-3 w-3" />}
-        className="!text-xs !px-2 !py-1 !h-7"
+        leftIcon={<Clipboard className="h-4 w-4" />}
+        fullWidthOnMobile={false}
       >
-        PASTE
+        Paste
       </Button>
-      
+
       <Button
         variant="outline"
         size="sm"
         onClick={onUpload}
-        leftIcon={<Upload className="h-3 w-3" />}
-        className="!text-xs !px-2 !py-1 !h-7"
+        leftIcon={<Upload className="h-4 w-4" />}
+        fullWidthOnMobile={false}
       >
-        UPLOAD
+        Upload
       </Button>
-      
+
       <Button
         variant="outline"
         size="sm"
         onClick={onSelectAll}
-        leftIcon={<CheckSquare className="h-3 w-3" />}
-        className="!text-xs !px-2 !py-1 !h-7"
+        leftIcon={<CheckSquare className="h-4 w-4" />}
+        fullWidthOnMobile={false}
       >
-        SELECT ALL
+        Select All
       </Button>
     </div>
   )

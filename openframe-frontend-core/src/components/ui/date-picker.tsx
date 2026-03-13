@@ -315,7 +315,7 @@ function DatePickerCalendar({
                 aria-label="Next month"
               />
             )}
-            {numberOfMonths === 2 && <div className="size-10 sm:size-12" />}
+            {numberOfMonths === 2 && <div className="size-10 md:size-12" />}
           </div>
           <DayPicker
             mode="range"
@@ -337,7 +337,7 @@ function DatePickerCalendar({
         {numberOfMonths === 2 && (
           <div className="flex-1 border-l border-ods-border">
             <div className="flex items-center justify-between px-4 pt-4">
-              <div className="size-10 sm:size-12" />
+              <div className="size-10 md:size-12" />
               <span className="text-[18px] font-medium leading-6 text-ods-text-primary">
                 {formatMonthYear(getSecondMonth(month))}
               </span>
@@ -374,7 +374,7 @@ function DatePickerCalendar({
 const triggerButtonStyles = cn(
   // Layout
   "flex items-center gap-2 w-full",
-  "h-11 sm:h-12 rounded-[6px] border px-3",
+  "h-11 md:h-12 rounded-[6px] border px-3",
   // Colors
   "bg-ods-card border-ods-border",
   // Typography
@@ -390,7 +390,7 @@ const triggerButtonStyles = cn(
 
 const timeSelectTriggerStyles = cn(
   "flex items-center justify-between gap-1",
-  "h-11 sm:h-12 min-h-0 px-3 rounded-[6px] border",
+  "h-11 md:h-12 min-h-0 px-3 rounded-[6px] border",
   "bg-ods-card border-ods-border",
   "text-[18px] font-medium leading-6",
   "enabled:hover:bg-ods-bg-hover enabled:hover:border-ods-border-hover enabled:active:bg-ods-bg-active enabled:active:border-ods-border-active",

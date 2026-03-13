@@ -74,7 +74,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange, className }: Pagina
             onClick={() => onPageChange(currentPage - 1)}
             disabled={currentPage === 1}
             aria-label="Go to previous page"
-            className="!h-10 !w-10 sm:!h-10 sm:!w-10"
+            className="!h-10 !w-10 md:!h-10 md:!w-10"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -99,7 +99,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange, className }: Pagina
                 variant={currentPage === page ? "primary" : "outline"}
                 size="icon"
                 onClick={() => onPageChange(page)}
-                className="!h-9 !w-9 sm:!h-9 sm:!w-9"
+                className="!h-9 !w-9 md:!h-9 md:!w-9"
                 aria-label={`Page ${page}`}
                 aria-current={currentPage === page ? "page" : undefined}
               >
@@ -116,7 +116,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange, className }: Pagina
             onClick={() => onPageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
             aria-label="Go to next page"
-            className="!h-10 !w-10 sm:!h-10 sm:!w-10"
+            className="!h-10 !w-10 md:!h-10 md:!w-10"
           >
             <ChevronRight className="h-4 w-4" />
             <span className="sr-only">Next page</span>

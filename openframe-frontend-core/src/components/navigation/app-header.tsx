@@ -164,7 +164,7 @@ export function AppHeader({
               className="bg-ods-card rounded-none px-3 py-3 hover:bg-ods-bg-card/80 focus:bg-ods-bg-card/80 cursor-pointer"
             >
               <div className="flex items-center gap-2">
-                <LogOutIcon className="text-error shrink-0" size={24} />
+                <LogOutIcon className="text-ods-error shrink-0" size={24} />
                 <span className="text-[18px] font-medium text-ods-text-primary">Log Out</span>
               </div>
             </DropdownMenuItem>
@@ -179,7 +179,7 @@ export function AppHeader({
             <div className="relative w-full h-full flex items-center justify-center">
               <Bell className="h-4 w-4 md:w-6 md:h-6" />
               {unreadCount > 0 && (
-                <span className="absolute top-2 right-2 bg-ods-accent text-text-on-accent text-[8px] rounded-full w-3 h-3 md:w-4 md:h-4 flex items-center justify-center">
+                <span className="absolute top-2 right-2 bg-ods-accent text-ods-text-on-accent text-[8px] rounded-full w-3 h-3 md:w-4 md:h-4 flex items-center justify-center">
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               )}
