@@ -145,7 +145,7 @@ export const WithDetailsButton: Story = {
         visible: true,
         component: (
           <div className="bg-ods-card box-border flex gap-2 items-center justify-center px-4 py-3 rounded-[6px] border border-ods-border cursor-pointer hover:bg-ods-bg-hover transition-colors">
-            <span className="font-['DM_Sans'] font-bold text-[18px] leading-[24px] text-ods-text-primary tracking-[-0.36px]">
+            <span className="text-h3 text-ods-text-primary tracking-[-0.36px]">
               Details
             </span>
           </div>
@@ -232,7 +232,7 @@ export const FullyLoaded: Story = {
         visible: true,
         component: (
           <div className="bg-ods-card box-border flex gap-2 items-center justify-center px-4 py-3 rounded-[6px] border border-ods-border cursor-pointer hover:bg-ods-bg-hover transition-colors">
-            <span className="font-['DM_Sans'] font-bold text-[18px] leading-[24px] text-ods-text-primary tracking-[-0.36px]">
+            <span className="text-h3 text-ods-text-primary tracking-[-0.36px]">
               Details
             </span>
           </div>

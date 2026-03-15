@@ -37,6 +37,8 @@ public class OAuthBffController {
     private int stateCookieTtlSeconds;
     @Value("${openframe.gateway.oauth.dev-ticket-enabled:true}")
     private boolean devTicketEnabled;
+    @Value("${openframe.auth.error-url}")
+    private String authErrorUrl;
 
     @GetMapping("/login")
     public Mono<ResponseEntity<Void>> login(@RequestParam String tenantId,
@@ -89,7 +91,7 @@ public class OAuthBffController {
                     String msg = URLEncoder.encode(
                             e.getMessage() != null ? e.getMessage() : "Authentication failed. Please try again.",
                             StandardCharsets.UTF_8);
-                    return Mono.just(buildFound("/auth/error?error=" + msg, state));
+                    return Mono.just(buildFound(authErrorUrl + "?error=" + msg, state));
                 });
     }
 

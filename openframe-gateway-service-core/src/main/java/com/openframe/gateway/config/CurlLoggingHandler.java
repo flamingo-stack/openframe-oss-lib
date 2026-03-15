@@ -21,7 +21,7 @@ public class CurlLoggingHandler extends ChannelDuplexHandler {
 
     @Override
     public void channelRegistered(ChannelHandlerContext ctx) throws Exception {
-        log.info("Channel registered");
+        log.debug("Channel registered");
         super.channelRegistered(ctx);
     }
 
@@ -39,9 +39,9 @@ public class CurlLoggingHandler extends ChannelDuplexHandler {
             String fullUrl;
             if (targetUri != null) {
                 fullUrl = targetUri.toString() ;
-                log.info("Using target URI: {}", targetUri);
+                log.debug("Using target URI: {}", targetUri);
             } else {
-                log.warn("No target URI found in channel attributes");
+                log.debug("No target URI found in channel attributes");
                 fullUrl = request.uri();
             }
             
@@ -71,7 +71,7 @@ public class CurlLoggingHandler extends ChannelDuplexHandler {
             }
 
             if (msg instanceof LastHttpContent) {
-                log.info("Proxied request as curl command: \n{}", curl);
+                log.debug("Proxied request as curl command: \n{}", curl);
                 isRequest = false;
             }
         }

@@ -2,7 +2,7 @@ import type { UserProfile } from "./user"
 
 // Core Platform Types (dynamically fetched from database via API)
 export type Platform = string;
-export type BlogStatus = 'draft' | 'published' | 'scheduled' | 'archived';
+export type BlogStatus = 'draft' | 'ai_drafted' | 'published' | 'ai_published' | 'scheduled' | 'archived';
 
 // Author interface for blog posts
 export interface BlogAuthor {

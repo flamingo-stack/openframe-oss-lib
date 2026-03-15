@@ -1,5 +1,52 @@
 import type { Config } from 'tailwindcss'
+import plugin from 'tailwindcss/plugin'
 import tailwindcssAnimate from 'tailwindcss-animate'
+
+const odsTypographyPlugin = plugin(({ addUtilities }) => {
+  addUtilities({
+    '.text-h1': {
+      fontFamily: 'var(--font-h1-family)',
+      fontWeight: 'var(--font-h1-weight)',
+      fontSize: 'var(--font-size-h1-title)',
+      lineHeight: 'var(--font-line-space-h1-main-title)',
+      letterSpacing: '-0.02em',
+    },
+    '.text-h2': {
+      fontFamily: 'var(--font-h2-family)',
+      fontWeight: 'var(--font-h2-weight)',
+      fontSize: 'var(--font-size-h2-sub-title)',
+      lineHeight: 'var(--font-line-space-h2-sub-title)',
+      letterSpacing: '-0.02em',
+    },
+    '.text-h3': {
+      fontFamily: 'var(--font-h3-family)',
+      fontWeight: 'var(--font-h3-weight)',
+      fontSize: 'var(--font-size-h3-body)',
+      lineHeight: 'var(--font-line-space-h3-body)',
+      letterSpacing: '-0.02em',
+    },
+    '.text-h4': {
+      fontFamily: 'var(--font-h4-family)',
+      fontWeight: 'var(--font-h4-weight)',
+      fontSize: 'var(--font-size-h4-body)',
+      lineHeight: 'var(--font-line-space-h4-body)',
+    },
+    '.text-h5': {
+      fontFamily: 'var(--font-h5-family)',
+      fontWeight: 'var(--font-h5-weight)',
+      fontSize: 'var(--font-size-h5-caption)',
+      lineHeight: 'var(--font-line-space-h5-caption)',
+      textTransform: 'uppercase',
+      letterSpacing: '-0.02em',
+    },
+    '.text-h6': {
+      fontFamily: 'var(--font-h6-family)',
+      fontWeight: 'var(--font-h6-weight)',
+      fontSize: 'var(--font-size-h6-caption)',
+      lineHeight: 'var(--font-line-space-h6-caption)',
+    },
+  })
+})
 
 const config: Config = {
   content: [
@@ -8,16 +55,10 @@ const config: Config = {
   safelist: [
     // Dynamically generated classes for table hide/show functionality
     'hidden',
-    'sm:hidden',
     'md:hidden',
     'lg:hidden',
-    'xl:hidden',
-    '2xl:hidden',
-    'sm:flex',
     'md:flex',
     'lg:flex',
-    'xl:flex',
-    '2xl:flex',
   ],
   theme: {
     container: {
@@ -65,122 +106,30 @@ const config: Config = {
         },
 
         // =================================================
-        // OPEN DESIGN SYSTEM (ODS) COLORS - SHARED
+        // ODS (Open Design System) COLORS
         // =================================================
-        // These are the canonical ODS color utilities used across all apps
-        
-        // Background colors
-        "bg-primary": "var(--color-bg)",                    // #161616
-        "bg-card": "var(--color-bg-card)",                  // #212121
-        "bg-hover": "var(--color-bg-hover)",                // #2b2b2b
-        "bg-active": "var(--color-bg-active)",              // #353535
-        "bg-surface": "var(--color-bg-surface)",            // #3a3a3a
-        "bg-overlay": "var(--color-bg-overlay)",
-        "bg-skeleton": "var(--color-bg-skeleton)",
-        
-        // Text colors
-        "text-primary": "var(--color-text-primary)",        // #fafafa
-        "text-secondary": "var(--color-text-secondary)",    // #888888
-        "text-tertiary": "var(--color-text-tertiary)",      // #444444
-        "text-muted": "var(--color-text-muted)",            // #747474
-        "text-subtle": "var(--color-text-subtle)",
-        "text-disabled": "var(--color-text-disabled)",     // #3a3a3a
-        "text-on-accent": "var(--color-text-on-accent)",    // #212121
-        "text-on-dark": "var(--color-text-on-dark)",
-        "text-placeholder": "var(--color-text-placeholder)",
-        
-        // Border colors
-        "border-primary": "var(--color-border-default)",    // #3a3a3a
-        "border-hover": "var(--color-border-hover)",        // #444444
-        "border-active": "var(--color-border-active)",      // #4e4e4e
-        "border-focus": "var(--color-border-focus)",        // #ffc008
-        "border-subtle": "var(--color-border-subtle)",
-        "border-strong": "var(--color-border-strong)",     // #888888
-        
-        // Accent colors
-        "accent-primary": "var(--color-accent-primary)",    // #ffc008
-        "accent-hover": "var(--color-accent-hover)",        // #f5b600
-        "accent-active": "var(--color-accent-active)",      // #ebac00
-        "accent-focus": "var(--color-accent-focus)",
-        "accent-disabled": "var(--color-accent-disabled)",
-        
-        // Status colors
-        "success": "var(--color-success)",
-        "success-hover": "var(--color-success-hover)",
-        "success-active": "var(--color-success-active)",
-        "error": "var(--color-error)",
-        "error-hover": "var(--color-error-hover)",
-        "error-active": "var(--color-error-active)",
-        "warning": "var(--color-warning)",
-        "warning-hover": "var(--color-warning-hover)",
-        "warning-active": "var(--color-warning-active)",
-        "info": "var(--color-info)",
-        "info-hover": "var(--color-info-hover)",
-        "info-active": "var(--color-info-active)",
-        
-        // Interactive states
-        "disabled": "var(--color-disabled)",
-        "focus-ring": "var(--color-focus-ring)",
-        "focus-visible": "var(--color-focus-visible)",
-        
-        // Links
-        "link": "var(--color-link)",
-        "link-hover": "var(--color-link-hover)",
-        "link-visited": "var(--color-link-visited)",
-
-        // Convenience shortcuts
-        "divider": "var(--color-divider)",                  // #3a3a3a
-
-        // ODS namespace - FLAT structure to match ui-kit component usage
-        "ods-bg": "var(--color-bg)",
-        "ods-card": "var(--color-bg-card)",
-        "ods-bg-hover": "var(--color-bg-hover)",
-        "ods-bg-active": "var(--color-bg-active)",
-        "ods-bg-surface": "var(--color-bg-surface)",
-        "ods-border": "var(--color-border-default)",
-        "ods-border-hover": "var(--color-border-hover)",
-        "ods-border-focus": "var(--color-border-focus)",
-        "ods-border-active": "var(--color-border-active)",
-        "ods-divider": "var(--color-divider)",
-        "ods-text-primary": "var(--color-text-primary)",
-        "ods-text-secondary": "var(--color-text-secondary)",
-        "ods-text-tertiary": "var(--color-text-tertiary)",
-        "ods-text-muted": "var(--color-text-muted)",
-        "ods-text-disabled": "var(--color-text-disabled)",
-        "ods-text-on-accent": "var(--color-text-on-accent)",
-        "ods-text-on-dark": "var(--color-text-on-dark)",
-        "ods-accent": "var(--color-accent-primary)",
-        "ods-accent-hover": "var(--color-accent-hover)",
-        "ods-accent-active": "var(--color-accent-active)",
-        "ods-focus": "var(--color-focus-ring)",
-        "ods-disabled": "var(--color-disabled)",
-        "ods-success": "var(--color-success)",
-        "ods-success-hover": "var(--color-success-hover)",
-        "ods-error": "var(--color-error)",
-        "ods-error-hover": "var(--color-error-hover)",
-        "ods-warning": "var(--color-warning)",
-        "ods-warning-hover": "var(--color-warning-hover)",
-        "ods-info": "var(--color-info)",
-        "ods-info-hover": "var(--color-info-hover)",
-        "ods-link": "var(--color-link)",
-        "ods-link-hover": "var(--color-link-hover)",
-
-        // Adaptive current color (platform-specific)
-        "ods-current": "var(--ods-current)",
-
-        // Legacy nested structure (keep for any existing usage)
+        // Single nested structure: generates bg-ods-*, text-ods-*, border-ods-* utilities
         ods: {
+          // Backgrounds
           bg: "var(--color-bg)",
           card: "var(--color-bg-card)",
           overlay: "var(--color-bg-overlay)",
           skeleton: "var(--color-bg-skeleton)",
-          border: "var(--color-border-default)",
-          bgHover: "var(--color-bg-hover)",
           "bg-hover": "var(--color-bg-hover)",
-          "card-hover": "var(--color-bg-hover)",
           "bg-active": "var(--color-bg-active)",
-          bgActive: "var(--color-bg-active)",
+          "bg-surface": "var(--color-bg-surface)",
+          "card-hover": "var(--color-bg-hover)",
           divider: "var(--color-divider)",
+
+          // Borders
+          border: {
+            DEFAULT: "var(--color-border-default)",
+            hover: "var(--color-border-hover)",
+            active: "var(--color-border-active)",
+            focus: "var(--color-border-focus)",
+          },
+
+          // Text
           text: {
             primary: "var(--color-text-primary)",
             secondary: "var(--color-text-secondary)",
@@ -191,6 +140,8 @@ const config: Config = {
             "on-accent": "var(--color-text-on-accent)",
             "on-dark": "var(--color-text-on-dark)",
           },
+
+          // Accent
           accent: {
             DEFAULT: "var(--color-accent-primary)",
             hover: "var(--color-accent-hover)",
@@ -198,47 +149,133 @@ const config: Config = {
             focus: "var(--color-accent-focus)",
             disabled: "var(--color-accent-disabled)",
           },
+
+          // Status
           success: {
             DEFAULT: "var(--color-success)",
             hover: "var(--color-success-hover)",
             active: "var(--color-success-active)",
+            secondary: "var(--color-success-secondary)",
+            "secondary-hover": "var(--color-success-secondary-hover)",
+            "secondary-active": "var(--color-success-secondary-active)",
           },
           error: {
             DEFAULT: "var(--color-error)",
             hover: "var(--color-error-hover)",
             active: "var(--color-error-active)",
+            secondary: "var(--color-error-secondary)",
+            "secondary-hover": "var(--color-error-secondary-hover)",
+            "secondary-active": "var(--color-error-secondary-active)",
           },
           warning: {
             DEFAULT: "var(--color-warning)",
             hover: "var(--color-warning-hover)",
             active: "var(--color-warning-active)",
+            secondary: "var(--color-warning-secondary)",
+            "secondary-hover": "var(--color-warning-secondary-hover)",
+            "secondary-active": "var(--color-warning-secondary-active)",
           },
           info: {
             DEFAULT: "var(--color-info)",
             hover: "var(--color-info-hover)",
             active: "var(--color-info-active)",
           },
+
+          // Interactive states
           disabled: "var(--color-disabled)",
           focus: "var(--color-focus-ring)",
           "focus-visible": "var(--color-focus-visible)",
+
+          // Links
           link: {
             DEFAULT: "var(--color-link)",
             hover: "var(--color-link-hover)",
             visited: "var(--color-link-visited)",
           },
+
+          // Adaptive platform color
+          current: "var(--ods-current)",
         },
       },
+      // Custom breakpoints (aligned with ODS responsive tokens from Figma)
+      screens: {
+        'md': '800px',   // Tablet: 50rem
+        'lg': '1280px',  // Desktop: 80rem
+        'xl': '1440px',  // Large desktop: 90rem
+      },
+
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+
       fontFamily: {
-        sans: ["DM Sans", "sans-serif"],
-        mono: ["Azeret Mono", "monospace"],
-        body: ["DM Sans", "sans-serif"],
-        heading: ["Azeret Mono", "monospace"],
+        sans: ["var(--font-family-body)"],
+        mono: ["var(--font-family-heading)"],
+        body: ["var(--font-family-body)"],
+        heading: ["var(--font-family-heading)"],
       },
+
+      // =================================================
+      // TYPOGRAPHY
+      // =================================================
+      fontSize: {
+        // Responsive heading sizes (from ods-responsive-tokens.css)
+        'heading-1': ['var(--font-size-h1-title)', { lineHeight: 'var(--font-line-space-h1-main-title)' }],
+        'heading-2': ['var(--font-size-h2-sub-title)', { lineHeight: 'var(--font-line-space-h2-sub-title)' }],
+        'heading-3': ['var(--font-size-h3-body)', { lineHeight: 'var(--font-line-space-h3-body)' }],
+        'heading-4': ['var(--font-size-h4-body)', { lineHeight: 'var(--font-line-space-h4-body)' }],
+        'heading-5': ['var(--font-size-h5-caption)', { lineHeight: 'var(--font-line-space-h5-caption)' }],
+        'heading-6': ['var(--font-size-h6-caption)', { lineHeight: 'var(--font-line-space-h6-caption)' }],
+      },
+
+      // =================================================
+      // SHADOWS
+      // =================================================
+      boxShadow: {
+        'card': 'var(--shadow-card)',
+        'card-hover': 'var(--shadow-card-hover)',
+        'modal': 'var(--shadow-modal)',
+        'dropdown': 'var(--shadow-dropdown)',
+        'tooltip': 'var(--shadow-tooltip)',
+        'focus': 'var(--shadow-focus)',
+        'accent': 'var(--shadow-accent)',
+        'accent-lg': 'var(--shadow-accent-lg)',
+      },
+
+      // =================================================
+      // TRANSITIONS
+      // =================================================
+      transitionDuration: {
+        'fast': 'var(--duration-fast)',
+        'normal': 'var(--duration-normal)',
+        'slow': 'var(--duration-slow)',
+        'slower': 'var(--duration-slower)',
+      },
+      transitionTimingFunction: {
+        'bounce': 'var(--ease-bounce)',
+        'elastic': 'var(--ease-elastic)',
+      },
+
+      // =================================================
+      // Z-INDEX
+      // =================================================
+      zIndex: {
+        'dropdown': 'var(--z-dropdown)',
+        'sticky': 'var(--z-sticky)',
+        'fixed': 'var(--z-fixed)',
+        'modal-backdrop': 'var(--z-modal-backdrop)',
+        'modal': 'var(--z-modal)',
+        'popover': 'var(--z-popover)',
+        'tooltip': 'var(--z-tooltip)',
+        'notification': 'var(--z-notification)',
+        'debug': 'var(--z-debug)',
+      },
+
+      // =================================================
+      // ANIMATIONS
+      // =================================================
       keyframes: {
         "accordion-down": {
           from: { height: "0" },
@@ -248,14 +285,19 @@ const config: Config = {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        "fade-in": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "fade-in": "fade-in 0.3s ease-out",
       },
     },
   },
-  plugins: [tailwindcssAnimate],
+  plugins: [tailwindcssAnimate, odsTypographyPlugin],
 }
 
 export default config

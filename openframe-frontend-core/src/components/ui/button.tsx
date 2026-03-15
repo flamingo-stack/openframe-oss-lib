@@ -12,7 +12,7 @@ import { cn } from "../../utils/cn"
 const buttonVariants = cva(
   // Base styles following ButtonFull specifications with Figma-accurate typography
   // Text wrapping enabled - full width on mobile, extra small text and minimal gap for better wrapping
-  "whitespace-nowrap inline-flex items-center justify-center gap-1 sm:gap-2 rounded-[6px] font-['DM_Sans'] font-bold text-xs sm:text-lg leading-tight transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 !w-full sm:!w-auto text-center",
+  "whitespace-nowrap inline-flex items-center justify-center gap-1 md:gap-2 rounded-[6px] font-['DM_Sans'] font-bold text-xs md:text-lg leading-tight transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 !w-full md:!w-auto text-center",
   {
     variants: {
       variant: { 
@@ -31,7 +31,7 @@ const buttonVariants = cva(
         // Ghost navigation variant - left-aligned for navigation menus
         "ghost-nav": "bg-transparent text-ods-text-primary hover:bg-ods-bg-hover active:bg-ods-bg-active focus-visible:ring-2 focus-visible:ring-ods-focus disabled:text-ods-text-disabled justify-start !w-auto whitespace-nowrap !text-base",
         // Link variant for text-like buttons
-        link: "bg-transparent text-ods-link underline-offset-4 hover:underline hover:text-ods-link-hover focus-visible:ring-2 focus-visible:ring-ods-focus disabled:text-ods-text-disabled text-[12px] sm:text-[14px]",
+        link: "bg-transparent text-ods-link underline-offset-4 hover:underline hover:text-ods-link-hover focus-visible:ring-2 focus-visible:ring-ods-focus disabled:text-ods-text-disabled text-[12px] md:text-[14px]",
         // Search variant for search containers
         search: "bg-ods-card border border-ods-border text-ods-text-primary hover:bg-ods-bg-hover hover:border-ods-border focus-visible:ring-2 focus-visible:ring-ods-focus disabled:bg-ods-disabled disabled:text-ods-text-disabled",
         // Special variant for submit product buttons (header usage)
@@ -59,20 +59,20 @@ const buttonVariants = cva(
         // Table display variant - for non-interactive display in tables (no hover, no padding)
         "table-display": "bg-transparent text-ods-text-primary cursor-default pointer-events-none font-normal",
         // Device action variant - for device detail page action buttons
-        "device-action": "bg-ods-card border border-ods-border hover:bg-ods-bg-hover text-ods-text-primary px-4 py-3 rounded-[6px] font-['DM_Sans'] font-bold text-[18px] tracking-[-0.36px] disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-ods-card disabled:text-ods-text-secondary",
-        card: "bg-ods-card border border-ods-border hover:bg-ods-bg-hover text-ods-text-primary px-4 py-3 rounded-[6px] font-['DM_Sans'] font-bold text-[18px] tracking-[-0.36px] disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-ods-card disabled:text-ods-text-secondary",
+        "device-action": "bg-ods-card border border-ods-border hover:bg-ods-bg-hover text-ods-text-primary px-4 py-3 rounded-[6px] text-h3 tracking-[-0.36px] disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-ods-card disabled:text-ods-text-secondary",
+        card: "bg-ods-card border border-ods-border hover:bg-ods-bg-hover text-ods-text-primary px-4 py-3 rounded-[6px] text-h3 tracking-[-0.36px] disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-ods-card disabled:text-ods-text-secondary",
         // Ghost subtle variant - no background change on hover/click, only text/icon turns white
         "ghost-subtle": "bg-transparent text-ods-text-secondary hover:bg-transparent hover:text-white active:bg-transparent active:text-white [&_svg]:transition-colors [&_svg]:text-ods-text-secondary [&:hover_svg]:text-white [&:active_svg]:text-white focus-visible:ring-2 focus-visible:ring-ods-focus disabled:text-ods-text-disabled !w-auto whitespace-nowrap !text-base cursor-pointer transition-colors",
       },
       size: {
         // Small size for secondary actions
-        sm: "h-10 px-2 sm:px-6 py-2 text-sm",
+        sm: "h-10 px-2 md:px-6 py-2 text-sm",
         // Default size for most buttons (ButtonFull default)
-        default: "h-12 px-2 sm:px-8 py-3 text-base",
+        default: "h-12 px-2 md:px-8 py-3 text-base",
         // Large size for prominent CTAs (ButtonFull lg) - adjusted for better text/icon fit
-        lg: "min-h-[48px] px-2 sm:px-8 py-3 text-base",
+        lg: "min-h-[48px] px-2 md:px-8 py-3 text-base",
         // Icon-only buttons - fixed square size on all breakpoints
-        icon: "!w-11 !h-11 sm:!w-12 sm:!h-12 p-0 shrink-0",
+        icon: "!w-11 !h-11 md:!w-12 md:!h-12 p-0 shrink-0",
         // Icon-only large buttons (like hamburger menu) - fixed square size on all breakpoints
         iconLg: "!w-12 !h-12 p-0 shrink-0",
         // Touch-friendly mobile sizing
@@ -184,7 +184,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       if (!isCenterIconOnly) {
         return (
           <>
-            {leftIcon && !loading && <span className="flex items-center justify-center [&_svg]:w-4 [&_svg]:h-4 sm:[&_svg]:w-6 sm:[&_svg]:h-6">{leftIcon}</span>}
+            {leftIcon && !loading && <span className="flex items-center justify-center [&_svg]:w-4 [&_svg]:h-4 md:[&_svg]:w-6 md:[&_svg]:h-6">{leftIcon}</span>}
             {loading && (
               <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -194,7 +194,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             {children && (
               <span className={cn(loading && "opacity-70")}>{children}</span>
             )}
-            {rightIcon && !loading && <span className="flex items-center justify-center [&_svg]:w-4 [&_svg]:h-4 sm:[&_svg]:w-6 sm:[&_svg]:h-6">{rightIcon}</span>}
+            {rightIcon && !loading && <span className="flex items-center justify-center [&_svg]:w-4 [&_svg]:h-4 md:[&_svg]:w-6 md:[&_svg]:h-6">{rightIcon}</span>}
           </>
         )
       }

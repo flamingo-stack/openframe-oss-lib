@@ -1,0 +1,16 @@
+/* React-scroll active states (used in vendor-detail-content.tsx) */
+.nav-item-active::before {
+  content: '';
+  position: absolute;
+  width: 4px;
+  height: 24px;
+  left: -2px;
+  top: 8px;
+  background-color: var(--color-accent-primary);
+  border-radius: 2px;
+  z-index: 10;
+}
+
+.nav-item-active span {
+  color: var(--color-text-primary) !important;
+}

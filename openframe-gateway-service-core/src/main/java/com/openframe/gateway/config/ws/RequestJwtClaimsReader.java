@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 
 import java.time.Instant;
+import java.util.Optional;
 
 import static com.openframe.gateway.config.ws.ToolWebSocketProxyUrlFilter.ORIGINAL_AUTHORIZATION_ATTR;
 import static com.openframe.gateway.config.ws.WebSocketServiceSecurityDecorator.CLOCK_SKEW_SECONDS;
@@ -21,6 +22,16 @@ public class RequestJwtClaimsReader {
     public Instant getExpiration(ServerWebExchange exchange) {
         Claims jwtClaims = getClaims(exchange);
         return jwtClaims.getExpiration().toInstant();
+    }
+
+    public Optional<String> getSubject(ServerWebExchange exchange) {
+        try {
+            Claims claims = getClaims(exchange);
+            Object sub = claims.get("sub");
+            return sub == null ? Optional.empty() : Optional.of(String.valueOf(sub));
+        } catch (Exception e) {
+            return Optional.empty();
+        }
     }
 
     private Claims getClaims(ServerWebExchange exchange) {

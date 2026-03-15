@@ -553,7 +553,7 @@ export const IconButtonsLargeWithNumber: Story = {
   },
   render: () => (
     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-      <Button variant="outline" size="icon" className="!h-9 !w-9 sm:!w-9">1</Button>
+      <Button variant="outline" size="icon" className="!h-9 !w-9 md:!w-9">1</Button>
       <Button variant="outline" size="iconLg" centerIcon={<span style={{ fontSize: '18px', fontWeight: 'bold' }}>2</span>} />
       <Button variant="primary" size="iconLg" centerIcon={<span style={{ fontSize: '18px', fontWeight: 'bold' }}>10</span>} />
       <Button variant="secondary" size="iconLg" centerIcon={<span style={{ fontSize: '18px', fontWeight: 'bold' }}>25</span>} />

@@ -21,10 +21,10 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description }) =
       
       {/* Text Container */}
       <div className="flex flex-col gap-2">
-        <h3 className="font-['DM_Sans'] font-bold text-[18px] leading-[24px] text-ods-text-primary tracking-[-0.36px]">
+        <h3 className="text-h3 text-ods-text-primary tracking-[-0.36px]">
           {title}
         </h3>
-        <p className="font-['DM_Sans'] font-medium text-[18px] leading-[24px] text-ods-text-primary">
+        <p className="text-h4 text-ods-text-primary">
           {description}
         </p>
       </div>
@@ -57,11 +57,11 @@ const OpenSourceFeatures: React.FC = () => {
   ];
 
   return (
-    <section className="w-full bg-[#161616] py-12 sm:py-16 lg:py-20">
+    <section className="w-full bg-[#161616] py-12 md:py-16 lg:py-20">
       <div className="w-full max-w-[1920px] mx-auto px-6 md:px-20">
         {/* Section Title */}
         <div className="flex flex-col items-center gap-10">
-          <h2 className="font-['Azeret_Mono'] font-semibold text-3xl sm:text-4xl lg:text-5xl xl:text-[56px] leading-tight text-center tracking-[-0.02em] text-ods-text-primary w-full">
+          <h2 className="text-h1 text-center tracking-[-0.02em] text-ods-text-primary w-full">
             <span className="text-ods-accent">100%</span>
             <span> Open-Source. </span>
             <span className="text-ods-accent">0%</span>

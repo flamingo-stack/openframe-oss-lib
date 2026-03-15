@@ -12,6 +12,7 @@ export interface VideoTeaser {
   thumbnail_url?: string // Optional thumbnail image URL for video preview. If not provided, video player will show first frame automatically.
   published?: boolean // Controls visibility on public preview page (default: false, admin must select)
   source?: 'manual' | 'ai_generated' // Track origin of teaser
+  created_at?: string // ISO timestamp for sorting (newer items first)
   // Duration auto-detected from video file
 }
 
@@ -31,6 +32,13 @@ export interface VideoClip {
   thumbnail_url?: string
 }
 
+export interface CustomerInterviewConfig {
+  /** Target duration in seconds for AI-generated highlight video (default: 180) */
+  highlight_target_duration_seconds?: number
+  /** Skip subtitle burning during highlight video generation */
+  skipSubtitleBurning?: boolean
+}
+
 export interface CustomerInterview {
   id: number
   title: string
@@ -44,6 +52,12 @@ export interface CustomerInterview {
   // Video content
   main_video_url: string | null
   teasers: VideoTeaser[] // JSONB array
+
+  // Highlight video (AI-generated summary video)
+  highlight_video_url?: string | null
+  highlight_video_thumbnail?: string | null
+  highlight_video_duration_ms?: number | null
+  highlight_video_source?: 'manual' | 'ai_generated' | null
 
   // Optional case study link
   case_study_id: number | null
@@ -82,6 +96,34 @@ export interface CustomerInterview {
   assemblyai_transcript_id?: string
   twelvelabs_video_id?: string
 
+  // Word-level transcript data for video processing
+  transcript_words_data?: Array<{
+    text: string
+    start: number  // milliseconds
+    end: number    // milliseconds
+    confidence: number
+    speaker?: string
+  }>
+
+  // Incentive mention exclusion ranges (computed during transcription)
+  incentive_excluded_ranges?: Array<{
+    start: number  // seconds
+    end: number    // seconds
+  }>
+
+  // Speaker identification mapping (computed during transcription)
+  // Maps AssemblyAI labels ("A", "B") to actual person info
+  speaker_mapping?: {
+    [label: string]: {
+      name: string
+      role: 'interviewer' | 'interviewee'
+      userId?: string
+    }
+  }
+
+  /** Per-interview configuration options (JSONB) */
+  config?: CustomerInterviewConfig
+
   // Timestamps
   created_at: string
   updated_at: string
@@ -109,6 +151,7 @@ export interface CreateCustomerInterviewData {
   transcript?: string // Markdown supported
   user_id?: string // Customer UUID
   main_video_url?: string
+  highlight_video_url?: string | null
   teasers?: VideoTeaser[]
   case_study_id?: number | null
   seo_title?: string
@@ -121,6 +164,7 @@ export interface CreateCustomerInterviewData {
   author_id: string
   platforms: string[] // Array of platform IDs (UUIDs)
   featured_platform?: string // Platform ID for featured
+  config?: CustomerInterviewConfig
 }
 
 export type UpdateCustomerInterviewData = Partial<CreateCustomerInterviewData>

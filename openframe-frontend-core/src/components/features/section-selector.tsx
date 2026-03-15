@@ -170,7 +170,7 @@ export const SectionSelector: React.FC<SectionSelectorProps> = ({
   showDescription = true
 }) => {
   const containerClasses = cn(
-    layout === 'wrap' ? 'flex flex-wrap gap-2 sm:gap-4 lg:gap-6' : 'flex flex-col gap-2',
+    layout === 'wrap' ? 'flex flex-wrap gap-2 md:gap-4 lg:gap-6' : 'flex flex-col gap-2',
     className
   )
 
@@ -179,7 +179,7 @@ export const SectionSelector: React.FC<SectionSelectorProps> = ({
       case 'full':
         return 'w-full'
       case 'responsive':
-        return 'w-full sm:w-[calc(50%-8px)] lg:w-auto'
+        return 'w-full md:w-[calc(50%-8px)] lg:w-auto'
       default:
         return ''
     }

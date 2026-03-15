@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
@@ -28,6 +29,9 @@ public class SsoTenantRegistrationSuccessHandler extends SavedRequestAwareAuthen
 
     private final List<SsoFlowHandler> flowHandlers;
     private final SsoCookieCodec ssoCookieCodec;
+
+    @Value("${openframe.auth.error-url}")
+    private String authErrorUrl;
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request,
                                         HttpServletResponse response,
@@ -50,7 +54,7 @@ public class SsoTenantRegistrationSuccessHandler extends SavedRequestAwareAuthen
         } catch (Exception e) {
             log.error("SSO tenant registration finalization failed: {}", e.getMessage(), e);
             String msg = URLEncoder.encode(e.getMessage() != null ? e.getMessage() : "Registration failed. Please try again.", StandardCharsets.UTF_8);
-            response.sendRedirect(request.getContextPath() + "/auth/error?error=" + msg);
+            response.sendRedirect(authErrorUrl + "?error=" + msg);
         }
     }
 

@@ -336,6 +336,7 @@ export type ContentSourceType =
   | 'blog_post_seed'      // Generate new blog post (seed blog workflow)
   | 'blog_post_existing'  // Use existing blog post
   | 'case_study'
+  | 'customer_interview'  // Link to customer interview
   | 'from_scratch';
 
 export type URLInjectionPreference = 'none' | 'in_post' | 'as_comment';
