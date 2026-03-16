@@ -11,8 +11,7 @@ public interface PinotDeviceRepository {
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
-            List<String> tagKeyValues,
-            List<String> tagTypes
+            List<String> tagKeyValues
     );
 
     Map<String, Integer> getDeviceTypeFilterOptions(
@@ -21,8 +20,7 @@ public interface PinotDeviceRepository {
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
-            List<String> tagKeyValues,
-            List<String> tagTypes
+            List<String> tagKeyValues
     );
 
     Map<String, Integer> getOsTypeFilterOptions(
@@ -31,8 +29,7 @@ public interface PinotDeviceRepository {
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
-            List<String> tagKeyValues,
-            List<String> tagTypes
+            List<String> tagKeyValues
     );
 
     Map<String, Integer> getOrganizationFilterOptions(
@@ -41,8 +38,7 @@ public interface PinotDeviceRepository {
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
-            List<String> tagKeyValues,
-            List<String> tagTypes
+            List<String> tagKeyValues
     );
 
     /**
@@ -54,21 +50,7 @@ public interface PinotDeviceRepository {
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
-            List<String> tagKeyValues,
-            List<String> tagTypes
-    );
-
-    /**
-     * Get tag type filter options from the tagTypes MV column.
-     */
-    Map<String, Integer> getTagTypeFilterOptions(
-            List<String> statuses,
-            List<String> deviceTypes,
-            List<String> osTypes,
-            List<String> organizationIds,
-            List<String> tagKeys,
-            List<String> tagKeyValues,
-            List<String> tagTypes
+            List<String> tagKeyValues
     );
 
     int getFilteredDeviceCount(
@@ -77,7 +59,6 @@ public interface PinotDeviceRepository {
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
-            List<String> tagKeyValues,
-            List<String> tagTypes
+            List<String> tagKeyValues
     );
 }

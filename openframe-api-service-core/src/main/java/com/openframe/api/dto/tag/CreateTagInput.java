@@ -1,6 +1,5 @@
 package com.openframe.api.dto.tag;
 
-import com.openframe.data.document.tool.TagType;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -17,8 +16,6 @@ public class CreateTagInput {
 
     @NotBlank(message = "Tag key is required")
     private String key;
-
-    private TagType type;
 
     private String description;
 

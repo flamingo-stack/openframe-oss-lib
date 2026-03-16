@@ -30,9 +30,6 @@ public class DeviceFilterResponse {
     @Schema(description = "Available tag keys with counts")
     private List<TagFilterItem> tagKeys;
 
-    @Schema(description = "Available tag types with counts")
-    private List<DeviceFilterItem> tagTypes;
-
     @Schema(description = "Total count of filtered devices")
     private Integer filteredCount;
 

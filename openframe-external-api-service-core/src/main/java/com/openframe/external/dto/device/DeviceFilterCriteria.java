@@ -34,7 +34,4 @@ public class DeviceFilterCriteria {
 
     @Schema(description = "Tag values to filter by")
     private List<String> tagValues;
-
-    @Schema(description = "Tag types to filter by")
-    private List<String> tagTypes;
 }

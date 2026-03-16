@@ -316,7 +316,6 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
 
         List<String> tagKeyNames = new ArrayList<>();
         List<String> tagKeyValues = new ArrayList<>();
-        Set<String> tagTypesSet = new LinkedHashSet<>();
 
         for (Tag tag : tags) {
             String key = tag.getKey();
@@ -331,11 +330,6 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
                     tagKeyValues.add(key + ":" + value);
                 }
             }
-
-            // Tag type for filtering (deduplicated — avoids inflated counts in Pinot GROUP BY)
-            if (tag.getType() != null) {
-                tagTypesSet.add(tag.getType().name());
-            }
         }
 
         return MachinePinotMessage.builder()
@@ -346,7 +340,7 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
                 .osType(machine.getOsType())
                 .tags(tagKeyNames)
                 .tagKeyValues(tagKeyValues)
-                .tagTypes(new ArrayList<>(tagTypesSet))
+                .ingestionTime(System.currentTimeMillis())
                 .build();
     }
 }

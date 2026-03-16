@@ -4,6 +4,8 @@ import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class AgentRegistrationRequest {
     // Core identification
@@ -29,4 +31,7 @@ public class AgentRegistrationRequest {
     private String osVersion;
     private String osBuild;
     private String timezone;
+
+    // Tags to create and assign to the device at registration time
+    private List<AgentRegistrationTagInput> tags;
 } 

@@ -3,7 +3,6 @@ package com.openframe.external.mapper;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.device.*;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.tool.TagType;
 import com.openframe.external.dto.device.*;
 import com.openframe.external.dto.shared.SortCriteria;
 import com.openframe.api.dto.shared.SortInput;
@@ -80,7 +79,6 @@ public class DeviceMapper extends BaseRestMapper {
         return DeviceTagResponse.builder()
                 .tagId(deviceTag.getTagId())
                 .key(deviceTag.getKey())
-                .type(deviceTag.getType())
                 .description(deviceTag.getDescription())
                 .color(deviceTag.getColor())
                 .values(deviceTag.getValues() != null ? deviceTag.getValues() : List.of())
@@ -106,7 +104,6 @@ public class DeviceMapper extends BaseRestMapper {
                 .osTypes(toDeviceFilterOptions(filters.getOsTypes()))
                 .organizationIds(toDeviceFilterOptions(filters.getOrganizationIds()))
                 .tagKeys(toTagFilterOptions(filters.getTagKeys()))
-                .tagTypes(toDeviceFilterOptions(filters.getTagTypes()))
                 .filteredCount(filters.getFilteredCount())
                 .build();
     }
@@ -123,14 +120,6 @@ public class DeviceMapper extends BaseRestMapper {
                 .organizationIds(criteria.getOrganizationIds())
                 .tagKeys(criteria.getTagKeys())
                 .tagValues(criteria.getTagValues());
-
-        // Convert tagTypes from String to TagType enum
-        if (criteria.getTagTypes() != null) {
-            List<TagType> tagTypes = criteria.getTagTypes().stream()
-                    .map(TagType::valueOf)
-                    .collect(Collectors.toList());
-            builder.tagTypes(tagTypes);
-        }
 
         return builder.build();
     }

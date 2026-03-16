@@ -27,7 +27,6 @@ public class GraphQLDeviceMapper {
                 .organizationIds(input.getOrganizationIds())
                 .tagKeys(input.getTagKeys())
                 .tagValues(input.getTagValues())
-                .tagTypes(input.getTagTypes())
                 .build();
     }
 

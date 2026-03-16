@@ -102,31 +102,6 @@ public class DeviceDataFetcher {
     }
 
     @DgsMutation
-    public Machine createDevice(@InputArgument @Valid CreateDeviceInput input) {
-        log.info("Creating device via GraphQL - org: {}, osType: {}, type: {}, tags: {}",
-                input.getOrganizationId(), input.getOsType(), input.getType(),
-                input.getTags() != null ? input.getTags().size() : 0);
-
-        Machine machine = deviceService.createDevice(
-                input.getOrganizationId(),
-                input.getDisplayName(),
-                input.getHostname(),
-                input.getType(),
-                input.getOsType());
-
-        // Assign tags if provided
-        if (input.getTags() != null && !input.getTags().isEmpty()) {
-            for (DeviceTagInput tagInput : input.getTags()) {
-                String resolvedTagId = tagService.resolveTagId(
-                        null, tagInput.getKey(), input.getOrganizationId(), null);
-                tagService.assignTagToDevice(machine.getMachineId(), resolvedTagId,
-                        tagInput.getValues(), null, input.getOrganizationId());
-            }
-        }
-        return machine;
-    }
-
-    @DgsMutation
     public DeviceTag assignTagToDevice(@InputArgument @NotBlank String machineId,
                                         @InputArgument @Valid AssignTagInput input) {
         log.info("Assigning tag via GraphQL - machineId: {}, tagId: {}, key: {}",
@@ -136,7 +111,8 @@ public class DeviceDataFetcher {
                 .orElseThrow(() -> new DeviceNotFoundException("Device not found with ID: " + machineId));
 
         String resolvedTagId = tagService.resolveTagId(
-                input.getTagId(), input.getKey(), machine.getOrganizationId(), null);
+                input.getTagId(), input.getKey(), machine.getOrganizationId(), null,
+                input.getValues());
         tagService.assignTagToDevice(machine.getMachineId(), resolvedTagId, input.getValues(),
                 null, machine.getOrganizationId());
 
@@ -160,7 +136,8 @@ public class DeviceDataFetcher {
 
         for (AssignTagInput tag : input.getTags()) {
             String resolvedTagId = tagService.resolveTagId(
-                    tag.getTagId(), tag.getKey(), machine.getOrganizationId(), null);
+                    tag.getTagId(), tag.getKey(), machine.getOrganizationId(), null,
+                    tag.getValues());
             tagService.assignTagToDevice(machine.getMachineId(), resolvedTagId, tag.getValues(),
                     null, machine.getOrganizationId());
         }
@@ -210,7 +187,8 @@ public class DeviceDataFetcher {
         String organizationId = firstMachine.getOrganizationId();
 
         String resolvedTagId = tagService.resolveTagId(
-                input.getTagId(), input.getKey(), organizationId, null);
+                input.getTagId(), input.getKey(), organizationId, null,
+                input.getValues());
         tagService.bulkAssignTag(input.getMachineIds(), resolvedTagId, input.getValues(),
                 null, organizationId);
         return true;

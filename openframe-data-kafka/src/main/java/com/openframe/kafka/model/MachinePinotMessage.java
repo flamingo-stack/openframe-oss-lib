@@ -24,5 +24,5 @@ public class MachinePinotMessage implements KafkaMessage {
     private String osType;
     private List<String> tags;              // tag key names for Pinot MV column
     private List<String> tagKeyValues;      // "key:value" pairs for Pinot indexing
-    private List<String> tagTypes;          // tag type names for filtering
+    private long ingestionTime;
 }

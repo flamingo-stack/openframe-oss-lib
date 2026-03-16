@@ -1,6 +1,5 @@
 package com.openframe.api.dto.tag;
 
-import com.openframe.data.document.tool.TagType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -17,8 +16,6 @@ public class UpdateTagInput {
     private String description;
 
     private String color;
-
-    private TagType type;
 
     private List<String> values;
 }

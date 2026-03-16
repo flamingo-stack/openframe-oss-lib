@@ -11,11 +11,15 @@ extend type Query {
     device(machineId: String!): Machine
 
     # Tag key queries
-    tags(organizationId: String!, types: [TagType!]): [Tag!]!
+    tags(organizationId: String!): [Tag!]!
     tag(tagId: ID!): Tag
 
     # Tag value options for filter UI (returns distinct values for a tag key with device counts)
     tagValueOptions(tagKey: String!): [DeviceFilterOption!]!
+
+    # Autocomplete queries for tag key and value search
+    tagKeySuggestions(organizationId: String!, search: String!): [Tag!]!
+    tagValueSuggestions(organizationId: String!, tagKey: String!, search: String!): [String!]!
 }
 
 extend type Mutation {
@@ -23,9 +27,6 @@ extend type Mutation {
     createTag(input: CreateTagInput!): Tag!
     updateTag(tagId: ID!, input: UpdateTagInput!): Tag!
     deleteTag(tagId: ID!): Boolean!
-
-    # Device creation
-    createDevice(input: CreateDeviceInput!): Machine!
 
     # Device tag assignment
     assignTagToDevice(machineId: String!, input: AssignTagInput!): DeviceTag!
@@ -38,17 +39,10 @@ extend type Mutation {
     bulkRemoveTag(input: BulkRemoveTagInput!): Boolean!
 }
 
-enum TagType {
-    CUSTOM
-    SYSTEM
-    CATEGORY
-}
-
 # Tag key definition (not tied to a device)
 type Tag {
     id: ID!
     key: String!
-    type: TagType!
     description: String
     color: String
     values: [String!]
@@ -63,7 +57,6 @@ type DeviceFilters {
     osTypes: [DeviceFilterOption!]!
     organizationIds: [DeviceFilterOption!]!
     tagKeys: [TagFilterOption!]!
-    tagTypes: [DeviceFilterOption!]!
     filteredCount: Int!
 }
 
@@ -86,14 +79,12 @@ input DeviceFilterInput {
     organizationIds: [String!]
     tagKeys: [String!]
     tagValues: [String!]
-    tagTypes: [TagType!]
 }
 
 # --- Tag CRUD inputs ---
 
 input CreateTagInput {
     key: String!
-    type: TagType
     description: String
     color: String
     values: [String!]
@@ -103,23 +94,6 @@ input CreateTagInput {
 input UpdateTagInput {
     description: String
     color: String
-    type: TagType
-    values: [String!]
-}
-
-# --- Device creation input ---
-
-input CreateDeviceInput {
-    organizationId: String!
-    displayName: String
-    hostname: String
-    type: DeviceType
-    osType: String!
-    tags: [DeviceTagInput!]
-}
-
-input DeviceTagInput {
-    key: String!
     values: [String!]
 }
 
@@ -183,7 +157,6 @@ type Machine {
 type DeviceTag {
     tagId: String!
     key: String!
-    type: TagType!
     description: String
     color: String
     values: [String!]!

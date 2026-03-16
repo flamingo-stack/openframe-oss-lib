@@ -64,7 +64,6 @@ public class DeviceQueries {
                     tags {
                         tagId
                         key
-                        type
                         description
                         color
                         values
@@ -168,7 +167,6 @@ public class DeviceQueries {
                     osTypes { value label count }
                     organizationIds { value label count }
                     tagKeys { value label count }
-                    tagTypes { value label count }
                     filteredCount
                 }
             }

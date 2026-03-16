@@ -82,9 +82,6 @@ public class DeviceController {
             @Parameter(description = "Tag values to filter by")
             @RequestParam(required = false) List<String> tagValues,
 
-            @Parameter(description = "Tag types to filter by")
-            @RequestParam(required = false) List<String> tagTypes,
-
             @Parameter(description = "Search query for device name/hostname")
             @RequestParam(required = false) String search,
 
@@ -116,7 +113,6 @@ public class DeviceController {
                 .organizationIds(organizationIds)
                 .tagKeys(tagKeys)
                 .tagValues(tagValues)
-                .tagTypes(tagTypes)
                 .build();
 
         PaginationCriteria paginationCriteria = PaginationCriteria.builder()
@@ -214,9 +210,6 @@ public class DeviceController {
             @Parameter(description = "Tag values to filter by")
             @RequestParam(required = false) List<String> tagValues,
 
-            @Parameter(description = "Tag types to filter by")
-            @RequestParam(required = false) List<String> tagTypes,
-
             @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
             @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
 
@@ -229,7 +222,6 @@ public class DeviceController {
                 .organizationIds(organizationIds)
                 .tagKeys(tagKeys)
                 .tagValues(tagValues)
-                .tagTypes(tagTypes)
                 .build();
         var filters = deviceFilterService.getDeviceFilters(
                 deviceMapper.toDeviceFilterOptions(filterCriteria)).join();

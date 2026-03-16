@@ -1,6 +1,5 @@
 package com.openframe.external.dto.device;
 
-import com.openframe.data.document.tool.TagType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -25,9 +24,6 @@ public class DeviceTagResponse {
 
     @Schema(description = "Tag key identifier", example = "site")
     private String key;
-
-    @Schema(description = "Tag type classification", example = "CUSTOM")
-    private TagType type;
 
     @Schema(description = "Tag description", example = "Physical location of the device")
     private String description;

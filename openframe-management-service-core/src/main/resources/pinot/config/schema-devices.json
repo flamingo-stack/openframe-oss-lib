@@ -36,11 +36,6 @@
       "name": "tagKeyValues",
       "dataType": "STRING",
       "singleValueField": false
-    },
-    {
-      "name": "tagTypes",
-      "dataType": "STRING",
-      "singleValueField": false
     }
   ],
   "dateTimeFieldSpecs": [

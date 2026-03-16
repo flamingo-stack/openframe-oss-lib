@@ -40,6 +40,7 @@ public class AgentRegistrationService {
     private final MachineIdGenerator machineIdGenerator;
     private final AgentRegistrationToolInstallationService agentRegistrationToolInstallationService;
     private final AgentRegistrationProcessor agentRegistrationProcessor;
+    private final RegistrationTagAssignmentService registrationTagAssignmentService;
 
     @Transactional
     // TODO: two phase commit for the nats integration or other fallback
@@ -55,6 +56,11 @@ public class AgentRegistrationService {
 
         saveOAuthClient(machineId, clientId, clientSecret);
         Machine machine = saveMachine(machineId, request, resolvedOrganizationId);
+
+        // Assign tags from registration request (creates tags if they don't exist)
+        if (request.getTags() != null && !request.getTags().isEmpty()) {
+            registrationTagAssignmentService.assignTags(machineId, resolvedOrganizationId, request.getTags());
+        }
 
         agentRegistrationToolInstallationService.process(machineId);
 

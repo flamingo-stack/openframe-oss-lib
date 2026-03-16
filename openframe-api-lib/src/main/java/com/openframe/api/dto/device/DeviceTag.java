@@ -1,6 +1,5 @@
 package com.openframe.api.dto.device;
 
-import com.openframe.data.document.tool.TagType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,7 +20,6 @@ public class DeviceTag {
 
     private String tagId;           // Tag.id
     private String key;             // Tag.key
-    private TagType type;           // Tag.type
     private String description;     // Tag.description
     private String color;           // Tag.color
     private List<String> values;    // MachineTag.values

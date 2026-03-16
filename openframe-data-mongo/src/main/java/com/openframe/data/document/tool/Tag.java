@@ -29,7 +29,6 @@ public class Tag {
      * Unique per organization (compound index with organizationId).
      */
     private String key;
-    private TagType type;
 
     private String description;
     private String color;  // Optional

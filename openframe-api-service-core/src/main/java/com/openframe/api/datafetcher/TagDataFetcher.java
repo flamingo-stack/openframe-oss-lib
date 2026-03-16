@@ -9,7 +9,6 @@ import com.openframe.api.dto.tag.CreateTagInput;
 import com.openframe.api.dto.tag.UpdateTagInput;
 import com.openframe.api.service.TagService;
 import com.openframe.data.document.tool.Tag;
-import com.openframe.data.document.tool.TagType;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -27,10 +26,9 @@ public class TagDataFetcher {
     private final TagService tagService;
 
     @DgsQuery
-    public List<Tag> tags(@InputArgument @NotBlank String organizationId,
-                          @InputArgument List<TagType> types) {
-        log.debug("Fetching tags for org: {}, types: {}", organizationId, types);
-        return tagService.listTags(organizationId, types);
+    public List<Tag> tags(@InputArgument @NotBlank String organizationId) {
+        log.debug("Fetching tags for org: {}", organizationId);
+        return tagService.listTags(organizationId);
     }
 
     @DgsQuery
@@ -45,14 +43,28 @@ public class TagDataFetcher {
         return tagService.getTagValueOptions(tagKey);
     }
 
+    @DgsQuery
+    public List<Tag> tagKeySuggestions(@InputArgument @NotBlank String organizationId,
+                                       @InputArgument @NotBlank String search) {
+        log.debug("Autocomplete tag keys for org: {}, search: {}", organizationId, search);
+        return tagService.searchTagKeys(organizationId, search);
+    }
+
+    @DgsQuery
+    public List<String> tagValueSuggestions(@InputArgument @NotBlank String organizationId,
+                                            @InputArgument @NotBlank String tagKey,
+                                            @InputArgument @NotBlank String search) {
+        log.debug("Autocomplete tag values for org: {}, key: {}, search: {}", organizationId, tagKey, search);
+        return tagService.searchTagValues(organizationId, tagKey, search);
+    }
+
     @DgsMutation
     public Tag createTag(@InputArgument @Valid CreateTagInput input) {
-        log.info("Creating tag via GraphQL - key: {}, type: {}, org: {}",
-                input.getKey(), input.getType(), input.getOrganizationId());
+        log.info("Creating tag via GraphQL - key: {}, org: {}",
+                input.getKey(), input.getOrganizationId());
 
         return tagService.createTag(
                 input.getKey(),
-                input.getType(),
                 input.getDescription(),
                 input.getColor(),
                 input.getOrganizationId(),
@@ -71,7 +83,6 @@ public class TagDataFetcher {
                 tagId,
                 input.getDescription(),
                 input.getColor(),
-                input.getType(),
                 input.getValues(),
                 null
         );

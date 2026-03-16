@@ -40,35 +40,29 @@ public class DeviceFilterService {
         List<String> organizationIds = filters != null ? filters.getOrganizationIds() : emptyList();
         List<String> tagKeys = filters != null ? filters.getTagKeys() : emptyList();
         List<String> tagKeyValues = buildTagKeyValuesFilter(filters);
-        List<String> tagTypes = filters != null && filters.getTagTypes() != null ?
-                filters.getTagTypes().stream().map(Enum::name).toList() : emptyList();
 
         CompletableFuture<Map<String, Integer>> statusesFuture = CompletableFuture.supplyAsync(() ->
-                pinotDeviceRepository.getStatusFilterOptions(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, tagTypes));
+                pinotDeviceRepository.getStatusFilterOptions(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
         CompletableFuture<Map<String, Integer>> deviceTypesFuture = CompletableFuture.supplyAsync(() ->
-                pinotDeviceRepository.getDeviceTypeFilterOptions(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, tagTypes));
+                pinotDeviceRepository.getDeviceTypeFilterOptions(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
         CompletableFuture<Map<String, Integer>> osTypesFuture = CompletableFuture.supplyAsync(() ->
-                pinotDeviceRepository.getOsTypeFilterOptions(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, tagTypes));
+                pinotDeviceRepository.getOsTypeFilterOptions(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
         CompletableFuture<Map<String, Integer>> organizationsFuture = CompletableFuture.supplyAsync(() ->
-                pinotDeviceRepository.getOrganizationFilterOptions(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, tagTypes));
+                pinotDeviceRepository.getOrganizationFilterOptions(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
         CompletableFuture<Map<String, Integer>> tagKeysFuture = CompletableFuture.supplyAsync(() ->
-                pinotDeviceRepository.getTagKeyFilterOptions(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, tagTypes));
-        CompletableFuture<Map<String, Integer>> tagTypesFuture = CompletableFuture.supplyAsync(() ->
-                pinotDeviceRepository.getTagTypeFilterOptions(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, tagTypes));
+                pinotDeviceRepository.getTagKeyFilterOptions(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
         CompletableFuture<Integer> filteredCountFuture = CompletableFuture.supplyAsync(() ->
-                pinotDeviceRepository.getFilteredDeviceCount(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, tagTypes));
+                pinotDeviceRepository.getFilteredDeviceCount(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
 
         return CompletableFuture.allOf(
                         statusesFuture, deviceTypesFuture, osTypesFuture,
-                        organizationsFuture, tagKeysFuture,
-                        tagTypesFuture, filteredCountFuture)
+                        organizationsFuture, tagKeysFuture, filteredCountFuture)
                 .thenApply(v -> DeviceFilters.builder()
                         .statuses(convertMapToFilterOptions(statusesFuture.join()))
                         .deviceTypes(convertMapToFilterOptions(deviceTypesFuture.join()))
                         .osTypes(convertMapToFilterOptions(osTypesFuture.join()))
                         .organizationIds(convertMapToOrganizationFilterOptions(organizationsFuture.join()))
                         .tagKeys(convertMapToTagFilterOptions(tagKeysFuture.join()))
-                        .tagTypes(convertMapToFilterOptions(tagTypesFuture.join()))
                         .filteredCount(filteredCountFuture.join())
                         .build()
                 );

@@ -6,7 +6,6 @@ import com.openframe.api.exception.TagAlreadyExistsException;
 import com.openframe.api.exception.TagNotFoundException;
 import com.openframe.data.document.device.MachineTag;
 import com.openframe.data.document.tool.Tag;
-import com.openframe.data.document.tool.TagType;
 import com.openframe.data.repository.device.MachineTagRepository;
 import com.openframe.data.repository.tool.TagRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -37,9 +36,9 @@ public class TagService {
     }
 
     @Transactional
-    public Tag createTag(String key, TagType type, String description, String color,
+    public Tag createTag(String key, String description, String color,
                          String organizationId, String createdBy, List<String> values) {
-        log.info("Creating tag with key: {}, type: {}, org: {}", key, type, organizationId);
+        log.info("Creating tag with key: {}, org: {}", key, organizationId);
 
         validateTagKey(key);
         validateTagValues(values);
@@ -53,7 +52,6 @@ public class TagService {
 
             Tag tag = Tag.builder()
                     .key(key)
-                    .type(type != null ? type : TagType.CUSTOM)
                     .description(description)
                     .color(color)
                     .values(values != null ? deduplicateValues(values) : null)
@@ -73,7 +71,7 @@ public class TagService {
     }
 
     @Transactional
-    public Tag updateTag(String tagId, String description, String color, TagType type,
+    public Tag updateTag(String tagId, String description, String color,
                          List<String> values, String organizationId) {
         log.info("Updating tag: {}", tagId);
 
@@ -90,9 +88,6 @@ public class TagService {
         if (color != null) {
             tag.setColor(color);
         }
-        if (type != null) {
-            tag.setType(type);
-        }
         if (values != null) {
             validateTagValues(values);
             tag.setValues(deduplicateValues(values));
@@ -100,6 +95,13 @@ public class TagService {
 
         Tag saved = tagRepository.save(tag);
         log.info("Tag updated successfully: id={}", saved.getId());
+
+        // Cascade: clean up device tag values that are no longer in the predefined list.
+        // MachineTag saves trigger the AOP aspect → Kafka → Pinot sync automatically.
+        if (values != null) {
+            cascadeTagValueChanges(saved.getId(), saved.getValues());
+        }
+
         return saved;
     }
 
@@ -120,12 +122,8 @@ public class TagService {
         log.info("Tag deleted successfully: {}", tagId);
     }
 
-    public List<Tag> listTags(String organizationId, List<TagType> types) {
-        log.debug("Listing tags for org: {}, types: {}", organizationId, types);
-
-        if (types != null && !types.isEmpty()) {
-            return tagRepository.findByOrganizationIdAndTypeIn(organizationId, types);
-        }
+    public List<Tag> listTags(String organizationId) {
+        log.debug("Listing tags for org: {}", organizationId);
         return tagRepository.findByOrganizationId(organizationId);
     }
 
@@ -134,9 +132,41 @@ public class TagService {
     }
 
     /**
-     * Find an existing tag by key within an organization, or create a new CUSTOM tag if not found.
+     * Search tag keys by prefix for autocomplete.
+     * Returns tags whose key contains the search string (case-insensitive).
      */
-    private Tag findOrCreateTag(String key, String organizationId, String createdBy) {
+    public List<Tag> searchTagKeys(String organizationId, String search) {
+        log.debug("Searching tag keys for org: {}, search: {}", organizationId, search);
+        if (search == null || search.isBlank()) {
+            return tagRepository.findByOrganizationId(organizationId);
+        }
+        return tagRepository.findByOrganizationIdAndKeyContainingIgnoreCase(organizationId, search);
+    }
+
+    /**
+     * Search tag values by prefix for autocomplete.
+     * Returns values from the tag's predefined options that contain the search string (case-insensitive).
+     */
+    public List<String> searchTagValues(String organizationId, String tagKey, String search) {
+        log.debug("Searching tag values for org: {}, key: {}, search: {}", organizationId, tagKey, search);
+        Tag tag = tagRepository.findValuesByKeyAndOrganizationId(tagKey, organizationId);
+        if (tag == null || tag.getValues() == null || tag.getValues().isEmpty()) {
+            return List.of();
+        }
+        if (search == null || search.isBlank()) {
+            return tag.getValues();
+        }
+        String lowerSearch = search.toLowerCase();
+        return tag.getValues().stream()
+                .filter(v -> v.toLowerCase().contains(lowerSearch))
+                .toList();
+    }
+
+    /**
+     * Find an existing tag by key within an organization, or create a new tag if not found.
+     * When creating, the provided values become the tag's predefined options.
+     */
+    private Tag findOrCreateTag(String key, String organizationId, String createdBy, List<String> values) {
         log.debug("Finding or creating tag with key: {}, org: {}", key, organizationId);
 
         Tag existing = tagRepository.findByKeyAndOrganizationId(key, organizationId);
@@ -144,23 +174,26 @@ public class TagService {
             return existing;
         }
 
-        return createTag(key, TagType.CUSTOM, null, null, organizationId, createdBy, null);
+        return createTag(key, null, null, organizationId, createdBy, values);
     }
 
     /**
      * Resolve a tag identifier to a tagId. Accepts either a tagId or a key.
      * If key is provided and no matching tag exists, it will be auto-created as CUSTOM.
+     * When creating, the provided values become the tag's predefined options.
      *
      * @param tagId          tag definition ID (optional if key is provided)
      * @param key            tag key name (optional if tagId is provided)
      * @param organizationId organization context for key-based lookup/creation
      * @param createdBy      user ID for tag auto-creation
+     * @param values         values to set as predefined options when auto-creating
      * @return resolved tag ID
      * @throws IllegalArgumentException if neither tagId nor key is provided
      * @throws TagNotFoundException     if tagId is provided but not found
      */
     @Transactional
-    public String resolveTagId(String tagId, String key, String organizationId, String createdBy) {
+    public String resolveTagId(String tagId, String key, String organizationId, String createdBy,
+                               List<String> values) {
         if (tagId != null && !tagId.isBlank()) {
             if (!tagRepository.existsById(tagId)) {
                 throw new TagNotFoundException("Tag not found: " + tagId);
@@ -168,7 +201,7 @@ public class TagService {
             return tagId;
         }
         if (key != null && !key.isBlank()) {
-            Tag tag = findOrCreateTag(key, organizationId, createdBy);
+            Tag tag = findOrCreateTag(key, organizationId, createdBy, values);
             return tag.getId();
         }
         throw new IllegalArgumentException("Either tagId or key must be provided");
@@ -231,6 +264,7 @@ public class TagService {
         }
 
         validateTagValues(values);
+        validateValuesAgainstPredefined(tag, values);
         List<String> normalizedValues = values != null ? deduplicateValues(values) : List.of();
 
         // Upsert: update values if already assigned, otherwise create new association
@@ -264,6 +298,10 @@ public class TagService {
         log.info("Updating tag {} values on device {}: {}", tagId, machineId, values);
 
         validateTagValues(values);
+
+        Tag tag = tagRepository.findById(tagId)
+                .orElseThrow(() -> new TagNotFoundException("Tag not found: " + tagId));
+        validateValuesAgainstPredefined(tag, values);
 
         List<MachineTag> machineTags = machineTagRepository.findByMachineId(machineId);
         MachineTag machineTag = machineTags.stream()
@@ -301,6 +339,7 @@ public class TagService {
         }
 
         validateTagValues(values);
+        validateValuesAgainstPredefined(tag, values);
 
         Instant now = Instant.now();
         List<String> normalizedValues = values != null ? deduplicateValues(values) : List.of();
@@ -428,7 +467,6 @@ public class TagService {
         return DeviceTag.builder()
                 .tagId(tag.getId())
                 .key(tag.getKey())
-                .type(tag.getType())
                 .description(tag.getDescription())
                 .color(tag.getColor())
                 .values(machineTag.getValues() != null ? machineTag.getValues() : List.of())
@@ -438,7 +476,66 @@ public class TagService {
                 .build();
     }
 
-    // --- Validation helpers ---
+    // --- Cascade helpers ---
+
+    /**
+     * When admin updates Tag.values (predefined options), remove any device-assigned values
+     * that are no longer in the allowed list. Each MachineTag save triggers the AOP aspect
+     * which sends a Kafka message → Pinot is updated automatically.
+     */
+    private void cascadeTagValueChanges(String tagId, List<String> allowedValues) {
+        if (allowedValues == null || allowedValues.isEmpty()) {
+            // No predefined options → free-text, nothing to clean up
+            return;
+        }
+
+        Set<String> allowedSet = new HashSet<>(allowedValues);
+        List<MachineTag> machineTags = machineTagRepository.findByTagId(tagId);
+
+        for (MachineTag mt : machineTags) {
+            if (mt.getValues() == null || mt.getValues().isEmpty()) {
+                continue;
+            }
+
+            List<String> filtered = mt.getValues().stream()
+                    .filter(allowedSet::contains)
+                    .toList();
+
+            if (filtered.size() != mt.getValues().size()) {
+                int removed = mt.getValues().size() - filtered.size();
+                mt.setValues(new ArrayList<>(filtered));
+                machineTagRepository.save(mt);
+                log.info("Cascaded tag value cleanup: machine={}, tag={}, removed {} stale values",
+                        mt.getMachineId(), tagId, removed);
+            }
+        }
+    }
+
+    /**
+     * Validates that the provided values are within the tag's predefined options.
+     * If Tag.values is null (free-text tag), any values are allowed.
+     * If Tag.values is non-empty (predefined options), only those values are allowed.
+     */
+    private void validateValuesAgainstPredefined(Tag tag, List<String> values) {
+        if (values == null || values.isEmpty()) {
+            return;
+        }
+        if (tag.getValues() == null || tag.getValues().isEmpty()) {
+            // Free-text tag — any value is allowed
+            return;
+        }
+
+        Set<String> allowed = new HashSet<>(tag.getValues());
+        List<String> invalid = values.stream()
+                .filter(v -> !allowed.contains(v))
+                .toList();
+
+        if (!invalid.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Values " + invalid + " are not in the predefined options for tag '"
+                            + tag.getKey() + "'. Allowed values: " + tag.getValues());
+        }
+    }
 
     /**
      * Validates tag key format: alphanumeric, underscore, hyphen only.

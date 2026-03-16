@@ -2,7 +2,6 @@ package com.openframe.api.dto.device;
 
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
-import com.openframe.data.document.tool.TagType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,5 +20,4 @@ public class DeviceFilterInput {
     private List<String> organizationIds;
     private List<String> tagKeys;
     private List<String> tagValues;
-    private List<TagType> tagTypes;
 } 

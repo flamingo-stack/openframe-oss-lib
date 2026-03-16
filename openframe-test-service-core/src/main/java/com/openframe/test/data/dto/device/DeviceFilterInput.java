@@ -18,5 +18,4 @@ public class DeviceFilterInput {
     private List<String> organizationIds;
     private List<String> tagKeys;
     private List<String> tagValues;
-    private List<String> tagTypes;
 }

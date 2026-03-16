@@ -19,8 +19,7 @@
       "osType",
       "organizationId",
       "tags",
-      "tagKeyValues",
-      "tagTypes"
+      "tagKeyValues"
     ],
 
     "streamConfigs": {
@@ -44,13 +43,6 @@
     },
     {
       "name": "tagKeyValues",
-      "encodingType": "DICTIONARY",
-      "properties": {
-        "maxMultiValueEntries": 50
-      }
-    },
-    {
-      "name": "tagTypes",
       "encodingType": "DICTIONARY",
       "properties": {
         "maxMultiValueEntries": 50
