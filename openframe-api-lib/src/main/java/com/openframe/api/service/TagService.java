@@ -2,6 +2,7 @@ package com.openframe.api.service;
 
 import com.openframe.api.dto.device.DeviceFilterOption;
 import com.openframe.api.dto.device.DeviceTag;
+import com.openframe.api.dto.tag.CreateTagInput;
 import com.openframe.api.exception.TagAlreadyExistsException;
 import com.openframe.api.exception.TagNotFoundException;
 import com.openframe.data.document.device.MachineTag;
@@ -36,28 +37,26 @@ public class TagService {
     }
 
     @Transactional
-    public Tag createTag(String key, String description, String color,
-                         String organizationId, String createdBy, List<String> values) {
-        log.info("Creating tag with key: {}, org: {}", key, organizationId);
+    public Tag createTag(CreateTagInput input) {
+        log.info("Creating tag with key: {}, org: {}", input.getKey(), input.getOrganizationId());
 
-        validateTagKey(key);
-        validateTagValues(values);
-        validateDescription(description);
+        validateTagKey(input.getKey());
+        validateTagValues(input.getValues());
+        validateDescription(input.getDescription());
 
         try {
-            if (tagRepository.existsByKeyAndOrganizationId(key, organizationId)) {
+            if (tagRepository.existsByKeyAndOrganizationId(input.getKey(), input.getOrganizationId())) {
                 throw new TagAlreadyExistsException(
-                        "Tag with key '" + key + "' already exists in organization " + organizationId);
+                        "Tag with key '" + input.getKey() + "' already exists in organization " + input.getOrganizationId());
             }
 
             Tag tag = Tag.builder()
-                    .key(key)
-                    .description(description)
-                    .color(color)
-                    .values(values != null ? deduplicateValues(values) : null)
-                    .organizationId(organizationId)
+                    .key(input.getKey())
+                    .description(input.getDescription())
+                    .color(input.getColor())
+                    .values(input.getValues() != null ? deduplicateValues(input.getValues()) : null)
+                    .organizationId(input.getOrganizationId())
                     .createdAt(Instant.now())
-                    .createdBy(createdBy)
                     .build();
 
             Tag saved = tagRepository.save(tag);
@@ -66,7 +65,7 @@ public class TagService {
         } catch (DuplicateKeyException e) {
             // Race condition: another thread created the same tag between our check and save
             throw new TagAlreadyExistsException(
-                    "Tag with key '" + key + "' already exists in organization " + organizationId);
+                    "Tag with key '" + input.getKey() + "' already exists in organization " + input.getOrganizationId());
         }
     }
 
@@ -166,7 +165,7 @@ public class TagService {
      * Find an existing tag by key within an organization, or create a new tag if not found.
      * When creating, the provided values become the tag's predefined options.
      */
-    private Tag findOrCreateTag(String key, String organizationId, String createdBy, List<String> values) {
+    private Tag findOrCreateTag(String key, String organizationId, List<String> values) {
         log.debug("Finding or creating tag with key: {}, org: {}", key, organizationId);
 
         Tag existing = tagRepository.findByKeyAndOrganizationId(key, organizationId);
@@ -174,7 +173,11 @@ public class TagService {
             return existing;
         }
 
-        return createTag(key, null, null, organizationId, createdBy, values);
+        return createTag(CreateTagInput.builder()
+                .key(key)
+                .organizationId(organizationId)
+                .values(values)
+                .build());
     }
 
     /**
@@ -185,14 +188,13 @@ public class TagService {
      * @param tagId          tag definition ID (optional if key is provided)
      * @param key            tag key name (optional if tagId is provided)
      * @param organizationId organization context for key-based lookup/creation
-     * @param createdBy      user ID for tag auto-creation
      * @param values         values to set as predefined options when auto-creating
      * @return resolved tag ID
      * @throws IllegalArgumentException if neither tagId nor key is provided
      * @throws TagNotFoundException     if tagId is provided but not found
      */
     @Transactional
-    public String resolveTagId(String tagId, String key, String organizationId, String createdBy,
+    public String resolveTagId(String tagId, String key, String organizationId,
                                List<String> values) {
         if (tagId != null && !tagId.isBlank()) {
             if (!tagRepository.existsById(tagId)) {
@@ -201,7 +203,7 @@ public class TagService {
             return tagId;
         }
         if (key != null && !key.isBlank()) {
-            Tag tag = findOrCreateTag(key, organizationId, createdBy, values);
+            Tag tag = findOrCreateTag(key, organizationId, values);
             return tag.getId();
         }
         throw new IllegalArgumentException("Either tagId or key must be provided");
@@ -251,7 +253,7 @@ public class TagService {
 
     @Transactional
     public MachineTag assignTagToDevice(String machineId, String tagId, List<String> values,
-                                         String createdBy, String deviceOrganizationId) {
+                                         String deviceOrganizationId) {
         log.info("Assigning tag {} to device {} with values: {}", tagId, machineId, values);
 
         Tag tag = tagRepository.findById(tagId)
@@ -274,7 +276,6 @@ public class TagService {
             MachineTag machineTag = existing.get();
             machineTag.setValues(normalizedValues);
             machineTag.setTaggedAt(Instant.now());
-            machineTag.setTaggedBy(createdBy);
             MachineTag saved = machineTagRepository.save(machineTag);
             log.info("Tag assignment updated: machineTag.id={}", saved.getId());
             return saved;
@@ -285,7 +286,6 @@ public class TagService {
                 .tagId(tagId)
                 .values(normalizedValues)
                 .taggedAt(Instant.now())
-                .taggedBy(createdBy)
                 .build();
 
         MachineTag saved = machineTagRepository.save(machineTag);
@@ -325,8 +325,7 @@ public class TagService {
 
     @Transactional
     public List<MachineTag> bulkAssignTag(List<String> machineIds, String tagId,
-                                           List<String> values, String createdBy,
-                                           String organizationId) {
+                                           List<String> values, String organizationId) {
         log.info("Bulk assigning tag {} to {} devices with values: {}", tagId, machineIds.size(), values);
 
         Tag tag = tagRepository.findById(tagId)
@@ -357,7 +356,6 @@ public class TagService {
                         // Update existing association
                         existing.setValues(normalizedValues);
                         existing.setTaggedAt(now);
-                        existing.setTaggedBy(createdBy);
                         return existing;
                     }
                     // Create new association
@@ -366,7 +364,6 @@ public class TagService {
                             .tagId(tagId)
                             .values(normalizedValues)
                             .taggedAt(now)
-                            .taggedBy(createdBy)
                             .build();
                 })
                 .toList();
@@ -472,7 +469,6 @@ public class TagService {
                 .values(machineTag.getValues() != null ? machineTag.getValues() : List.of())
                 .organizationId(tag.getOrganizationId())
                 .createdAt(machineTag.getTaggedAt())
-                .createdBy(machineTag.getTaggedBy())
                 .build();
     }
 

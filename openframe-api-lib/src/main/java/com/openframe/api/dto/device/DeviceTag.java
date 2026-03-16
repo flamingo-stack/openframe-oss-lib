@@ -25,5 +25,4 @@ public class DeviceTag {
     private List<String> values;    // MachineTag.values
     private String organizationId;  // Tag.organizationId
     private Instant createdAt;      // MachineTag.createdAt
-    private String createdBy;       // MachineTag.createdBy
 }

@@ -4,11 +4,13 @@ import com.netflix.graphql.dgs.*;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
-import com.openframe.api.dto.device.*;
+import com.openframe.api.dto.device.DeviceFilterInput;
+import com.openframe.api.dto.device.DeviceFilterOptions;
+import com.openframe.api.dto.device.DeviceFilters;
+import com.openframe.api.dto.device.DeviceTag;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.CursorPaginationInput;
 import com.openframe.api.dto.shared.SortInput;
-import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.api.service.DeviceFilterService;
 import com.openframe.api.service.DeviceService;
@@ -101,105 +103,4 @@ public class DeviceDataFetcher {
         return dataLoader.load(organizationId);
     }
 
-    @DgsMutation
-    public DeviceTag assignTagToDevice(@InputArgument @NotBlank String machineId,
-                                        @InputArgument @Valid AssignTagInput input) {
-        log.info("Assigning tag via GraphQL - machineId: {}, tagId: {}, key: {}",
-                machineId, input.getTagId(), input.getKey());
-
-        Machine machine = deviceService.findByMachineId(machineId)
-                .orElseThrow(() -> new DeviceNotFoundException("Device not found with ID: " + machineId));
-
-        String resolvedTagId = tagService.resolveTagId(
-                input.getTagId(), input.getKey(), machine.getOrganizationId(), null,
-                input.getValues());
-        tagService.assignTagToDevice(machine.getMachineId(), resolvedTagId, input.getValues(),
-                null, machine.getOrganizationId());
-
-        // Return enriched DeviceTag
-        return tagService.getDeviceTagsForMachine(machine.getMachineId()).stream()
-                .filter(dt -> dt.getTagId().equals(resolvedTagId))
-                .findFirst()
-                .orElse(DeviceTag.builder()
-                        .tagId(resolvedTagId)
-                        .values(input.getValues() != null ? input.getValues() : List.of())
-                        .build());
-    }
-
-    @DgsMutation
-    public List<DeviceTag> batchAssignTagsToDevice(@InputArgument @NotBlank String machineId,
-                                                    @InputArgument @Valid BatchAssignTagsInput input) {
-        log.info("Batch assigning {} tags to device {} via GraphQL", input.getTags().size(), machineId);
-
-        Machine machine = deviceService.findByMachineId(machineId)
-                .orElseThrow(() -> new DeviceNotFoundException("Device not found with ID: " + machineId));
-
-        for (AssignTagInput tag : input.getTags()) {
-            String resolvedTagId = tagService.resolveTagId(
-                    tag.getTagId(), tag.getKey(), machine.getOrganizationId(), null,
-                    tag.getValues());
-            tagService.assignTagToDevice(machine.getMachineId(), resolvedTagId, tag.getValues(),
-                    null, machine.getOrganizationId());
-        }
-
-        return tagService.getDeviceTagsForMachine(machine.getMachineId());
-    }
-
-    @DgsMutation
-    public DeviceTag updateDeviceTagValues(@InputArgument @NotBlank String machineId,
-                                            @InputArgument @NotBlank String tagId,
-                                            @InputArgument @Valid UpdateDeviceTagValuesInput input) {
-        log.info("Updating tag {} values on device {} via GraphQL", tagId, machineId);
-
-        Machine machine = deviceService.findByMachineId(machineId)
-                .orElseThrow(() -> new DeviceNotFoundException("Device not found with ID: " + machineId));
-
-        tagService.updateDeviceTagValues(machine.getMachineId(), tagId, input.getValues());
-
-        return tagService.getDeviceTagsForMachine(machine.getMachineId()).stream()
-                .filter(dt -> dt.getTagId().equals(tagId))
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException(
-                        "Tag " + tagId + " not found on device " + machineId + " after update"));
-    }
-
-    @DgsMutation
-    public boolean removeTagFromDevice(@InputArgument @NotBlank String machineId,
-                                        @InputArgument @NotBlank String tagId) {
-        log.info("Removing tag {} from device {} via GraphQL", tagId, machineId);
-
-        Machine machine = deviceService.findByMachineId(machineId)
-                .orElseThrow(() -> new DeviceNotFoundException("Device not found with ID: " + machineId));
-
-        tagService.removeTagFromDevice(machine.getMachineId(), tagId);
-        return true;
-    }
-
-    @DgsMutation
-    public boolean bulkAssignTag(@InputArgument @Valid BulkAssignTagInput input) {
-        log.info("Bulk assigning tag (tagId={}, key={}) to {} devices via GraphQL",
-                input.getTagId(), input.getKey(), input.getMachineIds().size());
-
-        // Extract organizationId from the first machine to scope the operation
-        String firstMachineId = input.getMachineIds().get(0);
-        Machine firstMachine = deviceService.findByMachineId(firstMachineId)
-                .orElseThrow(() -> new DeviceNotFoundException("Device not found with ID: " + firstMachineId));
-        String organizationId = firstMachine.getOrganizationId();
-
-        String resolvedTagId = tagService.resolveTagId(
-                input.getTagId(), input.getKey(), organizationId, null,
-                input.getValues());
-        tagService.bulkAssignTag(input.getMachineIds(), resolvedTagId, input.getValues(),
-                null, organizationId);
-        return true;
-    }
-
-    @DgsMutation
-    public boolean bulkRemoveTag(@InputArgument @Valid BulkRemoveTagInput input) {
-        log.info("Bulk removing tag {} from {} devices via GraphQL",
-                input.getTagId(), input.getMachineIds().size());
-
-        tagService.bulkRemoveTag(input.getMachineIds(), input.getTagId());
-        return true;
-    }
 }

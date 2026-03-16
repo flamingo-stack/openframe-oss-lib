@@ -58,9 +58,7 @@ public class AgentRegistrationService {
         Machine machine = saveMachine(machineId, request, resolvedOrganizationId);
 
         // Assign tags from registration request (creates tags if they don't exist)
-        if (request.getTags() != null && !request.getTags().isEmpty()) {
-            registrationTagAssignmentService.assignTags(machineId, resolvedOrganizationId, request.getTags());
-        }
+        registrationTagAssignmentService.assignTags(machineId, resolvedOrganizationId, request.getTags());
 
         agentRegistrationToolInstallationService.process(machineId);
 

@@ -4,6 +4,8 @@ import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import lombok.Data;
 
+import jakarta.validation.Valid;
+
 import java.util.List;
 
 @Data
@@ -33,5 +35,6 @@ public class AgentRegistrationRequest {
     private String timezone;
 
     // Tags to create and assign to the device at registration time
+    @Valid
     private List<AgentRegistrationTagInput> tags;
 } 

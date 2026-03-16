@@ -48,7 +48,6 @@ type Tag {
     values: [String!]
     organizationId: String!
     createdAt: Instant
-    createdBy: String
 }
 
 type DeviceFilters {
@@ -161,7 +160,6 @@ type DeviceTag {
     color: String
     values: [String!]!
     createdAt: Instant
-    createdBy: String
 }
 
 enum DeviceStatus {

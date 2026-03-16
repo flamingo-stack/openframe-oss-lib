@@ -1,5 +1,6 @@
 package com.openframe.client.dto.agent;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -16,6 +17,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AgentRegistrationTagInput {
+    @NotBlank
     private String key;            // tag key name (e.g., "site")
     private List<String> values;   // values to assign (e.g., ["CHICAGO"])
 }

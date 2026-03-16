@@ -46,11 +46,6 @@ public class RegistrationTagAssignmentService {
         Instant now = Instant.now();
 
         for (AgentRegistrationTagInput tagInput : tags) {
-            if (tagInput.getKey() == null || tagInput.getKey().isBlank()) {
-                log.warn("Skipping tag with blank key during registration for machine: {}", machineId);
-                continue;
-            }
-
             try {
                 Tag tag = findOrCreateTag(tagInput.getKey(), organizationId, tagInput.getValues(), now);
 
@@ -59,7 +54,6 @@ public class RegistrationTagAssignmentService {
                         .tagId(tag.getId())
                         .values(tagInput.getValues() != null ? tagInput.getValues() : List.of())
                         .taggedAt(now)
-                        .taggedBy("registration")
                         .build();
 
                 machineTagRepository.save(machineTag);
@@ -99,7 +93,6 @@ public class RegistrationTagAssignmentService {
                 .values(values)
                 .organizationId(organizationId)
                 .createdAt(now)
-                .createdBy("registration")
                 .build();
 
         Tag saved = tagRepository.save(tag);

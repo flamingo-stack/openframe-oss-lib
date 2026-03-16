@@ -63,14 +63,7 @@ public class TagDataFetcher {
         log.info("Creating tag via GraphQL - key: {}, org: {}",
                 input.getKey(), input.getOrganizationId());
 
-        return tagService.createTag(
-                input.getKey(),
-                input.getDescription(),
-                input.getColor(),
-                input.getOrganizationId(),
-                null, // createdBy — not available in GraphQL context without auth
-                input.getValues()
-        );
+        return tagService.createTag(input);
     }
 
     @DgsMutation
@@ -78,7 +71,6 @@ public class TagDataFetcher {
                          @InputArgument @Valid UpdateTagInput input) {
         log.info("Updating tag via GraphQL - tagId: {}", tagId);
 
-        // TODO: extract organizationId from auth context (SecurityContextHolder) once auth is wired in
         return tagService.updateTag(
                 tagId,
                 input.getDescription(),
@@ -91,7 +83,6 @@ public class TagDataFetcher {
     @DgsMutation
     public boolean deleteTag(@InputArgument @NotBlank String tagId) {
         log.info("Deleting tag via GraphQL - tagId: {}", tagId);
-        // TODO: extract organizationId from auth context (SecurityContextHolder) once auth is wired in
         tagService.deleteTag(tagId, null);
         return true;
     }
