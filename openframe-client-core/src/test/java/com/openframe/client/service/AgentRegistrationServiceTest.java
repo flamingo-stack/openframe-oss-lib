@@ -28,6 +28,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -188,7 +189,7 @@ class AgentRegistrationServiceTest {
         AgentRegistrationResponse response = agentRegistrationService.register(INITIAL_KEY, request);
 
         assertNotNull(response);
-        verify(registrationTagAssignmentService, never()).assignTags(any(), any(), any());
+        verify(registrationTagAssignmentService).assignTags(eq(MACHINE_ID), eq("custom-uuid"), isNull());
     }
 
     private AgentRegistrationRequest createTestRequest() {
