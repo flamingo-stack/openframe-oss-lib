@@ -6,37 +6,22 @@ import type { MSP } from './stack'
 import type { UserProfile } from './user'
 import type { CaseStudy } from './case-study'
 
-export interface VideoTeaser {
-  url: string
-  title?: string
-  thumbnail_url?: string // Optional thumbnail image URL for video preview. If not provided, video player will show first frame automatically.
-  published?: boolean // Controls visibility on public preview page (default: false, admin must select)
-  source?: 'manual' | 'ai_generated' // Track origin of teaser
-  created_at?: string // ISO timestamp for sorting (newer items first)
-  // Duration auto-detected from video file
-}
+// Re-export shared video processing types for backwards compatibility
+export type { VideoTeaser, Speaker, VideoClip, TranscriptWord, SpeakerMapping, ExcludedRange } from './video-processing'
+import type { VideoTeaser, Speaker, VideoClip, TranscriptWord, SpeakerMapping, ExcludedRange } from './video-processing'
 
-export interface Speaker {
-  label: string
-  name?: string
-  confidence?: number
-}
-
-export interface VideoClip {
-  start_time: number
-  end_time: number
-  description: string
-  query_used: string
-  confidence: number
-  twelve_labs_id?: string
-  thumbnail_url?: string
+export interface CustomerInterviewConfig {
+  /** Target duration in seconds for AI-generated highlight video (default: 180) */
+  highlight_target_duration_seconds?: number
+  /** Skip subtitle burning during highlight video generation */
+  skipSubtitleBurning?: boolean
 }
 
 export interface CustomerInterview {
   id: number
   title: string
   slug: string
-  summary: string | null // Markdown supported
+  video_summary: string | null // AI-generated summary from video transcription (Markdown supported)
   transcript: string | null // Markdown supported
 
   // OpenMSP user (customer)
@@ -79,9 +64,9 @@ export interface CustomerInterview {
   ai_transcript_raw?: string
   ai_transcript_formatted?: string
   ai_confidence_transcript?: number
+  ai_confidence_video_summary?: number // Confidence for video-generated summary
   ai_summary_bullets?: string[]
   ai_summary_gist?: string
-  ai_confidence_summary?: number
   ai_speakers?: Speaker[]
   ai_video_clips?: VideoClip[]
 
@@ -90,29 +75,17 @@ export interface CustomerInterview {
   twelvelabs_video_id?: string
 
   // Word-level transcript data for video processing
-  transcript_words_data?: Array<{
-    text: string
-    start: number  // milliseconds
-    end: number    // milliseconds
-    confidence: number
-    speaker?: string
-  }>
+  transcript_words_data?: TranscriptWord[]
 
   // Incentive mention exclusion ranges (computed during transcription)
-  incentive_excluded_ranges?: Array<{
-    start: number  // seconds
-    end: number    // seconds
-  }>
+  incentive_excluded_ranges?: ExcludedRange[]
 
   // Speaker identification mapping (computed during transcription)
   // Maps AssemblyAI labels ("A", "B") to actual person info
-  speaker_mapping?: {
-    [label: string]: {
-      name: string
-      role: 'interviewer' | 'interviewee'
-      userId?: string
-    }
-  }
+  speaker_mapping?: SpeakerMapping
+
+  /** Per-interview configuration options (JSONB) */
+  config?: CustomerInterviewConfig
 
   // Timestamps
   created_at: string
@@ -137,7 +110,7 @@ export interface CustomerInterview {
 export interface CreateCustomerInterviewData {
   title: string
   slug: string
-  summary?: string // Markdown supported
+  video_summary?: string // AI-generated summary from video transcription (Markdown supported)
   transcript?: string // Markdown supported
   user_id?: string // Customer UUID
   main_video_url?: string
@@ -154,6 +127,7 @@ export interface CreateCustomerInterviewData {
   author_id: string
   platforms: string[] // Array of platform IDs (UUIDs)
   featured_platform?: string // Platform ID for featured
+  config?: CustomerInterviewConfig
 }
 
 export type UpdateCustomerInterviewData = Partial<CreateCustomerInterviewData>

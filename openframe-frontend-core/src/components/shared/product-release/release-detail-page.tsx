@@ -12,8 +12,10 @@ import { GitHubIcon } from '../../icons/github-icon';
 import { AlertTriangle, ExternalLink, BookMarked } from 'lucide-react';
 import { formatReleaseDate } from '../../../utils/date-formatters';
 import { YouTubeEmbed, extractYouTubeId } from '../../features/youtube-embed';
+import { VideoPlayer } from '../../features/video-player';
 import { DetailPageSkeleton } from '../detail-page-skeleton';
 import type { ChangelogEntry } from '../../../types/product-release';
+import type { VideoTeaser } from '../../../types/video-processing';
 
 // Types for injectable components
 export interface MarkdownRendererProps {
@@ -41,6 +43,12 @@ export interface DeliverySectionProps {
   isLoading: boolean;
 }
 
+export interface VideoSectionProps {
+  bites: VideoTeaser[];
+  title?: string;
+  filterPublished?: boolean;
+}
+
 // Type for the useRelease hook result
 export interface UseReleaseResult {
   data: unknown;
@@ -57,6 +65,7 @@ export interface ReleaseDetailPageProps {
   MarkdownRenderer?: ComponentType<MarkdownRendererProps>;
   RoadmapSection?: ComponentType<RoadmapSectionProps>;
   DeliverySection?: ComponentType<DeliverySectionProps>;
+  VideoSection?: ComponentType<VideoSectionProps>;
   // API endpoints for fetching linked tasks
   roadmapApiEndpoint?: string;
   deliveryApiEndpoint?: string;
@@ -74,6 +83,7 @@ export function ReleaseDetailPage({
   MarkdownRenderer = DefaultMarkdownRenderer,
   RoadmapSection,
   DeliverySection,
+  VideoSection,
   roadmapApiEndpoint = '/api/roadmap',
   deliveryApiEndpoint = '/api/delivery'
 }: ReleaseDetailPageProps) {
@@ -167,6 +177,10 @@ export function ReleaseDetailPage({
   const migrationGuideUrl = release.migration_guide_url as string | undefined;
   const documentationUrl = release.documentation_url as string | undefined;
   const youtubeUrl = release.youtube_url as string | undefined;
+  const mainVideoUrl = release.main_video_url as string | undefined;
+  const videoBites = release.video_bites as VideoTeaser[] | undefined;
+  const highlightVideoUrl = release.highlight_video_url as string | undefined;
+  const highlightVideoThumbnail = release.highlight_video_thumbnail as string | undefined;
   const breakingChanges = release.breaking_changes as ChangelogEntry[] | undefined;
   const featuresAdded = release.features_added as ChangelogEntry[] | undefined;
   const bugFixed = release.bugs_fixed as ChangelogEntry[] | undefined;
@@ -310,6 +324,38 @@ export function ReleaseDetailPage({
           ) : null;
         })()}
 
+        {/* Main Video - Uploaded video for AI processing (fallback if no YouTube) */}
+        {!youtubeUrl && mainVideoUrl && (
+          <div className="flex justify-center w-full">
+            <div className="w-full max-w-3xl">
+              <VideoPlayer
+                url={mainVideoUrl}
+                controls={true}
+                muted={false}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Highlight Video - AI-generated highlight reel */}
+        {highlightVideoUrl && (
+          <div className="flex flex-col gap-4 w-full">
+            <p className="text-h5 tracking-[-0.28px] text-ods-text-secondary">
+              Video Highlights
+            </p>
+            <div className="flex justify-center w-full">
+              <div className="w-full max-w-3xl">
+                <VideoPlayer
+                  url={highlightVideoUrl}
+                  poster={highlightVideoThumbnail}
+                  controls={true}
+                  muted={false}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Content */}
         {releaseContent && (
           <div className="text-h4 text-ods-text-primary">
@@ -355,6 +401,15 @@ export function ReleaseDetailPage({
           entries={improvements || []}
           SimpleMarkdownRenderer={MarkdownRenderer}
         />
+
+        {/* Video Bites Section - Display video clips */}
+        {VideoSection && videoBites && videoBites.length > 0 && (
+          <VideoSection
+            bites={videoBites}
+            title="Video Clips"
+            filterPublished={true}
+          />
+        )}
 
         {/* Related Roadmap Items */}
         {RoadmapSection && (roadmapLoading || roadmapTasks.length > 0) && (
