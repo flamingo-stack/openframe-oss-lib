@@ -84,7 +84,6 @@ public class DeviceMapper extends BaseRestMapper {
                 .values(deviceTag.getValues() != null ? deviceTag.getValues() : List.of())
                 .organizationId(deviceTag.getOrganizationId())
                 .createdAt(deviceTag.getCreatedAt())
-                .createdBy(deviceTag.getCreatedBy())
                 .build();
     }
 
