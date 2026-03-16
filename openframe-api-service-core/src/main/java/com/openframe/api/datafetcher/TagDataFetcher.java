@@ -1,15 +1,11 @@
 package com.openframe.api.datafetcher;
 
 import com.netflix.graphql.dgs.DgsComponent;
-import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.dto.device.DeviceFilterOption;
-import com.openframe.api.dto.tag.CreateTagInput;
-import com.openframe.api.dto.tag.UpdateTagInput;
 import com.openframe.api.service.TagService;
 import com.openframe.data.document.tool.Tag;
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,12 +28,6 @@ public class TagDataFetcher {
     }
 
     @DgsQuery
-    public Tag tag(@InputArgument @NotBlank String tagId) {
-        log.debug("Fetching tag by ID: {}", tagId);
-        return tagService.findTagById(tagId).orElse(null);
-    }
-
-    @DgsQuery
     public List<DeviceFilterOption> tagValueOptions(@InputArgument @NotBlank String tagKey) {
         log.debug("Fetching tag value options for key: {}", tagKey);
         return tagService.getTagValueOptions(tagKey);
@@ -56,34 +46,5 @@ public class TagDataFetcher {
                                             @InputArgument @NotBlank String search) {
         log.debug("Autocomplete tag values for org: {}, key: {}, search: {}", organizationId, tagKey, search);
         return tagService.searchTagValues(organizationId, tagKey, search);
-    }
-
-    @DgsMutation
-    public Tag createTag(@InputArgument @Valid CreateTagInput input) {
-        log.info("Creating tag via GraphQL - key: {}, org: {}",
-                input.getKey(), input.getOrganizationId());
-
-        return tagService.createTag(input);
-    }
-
-    @DgsMutation
-    public Tag updateTag(@InputArgument @NotBlank String tagId,
-                         @InputArgument @Valid UpdateTagInput input) {
-        log.info("Updating tag via GraphQL - tagId: {}", tagId);
-
-        return tagService.updateTag(
-                tagId,
-                input.getDescription(),
-                input.getColor(),
-                input.getValues(),
-                null
-        );
-    }
-
-    @DgsMutation
-    public boolean deleteTag(@InputArgument @NotBlank String tagId) {
-        log.info("Deleting tag via GraphQL - tagId: {}", tagId);
-        tagService.deleteTag(tagId, null);
-        return true;
     }
 }

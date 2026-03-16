@@ -12,31 +12,12 @@ extend type Query {
 
     # Tag key queries
     tags(organizationId: String!): [Tag!]!
-    tag(tagId: ID!): Tag
-
     # Tag value options for filter UI (returns distinct values for a tag key with device counts)
     tagValueOptions(tagKey: String!): [DeviceFilterOption!]!
 
     # Autocomplete queries for tag key and value search
     tagKeySuggestions(organizationId: String!, search: String!): [Tag!]!
     tagValueSuggestions(organizationId: String!, tagKey: String!, search: String!): [String!]!
-}
-
-extend type Mutation {
-    # Tag key CRUD
-    createTag(input: CreateTagInput!): Tag!
-    updateTag(tagId: ID!, input: UpdateTagInput!): Tag!
-    deleteTag(tagId: ID!): Boolean!
-
-    # Device tag assignment
-    assignTagToDevice(machineId: String!, input: AssignTagInput!): DeviceTag!
-    batchAssignTagsToDevice(machineId: String!, input: BatchAssignTagsInput!): [DeviceTag!]!
-    updateDeviceTagValues(machineId: String!, tagId: String!, input: UpdateDeviceTagValuesInput!): DeviceTag!
-    removeTagFromDevice(machineId: String!, tagId: String!): Boolean!
-
-    # Bulk operations
-    bulkAssignTag(input: BulkAssignTagInput!): Boolean!
-    bulkRemoveTag(input: BulkRemoveTagInput!): Boolean!
 }
 
 # Tag key definition (not tied to a device)
@@ -78,50 +59,6 @@ input DeviceFilterInput {
     organizationIds: [String!]
     tagKeys: [String!]
     tagValues: [String!]
-}
-
-# --- Tag CRUD inputs ---
-
-input CreateTagInput {
-    key: String!
-    description: String
-    color: String
-    values: [String!]
-    organizationId: String!
-}
-
-input UpdateTagInput {
-    description: String
-    color: String
-    values: [String!]
-}
-
-# --- Device tag assignment inputs ---
-
-input AssignTagInput {
-    tagId: String
-    key: String
-    values: [String!]
-}
-
-input BatchAssignTagsInput {
-    tags: [AssignTagInput!]!
-}
-
-input BulkAssignTagInput {
-    machineIds: [String!]!
-    tagId: String
-    key: String
-    values: [String!]
-}
-
-input BulkRemoveTagInput {
-    machineIds: [String!]!
-    tagId: String!
-}
-
-input UpdateDeviceTagValuesInput {
-    values: [String!]
 }
 
 type Machine {
