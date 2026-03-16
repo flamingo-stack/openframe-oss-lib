@@ -3,6 +3,7 @@
 
 import type { PlatformRecord } from './platform'
 import type { BlogTag } from './blog'
+import type { VideoTeaser, TranscriptWord, SpeakerMapping } from './video-processing'
 
 export interface ChangelogEntry {
   title: string
@@ -87,12 +88,27 @@ export interface ProductRelease {
   migration_guide_url: string | null
   documentation_url: string | null
 
-  // Video
+  // Video (youtube_url for embeds, main_video_url for AI processing)
   youtube_url: string | null
+  main_video_url: string | null
+  transcript: string | null
+  transcript_words_data?: TranscriptWord[]
+  video_summary: string | null // AI-generated summary from video transcription
+  video_bites: VideoTeaser[] // JSONB array of extracted video clips
+  highlight_video_url: string | null
+  highlight_video_thumbnail: string | null
+  highlight_video_duration_ms: number | null
+  highlight_video_source: 'manual' | 'ai_generated' | null
+  ai_transcript_formatted?: string
+  speaker_mapping?: SpeakerMapping
+  ai_confidence_transcript: number | null
+  ai_confidence_video_summary: number | null // Confidence for video-generated summary
+  ai_confidence_summary: number | null // Confidence for entity summary (Release Content Generation)
 
   // SEO
   seo_title: string | null
   seo_description: string | null
+  seo_keywords: string | null
   og_image_url: string | null
 
   // Publishing
@@ -144,8 +160,17 @@ export interface CreateProductReleaseData {
   migration_guide_url?: string
   documentation_url?: string
   youtube_url?: string
+  main_video_url?: string
+  transcript?: string
+  video_summary?: string // AI-generated summary from video transcription
+  video_bites?: VideoTeaser[]
+  highlight_video_url?: string | null
+  highlight_video_thumbnail?: string | null
+  highlight_video_duration_ms?: number | null
+  highlight_video_source?: 'manual' | 'ai_generated' | null
   seo_title?: string
   seo_description?: string
+  seo_keywords?: string
   og_image_url?: string
   status: 'draft' | 'published' | 'archived'
   published_at?: string | null

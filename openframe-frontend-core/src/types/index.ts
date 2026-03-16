@@ -23,6 +23,7 @@ export * from './luma'
 export * from './product-release'
 export * from './vendor'
 export * from './vendor-links'
+export * from './video-processing'
 
 // User and profile types
 export * from './employee'
