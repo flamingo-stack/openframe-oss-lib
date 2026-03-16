@@ -29,9 +29,7 @@ public class NatsMessagePublisher {
                     .build();
 
             boolean result = streamBridge.send(subject, message);
-            if (result) {
-                log.info("Successfully published message to subject: {}", subject);
-            } else {
+            if (!result) {
                 throw new NatsException("Failed to publish message to subject: " + subject);
             }
         } catch (Exception e) {
