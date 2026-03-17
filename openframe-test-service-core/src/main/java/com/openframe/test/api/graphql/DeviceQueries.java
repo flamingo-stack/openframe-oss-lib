@@ -62,11 +62,11 @@ public class DeviceQueries {
                     registeredAt
                     updatedAt
                     tags {
-                        tagId
-                        key
+                        id
+                        name
                         description
                         color
-                        values
+                        organizationId
                         createdAt
                         createdBy
                     }
@@ -166,7 +166,7 @@ public class DeviceQueries {
                     deviceTypes { value label count }
                     osTypes { value label count }
                     organizationIds { value label count }
-                    tagKeys { value label count }
+                    tags { value label count }
                     filteredCount
                 }
             }
