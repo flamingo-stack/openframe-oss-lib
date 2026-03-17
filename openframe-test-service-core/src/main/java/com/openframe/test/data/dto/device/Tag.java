@@ -13,8 +13,7 @@ import lombok.NoArgsConstructor;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Tag {
     private String id;
-    private String key;
-    private String type;
+    private String name;
     private String description;
     private String color;
     private String organizationId;

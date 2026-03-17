@@ -18,6 +18,6 @@ public class DeviceFilters {
     private List<DeviceFilterOption> deviceTypes;
     private List<DeviceFilterOption> osTypes;
     private List<DeviceFilterOption> organizationIds;
-    private List<TagFilterOption> tagKeys;
+    private List<TagFilterOption> tags;
     private Integer filteredCount;
 }
