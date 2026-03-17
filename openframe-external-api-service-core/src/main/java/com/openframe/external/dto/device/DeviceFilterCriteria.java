@@ -28,7 +28,10 @@ public class DeviceFilterCriteria {
     
     @Schema(description = "Organization IDs to filter by")
     private List<String> organizationIds;
-    
-    @Schema(description = "Tag names to filter by")
-    private List<String> tagNames;
+
+    @Schema(description = "Tag keys to filter by")
+    private List<String> tagKeys;
+
+    @Schema(description = "Tag values to filter by")
+    private List<String> tagValues;
 }

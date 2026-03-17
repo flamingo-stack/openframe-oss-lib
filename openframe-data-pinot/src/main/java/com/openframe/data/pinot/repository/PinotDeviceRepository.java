@@ -10,7 +10,8 @@ public interface PinotDeviceRepository {
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
-            List<String> tagNames
+            List<String> tagKeys,
+            List<String> tagKeyValues
     );
 
     Map<String, Integer> getDeviceTypeFilterOptions(
@@ -18,7 +19,8 @@ public interface PinotDeviceRepository {
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
-            List<String> tagNames
+            List<String> tagKeys,
+            List<String> tagKeyValues
     );
 
     Map<String, Integer> getOsTypeFilterOptions(
@@ -26,7 +28,8 @@ public interface PinotDeviceRepository {
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
-            List<String> tagNames
+            List<String> tagKeys,
+            List<String> tagKeyValues
     );
 
     Map<String, Integer> getOrganizationFilterOptions(
@@ -34,15 +37,20 @@ public interface PinotDeviceRepository {
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
-            List<String> tagNames
+            List<String> tagKeys,
+            List<String> tagKeyValues
     );
 
-    Map<String, Integer> getTagFilterOptions(
+    /**
+     * Get tag key filter options from the tags MV column.
+     */
+    Map<String, Integer> getTagKeyFilterOptions(
             List<String> statuses,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
-            List<String> tagNames
+            List<String> tagKeys,
+            List<String> tagKeyValues
     );
 
     int getFilteredDeviceCount(
@@ -50,6 +58,7 @@ public interface PinotDeviceRepository {
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
-            List<String> tagNames
+            List<String> tagKeys,
+            List<String> tagKeyValues
     );
-} 
+}
