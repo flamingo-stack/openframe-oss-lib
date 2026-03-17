@@ -9,6 +9,26 @@ extend type Query {
     ): DeviceConnection!
 
     device(machineId: String!): Machine
+
+    # Tag key queries
+    tags(organizationId: String!): [Tag!]!
+    # Tag value options for filter UI (returns distinct values for a tag key with device counts)
+    tagValueOptions(tagKey: String!): [DeviceFilterOption!]!
+
+    # Autocomplete queries for tag key and value search
+    tagKeySuggestions(organizationId: String!, search: String!): [Tag!]!
+    tagValueSuggestions(organizationId: String!, tagKey: String!, search: String!): [String!]!
+}
+
+# Tag key definition (not tied to a device)
+type Tag {
+    id: ID!
+    key: String!
+    description: String
+    color: String
+    values: [String!]
+    organizationId: String!
+    createdAt: Instant
 }
 
 type DeviceFilters {
@@ -16,7 +36,7 @@ type DeviceFilters {
     deviceTypes: [DeviceFilterOption!]!
     osTypes: [DeviceFilterOption!]!
     organizationIds: [DeviceFilterOption!]!
-    tags: [TagFilterOption!]!
+    tagKeys: [TagFilterOption!]!
     filteredCount: Int!
 }
 
@@ -37,7 +57,8 @@ input DeviceFilterInput {
     deviceTypes: [DeviceType!]
     osTypes: [String!]
     organizationIds: [String!]
-    tagNames: [String!]
+    tagKeys: [String!]
+    tagValues: [String!]
 }
 
 type Machine {
@@ -63,19 +84,19 @@ type Machine {
     timezone: String
     registeredAt: Instant
     updatedAt: Instant
-    tags: [Tag]
+    tags: [DeviceTag]
     toolConnections: [ToolConnection]
     installedAgents: [InstalledAgent]
 }
 
-type Tag {
-    id: ID!
-    name: String!
+# Tag as assigned to a device (key + values)
+type DeviceTag {
+    tagId: String!
+    key: String!
     description: String
     color: String
-    organizationId: String!
-    createdAt: Instant!
-    createdBy: String!
+    values: [String!]!
+    createdAt: Instant
 }
 
 enum DeviceStatus {
@@ -84,7 +105,7 @@ enum DeviceStatus {
     INACTIVE
     MAINTENANCE
     DECOMMISSIONED,
-    ONLINE, 
+    ONLINE,
     OFFLINE,
     DELETED,
     ARCHIVED

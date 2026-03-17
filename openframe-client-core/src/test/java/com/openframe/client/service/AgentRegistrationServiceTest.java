@@ -2,10 +2,8 @@ package com.openframe.client.service;
 
 import com.openframe.client.dto.agent.AgentRegistrationRequest;
 import com.openframe.client.dto.agent.AgentRegistrationResponse;
-import com.openframe.client.service.agentregistration.AgentRegistrationService;
-import com.openframe.client.service.agentregistration.AgentRegistrationToolInstallationService;
-import com.openframe.client.service.agentregistration.AgentSecretGenerator;
-import com.openframe.client.service.agentregistration.MachineIdGenerator;
+import com.openframe.client.dto.agent.AgentRegistrationTagInput;
+import com.openframe.client.service.agentregistration.*;
 import com.openframe.client.service.agentregistration.processor.AgentRegistrationProcessor;
 import com.openframe.client.service.validator.AgentRegistrationSecretValidator;
 import com.openframe.data.document.device.DeviceStatus;
@@ -24,10 +22,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,6 +39,9 @@ class AgentRegistrationServiceTest {
 
     @Mock
     private MachineRepository machineRepository;
+
+    @Mock
+    private RegistrationTagAssignmentService registrationTagAssignmentService;
 
     @Mock
     private OrganizationService organizationService;
@@ -75,8 +79,8 @@ class AgentRegistrationServiceTest {
     @BeforeEach
     void setUp() {
         agentRegistrationService = new AgentRegistrationService(oauthClientRepository, machineRepository, organizationService,
-                agentRegistrationSecretValidator, agentSecretGenerator, passwordEncoder, machineIdGenerator, 
-                agentRegistrationToolInstallationService, agentRegistrationProcessor);
+                agentRegistrationSecretValidator, agentSecretGenerator, passwordEncoder, machineIdGenerator,
+                agentRegistrationToolInstallationService, agentRegistrationProcessor, registrationTagAssignmentService);
         request = createTestRequest();
     }
 
@@ -144,6 +148,48 @@ class AgentRegistrationServiceTest {
         verify(oauthClientRepository).existsByMachineId(MACHINE_ID);
         verify(oauthClientRepository, never()).save(any());
         verify(machineRepository, never()).save(any());
+    }
+
+    @Test
+    void registerAgent_WithTags_AssignsTagsToDevice() {
+        when(machineIdGenerator.generate()).thenReturn(MACHINE_ID);
+        when(oauthClientRepository.existsByMachineId(MACHINE_ID)).thenReturn(false);
+        when(agentSecretGenerator.generate()).thenReturn(CLIENT_SECRET);
+        when(organizationService.getDefaultOrganization())
+                .thenReturn(Optional.of(new Organization("id", OrganizationService.DEFAULT_ORGANIZATION_NAME, "custom-uuid", true, null, null, null, null, null, null, null, null, null, null, null, null)));
+        when(passwordEncoder.encode(CLIENT_SECRET)).thenReturn("encoded-secret");
+        when(oauthClientRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
+        when(machineRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
+
+        List<AgentRegistrationTagInput> tags = List.of(
+                AgentRegistrationTagInput.builder().key("site").values(List.of("CHICAGO")).build(),
+                AgentRegistrationTagInput.builder().key("environment").values(List.of("production", "staging")).build()
+        );
+        request.setTags(tags);
+
+        AgentRegistrationResponse response = agentRegistrationService.register(INITIAL_KEY, request);
+
+        assertNotNull(response);
+        assertEquals(MACHINE_ID, response.getMachineId());
+
+        verify(registrationTagAssignmentService).assignTags(eq(MACHINE_ID), eq("custom-uuid"), eq(tags));
+    }
+
+    @Test
+    void registerAgent_WithoutTags_DoesNotAssignTags() {
+        when(machineIdGenerator.generate()).thenReturn(MACHINE_ID);
+        when(oauthClientRepository.existsByMachineId(MACHINE_ID)).thenReturn(false);
+        when(agentSecretGenerator.generate()).thenReturn(CLIENT_SECRET);
+        when(organizationService.getDefaultOrganization())
+                .thenReturn(Optional.of(new Organization("id", OrganizationService.DEFAULT_ORGANIZATION_NAME, "custom-uuid", true, null, null, null, null, null, null, null, null, null, null, null, null)));
+        when(passwordEncoder.encode(CLIENT_SECRET)).thenReturn("encoded-secret");
+        when(oauthClientRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
+        when(machineRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
+
+        AgentRegistrationResponse response = agentRegistrationService.register(INITIAL_KEY, request);
+
+        assertNotNull(response);
+        verify(registrationTagAssignmentService).assignTags(eq(MACHINE_ID), eq("custom-uuid"), isNull());
     }
 
     private AgentRegistrationRequest createTestRequest() {

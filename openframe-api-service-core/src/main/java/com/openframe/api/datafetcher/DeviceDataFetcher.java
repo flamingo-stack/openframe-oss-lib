@@ -4,17 +4,20 @@ import com.netflix.graphql.dgs.*;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
-import com.openframe.api.dto.device.*;
+import com.openframe.api.dto.device.DeviceFilterInput;
+import com.openframe.api.dto.device.DeviceFilterOptions;
+import com.openframe.api.dto.device.DeviceFilters;
+import com.openframe.api.dto.device.DeviceTag;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.CursorPaginationInput;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.api.service.DeviceFilterService;
 import com.openframe.api.service.DeviceService;
+import com.openframe.api.service.TagService;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.installedagents.InstalledAgent;
 import com.openframe.data.document.organization.Organization;
-import com.openframe.data.document.tool.Tag;
 import com.openframe.data.document.tool.ToolConnection;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -34,6 +37,7 @@ public class DeviceDataFetcher {
 
     private final DeviceService deviceService;
     private final DeviceFilterService deviceFilterService;
+    private final TagService tagService;
     private final GraphQLDeviceMapper mapper;
 
     @DgsQuery
@@ -51,7 +55,7 @@ public class DeviceDataFetcher {
             @InputArgument String search,
             @InputArgument @Valid SortInput sort) {
 
-        log.debug("Fetching devices with filter: {}, pagination: {}, search: {}, sort: {}", 
+        log.debug("Fetching devices with filter: {}, pagination: {}, search: {}, sort: {}",
             filter, pagination, search, sort);
         DeviceFilterOptions filterOptions = mapper.toDeviceFilterOptions(filter);
         CursorPaginationCriteria paginationCriteria = mapper.toCursorPaginationCriteria(pagination);
@@ -66,10 +70,10 @@ public class DeviceDataFetcher {
     }
 
     @DgsData(parentType = "Machine")
-    public CompletableFuture<List<Tag>> tags(DgsDataFetchingEnvironment dfe) {
-        DataLoader<String, List<Tag>> dataLoader = dfe.getDataLoader("tagDataLoader");
+    public CompletableFuture<List<DeviceTag>> tags(DgsDataFetchingEnvironment dfe) {
+        DataLoader<String, List<DeviceTag>> dataLoader = dfe.getDataLoader("tagDataLoader");
         Machine machine = dfe.getSource();
-        return dataLoader.load(machine.getId());
+        return dataLoader.load(machine.getMachineId());
     }
 
     @DgsData(parentType = "Machine")
@@ -98,5 +102,5 @@ public class DeviceDataFetcher {
         
         return dataLoader.load(organizationId);
     }
-}
 
+}
