@@ -34,6 +34,22 @@ export interface NatsClientOptions {
   reconnectTimeWaitMs?: number
 
   /**
+   * Exponential backoff for reconnect delays.
+   * When set, uses `reconnectDelayHandler` from nats.ws under the hood,
+   * overriding `reconnectTimeWaitMs`.
+   */
+  exponentialBackoff?: {
+    /** Initial delay in ms (default: 1000) */
+    initialDelayMs?: number
+    /** Maximum delay cap in ms (default: 30000) */
+    maxDelayMs?: number
+    /** Multiplier per attempt (default: 2) */
+    multiplier?: number
+    /** Add random jitter 0-50% of delay to prevent thundering herd (default: true) */
+    jitter?: boolean
+  }
+
+  /**
    * Ping behavior (keep-alive).
    */
   pingIntervalMs?: number
@@ -158,7 +174,42 @@ function toNatsHeaders(nats: typeof import('nats.ws'), init: NatsHeadersInit): N
   return h
 }
 
-function mapOptionsToConnectionOptions(opts: NatsClientOptions): ConnectionOptions {
+/** Returns a cryptographically random float in [0, 1). */
+function cryptoRandom(): number {
+  const buf = new Uint32Array(1)
+  crypto.getRandomValues(buf)
+  return buf[0] / (0xffffffff + 1)
+}
+
+interface ExponentialBackoffHandle {
+  handler: () => number
+  reset: () => void
+}
+
+function createExponentialBackoffHandler(opts: NonNullable<NatsClientOptions['exponentialBackoff']>): ExponentialBackoffHandle {
+  const initialDelay = opts.initialDelayMs ?? 1000
+  const maxDelay = opts.maxDelayMs ?? 30_000
+  const multiplier = opts.multiplier ?? 2
+  const jitter = opts.jitter ?? true
+
+  let attempt = 0
+
+  return {
+    handler: (): number => {
+      const delay = Math.min(initialDelay * multiplier ** attempt, maxDelay)
+      attempt++
+      return jitter ? delay * (0.5 + cryptoRandom() * 0.5) : delay
+    },
+    reset: () => {
+      attempt = 0
+    },
+  }
+}
+
+function mapOptionsToConnectionOptions(
+  opts: NatsClientOptions,
+  backoff?: ExponentialBackoffHandle,
+): ConnectionOptions {
   return {
     servers: opts.servers,
     name: opts.name,
@@ -169,6 +220,7 @@ function mapOptionsToConnectionOptions(opts: NatsClientOptions): ConnectionOptio
     reconnect: opts.reconnect ?? true,
     maxReconnectAttempts: opts.maxReconnectAttempts,
     reconnectTimeWait: opts.reconnectTimeWaitMs,
+    reconnectDelayHandler: backoff?.handler,
     pingInterval: opts.pingIntervalMs,
     maxPingOut: opts.maxPingOut,
     inboxPrefix: opts.inboxPrefix,
@@ -189,6 +241,10 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
   let nc: NatsConnection | null = null
   let statusLoopAbort: AbortController | null = null
 
+  const backoff = options.exponentialBackoff
+    ? createExponentialBackoffHandler(options.exponentialBackoff)
+    : undefined
+
   const statusListeners = new Set<(event: NatsStatusEvent) => void>()
 
   function emitStatus(event: NatsStatusEvent) {
@@ -208,7 +264,7 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
     emitStatus({ status: 'connecting' })
 
     const nats = await importNats()
-    const conn = await nats.connect(mapOptionsToConnectionOptions(options))
+    const conn = await nats.connect(mapOptionsToConnectionOptions(options, backoff))
     nc = conn
 
     emitStatus({ status: 'connected' })
@@ -222,6 +278,9 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
           if (signal.aborted) return
           const mapped = mapNatsTypeToStatus((s as any)?.type)
           if (mapped) {
+            if (mapped === 'connected' && backoff) {
+              backoff.reset()
+            }
             emitStatus({ status: mapped, data: (s as any)?.data })
             if (mapped === 'closed') {
               nc = null
