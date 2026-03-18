@@ -58,7 +58,7 @@ public class ToolConnectionService {
     ) {
         if (toolConnection.getStatus() == ConnectionStatus.DISCONNECTED) {
             toolConnection.setStatus(ConnectionStatus.CONNECTED);
-            toolConnection.setAgentToolId(toolAgentIdTransformerService.transform(toolType, agentId, lastAttempt));
+            toolConnection.setAgentToolId(toolAgentIdTransformerService.transform(toolType, openframeAgentId, agentId, lastAttempt));
             toolConnection.setConnectedAt(Instant.now());
             toolConnection.setDisconnectedAt(null);
             toolConnectionRepository.save(toolConnection);
@@ -67,10 +67,9 @@ public class ToolConnectionService {
         } else {
             // Connection is already CONNECTED
             String currentAgentToolId = toolConnection.getAgentToolId();
-            String transformedAgentToolId = toolAgentIdTransformerService.transform(toolType, agentId, lastAttempt);
+            String transformedAgentToolId = toolAgentIdTransformerService.transform(toolType, openframeAgentId, agentId, lastAttempt);
             if (!transformedAgentToolId.equals(currentAgentToolId)) {
-                // If agentToolId is different, update it
-                toolConnection.setAgentToolId(toolAgentIdTransformerService.transform(toolType, agentId, lastAttempt));
+                toolConnection.setAgentToolId(transformedAgentToolId);
                 toolConnection.setLastSyncAt(Instant.now());
                 toolConnectionRepository.save(toolConnection);
                 log.info("Updated agentToolId for existing connected tool connection: machineId={} tool={} oldAgentToolId={} newAgentToolId={}", 
@@ -87,7 +86,7 @@ public class ToolConnectionService {
         ToolConnection connection = new ToolConnection();
         connection.setMachineId(openframeAgentId);
         connection.setToolType(toolType);
-        connection.setAgentToolId(toolAgentIdTransformerService.transform(toolType, agentToolId, lastAttempt));
+        connection.setAgentToolId(toolAgentIdTransformerService.transform(toolType, openframeAgentId, agentToolId, lastAttempt));
         connection.setStatus(ConnectionStatus.CONNECTED);
         connection.setConnectedAt(Instant.now());
         toolConnectionRepository.save(connection);
