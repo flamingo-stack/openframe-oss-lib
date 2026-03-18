@@ -81,7 +81,7 @@ public class FleetMdmAgentIdTransformer implements ToolAgentIdTransformer {
                             .findFirst())
                     .map(host -> processMatchingHost(host, agentToolId))
                     .orElseGet(() -> {
-                        logNoMatch(agentToolId, uuidMatched.size());
+                        logNoMatch(agentToolId);
                         return processNoMatchingHost(agentToolId, lastAttempt);
                     });
         } catch (Exception e) {
@@ -117,8 +117,8 @@ public class FleetMdmAgentIdTransformer implements ToolAgentIdTransformer {
         log.info("Matched host by osVersion fallback, uuid={}, host_id={}, osquery_host_id={}", uuid, hostId, osqueryHostId);
     }
 
-    private void logNoMatch(String uuid, int uuidMatchedCount) {
-        log.warn("No matching host found, uuid={}, uuid_matched_count={}", uuid, uuidMatchedCount);
+    private void logNoMatch(String uuid) {
+        log.warn("No matching host found, uuid={}", uuid);
     }
 
     private void logHosts(List<Host> hosts) {
