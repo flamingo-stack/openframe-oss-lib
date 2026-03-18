@@ -11,6 +11,10 @@ public class Host {
     private Long id;
     private String hostname;
     private String uuid;
+
+    @JsonProperty("osquery_host_id")
+    private String osqueryHostId;
+
     private String platform;
 
     @JsonProperty("created_at")
@@ -154,6 +158,9 @@ public class Host {
 
     public String getUuid() { return uuid; }
     public void setUuid(String uuid) { this.uuid = uuid; }
+
+    public String getOsqueryHostId() { return osqueryHostId; }
+    public void setOsqueryHostId(String osqueryHostId) { this.osqueryHostId = osqueryHostId; }
 
     public String getPlatform() { return platform; }
     public void setPlatform(String platform) { this.platform = platform; }
@@ -302,6 +309,7 @@ public class Host {
                 "id=" + id +
                 ", hostname='" + hostname + '\'' +
                 ", uuid='" + uuid + '\'' +
+                ", osqueryHostId='" + osqueryHostId + '\'' +
                 ", platform='" + platform + '\'' +
                 ", createdAt='" + createdAt + '\'' +
                 ", updatedAt='" + updatedAt + '\'' +
