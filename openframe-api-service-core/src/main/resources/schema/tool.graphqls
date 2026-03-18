@@ -47,8 +47,9 @@ type ToolCredentials {
     apiKey: APIKey
 }
 
-type IntegratedTool {
+type IntegratedTool implements Node {
     id: ID!
+    rawId: ID!
     name: String!
     description: String
     icon: String

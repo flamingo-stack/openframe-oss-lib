@@ -1,5 +1,5 @@
 extend type Query {
-    events(filter: EventFilterInput, pagination: CursorPaginationInput, search: String, sort: SortInput): EventConnection!
+    events(filter: EventFilterInput, first: Int, after: String, last: Int, before: String, search: String, sort: SortInput): EventConnection!
     eventById(id: ID!): Event
     eventFilters(filter: EventFilterInput): EventFilters!
 }
@@ -9,8 +9,9 @@ extend type Mutation {
     updateEvent(id: ID!, input: CreateEventInput!): Event
 }
 
-type Event {
+type Event implements Node {
     id: ID!
+    rawId: ID!
     userId: ID!
     timestamp: Instant!
     type: String!
@@ -33,7 +34,7 @@ input CreateEventInput {
 
 type EventConnection {
     edges: [EventEdge!]!
-    pageInfo: CursorPageInfo!
+    pageInfo: PageInfo!
 }
 
 type EventEdge {

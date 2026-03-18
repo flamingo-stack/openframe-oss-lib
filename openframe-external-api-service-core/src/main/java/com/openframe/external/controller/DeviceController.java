@@ -9,13 +9,13 @@ import com.openframe.core.dto.ErrorResponse;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
-import com.openframe.external.dto.device.DeviceFilterCriteria;
+import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.external.dto.device.DeviceFilterResponse;
 import com.openframe.external.dto.device.DeviceResponse;
 import com.openframe.external.dto.device.DevicesResponse;
 import com.openframe.external.dto.device.UpdateDeviceStatusRequest;
-import com.openframe.external.dto.shared.PaginationCriteria;
-import com.openframe.external.dto.shared.SortCriteria;
+import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.dto.shared.SortInput;
 import com.openframe.external.mapper.DeviceMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -115,21 +115,11 @@ public class DeviceController {
                 .tagValues(tagValues)
                 .build();
 
-        PaginationCriteria paginationCriteria = PaginationCriteria.builder()
-                .limit(limit)
-                .cursor(cursor)
-                .build();
-
-        SortCriteria sortCriteria = SortCriteria.builder()
-                .field(sortField)
-                .direction(sortDirection)
-                .build();
-
         var result = deviceService.queryDevices(
-                deviceMapper.toDeviceFilterOptions(filterCriteria),
-                deviceMapper.toCursorPaginationCriteria(paginationCriteria),
+                filterCriteria,
+                CursorPaginationCriteria.fromRest(cursor, limit),
                 search,
-                deviceMapper.toSortInput(sortCriteria));
+                SortInput.from(sortField, sortDirection));
 
         if (includeTags) {
             List<String> machineIds = result.getItems().stream()
@@ -224,7 +214,7 @@ public class DeviceController {
                 .tagValues(tagValues)
                 .build();
         var filters = deviceFilterService.getDeviceFilters(
-                deviceMapper.toDeviceFilterOptions(filterCriteria)).join();
+                filterCriteria).join();
         return deviceMapper.toDeviceFilterResponse(filters);
     }
 

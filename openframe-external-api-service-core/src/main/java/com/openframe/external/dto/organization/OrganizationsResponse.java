@@ -1,6 +1,7 @@
 package com.openframe.external.dto.organization;
 
 import com.openframe.api.dto.organization.OrganizationResponse;
+import com.openframe.api.dto.shared.PageInfo;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,10 +19,5 @@ import java.util.List;
 public class OrganizationsResponse {
     private List<OrganizationResponse> organizations;
     private Integer total;
-    
-    // Pagination info
-    private Boolean hasNextPage;
-    private Boolean hasPreviousPage;
-    private String startCursor;
-    private String endCursor;
+    private PageInfo pageInfo;
 }

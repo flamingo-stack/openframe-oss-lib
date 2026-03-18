@@ -1,15 +1,16 @@
 package com.openframe.api.datafetcher;
 
 import com.netflix.graphql.dgs.*;
+import com.openframe.api.relay.GlobalId;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.device.DeviceFilterInput;
-import com.openframe.api.dto.device.DeviceFilterOptions;
+import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.device.DeviceFilters;
 import com.openframe.api.dto.device.DeviceTag;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
-import com.openframe.api.dto.shared.CursorPaginationInput;
+import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.api.service.DeviceFilterService;
@@ -43,7 +44,7 @@ public class DeviceDataFetcher {
     @DgsQuery
     public CompletableFuture<DeviceFilters> deviceFilters(@InputArgument @Valid DeviceFilterInput filter) {
         log.debug("Fetching device filters with filter: {}", filter);
-        DeviceFilterOptions filterOptions = mapper.toDeviceFilterOptions(filter);
+        DeviceFilterCriteria filterOptions = mapper.toDeviceFilterCriteria(filter);
 
         return deviceFilterService.getDeviceFilters(filterOptions);
     }
@@ -51,14 +52,18 @@ public class DeviceDataFetcher {
     @DgsQuery
     public CountedGenericConnection<GenericEdge<Machine>> devices(
             @InputArgument @Valid DeviceFilterInput filter,
-            @InputArgument @Valid CursorPaginationInput pagination,
+            @InputArgument Integer first,
+            @InputArgument String after,
+            @InputArgument Integer last,
+            @InputArgument String before,
             @InputArgument String search,
             @InputArgument @Valid SortInput sort) {
 
-        log.debug("Fetching devices with filter: {}, pagination: {}, search: {}, sort: {}",
-            filter, pagination, search, sort);
-        DeviceFilterOptions filterOptions = mapper.toDeviceFilterOptions(filter);
-        CursorPaginationCriteria paginationCriteria = mapper.toCursorPaginationCriteria(pagination);
+        log.debug("Fetching devices with filter: {}, first: {}, after: {}, last: {}, before: {}, search: {}, sort: {}",
+            filter, first, after, last, before, search, sort);
+        DeviceFilterCriteria filterOptions = mapper.toDeviceFilterCriteria(filter);
+        ConnectionArgs connectionArgs = ConnectionArgs.builder().first(first).after(after).last(last).before(before).build();
+        CursorPaginationCriteria paginationCriteria = mapper.toCursorPaginationCriteria(connectionArgs);
         CountedGenericQueryResult<Machine> result = deviceService.queryDevices(filterOptions, paginationCriteria, search, sort);
         return mapper.toDeviceConnection(result);
     }
@@ -67,6 +72,18 @@ public class DeviceDataFetcher {
     public Machine device(@InputArgument @NotBlank String machineId) {
         log.debug("Fetching device with ID: {}", machineId);
         return deviceService.findByMachineId(machineId).orElse(null);
+    }
+
+    @DgsData(parentType = "Machine", field = "id")
+    public String machineNodeId(DgsDataFetchingEnvironment dfe) {
+        Machine machine = dfe.getSource();
+        return GlobalId.toGlobalId("Machine", machine.getMachineId());
+    }
+
+    @DgsData(parentType = "Machine", field = "rawId")
+    public String machineRawId(DgsDataFetchingEnvironment dfe) {
+        Machine machine = dfe.getSource();
+        return machine.getId();
     }
 
     @DgsData(parentType = "Machine")

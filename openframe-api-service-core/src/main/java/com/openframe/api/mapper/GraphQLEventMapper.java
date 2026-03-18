@@ -4,8 +4,9 @@ import com.openframe.api.dto.GenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.event.*;
+import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
-import com.openframe.api.dto.shared.CursorPaginationInput;
+import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.data.document.event.Event;
 import org.springframework.stereotype.Component;
 
@@ -15,12 +16,12 @@ import java.util.stream.Collectors;
 @Component
 public class GraphQLEventMapper {
 
-    public EventFilterOptions toEventFilterOptions(EventFilterInput input) {
+    public EventFilterCriteria toEventFilterCriteria(EventFilterInput input) {
         if (input == null) {
-            return EventFilterOptions.builder().build();
+            return EventFilterCriteria.builder().build();
         }
 
-        return EventFilterOptions.builder()
+        return EventFilterCriteria.builder()
                 .userIds(input.getUserIds())
                 .eventTypes(input.getEventTypes())
                 .startDate(input.getStartDate())
@@ -28,15 +29,8 @@ public class GraphQLEventMapper {
                 .build();
     }
 
-    public CursorPaginationCriteria toCursorPaginationCriteria(CursorPaginationInput input) {
-        if (input == null) {
-            return CursorPaginationCriteria.builder().build();
-        }
-
-        return CursorPaginationCriteria.builder()
-                .limit(input.getLimit())
-                .cursor(input.getCursor())
-                .build();
+    public CursorPaginationCriteria toCursorPaginationCriteria(ConnectionArgs args) {
+        return CursorPaginationCriteria.fromConnectionArgs(args);
     }
 
     public GenericConnection<GenericEdge<Event>> toEventConnection(GenericQueryResult<Event> result) {
@@ -50,7 +44,7 @@ public class GraphQLEventMapper {
         List<GenericEdge<Event>> edges = result.getItems().stream()
                 .map(event -> GenericEdge.<Event>builder()
                         .node(event)
-                        .cursor(event.getId())
+                        .cursor(CursorCodec.encode(event.getId()))
                         .build())
                 .collect(Collectors.toList());
 

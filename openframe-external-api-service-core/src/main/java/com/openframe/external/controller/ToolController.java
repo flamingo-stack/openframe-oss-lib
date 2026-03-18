@@ -2,10 +2,10 @@ package com.openframe.external.controller;
 
 import com.openframe.api.service.ToolService;
 import com.openframe.core.dto.ErrorResponse;
-import com.openframe.external.dto.tool.ToolFilterCriteria;
+import com.openframe.api.dto.tool.ToolFilterCriteria;
 import com.openframe.external.dto.tool.ToolFilterResponse;
 import com.openframe.external.dto.tool.ToolsResponse;
-import com.openframe.external.dto.shared.SortCriteria;
+import com.openframe.api.dto.shared.SortInput;
 import com.openframe.external.mapper.ToolMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -69,13 +69,8 @@ public class ToolController {
                 .category(category)
                 .build();
         
-        SortCriteria sortCriteria = SortCriteria.builder()
-                .field(sortField)
-                .direction(sortDirection)
-                .build();
-
-        var result = toolService.queryTools(toolMapper.toToolFilterOptions(filterCriteria), search, 
-                                           toolMapper.toSortInput(sortCriteria));
+        var result = toolService.queryTools(filterCriteria, search,
+                                           SortInput.from(sortField, sortDirection));
         return toolMapper.toToolsResponse(result);
     }
 

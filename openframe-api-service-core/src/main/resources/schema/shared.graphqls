@@ -2,8 +2,14 @@
 # This file contains common types and base types used across multiple schemas
 
 # Base types that can be extended by other schemas
+interface Node {
+    id: ID!
+}
+
 type Query {
-    # Base Query type - extended by other schemas
+    # Relay Node interface queries
+    node(id: ID!): Node
+    nodes(ids: [ID!]!): [Node]!
 }
 
 type Mutation {
@@ -14,8 +20,8 @@ type Mutation {
 scalar Instant
 scalar Date  # Date in yyyy-MM-dd format 
 
-# Common pagination types
-type CursorPageInfo {
+# Relay Connection Spec page info
+type PageInfo {
     hasNextPage: Boolean!
     hasPreviousPage: Boolean!
     startCursor: String
@@ -26,12 +32,6 @@ enum ToolType {
     MESHCENTRAL
     TACTICAL_RMM
     FLEET_MDM
-}
-
-# Common input for cursor-based pagination
-input CursorPaginationInput {
-    limit: Int
-    cursor: String
 }
 
 # Sorting support

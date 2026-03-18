@@ -3,7 +3,10 @@ extend type Query {
 
     devices(
         filter: DeviceFilterInput
-        pagination: CursorPaginationInput
+        first: Int
+        after: String
+        last: Int
+        before: String
         search: String
         sort: SortInput
     ): DeviceConnection!
@@ -61,8 +64,9 @@ input DeviceFilterInput {
     tagValues: [String!]
 }
 
-type Machine {
+type Machine implements Node {
     id: ID!
+    rawId: ID!
     machineId: String!
     ip: String
     macAddress: String
@@ -126,7 +130,7 @@ enum DeviceType {
 
 type DeviceConnection {
     edges: [DeviceEdge!]!
-    pageInfo: CursorPageInfo!
+    pageInfo: PageInfo!
     filteredCount: Int!
 }
 

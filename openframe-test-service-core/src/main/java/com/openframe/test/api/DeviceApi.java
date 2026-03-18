@@ -3,7 +3,7 @@ package com.openframe.test.api;
 import com.openframe.test.data.dto.device.*;
 import com.openframe.test.data.dto.device.fleet.FleetHost;
 import com.openframe.test.data.dto.device.tactical.TacticalAgent;
-import com.openframe.test.data.dto.shared.CursorPaginationInput;
+
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 
@@ -44,18 +44,16 @@ public class DeviceApi {
                 .extract().jsonPath().get("data.devices.edges.node.machineId");
     }
 
-    public static List<String> getAllDeviceIds(DeviceFilterInput filter, CursorPaginationInput pagination) {
+    public static List<String> getAllDeviceIds(DeviceFilterInput filter, Integer first, String after) {
         List<String> machineIds = new ArrayList<>();
-        String cursor = pagination.getCursor();
+        String cursor = after;
         boolean hasNextPage = true;
 
         while (hasNextPage) {
             Map<String, Object> variables = new HashMap<>();
             variables.put("filter", filter);
-            variables.put("pagination", CursorPaginationInput.builder()
-                    .limit(pagination.getLimit())
-                    .cursor(cursor)
-                    .build());
+            variables.put("first", first);
+            variables.put("after", cursor);
             Map<String, Object> body = new HashMap<>();
             body.put("query", ALL_DEVICE_IDS);
             body.put("variables", variables);
@@ -112,18 +110,16 @@ public class DeviceApi {
                 .extract().jsonPath().getList("data.devices.edges.node", Machine.class);
     }
 
-    public static List<String> getAllDevices(DeviceFilterInput filter, CursorPaginationInput pagination) {
+    public static List<String> getAllDevices(DeviceFilterInput filter, Integer first, String after) {
         List<String> fleetIds = new ArrayList<>();
-        String cursor = pagination.getCursor();
+        String cursor = after;
         boolean hasNextPage = true;
 
         while (hasNextPage) {
             Map<String, Object> variables = new HashMap<>();
             variables.put("filter", filter);
-            variables.put("pagination", CursorPaginationInput.builder()
-                    .limit(pagination.getLimit())
-                    .cursor(cursor)
-                    .build());
+            variables.put("first", first);
+            variables.put("after", cursor);
             Map<String, Object> body = new HashMap<>();
             body.put("query", ALL_DEVICES);
             body.put("variables", variables);

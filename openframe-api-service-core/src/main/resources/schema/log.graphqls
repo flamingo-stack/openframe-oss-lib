@@ -3,7 +3,10 @@ extend type Query {
 
     logs(
         filter: LogFilterInput
-        pagination: CursorPaginationInput
+        first: Int
+        after: String
+        last: Int
+        before: String
         search: String
         sort: SortInput
     ): LogConnection!
@@ -43,7 +46,7 @@ input LogFilterInput {
 
 type LogConnection {
     edges: [LogEdge!]!
-    pageInfo: CursorPageInfo!
+    pageInfo: PageInfo!
 }
 
 type LogEdge {

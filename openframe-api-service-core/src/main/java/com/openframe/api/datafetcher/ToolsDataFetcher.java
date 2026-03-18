@@ -1,10 +1,10 @@
 package com.openframe.api.datafetcher;
 
-import com.netflix.graphql.dgs.DgsComponent;
-import com.netflix.graphql.dgs.DgsQuery;
-import com.netflix.graphql.dgs.InputArgument;
+import com.netflix.graphql.dgs.*;
+import com.openframe.api.relay.GlobalId;
+import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.api.dto.tool.ToolFilterInput;
-import com.openframe.api.dto.tool.ToolFilterOptions;
+import com.openframe.api.dto.tool.ToolFilterCriteria;
 import com.openframe.api.dto.tool.ToolFilters;
 import com.openframe.api.dto.tool.ToolList;
 import com.openframe.api.dto.shared.SortInput;
@@ -24,6 +24,18 @@ public class ToolsDataFetcher {
     private final ToolService toolService;
     private final GraphQLToolMapper toolMapper;
 
+    @DgsData(parentType = "IntegratedTool", field = "id")
+    public String toolNodeId(DgsDataFetchingEnvironment dfe) {
+        IntegratedTool tool = dfe.getSource();
+        return GlobalId.toGlobalId("IntegratedTool", tool.getId());
+    }
+
+    @DgsData(parentType = "IntegratedTool", field = "rawId")
+    public String toolRawId(DgsDataFetchingEnvironment dfe) {
+        IntegratedTool tool = dfe.getSource();
+        return tool.getId();
+    }
+
     @DgsQuery
     public ToolList integratedTools(
             @InputArgument @Valid ToolFilterInput filter,
@@ -32,7 +44,7 @@ public class ToolsDataFetcher {
 
         log.debug("Getting integrated tools with filter: {}, search: {}, sort: {}", filter, search, sort);
 
-        ToolFilterOptions filterOptions = toolMapper.toToolFilterOptions(filter);
+        ToolFilterCriteria filterOptions = toolMapper.toToolFilterCriteria(filter);
         return toolService.queryTools(filterOptions, search, sort);
     }
 

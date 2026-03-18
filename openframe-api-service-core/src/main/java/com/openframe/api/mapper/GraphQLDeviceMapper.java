@@ -4,8 +4,9 @@ import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.device.*;
+import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
-import com.openframe.api.dto.shared.CursorPaginationInput;
+import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.data.document.device.Machine;
 import org.springframework.stereotype.Component;
 
@@ -15,12 +16,12 @@ import java.util.stream.Collectors;
 @Component
 public class GraphQLDeviceMapper {
 
-    public DeviceFilterOptions toDeviceFilterOptions(DeviceFilterInput input) {
+    public DeviceFilterCriteria toDeviceFilterCriteria(DeviceFilterInput input) {
         if (input == null) {
-            return DeviceFilterOptions.builder().build();
+            return DeviceFilterCriteria.builder().build();
         }
 
-        return DeviceFilterOptions.builder()
+        return DeviceFilterCriteria.builder()
                 .statuses(input.getStatuses())
                 .deviceTypes(input.getDeviceTypes())
                 .osTypes(input.getOsTypes())
@@ -30,22 +31,15 @@ public class GraphQLDeviceMapper {
                 .build();
     }
 
-    public CursorPaginationCriteria toCursorPaginationCriteria(CursorPaginationInput input) {
-        if (input == null) {
-            return new CursorPaginationCriteria();
-        }
-
-        return CursorPaginationCriteria.builder()
-                .limit(input.getLimit())
-                .cursor(input.getCursor())
-                .build();
+    public CursorPaginationCriteria toCursorPaginationCriteria(ConnectionArgs args) {
+        return CursorPaginationCriteria.fromConnectionArgs(args);
     }
 
     public CountedGenericConnection<GenericEdge<Machine>> toDeviceConnection(CountedGenericQueryResult<Machine> result) {
         List<GenericEdge<Machine>> edges = result.getItems().stream()
                 .map(machine -> GenericEdge.<Machine>builder()
                         .node(machine)
-                        .cursor(machine.getMachineId())
+                        .cursor(CursorCodec.encode(machine.getId()))
                         .build())
                 .collect(Collectors.toList());
         return CountedGenericConnection.<GenericEdge<Machine>>builder()

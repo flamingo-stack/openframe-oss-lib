@@ -2,7 +2,8 @@ package com.openframe.api.service;
 
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.audit.*;
-import com.openframe.api.dto.shared.CursorPageInfo;
+import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.data.cassandra.model.UnifiedLogEvent;
@@ -30,7 +31,7 @@ public class LogService {
     private final UnifiedLogEventRepository unifiedLogEventRepository;
 
 
-    public GenericQueryResult<LogEvent> queryLogs(LogFilterOptions filter, CursorPaginationCriteria paginationCriteria, String search, SortInput sort) {
+    public GenericQueryResult<LogEvent> queryLogs(LogFilterCriteria filter, CursorPaginationCriteria paginationCriteria, String search, SortInput sort) {
         CursorPaginationCriteria normalizedCriteria = paginationCriteria.normalize();
 
         log.debug("Querying logs with filter: {}, pagination: {}, search: {}, sort: {}",
@@ -103,7 +104,7 @@ public class LogService {
         }
     }
 
-    public LogFilters getLogFilters(LogFilterOptions filters) {
+    public LogFilters getLogFilters(LogFilterCriteria filters) {
         log.debug("Getting log filters with filter: {}", filters);
         LocalDate startDate = filters.getStartDate();
         LocalDate endDate = filters.getEndDate();
@@ -152,11 +153,11 @@ public class LogService {
                 .map(this::mapToLogEvent)
                 .collect(Collectors.toList());
 
-        CursorPageInfo pageInfo = CursorPageInfo.builder()
+        PageInfo pageInfo = PageInfo.builder()
                 .hasNextPage(logs.size() == limit)
                 .hasPreviousPage(cursor != null)
-                .startCursor(events.isEmpty() ? null : createLogCursor(events.getFirst()))
-                .endCursor(events.isEmpty() ? null : createLogCursor(events.getLast()))
+                .startCursor(events.isEmpty() ? null : CursorCodec.encode(createLogCursor(events.getFirst())))
+                .endCursor(events.isEmpty() ? null : CursorCodec.encode(createLogCursor(events.getLast())))
                 .build();
 
         return GenericQueryResult.<LogEvent>builder()

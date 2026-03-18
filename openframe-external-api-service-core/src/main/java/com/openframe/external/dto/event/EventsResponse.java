@@ -1,6 +1,6 @@
 package com.openframe.external.dto.event;
 
-import com.openframe.external.dto.shared.PageInfo;
+import com.openframe.api.dto.shared.PageInfo;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.Builder;

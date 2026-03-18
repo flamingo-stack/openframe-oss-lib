@@ -7,7 +7,7 @@ import com.openframe.api.dto.GenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.audit.*;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
-import com.openframe.api.dto.shared.CursorPaginationInput;
+import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLLogMapper;
 import com.openframe.api.service.LogService;
@@ -33,22 +33,26 @@ public class LogDataFetcher {
     public LogFilters logFilters(@InputArgument @Valid LogFilterInput filter) {
         log.debug("Fetching audit filters with filter: {}", filter);
 
-        LogFilterOptions filterOptions = logMapper.toLogFilterOptions(filter);
+        LogFilterCriteria filterOptions = logMapper.toLogFilterCriteria(filter);
         return logService.getLogFilters(filterOptions);
     }
 
     @DgsQuery
     public GenericConnection<GenericEdge<LogEvent>> logs(
             @InputArgument @Valid LogFilterInput filter,
-            @InputArgument @Valid CursorPaginationInput pagination,
+            @InputArgument Integer first,
+            @InputArgument String after,
+            @InputArgument Integer last,
+            @InputArgument String before,
             @InputArgument String search,
             @InputArgument @Valid SortInput sort) {
 
-        log.debug("Fetching logs with filter: {}, pagination: {}, search: {}, sort: {}",
-                filter, pagination, search, sort);
+        log.debug("Fetching logs with filter: {}, first: {}, after: {}, last: {}, before: {}, search: {}, sort: {}",
+                filter, first, after, last, before, search, sort);
 
-        LogFilterOptions filterOptions = logMapper.toLogFilterOptions(filter);
-        CursorPaginationCriteria paginationCriteria = logMapper.toCursorPaginationCriteria(pagination);
+        LogFilterCriteria filterOptions = logMapper.toLogFilterCriteria(filter);
+        ConnectionArgs connectionArgs = ConnectionArgs.builder().first(first).after(after).last(last).before(before).build();
+        CursorPaginationCriteria paginationCriteria = logMapper.toCursorPaginationCriteria(connectionArgs);
 
         var result = logService.queryLogs(filterOptions, paginationCriteria, search, sort);
         GenericConnection<GenericEdge<LogEvent>> connection = logMapper.toLogConnection(result);

@@ -1,6 +1,6 @@
 package com.openframe.api.dto;
 
-import com.openframe.api.dto.shared.CursorPageInfo;
+import com.openframe.api.dto.shared.PageInfo;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;

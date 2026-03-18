@@ -13,7 +13,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class LogFilterOptions {
+public class LogFilterCriteria {
 
     private LocalDate startDate;
     private LocalDate endDate;
