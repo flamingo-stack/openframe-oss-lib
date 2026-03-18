@@ -113,3 +113,6 @@ export type {
 export { CursorPagination, CursorPaginationSimple } from './cursor-pagination'
 export type { CursorPaginationProps } from './cursor-pagination'
 
+// Phone input
+export * from './phone-input'
+

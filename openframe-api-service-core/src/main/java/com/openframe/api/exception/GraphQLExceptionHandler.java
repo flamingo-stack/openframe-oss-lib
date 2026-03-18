@@ -1,5 +1,9 @@
 package com.openframe.api.exception;
 
+import com.openframe.core.exception.BaseException;
+import com.openframe.core.exception.ConflictException;
+import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.pinot.repository.exception.PinotQueryException;
 import graphql.GraphQLError;
 import graphql.execution.DataFetcherExceptionHandlerParameters;
@@ -9,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 @Component
@@ -25,45 +30,21 @@ public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
         GraphQLError error;
 
         if (exception instanceof PinotQueryException) {
-            error = GraphQLError.newError()
-                    .message("Query failed. Please try again later.")
-                    .extensions(java.util.Map.of(
-                            "code", "PINOT_QUERY_ERROR",
-                            "timestamp", System.currentTimeMillis()
-                    ))
-                    .build();
+            error = buildError("Query failed. Please try again later.", ErrorCode.PINOT_QUERY_ERROR);
         } else if (exception instanceof DataAccessException) {
-            error = GraphQLError.newError()
-                    .message("Database operation failed. Please try again later.")
-                    .extensions(java.util.Map.of(
-                            "code", "DATABASE_ERROR",
-                            "timestamp", System.currentTimeMillis()
-                    ))
-                    .build();
+            error = buildError("Database operation failed. Please try again later.", ErrorCode.DATABASE_ERROR);
+        } else if (exception instanceof NotFoundException nfe) {
+            error = buildError(nfe.getMessage(), nfe.getErrorCode());
+        } else if (exception instanceof ConflictException ce) {
+            error = buildError(ce.getMessage(), ce.getErrorCode());
+        } else if (exception instanceof BaseException be) {
+            error = buildError(be.getMessage(), be.getErrorCode());
         } else if (exception instanceof IllegalArgumentException) {
-            error = GraphQLError.newError()
-                    .message(exception.getMessage())
-                    .extensions(java.util.Map.of(
-                            "code", "VALIDATION_ERROR",
-                            "timestamp", System.currentTimeMillis()
-                    ))
-                    .build();
+            error = buildError(exception.getMessage(), ErrorCode.VALIDATION_ERROR);
         } else if (exception instanceof RuntimeException) {
-            error = GraphQLError.newError()
-                    .message("An unexpected error occurred. Please try again later.")
-                    .extensions(java.util.Map.of(
-                            "code", "INTERNAL_ERROR",
-                            "timestamp", System.currentTimeMillis()
-                    ))
-                    .build();
+            error = buildError("An unexpected error occurred. Please try again later.", ErrorCode.INTERNAL_ERROR);
         } else {
-            error = GraphQLError.newError()
-                    .message("An unexpected error occurred. Please try again later.")
-                    .extensions(java.util.Map.of(
-                            "code", "UNKNOWN_ERROR",
-                            "timestamp", System.currentTimeMillis()
-                    ))
-                    .build();
+            error = buildError("An unexpected error occurred. Please try again later.", ErrorCode.INTERNAL_ERROR);
         }
 
         return CompletableFuture.completedFuture(
@@ -71,5 +52,16 @@ public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
                         .error(error)
                         .build()
         );
+    }
+
+    private GraphQLError buildError(String message, ErrorCode errorCode) {
+        return GraphQLError.newError()
+                .message(message)
+                .extensions(Map.of(
+                        "code", errorCode.getCode(),
+                        "httpStatus", errorCode.getHttpStatus(),
+                        "timestamp", System.currentTimeMillis()
+                ))
+                .build();
     }
 } 

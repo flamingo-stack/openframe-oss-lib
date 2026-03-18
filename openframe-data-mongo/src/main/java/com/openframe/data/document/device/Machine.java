@@ -56,4 +56,6 @@ public class Machine {
     private Instant registeredAt;  // When device was first registered (replaces createdAt)
     @LastModifiedDate
     private Instant updatedAt;     // Last time device info was updated (replaces lastModifiedAt)
+
+    private Instant stuckNotifiedAt; // When DEVICE_STUCK event was sent (null = not yet notified)
 }

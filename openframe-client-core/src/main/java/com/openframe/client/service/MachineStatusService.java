@@ -1,11 +1,13 @@
 package com.openframe.client.service;
 
+import com.openframe.client.event.DeviceFirstConnectedEvent;
 import com.openframe.client.exception.MachineNotFoundException;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.repository.device.MachineRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -16,6 +18,7 @@ import java.time.Instant;
 public class MachineStatusService {
 
     private final MachineRepository machineRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public void updateToOnline(String machineId, Instant eventTimestamp) {
         update(machineId, DeviceStatus.ONLINE, eventTimestamp);
@@ -47,10 +50,16 @@ public class MachineStatusService {
     }
 
     private void applyStatusUpdate(Machine machine, DeviceStatus newStatus, Instant eventTimestamp) {
+        DeviceStatus previousStatus = machine.getStatus();
         machine.setStatus(newStatus);
         machine.setLastSeen(eventTimestamp);
         machineRepository.save(machine);
         log.info("Updated machineId={} to status={} at {}", machine.getMachineId(), newStatus, eventTimestamp);
+
+        if (previousStatus == DeviceStatus.PENDING && (newStatus == DeviceStatus.ONLINE || newStatus == DeviceStatus.OFFLINE)) {
+            log.info("Device first connected: machineId={}, transition {} -> {}", machine.getMachineId(), previousStatus, newStatus);
+            eventPublisher.publishEvent(new DeviceFirstConnectedEvent(this, machine));
+        }
     }
 
     private void logStaleEvent(Machine machine, Instant eventTimestamp) {

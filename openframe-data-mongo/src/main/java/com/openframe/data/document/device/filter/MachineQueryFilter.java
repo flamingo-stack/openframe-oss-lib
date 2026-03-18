@@ -14,5 +14,4 @@ public class MachineQueryFilter {
     private List<String> deviceTypes;
     private List<String> osTypes;
     private List<String> organizationIds;
-    private List<String> tagNames;
 } 
