@@ -72,24 +72,16 @@ public class FleetMdmAgentIdTransformer implements ToolAgentIdTransformer {
             // Prefer the host where osquery_host_id == uuid (actual record, not the stale hostname-based duplicate)
             return uuidMatched.stream()
                     .filter(host -> agentToolId.equals(host.getOsqueryHostId()))
-                    .peek(host -> {
-                        Long hostId = host.getId();
-                        String osqueryHostId = host.getOsqueryHostId();
-                        log.info("Matched host by osquery_host_id, uuid={}, host_id={}, osquery_host_id={}", agentToolId, hostId, osqueryHostId);
-                    })
+                    .peek(host -> logOsqueryHostIdMatch(agentToolId, host))
                     .findFirst()
                     // TODO: remove by osquery version matching after migration
                     .or(() -> uuidMatched.stream()
                             .filter(host -> isNotBlank(host.getOsVersion()) || isNotBlank(host.getOsqueryVersion()))
-                            .peek(host -> {
-                                Long hostId = host.getId();
-                                String osqueryHostId = host.getOsqueryHostId();
-                                log.info("Matched host by osVersion fallback, uuid={}, host_id={}, osquery_host_id={}", agentToolId, hostId, osqueryHostId);
-                            })
+                            .peek(host -> logOsVersionFallbackMatch(agentToolId, host))
                             .findFirst())
                     .map(host -> processMatchingHost(host, agentToolId))
                     .orElseGet(() -> {
-                        log.warn("No matching host found, uuid={}, uuid_matched_count={}", agentToolId, uuidMatched.size());
+                        logNoMatch(agentToolId, uuidMatched.size());
                         return processNoMatchingHost(agentToolId, lastAttempt);
                     });
         } catch (Exception e) {
@@ -111,6 +103,22 @@ public class FleetMdmAgentIdTransformer implements ToolAgentIdTransformer {
             log.info("Use uuid to fix it manually: {}", agentToolId);
             return agentToolId;
         }
+    }
+
+    private void logOsqueryHostIdMatch(String uuid, Host host) {
+        Long hostId = host.getId();
+        String osqueryHostId = host.getOsqueryHostId();
+        log.info("Matched host by osquery_host_id, uuid={}, host_id={}, osquery_host_id={}", uuid, hostId, osqueryHostId);
+    }
+
+    private void logOsVersionFallbackMatch(String uuid, Host host) {
+        Long hostId = host.getId();
+        String osqueryHostId = host.getOsqueryHostId();
+        log.info("Matched host by osVersion fallback, uuid={}, host_id={}, osquery_host_id={}", uuid, hostId, osqueryHostId);
+    }
+
+    private void logNoMatch(String uuid, int uuidMatchedCount) {
+        log.warn("No matching host found, uuid={}, uuid_matched_count={}", uuid, uuidMatchedCount);
     }
 
     private void logHosts(List<Host> hosts) {
