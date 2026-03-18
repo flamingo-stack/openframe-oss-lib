@@ -56,8 +56,9 @@ public class FleetMdmAgentIdTransformer implements ToolAgentIdTransformer {
 
             // Create Fleet MDM client
             FleetMdmClient fleetClient = new FleetMdmClient(apiUrl, apiToken);
-            
-            List<Host> hosts = fleetClient.searchHosts(agentToolId, 0, 10);
+
+            // Search for hosts with the UUID, limit to 2 as requested
+            List<Host> hosts = fleetClient.searchHosts(agentToolId, 0, 2);
             
             if (hosts.isEmpty()) {
                 throw new IllegalStateException("No hosts found in Fleet MDM for UUID: " + agentToolId);
