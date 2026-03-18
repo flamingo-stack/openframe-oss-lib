@@ -34,6 +34,13 @@ export interface NatsClientOptions {
   reconnectTimeWaitMs?: number
 
   /**
+   * Maximum reconnect wait time in milliseconds when using exponential backoff.
+   * Each reconnect attempt doubles the wait time up to this ceiling.
+   * Jitter (±50%) is added automatically. Defaults to 60000 (60s).
+   */
+  maxReconnectTimeWaitMs?: number
+
+  /**
    * Ping behavior (keep-alive).
    */
   pingIntervalMs?: number
@@ -158,8 +165,20 @@ function toNatsHeaders(nats: typeof import('nats.ws'), init: NatsHeadersInit): N
   return h
 }
 
+function createExponentialBackoff(baseMs: number, maxMs: number) {
+  let attempt = 0
+  const handler = () => {
+    const delay = Math.min(baseMs * Math.pow(2, attempt), maxMs)
+    const jitter = delay * 0.5 * Math.random()
+    attempt++
+    return delay + jitter
+  }
+  handler.reset = () => { attempt = 0 }
+  return handler
+}
+
 function mapOptionsToConnectionOptions(opts: NatsClientOptions): ConnectionOptions {
-  return {
+  const connOpts: ConnectionOptions = {
     servers: opts.servers,
     name: opts.name,
     token: opts.token,
@@ -173,6 +192,17 @@ function mapOptionsToConnectionOptions(opts: NatsClientOptions): ConnectionOptio
     maxPingOut: opts.maxPingOut,
     inboxPrefix: opts.inboxPrefix,
   }
+
+  if (opts.maxReconnectTimeWaitMs) {
+    const backoff = createExponentialBackoff(
+      opts.reconnectTimeWaitMs ?? 2000,
+      opts.maxReconnectTimeWaitMs,
+    )
+    connOpts.reconnectDelayHandler = backoff
+    ;(connOpts as any).__backoffHandler = backoff
+  }
+
+  return connOpts
 }
 
 function mapNatsTypeToStatus(type: unknown): NatsStatus | null {
@@ -208,7 +238,9 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
     emitStatus({ status: 'connecting' })
 
     const nats = await importNats()
-    const conn = await nats.connect(mapOptionsToConnectionOptions(options))
+    const connOpts = mapOptionsToConnectionOptions(options)
+    const backoffHandler = (connOpts as any).__backoffHandler as { reset?: () => void } | undefined
+    const conn = await nats.connect(connOpts)
     nc = conn
 
     emitStatus({ status: 'connected' })
@@ -222,6 +254,9 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
           if (signal.aborted) return
           const mapped = mapNatsTypeToStatus((s as any)?.type)
           if (mapped) {
+            if (mapped === 'connected') {
+              backoffHandler?.reset?.()
+            }
             emitStatus({ status: mapped, data: (s as any)?.data })
             if (mapped === 'closed') {
               nc = null
