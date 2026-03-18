@@ -57,24 +57,19 @@ public class FleetMdmAgentIdTransformer implements ToolAgentIdTransformer {
             // Create Fleet MDM client
             FleetMdmClient fleetClient = new FleetMdmClient(apiUrl, apiToken);
             
-            List<Host> hosts = fleetClient.searchHosts(agentToolId, 0, 10);
+            // Search for hosts with the UUID, limit to 2 as requested
+            List<Host> hosts = fleetClient.searchHosts(agentToolId, 0, 2);
             
             if (hosts.isEmpty()) {
                 throw new IllegalStateException("No hosts found in Fleet MDM for UUID: " + agentToolId);
             }
             logHosts(hosts);
 
-            // Due to a legacy enrollment bug, a single device can have two host records:
-            // one where osquery_host_id=hostname (stale duplicate) and one where osquery_host_id=uuid (actual).
-            // We pick the actual record by matching osquery_host_id against the device UUID.
+            // Filter hosts: exact UUID match and non-empty os data
             return hosts.stream()
                     .filter(host -> agentToolId.equals(host.getUuid()))
-                    .filter(host -> agentToolId.equals(host.getOsqueryHostId()))
+                    .filter(host -> isNotBlank(host.getOsVersion()) || isNotBlank(host.getOsqueryVersion()))
                     .findFirst()
-                    .or(() -> hosts.stream()
-                            .filter(host -> agentToolId.equals(host.getUuid()))
-                            .filter(host -> isNotBlank(host.getOsVersion()) || isNotBlank(host.getOsqueryVersion()))
-                            .findFirst())
                     .map(host -> processMatchingHost(host, agentToolId))
                     .orElseGet(() -> processNoMatchingHost(agentToolId, lastAttempt));
         } catch (Exception e) {
