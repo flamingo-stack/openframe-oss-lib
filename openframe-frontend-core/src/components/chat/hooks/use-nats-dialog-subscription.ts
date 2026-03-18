@@ -93,8 +93,9 @@ export function useNatsDialogSubscription({
         pass,
         connectTimeoutMs: NETWORK_CONFIG.CONNECT_TIMEOUT_MS,
         reconnect: true,
-        maxReconnectAttempts: -1, // Unlimited reconnection attempts
+        maxReconnectAttempts: -1,
         reconnectTimeWaitMs: NETWORK_CONFIG.RECONNECT_TIME_WAIT_MS,
+        maxReconnectTimeWaitMs: NETWORK_CONFIG.MAX_RECONNECT_TIME_WAIT_MS,
         pingIntervalMs: NETWORK_CONFIG.PING_INTERVAL_MS,
         maxPingOut: NETWORK_CONFIG.MAX_PING_OUT,
       })
