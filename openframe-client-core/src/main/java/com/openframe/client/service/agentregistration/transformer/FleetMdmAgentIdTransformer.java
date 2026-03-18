@@ -76,10 +76,7 @@ public class FleetMdmAgentIdTransformer implements ToolAgentIdTransformer {
                             .peek(host -> logOsVersionFallbackMatch(machineId, agentToolId, host))
                             .findFirst())
                     .map(host -> processMatchingHost(machineId, agentToolId, host))
-                    .orElseGet(() -> {
-                        logNoMatch(machineId, agentToolId);
-                        return processNoMatchingHost(machineId, agentToolId, lastAttempt);
-                    });
+                    .orElseGet(() -> processNoMatchingHost(machineId, agentToolId, lastAttempt));
         } catch (Exception e) {
             log.error("Failed to transform Fleet MDM agent tool ID, machineId={}, uuid={}", machineId, agentToolId, e);
             throw new IllegalStateException("Failed to transform Fleet MDM agent tool ID", e);
@@ -93,12 +90,12 @@ public class FleetMdmAgentIdTransformer implements ToolAgentIdTransformer {
     }
 
     private String processNoMatchingHost(String machineId, String agentToolId, boolean lastAttempt) {
+        log.warn("No matching host found, machineId={}, uuid={}", machineId, agentToolId);
         if (!lastAttempt) {
             throw new IllegalStateException("No valid fleetmdm-agent mdm host found with machineId=" + machineId + ", uuid=" + agentToolId);
-        } else {
-            log.info("Use uuid to fix it manually, machineId={}, uuid={}", machineId, agentToolId);
-            return agentToolId;
         }
+        log.info("Use uuid to fix it manually, machineId={}, uuid={}", machineId, agentToolId);
+        return agentToolId;
     }
 
     private void logOsqueryHostIdMatch(String machineId, String uuid, Host host) {
@@ -111,10 +108,6 @@ public class FleetMdmAgentIdTransformer implements ToolAgentIdTransformer {
         Long hostId = host.getId();
         String osqueryHostId = host.getOsqueryHostId();
         log.info("Matched host by osVersion fallback, machineId={}, uuid={}, host_id={}, osquery_host_id={}", machineId, uuid, hostId, osqueryHostId);
-    }
-
-    private void logNoMatch(String machineId, String uuid) {
-        log.warn("No matching host found, machineId={}, uuid={}", machineId, uuid);
     }
 
     private void logHosts(String machineId, String uuid, List<Host> hosts) {
