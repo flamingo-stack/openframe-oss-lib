@@ -20,7 +20,7 @@ public class MeshCentralAgentIdTransformer implements ToolAgentIdTransformer {
     }
 
     @Override
-    public String transform(String agentToolId, boolean __) {
+    public String transform(String machineId, String agentToolId, boolean __) {
         if (isBlank(agentToolId)) {
             log.warn("Agent tool ID is blank for MeshCentral");
             return agentToolId;
