@@ -1,6 +1,7 @@
 import type { Config } from 'tailwindcss'
 import plugin from 'tailwindcss/plugin'
 import tailwindcssAnimate from 'tailwindcss-animate'
+import containerQueries from '@tailwindcss/container-queries'
 
 const odsTypographyPlugin = plugin(({ addUtilities }) => {
   addUtilities({
@@ -297,7 +298,7 @@ const config: Config = {
       },
     },
   },
-  plugins: [tailwindcssAnimate, odsTypographyPlugin],
+  plugins: [tailwindcssAnimate, odsTypographyPlugin, containerQueries],
 }
 
 export default config
