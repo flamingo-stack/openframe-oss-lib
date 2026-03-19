@@ -19,7 +19,6 @@ extend type Query {
 
 type Organization implements Node {
     id: ID!
-    rawId: ID!
     name: String!
     organizationId: String!  # Generated as UUID on creation
     category: String

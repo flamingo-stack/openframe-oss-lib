@@ -1,7 +1,7 @@
 package com.openframe.api.datafetcher;
 
 import com.netflix.graphql.dgs.*;
-import com.openframe.api.relay.GlobalId;
+import graphql.relay.Relay;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
@@ -29,6 +29,8 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 public class OrganizationDataFetcher {
 
+    private static final Relay RELAY = new Relay();
+
     private final OrganizationService organizationService;
     private final OrganizationQueryService organizationQueryService;
     private final GraphQLOrganizationMapper mapper;
@@ -36,13 +38,7 @@ public class OrganizationDataFetcher {
     @DgsData(parentType = "Organization", field = "id")
     public String organizationNodeId(DgsDataFetchingEnvironment dfe) {
         Organization org = dfe.getSource();
-        return GlobalId.toGlobalId("Organization", org.getOrganizationId());
-    }
-
-    @DgsData(parentType = "Organization", field = "rawId")
-    public String organizationRawId(DgsDataFetchingEnvironment dfe) {
-        Organization org = dfe.getSource();
-        return org.getOrganizationId();
+        return RELAY.toGlobalId("Organization", org.getOrganizationId());
     }
 
     @DgsQuery
@@ -68,7 +64,7 @@ public class OrganizationDataFetcher {
 
     @DgsQuery
     public Organization organization(@InputArgument @NotBlank String id) {
-        String organizationId = GlobalId.decode(id).rawId();
+        String organizationId = RELAY.fromGlobalId(id).getId();
         log.debug("Fetching organization by global ID: {}, organizationId: {}", id, organizationId);
         return organizationService.getOrganizationByOrganizationId(organizationId).orElse(null);
     }

@@ -3,8 +3,8 @@ package com.openframe.api.datafetcher;
 import com.netflix.graphql.dgs.DgsComponent;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
-import com.openframe.api.relay.GlobalId;
 import com.openframe.api.relay.NodeType;
+import graphql.relay.Relay;
 import com.openframe.api.service.DeviceService;
 import com.openframe.api.service.EventService;
 import com.openframe.api.service.ToolService;
@@ -21,6 +21,8 @@ import java.util.List;
 @Slf4j
 public class NodeDataFetcher {
 
+    private static final Relay RELAY = new Relay();
+
     private final DeviceService deviceService;
     private final OrganizationService organizationService;
     private final EventService eventService;
@@ -32,7 +34,7 @@ public class NodeDataFetcher {
     @DgsQuery
     public Object node(@InputArgument String id) {
         log.debug("Resolving node with global ID: {}", id);
-        GlobalId globalId = GlobalId.decode(id);
+        Relay.ResolvedGlobalId globalId = RELAY.fromGlobalId(id);
         return resolveNode(globalId);
     }
 
@@ -42,7 +44,7 @@ public class NodeDataFetcher {
         return ids.stream()
                 .map(id -> {
                     try {
-                        GlobalId globalId = GlobalId.decode(id);
+                        Relay.ResolvedGlobalId globalId = RELAY.fromGlobalId(id);
                         return resolveNode(globalId);
                     } catch (Exception e) {
                         log.warn("Failed to resolve node: {}", id, e);
@@ -52,17 +54,17 @@ public class NodeDataFetcher {
                 .toList();
     }
 
-    private Object resolveNode(GlobalId globalId) {
-        NodeType nodeType = NodeType.fromTypeName(globalId.typeName());
+    private Object resolveNode(Relay.ResolvedGlobalId globalId) {
+        NodeType nodeType = NodeType.fromTypeName(globalId.getType());
         return switch (nodeType) {
-            case MACHINE -> deviceService.findByMachineId(globalId.rawId()).orElse(null);
-            case ORGANIZATION -> organizationService.getOrganizationByOrganizationId(globalId.rawId()).orElse(null);
-            case EVENT -> eventService.findById(globalId.rawId()).orElse(null);
-            case INTEGRATED_TOOL -> toolService.findById(globalId.rawId()).orElse(null);
+            case MACHINE -> deviceService.findByMachineId(globalId.getId()).orElse(null);
+            case ORGANIZATION -> organizationService.getOrganizationByOrganizationId(globalId.getId()).orElse(null);
+            case EVENT -> eventService.findById(globalId.getId()).orElse(null);
+            case INTEGRATED_TOOL -> toolService.findById(globalId.getId()).orElse(null);
             case TENANT -> tenantRepository != null
-                    ? tenantRepository.findById(globalId.rawId()).orElse(null)
+                    ? tenantRepository.findById(globalId.getId()).orElse(null)
                     : null;
-            default -> throw new IllegalArgumentException("Unsupported node type: " + globalId.typeName());
+            default -> throw new IllegalArgumentException("Unsupported node type: " + globalId.getType());
         };
     }
 }

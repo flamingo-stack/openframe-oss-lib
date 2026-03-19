@@ -11,7 +11,6 @@ extend type Mutation {
 
 type Event implements Node {
     id: ID!
-    rawId: ID!
     userId: ID!
     timestamp: Instant!
     type: String!

@@ -1,7 +1,7 @@
 package com.openframe.api.datafetcher;
 
 import com.netflix.graphql.dgs.*;
-import com.openframe.api.relay.GlobalId;
+import graphql.relay.Relay;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
@@ -35,6 +35,8 @@ import java.util.concurrent.CompletableFuture;
 @Validated
 @RequiredArgsConstructor
 public class DeviceDataFetcher {
+
+    private static final Relay RELAY = new Relay();
 
     private final DeviceService deviceService;
     private final DeviceFilterService deviceFilterService;
@@ -77,13 +79,7 @@ public class DeviceDataFetcher {
     @DgsData(parentType = "Machine", field = "id")
     public String machineNodeId(DgsDataFetchingEnvironment dfe) {
         Machine machine = dfe.getSource();
-        return GlobalId.toGlobalId("Machine", machine.getMachineId());
-    }
-
-    @DgsData(parentType = "Machine", field = "rawId")
-    public String machineRawId(DgsDataFetchingEnvironment dfe) {
-        Machine machine = dfe.getSource();
-        return machine.getMachineId();
+        return RELAY.toGlobalId("Machine", machine.getMachineId());
     }
 
     @DgsData(parentType = "Machine")

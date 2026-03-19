@@ -1,7 +1,7 @@
 package com.openframe.api.datafetcher;
 
 import com.netflix.graphql.dgs.*;
-import com.openframe.api.relay.GlobalId;
+import graphql.relay.Relay;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.api.dto.tool.ToolFilterInput;
 import com.openframe.api.dto.tool.ToolFilterCriteria;
@@ -21,19 +21,15 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 public class ToolsDataFetcher {
 
+    private static final Relay RELAY = new Relay();
+
     private final ToolService toolService;
     private final GraphQLToolMapper toolMapper;
 
     @DgsData(parentType = "IntegratedTool", field = "id")
     public String toolNodeId(DgsDataFetchingEnvironment dfe) {
         IntegratedTool tool = dfe.getSource();
-        return GlobalId.toGlobalId("IntegratedTool", tool.getId());
-    }
-
-    @DgsData(parentType = "IntegratedTool", field = "rawId")
-    public String toolRawId(DgsDataFetchingEnvironment dfe) {
-        IntegratedTool tool = dfe.getSource();
-        return tool.getId();
+        return RELAY.toGlobalId("IntegratedTool", tool.getId());
     }
 
     @DgsQuery

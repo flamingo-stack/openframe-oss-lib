@@ -49,7 +49,6 @@ type ToolCredentials {
 
 type IntegratedTool implements Node {
     id: ID!
-    rawId: ID!
     name: String!
     description: String
     icon: String

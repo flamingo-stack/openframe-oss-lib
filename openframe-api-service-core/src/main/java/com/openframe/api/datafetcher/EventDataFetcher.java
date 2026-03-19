@@ -1,7 +1,7 @@
 package com.openframe.api.datafetcher;
 
 import com.netflix.graphql.dgs.*;
-import com.openframe.api.relay.GlobalId;
+import graphql.relay.Relay;
 import com.openframe.api.dto.GenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.GenericQueryResult;
@@ -27,19 +27,15 @@ import java.time.Instant;
 @Validated
 public class EventDataFetcher {
 
+    private static final Relay RELAY = new Relay();
+
     private final EventService eventService;
     private final GraphQLEventMapper eventMapper;
 
     @DgsData(parentType = "Event", field = "id")
     public String eventNodeId(DgsDataFetchingEnvironment dfe) {
         Event event = dfe.getSource();
-        return GlobalId.toGlobalId("Event", event.getId());
-    }
-
-    @DgsData(parentType = "Event", field = "rawId")
-    public String eventRawId(DgsDataFetchingEnvironment dfe) {
-        Event event = dfe.getSource();
-        return event.getId();
+        return RELAY.toGlobalId("Event", event.getId());
     }
 
     @DgsQuery
@@ -70,7 +66,7 @@ public class EventDataFetcher {
 
     @DgsQuery
     public Event eventById(@InputArgument @NotBlank String id) {
-        String rawId = GlobalId.decode(id).rawId();
+        String rawId = RELAY.fromGlobalId(id).getId();
         log.debug("Getting event by global ID: {}, rawId: {}", id, rawId);
         return eventService.findById(rawId)
                 .orElse(null);
@@ -99,7 +95,7 @@ public class EventDataFetcher {
     @DgsMutation
     public Event updateEvent(@InputArgument @NotBlank String id,
                              @InputArgument @Valid CreateEventInput input) {
-        String rawId = GlobalId.decode(id).rawId();
+        String rawId = RELAY.fromGlobalId(id).getId();
         log.debug("Updating event with global ID: {}, rawId: {} and input: {}", id, rawId, input);
 
         Event event = Event.builder()
