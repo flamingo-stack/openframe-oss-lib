@@ -62,13 +62,12 @@ public class DeviceQueries {
                     registeredAt
                     updatedAt
                     tags {
-                        id
-                        name
+                        tagId
+                        key
                         description
                         color
-                        organizationId
+                        values
                         createdAt
-                        createdBy
                     }
                     toolConnections {
                         id
