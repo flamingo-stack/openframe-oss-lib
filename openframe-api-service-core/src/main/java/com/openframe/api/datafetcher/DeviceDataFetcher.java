@@ -71,8 +71,15 @@ public class DeviceDataFetcher {
     }
 
     @DgsQuery
+    public Machine deviceById(@InputArgument @NotBlank String id) {
+        String machineId = RELAY.fromGlobalId(id).getId();
+        log.debug("Fetching device by global ID: {}, machineId: {}", id, machineId);
+        return deviceService.findByMachineId(machineId).orElse(null);
+    }
+
+    @DgsQuery
     public Machine device(@InputArgument @NotBlank String machineId) {
-        log.debug("Fetching device with ID: {}", machineId);
+        log.debug("Fetching device with machineId: {}", machineId);
         return deviceService.findByMachineId(machineId).orElse(null);
     }
 

@@ -11,6 +11,10 @@ extend type Query {
         sort: SortInput
     ): DeviceConnection!
 
+    # Get single device by Relay global ID
+    deviceById(id: ID!): Machine
+
+    # Get single device by machineId
     device(machineId: String!): Machine
 
     # Tag key queries
