@@ -17,13 +17,13 @@ export function QueryReportTableSkeleton({
       {/* Skeleton header */}
       <div className={cn(
         'flex items-center gap-4 px-4',
-        isCompact ? 'py-2 border-b border-ods-border' : 'py-3'
+        isCompact ? 'py-2 border-b border-ods-border' : ''
       )}>
         {Array.from({ length: columns }).map((_, i) => (
           <div
             key={`header-${i}`}
-            className="shrink-0"
-            style={{ width: columnWidth }}
+            className="shrink-0 flex items-center"
+            style={{ width: columnWidth, height: 48 }}
           >
             <div className="h-4 bg-ods-bg-surface rounded w-3/4 animate-pulse" />
           </div>

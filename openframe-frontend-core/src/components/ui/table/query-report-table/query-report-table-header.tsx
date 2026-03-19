@@ -22,7 +22,7 @@ export function QueryReportTableHeader({
     <div
       className={cn(
         'flex items-center gap-4 px-4',
-        isCompact ? 'py-2 border-b border-ods-border' : 'py-3',
+        isCompact ? 'py-2 border-b border-ods-border' : '',
         className
       )}
     >
@@ -53,11 +53,15 @@ function TruncatedHeaderCell({ value, width }: { value: string; width: number })
       <Tooltip open={isTruncated ? undefined : false}>
         <TooltipTrigger asChild onMouseEnter={checkTruncation}>
           <div
-            ref={textRef}
-            className="shrink-0 font-mono font-medium text-[14px] leading-[20px] text-ods-text-secondary uppercase tracking-[-0.28px] truncate"
-            style={{ width }}
+            className="shrink-0 flex items-center"
+            style={{ width, height: 48 }}
           >
-            {value}
+            <div
+              ref={textRef}
+              className="font-mono font-medium text-[14px] leading-[20px] text-ods-text-secondary uppercase tracking-[-0.28px] truncate"
+            >
+              {value}
+            </div>
           </div>
         </TooltipTrigger>
         <TooltipContent side="bottom" className="max-w-xs break-words">
