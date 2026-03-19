@@ -5,7 +5,9 @@ public enum NodeType {
     ORGANIZATION("Organization"),
     EVENT("Event"),
     INTEGRATED_TOOL("IntegratedTool"),
-    TENANT("Tenant");
+    TENANT("Tenant"),
+    DIALOG("Dialog"),
+    MESSAGE("Message");
 
     private final String graphqlTypeName;
 

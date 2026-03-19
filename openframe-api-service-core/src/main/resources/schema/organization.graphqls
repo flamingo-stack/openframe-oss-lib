@@ -11,7 +11,7 @@ extend type Query {
     ): OrganizationConnection!
 
     # Get single organization by ID
-    organization(id: String!): Organization
+    organization(id: ID!): Organization
 
     # Get organization by organizationId
     organizationByOrganizationId(organizationId: String!): Organization

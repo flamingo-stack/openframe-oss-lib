@@ -83,7 +83,7 @@ public class DeviceDataFetcher {
     @DgsData(parentType = "Machine", field = "rawId")
     public String machineRawId(DgsDataFetchingEnvironment dfe) {
         Machine machine = dfe.getSource();
-        return machine.getId();
+        return machine.getMachineId();
     }
 
     @DgsData(parentType = "Machine")

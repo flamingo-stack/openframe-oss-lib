@@ -70,8 +70,9 @@ public class EventDataFetcher {
 
     @DgsQuery
     public Event eventById(@InputArgument @NotBlank String id) {
-        log.debug("Getting event by ID: {}", id);
-        return eventService.findById(id)
+        String rawId = GlobalId.decode(id).rawId();
+        log.debug("Getting event by global ID: {}, rawId: {}", id, rawId);
+        return eventService.findById(rawId)
                 .orElse(null);
     }
 
@@ -98,15 +99,16 @@ public class EventDataFetcher {
     @DgsMutation
     public Event updateEvent(@InputArgument @NotBlank String id,
                              @InputArgument @Valid CreateEventInput input) {
-        log.debug("Updating event with ID: {} and input: {}", id, input);
+        String rawId = GlobalId.decode(id).rawId();
+        log.debug("Updating event with global ID: {}, rawId: {} and input: {}", id, rawId, input);
 
         Event event = Event.builder()
-                .id(id)
+                .id(rawId)
                 .userId(input.getUserId())
                 .type(input.getType())
                 .payload(input.getData())
                 .build();
 
-        return eventService.updateEvent(id, event);
+        return eventService.updateEvent(rawId, event);
     }
 }

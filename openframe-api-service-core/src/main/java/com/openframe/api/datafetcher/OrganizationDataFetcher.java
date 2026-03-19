@@ -42,7 +42,7 @@ public class OrganizationDataFetcher {
     @DgsData(parentType = "Organization", field = "rawId")
     public String organizationRawId(DgsDataFetchingEnvironment dfe) {
         Organization org = dfe.getSource();
-        return org.getId();
+        return org.getOrganizationId();
     }
 
     @DgsQuery
@@ -68,8 +68,9 @@ public class OrganizationDataFetcher {
 
     @DgsQuery
     public Organization organization(@InputArgument @NotBlank String id) {
-        log.debug("Fetching organization by ID: {}", id);
-        return organizationService.getOrganizationById(id).orElse(null);
+        String organizationId = GlobalId.decode(id).rawId();
+        log.debug("Fetching organization by global ID: {}, organizationId: {}", id, organizationId);
+        return organizationService.getOrganizationByOrganizationId(organizationId).orElse(null);
     }
 
     @DgsQuery

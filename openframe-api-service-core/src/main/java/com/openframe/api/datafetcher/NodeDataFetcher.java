@@ -62,6 +62,7 @@ public class NodeDataFetcher {
             case TENANT -> tenantRepository != null
                     ? tenantRepository.findById(globalId.rawId()).orElse(null)
                     : null;
+            default -> throw new IllegalArgumentException("Unsupported node type: " + globalId.typeName());
         };
     }
 }
