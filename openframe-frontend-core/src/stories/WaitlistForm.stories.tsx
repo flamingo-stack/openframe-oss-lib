@@ -11,7 +11,7 @@ const meta = {
   },
   decorators: [
     (Story) => (
-      <div style={{ maxWidth: 520, padding: 24, background: '#1a1a1a', borderRadius: 12 }}>
+      <div>
         <Story />
         <Toaster />
       </div>

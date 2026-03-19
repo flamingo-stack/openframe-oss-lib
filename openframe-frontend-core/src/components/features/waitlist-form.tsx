@@ -126,9 +126,13 @@ export function WaitlistForm({
 
   if (!isClient) {
     return (
-      <div className={cn("flex flex-col md:flex-row items-center gap-3 md:gap-4 w-full max-w-md", className)}>
-        <div className="w-full md:flex-1 h-12 bg-ods-card border border-ods-border rounded-md animate-pulse" />
-        <div className="w-full md:w-auto h-12 min-w-[160px] bg-[#FFC008] rounded-md animate-pulse opacity-50" />
+      <div className={cn("@container flex flex-col items-center gap-3 w-full", className)}>
+        <div className="w-full h-12 bg-ods-card border border-ods-border rounded-md animate-pulse" />
+        <div className="w-full h-12 bg-ods-card border border-ods-border rounded-md animate-pulse" />
+        <div className="flex flex-col @md:flex-row items-center justify-between w-full gap-4">
+          <div className="w-full @md:flex-1 h-5 bg-ods-card rounded animate-pulse" />
+          <div className="w-full @md:w-auto h-12 min-w-[160px] bg-[#FFC008] rounded-md animate-pulse opacity-50" />
+        </div>
       </div>
     )
   }
@@ -155,8 +159,8 @@ export function WaitlistForm({
   }
 
   return (
-    <div id={id} className={cn("flex flex-col gap-2 w-full", className)}>
-      <div className="flex flex-col items-center gap-3 md:gap-4 w-full">
+    <div id={id} className={cn("@container flex flex-col gap-2 w-full", className)}>
+      <div className="flex flex-col items-center gap-3 @md:gap-4 w-full">
         <Input
           type="email"
           value={email}
@@ -178,7 +182,7 @@ export function WaitlistForm({
           onKeyDown={handleKeyDown}
         />
 
-        <div className="flex items-center justify-between w-full gap-4 md:flex-row flex-col">
+        <div className="flex items-center justify-between w-full gap-4 flex-col @2xl:flex-row">
           <p className={cn("text-h6 flex items-center gap-[var(--spacing-system-xs)] text-left w-full", hintColor)}>
             {showIcon && <InfoCircleIcon size={16} className="shrink-0" />}
             {hintMessage}
@@ -189,6 +193,7 @@ export function WaitlistForm({
             disabled={isSubmitting}
             leftIcon={<OpenFrameLogo />}
             onClick={handleSubmit}
+            className="w-full @2xl:w-auto"
           >
             {isSuccess ? successLabel : submitLabel}
           </Button>

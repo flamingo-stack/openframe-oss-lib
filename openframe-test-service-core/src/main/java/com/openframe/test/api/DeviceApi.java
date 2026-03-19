@@ -71,8 +71,7 @@ public class DeviceApi {
                 hasNextPage = Boolean.TRUE.equals(next);
                 cursor = response.getString("data.devices.pageInfo.endCursor");
             } else {
-                System.out.printf("%s -> %d%n", getBaseUrl(), responseR.getStatusCode());
-                break;
+                throw new AssertionError("%s -> %d%n".formatted(getBaseUrl(), responseR.getStatusCode()));
             }
         }
 
