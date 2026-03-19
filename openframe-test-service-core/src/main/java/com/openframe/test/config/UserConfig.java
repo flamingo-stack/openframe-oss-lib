@@ -8,7 +8,6 @@ public class UserConfig {
 
     private static String email;
     private static String password;
-    private static User user;
 
     public static void configure(String email, String password) {
         UserConfig.email = email;
@@ -16,14 +15,11 @@ public class UserConfig {
     }
 
     public static User getUser() {
-        if (user == null) {
-            user = User.builder()
-                    .email(getEmail())
-                    .password(getPassword())
-                    .domain(getDomain())
-                    .build();
-        }
-        return user;
+        return User.builder()
+                .email(getEmail())
+                .password(getPassword())
+                .domain(getDomain())
+                .build();
     }
 
     public static String getEmail() {

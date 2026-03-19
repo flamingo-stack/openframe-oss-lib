@@ -4,6 +4,7 @@ import com.openframe.test.api.graphql.OrganizationQueries;
 import com.openframe.test.data.dto.organization.CreateOrganizationRequest;
 import com.openframe.test.data.dto.organization.Organization;
 import com.openframe.test.helpers.RequestSpecHelper;
+import static com.openframe.test.helpers.RequestSpecHelper.graphqlSuccess;
 import io.restassured.http.ContentType;
 
 import java.util.List;
@@ -22,14 +23,15 @@ public class OrganizationApi {
         Map<String, String> body = Map.ofEntries(Map.entry("query", ORGANIZATION_NAMES));
         return given(RequestSpecHelper.getAuthorizedSpec())
                 .body(body).post(GRAPHQL)
-                .then().extract().jsonPath().getList("data.organizations.edges.node.name", String.class);
+                .then().spec(graphqlSuccess())
+                .extract().jsonPath().getList("data.organizations.edges.node.name", String.class);
     }
 
     public static List<Organization> listOrganizations() {
         Map<String, String> body = Map.of("query", OrganizationQueries.ORGANIZATIONS);
         return given(RequestSpecHelper.getAuthorizedSpec())
                 .body(body).post(GRAPHQL)
-                .then().statusCode(200)
+                .then().spec(graphqlSuccess())
                 .extract().jsonPath().getList("data.organizations.edges.node", Organization.class);
     }
 
@@ -46,7 +48,7 @@ public class OrganizationApi {
         );
         return given(RequestSpecHelper.getAuthorizedSpec())
                 .body(body).post(GRAPHQL)
-                .then().statusCode(200)
+                .then().spec(graphqlSuccess())
                 .extract().jsonPath().getObject("data.organization", Organization.class);
     }
 

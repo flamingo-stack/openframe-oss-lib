@@ -19,6 +19,7 @@ public class DeviceFilterOptions {
     private List<DeviceType> deviceTypes;
     private List<String> osTypes;
     private List<String> organizationIds;
-    private List<String> tagNames;
 
+    private List<String> tagKeys;
+    private List<String> tagValues;
 } 

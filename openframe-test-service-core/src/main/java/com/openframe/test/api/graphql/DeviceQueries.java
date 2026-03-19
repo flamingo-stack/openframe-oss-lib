@@ -62,13 +62,12 @@ public class DeviceQueries {
                     registeredAt
                     updatedAt
                     tags {
-                        id
-                        name
+                        tagId
+                        key
                         description
                         color
-                        organizationId
+                        values
                         createdAt
-                        createdBy
                     }
                     toolConnections {
                         id
@@ -166,7 +165,7 @@ public class DeviceQueries {
                     deviceTypes { value label count }
                     osTypes { value label count }
                     organizationIds { value label count }
-                    tags { value label count }
+                    tagKeys { value label count }
                     filteredCount
                 }
             }

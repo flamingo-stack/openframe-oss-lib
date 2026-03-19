@@ -1,5 +1,6 @@
 package com.openframe.external.controller;
 
+import com.openframe.api.dto.device.DeviceTag;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.service.DeviceFilterService;
 import com.openframe.api.service.DeviceService;
@@ -8,7 +9,6 @@ import com.openframe.core.dto.ErrorResponse;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.tool.Tag;
 import com.openframe.external.dto.device.DeviceFilterCriteria;
 import com.openframe.external.dto.device.DeviceFilterResponse;
 import com.openframe.external.dto.device.DeviceResponse;
@@ -32,8 +32,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static org.springframework.http.HttpStatus.NO_CONTENT;
-import static org.springframework.http.HttpStatus.OK;
+import static org.springframework.http.HttpStatus.*;
 
 @RestController
 @RequestMapping("/api/v1/devices")
@@ -77,8 +76,11 @@ public class DeviceController {
             @Parameter(description = "Organization IDs to filter by")
             @RequestParam(required = false) List<String> organizationIds,
 
-            @Parameter(description = "Tag names to filter by")
-            @RequestParam(required = false) List<String> tagNames,
+            @Parameter(description = "Tag keys to filter by")
+            @RequestParam(required = false) List<String> tagKeys,
+
+            @Parameter(description = "Tag values to filter by")
+            @RequestParam(required = false) List<String> tagValues,
 
             @Parameter(description = "Search query for device name/hostname")
             @RequestParam(required = false) String search,
@@ -91,10 +93,10 @@ public class DeviceController {
 
             @Parameter(description = "Cursor for pagination (optional)")
             @RequestParam(required = false) String cursor,
-            
+
             @Parameter(description = "Field to sort by (e.g., hostname, displayName, status, lastSeen)")
             @RequestParam(required = false) String sortField,
-            
+
             @Parameter(description = "Sort direction (ASC or DESC), default: DESC")
             @RequestParam(required = false, defaultValue = "DESC") String sortDirection,
 
@@ -109,35 +111,35 @@ public class DeviceController {
                 .deviceTypes(deviceTypes)
                 .osTypes(osTypes)
                 .organizationIds(organizationIds)
-                .tagNames(tagNames)
+                .tagKeys(tagKeys)
+                .tagValues(tagValues)
                 .build();
 
         PaginationCriteria paginationCriteria = PaginationCriteria.builder()
                 .limit(limit)
                 .cursor(cursor)
                 .build();
-        
+
         SortCriteria sortCriteria = SortCriteria.builder()
                 .field(sortField)
                 .direction(sortDirection)
                 .build();
 
         var result = deviceService.queryDevices(
-                deviceMapper.toDeviceFilterOptions(filterCriteria), 
-                deviceMapper.toCursorPaginationCriteria(paginationCriteria), 
+                deviceMapper.toDeviceFilterOptions(filterCriteria),
+                deviceMapper.toCursorPaginationCriteria(paginationCriteria),
                 search,
                 deviceMapper.toSortInput(sortCriteria));
 
         if (includeTags) {
             List<String> machineIds = result.getItems().stream()
-                    .map(Machine::getId)
+                    .map(Machine::getMachineId)
                     .collect(Collectors.toList());
             try {
-                List<List<Tag>> tagsPerMachine = tagService.getTagsForMachines(machineIds);
-                return deviceMapper.toDevicesResponseWithTags(result, tagsPerMachine);
+                List<List<DeviceTag>> tagsPerMachine = tagService.getDeviceTagsForMachines(machineIds);
+                return deviceMapper.toDevicesResponseWithDeviceTags(result, tagsPerMachine);
             } catch (Exception e) {
                 log.error("Failed to load tags for devices", e);
-                // Fallback to response without tags
                 return deviceMapper.toDevicesResponse(result);
             }
         }
@@ -170,9 +172,9 @@ public class DeviceController {
 
         Machine machine = deviceService.findByMachineId(machineId)
                 .orElseThrow(() -> new DeviceNotFoundException("Device not found with ID: " + machineId));
-        
-        List<Tag> tags = tagService.getTagsForMachine(machine.getId());
-        return deviceMapper.toDeviceResponse(machine, tags);
+
+        List<DeviceTag> deviceTags = tagService.getDeviceTagsForMachine(machine.getMachineId());
+        return deviceMapper.toDeviceResponse(machine, deviceTags);
     }
 
     @Operation(
@@ -202,8 +204,11 @@ public class DeviceController {
             @Parameter(description = "Organization IDs to filter by")
             @RequestParam(required = false) List<String> organizationIds,
 
-            @Parameter(description = "Tag names to filter by")
-            @RequestParam(required = false) List<String> tagNames,
+            @Parameter(description = "Tag keys to filter by")
+            @RequestParam(required = false) List<String> tagKeys,
+
+            @Parameter(description = "Tag values to filter by")
+            @RequestParam(required = false) List<String> tagValues,
 
             @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
             @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
@@ -215,7 +220,8 @@ public class DeviceController {
                 .deviceTypes(deviceTypes)
                 .osTypes(osTypes)
                 .organizationIds(organizationIds)
-                .tagNames(tagNames)
+                .tagKeys(tagKeys)
+                .tagValues(tagValues)
                 .build();
         var filters = deviceFilterService.getDeviceFilters(
                 deviceMapper.toDeviceFilterOptions(filterCriteria)).join();
@@ -226,17 +232,6 @@ public class DeviceController {
             summary = "Update device status by machine ID",
             description = "Set device status to DELETED or ARCHIVED"
     )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "204", description = "Device status updated"),
-            @ApiResponse(responseCode = "400", description = "Invalid status value",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized - invalid or missing API key",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "Device not found",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "500", description = "Internal server error",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-    })
     @PatchMapping("/{machineId}")
     @ResponseStatus(NO_CONTENT)
     public void updateDeviceStatus(
@@ -248,4 +243,5 @@ public class DeviceController {
         log.info("Updating device {} status to {} - userId: {}, apiKeyId: {}", machineId, request.status(), userId, apiKeyId);
         deviceService.updateStatusByMachineId(machineId, request.status());
     }
-} 
+
+}

@@ -14,11 +14,11 @@ public class ToolAgentIdTransformerService {
 
     private final List<ToolAgentIdTransformer> transformers;
 
-    public String transform(ToolType toolType, String agentToolId, boolean lastAttempt) {
+    public String transform(ToolType toolType, String machineId, String agentToolId, boolean lastAttempt) {
         return transformers.stream()
                 .filter(transformer -> toolType.equals(transformer.getToolType()))
                 .findFirst()
-                .map(transformer -> transformer.transform(agentToolId, lastAttempt))
+                .map(transformer -> transformer.transform(machineId, agentToolId, lastAttempt))
                 .orElse(agentToolId);
     }
 

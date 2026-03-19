@@ -15,9 +15,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Implementation of RepositoryEventService that handles repository events and sends Kafka messages.
@@ -116,6 +115,88 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
         }
     }
 
+    @Override
+    public void processMachineTagDelete(String machineId, String tagId) {
+        try {
+            log.info("Processing machineTag delete event: machineId={}, tagId={}", machineId, tagId);
+
+            Machine machine = fetchMachine(machineId);
+            if (machine == null) {
+                log.warn("Machine not found for machineId: {}", machineId);
+                return;
+            }
+
+            // Fetch current tags and exclude the one being removed
+            List<MachineTag> currentMachineTags = machineTagRepository.findByMachineId(machineId);
+            List<String> remainingTagIds = currentMachineTags.stream()
+                    .map(MachineTag::getTagId)
+                    .filter(id -> !id.equals(tagId))
+                    .toList();
+
+            List<Tag> remainingTags = remainingTagIds.isEmpty()
+                    ? List.of()
+                    : tagRepository.findAllById(remainingTagIds);
+
+            // Build message excluding the removed tag's MachineTag
+            List<MachineTag> remainingMachineTags = currentMachineTags.stream()
+                    .filter(mt -> !mt.getTagId().equals(tagId))
+                    .toList();
+
+            MachinePinotMessage message = buildMachinePinotMessageFromParts(machine, remainingTags, remainingMachineTags);
+            ossTenantKafkaProducer.publish(machineEventsTopic, machineId, message);
+
+            log.info("MachineTag delete event processed for machine: {}", machineId);
+        } catch (Exception e) {
+            log.error("Error processing machineTag delete event: {}", e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public void processMachineTagDeleteByTagId(String tagId) {
+        try {
+            log.info("Processing bulk machineTag delete by tagId: {}", tagId);
+
+            List<String> affectedMachineIds = fetchMachineIdsForTag(tagId);
+            if (affectedMachineIds.isEmpty()) {
+                log.info("No machines affected by tag deletion: {}", tagId);
+                return;
+            }
+
+            for (String machineId : affectedMachineIds) {
+                try {
+                    Machine machine = fetchMachine(machineId);
+                    if (machine == null) {
+                        continue;
+                    }
+
+                    // Fetch current tags and exclude the one being deleted
+                    List<MachineTag> currentMachineTags = machineTagRepository.findByMachineId(machineId);
+                    List<String> remainingTagIds = currentMachineTags.stream()
+                            .map(MachineTag::getTagId)
+                            .filter(id -> !id.equals(tagId))
+                            .toList();
+
+                    List<Tag> remainingTags = remainingTagIds.isEmpty()
+                            ? List.of()
+                            : tagRepository.findAllById(remainingTagIds);
+
+                    List<MachineTag> remainingMachineTags = currentMachineTags.stream()
+                            .filter(mt -> !mt.getTagId().equals(tagId))
+                            .toList();
+
+                    MachinePinotMessage message = buildMachinePinotMessageFromParts(machine, remainingTags, remainingMachineTags);
+                    ossTenantKafkaProducer.publish(machineEventsTopic, machineId, message);
+                } catch (Exception e) {
+                    log.error("Error processing machine {} for tag deletion: {}", machineId, e.getMessage());
+                }
+            }
+
+            log.info("Bulk machineTag delete processed for {} machines", affectedMachineIds.size());
+        } catch (Exception e) {
+            log.error("Error processing bulk machineTag delete: {}", e.getMessage(), e);
+        }
+    }
+
     private void sendMachineEventToKafka(Machine machineEntity) {
         try {
             // Fetch all tags for the machine
@@ -150,7 +231,7 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
     }
 
     private void sendTagEventToKafka(Tag tagEntity) {
-        // Check if this is an update operation and if name changed
+        // Check if this is an update operation and if key changed
         if (tagEntity.getId() != null) {
 
             // Fetch all machines with this tag
@@ -165,14 +246,14 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
                         MachinePinotMessage message = buildMachinePinotMessage(machine, machineTags);
 
                         ossTenantKafkaProducer.publish(machineEventsTopic, machineId, message);
-                        log.debug("Sent update for machine {} due to tag name change", machineId);
+                        log.debug("Sent update for machine {} due to tag key change", machineId);
                     }
                 } catch (Exception e) {
-                    log.error("Error processing machine {} for tag name change: {}", machineId, e.getMessage());
+                    log.error("Error processing machine {} for tag key change: {}", machineId, e.getMessage());
                 }
             }
 
-            log.info("Processed tag name change for {} machines", machineIds.size());
+            log.info("Processed tag key change for {} machines", machineIds.size());
         }
     }
 
@@ -217,17 +298,49 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
 
     /**
      * Builds MachinePinotMessage from Machine entity and its tags.
+     * Fetches MachineTag entries from DB to get per-device values.
      */
     private MachinePinotMessage buildMachinePinotMessage(Machine machine, List<Tag> tags) {
+        List<MachineTag> machineTags = machineTagRepository.findByMachineId(machine.getMachineId());
+        return buildMachinePinotMessageFromParts(machine, tags, machineTags);
+    }
+
+    /**
+     * Builds MachinePinotMessage from pre-resolved Machine, Tags, and MachineTag entries.
+     * Used by delete handlers where the MachineTag list must exclude the tag being removed.
+     */
+    private MachinePinotMessage buildMachinePinotMessageFromParts(Machine machine, List<Tag> tags,
+                                                                   List<MachineTag> machineTags) {
+        Map<String, MachineTag> machineTagByTagId = machineTags.stream()
+                .collect(Collectors.toMap(MachineTag::getTagId, mt -> mt, (a, b) -> a));
+
+        List<String> tagKeyNames = new ArrayList<>();
+        List<String> tagKeyValues = new ArrayList<>();
+
+        for (Tag tag : tags) {
+            String key = tag.getKey();
+            if (key != null) {
+                tagKeyNames.add(key);
+            }
+
+            // Build key:value pairs for Pinot indexing
+            MachineTag mt = machineTagByTagId.get(tag.getId());
+            if (mt != null && mt.getValues() != null && !mt.getValues().isEmpty()) {
+                for (String value : mt.getValues()) {
+                    tagKeyValues.add(key + ":" + value);
+                }
+            }
+        }
+
         return MachinePinotMessage.builder()
                 .machineId(machine.getMachineId())
                 .organizationId(machine.getOrganizationId())
                 .deviceType(machine.getType() != null ? machine.getType().toString() : null)
                 .status(machine.getStatus() != null ? machine.getStatus().toString() : null)
                 .osType(machine.getOsType())
-                .tags(tags.stream()
-                        .map(Tag::getName)
-                        .toList())
+                .tags(tagKeyNames)
+                .tagKeyValues(tagKeyValues)
+                .ingestionTime(System.currentTimeMillis())
                 .build();
     }
 }

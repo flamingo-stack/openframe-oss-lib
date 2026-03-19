@@ -25,7 +25,8 @@ public class GraphQLDeviceMapper {
                 .deviceTypes(input.getDeviceTypes())
                 .osTypes(input.getOsTypes())
                 .organizationIds(input.getOrganizationIds())
-                .tagNames(input.getTagNames())
+                .tagKeys(input.getTagKeys())
+                .tagValues(input.getTagValues())
                 .build();
     }
 
@@ -53,4 +54,4 @@ public class GraphQLDeviceMapper {
                 .filteredCount(result.getFilteredCount())
                 .build();
     }
-} 
+}

@@ -1,5 +1,6 @@
 package com.openframe.test.data.dto.organization;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Builder;
 import lombok.Data;
 
@@ -11,6 +12,7 @@ import java.time.LocalDate;
  */
 @Data
 @Builder
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class CreateOrganizationRequest {
     String name;
     String category;

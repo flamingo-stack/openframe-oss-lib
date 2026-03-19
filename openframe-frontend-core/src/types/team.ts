@@ -16,6 +16,7 @@ export interface TeamMember {
   profile_image_hash?: string;
   bio?: string;
   location?: string;
+  location_country?: string;
   start_date?: string;
   end_date?: string;
   employment_status: string;

@@ -53,4 +53,4 @@ export * from './youtube-embed'
 // AI Enrich components
 export * from './ai-enrich'
 export * from './policy-configuration-panel'
-
+export * from './waitlist-form'

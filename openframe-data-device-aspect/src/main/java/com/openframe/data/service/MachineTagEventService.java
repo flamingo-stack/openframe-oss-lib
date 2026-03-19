@@ -44,7 +44,7 @@ public interface MachineTagEventService {
 
     /**
      * Processes tag save event.
-     * Only processes when tag name changes, fetches all affected machines.
+     * Only processes when tag key changes, fetches all affected machines.
      *
      * @param tag the tag entity that was saved
      */
@@ -57,5 +57,24 @@ public interface MachineTagEventService {
      * @param tags the collection of tag entities that were saved
      */
     void processTagSaveAll(Iterable<Tag> tags);
+
+    /**
+     * Processes machineTag delete event for a single device.
+     * Must be called BEFORE the delete so affected machineId can be resolved.
+     * Re-syncs the machine to Pinot without the removed tag.
+     *
+     * @param machineId the machine from which the tag is being removed
+     * @param tagId     the tag being removed
+     */
+    void processMachineTagDelete(String machineId, String tagId);
+
+    /**
+     * Processes bulk machineTag delete by tagId.
+     * Must be called BEFORE the delete so affected machineIds can be resolved.
+     * Re-syncs all affected machines to Pinot without the removed tag.
+     *
+     * @param tagId the tag being removed from all devices
+     */
+    void processMachineTagDeleteByTagId(String tagId);
 }
 

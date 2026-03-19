@@ -59,8 +59,8 @@ export function QueryReportTable({
 
   return (
     <div className={cn('flex flex-col w-full', isCompact ? 'gap-0' : 'gap-6', className)}>
-      {/* Title bar — hidden in compact mode */}
-      {!isCompact && (
+      {/* Title bar — hidden in compact mode and when empty */}
+      {!isCompact && (title || headerActions || (showExport && data.length > 0)) && (
         <div className="flex items-end justify-between pt-6">
           <h2 className="font-mono font-semibold text-[32px] leading-[40px] text-ods-text-primary">
             {title}
@@ -136,7 +136,7 @@ export function QueryReportTable({
                   columnWidth={columnWidth}
                   variant={variant}
                 />
-                <div className={cn('flex flex-col', isCompact ? 'gap-0' : 'gap-2')}>
+                <div className={cn('flex flex-col', isCompact ? 'gap-0' : 'gap-2 p-4')}>
                   {data.map((row, index) => (
                     <QueryReportTableRow
                       key={index}

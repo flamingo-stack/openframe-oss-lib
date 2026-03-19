@@ -9,6 +9,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
@@ -94,7 +95,9 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
             isDesc ? Criteria.where(ID_FIELD).lt(cursorId) : Criteria.where(ID_FIELD).gt(cursorId)
         );
 
-        query.addCriteria(new Criteria().orOperator(pastSortValue, sameSortValuePastId));
+        query.addCriteria(Criteria.where("$or").is(
+                List.of(pastSortValue.getCriteriaObject(), sameSortValuePastId.getCriteriaObject())
+        ));
     }
 
     private Object getSortFieldValue(Machine machine, String sortField) {
@@ -114,37 +117,39 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
 
     @Override
     public Query buildDeviceQuery(MachineQueryFilter filter, String search) {
-        Query query = new Query();
+        List<Criteria> criteriaList = new ArrayList<>();
+
         if (filter != null) {
             if (filter.getStatuses() != null && !filter.getStatuses().isEmpty()) {
-                query.addCriteria(Criteria.where("status").in(filter.getStatuses()));
+                criteriaList.add(Criteria.where("status").in(filter.getStatuses()));
             }
             if (filter.getDeviceTypes() != null && !filter.getDeviceTypes().isEmpty()) {
-                query.addCriteria(Criteria.where("type").in(filter.getDeviceTypes()));
+                criteriaList.add(Criteria.where("type").in(filter.getDeviceTypes()));
             }
             if (filter.getOsTypes() != null && !filter.getOsTypes().isEmpty()) {
-                query.addCriteria(Criteria.where("osType").in(filter.getOsTypes()));
+                criteriaList.add(Criteria.where("osType").in(filter.getOsTypes()));
             }
             if (filter.getOrganizationIds() != null && !filter.getOrganizationIds().isEmpty()) {
-                query.addCriteria(Criteria.where("organizationId").in(filter.getOrganizationIds()));
+                criteriaList.add(Criteria.where("organizationId").in(filter.getOrganizationIds()));
             }
         }
-        applySearchCriteria(query, search);
-        return query;
-    }
 
-    private void applySearchCriteria(Query query, String search) {
         if (search != null && !search.isEmpty()) {
-            Criteria searchCriteria = new Criteria().orOperator(
+            criteriaList.add(new Criteria().orOperator(
                     Criteria.where("hostname").regex(search, "i"),
                     Criteria.where("displayName").regex(search, "i"),
                     Criteria.where("ip").regex(search, "i"),
                     Criteria.where("serialNumber").regex(search, "i"),
                     Criteria.where("manufacturer").regex(search, "i"),
                     Criteria.where("model").regex(search, "i")
-            );
-            query.addCriteria(searchCriteria);
+            ));
         }
+
+        Query query = new Query();
+        if (!criteriaList.isEmpty()) {
+            query.addCriteria(new Criteria().andOperator(criteriaList.toArray(new Criteria[0])));
+        }
+        return query;
     }
 
     @Override

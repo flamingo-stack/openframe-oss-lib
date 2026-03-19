@@ -3,12 +3,15 @@ package com.openframe.test.helpers;
 import com.openframe.test.config.EnvironmentConfig;
 import io.restassured.RestAssured;
 import io.restassured.builder.RequestSpecBuilder;
+import io.restassured.builder.ResponseSpecBuilder;
 import io.restassured.config.HttpClientConfig;
 import io.restassured.config.LogConfig;
 import io.restassured.config.SSLConfig;
 import io.restassured.filter.log.RequestLoggingFilter;
 import io.restassured.http.ContentType;
 import io.restassured.specification.RequestSpecification;
+import io.restassured.specification.ResponseSpecification;
+import static org.hamcrest.Matchers.nullValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,7 +24,7 @@ import static com.openframe.test.config.EnvironmentConfig.getAuthUrl;
 
 public class RequestSpecHelper {
 
-    private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(32);
     private static final Logger log = LoggerFactory.getLogger(RequestSpecHelper.class);
     private static final PrintStream SLF4J_STREAM = new PrintStream(new Slf4jOutputStream(log), true);
 
@@ -54,6 +57,13 @@ public class RequestSpecHelper {
 
     public static void setEnableLogging(boolean enabled) {
         enableLogging = enabled;
+    }
+
+    public static ResponseSpecification graphqlSuccess() {
+        return new ResponseSpecBuilder()
+                .expectStatusCode(200)
+                .expectBody("errors", nullValue())
+                .build();
     }
 
     public static RequestSpecification getAuthorizedSpec() {

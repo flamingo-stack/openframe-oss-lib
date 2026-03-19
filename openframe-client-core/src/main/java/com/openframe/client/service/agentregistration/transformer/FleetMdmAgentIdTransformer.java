@@ -37,14 +37,13 @@ public class FleetMdmAgentIdTransformer implements ToolAgentIdTransformer {
     //  Use it here and at other places.
     // TODO: revise logic or full architecture:
     @Override
-    public String transform(String agentToolId, boolean lastAttempt) {
+    public String transform(String machineId, String agentToolId, boolean lastAttempt) {
         if (isBlank(agentToolId)) {
-            log.warn("Agent tool ID is blank for Fleet MDM");
+            log.warn("Agent tool ID is blank for Fleet MDM, machineId={}", machineId);
             return agentToolId;
         }
 
         try {
-            // Get the integrated tool configuration
             IntegratedTool integratedTool = integratedToolService.getToolById(TOOL_ID)
                     .orElseThrow(() -> new IllegalStateException("Found no tool with id " + TOOL_ID));
             
@@ -54,48 +53,66 @@ public class FleetMdmAgentIdTransformer implements ToolAgentIdTransformer {
             String apiUrl = toolUrl.getUrl() + ":" + toolUrl.getPort();
             String apiToken = integratedTool.getCredentials().getApiKey().getKey();
 
-            // Create Fleet MDM client
             FleetMdmClient fleetClient = new FleetMdmClient(apiUrl, apiToken);
-            
-            // Search for hosts with the UUID, limit to 2 as requested
+
             List<Host> hosts = fleetClient.searchHosts(agentToolId, 0, 2);
             
             if (hosts.isEmpty()) {
                 throw new IllegalStateException("No hosts found in Fleet MDM for UUID: " + agentToolId);
             }
-            logHosts(hosts);
+            logHosts(machineId, agentToolId, hosts);
 
-            // Filter hosts: exact UUID match and non-empty os data
-            return hosts.stream()
+            List<Host> uuidMatched = hosts.stream()
                     .filter(host -> agentToolId.equals(host.getUuid()))
-                    .filter(host -> isNotBlank(host.getOsVersion()) || isNotBlank(host.getOsqueryVersion()))
+                    .toList();
+
+            return uuidMatched.stream()
+                    .filter(host -> agentToolId.equals(host.getOsqueryHostId()))
+                    .peek(host -> logOsqueryHostIdMatch(machineId, agentToolId, host))
                     .findFirst()
-                    .map(host -> processMatchingHost(host, agentToolId))
-                    .orElseGet(() -> processNoMatchingHost(agentToolId, lastAttempt));
+                    // TODO: remove by osquery version matching after migration
+                    .or(() -> uuidMatched.stream()
+                            .filter(host -> isNotBlank(host.getOsVersion()) || isNotBlank(host.getOsqueryVersion()))
+                            .peek(host -> logOsVersionFallbackMatch(machineId, agentToolId, host))
+                            .findFirst())
+                    .map(host -> processMatchingHost(machineId, agentToolId, host))
+                    .orElseGet(() -> processNoMatchingHost(machineId, agentToolId, lastAttempt));
         } catch (Exception e) {
-            log.error("Failed to transform Fleet MDM agent tool ID: {}", agentToolId, e);
+            log.error("Failed to transform Fleet MDM agent tool ID, machineId={}, uuid={}", machineId, agentToolId, e);
             throw new IllegalStateException("Failed to transform Fleet MDM agent tool ID", e);
         }
     }
 
-    private String processMatchingHost(Host host, String agentToolId) {
+    private String processMatchingHost(String machineId, String agentToolId, Host host) {
         String transformedAgentToolId = String.valueOf(host.getId());
-        log.info("Transformed Fleet MDM agent tool ID from UUID {} to host ID {}", agentToolId, transformedAgentToolId);
+        log.info("Transformed Fleet MDM agent tool ID, machineId={}, uuid={}, host_id={}", machineId, agentToolId, transformedAgentToolId);
         return transformedAgentToolId;
     }
 
-    private String processNoMatchingHost(String agentToolId, boolean lastAttempt) {
+    private String processNoMatchingHost(String machineId, String agentToolId, boolean lastAttempt) {
+        log.warn("No matching host found, machineId={}, uuid={}", machineId, agentToolId);
         if (!lastAttempt) {
-            throw new IllegalStateException("No valid fleetmdm-agent mdm host found with uuid=" + agentToolId);
-        } else {
-            log.info("Use uuid to fix it manually: {}", agentToolId);
-            return agentToolId;
+            throw new IllegalStateException("No valid fleetmdm-agent mdm host found with machineId=" + machineId + ", uuid=" + agentToolId);
         }
+        log.info("Use uuid to fix it manually, machineId={}, uuid={}", machineId, agentToolId);
+        return agentToolId;
     }
 
-    private void logHosts(List<Host> hosts) {
+    private void logOsqueryHostIdMatch(String machineId, String uuid, Host host) {
+        Long hostId = host.getId();
+        String osqueryHostId = host.getOsqueryHostId();
+        log.info("Matched host by osquery_host_id, machineId={}, uuid={}, host_id={}, osquery_host_id={}", machineId, uuid, hostId, osqueryHostId);
+    }
+
+    private void logOsVersionFallbackMatch(String machineId, String uuid, Host host) {
+        Long hostId = host.getId();
+        String osqueryHostId = host.getOsqueryHostId();
+        log.info("Matched host by osVersion fallback, machineId={}, uuid={}, host_id={}, osquery_host_id={}", machineId, uuid, hostId, osqueryHostId);
+    }
+
+    private void logHosts(String machineId, String uuid, List<Host> hosts) {
         String hostsInfo = buildHostInfo(hosts);
-        log.info("Hosts: \n{}", hostsInfo);
+        log.info("Fleet hosts search result, machineId={}, uuid={}\n{}", machineId, uuid, hostsInfo);
     }
 
     private String buildHostInfo(List<Host> hosts) {
