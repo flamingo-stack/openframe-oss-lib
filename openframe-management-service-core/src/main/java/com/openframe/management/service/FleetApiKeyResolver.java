@@ -33,7 +33,7 @@ public class FleetApiKeyResolver {
 
         ToolCredentials credentials = tool.getCredentials();
 
-        String adminToken = setupOrLogin(client, credentials);
+        String adminToken = setupOrLogin(client, credentials, fleetUrl);
         return createOrLoginApiUser(client, credentials, adminToken);
     }
 
@@ -51,16 +51,17 @@ public class FleetApiKeyResolver {
         return url;
     }
 
-    private String setupOrLogin(FleetMdmSetupClient client, ToolCredentials credentials) {
+    private String setupOrLogin(FleetMdmSetupClient client, ToolCredentials credentials, String fleetUrl) {
         try {
-            SetupRequest setupRequest = buildSetupRequest(credentials);
+            SetupRequest setupRequest = buildSetupRequest(credentials, fleetUrl);
             SetupResponse setupResponse = client.setup(setupRequest);
 
             log.info("Fleet initial setup completed");
             return setupResponse.getToken();
         } catch (FleetMdmApiException e) {
-            if (e.getStatusCode() >= 400 && e.getStatusCode() < 500) {
-                log.info("Fleet already initialized (HTTP {}), logging in as admin", e.getStatusCode());
+            int statusCode = e.getStatusCode();
+            if (statusCode >= 400 && e.getStatusCode() < 500) {
+                log.info("Fleet already initialized (HTTP {}), logging in as admin", statusCode);
 
                 LoginRequest adminLoginRequest = buildLoginRequest(credentials);
                 return client.login(adminLoginRequest).getToken();
@@ -69,7 +70,7 @@ public class FleetApiKeyResolver {
         }
     }
 
-    private SetupRequest buildSetupRequest(ToolCredentials credentials) {
+    private SetupRequest buildSetupRequest(ToolCredentials credentials, String fleetUrl) {
         SetupRequest.AdminInfo admin = new SetupRequest.AdminInfo();
         admin.setEmail(credentials.getUsername());
         admin.setPassword(credentials.getPassword());
@@ -81,6 +82,7 @@ public class FleetApiKeyResolver {
         SetupRequest request = new SetupRequest();
         request.setAdmin(admin);
         request.setOrgInfo(orgInfo);
+        request.setServerUrl(fleetUrl);
 
         return request;
     }

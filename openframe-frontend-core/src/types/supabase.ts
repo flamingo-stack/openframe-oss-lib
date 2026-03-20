@@ -283,6 +283,276 @@ export type Database = {
         }
         Relationships: []
       }
+      podcast_episodes: {
+        Row: {
+          id: string
+          podbean_episode_id: string
+          podbean_podcast_id: string
+          title: string
+          description: string | null
+          cover_url: string | null
+          audio_url: string | null
+          video_url: string | null
+          media_type: string | null
+          duration_seconds: number | null
+          status: string | null
+          published_at: string | null
+          external_url: string | null
+          hosts: Json | null
+          platform_id: string
+          is_deleted: boolean | null
+          last_synced_at: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          podbean_episode_id: string
+          podbean_podcast_id: string
+          title: string
+          description?: string | null
+          cover_url?: string | null
+          audio_url?: string | null
+          video_url?: string | null
+          media_type?: string | null
+          duration_seconds?: number | null
+          status?: string | null
+          published_at?: string | null
+          external_url?: string | null
+          hosts?: Json | null
+          platform_id: string
+          is_deleted?: boolean | null
+          last_synced_at?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          podbean_episode_id?: string
+          podbean_podcast_id?: string
+          title?: string
+          description?: string | null
+          cover_url?: string | null
+          audio_url?: string | null
+          video_url?: string | null
+          media_type?: string | null
+          duration_seconds?: number | null
+          status?: string | null
+          published_at?: string | null
+          external_url?: string | null
+          hosts?: Json | null
+          platform_id?: string
+          is_deleted?: boolean | null
+          last_synced_at?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "podcast_episodes_platform_id_fkey"
+            columns: ["platform_id"]
+            isOneToOne: false
+            referencedRelation: "platforms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webinars: {
+        Row: {
+          id: string
+          livestorm_event_id: string
+          title: string
+          description: string | null
+          cover_url: string | null
+          start_at: string
+          end_at: string | null
+          timezone: string | null
+          registration_url: string | null
+          recording_url: string | null
+          hosts: Json | null
+          platform_id: string
+          is_deleted: boolean | null
+          last_synced_at: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          livestorm_event_id: string
+          title: string
+          description?: string | null
+          cover_url?: string | null
+          start_at: string
+          end_at?: string | null
+          timezone?: string | null
+          registration_url?: string | null
+          recording_url?: string | null
+          hosts?: Json | null
+          platform_id: string
+          is_deleted?: boolean | null
+          last_synced_at?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          livestorm_event_id?: string
+          title?: string
+          description?: string | null
+          cover_url?: string | null
+          start_at?: string
+          end_at?: string | null
+          timezone?: string | null
+          registration_url?: string | null
+          recording_url?: string | null
+          hosts?: Json | null
+          platform_id?: string
+          is_deleted?: boolean | null
+          last_synced_at?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webinars_platform_id_fkey"
+            columns: ["platform_id"]
+            isOneToOne: false
+            referencedRelation: "platforms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      luma_events: {
+        Row: {
+          id: string
+          luma_api_id: string
+          name: string
+          description: string | null
+          description_md: string | null
+          cover_url: string | null
+          event_url: string | null
+          start_at: string | null
+          end_at: string | null
+          duration_interval: string | null
+          timezone: string | null
+          geo_address: Json | null
+          geo_latitude: number | null
+          geo_longitude: number | null
+          location_name: string | null
+          location_full_address: string | null
+          visibility: string | null
+          meeting_url: string | null
+          registration_questions: Json | null
+          tags: string[] | null
+          guest_count: number | null
+          platform_id: string
+          is_deleted: boolean | null
+          last_synced_at: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          luma_api_id: string
+          name: string
+          description?: string | null
+          description_md?: string | null
+          cover_url?: string | null
+          event_url?: string | null
+          start_at?: string | null
+          end_at?: string | null
+          duration_interval?: string | null
+          timezone?: string | null
+          geo_address?: Json | null
+          geo_latitude?: number | null
+          geo_longitude?: number | null
+          location_name?: string | null
+          location_full_address?: string | null
+          visibility?: string | null
+          meeting_url?: string | null
+          registration_questions?: Json | null
+          tags?: string[] | null
+          guest_count?: number | null
+          platform_id: string
+          is_deleted?: boolean | null
+          last_synced_at?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          luma_api_id?: string
+          name?: string
+          description?: string | null
+          description_md?: string | null
+          cover_url?: string | null
+          event_url?: string | null
+          start_at?: string | null
+          end_at?: string | null
+          duration_interval?: string | null
+          timezone?: string | null
+          geo_address?: Json | null
+          geo_latitude?: number | null
+          geo_longitude?: number | null
+          location_name?: string | null
+          location_full_address?: string | null
+          visibility?: string | null
+          meeting_url?: string | null
+          registration_questions?: Json | null
+          tags?: string[] | null
+          guest_count?: number | null
+          platform_id?: string
+          is_deleted?: boolean | null
+          last_synced_at?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "luma_events_platform_id_fkey"
+            columns: ["platform_id"]
+            isOneToOne: false
+            referencedRelation: "platforms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vendor_github_stats: {
+        Row: {
+          id: string
+          vendor_id: number
+          github_stars: number | null
+          github_forks: number | null
+          github_commits: number | null
+          github_license: string | null
+          github_last_commit: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          vendor_id: number
+          github_stars?: number | null
+          github_forks?: number | null
+          github_commits?: number | null
+          github_license?: string | null
+          github_last_commit?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          vendor_id?: number
+          github_stars?: number | null
+          github_forks?: number | null
+          github_commits?: number | null
+          github_license?: string | null
+          github_last_commit?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

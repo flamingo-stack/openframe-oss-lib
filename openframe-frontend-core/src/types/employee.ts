@@ -6,6 +6,7 @@ export interface Employee {
   role: string;
   job_title: string;
   about: string;
+  location_country?: string;
 }
 
 export interface EmployeeResponse {
