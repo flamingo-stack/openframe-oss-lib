@@ -2,7 +2,7 @@ package com.openframe.test.tests;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
+import com.openframe.test.data.dto.shared.CursorPaginationInput;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
@@ -38,13 +38,14 @@ public class StatsTest extends BaseTest {
     @Test
     public void collectStats() throws Exception {
         Map<String, Integer> stats = new ConcurrentHashMap<>();
+        CursorPaginationInput pagination = CursorPaginationInput.builder().limit(100).build();
         List<Future<?>> futures = new ArrayList<>();
         try (ExecutorService executor = Executors.newFixedThreadPool(15)) {
             for (String domain : getDomains()) {
                 futures.add(executor.submit(() -> {
                     System.out.println(domain);
                     setBaseUrl("https://" + domain + "/");
-                    List<String> fleetIds = getAllDevices(statDevicesFilter(), 100, null);
+                    List<String> fleetIds = getAllDevices(statDevicesFilter(), pagination);
                     for (String fleetId : fleetIds) {
                         try {
                             Thread.sleep(50);

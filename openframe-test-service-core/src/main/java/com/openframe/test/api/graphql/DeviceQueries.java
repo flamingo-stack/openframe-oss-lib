@@ -15,8 +15,8 @@ public class DeviceQueries {
             """;
 
     public static final String ALL_DEVICE_IDS = """
-            query($filter: DeviceFilterInput, $first: Int, $after: String) {
-                devices(filter: $filter, first: $first, after: $after) {
+            query($filter: DeviceFilterInput, $pagination: CursorPaginationInput) {
+                devices(filter: $filter, pagination: $pagination) {
                     edges {
                         node {
                             machineId
@@ -62,12 +62,13 @@ public class DeviceQueries {
                     registeredAt
                     updatedAt
                     tags {
-                        tagId
-                        key
+                        id
+                        name
                         description
                         color
-                        values
+                        organizationId
                         createdAt
+                        createdBy
                     }
                     toolConnections {
                         id
@@ -146,8 +147,8 @@ public class DeviceQueries {
             """;
 
     public static final String ALL_DEVICES = """
-            query($filter: DeviceFilterInput, $first: Int, $after: String) {
-                devices(filter: $filter, first: $first, after: $after) {
+            query($filter: DeviceFilterInput, $pagination: CursorPaginationInput) {
+                devices(filter: $filter, pagination: $pagination) {
                     edges {
                         node {
                             toolConnections { toolType agentToolId }
