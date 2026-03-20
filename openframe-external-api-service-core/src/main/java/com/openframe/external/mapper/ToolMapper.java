@@ -1,6 +1,5 @@
 package com.openframe.external.mapper;
 
-import com.openframe.api.dto.tool.ToolFilterOptions;
 import com.openframe.api.dto.tool.ToolFilters;
 import com.openframe.api.dto.tool.ToolList;
 import com.openframe.data.document.tool.IntegratedTool;
@@ -8,9 +7,6 @@ import com.openframe.data.document.tool.ToolApiKey;
 import com.openframe.data.document.tool.ToolCredentials;
 import com.openframe.data.document.tool.ToolUrl;
 import com.openframe.external.dto.tool.*;
-import com.openframe.external.dto.shared.SortCriteria;
-import com.openframe.api.dto.shared.SortInput;
-import com.openframe.api.dto.shared.SortDirection;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -112,30 +108,4 @@ public class ToolMapper {
                 .keyName(apiKey.getKeyName())
                 .build();
     }
-
-    public ToolFilterOptions toToolFilterOptions(ToolFilterCriteria criteria) {
-        if (criteria == null) {
-            return ToolFilterOptions.builder().build();
-        }
-        
-        return ToolFilterOptions.builder()
-                .enabled(criteria.getEnabled())
-                .type(criteria.getType())
-                .category(criteria.getCategory())
-                .platformCategory(criteria.getPlatformCategory())
-                .build();
-    }
-    
-    public SortInput toSortInput(SortCriteria criteria) {
-        if (criteria == null) {
-            return null;
-        }
-        
-        SortInput sortInput = new SortInput();
-        sortInput.setField(criteria.getField());
-        sortInput.setDirection(SortDirection.ASC.name().equalsIgnoreCase(criteria.getDirection()) ? 
-            SortDirection.ASC : SortDirection.DESC);
-        
-        return sortInput;
-    }
-} 
+}

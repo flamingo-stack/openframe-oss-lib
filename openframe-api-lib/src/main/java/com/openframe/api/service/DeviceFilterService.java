@@ -1,7 +1,7 @@
 package com.openframe.api.service;
 
 import com.openframe.api.dto.device.DeviceFilterOption;
-import com.openframe.api.dto.device.DeviceFilterOptions;
+import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.device.DeviceFilters;
 import com.openframe.api.dto.device.TagFilterOption;
 import com.openframe.data.document.organization.Organization;
@@ -31,7 +31,7 @@ public class DeviceFilterService {
         this.organizationRepository = organizationRepository;
     }
 
-    public CompletableFuture<DeviceFilters> getDeviceFilters(DeviceFilterOptions filters) {
+    public CompletableFuture<DeviceFilters> getDeviceFilters(DeviceFilterCriteria filters) {
         List<String> statuses = filters != null && filters.getStatuses() != null ?
                 filters.getStatuses().stream().map(Enum::name).toList() : emptyList();
         List<String> deviceTypes = filters != null && filters.getDeviceTypes() != null ?
@@ -70,10 +70,10 @@ public class DeviceFilterService {
 
     /**
      * Builds the tagKeyValues filter list for Pinot queries.
-     * Combines tagKeys and tagValues from DeviceFilterOptions into "key:value" format.
+     * Combines tagKeys and tagValues from DeviceFilterCriteria into "key:value" format.
      * If only tagValues are provided (no tagKeys), passes them as-is for partial matching.
      */
-    private List<String> buildTagKeyValuesFilter(DeviceFilterOptions filters) {
+    private List<String> buildTagKeyValuesFilter(DeviceFilterCriteria filters) {
         if (filters == null) {
             return emptyList();
         }

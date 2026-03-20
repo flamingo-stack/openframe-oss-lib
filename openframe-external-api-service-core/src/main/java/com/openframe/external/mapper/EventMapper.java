@@ -1,16 +1,11 @@
 package com.openframe.external.mapper;
 
 import com.openframe.api.dto.GenericQueryResult;
-import com.openframe.api.dto.event.EventFilterOptions;
 import com.openframe.api.dto.event.EventFilters;
 import com.openframe.data.document.event.Event;
-import com.openframe.external.dto.event.EventFilterCriteria;
 import com.openframe.external.dto.event.EventFilterResponse;
 import com.openframe.external.dto.event.EventResponse;
 import com.openframe.external.dto.event.EventsResponse;
-import com.openframe.external.dto.shared.SortCriteria;
-import com.openframe.api.dto.shared.SortInput;
-import com.openframe.api.dto.shared.SortDirection;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -63,35 +58,8 @@ public class EventMapper extends BaseRestMapper {
         
         return EventsResponse.builder()
                 .events(eventResponses)
-                .pageInfo(toRestPageInfo(queryResult.getPageInfo()))
+                .pageInfo(queryResult.getPageInfo())
                 .build();
     }
 
-
-    public EventFilterOptions toEventFilterOptions(EventFilterCriteria criteria) {
-        if (criteria == null) {
-            return EventFilterOptions.builder().build();
-        }
-        
-        return EventFilterOptions.builder()
-                .userIds(criteria.getUserIds())
-                .eventTypes(criteria.getEventTypes())
-                .startDate(criteria.getStartDate())
-                .endDate(criteria.getEndDate())
-                .build();
-    }
-    
-    public SortInput toSortInput(SortCriteria criteria) {
-        if (criteria == null) {
-            return null;
-        }
-        
-        SortInput sortInput = new SortInput();
-        sortInput.setField(criteria.getField());
-        sortInput.setDirection(SortDirection.ASC.name().equalsIgnoreCase(criteria.getDirection()) ? 
-            SortDirection.ASC : SortDirection.DESC);
-        
-        return sortInput;
-    }
-
-} 
+}

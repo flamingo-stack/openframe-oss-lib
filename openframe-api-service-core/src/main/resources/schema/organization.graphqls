@@ -2,19 +2,22 @@ extend type Query {
     # Get all organizations with optional filtering and pagination
     organizations(
         filter: OrganizationFilterInput
-        pagination: CursorPaginationInput
+        first: Int
+        after: String
+        last: Int
+        before: String
         search: String
         sort: SortInput
     ): OrganizationConnection!
 
     # Get single organization by ID
-    organization(id: String!): Organization
+    organization(id: ID!): Organization
 
     # Get organization by organizationId
     organizationByOrganizationId(organizationId: String!): Organization
 }
 
-type Organization {
+type Organization implements Node {
     id: ID!
     name: String!
     organizationId: String!  # Generated as UUID on creation
@@ -75,7 +78,7 @@ input OrganizationFilterInput {
 
 type OrganizationConnection {
     edges: [OrganizationEdge!]!
-    pageInfo: CursorPageInfo!
+    pageInfo: PageInfo!
     filteredCount: Int!
 }
 

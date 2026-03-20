@@ -1,9 +1,10 @@
 package com.openframe.api.service;
 
 import com.openframe.api.dto.GenericQueryResult;
-import com.openframe.api.dto.event.EventFilterOptions;
+import com.openframe.api.dto.event.EventFilterCriteria;
 import com.openframe.api.dto.event.EventFilters;
-import com.openframe.api.dto.shared.CursorPageInfo;
+import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.shared.SortDirection;
@@ -27,7 +28,7 @@ public class EventService {
     
     private final EventRepository eventRepository;
 
-    public GenericQueryResult<Event> queryEvents(EventFilterOptions filterOptions,
+    public GenericQueryResult<Event> queryEvents(EventFilterCriteria filterOptions,
                                           CursorPaginationCriteria paginationCriteria,
                                           String search,
                                           SortInput sort) {
@@ -45,7 +46,7 @@ public class EventService {
         List<Event> pageItems = fetchPageItems(query, normalizedPagination, sortField, sortDirection);
         boolean hasNextPage = pageItems.size() == normalizedPagination.getLimit();
         
-        CursorPageInfo pageInfo = buildPageInfo(pageItems, hasNextPage, normalizedPagination.hasCursor());
+        PageInfo pageInfo = buildPageInfo(pageItems, hasNextPage, normalizedPagination.hasCursor());
         
         return GenericQueryResult.<Event>builder()
                 .items(pageItems)
@@ -107,7 +108,7 @@ public class EventService {
                 : events;
     }
     
-    private EventQueryFilter buildQueryFilter(EventFilterOptions filterOptions) {
+    private EventQueryFilter buildQueryFilter(EventFilterCriteria filterOptions) {
         if (filterOptions == null) {
             return EventQueryFilter.builder().build();
         }
@@ -120,11 +121,11 @@ public class EventService {
                 .build();
     }
     
-    private CursorPageInfo buildPageInfo(List<Event> events, boolean hasNextPage, boolean hasPreviousPage) {
-        String startCursor = events.isEmpty() ? null : events.getFirst().getId();
-        String endCursor = events.isEmpty() ? null : events.getLast().getId();
-        
-        return CursorPageInfo.builder()
+    private PageInfo buildPageInfo(List<Event> events, boolean hasNextPage, boolean hasPreviousPage) {
+        String startCursor = events.isEmpty() ? null : CursorCodec.encode(events.getFirst().getId());
+        String endCursor = events.isEmpty() ? null : CursorCodec.encode(events.getLast().getId());
+
+        return PageInfo.builder()
                 .hasNextPage(hasNextPage)
                 .hasPreviousPage(hasPreviousPage)
                 .startCursor(startCursor)

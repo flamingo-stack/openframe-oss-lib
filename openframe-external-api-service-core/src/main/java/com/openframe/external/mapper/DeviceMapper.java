@@ -4,9 +4,6 @@ import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.device.*;
 import com.openframe.data.document.device.Machine;
 import com.openframe.external.dto.device.*;
-import com.openframe.external.dto.shared.SortCriteria;
-import com.openframe.api.dto.shared.SortInput;
-import com.openframe.api.dto.shared.SortDirection;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -49,7 +46,7 @@ public class DeviceMapper extends BaseRestMapper {
 
         return DevicesResponse.builder()
                 .devices(deviceResponses)
-                .pageInfo(toRestPageInfo(queryResult.getPageInfo()))
+                .pageInfo(queryResult.getPageInfo())
                 .filteredCount(queryResult.getFilteredCount())
                 .build();
     }
@@ -70,7 +67,7 @@ public class DeviceMapper extends BaseRestMapper {
 
         return DevicesResponse.builder()
                 .devices(deviceResponses)
-                .pageInfo(toRestPageInfo(queryResult.getPageInfo()))
+                .pageInfo(queryResult.getPageInfo())
                 .filteredCount(queryResult.getFilteredCount())
                 .build();
     }
@@ -98,33 +95,16 @@ public class DeviceMapper extends BaseRestMapper {
 
     public DeviceFilterResponse toDeviceFilterResponse(DeviceFilters filters) {
         return DeviceFilterResponse.builder()
-                .statuses(toDeviceFilterOptions(filters.getStatuses()))
-                .deviceTypes(toDeviceFilterOptions(filters.getDeviceTypes()))
-                .osTypes(toDeviceFilterOptions(filters.getOsTypes()))
-                .organizationIds(toDeviceFilterOptions(filters.getOrganizationIds()))
+                .statuses(toDeviceFilterItems(filters.getStatuses()))
+                .deviceTypes(toDeviceFilterItems(filters.getDeviceTypes()))
+                .osTypes(toDeviceFilterItems(filters.getOsTypes()))
+                .organizationIds(toDeviceFilterItems(filters.getOrganizationIds()))
                 .tagKeys(toTagFilterOptions(filters.getTagKeys()))
                 .filteredCount(filters.getFilteredCount())
                 .build();
     }
 
-    public DeviceFilterOptions toDeviceFilterOptions(DeviceFilterCriteria criteria) {
-        if (criteria == null) {
-            return DeviceFilterOptions.builder().build();
-        }
-
-        DeviceFilterOptions.DeviceFilterOptionsBuilder builder = DeviceFilterOptions.builder()
-                .statuses(criteria.getStatuses())
-                .deviceTypes(criteria.getDeviceTypes())
-                .osTypes(criteria.getOsTypes())
-                .organizationIds(criteria.getOrganizationIds())
-                .tagKeys(criteria.getTagKeys())
-                .tagValues(criteria.getTagValues());
-
-        return builder.build();
-    }
-
-
-    private List<DeviceFilterItem> toDeviceFilterOptions(List<DeviceFilterOption> options) {
+    private List<DeviceFilterItem> toDeviceFilterItems(List<DeviceFilterOption> options) {
         if (options == null) {
             return List.of();
         }
@@ -148,18 +128,5 @@ public class DeviceMapper extends BaseRestMapper {
                         .count(option.getCount())
                         .build())
                 .collect(Collectors.toList());
-    }
-
-    public SortInput toSortInput(SortCriteria criteria) {
-        if (criteria == null) {
-            return null;
-        }
-
-        SortInput sortInput = new SortInput();
-        sortInput.setField(criteria.getField());
-        sortInput.setDirection(SortDirection.ASC.name().equalsIgnoreCase(criteria.getDirection()) ?
-            SortDirection.ASC : SortDirection.DESC);
-
-        return sortInput;
     }
 }
