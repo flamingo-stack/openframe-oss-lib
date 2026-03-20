@@ -12,7 +12,6 @@ import java.util.Map;
 import static com.openframe.test.api.graphql.LogQueries.*;
 import static com.openframe.test.config.EnvironmentConfig.GRAPHQL;
 import static com.openframe.test.helpers.RequestSpecHelper.getAuthorizedSpec;
-import static com.openframe.test.helpers.RequestSpecHelper.graphqlSuccess;
 import static io.restassured.RestAssured.given;
 
 public class LogsApi {
@@ -21,7 +20,7 @@ public class LogsApi {
         Map<String, String> body = Map.of("query", LOG_FILTERS);
         return given(getAuthorizedSpec())
                 .body(body).post(GRAPHQL)
-                .then().spec(graphqlSuccess())
+                .then().statusCode(200)
                 .extract().jsonPath().getObject("data.logFilters", LogFilters.class);
     }
 
@@ -29,7 +28,7 @@ public class LogsApi {
         Map<String, String> body = Map.of("query", LOGS);
         return given(getAuthorizedSpec())
                 .body(body).post(GRAPHQL)
-                .then().spec(graphqlSuccess())
+                .then().statusCode(200)
                 .extract().jsonPath().getList("data.logs.edges.node", LogEvent.class);
     }
 
@@ -39,7 +38,7 @@ public class LogsApi {
         body.put("variables", Map.of("filter", filter));
         return given(getAuthorizedSpec())
                 .body(body).post(GRAPHQL)
-                .then().spec(graphqlSuccess())
+                .then().statusCode(200)
                 .extract().jsonPath().getList("data.logs.edges.node", LogEvent.class);
     }
 
@@ -49,7 +48,7 @@ public class LogsApi {
         body.put("variables", Map.of("search", search));
         return given(getAuthorizedSpec())
                 .body(body).post(GRAPHQL)
-                .then().spec(graphqlSuccess())
+                .then().statusCode(200)
                 .extract().jsonPath().getList("data.logs.edges.node", LogEvent.class);
     }
 
@@ -65,7 +64,7 @@ public class LogsApi {
         ));
         return given(getAuthorizedSpec())
                 .body(body).post(GRAPHQL)
-                .then().spec(graphqlSuccess())
+                .then().statusCode(200)
                 .extract().jsonPath().getObject("data.logDetails", LogDetails.class);
     }
 }

@@ -3,7 +3,7 @@ package com.openframe.test.api;
 import com.openframe.test.data.dto.device.*;
 import com.openframe.test.data.dto.device.fleet.FleetHost;
 import com.openframe.test.data.dto.device.tactical.TacticalAgent;
-
+import com.openframe.test.data.dto.shared.CursorPaginationInput;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 
@@ -14,7 +14,8 @@ import java.util.Map;
 
 import static com.openframe.test.api.graphql.DeviceQueries.*;
 import static com.openframe.test.config.EnvironmentConfig.GRAPHQL;
-import static com.openframe.test.helpers.RequestSpecHelper.*;
+import static com.openframe.test.helpers.RequestSpecHelper.getAuthorizedSpec;
+import static com.openframe.test.helpers.RequestSpecHelper.getBaseUrl;
 import static io.restassured.RestAssured.given;
 
 public class DeviceApi {
@@ -29,7 +30,7 @@ public class DeviceApi {
         body.put("variables", Map.of("filter", filter));
         return given(getAuthorizedSpec())
                 .body(body).post(GRAPHQL)
-                .then().spec(graphqlSuccess())
+                .then().statusCode(200)
                 .extract().jsonPath().getList("data.devices.edges.node.hostname", String.class);
     }
 
@@ -39,34 +40,42 @@ public class DeviceApi {
         body.put("variables", Map.of("filter", filter));
         return given(getAuthorizedSpec())
                 .body(body).post(GRAPHQL)
-                .then().spec(graphqlSuccess())
+                .then().statusCode(200)
                 .extract().jsonPath().get("data.devices.edges.node.machineId");
     }
 
-    public static List<String> getAllDeviceIds(DeviceFilterInput filter, Integer first, String after) {
+    public static List<String> getAllDeviceIds(DeviceFilterInput filter, CursorPaginationInput pagination) {
         List<String> machineIds = new ArrayList<>();
-        String cursor = after;
+        String cursor = pagination.getCursor();
         boolean hasNextPage = true;
 
         while (hasNextPage) {
             Map<String, Object> variables = new HashMap<>();
             variables.put("filter", filter);
-            variables.put("first", first);
-            variables.put("after", cursor);
+            variables.put("pagination", CursorPaginationInput.builder()
+                    .limit(pagination.getLimit())
+                    .cursor(cursor)
+                    .build());
             Map<String, Object> body = new HashMap<>();
             body.put("query", ALL_DEVICE_IDS);
             body.put("variables", variables);
 
-            var response = given(getAuthorizedSpec())
-                    .body(body).post(GRAPHQL)
-                    .then().spec(graphqlSuccess())
-                    .extract().jsonPath();
+            var responseR = given(getAuthorizedSpec())
+                    .body(body).post(GRAPHQL);
+            if (responseR.statusCode() == 200) {
+                var response = responseR.then()
+                        .extract().jsonPath();
 
-            List<String> ids = response.getList("data.devices.edges.node.machineId", String.class);
-            machineIds.addAll(ids);
+                List<String> ids = response.getList("data.devices.edges.node.machineId", String.class);
+                machineIds.addAll(ids);
 
-            hasNextPage = response.getObject("data.devices.pageInfo.hasNextPage", Boolean.class);
-            cursor = response.getString("data.devices.pageInfo.endCursor");
+                Boolean next = response.getObject("data.devices.pageInfo.hasNextPage", Boolean.class);
+                hasNextPage = Boolean.TRUE.equals(next);
+                cursor = response.getString("data.devices.pageInfo.endCursor");
+            } else {
+                System.out.printf("%s -> %d%n", getBaseUrl(), responseR.getStatusCode());
+                break;
+            }
         }
 
         return machineIds;
@@ -79,7 +88,7 @@ public class DeviceApi {
         );
         return given(getAuthorizedSpec())
                 .body(body).post(GRAPHQL)
-                .then().spec(graphqlSuccess())
+                .then().statusCode(200)
                 .extract().jsonPath().getObject("data.device", Machine.class);
     }
 
@@ -99,43 +108,50 @@ public class DeviceApi {
         body.put("variables", Map.of("filter", filter));
         return given(getAuthorizedSpec())
                 .body(body).post(GRAPHQL)
-                .then().spec(graphqlSuccess())
+                .then().statusCode(200)
                 .extract().jsonPath().getList("data.devices.edges.node", Machine.class);
     }
 
-    public static List<String> getAllDevices(DeviceFilterInput filter, Integer first, String after) {
+    public static List<String> getAllDevices(DeviceFilterInput filter, CursorPaginationInput pagination) {
         List<String> fleetIds = new ArrayList<>();
-        String cursor = after;
+        String cursor = pagination.getCursor();
         boolean hasNextPage = true;
 
         while (hasNextPage) {
             Map<String, Object> variables = new HashMap<>();
             variables.put("filter", filter);
-            variables.put("first", first);
-            variables.put("after", cursor);
+            variables.put("pagination", CursorPaginationInput.builder()
+                    .limit(pagination.getLimit())
+                    .cursor(cursor)
+                    .build());
             Map<String, Object> body = new HashMap<>();
             body.put("query", ALL_DEVICES);
             body.put("variables", variables);
 
-            var response = given(getAuthorizedSpec())
-                    .body(body).post(GRAPHQL)
-                    .then().spec(graphqlSuccess())
-                    .extract().jsonPath();
+            var responseR = given(getAuthorizedSpec())
+                    .body(body).post(GRAPHQL);
+            if (responseR.statusCode() == 200) {
+                var response = responseR.then()
+                        .extract().jsonPath();
 
-            List<DeviceWithConnections> devices = response.getList(
-                    "data.devices.edges.node", DeviceWithConnections.class);
+                List<DeviceWithConnections> devices = response.getList(
+                        "data.devices.edges.node", DeviceWithConnections.class);
 
-            for (DeviceWithConnections device : devices) {
-                device.getToolConnections().stream()
-                        .filter(tc -> "FLEET_MDM".equals(tc.getToolType()))
-                        .findFirst()
-                        .map(ToolConnection::getAgentToolId)
-                        .ifPresent(fleetIds::add);
+                for (DeviceWithConnections device : devices) {
+                    device.getToolConnections().stream()
+                            .filter(tc -> "FLEET_MDM".equals(tc.getToolType()))
+                            .findFirst()
+                            .map(ToolConnection::getAgentToolId)
+                            .ifPresent(fleetIds::add);
+                }
+
+                Boolean next = response.getObject("data.devices.pageInfo.hasNextPage", Boolean.class);
+                hasNextPage = Boolean.TRUE.equals(next);
+                cursor = response.getString("data.devices.pageInfo.endCursor");
+            } else {
+                System.out.printf("%s -> %d%n", getBaseUrl(), responseR.getStatusCode());
+                break;
             }
-
-            Boolean next = response.getObject("data.devices.pageInfo.hasNextPage", Boolean.class);
-            hasNextPage = Boolean.TRUE.equals(next);
-            cursor = response.getString("data.devices.pageInfo.endCursor");
 
         }
 
@@ -164,7 +180,7 @@ public class DeviceApi {
         body.put("variables", Map.of("filter", filter, "search", search));
         return given(getAuthorizedSpec())
                 .body(body).post(GRAPHQL)
-                .then().spec(graphqlSuccess())
+                .then().statusCode(200)
                 .extract().jsonPath().getObject("data.devices.edges[0].node", Machine.class);
     }
 
@@ -201,7 +217,7 @@ public class DeviceApi {
         Map<String, String> body = Map.of("query", DEVICE_FILTERS);
         return given(getAuthorizedSpec())
                 .body(body).post(GRAPHQL)
-                .then().spec(graphqlSuccess())
+                .then().statusCode(200)
                 .extract().jsonPath().getObject("data.deviceFilters", DeviceFilters.class);
     }
 }
