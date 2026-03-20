@@ -8,9 +8,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static com.openframe.test.config.EnvironmentConfig.DEFAULT_BASE_URL;
+import static com.openframe.test.config.EnvironmentConfig.getAuthUrl;
 import static com.openframe.test.config.EnvironmentConfig.getBaseUrl;
 import static com.openframe.test.helpers.RequestSpecHelper.getAuthFlowRequestSpec;
-import static com.openframe.test.helpers.RequestSpecHelper.getUnAuthorizedSpec;
 import static io.restassured.RestAssured.given;
 
 public class AuthApi {
@@ -82,7 +82,8 @@ public class AuthApi {
     }
 
     public static Map<String, String> refresh(String tenantId, Map<String, String> cookies) {
-        return given(getUnAuthorizedSpec())
+        return given(getAuthFlowRequestSpec())
+                .baseUri(getAuthUrl())
                 .cookie("refresh_token", cookies.get("refresh_token"))
                 .queryParam("tenantId", tenantId)
                 .when()
@@ -93,7 +94,8 @@ public class AuthApi {
     }
 
     public static Map<String, String> refresh(Map<String, String> cookies) {
-        return given(getUnAuthorizedSpec())
+        return given(getAuthFlowRequestSpec())
+                .baseUri(getAuthUrl())
                 .cookie("refresh_token", cookies.get("refresh_token"))
                 .when()
                 .post(OAUTH_REFRESH)
@@ -103,7 +105,8 @@ public class AuthApi {
     }
 
     public static Response attemptRefresh(User user, Map<String, String> cookies) {
-        return given(getUnAuthorizedSpec())
+        return given(getAuthFlowRequestSpec())
+                .baseUri(getAuthUrl())
                 .cookie("refresh_token", cookies.get("refresh_token"))
 //                .queryParam("tenantId", user.getTenantId())
                 .when()
@@ -114,7 +117,8 @@ public class AuthApi {
     }
 
     public static Map<String, String> logout(String tenantId, Map<String, String> cookies) {
-        return given(getUnAuthorizedSpec())
+        return given(getAuthFlowRequestSpec())
+                .baseUri(getAuthUrl())
                 .cookie("refresh_token", cookies.get("refresh_token"))
                 .queryParam("tenantId", tenantId)
                 .get(OAUTH_LOGOUT)
@@ -123,7 +127,8 @@ public class AuthApi {
     }
 
     public static Map<String, String> logout(Map<String, String> cookies) {
-        return given(getUnAuthorizedSpec())
+        return given(getAuthFlowRequestSpec())
+                .baseUri(getAuthUrl())
                 .cookie("refresh_token", cookies.get("refresh_token"))
                 .get(OAUTH_LOGOUT)
                 .then().statusCode(204)
