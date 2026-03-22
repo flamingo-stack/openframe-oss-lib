@@ -85,6 +85,8 @@ export { HubspotIcon } from './hubspot-icon';
 export { ClaudeIcon } from './claude-icon';
 export { LinkedInIcon } from './linkedin-icon';
 export { LumaIcon } from './luma-icon';
+export { LivestormIcon } from './livestorm-icon';
+export { PodbeanIcon } from './podbean-icon';
 export { WhatsAppIcon } from './whatsapp-icon';
 export { FigmaIcon } from './figma-icon';
 export { ImageIcon } from './image-icon';
