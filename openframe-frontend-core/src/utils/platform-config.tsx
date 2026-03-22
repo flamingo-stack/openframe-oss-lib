@@ -14,6 +14,7 @@ export const platformIcons = {
   'product-hub': <FlamingoLogo className="h-5 w-5" fill="#5EA62E" />,
   'revenue-hub': <FlamingoLogo className="h-5 w-5" fill="#FFC008" />,
   'people-hub': <FlamingoLogo className="h-5 w-5" fill="#5EFAF0" />,
+  'company-hub': <FlamingoLogo className="h-5 w-5" fill="#f36666" />,
   tmcg: <MiamiCyberGangLogoFaceOnly  className="h-5 w-5" />,
   universal: <Globe className="h-5 w-5 text-[#10B981]" />
 };
@@ -28,6 +29,7 @@ export const platformColors = {
   'product-hub': 'bg-[#5EA62E]',
   'revenue-hub': 'bg-[#FFC008]',
   'people-hub': 'bg-[#5EFAF0]',
+  'company-hub': 'bg-[#f36666]',
   tmcg: 'bg-[#FF6B6B]',
   universal: 'bg-[#10B981]'
 };
@@ -169,6 +171,8 @@ export function getSmallPlatformIcon(platformName: string): React.ReactNode {
       return <FlamingoLogo className={className} fill="var(--ods-attention-yellow-warning)" />;
     case 'people-hub':
       return <FlamingoLogo className={className} fill="var(--ods-flamingo-cyan-base)" />;
+    case 'company-hub':
+      return <FlamingoLogo className={className} fill="var(--ods-attention-red-error)" />;
     case 'tmcg':
       return <MiamiCyberGangLogoFaceOnly className={className} />;
     case 'universal':
@@ -198,6 +202,8 @@ export function getPlatformIconComponent(platformName: string, className: string
       return <FlamingoLogo className={className} fill="var(--ods-attention-yellow-warning)" />;
     case 'people-hub':
       return <FlamingoLogo className={className} fill="var(--ods-flamingo-cyan-base)" />;
+    case 'company-hub':
+      return <FlamingoLogo className={className} fill="var(--ods-attention-red-error)" />;
     case 'tmcg':
       return <MiamiCyberGangLogoFaceOnly size={24} className={className} />;
     case 'universal':

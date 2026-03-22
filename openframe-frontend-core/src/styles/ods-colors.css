@@ -325,6 +325,26 @@
   --ods-accent: var(--ods-flamingo-cyan-base);
 }
 
+[data-app-type="company-hub"] {
+  /* Company Hub uses red for investor relations and data room */
+  --color-accent-primary: var(--ods-attention-red-error);
+  --color-accent-hover: var(--ods-attention-red-error-hover);
+  --color-accent-active: var(--ods-attention-red-error-action);
+  --color-accent-focus: var(--ods-attention-red-error);
+  --color-focus-ring: var(--ods-attention-red-error);
+  --color-focus-visible: var(--ods-attention-red-error);
+  --color-link: var(--ods-attention-red-error);
+  --color-link-hover: var(--ods-attention-red-error-hover);
+  --color-bg: var(--ods-system-greys-background);
+  --color-bg-card: var(--ods-system-greys-black);
+  --color-bg-hover: var(--ods-system-greys-black-hover);
+  --color-bg-active: var(--ods-system-greys-black-action);
+
+  /* Company Hub uses red as adaptive color and accent */
+  --ods-current: var(--ods-attention-red-error);
+  --ods-accent: var(--ods-attention-red-error);
+}
+
 /* Light Theme Support */
 .theme-light {
   --color-bg: var(--ods-system-greys-white);
