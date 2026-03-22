@@ -337,12 +337,15 @@ export type ContentSourceType =
   | 'blog_post_existing'  // Use existing blog post
   | 'case_study'
   | 'customer_interview'  // Link to customer interview
+  | 'event'               // Luma events
+  | 'podcast'             // Podcast episodes
+  | 'webinar'             // Webinars
   | 'from_scratch';
 
 export type URLInjectionPreference = 'none' | 'in_post' | 'as_comment';
 
 export interface ContentSourceOption {
-  id: number;
+  id: number | string;  // Events/podcasts/webinars use UUID strings
   type: ContentSourceType;
   title: string;
   summary?: string;
