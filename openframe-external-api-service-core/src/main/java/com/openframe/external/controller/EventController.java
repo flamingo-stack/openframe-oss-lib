@@ -3,12 +3,12 @@ package com.openframe.external.controller;
 import com.openframe.api.service.EventService;
 import com.openframe.core.dto.ErrorResponse;
 import com.openframe.data.document.event.Event;
-import com.openframe.external.dto.event.EventFilterCriteria;
+import com.openframe.api.dto.event.EventFilterCriteria;
 import com.openframe.external.dto.event.EventFilterResponse;
 import com.openframe.external.dto.event.EventResponse;
 import com.openframe.external.dto.event.EventsResponse;
-import com.openframe.external.dto.shared.PaginationCriteria;
-import com.openframe.external.dto.shared.SortCriteria;
+import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.dto.shared.SortInput;
 import com.openframe.external.exception.EventNotFoundException;
 import com.openframe.external.mapper.EventMapper;
 import io.swagger.v3.oas.annotations.Operation;
@@ -85,21 +85,11 @@ public class EventController {
                 .endDate(endDate)
                 .build();
 
-        PaginationCriteria paginationCriteria = PaginationCriteria.builder()
-                .cursor(cursor)
-                .limit(limit)
-                .build();
-        
-        SortCriteria sortCriteria = SortCriteria.builder()
-                .field(sortField)
-                .direction(sortDirection)
-                .build();
-
         var result = eventService.queryEvents(
-                eventMapper.toEventFilterOptions(filterCriteria), 
-                eventMapper.toCursorPaginationCriteria(paginationCriteria), 
+                filterCriteria,
+                CursorPaginationCriteria.fromRest(cursor, limit),
                 search,
-                eventMapper.toSortInput(sortCriteria));
+                SortInput.from(sortField, sortDirection));
         return eventMapper.toEventsResponse(result);
     }
 

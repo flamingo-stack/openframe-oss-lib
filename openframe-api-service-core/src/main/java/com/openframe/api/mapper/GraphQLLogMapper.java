@@ -4,8 +4,9 @@ import com.openframe.api.dto.GenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.audit.*;
+import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
-import com.openframe.api.dto.shared.CursorPaginationInput;
+import com.openframe.api.dto.shared.ConnectionArgs;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -14,12 +15,12 @@ import java.util.stream.Collectors;
 @Component
 public class GraphQLLogMapper {
 
-    public LogFilterOptions toLogFilterOptions(LogFilterInput input) {
+    public LogFilterCriteria toLogFilterCriteria(LogFilterInput input) {
         if (input == null) {
-            return LogFilterOptions.builder().build();
+            return LogFilterCriteria.builder().build();
         }
 
-        return LogFilterOptions.builder()
+        return LogFilterCriteria.builder()
                 .startDate(input.getStartDate())
                 .endDate(input.getEndDate())
                 .eventTypes(input.getEventTypes())
@@ -30,22 +31,15 @@ public class GraphQLLogMapper {
                 .build();
     }
 
-    public CursorPaginationCriteria toCursorPaginationCriteria(CursorPaginationInput input) {
-        if (input == null) {
-            return CursorPaginationCriteria.builder().build();
-        }
-
-        return CursorPaginationCriteria.builder()
-                .limit(input.getLimit())
-                .cursor(input.getCursor())
-                .build();
+    public CursorPaginationCriteria toCursorPaginationCriteria(ConnectionArgs args) {
+        return CursorPaginationCriteria.fromConnectionArgs(args);
     }
 
     public GenericConnection<GenericEdge<LogEvent>> toLogConnection(GenericQueryResult<LogEvent> result) {
         List<GenericEdge<LogEvent>> edges = result.getItems().stream()
                 .map(logEvent -> GenericEdge.<LogEvent>builder()
                         .node(logEvent)
-                        .cursor(createLogCursor(logEvent))
+                        .cursor(CursorCodec.encode(createLogCursor(logEvent)))
                         .build())
                 .collect(Collectors.toList());
 

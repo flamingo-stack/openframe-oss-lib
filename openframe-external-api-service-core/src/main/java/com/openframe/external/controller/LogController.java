@@ -5,9 +5,9 @@ import com.openframe.core.dto.ErrorResponse;
 import com.openframe.external.dto.audit.LogsResponse;
 import com.openframe.external.dto.audit.LogFilterResponse;
 import com.openframe.external.dto.audit.LogDetailsResponse;
-import com.openframe.external.dto.audit.LogFilterCriteria;
-import com.openframe.external.dto.shared.PaginationCriteria;
-import com.openframe.external.dto.shared.SortCriteria;
+import com.openframe.api.dto.audit.LogFilterCriteria;
+import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.dto.shared.SortInput;
 import com.openframe.external.mapper.LogMapper;
 import com.openframe.external.exception.LogNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -93,21 +93,11 @@ public class LogController {
                 .deviceId(deviceId)
                 .build();
         
-        PaginationCriteria paginationCriteria = PaginationCriteria.builder()
-                .limit(limit)
-                .cursor(cursor)
-                .build();
-        
-        SortCriteria sortCriteria = SortCriteria.builder()
-                .field(sortField)
-                .direction(sortDirection)
-                .build();
-        
         var result = logService.queryLogs(
-                logMapper.toLogFilterOptions(filterCriteria), 
-                logMapper.toCursorPaginationCriteria(paginationCriteria), 
+                filterCriteria,
+                CursorPaginationCriteria.fromRest(cursor, limit),
                 search,
-                logMapper.toSortInput(sortCriteria));
+                SortInput.from(sortField, sortDirection));
         return logMapper.toLogsResponse(result);
     }
 
@@ -153,7 +143,7 @@ public class LogController {
                 .build();
         
         var filters = logService.getLogFilters(
-                logMapper.toLogFilterOptions(filterCriteria));
+                filterCriteria);
         return logMapper.toLogFilterResponse(filters);
     }
 

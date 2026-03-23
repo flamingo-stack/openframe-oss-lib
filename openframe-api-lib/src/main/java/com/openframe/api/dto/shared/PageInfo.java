@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CursorPageInfo {
+public class PageInfo {
     private boolean hasNextPage;
     private boolean hasPreviousPage;
     private String startCursor;

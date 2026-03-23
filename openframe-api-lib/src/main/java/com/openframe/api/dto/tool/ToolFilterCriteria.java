@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ToolFilterOptions {
+public class ToolFilterCriteria {
     private Boolean enabled;
     private String type;
     private String category;

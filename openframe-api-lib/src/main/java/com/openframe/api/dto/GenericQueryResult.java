@@ -1,6 +1,6 @@
 package com.openframe.api.dto;
 
-import com.openframe.api.dto.shared.CursorPageInfo;
+import com.openframe.api.dto.shared.PageInfo;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -14,5 +14,5 @@ import java.util.List;
 @AllArgsConstructor
 public class GenericQueryResult<T> {
     private List<T> items;
-    private CursorPageInfo pageInfo;
+    private PageInfo pageInfo;
 }

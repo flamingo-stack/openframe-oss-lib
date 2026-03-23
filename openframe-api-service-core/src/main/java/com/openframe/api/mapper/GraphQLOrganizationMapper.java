@@ -5,8 +5,9 @@ import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.organization.OrganizationFilterInput;
 import com.openframe.api.dto.organization.OrganizationFilterOptions;
+import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
-import com.openframe.api.dto.shared.CursorPaginationInput;
+import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.data.document.organization.Organization;
 import org.springframework.stereotype.Component;
 
@@ -38,15 +39,8 @@ public class GraphQLOrganizationMapper {
     /**
      * Convert GraphQL pagination input to internal pagination criteria.
      */
-    public CursorPaginationCriteria toCursorPaginationCriteria(CursorPaginationInput input) {
-        if (input == null) {
-            return new CursorPaginationCriteria();
-        }
-
-        return CursorPaginationCriteria.builder()
-                .limit(input.getLimit())
-                .cursor(input.getCursor())
-                .build();
+    public CursorPaginationCriteria toCursorPaginationCriteria(ConnectionArgs args) {
+        return CursorPaginationCriteria.fromConnectionArgs(args);
     }
 
     /**
@@ -56,7 +50,7 @@ public class GraphQLOrganizationMapper {
         List<GenericEdge<Organization>> edges = result.getItems().stream()
                 .map(organization -> GenericEdge.<Organization>builder()
                         .node(organization)
-                        .cursor(organization.getId())
+                        .cursor(CursorCodec.encode(organization.getId()))
                         .build())
                 .collect(Collectors.toList());
 

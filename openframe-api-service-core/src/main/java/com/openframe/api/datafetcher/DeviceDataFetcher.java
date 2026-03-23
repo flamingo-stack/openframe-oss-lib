@@ -1,15 +1,16 @@
 package com.openframe.api.datafetcher;
 
 import com.netflix.graphql.dgs.*;
+import graphql.relay.Relay;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.device.DeviceFilterInput;
-import com.openframe.api.dto.device.DeviceFilterOptions;
+import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.device.DeviceFilters;
 import com.openframe.api.dto.device.DeviceTag;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
-import com.openframe.api.dto.shared.CursorPaginationInput;
+import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.api.service.DeviceFilterService;
@@ -35,6 +36,8 @@ import java.util.concurrent.CompletableFuture;
 @RequiredArgsConstructor
 public class DeviceDataFetcher {
 
+    private static final Relay RELAY = new Relay();
+
     private final DeviceService deviceService;
     private final DeviceFilterService deviceFilterService;
     private final TagService tagService;
@@ -43,7 +46,7 @@ public class DeviceDataFetcher {
     @DgsQuery
     public CompletableFuture<DeviceFilters> deviceFilters(@InputArgument @Valid DeviceFilterInput filter) {
         log.debug("Fetching device filters with filter: {}", filter);
-        DeviceFilterOptions filterOptions = mapper.toDeviceFilterOptions(filter);
+        DeviceFilterCriteria filterOptions = mapper.toDeviceFilterCriteria(filter);
 
         return deviceFilterService.getDeviceFilters(filterOptions);
     }
@@ -51,22 +54,39 @@ public class DeviceDataFetcher {
     @DgsQuery
     public CountedGenericConnection<GenericEdge<Machine>> devices(
             @InputArgument @Valid DeviceFilterInput filter,
-            @InputArgument @Valid CursorPaginationInput pagination,
+            @InputArgument Integer first,
+            @InputArgument String after,
+            @InputArgument Integer last,
+            @InputArgument String before,
             @InputArgument String search,
             @InputArgument @Valid SortInput sort) {
 
-        log.debug("Fetching devices with filter: {}, pagination: {}, search: {}, sort: {}",
-            filter, pagination, search, sort);
-        DeviceFilterOptions filterOptions = mapper.toDeviceFilterOptions(filter);
-        CursorPaginationCriteria paginationCriteria = mapper.toCursorPaginationCriteria(pagination);
+        log.debug("Fetching devices with filter: {}, first: {}, after: {}, last: {}, before: {}, search: {}, sort: {}",
+            filter, first, after, last, before, search, sort);
+        DeviceFilterCriteria filterOptions = mapper.toDeviceFilterCriteria(filter);
+        ConnectionArgs connectionArgs = ConnectionArgs.builder().first(first).after(after).last(last).before(before).build();
+        CursorPaginationCriteria paginationCriteria = mapper.toCursorPaginationCriteria(connectionArgs);
         CountedGenericQueryResult<Machine> result = deviceService.queryDevices(filterOptions, paginationCriteria, search, sort);
         return mapper.toDeviceConnection(result);
     }
 
     @DgsQuery
-    public Machine device(@InputArgument @NotBlank String machineId) {
-        log.debug("Fetching device with ID: {}", machineId);
+    public Machine deviceById(@InputArgument @NotBlank String id) {
+        String machineId = RELAY.fromGlobalId(id).getId();
+        log.debug("Fetching device by global ID: {}, machineId: {}", id, machineId);
         return deviceService.findByMachineId(machineId).orElse(null);
+    }
+
+    @DgsQuery
+    public Machine device(@InputArgument @NotBlank String machineId) {
+        log.debug("Fetching device with machineId: {}", machineId);
+        return deviceService.findByMachineId(machineId).orElse(null);
+    }
+
+    @DgsData(parentType = "Machine", field = "id")
+    public String machineNodeId(DgsDataFetchingEnvironment dfe) {
+        Machine machine = dfe.getSource();
+        return RELAY.toGlobalId("Machine", machine.getMachineId());
     }
 
     @DgsData(parentType = "Machine")

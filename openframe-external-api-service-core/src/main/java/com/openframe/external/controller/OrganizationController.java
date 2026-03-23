@@ -2,9 +2,7 @@ package com.openframe.external.controller;
 
 import com.openframe.api.dto.organization.*;
 import com.openframe.api.dto.shared.SortInput;
-import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
-import com.openframe.external.dto.shared.PaginationCriteria;
 import com.openframe.external.mapper.OrganizationMapper;
 import com.openframe.api.service.OrganizationCommandService;
 import com.openframe.api.service.OrganizationQueryService;
@@ -105,28 +103,11 @@ public class OrganizationController {
                 .hasActiveContract(hasActiveContract)
                 .build();
 
-        // Build pagination criteria
-        PaginationCriteria paginationCriteria = PaginationCriteria.builder()
-                .limit(limit)
-                .cursor(cursor)
-                .build();
-
-        // Build sort input if provided
-        SortInput sort = null;
-        if (sortField != null && !sortField.trim().isEmpty()) {
-            SortDirection direction = (sortDirection != null && "ASC".equalsIgnoreCase(sortDirection)) 
-                ? SortDirection.ASC : SortDirection.DESC;
-            sort = SortInput.builder()
-                .field(sortField)
-                .direction(direction)
-                .build();
-        }
-
         var result = organizationQueryService.queryOrganizations(
-                filterOptions, 
-                organizationMapper.toCursorPaginationCriteria(paginationCriteria), 
-                search, 
-                sort);
+                filterOptions,
+                CursorPaginationCriteria.fromRest(cursor, limit),
+                search,
+                SortInput.from(sortField, sortDirection));
 
         return organizationMapper.toOrganizationsResponse(result);
     }

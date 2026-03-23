@@ -12,7 +12,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class EventFilterOptions {
+public class EventFilterCriteria {
     private List<String> userIds;
     private List<String> eventTypes;
     private LocalDate startDate;
