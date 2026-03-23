@@ -67,14 +67,10 @@ public class FleetMdmAgentIdTransformer implements ToolAgentIdTransformer {
                     .toList();
 
             return uuidMatched.stream()
-                    .filter(host -> agentToolId.equals(host.getOsqueryHostId()))
+                    .filter(host -> agentToolId.equals(host.getUuid()))
+                    .filter(host -> isNotBlank(host.getOsqueryVersion()))
                     .peek(host -> logOsqueryHostIdMatch(machineId, agentToolId, host))
                     .findFirst()
-                    // TODO: remove by osquery version matching after migration
-                    .or(() -> uuidMatched.stream()
-                            .filter(host -> isNotBlank(host.getOsVersion()) || isNotBlank(host.getOsqueryVersion()))
-                            .peek(host -> logOsVersionFallbackMatch(machineId, agentToolId, host))
-                            .findFirst())
                     .map(host -> processMatchingHost(machineId, agentToolId, host))
                     .orElseGet(() -> processNoMatchingHost(machineId, agentToolId, lastAttempt));
         } catch (Exception e) {
@@ -102,12 +98,6 @@ public class FleetMdmAgentIdTransformer implements ToolAgentIdTransformer {
         Long hostId = host.getId();
         String osqueryHostId = host.getOsqueryHostId();
         log.info("Matched host by osquery_host_id, machineId={}, uuid={}, host_id={}, osquery_host_id={}", machineId, uuid, hostId, osqueryHostId);
-    }
-
-    private void logOsVersionFallbackMatch(String machineId, String uuid, Host host) {
-        Long hostId = host.getId();
-        String osqueryHostId = host.getOsqueryHostId();
-        log.info("Matched host by osVersion fallback, machineId={}, uuid={}, host_id={}, osquery_host_id={}", machineId, uuid, hostId, osqueryHostId);
     }
 
     private void logHosts(String machineId, String uuid, List<Host> hosts) {
