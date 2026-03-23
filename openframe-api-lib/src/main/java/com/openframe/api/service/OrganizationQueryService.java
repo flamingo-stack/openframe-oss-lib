@@ -3,7 +3,8 @@ package com.openframe.api.service;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.organization.OrganizationFilterOptions;
 import com.openframe.api.dto.organization.OrganizationList;
-import com.openframe.api.dto.shared.CursorPageInfo;
+import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.shared.SortDirection;
@@ -52,7 +53,7 @@ public class OrganizationQueryService {
         List<Organization> pageItems = fetchPageItems(query, normalizedPagination, sortField, sortDirection);
         boolean hasNextPage = pageItems.size() == normalizedPagination.getLimit();
 
-        CursorPageInfo pageInfo = buildPageInfo(pageItems, hasNextPage, normalizedPagination.hasCursor());
+        PageInfo pageInfo = buildPageInfo(pageItems, hasNextPage, normalizedPagination.hasCursor());
 
         return CountedGenericQueryResult.<Organization>builder()
                 .items(pageItems)
@@ -70,11 +71,11 @@ public class OrganizationQueryService {
             : organizations;
     }
 
-    private CursorPageInfo buildPageInfo(List<Organization> pageItems, boolean hasNextPage, boolean hasPreviousPage) {
-        String startCursor = pageItems.isEmpty() ? null : pageItems.getFirst().getId();
-        String endCursor = pageItems.isEmpty() ? null : pageItems.getLast().getId();
+    private PageInfo buildPageInfo(List<Organization> pageItems, boolean hasNextPage, boolean hasPreviousPage) {
+        String startCursor = pageItems.isEmpty() ? null : CursorCodec.encode(pageItems.getFirst().getId());
+        String endCursor = pageItems.isEmpty() ? null : CursorCodec.encode(pageItems.getLast().getId());
 
-        return CursorPageInfo.builder()
+        return PageInfo.builder()
                 .hasNextPage(hasNextPage)
                 .hasPreviousPage(hasPreviousPage)
                 .startCursor(startCursor)

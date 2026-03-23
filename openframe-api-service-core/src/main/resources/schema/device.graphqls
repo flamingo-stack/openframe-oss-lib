@@ -3,11 +3,18 @@ extend type Query {
 
     devices(
         filter: DeviceFilterInput
-        pagination: CursorPaginationInput
+        first: Int
+        after: String
+        last: Int
+        before: String
         search: String
         sort: SortInput
     ): DeviceConnection!
 
+    # Get single device by Relay global ID
+    deviceById(id: ID!): Machine
+
+    # Get single device by machineId
     device(machineId: String!): Machine
 
     # Tag key queries
@@ -61,7 +68,7 @@ input DeviceFilterInput {
     tagValues: [String!]
 }
 
-type Machine {
+type Machine implements Node {
     id: ID!
     machineId: String!
     ip: String
@@ -126,7 +133,7 @@ enum DeviceType {
 
 type DeviceConnection {
     edges: [DeviceEdge!]!
-    pageInfo: CursorPageInfo!
+    pageInfo: PageInfo!
     filteredCount: Int!
 }
 

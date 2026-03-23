@@ -1,6 +1,6 @@
 package com.openframe.api.service;
 
-import com.openframe.api.dto.tool.ToolFilterOptions;
+import com.openframe.api.dto.tool.ToolFilterCriteria;
 import com.openframe.api.dto.tool.ToolFilters;
 import com.openframe.api.dto.tool.ToolList;
 import com.openframe.api.dto.shared.SortInput;
@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -21,7 +22,12 @@ public class ToolService {
     
     private final IntegratedToolRepository integratedToolRepository;
 
-    public ToolList queryTools(ToolFilterOptions filterOptions, String search, SortInput sort) {
+    public Optional<IntegratedTool> findById(String id) {
+        log.debug("Finding integrated tool by ID: {}", id);
+        return integratedToolRepository.findById(id);
+    }
+
+    public ToolList queryTools(ToolFilterCriteria filterOptions, String search, SortInput sort) {
         log.debug("Querying tools with filter: {}, search: {}, sort: {}", filterOptions, search, sort);
         
         ToolQueryFilter queryFilter = buildQueryFilter(filterOptions);
@@ -52,7 +58,7 @@ public class ToolService {
                 .build();
     }
     
-    private ToolQueryFilter buildQueryFilter(ToolFilterOptions filterOptions) {
+    private ToolQueryFilter buildQueryFilter(ToolFilterCriteria filterOptions) {
         if (filterOptions == null) {
             return ToolQueryFilter.builder().build();
         }

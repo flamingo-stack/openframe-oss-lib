@@ -1,18 +1,18 @@
 package com.openframe.api.mapper;
 
 import com.openframe.api.dto.tool.ToolFilterInput;
-import com.openframe.api.dto.tool.ToolFilterOptions;
+import com.openframe.api.dto.tool.ToolFilterCriteria;
 import org.springframework.stereotype.Component;
 
 @Component
 public class GraphQLToolMapper {
 
-    public ToolFilterOptions toToolFilterOptions(ToolFilterInput input) {
+    public ToolFilterCriteria toToolFilterCriteria(ToolFilterInput input) {
         if (input == null) {
-            return ToolFilterOptions.builder().build();
+            return ToolFilterCriteria.builder().build();
         }
 
-        return ToolFilterOptions.builder()
+        return ToolFilterCriteria.builder()
                 .enabled(input.getEnabled())
                 .type(input.getType())
                 .category(input.getCategory())

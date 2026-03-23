@@ -1,15 +1,13 @@
 package com.openframe.api.datafetcher;
 
-import com.netflix.graphql.dgs.DgsComponent;
-import com.netflix.graphql.dgs.DgsMutation;
-import com.netflix.graphql.dgs.DgsQuery;
-import com.netflix.graphql.dgs.InputArgument;
+import com.netflix.graphql.dgs.*;
+import graphql.relay.Relay;
 import com.openframe.api.dto.GenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.event.*;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
-import com.openframe.api.dto.shared.CursorPaginationInput;
+import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLEventMapper;
 import com.openframe.api.service.EventService;
@@ -29,21 +27,33 @@ import java.time.Instant;
 @Validated
 public class EventDataFetcher {
 
+    private static final Relay RELAY = new Relay();
+
     private final EventService eventService;
     private final GraphQLEventMapper eventMapper;
+
+    @DgsData(parentType = "Event", field = "id")
+    public String eventNodeId(DgsDataFetchingEnvironment dfe) {
+        Event event = dfe.getSource();
+        return RELAY.toGlobalId("Event", event.getId());
+    }
 
     @DgsQuery
     public GenericConnection<GenericEdge<Event>> events(
             @InputArgument @Valid EventFilterInput filter,
-            @InputArgument @Valid CursorPaginationInput pagination,
+            @InputArgument Integer first,
+            @InputArgument String after,
+            @InputArgument Integer last,
+            @InputArgument String before,
             @InputArgument String search,
             @InputArgument @Valid SortInput sort) {
 
-        log.debug("Getting events with filter: {}, pagination: {}, search: {}, sort: {}",
-                filter, pagination, search, sort);
+        log.debug("Getting events with filter: {}, first: {}, after: {}, last: {}, before: {}, search: {}, sort: {}",
+                filter, first, after, last, before, search, sort);
 
-        EventFilterOptions filterOptions = eventMapper.toEventFilterOptions(filter);
-        CursorPaginationCriteria paginationCriteria = eventMapper.toCursorPaginationCriteria(pagination);
+        EventFilterCriteria filterOptions = eventMapper.toEventFilterCriteria(filter);
+        ConnectionArgs connectionArgs = ConnectionArgs.builder().first(first).after(after).last(last).before(before).build();
+        CursorPaginationCriteria paginationCriteria = eventMapper.toCursorPaginationCriteria(connectionArgs);
 
         GenericQueryResult<Event> result = eventService.queryEvents(filterOptions, paginationCriteria, search, sort);
         GenericConnection<GenericEdge<Event>> connection = eventMapper.toEventConnection(result);
@@ -56,8 +66,9 @@ public class EventDataFetcher {
 
     @DgsQuery
     public Event eventById(@InputArgument @NotBlank String id) {
-        log.debug("Getting event by ID: {}", id);
-        return eventService.findById(id)
+        String rawId = RELAY.fromGlobalId(id).getId();
+        log.debug("Getting event by global ID: {}, rawId: {}", id, rawId);
+        return eventService.findById(rawId)
                 .orElse(null);
     }
 
@@ -84,15 +95,16 @@ public class EventDataFetcher {
     @DgsMutation
     public Event updateEvent(@InputArgument @NotBlank String id,
                              @InputArgument @Valid CreateEventInput input) {
-        log.debug("Updating event with ID: {} and input: {}", id, input);
+        String rawId = RELAY.fromGlobalId(id).getId();
+        log.debug("Updating event with global ID: {}, rawId: {} and input: {}", id, rawId, input);
 
         Event event = Event.builder()
-                .id(id)
+                .id(rawId)
                 .userId(input.getUserId())
                 .type(input.getType())
                 .payload(input.getData())
                 .build();
 
-        return eventService.updateEvent(id, event);
+        return eventService.updateEvent(rawId, event);
     }
 }

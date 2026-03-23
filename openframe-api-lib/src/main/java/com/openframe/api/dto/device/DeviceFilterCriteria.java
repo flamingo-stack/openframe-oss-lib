@@ -13,7 +13,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class DeviceFilterOptions {
+public class DeviceFilterCriteria {
 
     private List<DeviceStatus> statuses;
     private List<DeviceType> deviceTypes;

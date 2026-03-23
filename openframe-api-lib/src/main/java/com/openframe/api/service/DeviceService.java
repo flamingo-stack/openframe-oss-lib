@@ -1,8 +1,9 @@
 package com.openframe.api.service;
 
 import com.openframe.api.dto.CountedGenericQueryResult;
-import com.openframe.api.dto.device.DeviceFilterOptions;
-import com.openframe.api.dto.shared.CursorPageInfo;
+import com.openframe.api.dto.device.DeviceFilterCriteria;
+import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.shared.SortDirection;
@@ -49,7 +50,7 @@ public class DeviceService {
         return result;
     }
 
-    public CountedGenericQueryResult<Machine> queryDevices(DeviceFilterOptions filterOptions,
+    public CountedGenericQueryResult<Machine> queryDevices(DeviceFilterCriteria filterOptions,
                                                   CursorPaginationCriteria paginationCriteria,
                                                   String search,
                                                   SortInput sort) {
@@ -68,7 +69,7 @@ public class DeviceService {
         List<Machine> pageItems = fetchPageItems(query, normalizedPagination, sortField, sortDirection);
         boolean hasNextPage = pageItems.size() == normalizedPagination.getLimit();
 
-        CursorPageInfo pageInfo = buildPageInfo(pageItems, hasNextPage, normalizedPagination.hasCursor());
+        PageInfo pageInfo = buildPageInfo(pageItems, hasNextPage, normalizedPagination.hasCursor());
 
         return CountedGenericQueryResult.<Machine>builder()
                 .items(pageItems)
@@ -86,11 +87,11 @@ public class DeviceService {
             : machines;
     }
     
-    private CursorPageInfo buildPageInfo(List<Machine> pageItems, boolean hasNextPage, boolean hasPreviousPage) {
-        String startCursor = pageItems.isEmpty() ? null : pageItems.getFirst().getId();
-        String endCursor = pageItems.isEmpty() ? null : pageItems.getLast().getId();
-        
-        return CursorPageInfo.builder()
+    private PageInfo buildPageInfo(List<Machine> pageItems, boolean hasNextPage, boolean hasPreviousPage) {
+        String startCursor = pageItems.isEmpty() ? null : CursorCodec.encode(pageItems.getFirst().getId());
+        String endCursor = pageItems.isEmpty() ? null : CursorCodec.encode(pageItems.getLast().getId());
+
+        return PageInfo.builder()
                 .hasNextPage(hasNextPage)
                 .hasPreviousPage(hasPreviousPage)
                 .startCursor(startCursor)
@@ -98,7 +99,7 @@ public class DeviceService {
                 .build();
     }
 
-    private Query buildDeviceQuery(DeviceFilterOptions filter, String search) {
+    private Query buildDeviceQuery(DeviceFilterCriteria filter, String search) {
         MachineQueryFilter queryFilter = mapToMachineQueryFilter(filter);
         Query query = machineRepository.buildDeviceQuery(queryFilter, search);
 
@@ -121,7 +122,7 @@ public class DeviceService {
      * Returns null if no tag filters are applied, meaning no restriction needed.
      * Returns an empty list if tag filters are applied but no machines match.
      */
-    private List<String> resolveTagFilterToMachineIds(DeviceFilterOptions filter) {
+    private List<String> resolveTagFilterToMachineIds(DeviceFilterCriteria filter) {
         boolean hasTagKeys = filter.getTagKeys() != null && !filter.getTagKeys().isEmpty();
         boolean hasTagValues = filter.getTagValues() != null && !filter.getTagValues().isEmpty();
 
@@ -161,7 +162,7 @@ public class DeviceService {
                 .collect(Collectors.toList());
     }
 
-    private MachineQueryFilter mapToMachineQueryFilter(DeviceFilterOptions filter) {
+    private MachineQueryFilter mapToMachineQueryFilter(DeviceFilterCriteria filter) {
         if (filter == null) {
             return new MachineQueryFilter();
         }
