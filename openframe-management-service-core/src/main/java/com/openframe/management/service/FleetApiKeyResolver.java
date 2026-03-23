@@ -59,8 +59,9 @@ public class FleetApiKeyResolver {
             log.info("Fleet initial setup completed");
             return setupResponse.getToken();
         } catch (FleetMdmApiException e) {
-            if (e.getStatusCode() == 409 || e.getStatusCode() == 422) {
-                log.info("Fleet already initialized (HTTP {}), logging in as admin", e.getStatusCode());
+            int statusCode = e.getStatusCode();
+            if (statusCode >= 400 && e.getStatusCode() < 500) {
+                log.info("Fleet already initialized (HTTP {}), logging in as admin", statusCode);
 
                 LoginRequest adminLoginRequest = buildLoginRequest(credentials);
                 return client.login(adminLoginRequest).getToken();

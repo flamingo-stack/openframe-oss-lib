@@ -15,6 +15,14 @@ export interface SelectableOption {
   icon?: React.ReactNode;
   color?: string;
   disabled?: boolean;      // If true, option is shown grayed out and not selectable
+  section?: string;        // Optional section ID to group options
+}
+
+export interface SectionDefinition {
+  id: string;              // Section identifier (matches option.section)
+  label: string;           // Display label for the section
+  icon?: React.ReactNode;  // Optional icon for the section header
+  description?: string;    // Optional description shown under section label
 }
 
 interface PushButtonSelectorProps {
@@ -30,6 +38,7 @@ interface PushButtonSelectorProps {
   isLoading?: boolean;
   error?: string | null;
   skeletonCount?: number;
+  sections?: SectionDefinition[];  // Optional sections for grouping options
 }
 
 // Skeleton component matching external pattern from announcement-form.tsx
@@ -89,7 +98,8 @@ export function PushButtonSelector({
   optional = false,
   isLoading = false,
   error = null,
-  skeletonCount = 3
+  skeletonCount = 3,
+  sections
 }: PushButtonSelectorProps) {
 
   // LOADING STATE
@@ -137,6 +147,129 @@ export function PushButtonSelector({
 
   const getSelectedOptions = () => options.filter(option => validSelectedIds.includes(option.id));
 
+  // Helper to render a single option
+  const renderOption = (option: SelectableOption) => {
+    const isSelected = validSelectedIds.includes(option.id);
+
+    return (
+      <div
+        key={option.id}
+        className={`
+          p-4 rounded-lg border transition-all duration-200 group
+          ${option.disabled
+            ? 'cursor-not-allowed opacity-40 bg-ods-card border-ods-border'
+            : isSelected
+              ? 'cursor-pointer bg-ods-bg-secondary border-ods-accent shadow-sm'
+              : 'cursor-pointer bg-ods-bg-primary border-ods-border hover:border-ods-border-hover hover:bg-ods-bg-hover'
+          }
+        `}
+        onClick={() => !option.disabled && toggleSelection(option.id)}
+      >
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            {option.icon && (
+              <div className={`flex-shrink-0 transition-transform duration-200 ${isSelected ? 'scale-110' : 'group-hover:scale-105'}`}>
+                {option.icon}
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="font-['DM_Sans'] text-[16px] font-semibold text-ods-text-primary">
+                {option.displayName || option.name}
+              </div>
+              {option.description && (
+                <div className="font-['DM_Sans'] text-[12px] text-ods-text-secondary line-clamp-2">
+                  {option.description}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Selection Indicator */}
+          <div className={`
+            flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-all duration-200
+            ${isSelected
+              ? 'bg-ods-accent border-ods-accent scale-110'
+              : 'border-ods-border group-hover:border-ods-border-hover'
+            }
+          `}>
+            {isSelected && (
+              <Check className="w-4 h-4 text-ods-text-primary font-bold" strokeWidth={3} />
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Group options by section if sections are provided
+  const renderOptionsContent = () => {
+    if (!sections || sections.length === 0) {
+      // No sections - render flat list
+      return (
+        <div className="space-y-3">
+          {options.map(renderOption)}
+        </div>
+      );
+    }
+
+    // Group options by section
+    const optionsBySection = new Map<string, SelectableOption[]>();
+    const ungroupedOptions: SelectableOption[] = [];
+
+    options.forEach(option => {
+      if (option.section) {
+        const existing = optionsBySection.get(option.section) || [];
+        optionsBySection.set(option.section, [...existing, option]);
+      } else {
+        ungroupedOptions.push(option);
+      }
+    });
+
+    return (
+      <div className="space-y-4">
+        {/* Render sections in order */}
+        {sections.map(section => {
+          const sectionOptions = optionsBySection.get(section.id) || [];
+          if (sectionOptions.length === 0) return null;
+
+          return (
+            <div key={section.id} className="space-y-2">
+              {/* Section Header */}
+              <div className="flex items-center gap-2 px-1">
+                {section.icon && (
+                  <div className="text-ods-text-secondary">
+                    {section.icon}
+                  </div>
+                )}
+                <div>
+                  <div className="font-['DM_Sans'] text-[14px] font-semibold text-ods-text-primary">
+                    {section.label}
+                  </div>
+                  {section.description && (
+                    <div className="font-['DM_Sans'] text-[11px] text-ods-text-tertiary">
+                      {section.description}
+                    </div>
+                  )}
+                </div>
+              </div>
+              {/* Section Options */}
+              <div className="space-y-2">
+                {sectionOptions.map(renderOption)}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Render ungrouped options at the end */}
+        {ungroupedOptions.length > 0 && (
+          <div className="space-y-2">
+            {ungroupedOptions.map(renderOption)}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className={`space-y-4 ${className}`}>
       {title && (
@@ -145,60 +278,7 @@ export function PushButtonSelector({
         </h3>
       )}
 
-      <div className="space-y-3">
-        {options.map(option => {
-          const isSelected = validSelectedIds.includes(option.id);
-
-          return (
-            <div
-              key={option.id}
-              className={`
-                p-4 rounded-lg border transition-all duration-200 group
-                ${option.disabled
-                  ? 'cursor-not-allowed opacity-40 bg-ods-card border-ods-border'
-                  : isSelected
-                    ? 'cursor-pointer bg-ods-bg-secondary border-ods-accent shadow-sm'
-                    : 'cursor-pointer bg-ods-bg-primary border-ods-border hover:border-ods-border-hover hover:bg-ods-bg-hover'
-                }
-              `}
-              onClick={() => !option.disabled && toggleSelection(option.id)}
-            >
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  {option.icon && (
-                    <div className={`flex-shrink-0 transition-transform duration-200 ${isSelected ? 'scale-110' : 'group-hover:scale-105'}`}>
-                      {option.icon}
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="font-['DM_Sans'] text-[16px] font-semibold text-ods-text-primary">
-                      {option.displayName || option.name}
-                    </div>
-                    {option.description && (
-                      <div className="font-['DM_Sans'] text-[12px] text-ods-text-secondary line-clamp-2">
-                        {option.description}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Selection Indicator */}
-                <div className={`
-                  flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-all duration-200
-                  ${isSelected
-                    ? 'bg-ods-accent border-ods-accent scale-110'
-                    : 'border-ods-border group-hover:border-ods-border-hover'
-                  }
-                `}>
-                  {isSelected && (
-                    <Check className="w-4 h-4 text-ods-text-primary font-bold" strokeWidth={3} />
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {renderOptionsContent()}
 
       {/* Selection Summary */}
       {selectionSummary && validSelectedIds.length > 0 && (
