@@ -67,10 +67,10 @@ export function StickySectionNav({
           {/* Navigation button */}
           <button
             onClick={() => onSectionClick(section.id)}
-            className="flex-1 flex items-stretch gap-2 px-3 py-2 cursor-pointer relative"
+            className="flex-1 flex items-center gap-2 px-3 py-2 cursor-pointer relative"
           >
             <span className={cn(
-              "flex items-center font-['DM_Sans'] text-[14px] font-medium tracking-[-0.02em] leading-[1.43em] transition-all duration-200",
+              "text-left font-['DM_Sans'] text-[14px] font-medium tracking-[-0.02em] leading-[1.43em] transition-all duration-200",
               activeSection === section.id
                 ? "text-ods-text-primary"
                 : "text-ods-text-secondary hover:text-ods-text-primary"
