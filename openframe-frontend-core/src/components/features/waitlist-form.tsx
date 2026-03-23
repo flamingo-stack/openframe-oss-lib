@@ -1,7 +1,6 @@
 "use client"
 
 import { OpenFrameLogo } from '../icons'
-import { InfoCircleIcon } from '../icons-v2-generated'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { PhoneInput } from '../ui/phone-input'
@@ -35,12 +34,16 @@ export interface WaitlistFormProps {
   submitLabel?: string
   /** Label shown after success. Defaults to "You're in!" */
   successLabel?: string
-  /** Hint shown below inputs when no warning is active */
+  /** Hint shown in the disclaimer box */
   defaultHint?: string
   /** Warning shown when a generic email domain is detected */
   genericEmailHint?: string
   /** Warning shown when phone validation fails */
   invalidPhoneHint?: string
+  /** URL for the privacy policy link in the disclaimer */
+  privacyPolicyUrl?: string
+  /** SMS consent text shown below the hint in the disclaimer box */
+  consentText?: string
 }
 
 /**
@@ -71,6 +74,8 @@ export function WaitlistForm({
   defaultHint = "MSP spam filters are aggressive. Drop your number in case email fails.",
   genericEmailHint = "Use a work email \u2014 personal emails may not be verified or approved.",
   invalidPhoneHint = "Invalid phone number format.",
+  privacyPolicyUrl,
+  consentText = "I agree to receive recurring automated text messages at the phone number provided. Msg & data rates may apply. Msg frequency varies. Reply HELP for help and STOP to cancel.",
 }: WaitlistFormProps) {
   const [email, setEmail] = useState(defaultEmail)
   const [phone, setPhone] = useState('')
@@ -126,30 +131,28 @@ export function WaitlistForm({
 
   if (!isClient) {
     return (
-      <div className={cn("@container flex flex-col items-center gap-3 w-full", className)}>
-        <div className="w-full h-12 bg-ods-card border border-ods-border rounded-md animate-pulse" />
-        <div className="w-full h-12 bg-ods-card border border-ods-border rounded-md animate-pulse" />
-        <div className="flex flex-col @md:flex-row items-center justify-between w-full gap-4">
-          <div className="w-full @md:flex-1 h-5 bg-ods-card rounded animate-pulse" />
-          <div className="w-full @md:w-auto h-12 min-w-[160px] bg-[#FFC008] rounded-md animate-pulse opacity-50" />
+      <div className={cn(
+        "flex flex-col gap-[var(--spacing-system-l)] rounded-[6px] border border-ods-border bg-ods-bg p-[var(--spacing-system-m)]",
+        className
+      )}>
+        {/* Email input skeleton */}
+        <div className="w-full h-12 bg-ods-card border border-ods-border rounded-[6px] animate-pulse" />
+        {/* Phone input skeleton */}
+        <div className="flex gap-[var(--spacing-system-xs)] w-full">
+          <div className="w-[130px] h-12 bg-ods-card border border-ods-border rounded-[6px] animate-pulse shrink-0" />
+          <div className="flex-1 h-12 bg-ods-card border border-ods-border rounded-[6px] animate-pulse" />
+        </div>
+        {/* Disclaimer + button skeleton */}
+        <div className="flex flex-col gap-[var(--spacing-system-m)] items-end w-full">
+          <div className="w-full rounded-[6px] border border-ods-border bg-ods-bg animate-pulse py-6 px-4" />
+          <div className="h-12 w-[200px] bg-ods-card border border-ods-border rounded-[6px] animate-pulse" />
         </div>
       </div>
     )
   }
 
   const showEmailWarning = isMailDomainGeneric
-  const showPhoneWarning = !showEmailWarning && isPhoneInvalid
-
-  const hintMessage = showEmailWarning
-    ? genericEmailHint
-    : showPhoneWarning
-      ? invalidPhoneHint
-      : defaultHint
-
-  const hintColor = (showEmailWarning || showPhoneWarning)
-    ? "text-[var(--ods-attention-yellow-warning)]"
-    : "text-white"
-  const showIcon = showEmailWarning || showPhoneWarning
+  const showPhoneWarning = isPhoneInvalid
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -159,18 +162,28 @@ export function WaitlistForm({
   }
 
   return (
-    <div id={id} className={cn("@container flex flex-col gap-2 w-full", className)}>
-      <div className="flex flex-col items-center gap-3 @md:gap-4 w-full">
-        <Input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          disabled={isSubmitting}
-          placeholder="Enter your Email"
-          onKeyDown={handleKeyDown}
-        />
+    <div
+      id={id}
+      className={cn(
+        "flex flex-col gap-[var(--spacing-system-l)] items-end rounded-[6px] border border-ods-border bg-ods-bg p-[var(--spacing-system-m)]",
+        className
+      )}
+    >
+      {/* Email Input */}
+      <Input
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        required
+        disabled={isSubmitting}
+        placeholder="Enter your Business Email"
+        onKeyDown={handleKeyDown}
+        error={showEmailWarning ? genericEmailHint : undefined}
+        errorVariant="warning"
+      />
 
+      {/* Phone Input */}
+      <div className="relative w-full">
         <PhoneInput
           value={phone}
           countryCode={countryCode}
@@ -178,26 +191,53 @@ export function WaitlistForm({
           onCountryChange={setCountryCode}
           onValidationChange={setIsPhoneInvalid}
           disabled={isSubmitting}
-          placeholder="Phone Number (optional)"
+          placeholder="Phone Number (in case email fails)"
           onKeyDown={handleKeyDown}
         />
-
-        <div className="flex items-center justify-between w-full gap-4 flex-col @2xl:flex-row">
-          <p className={cn("text-h6 flex items-center gap-[var(--spacing-system-xs)] text-left w-full", hintColor)}>
-            {showIcon && <InfoCircleIcon size={16} className="shrink-0" />}
-            {hintMessage}
+        {showPhoneWarning && (
+          <p className="text-h6 absolute bottom-0 left-0 translate-y-full text-[var(--ods-attention-yellow-warning)] truncate">
+            {invalidPhoneHint}
           </p>
-          <Button
-            type="button"
-            loading={isSubmitting}
-            disabled={isSubmitting}
-            leftIcon={<OpenFrameLogo />}
-            onClick={handleSubmit}
-            className="w-full @2xl:w-auto"
-          >
-            {isSuccess ? successLabel : submitLabel}
-          </Button>
+        )}
+      </div>
+      {/* Disclaimer + Button Section */}
+      <div className="flex flex-col gap-4 items-end w-full">
+
+        {/* Disclaimer Box */}
+        <div className="w-full rounded-[6px] border border-ods-border bg-ods-bg px-4 py-3">
+          <p className="text-h6 font-medium text-ods-text-primary leading-5">
+            {defaultHint}
+          </p>
+          <p className="text-h6 font-medium text-ods-text-secondary leading-5">
+            {consentText}
+            {privacyPolicyUrl && (
+              <>
+                &nbsp;
+                <a
+                  href={privacyPolicyUrl}
+                  className="text-[var(--color-accent-primary)] underline"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Privacy Policy
+                </a>
+                .
+              </>
+            )}
+          </p>
         </div>
+
+        {/* Submit Button — right-aligned */}
+        <Button
+          type="button"
+          loading={isSubmitting}
+          disabled={isSubmitting}
+          leftIcon={<OpenFrameLogo />}
+          onClick={handleSubmit}
+          className="w-full @2xl:w-auto"
+        >
+          {isSuccess ? successLabel : submitLabel}
+        </Button>
       </div>
     </div>
   )

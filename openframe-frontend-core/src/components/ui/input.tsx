@@ -7,7 +7,7 @@ import { cn } from "../../utils/cn";
 import { FieldWrapper } from "./field-wrapper";
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  /** When true, renders red error border & ring */
+  /** When true, renders error border & ring */
   invalid?: boolean;
   /** Element displayed at the start (left) of the input */
   startAdornment?: React.ReactNode;
@@ -17,12 +17,19 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
   label?: string;
   /** Error message displayed below the input */
   error?: string;
+  /** Color variant for error state: "error" (red) or "warning" (yellow) */
+  errorVariant?: "error" | "warning";
   /** When true, shows a loading spinner as end adornment */
   loading?: boolean;
 }
 
+const invalidBorderClasses = {
+  error: "border-ods-error hover:border-ods-error has-[:focus]:border-ods-error",
+  warning: "!border-[var(--ods-attention-yellow-warning)] hover:!border-[var(--ods-attention-yellow-warning)] has-[:focus]:!border-[var(--ods-attention-yellow-warning)]",
+} as const;
+
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, invalid = false, startAdornment, endAdornment, label, error, loading = false, ...props }, ref) => {
+  ({ className, type, invalid = false, startAdornment, endAdornment, label, error, errorVariant = "error", loading = false, ...props }, ref) => {
     const isInvalid = invalid || !!error
 
     const content = (
@@ -43,7 +50,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           // Disabled
           props.disabled && "!cursor-not-allowed bg-ods-bg",
           // Invalid
-          isInvalid && "border-ods-error hover:border-ods-error has-[:focus]:border-ods-error",
+          isInvalid && invalidBorderClasses[errorVariant],
           className
         )}
       >
@@ -83,7 +90,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
     )
 
     return (
-      <FieldWrapper label={label} error={error}>
+      <FieldWrapper label={label} error={error} errorVariant={errorVariant}>
         {content}
       </FieldWrapper>
     )
