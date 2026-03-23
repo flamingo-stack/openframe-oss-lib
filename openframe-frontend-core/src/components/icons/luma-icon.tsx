@@ -3,9 +3,15 @@ import React from 'react';
 interface LumaIconProps extends React.SVGProps<SVGSVGElement> {
   className?: string;
   size?: number;
+  color?: string;
 }
 
-export function LumaIcon({ className = '', size = 24, color = 'white', ...props }: LumaIconProps) {
+/**
+ * Luma brand icon
+ * Features a 4-pointed star shape representing the Luma logo
+ * Default color is 'currentColor' for easy styling
+ */
+export function LumaIcon({ className = '', size = 24, color = 'currentColor', ...props }: LumaIconProps) {
   return (
     <svg
       width={size}
