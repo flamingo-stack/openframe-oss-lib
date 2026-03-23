@@ -3,7 +3,7 @@
 import { Select, SelectContent, SelectGroup, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "./select"
 import { Input } from "./input"
 import type { CountryCode } from 'libphonenumber-js'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getCountryPhoneData, validatePhoneNumber, type CountryPhoneData } from '../../utils/country-phone-utils'
 
 export interface PhoneInputProps {
@@ -34,6 +34,7 @@ export function PhoneInput({
   )
 
   const [isInvalid, setIsInvalid] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null)
 
   const digitCount = useCallback((val: string) => val.replace(/[^0-9]/g, '').length, [])
 
@@ -48,6 +49,15 @@ export function PhoneInput({
     onValidationChange?.(invalid)
   }, [countryCode, digitCount, onValidationChange])
 
+  const debouncedValidation = useCallback((phone: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => runValidation(phone), 300)
+  }, [runValidation])
+
+  useEffect(() => {
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+  }, [])
+
   return (
     <div className="flex gap-2 w-full min-w-0">
       <Select
@@ -55,7 +65,7 @@ export function PhoneInput({
         onValueChange={(val) => {
           onCountryChange(val as CountryCode)
           if (value) {
-            setTimeout(() => runValidation(value), 0)
+            debouncedValidation(value)
           }
         }}
         disabled={disabled}
@@ -93,7 +103,7 @@ export function PhoneInput({
           if (val === '' || /^[0-9\-() ]*$/.test(val)) {
             onPhoneChange(val)
             if (digitCount(val) > 4) {
-              runValidation(val)
+              debouncedValidation(val)
             } else if (digitCount(val) === 0) {
               setIsInvalid(false)
               onValidationChange?.(false)

@@ -22,6 +22,7 @@ const meta = {
       await new Promise((r) => setTimeout(r, 1500));
     },
     geoApiUrl: null,
+    privacyPolicyUrl: 'https://flamingo.ai/privacy',
   },
 } satisfies Meta<typeof WaitlistForm>;
 
@@ -72,6 +73,15 @@ export const Success: Story = {
 };
 
 /**
+ * With privacy policy link in the disclaimer.
+ */
+export const WithPrivacyPolicy: Story = {
+  args: {
+    privacyPolicyUrl: 'https://flamingo.ai/privacy',
+  },
+};
+
+/**
  * Custom labels and hints.
  */
 export const CustomLabels: Story = {
@@ -81,6 +91,8 @@ export const CustomLabels: Story = {
     defaultHint: 'We only use your info to send updates.',
     genericEmailHint: 'Business emails only please.',
     invalidPhoneHint: 'Check your phone number.',
+    consentText: 'By signing up, you agree to our terms.',
+    privacyPolicyUrl: 'https://example.com/privacy',
   },
 };
 
@@ -90,7 +102,7 @@ export const CustomLabels: Story = {
 export const NarrowContainer: Story = {
   decorators: [
     (Story) => (
-      <div style={{ maxWidth: 360, padding: 16, background: '#1a1a1a', borderRadius: 12 }}>
+      <div style={{ maxWidth: 360 }}>
         <Story />
         <Toaster />
       </div>
