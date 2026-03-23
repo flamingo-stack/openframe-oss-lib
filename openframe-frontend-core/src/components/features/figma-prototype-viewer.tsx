@@ -458,6 +458,8 @@ export const FigmaPrototypeViewer: React.FC<FigmaPrototypeViewerProps> = ({
   // Refs
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const navTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const touchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   
   // Device Detection State
   const [screenWidth, setScreenWidth] = useState(
@@ -666,8 +668,9 @@ export const FigmaPrototypeViewer: React.FC<FigmaPrototypeViewerProps> = ({
       console.error('[Navigation Error]', error)
     }
     
-    // Reset navigation flag
-    setTimeout(() => setIsNavigating(false), 500)
+    // Reset navigation flag (tracked via ref for cleanup on unmount)
+    if (navTimerRef.current) clearTimeout(navTimerRef.current)
+    navTimerRef.current = setTimeout(() => setIsNavigating(false), 500)
   }, [config, isInitialized, viewMode, externalActiveSection])
   
   // Section Click Handler
@@ -696,8 +699,9 @@ export const FigmaPrototypeViewer: React.FC<FigmaPrototypeViewerProps> = ({
     // Disable overlay to allow touch to pass through to iframe
     overlayElement.style.pointerEvents = 'none'
     
-    // Re-enable overlay after interaction window (500ms for normal human interaction)
-    setTimeout(() => {
+    // Re-enable overlay after interaction window (tracked via ref for cleanup on unmount)
+    if (touchTimerRef.current) clearTimeout(touchTimerRef.current)
+    touchTimerRef.current = setTimeout(() => {
       if (overlayElement && overlayElement.style.pointerEvents === 'none') {
         overlayElement.style.pointerEvents = 'auto'
         console.log('[Touch] Overlay re-enabled for scrolling')
@@ -712,6 +716,14 @@ export const FigmaPrototypeViewer: React.FC<FigmaPrototypeViewerProps> = ({
     }
   }, [externalActiveSection, activeSection, isInitialized, navigateToSection])
   
+  // Cleanup all pending timers on unmount
+  useEffect(() => {
+    return () => {
+      if (navTimerRef.current) clearTimeout(navTimerRef.current)
+      if (touchTimerRef.current) clearTimeout(touchTimerRef.current)
+    }
+  }, [])
+
   // ============================================================================
   // RENDER
   // ============================================================================
