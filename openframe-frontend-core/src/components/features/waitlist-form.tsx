@@ -191,7 +191,7 @@ export function WaitlistForm({
           onCountryChange={setCountryCode}
           onValidationChange={setIsPhoneInvalid}
           disabled={isSubmitting}
-          placeholder="Phone Number (in case email fails)"
+          placeholder="Phone (optional)"
           onKeyDown={handleKeyDown}
         />
         {showPhoneWarning && (
