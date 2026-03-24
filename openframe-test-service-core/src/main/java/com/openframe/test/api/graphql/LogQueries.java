@@ -47,7 +47,7 @@ public class LogQueries {
             """;
 
     public static final String LOG_DETAILS = """
-            query($ingestDay: String!, $toolType: String!, $eventType: String!, $timestamp: Instant!, $toolEventId: String!) {
+            query($ingestDay: String!, $toolType: String!, $eventType: String!, $timestamp: Instant!, $toolEventId: ID!) {
                 logDetails(
                     ingestDay: $ingestDay
                     toolType: $toolType
