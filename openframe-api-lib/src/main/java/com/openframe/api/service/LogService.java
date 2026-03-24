@@ -175,6 +175,7 @@ public class LogService {
 
     private LogEvent mapToLogEvent(LogProjection log) {
         return LogEvent.builder()
+                .id(log.eventTimestamp.toEpochMilli() + "_" + log.toolEventId)
                 .toolEventId(log.toolEventId)
                 .ingestDay(log.ingestDay)
                 .timestamp(log.eventTimestamp)
@@ -192,6 +193,7 @@ public class LogService {
 
     private LogDetails mapToLogDetails(UnifiedLogEvent logEvent) {
         return LogDetails.builder()
+                .id(logEvent.getKey().getEventTimestamp().toEpochMilli() + "_" + logEvent.getKey().getToolEventId())
                 .toolEventId(logEvent.getKey().getToolEventId())
                 .timestamp(logEvent.getKey().getEventTimestamp())
                 .toolType(logEvent.getKey().getToolType())

@@ -89,6 +89,18 @@ public class DeviceDataFetcher {
         return RELAY.toGlobalId("Machine", machine.getMachineId());
     }
 
+    @DgsData(parentType = "ToolConnection", field = "id")
+    public String toolConnectionNodeId(DgsDataFetchingEnvironment dfe) {
+        ToolConnection tc = dfe.getSource();
+        return RELAY.toGlobalId("ToolConnection", tc.getId());
+    }
+
+    @DgsData(parentType = "InstalledAgent", field = "id")
+    public String installedAgentNodeId(DgsDataFetchingEnvironment dfe) {
+        InstalledAgent agent = dfe.getSource();
+        return RELAY.toGlobalId("InstalledAgent", agent.getId());
+    }
+
     @DgsData(parentType = "Machine")
     public CompletableFuture<List<DeviceTag>> tags(DgsDataFetchingEnvironment dfe) {
         DataLoader<String, List<DeviceTag>> dataLoader = dfe.getDataLoader("tagDataLoader");
