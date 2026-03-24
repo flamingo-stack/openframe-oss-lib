@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useEffect, useState, useRef } from 'react'
+import Image from 'next/image'
 import { motion, useScroll, useTransform, useMotionValue, useSpring } from 'framer-motion'
 
 interface ParallaxImageShowcaseProps {
@@ -149,15 +150,18 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
                 rotate: rotateGrid,
               }}
             >
-              <img
+              <Image
                 src={leftImage.src}
                 alt={leftImage.alt}
+                width={800}
+                height={500}
+                sizes="(max-width: 768px) 100vw, 33vw"
                 className="w-full h-auto object-contain"
                 style={shadow ? { boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)' } : {}}
               />
             </motion.div>
           )}
-          
+
           {/* Image #2 - Center */}
           {centerImage && (
             <motion.div
@@ -167,15 +171,18 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
                 rotate: rotateGrid,
               }}
             >
-              <img
+              <Image
                 src={centerImage.src}
                 alt={centerImage.alt}
+                width={800}
+                height={500}
+                sizes="(max-width: 768px) 100vw, 33vw"
                 className="w-full h-auto object-contain"
                 style={shadow ? { boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)' } : {}}
               />
             </motion.div>
           )}
-          
+
           {/* Image #3 - Right */}
           {rightImage && (
             <motion.div
@@ -185,9 +192,12 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
                 rotate: rotateGrid,
               }}
             >
-              <img
+              <Image
                 src={rightImage.src}
                 alt={rightImage.alt}
+                width={800}
+                height={500}
+                sizes="(max-width: 768px) 100vw, 33vw"
                 className="w-full h-auto object-contain"
                 style={shadow ? { boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)' } : {}}
               />
@@ -220,25 +230,29 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
               className="absolute left-20 lg:w-1/2 w-full h-full z-10"
               style={{ x: x, y: y, rotate: rotate }}
             >
-              <img
+              <Image
                 src={leftImage.src}
                 alt={leftImage.alt}
-                className="w-full h-full object-left object-top object-cover ods-card/50 border border-ods-border"
+                fill
+                sizes="50vw"
+                className="object-[left_top] object-cover ods-card/50 border border-ods-border"
               />
               <div className="absolute inset-0 shadow-2xl" />
             </motion.div>
           )}
-          
+
           {/* Right half: Image overlaps to the right */}
           {centerImage && (
             <motion.div
               className="absolute top-20 right-20 lg:w-1/2 w-full h-full z-20"
               style={{ x: x, y: y, rotate: rotate }}
             >
-              <img
+              <Image
                 src={centerImage.src}
                 alt={centerImage.alt}
-                className="w-full h-full object-left object-top object-cover ods-card/50 border border-ods-border"
+                fill
+                sizes="50vw"
+                className="object-[left_top] object-cover ods-card/50 border border-ods-border"
               />
               <div className="absolute inset-0 shadow-2xl" />
             </motion.div>
@@ -266,18 +280,20 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
             rotate: rotate,
           }}
         >
-          <img
+          <Image
             src={rightImage.src}
             alt={rightImage.alt}
-            className="w-full h-full object-contain"
+            fill
+            sizes="(max-width: 1024px) 80vw, 120vw"
+            className="object-contain"
           />
         </motion.div>
       )}
-      
+
       {/* Image #2 - Middle layer - z-index 2 */}
       {centerImage && (
         <motion.div
-          className="absolute z-[2] 
+          className="absolute z-[2]
             w-[75%] h-[55%] bottom-[10%] right-[0%]
             lg:w-[100%] lg:h-[80%] lg:bottom-[-15%] lg:right-[-20%]"
           style={{
@@ -286,18 +302,20 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
             rotate: rotate,
           }}
         >
-          <img
+          <Image
             src={centerImage.src}
             alt={centerImage.alt}
-            className="w-full h-full object-contain"
+            fill
+            sizes="(max-width: 1024px) 75vw, 100vw"
+            className="object-contain"
           />
         </motion.div>
       )}
-      
+
       {/* Image #1 - On top - z-index 3 */}
       {leftImage && (
         <motion.div
-          className="absolute z-[3] 
+          className="absolute z-[3]
             w-[85%] h-[65%] top-[10%] left-[-5%]
             lg:w-[110%] lg:h-[90%] lg:top-[0%] lg:left-[-25%]"
           style={{
@@ -306,10 +324,12 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
             rotate: rotate,
           }}
         >
-          <img
+          <Image
             src={leftImage.src}
             alt={leftImage.alt}
-            className="w-full h-full object-contain"
+            fill
+            sizes="(max-width: 1024px) 85vw, 110vw"
+            className="object-contain"
           />
         </motion.div>
       )}
