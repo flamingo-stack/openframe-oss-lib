@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.openframe.test.api.graphql.OrganizationQueries.FULL_ORGANIZATION;
+import static com.openframe.test.api.graphql.OrganizationQueries.ORGANIZATION_BY_ORGANIZATION_ID;
 import static com.openframe.test.api.graphql.OrganizationQueries.ORGANIZATION_NAMES;
 import static com.openframe.test.config.EnvironmentConfig.GRAPHQL;
 import static io.restassured.RestAssured.given;
@@ -50,6 +51,17 @@ public class OrganizationApi {
                 .body(body).post(GRAPHQL)
                 .then().spec(graphqlSuccess())
                 .extract().jsonPath().getObject("data.organization", Organization.class);
+    }
+
+    public static Organization retrieveOrganizationByOrganizationId(String organizationId) {
+        Map<String, Object> body = Map.of(
+                "query", ORGANIZATION_BY_ORGANIZATION_ID,
+                "variables", Map.of("organizationId", organizationId)
+        );
+        return given(RequestSpecHelper.getAuthorizedSpec())
+                .body(body).post(GRAPHQL)
+                .then().spec(graphqlSuccess())
+                .extract().jsonPath().getObject("data.organizationByOrganizationId", Organization.class);
     }
 
     public static Organization createOrganization(CreateOrganizationRequest request) {
