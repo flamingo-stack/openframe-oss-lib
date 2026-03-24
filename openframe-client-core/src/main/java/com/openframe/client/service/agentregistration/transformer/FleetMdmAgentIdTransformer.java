@@ -68,6 +68,7 @@ public class FleetMdmAgentIdTransformer implements ToolAgentIdTransformer {
                     .toList();
 
             return uuidMatched.stream()
+                    .filter(host -> agentToolId.equals(host.getUuid()))
                     .filter(host -> isNotBlank(host.getOsqueryVersion()))
                     .max(Comparator.comparing(host -> isNotBlank(host.getLastEnrolledAt()) ? host.getLastEnrolledAt() : ""))
                     .map(host -> {
