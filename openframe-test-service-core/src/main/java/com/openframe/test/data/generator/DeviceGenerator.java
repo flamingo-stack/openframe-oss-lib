@@ -64,4 +64,12 @@ public class DeviceGenerator {
                 .map(ToolConnection::getAgentToolId)
                 .orElse(null);
     }
+
+    public static String getMeshId(Machine device) {
+        return device.getToolConnections().stream()
+                .filter(tc -> "MESHCENTRAL".equals(tc.getToolType()))
+                .findFirst()
+                .map(ToolConnection::getAgentToolId)
+                .orElse(null);
+    }
 }
