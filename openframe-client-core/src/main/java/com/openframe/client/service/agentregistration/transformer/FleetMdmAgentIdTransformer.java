@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -69,9 +70,11 @@ public class FleetMdmAgentIdTransformer implements ToolAgentIdTransformer {
             return uuidMatched.stream()
                     .filter(host -> agentToolId.equals(host.getUuid()))
                     .filter(host -> isNotBlank(host.getOsqueryVersion()))
-                    .peek(host -> logOsqueryHostIdMatch(machineId, agentToolId, host))
-                    .findFirst()
-                    .map(host -> processMatchingHost(machineId, agentToolId, host))
+                    .max(Comparator.comparing(host -> isNotBlank(host.getLastEnrolledAt()) ? host.getLastEnrolledAt() : ""))
+                    .map(host -> {
+                        logOsqueryHostIdMatch(machineId, agentToolId, host);
+                        return processMatchingHost(machineId, agentToolId, host);
+                    })
                     .orElseGet(() -> processNoMatchingHost(machineId, agentToolId, lastAttempt));
         } catch (Exception e) {
             log.error("Failed to transform Fleet MDM agent tool ID, machineId={}, uuid={}", machineId, agentToolId, e);
