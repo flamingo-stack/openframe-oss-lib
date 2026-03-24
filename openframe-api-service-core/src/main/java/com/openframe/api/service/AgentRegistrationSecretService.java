@@ -2,6 +2,7 @@ package com.openframe.api.service;
 
 import com.openframe.api.dto.AgentRegistrationSecretResponse;
 import com.openframe.api.exception.AgentRegistrationSecretNotFoundException;
+import com.openframe.api.service.processor.AgentRegistrationSecretProcessor;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.service.AgentRegistrationSecretGenerator;
 import com.openframe.core.crypto.service.EncryptionService;
@@ -22,6 +23,7 @@ public class AgentRegistrationSecretService {
     private final AgentRegistrationSecretRepository secretRepository;
     private final EncryptionService encryptionService;
     private final AgentRegistrationSecretGenerator secretGenerator;
+    private final AgentRegistrationSecretProcessor secretProcessor;
 
     public AgentRegistrationSecretResponse getActiveSecret() {
         return secretRepository.findByActiveTrue()
@@ -58,6 +60,8 @@ public class AgentRegistrationSecretService {
         AgentRegistrationSecret savedKey = secretRepository.save(newSecret);
         log.info("Generated new agent registration secret with ID: {}", savedKey.getId());
 
+        secretProcessor.postProcessSecretGenerated(savedKey, newSecretKey);
+
         return AgentRegistrationSecretResponse.builder()
                 .id(savedKey.getId())
                 .key(newSecretKey)
@@ -72,5 +76,7 @@ public class AgentRegistrationSecretService {
         activeSecret.setActive(false);
         secretRepository.save(activeSecret);
         log.info("Deactivated previous key with ID: {}", activeSecret.getId());
+
+        secretProcessor.postProcessSecretDeactivated(activeSecret);
     }
-} 
+}

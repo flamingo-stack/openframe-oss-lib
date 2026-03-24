@@ -4,6 +4,7 @@ import com.openframe.core.service.AgentRegistrationSecretGenerator;
 import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.agent.AgentRegistrationSecret;
 import com.openframe.data.repository.agent.AgentRegistrationSecretRepository;
+import com.openframe.management.service.processor.AgentRegistrationSecretManagementProcessor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,7 @@ public class AgentRegistrationSecretManagementService {
     private final AgentRegistrationSecretRepository secretRepository;
     private final AgentRegistrationSecretGenerator secretGenerator;
     private final EncryptionService encryptionService;
+    private final AgentRegistrationSecretManagementProcessor secretProcessor;
 
     public void createInitialSecret() {
         if (secretRepository.existsAny()) {
@@ -34,6 +36,8 @@ public class AgentRegistrationSecretManagementService {
 
         AgentRegistrationSecret savedKey = secretRepository.save(agentRegistrationSecret);
         log.info("Generated new agent registration key with ID: {}", savedKey.getId());
+
+        secretProcessor.postProcessInitialSecretCreated(savedKey, secretKey);
     }
 
 }
