@@ -73,7 +73,7 @@ public class OrganizationQueries {
             """;
 
     public static final String FULL_ORGANIZATION = """
-            query($id: String!) {
+            query($id: ID!) {
                 organization(id: $id) {
                     id
                     name
