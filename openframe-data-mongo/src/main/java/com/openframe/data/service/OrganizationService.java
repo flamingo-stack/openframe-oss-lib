@@ -103,8 +103,9 @@ public class OrganizationService {
     public void deleteOrganization(String id) {
         log.info("Attempting to soft delete organization with ID: {}", id);
         
-        // Get organization to retrieve organizationId
-        Organization organization = organizationRepository.findById(id)
+        // Look up by organizationId first, fall back to document _id
+        Organization organization = organizationRepository.findByOrganizationId(id)
+                .or(() -> organizationRepository.findById(id))
                 .orElseThrow(() -> new IllegalArgumentException("Organization not found with id: " + id));
         
         // Check if already deleted
