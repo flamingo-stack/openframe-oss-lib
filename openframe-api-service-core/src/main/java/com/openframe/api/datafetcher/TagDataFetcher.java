@@ -1,8 +1,7 @@
 package com.openframe.api.datafetcher;
 
-import com.netflix.graphql.dgs.DgsComponent;
-import com.netflix.graphql.dgs.DgsQuery;
-import com.netflix.graphql.dgs.InputArgument;
+import com.netflix.graphql.dgs.*;
+import graphql.relay.Relay;
 import com.openframe.api.dto.device.DeviceFilterOption;
 import com.openframe.api.service.TagService;
 import com.openframe.data.document.tool.Tag;
@@ -19,7 +18,15 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TagDataFetcher {
 
+    private static final Relay RELAY = new Relay();
+
     private final TagService tagService;
+
+    @DgsData(parentType = "Tag", field = "id")
+    public String tagNodeId(DgsDataFetchingEnvironment dfe) {
+        Tag tag = dfe.getSource();
+        return RELAY.toGlobalId("Tag", tag.getId());
+    }
 
     @DgsQuery
     public List<Tag> tags(@InputArgument @NotBlank String organizationId) {
