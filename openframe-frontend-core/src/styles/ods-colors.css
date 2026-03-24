@@ -193,6 +193,7 @@
 
   /* OpenFrame uses yellow as adaptive color */
   --ods-current: var(--ods-open-yellow-base);
+  --ods-accent: var(--ods-open-yellow-base);
 }
 
 [data-app-type="flamingo"] {
@@ -218,6 +219,7 @@
 
   /* Flamingo uses pink as adaptive color */
   --ods-current: var(--ods-flamingo-pink-base);
+  --ods-accent: var(--ods-flamingo-pink-base);
 }
 
 [data-app-type="tmcg"] {
@@ -243,6 +245,7 @@
 
   /* TMCG uses pink as adaptive color */
   --ods-current: var(--ods-flamingo-pink-base);
+  --ods-accent: var(--ods-flamingo-pink-base);
 }
 
 [data-app-type="marketing-hub"] {

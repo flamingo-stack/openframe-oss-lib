@@ -1,4 +1,5 @@
 export { AdobeAeIcon } from './adobe-ae-icon';
+export { AdobePdfIcon } from './adobe-pdf-icon';
 export { AdobeAiIcon } from './adobe-ai-icon';
 export { AdobeIdIcon } from './adobe-id-icon';
 export { AdobePrIcon } from './adobe-pr-icon';
@@ -31,6 +32,7 @@ export { GoogleGeminiLogoIcon } from './google-gemini-logo-icon';
 export { GoogleIcon } from './google-icon';
 export { GoogleLogoIcon } from './google-logo-icon';
 export { GooglePlayIcon } from './google-play-icon';
+export { GoogleSheetsIcon } from './google-sheets-icon';
 export { InstagramIcon } from './instagram-icon';
 export { LinkedinIcon } from './linkedin-icon';
 export { LinkedinLogoIcon } from './linkedin-logo-icon';
