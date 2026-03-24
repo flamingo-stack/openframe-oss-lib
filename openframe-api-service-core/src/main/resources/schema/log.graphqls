@@ -18,7 +18,7 @@ extend type Query {
         toolType: String!       # Tool type (meshcentral, tactical-rmm, etc.)
         eventType: String!      # Event type (login, logout, script, etc.)
         timestamp: Instant!     # Timestamp of the audit
-        toolEventId: String!    # Tool event ID (raw tool identifier, not a Relay global ID)
+        toolEventId: ID!        # Tool event ID
     ): LogDetails
 }
 
