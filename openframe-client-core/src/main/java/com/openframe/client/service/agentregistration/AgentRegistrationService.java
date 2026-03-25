@@ -15,6 +15,7 @@ import com.openframe.data.repository.oauth.OAuthClientRepository;
 import com.openframe.data.service.OrganizationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +45,9 @@ public class AgentRegistrationService {
     private final AgentRegistrationProcessor agentRegistrationProcessor;
     private final RegistrationTagAssignmentService registrationTagAssignmentService;
     private final InstalledAgentService installedAgentService;
+
+    @Value("${openframe.feature.save-installed-agent-on-registration:false}")
+    private boolean saveInstalledAgentOnRegistrationEnabled;
 
     @Transactional
     // TODO: two phase commit for the nats integration or other fallback
@@ -119,8 +123,11 @@ public class AgentRegistrationService {
     }
 
     private void saveInstalledAgent(String machineId, AgentRegistrationRequest request) {
+        if (!saveInstalledAgentOnRegistrationEnabled) {
+            return;
+        }
         String agentVersion = request.getAgentVersion();
-            installedAgentService.addInstalledAgent(machineId, OPENFRAME_CLIENT_AGENT_TYPE, agentVersion, false);
+        installedAgentService.addInstalledAgent(machineId, OPENFRAME_CLIENT_AGENT_TYPE, agentVersion, false);
     }
 
     private Machine saveMachine(String machineId, AgentRegistrationRequest request, String organizationId) {
