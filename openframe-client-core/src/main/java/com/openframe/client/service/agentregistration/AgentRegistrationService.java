@@ -59,10 +59,9 @@ public class AgentRegistrationService {
         saveOAuthClient(machineId, clientId, clientSecret);
         Machine machine = saveMachine(machineId, request, resolvedOrganizationId);
 
-        // Assign tags from registration request (creates tags if they don't exist)
-        registrationTagAssignmentService.assignTags(machineId, resolvedOrganizationId, request.getTags());
-
         saveInstalledAgent(machineId, request);
+
+        registrationTagAssignmentService.assignTags(machineId, resolvedOrganizationId, request.getTags());
 
         agentRegistrationToolInstallationService.process(machineId);
 
@@ -91,14 +90,6 @@ public class AgentRegistrationService {
         return format(CLIENT_ID_TEMPLATE, machineId);
     }
 
-    /**
-     * Resolve organization ID for the machine.
-     * If provided organizationId exists, use it.
-     * Otherwise, fallback to default organization.
-     * 
-     * @param requestedOrganizationId organizationId from registration request (can be null)
-     * @return resolved organizationId to use
-     */
     private String resolveOrganizationId(String requestedOrganizationId) {
         // If organizationId provided, check if it exists
         if (requestedOrganizationId != null && !requestedOrganizationId.isBlank()) {
@@ -119,13 +110,6 @@ public class AgentRegistrationService {
         return defaultOrgId;
     }
 
-    /**
-     * Get default organization ID.
-     * Returns organizationId of the organization with name {@link OrganizationService#DEFAULT_ORGANIZATION_NAME}.
-     * 
-     * @return default organization ID
-     * @throws IllegalStateException if default organization doesn't exist
-     */
     private String getDefaultOrganizationId() {
         return organizationService.getDefaultOrganization()
                 .map(Organization::getOrganizationId)
