@@ -56,6 +56,19 @@ export interface UseReleaseResult {
   isLoading: boolean;
 }
 
+export interface VideoDisplaySectionProps {
+  mainVideoUrl?: string | null;
+  youtubeUrl?: string | null;
+  highlightVideoUrl?: string | null;
+  highlightVideoThumbnail?: string | null;
+  mainVideoPoster?: string | null;
+  title?: string;
+  videoSummary?: string | null;
+  videoBites?: VideoTeaser[];
+  bitesTitle?: string;
+  filterPublishedBites?: boolean;
+}
+
 export interface ReleaseDetailPageProps {
   slug: string;
   initialData?: unknown; // Optional pre-fetched data for admin preview
@@ -66,6 +79,8 @@ export interface ReleaseDetailPageProps {
   RoadmapSection?: ComponentType<RoadmapSectionProps>;
   DeliverySection?: ComponentType<DeliverySectionProps>;
   VideoSection?: ComponentType<VideoSectionProps>;
+  /** Injectable video display section with tabs for full/highlight video + summary + bites */
+  VideoDisplaySection?: ComponentType<VideoDisplaySectionProps>;
   // API endpoints for fetching linked tasks
   roadmapApiEndpoint?: string;
   deliveryApiEndpoint?: string;
@@ -84,6 +99,7 @@ export function ReleaseDetailPage({
   RoadmapSection,
   DeliverySection,
   VideoSection,
+  VideoDisplaySection,
   roadmapApiEndpoint = '/api/roadmap',
   deliveryApiEndpoint = '/api/delivery'
 }: ReleaseDetailPageProps) {
@@ -181,6 +197,7 @@ export function ReleaseDetailPage({
   const videoBites = release.video_bites as VideoTeaser[] | undefined;
   const highlightVideoUrl = release.highlight_video_url as string | undefined;
   const highlightVideoThumbnail = release.highlight_video_thumbnail as string | undefined;
+  const videoSummary = release.video_summary as string | undefined;
   const breakingChanges = release.breaking_changes as ChangelogEntry[] | undefined;
   const featuresAdded = release.features_added as ChangelogEntry[] | undefined;
   const bugFixed = release.bugs_fixed as ChangelogEntry[] | undefined;
@@ -311,49 +328,50 @@ export function ReleaseDetailPage({
           </div>
         )}
 
-        {/* YouTube Video Section - Full Width */}
-        {youtubeUrl && (() => {
-          const videoId = extractYouTubeId(youtubeUrl);
-          return videoId ? (
-              <YouTubeEmbed
-                videoId={videoId}
-                title={`${releaseTitle} - Video`}
-                showTitle={false}
-                showMeta={true}
-              />
-          ) : null;
-        })()}
-
-        {/* Main Video - Uploaded video for AI processing (fallback if no YouTube) */}
-        {!youtubeUrl && mainVideoUrl && (
-          <div className="flex justify-center w-full">
-            <div className="w-full max-w-3xl">
-              <VideoPlayer
-                url={mainVideoUrl}
-                controls={true}
-                muted={false}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Highlight Video - AI-generated highlight reel */}
-        {highlightVideoUrl && (
-          <div className="flex flex-col gap-4 w-full">
-            <p className="text-h5 tracking-[-0.28px] text-ods-text-secondary">
-              Video Highlights
-            </p>
-            <div className="flex justify-center w-full">
-              <div className="w-full max-w-3xl">
-                <VideoPlayer
-                  url={highlightVideoUrl}
-                  poster={highlightVideoThumbnail}
-                  controls={true}
-                  muted={false}
-                />
+        {/* Video Display Section - Injectable or fallback */}
+        {VideoDisplaySection ? (
+          <VideoDisplaySection
+            mainVideoUrl={mainVideoUrl}
+            youtubeUrl={youtubeUrl}
+            highlightVideoUrl={highlightVideoUrl}
+            highlightVideoThumbnail={highlightVideoThumbnail}
+            title={releaseTitle}
+            videoSummary={videoSummary}
+            videoBites={videoBites}
+            bitesTitle="Video Clips"
+            filterPublishedBites={true}
+          />
+        ) : (
+          <>
+            {youtubeUrl && (() => {
+              const videoId = extractYouTubeId(youtubeUrl);
+              return videoId ? (
+                <YouTubeEmbed videoId={videoId} title={`${releaseTitle} - Video`} showTitle={false} showMeta={true} />
+              ) : null;
+            })()}
+            {!youtubeUrl && mainVideoUrl && (
+              <div className="flex justify-center w-full">
+                <div className="w-full max-w-3xl">
+                  <VideoPlayer url={mainVideoUrl} controls={true} muted={false} />
+                </div>
               </div>
-            </div>
-          </div>
+            )}
+            {highlightVideoUrl && (
+              <div className="flex justify-center w-full">
+                <div className="w-full max-w-3xl">
+                  <VideoPlayer url={highlightVideoUrl} poster={highlightVideoThumbnail} controls={true} muted={false} />
+                </div>
+              </div>
+            )}
+            {videoSummary && (
+              <div className="flex flex-col gap-6 w-full min-w-0">
+                <h2 className="text-h1 tracking-[-1.12px] text-ods-text-primary break-words">Summary</h2>
+                <div className="text-h4 text-ods-text-primary break-words overflow-hidden">
+                  <MarkdownRenderer content={videoSummary} />
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* Content */}
@@ -402,8 +420,8 @@ export function ReleaseDetailPage({
           SimpleMarkdownRenderer={MarkdownRenderer}
         />
 
-        {/* Video Bites Section - Display video clips */}
-        {VideoSection && videoBites && videoBites.length > 0 && (
+        {/* Video Bites Section - Only when VideoDisplaySection is not handling it */}
+        {!VideoDisplaySection && VideoSection && videoBites && videoBites.length > 0 && (
           <VideoSection
             bites={videoBites}
             title="Video Clips"
