@@ -86,6 +86,7 @@ public class GatewaySecurityConfig {
                         .pathMatchers(
                                 CLIENTS_PREFIX + "/metrics/**",
                                 CLIENTS_PREFIX + "/api/agents/register",
+                                CLIENTS_PREFIX + "/api/release-version",
                                 CLIENTS_PREFIX + "/oauth/token",
                                 // TODO: removxxe after migration artifacts to GitHub
                                 CLIENTS_PREFIX + "/tool-agent/**"
