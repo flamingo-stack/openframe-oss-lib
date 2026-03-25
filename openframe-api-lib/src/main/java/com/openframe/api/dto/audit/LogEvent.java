@@ -12,6 +12,7 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 public class LogEvent {
+    private String id;
     private String toolEventId;
     private String eventType;
     private String ingestDay;

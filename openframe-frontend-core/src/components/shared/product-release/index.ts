@@ -5,6 +5,7 @@ export { ProductReleaseCardSkeleton, type ProductReleaseCardSkeletonProps } from
 export {
   ReleaseDetailPage,
   type ReleaseDetailPageProps,
+  type VideoDisplaySectionProps,
   type MarkdownRendererProps,
   type RoadmapItem,
   type DeliveryResponse,

@@ -137,7 +137,7 @@ public class OrganizationController {
 
         log.info("Getting organization by ID: {} - userId: {}, apiKeyId: {}", id, userId, apiKeyId);
 
-        var organization = organizationService.getOrganizationById(id)
+        var organization = organizationService.getOrganizationByOrganizationId(id)
                 .orElseThrow(() -> new OrganizationNotFoundException(id));
 
         return organizationMapper.toResponse(organization);

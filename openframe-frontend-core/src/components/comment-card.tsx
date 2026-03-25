@@ -3,8 +3,6 @@
 import { Button } from "./ui/button"
 import { VendorDisplayButton } from "./vendor-display-button"
 import { useAuth } from "./auth-stub"
-import Image from "next/image"
-import { getProxiedImageUrl } from "../utils/image-proxy-stub"
 import { formatRelativeTime } from "../utils/date-utils"
 import { UserSummary } from "./user-summary-stub"
 
