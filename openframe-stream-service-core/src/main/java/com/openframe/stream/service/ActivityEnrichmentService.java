@@ -113,6 +113,10 @@ public class ActivityEnrichmentService {
         return activity;
     }
 
+    private static final java.util.Set<String> POLICY_ACTIVITY_TYPES = java.util.Set.of(
+            "created_policy", "edited_policy", "deleted_policy", "applied_spec_policy"
+    );
+
     private static final class HeaderAdderFixedKey implements FixedKeyProcessor<String, ActivityMessage, ActivityMessage> {
 
         private FixedKeyProcessorContext<String, ActivityMessage> context;
@@ -123,9 +127,21 @@ public class ActivityEnrichmentService {
 
         @Override
         public void process(FixedKeyRecord<String, ActivityMessage> record) {
-            record.headers().add(MESSAGE_TYPE_HEADER, MessageType.FLEET_MDM_EVENT.name().getBytes(StandardCharsets.UTF_8));
+            MessageType messageType = resolveMessageType(record.value());
+            record.headers().add(MESSAGE_TYPE_HEADER, messageType.name().getBytes(StandardCharsets.UTF_8));
             record.headers().add("__TypeId__", "com.openframe.kafka.model.debezium.CommonDebeziumMessage".getBytes(StandardCharsets.UTF_8));
             context.forward(record);
+        }
+
+        private MessageType resolveMessageType(ActivityMessage activityMessage) {
+            if (activityMessage != null
+                    && activityMessage.getPayload() != null
+                    && activityMessage.getPayload().getAfter() != null
+                    && activityMessage.getPayload().getAfter().getActivityType() != null
+                    && POLICY_ACTIVITY_TYPES.contains(activityMessage.getPayload().getAfter().getActivityType())) {
+                return MessageType.FLEET_MDM_POLICY_ACTIVITY_EVENT;
+            }
+            return MessageType.FLEET_MDM_EVENT;
         }
 
         @Override

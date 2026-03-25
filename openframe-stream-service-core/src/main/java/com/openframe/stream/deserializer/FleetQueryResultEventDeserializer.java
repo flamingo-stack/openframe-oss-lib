@@ -172,17 +172,24 @@ public class FleetQueryResultEventDeserializer extends IntegratedToolEventDeseri
     private Query getQueryInfo(JsonNode afterField) {
         JsonNode queryIdNode = afterField.get("query_id");
         if (queryIdNode == null || queryIdNode.isNull()) {
+            log.warn("query_id field is missing or null in query result event, host_id: {}",
+                    afterField.has("host_id") ? afterField.get("host_id").asText() : "unknown");
             return null;
         }
 
         try {
             Long queryId = queryIdNode.asLong();
+            log.debug("Resolving query info for query_id: {}, host_id: {}", queryId,
+                    afterField.has("host_id") ? afterField.get("host_id").asText() : "unknown");
+
             Query query = fleetMdmCacheService.getQueryById(queryId);
-            
+
             if (query == null) {
-                log.debug("Query not found in cache for query_id: {}", queryId);
+                log.warn("Failed to resolve query name for query_id: {}. Fleet MDM client may not be initialized or query may have been deleted.", queryId);
+            } else {
+                log.debug("Resolved query_id: {} to query name: '{}'", queryId, query.getName());
             }
-            
+
             return query;
         } catch (Exception e) {
             log.error("Error fetching query info for query_id: {}", queryIdNode.asText(), e);
