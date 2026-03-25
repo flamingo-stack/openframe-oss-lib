@@ -31,6 +31,7 @@ public class AgentRegistrationService {
 
     private static final String AGENT_ROLE = "AGENT";
     private static final String CLIENT_ID_TEMPLATE = "agent_%s";
+    private static final String OPENFRAME_CLIENT_AGENT_TYPE = "openframe-client";
 
     private final OAuthClientRepository oauthClientRepository;
     private final MachineRepository machineRepository;
@@ -119,7 +120,7 @@ public class AgentRegistrationService {
 
     private void saveInstalledAgent(String machineId, AgentRegistrationRequest request) {
         String agentVersion = request.getAgentVersion();
-        installedAgentService.addInstalledAgent(machineId, "openframe-client", agentVersion, false);
+            installedAgentService.addInstalledAgent(machineId, OPENFRAME_CLIENT_AGENT_TYPE, agentVersion, false);
     }
 
     private Machine saveMachine(String machineId, AgentRegistrationRequest request, String organizationId) {
