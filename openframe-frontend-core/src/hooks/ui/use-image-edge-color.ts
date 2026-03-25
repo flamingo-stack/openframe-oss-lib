@@ -73,13 +73,27 @@ export function useImageEdgeColor(imageUrl: string | undefined | null, fallback 
       return;
     }
 
+    // Check if the image is same-origin (canvas requires CORS for cross-origin)
+    let isSameOrigin = false;
+    try {
+      const url = new URL(imageUrl, window.location.origin);
+      isSameOrigin = url.origin === window.location.origin;
+    } catch {
+      // Relative URL — same origin
+      isSameOrigin = true;
+    }
+
     const img = new Image();
-    img.crossOrigin = 'anonymous';
+    // Only set crossOrigin for same-origin images (avoids CORS errors for external CDNs)
+    if (isSameOrigin) {
+      img.crossOrigin = 'anonymous';
+    }
 
     img.onload = () => {
       try {
         setColor(extractEdgeColor(img));
       } catch {
+        // Canvas tainted by cross-origin image — fall back silently
         setColor(fallback);
       }
     };
