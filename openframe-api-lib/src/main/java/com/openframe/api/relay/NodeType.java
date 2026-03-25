@@ -7,7 +7,12 @@ public enum NodeType {
     INTEGRATED_TOOL("IntegratedTool"),
     TENANT("Tenant"),
     DIALOG("Dialog"),
-    MESSAGE("Message");
+    MESSAGE("Message"),
+    TAG("Tag"),
+    TOOL_CONNECTION("ToolConnection"),
+    INSTALLED_AGENT("InstalledAgent"),
+    LOG_EVENT("LogEvent"),
+    LOG_DETAILS("LogDetails");
 
     private final String graphqlTypeName;
 

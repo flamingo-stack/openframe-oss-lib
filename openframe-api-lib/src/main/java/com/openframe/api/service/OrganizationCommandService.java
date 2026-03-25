@@ -47,8 +47,7 @@ public class OrganizationCommandService {
     public Organization updateOrganization(String id, UpdateOrganizationRequest request) {
         log.debug("Updating organization {} from request", id);
         
-        // Get existing organization
-        Organization existing = organizationService.getOrganizationById(id)
+        Organization existing = organizationService.getOrganizationByOrganizationId(id)
                 .orElseThrow(() -> new IllegalArgumentException("Organization not found with id: " + id));
         
         // Update with request data (only non-null fields)

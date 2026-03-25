@@ -64,7 +64,7 @@ public class OrganizationsTest extends BaseTest {
     @DisplayName("Get Organization")
     public void testRetrieveOrganization() {
         List<Organization> organizations = OrganizationApi.listOrganizations();
-        Organization organization = OrganizationApi.retrieveOrganization(organizations.getFirst().getId());
+        Organization organization = OrganizationApi.retrieveOrganizationByOrganizationId(organizations.getFirst().getOrganizationId());
         assertThat(organization).as("No organization").isNotNull();
         assertThat(organization).as("Retrieved organization should match listed organization")
                 .usingRecursiveComparison()

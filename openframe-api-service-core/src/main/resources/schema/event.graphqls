@@ -11,7 +11,7 @@ extend type Mutation {
 
 type Event implements Node {
     id: ID!
-    userId: ID!
+    userId: String!
     timestamp: Instant!
     type: String!
     data: String
@@ -25,7 +25,7 @@ input EventFilterInput {
 }
 
 input CreateEventInput {
-    userId: ID!
+    userId: String!
     type: String!
     data: String
 }

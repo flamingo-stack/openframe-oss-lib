@@ -18,7 +18,7 @@ extend type Query {
         toolType: String!       # Tool type (meshcentral, tactical-rmm, etc.)
         eventType: String!      # Event type (login, logout, script, etc.)
         timestamp: Instant!     # Timestamp of the audit
-        toolEventId: ID!        # Tool event ID
+        toolEventId: String!    # Tool event ID
     ): LogDetails
 }
 
@@ -54,8 +54,9 @@ type LogEdge {
     cursor: String!
 }
 
-type LogEvent {
-    toolEventId: ID!
+type LogEvent implements Node {
+    id: ID!
+    toolEventId: String!
     eventType: String!
     ingestDay: String!
     toolType: String!
@@ -70,8 +71,9 @@ type LogEvent {
 }
 
 # Full audit details from Cassandra
-type LogDetails {
-    toolEventId: ID!
+type LogDetails implements Node {
+    id: ID!
+    toolEventId: String!
     eventType: String!
     ingestDay: String!
     toolType: String!
