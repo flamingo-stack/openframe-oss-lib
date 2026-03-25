@@ -1,5 +1,6 @@
 package com.openframe.data.service;
 
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.exception.OrganizationHasMachinesException;
 import com.openframe.data.repository.device.MachineRepository;
@@ -118,9 +119,11 @@ public class OrganizationService {
             throw new IllegalArgumentException("The default organization {} cannot be deleted: " + id);
         }
         
-        // Check if any machines are associated with this organization
-        if (machineRepository.existsByOrganizationId(organization.getOrganizationId())) {
-            log.warn("Cannot delete organization {} - has associated machines", organization.getOrganizationId());
+        // Check if any active machines are associated with this organization
+        // Allow deletion if all linked machines are in ARCHIVED or DELETED status
+        var excludedStatuses = EnumSet.of(DeviceStatus.ARCHIVED, DeviceStatus.DELETED);
+        if (machineRepository.existsByOrganizationIdAndStatusNotIn(organization.getOrganizationId(), excludedStatuses)) {
+            log.warn("Cannot delete organization {} - has active machines", organization.getOrganizationId());
             throw new OrganizationHasMachinesException(organization.getOrganizationId());
         }
         
