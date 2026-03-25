@@ -44,6 +44,9 @@ class AgentRegistrationServiceTest {
     private RegistrationTagAssignmentService registrationTagAssignmentService;
 
     @Mock
+    private InstalledAgentService installedAgentService;
+
+    @Mock
     private OrganizationService organizationService;
 
     @Mock
@@ -78,9 +81,19 @@ class AgentRegistrationServiceTest {
 
     @BeforeEach
     void setUp() {
-        agentRegistrationService = new AgentRegistrationService(oauthClientRepository, machineRepository, organizationService,
-                agentRegistrationSecretValidator, agentSecretGenerator, passwordEncoder, machineIdGenerator,
-                agentRegistrationToolInstallationService, agentRegistrationProcessor, registrationTagAssignmentService);
+        agentRegistrationService = new AgentRegistrationService(
+                oauthClientRepository,
+                machineRepository,
+                organizationService,
+                agentRegistrationSecretValidator,
+                agentSecretGenerator,
+                passwordEncoder,
+                machineIdGenerator,
+                agentRegistrationToolInstallationService,
+                agentRegistrationProcessor,
+                registrationTagAssignmentService,
+                installedAgentService
+        );
         request = createTestRequest();
     }
 
