@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import ReactPlayer from 'react-player';
+import { useImageEdgeColor } from '../../hooks/ui/use-image-edge-color';
 
 // Simple SVG icon components
 const Play = ({ size = 16, className }: { size?: number; className?: string }) => (
@@ -54,6 +55,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [isPlaying, setIsPlaying] = useState(autoPlay);
   const [mounted, setMounted] = useState(false);
   const [hasStarted, setHasStarted] = useState(autoPlay);
+  const posterBgColor = useImageEdgeColor(poster);
 
   useEffect(() => {
     setMounted(true);
@@ -150,7 +152,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               <img
                 src={poster}
                 alt={title || 'Video thumbnail'}
-                className="w-full h-full object-cover rounded-md"
+                className="w-full h-full object-contain rounded-md"
+                style={{ backgroundColor: posterBgColor }}
               />
             )}
             {/* Play button — sits on top of poster or the video first frame */}
