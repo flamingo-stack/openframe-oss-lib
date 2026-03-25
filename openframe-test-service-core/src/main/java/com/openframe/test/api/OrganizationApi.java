@@ -4,16 +4,14 @@ import com.openframe.test.api.graphql.OrganizationQueries;
 import com.openframe.test.data.dto.organization.CreateOrganizationRequest;
 import com.openframe.test.data.dto.organization.Organization;
 import com.openframe.test.helpers.RequestSpecHelper;
-import static com.openframe.test.helpers.RequestSpecHelper.graphqlSuccess;
 import io.restassured.http.ContentType;
 
 import java.util.List;
 import java.util.Map;
 
-import static com.openframe.test.api.graphql.OrganizationQueries.FULL_ORGANIZATION;
-import static com.openframe.test.api.graphql.OrganizationQueries.ORGANIZATION_BY_ORGANIZATION_ID;
-import static com.openframe.test.api.graphql.OrganizationQueries.ORGANIZATION_NAMES;
+import static com.openframe.test.api.graphql.OrganizationQueries.*;
 import static com.openframe.test.config.EnvironmentConfig.GRAPHQL;
+import static com.openframe.test.helpers.RequestSpecHelper.graphqlSuccess;
 import static io.restassured.RestAssured.given;
 
 public class OrganizationApi {
@@ -80,7 +78,7 @@ public class OrganizationApi {
     }
 
     public static void deleteOrganization(Organization organization) {
-        final String DELETE_ORGANIZATION = ORGANIZATIONS.concat("/").concat(organization.getId());
+        final String DELETE_ORGANIZATION = ORGANIZATIONS.concat("/").concat(organization.getOrganizationId());
         given(RequestSpecHelper.getAuthorizedSpec()).contentType(ContentType.JSON)
                 .delete(DELETE_ORGANIZATION)
                 .then().statusCode(204);
