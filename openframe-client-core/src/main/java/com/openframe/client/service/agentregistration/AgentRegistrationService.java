@@ -3,6 +3,7 @@ package com.openframe.client.service.agentregistration;
 import com.openframe.client.dto.agent.AgentRegistrationRequest;
 import com.openframe.client.dto.agent.AgentRegistrationResponse;
 import com.openframe.client.service.agentregistration.processor.AgentRegistrationProcessor;
+import com.openframe.client.service.InstalledAgentService;
 import com.openframe.client.service.validator.AgentRegistrationSecretValidator;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
@@ -41,6 +42,7 @@ public class AgentRegistrationService {
     private final AgentRegistrationToolInstallationService agentRegistrationToolInstallationService;
     private final AgentRegistrationProcessor agentRegistrationProcessor;
     private final RegistrationTagAssignmentService registrationTagAssignmentService;
+    private final InstalledAgentService installedAgentService;
 
     @Transactional
     // TODO: two phase commit for the nats integration or other fallback
@@ -59,6 +61,8 @@ public class AgentRegistrationService {
 
         // Assign tags from registration request (creates tags if they don't exist)
         registrationTagAssignmentService.assignTags(machineId, resolvedOrganizationId, request.getTags());
+
+        saveInstalledAgent(machineId, request);
 
         agentRegistrationToolInstallationService.process(machineId);
 
@@ -127,6 +131,11 @@ public class AgentRegistrationService {
                 .map(Organization::getOrganizationId)
                 .orElseThrow(() -> new IllegalStateException(
                         "Default organization not found. Please ensure it was created during tenant registration."));
+    }
+
+    private void saveInstalledAgent(String machineId, AgentRegistrationRequest request) {
+        String agentVersion = request.getAgentVersion();
+        installedAgentService.addInstalledAgent(machineId, "openframe-client", agentVersion, false);
     }
 
     private Machine saveMachine(String machineId, AgentRegistrationRequest request, String organizationId) {

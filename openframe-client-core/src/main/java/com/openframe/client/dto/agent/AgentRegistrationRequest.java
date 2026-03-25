@@ -2,6 +2,7 @@ package com.openframe.client.dto.agent;
 
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
+import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 import jakarta.validation.Valid;
@@ -18,6 +19,7 @@ public class AgentRegistrationRequest {
     private String ip;
     private String macAddress;
     private String osUuid;
+    @NotBlank
     private String agentVersion;
     private DeviceStatus status;
 
