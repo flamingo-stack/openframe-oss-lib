@@ -18,6 +18,10 @@ public class ToolConnectionService {
 
     private final ToolConnectionRepository toolConnectionRepository;
 
+    public Optional<ToolConnection> findById(String id) {
+        return toolConnectionRepository.findById(id);
+    }
+
     /**
      * Method to get tool connections for multiple machines (core logic for DataLoader)
      */

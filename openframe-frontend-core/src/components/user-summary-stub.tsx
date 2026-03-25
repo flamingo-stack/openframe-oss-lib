@@ -47,9 +47,9 @@ const getAuthProviderIcon = (provider: string) => {
       return <Image src="/icons/microsoft-logo.svg" alt="Microsoft" width={16} height={16} className="w-4 h-4" />;
     case "slack":
     case "slack_oidc":
-      return <div className="w-4 h-4 bg-[#888888] rounded-full" />; // Slack icon stub
+      return <div className="w-4 h-4 bg-ods-text-secondary rounded-full" />;
     default:
-      return <div className="w-4 h-4 bg-[#888888] rounded-full" />;
+      return <div className="w-4 h-4 bg-ods-text-secondary rounded-full" />;
   }
 };
 
@@ -89,30 +89,26 @@ export function UserSummary({
   if (compact) {
     return (
       <div className="flex items-center gap-3 min-w-0">
-        <div className="relative shrink-0" style={{ width: avatarSize, height: avatarSize }}>
-          <div className="rounded-lg overflow-hidden bg-ods-card border border-ods-border w-full h-full relative">
-            {avatarUrl ? (
-              <Image src={getProxiedImageUrl(avatarUrl) ?? avatarUrl} alt={name} fill className="object-cover" unoptimized />
-            ) : (
-              <div className="flex items-center justify-center h-full w-full bg-[#FFC008] text-[#161616] font-['Azeret_Mono'] font-bold">
-                {name.split(' ').map((n: string) => n.charAt(0)).join('').slice(0, 2)}
-              </div>
-            )}
-          </div>
-          {mspPreview && mspPreview.logoUrl && (
-            <div className="absolute -bottom-1 -right-1 size-6 rounded-full bg-[#FAFAFA] ring-1 ring-[#161616] overflow-hidden flex items-center justify-center select-none z-10">
-              <img src={getProxiedImageUrl(mspPreview.logoUrl) ?? mspPreview.logoUrl} alt={mspPreview.name || 'MSP'} className="object-cover w-full h-full" />
+        <div className="relative shrink-0">
+          {avatarUrl ? (
+            <Image src={getProxiedImageUrl(avatarUrl) ?? avatarUrl} alt={name} width={avatarSize} height={avatarSize} className="object-cover rounded-lg" />
+          ) : (
+            <div className="rounded-lg bg-ods-accent flex items-center justify-center text-ods-text-on-accent font-heading font-bold" style={{ width: avatarSize, height: avatarSize }}>
+              {name.split(' ').map((n: string) => n.charAt(0)).join('').slice(0, 2)}
             </div>
+          )}
+          {mspPreview && mspPreview.logoUrl && (
+            <Image src={getProxiedImageUrl(mspPreview.logoUrl) ?? mspPreview.logoUrl} alt={mspPreview.name || 'MSP'} width={24} height={24} className="absolute -bottom-1 -right-1 size-6 rounded-full object-cover select-none z-10" />
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="font-['DM_Sans'] text-[16px] leading-[1.3] text-ods-text-primary truncate">
+          <p className="text-h4 text-ods-text-primary truncate">
             {name}
             {mspPreview?.name && (
               <span className="text-ods-text-secondary"> • {mspPreview.name}</span>
             )}
           </p>
-          <p className="font-['DM_Sans'] text-[14px] leading-none text-ods-text-secondary truncate">
+          <p className="text-h6 text-ods-text-secondary truncate">
             {subtitle && subtitle.trim().length > 0 ? subtitle : (email && email.trim().length > 0 ? email : '\u00A0')}
           </p>
         </div>
@@ -126,29 +122,27 @@ export function UserSummary({
     <div className="flex gap-6 w-full items-start">
         {/* Avatar with badge wrapper */}
         <div className="relative shrink-0 h-24 w-24 overflow-visible">
-          <div className="rounded-full overflow-hidden bg-ods-card border border-ods-border w-full h-full relative">
-            {avatarUrl ? (
-              <Image src={getProxiedImageUrl(avatarUrl) ?? avatarUrl} alt={name} fill className="object-cover" unoptimized />
-            ) : (
-              <div className="flex items-center justify-center h-full w-full text-3xl text-ods-text-secondary font-['Azeret_Mono']">
-                {name.charAt(0).toUpperCase()}
-              </div>
-            )}
-          </div>
+          {avatarUrl ? (
+            <Image src={getProxiedImageUrl(avatarUrl) ?? avatarUrl} alt={name} width={96} height={96} className="object-cover rounded-full" />
+          ) : (
+            <div className="rounded-full bg-ods-card border border-ods-border w-full h-full flex items-center justify-center text-3xl text-ods-text-secondary font-heading">
+              {name.charAt(0).toUpperCase()}
+            </div>
+          )}
 
           {/* MSP logo badge (show only when MSP exists) */}
           {mspPreview && (
-            <div className="absolute -bottom-1 -right-1 size-10 rounded-full bg-[#FAFAFA] ring-2 ring-[#161616] overflow-hidden flex items-center justify-center select-none">
+            <div className="absolute -bottom-1 -right-1 size-10 rounded-full bg-ods-bg ring-2 ring-ods-border overflow-hidden flex items-center justify-center select-none">
               {mspPreview.logoUrl ? (
                 <Image
                   src={getProxiedImageUrl(mspPreview.logoUrl) ?? mspPreview.logoUrl}
                   alt={mspPreview.name || 'MSP Logo'}
-                  fill
+                  width={40}
+                  height={40}
                   className="object-cover"
-                  unoptimized
                 />
               ) : (
-                <span className="text-[#161616] font-['Azeret_Mono'] text-sm font-bold">
+                <span className="text-ods-text-primary font-heading text-sm font-bold">
                   {mspPreview.name?.charAt(0).toUpperCase() || '?'}
                 </span>
               )}
@@ -163,11 +157,11 @@ export function UserSummary({
           <p className="text-h2 text-ods-text-primary leading-none truncate">
             {name}
           </p>
-            <p className="font-['DM_Sans'] text-[18px] text-ods-text-secondary leading-none break-all truncate">
+            <p className="text-h4 text-ods-text-secondary break-all truncate">
               {(subtitle && subtitle.trim().length > 0) ? subtitle : (email && email.trim().length > 0 ? email : '\u00A0')}
             </p>
             {mspPreview && (
-              <p className="font-['DM_Sans'] text-[14px] text-ods-text-primary leading-none truncate">
+              <p className="text-h6 text-ods-text-primary truncate">
                 {/* Build string with separators */}
                 {[
                   mspPreview.name ?? '—',
@@ -196,7 +190,7 @@ export function UserSummary({
               {/* top part */}
           {authProviders && authProviders.length > 0 && (
                 <div className="flex items-center gap-2">
-              <span className="text-[12px] text-ods-text-secondary whitespace-nowrap select-none">
+              <span className="text-xs text-ods-text-secondary whitespace-nowrap select-none">
                 Authorized by
               </span>
               <div className="flex items-center gap-2">
@@ -223,7 +217,7 @@ export function UserSummary({
         <div className="flex md:hidden items-center justify-between w-full gap-4">
           {authProviders && authProviders.length > 0 && (
             <div className="flex items-center gap-2">
-              <span className="text-[12px] text-ods-text-secondary whitespace-nowrap select-none">Authorized by</span>
+              <span className="text-xs text-ods-text-secondary whitespace-nowrap select-none">Authorized by</span>
               <div className="flex items-center gap-2">
                 {authProviders.map((p) => (
                   <div key={p} className="flex items-center justify-center w-4 h-4">
