@@ -10,6 +10,7 @@ import com.openframe.sdk.fleetmdm.model.Query;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
@@ -88,6 +89,17 @@ public class FleetMdmCacheService {
      * @param policyId the policy ID
      * @return the Policy object, or null if not found
      */
+    /**
+     * Evict a policy from cache. Call when a policy mutation event is detected
+     * (edited_policy, deleted_policy, etc.) to ensure fresh data on next lookup.
+     *
+     * @param policyId the policy ID to evict
+     */
+    @CacheEvict(value = "fleetPolicyCache", key = "#policyId")
+    public void evictPolicyCache(Long policyId) {
+        log.debug("Evicted policy cache for policy_id: {}", policyId);
+    }
+
     @Cacheable(value = "fleetPolicyCache", key = "#policyId", unless = "#result == null || !#result.isPresent()")
     public Optional<Policy> getPolicyById(Long policyId) {
         log.debug("Cache miss for policy_id: {}, calling Fleet MDM API", policyId);

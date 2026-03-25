@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Component
 @Slf4j
@@ -23,6 +24,10 @@ public class FleetPolicyActivityDeserializer extends IntegratedToolEventDeserial
     private static final String FIELD_ID = "id";
     private static final String FIELD_DETAILS = "details";
     private static final String FIELD_CREATED_AT = "created_at";
+
+    private static final Set<String> POLICY_MUTATION_TYPES = Set.of(
+            "edited_policy", "deleted_policy"
+    );
 
     private final FleetMdmCacheService fleetMdmCacheService;
 
@@ -125,8 +130,16 @@ public class FleetPolicyActivityDeserializer extends IntegratedToolEventDeserial
     }
 
     private Optional<Policy> getPolicyInfo(JsonNode after) {
-        return extractPolicyId(after)
-                .flatMap(fleetMdmCacheService::getPolicyById);
+        Optional<Long> policyIdOpt = extractPolicyId(after);
+
+        // Evict cache on policy mutation events so subsequent lookups get fresh data
+        policyIdOpt.ifPresent(policyId ->
+                getSourceEventType(after)
+                        .filter(POLICY_MUTATION_TYPES::contains)
+                        .ifPresent(type -> fleetMdmCacheService.evictPolicyCache(policyId))
+        );
+
+        return policyIdOpt.flatMap(fleetMdmCacheService::getPolicyById);
     }
 
     private Optional<Long> extractPolicyId(JsonNode after) {
