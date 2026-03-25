@@ -137,9 +137,7 @@ public class OrganizationController {
 
         log.info("Getting organization by ID: {} - userId: {}, apiKeyId: {}", id, userId, apiKeyId);
 
-        // Look up by organizationId first, fall back to document _id
         var organization = organizationService.getOrganizationByOrganizationId(id)
-                .or(() -> organizationService.getOrganizationById(id))
                 .orElseThrow(() -> new OrganizationNotFoundException(id));
 
         return organizationMapper.toResponse(organization);
