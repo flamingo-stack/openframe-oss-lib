@@ -197,7 +197,6 @@ export function ReleaseDetailPage({
   const videoBites = release.video_bites as VideoTeaser[] | undefined;
   const highlightVideoUrl = release.highlight_video_url as string | undefined;
   const highlightVideoThumbnail = release.highlight_video_thumbnail as string | undefined;
-  const videoSummary = release.video_summary as string | undefined;
   const breakingChanges = release.breaking_changes as ChangelogEntry[] | undefined;
   const featuresAdded = release.features_added as ChangelogEntry[] | undefined;
   const bugFixed = release.bugs_fixed as ChangelogEntry[] | undefined;
@@ -336,7 +335,6 @@ export function ReleaseDetailPage({
             highlightVideoUrl={highlightVideoUrl}
             highlightVideoThumbnail={highlightVideoThumbnail}
             title={releaseTitle}
-            videoSummary={videoSummary}
             videoBites={videoBites}
             bitesTitle="Video Clips"
             filterPublishedBites={true}
@@ -360,14 +358,6 @@ export function ReleaseDetailPage({
               <div className="flex justify-center w-full">
                 <div className="w-full max-w-3xl">
                   <VideoPlayer url={highlightVideoUrl} poster={highlightVideoThumbnail} controls={true} muted={false} />
-                </div>
-              </div>
-            )}
-            {videoSummary && (
-              <div className="flex flex-col gap-6 w-full min-w-0">
-                <h2 className="text-h1 tracking-[-1.12px] text-ods-text-primary break-words">Summary</h2>
-                <div className="text-h4 text-ods-text-primary break-words overflow-hidden">
-                  <MarkdownRenderer content={videoSummary} />
                 </div>
               </div>
             )}
