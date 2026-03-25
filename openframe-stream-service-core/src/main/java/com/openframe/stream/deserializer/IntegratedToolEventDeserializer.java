@@ -258,4 +258,24 @@ public abstract class IntegratedToolEventDeserializer implements KafkaMessageDes
                 .map(JsonNode::asText)
                 .filter(StringUtils::isNotBlank);
     }
+
+    /**
+     * Put a value into an ObjectNode if the value is not null.
+     */
+    protected static void putIfPresent(ObjectNode node, String key, Object value) {
+        if (value == null) {
+            return;
+        }
+        if (value instanceof String s) {
+            node.put(key, s);
+        } else if (value instanceof Boolean b) {
+            node.put(key, b);
+        } else if (value instanceof Integer i) {
+            node.put(key, i);
+        } else if (value instanceof Long l) {
+            node.put(key, l);
+        } else {
+            node.put(key, value.toString());
+        }
+    }
 }

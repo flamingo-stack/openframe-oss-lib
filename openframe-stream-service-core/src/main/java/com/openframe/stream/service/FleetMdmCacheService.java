@@ -88,15 +88,24 @@ public class FleetMdmCacheService {
      * @param policyId the policy ID
      * @return the Policy object, or null if not found
      */
-    @Cacheable(value = "fleetPolicyCache", key = "#policyId", unless = "#result == null")
-    public Policy getPolicyById(Long policyId) {
-        log.debug("Fetching policy definition for policy ID: {}", policyId);
+    @Cacheable(value = "fleetPolicyCache", key = "#policyId", unless = "#result == null || !#result.isPresent()")
+    public Optional<Policy> getPolicyById(Long policyId) {
+        log.debug("Cache miss for policy_id: {}, calling Fleet MDM API", policyId);
         try {
             FleetMdmClient client = getFleetMdmClient();
-            return client != null ? client.getPolicyById(policyId) : null;
+            if (client == null) {
+                log.warn("FleetMdmClient is not initialized, cannot fetch policy_id: {}", policyId);
+                return Optional.empty();
+            }
+            Optional<Policy> policy = Optional.ofNullable(client.getPolicyById(policyId));
+            policy.ifPresentOrElse(
+                    p -> log.debug("Successfully fetched policy_id: {}, name: '{}'", policyId, p.getName()),
+                    () -> log.warn("Fleet MDM API returned null for policy_id: {} (policy may have been deleted)", policyId)
+            );
+            return policy;
         } catch (IOException | InterruptedException e) {
-            log.error("Error fetching policy definition for policy ID: {}", policyId, e);
-            return null;
+            log.error("Fleet MDM API call failed for policy_id: {}. Cause: {}", policyId, e.getMessage(), e);
+            return Optional.empty();
         }
     }
 

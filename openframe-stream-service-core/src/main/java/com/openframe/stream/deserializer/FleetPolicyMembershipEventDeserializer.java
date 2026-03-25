@@ -61,18 +61,13 @@ public class FleetPolicyMembershipEventDeserializer extends IntegratedToolEventD
 
     @Override
     protected Optional<String> getMessage(JsonNode afterField) {
-        String policyName = getPolicyName(afterField);
-        JsonNode passesNode = afterField.get("passes");
+        boolean passes = isPassing(afterField);
+        String passFailText = passes ? "passed" : "failed";
 
-        boolean passes = passesNode != null && !passesNode.isNull() && passesNode.asBoolean(false);
-
-        if (policyName != null) {
-            return Optional.of(String.format("Policy '%s' %s on host",
-                    policyName, passes ? "passed" : "failed"));
-        }
-
-        return Optional.of(String.format("Policy membership check %s",
-                passes ? "passed" : "failed"));
+        return getPolicyInfo(afterField)
+                .map(Policy::getName)
+                .map(name -> String.format("Policy '%s' %s on host", name, passFailText))
+                .or(() -> Optional.of(String.format("Policy membership check %s", passFailText)));
     }
 
     @Override
@@ -84,24 +79,12 @@ public class FleetPolicyMembershipEventDeserializer extends IntegratedToolEventD
 
     @Override
     protected String getResult(JsonNode after) {
-        JsonNode passesNode = after.get("passes");
-        boolean passes = passesNode != null && !passesNode.isNull() && passesNode.asBoolean(false);
-        if (!passes) {
-            return null;
-        }
-
-        return buildPolicyDetailsJson(after);
+        return isPassing(after) ? buildPolicyDetailsJson(after) : null;
     }
 
     @Override
     protected String getError(JsonNode after) {
-        JsonNode passesNode = after.get("passes");
-        boolean passes = passesNode != null && !passesNode.isNull() && passesNode.asBoolean(false);
-        if (passes) {
-            return null;
-        }
-
-        return buildPolicyDetailsJson(after);
+        return isPassing(after) ? null : buildPolicyDetailsJson(after);
     }
 
     @Override
@@ -109,38 +92,30 @@ public class FleetPolicyMembershipEventDeserializer extends IntegratedToolEventD
         return null;
     }
 
+    private boolean isPassing(JsonNode afterField) {
+        JsonNode passesNode = afterField.get("passes");
+        return passesNode != null && !passesNode.isNull() && passesNode.asBoolean(false);
+    }
+
     private String buildPolicyDetailsJson(JsonNode after) {
         try {
             ObjectNode detailsJson = mapper.createObjectNode();
 
-            Policy policyInfo = getPolicyInfo(after);
-            if (policyInfo != null) {
-                if (policyInfo.getName() != null) {
-                    detailsJson.put("policy_name", policyInfo.getName());
-                }
-                if (policyInfo.getQuery() != null) {
-                    detailsJson.put("query", policyInfo.getQuery());
-                }
-                if (policyInfo.getResolution() != null) {
-                    detailsJson.put("resolution", policyInfo.getResolution());
-                }
-                if (policyInfo.getDescription() != null) {
-                    detailsJson.put("description", policyInfo.getDescription());
-                }
-                if (policyInfo.getCritical() != null) {
-                    detailsJson.put("critical", policyInfo.getCritical());
-                }
-            }
+            getPolicyInfo(after).ifPresent(policy -> {
+                putIfPresent(detailsJson, "policy_name", policy.getName());
+                putIfPresent(detailsJson, "query", policy.getQuery());
+                putIfPresent(detailsJson, "resolution", policy.getResolution());
+                putIfPresent(detailsJson, "description", policy.getDescription());
+                putIfPresent(detailsJson, "critical", policy.getCritical());
+            });
 
-            JsonNode policyIdNode = after.get("policy_id");
-            if (policyIdNode != null && !policyIdNode.isNull()) {
-                detailsJson.put("policy_id", policyIdNode.asInt());
-            }
+            Optional.ofNullable(after.get("policy_id"))
+                    .filter(node -> !node.isNull())
+                    .ifPresent(node -> detailsJson.put("policy_id", node.asInt()));
 
-            JsonNode automationIterationNode = after.get("automation_iteration");
-            if (automationIterationNode != null && !automationIterationNode.isNull()) {
-                detailsJson.put("automation_iteration", automationIterationNode.asInt());
-            }
+            Optional.ofNullable(after.get("automation_iteration"))
+                    .filter(node -> !node.isNull())
+                    .ifPresent(node -> detailsJson.put("automation_iteration", node.asInt()));
 
             return mapper.writeValueAsString(detailsJson);
         } catch (Exception e) {
@@ -149,27 +124,10 @@ public class FleetPolicyMembershipEventDeserializer extends IntegratedToolEventD
         }
     }
 
-    private String getPolicyName(JsonNode afterField) {
-        Policy policyInfo = getPolicyInfo(afterField);
-        return policyInfo != null ? policyInfo.getName() : null;
-    }
-
-    private Policy getPolicyInfo(JsonNode afterField) {
-        JsonNode policyIdNode = afterField.get("policy_id");
-        if (policyIdNode == null || policyIdNode.isNull()) {
-            return null;
-        }
-
-        try {
-            Long policyId = policyIdNode.asLong();
-            Policy policy = fleetMdmCacheService.getPolicyById(policyId);
-            if (policy == null) {
-                log.debug("Policy not found in cache for policy_id: {}", policyId);
-            }
-            return policy;
-        } catch (Exception e) {
-            log.error("Error fetching policy info for policy_id: {}", policyIdNode.asText(), e);
-            return null;
-        }
+    private Optional<Policy> getPolicyInfo(JsonNode afterField) {
+        return Optional.ofNullable(afterField.get("policy_id"))
+                .filter(node -> !node.isNull())
+                .map(JsonNode::asLong)
+                .flatMap(fleetMdmCacheService::getPolicyById);
     }
 }

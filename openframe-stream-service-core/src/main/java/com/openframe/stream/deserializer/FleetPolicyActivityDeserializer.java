@@ -79,36 +79,23 @@ public class FleetPolicyActivityDeserializer extends IntegratedToolEventDeserial
 
     @Override
     protected String getResult(JsonNode after) {
-        Policy policyInfo = getPolicyInfo(after);
-        if (policyInfo == null) {
-            return null;
-        }
-
-        try {
-            ObjectNode resultJson = mapper.createObjectNode();
-            if (policyInfo.getName() != null) {
-                resultJson.put("policy_name", policyInfo.getName());
-            }
-            if (policyInfo.getQuery() != null) {
-                resultJson.put("query", policyInfo.getQuery());
-            }
-            if (policyInfo.getResolution() != null) {
-                resultJson.put("resolution", policyInfo.getResolution());
-            }
-            if (policyInfo.getDescription() != null) {
-                resultJson.put("description", policyInfo.getDescription());
-            }
-            if (policyInfo.getPlatform() != null) {
-                resultJson.put("platform", policyInfo.getPlatform());
-            }
-            if (policyInfo.getCritical() != null) {
-                resultJson.put("critical", policyInfo.getCritical());
-            }
-            return mapper.writeValueAsString(resultJson);
-        } catch (Exception e) {
-            log.error("Failed to create policy result JSON", e);
-            return null;
-        }
+        return getPolicyInfo(after)
+                .map(policy -> {
+                    try {
+                        ObjectNode resultJson = mapper.createObjectNode();
+                        putIfPresent(resultJson, "policy_name", policy.getName());
+                        putIfPresent(resultJson, "query", policy.getQuery());
+                        putIfPresent(resultJson, "resolution", policy.getResolution());
+                        putIfPresent(resultJson, "description", policy.getDescription());
+                        putIfPresent(resultJson, "platform", policy.getPlatform());
+                        putIfPresent(resultJson, "critical", policy.getCritical());
+                        return mapper.writeValueAsString(resultJson);
+                    } catch (Exception e) {
+                        log.error("Failed to create policy result JSON", e);
+                        return null;
+                    }
+                })
+                .orElse(null);
     }
 
     @Override
@@ -132,42 +119,28 @@ public class FleetPolicyActivityDeserializer extends IntegratedToolEventDeserial
         }
 
         // Fall back to cache lookup
-        Policy policyInfo = getPolicyInfo(after);
-        return policyInfo != null ? policyInfo.getName() : null;
+        return getPolicyInfo(after)
+                .map(Policy::getName)
+                .orElse(null);
     }
 
-    private Policy getPolicyInfo(JsonNode after) {
-        Long policyId = extractPolicyId(after);
-        if (policyId == null) {
-            return null;
-        }
-
-        try {
-            Policy policy = fleetMdmCacheService.getPolicyById(policyId);
-            if (policy == null) {
-                log.debug("Policy not found in cache for policy_id: {}", policyId);
-            }
-            return policy;
-        } catch (Exception e) {
-            log.error("Error fetching policy info for policy_id: {}", policyId, e);
-            return null;
-        }
+    private Optional<Policy> getPolicyInfo(JsonNode after) {
+        return extractPolicyId(after)
+                .flatMap(fleetMdmCacheService::getPolicyById);
     }
 
-    private Long extractPolicyId(JsonNode after) {
-        // Try to extract policy_id from details JSON
-        String detailsStr = parseStringField(after, FIELD_DETAILS).orElse(null);
-        if (detailsStr != null) {
-            try {
-                JsonNode detailsNode = mapper.readTree(detailsStr);
-                JsonNode policyIdNode = detailsNode.get("policy_id");
-                if (policyIdNode != null && !policyIdNode.isNull()) {
-                    return policyIdNode.asLong();
-                }
-            } catch (Exception e) {
-                log.debug("Could not parse details JSON for policy_id: {}", detailsStr);
-            }
-        }
-        return null;
+    private Optional<Long> extractPolicyId(JsonNode after) {
+        return parseStringField(after, FIELD_DETAILS)
+                .flatMap(detailsStr -> {
+                    try {
+                        JsonNode detailsNode = mapper.readTree(detailsStr);
+                        return Optional.ofNullable(detailsNode.get("policy_id"))
+                                .filter(node -> !node.isNull())
+                                .map(JsonNode::asLong);
+                    } catch (Exception e) {
+                        log.debug("Could not parse details JSON for policy_id: {}", detailsStr);
+                        return Optional.empty();
+                    }
+                });
     }
 }
