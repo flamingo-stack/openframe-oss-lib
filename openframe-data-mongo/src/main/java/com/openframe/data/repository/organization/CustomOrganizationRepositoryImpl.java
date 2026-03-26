@@ -45,10 +45,10 @@ public class CustomOrganizationRepositoryImpl implements CustomOrganizationRepos
         // Collect all criteria to combine them with $and
         List<Criteria> criteriaList = new ArrayList<>();
 
-        // Always exclude soft deleted organizations
+        // Always exclude non-active organizations (archived, deleted)
         criteriaList.add(new Criteria().orOperator(
-                Criteria.where("deleted").is(false),
-                Criteria.where("deleted").exists(false)
+                Criteria.where("status").is("ACTIVE"),
+                Criteria.where("status").exists(false)
         ));
 
         if (filter != null) {

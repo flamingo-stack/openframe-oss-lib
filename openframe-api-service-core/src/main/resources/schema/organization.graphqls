@@ -32,8 +32,8 @@ type Organization implements Node {
     createdAt: Instant
     updatedAt: Instant
     isDefault: Boolean!
-    deleted: Boolean
-    deletedAt: Instant
+    status: String
+    statusChangedAt: Instant
     
     # Logo for the organization
     image: OrganizationImage
