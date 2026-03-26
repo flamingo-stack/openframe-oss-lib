@@ -18,6 +18,10 @@ public enum MessageType {
     FLEET_MDM_EVENT(IntegratedToolType.FLEET, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
             List.of(Destination.CASSANDRA, Destination.KAFKA), EventHandlerType.COMMON_TYPE),
     FLEET_MDM_QUERY_RESULT_EVENT(IntegratedToolType.FLEET, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
+            List.of(Destination.CASSANDRA, Destination.KAFKA), EventHandlerType.COMMON_TYPE),
+    FLEET_MDM_POLICY_ACTIVITY_EVENT(IntegratedToolType.FLEET, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
+            List.of(Destination.CASSANDRA, Destination.KAFKA), EventHandlerType.COMMON_TYPE),
+    FLEET_MDM_POLICY_MEMBERSHIP_EVENT(IntegratedToolType.FLEET, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
             List.of(Destination.CASSANDRA, Destination.KAFKA), EventHandlerType.COMMON_TYPE);
 
     private final IntegratedToolType integratedToolType;

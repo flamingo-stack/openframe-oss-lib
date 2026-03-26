@@ -325,5 +325,9 @@ public class EventTypeMapper {
         
         // Setup Experience
         registerMapping(IntegratedToolType.FLEET, SourceEventTypes.Fleet.EDITED_SETUP_EXPERIENCE_SOFTWARE, UnifiedEventType.CONFIGURATION_UPDATED);
+
+        // Policy Membership
+        registerMapping(IntegratedToolType.FLEET, SourceEventTypes.Fleet.POLICY_MEMBERSHIP_PASS, UnifiedEventType.POLICY_APPLIED);
+        registerMapping(IntegratedToolType.FLEET, SourceEventTypes.Fleet.POLICY_MEMBERSHIP_FAIL, UnifiedEventType.POLICY_VIOLATION);
     }
 }
