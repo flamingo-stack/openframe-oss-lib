@@ -17,4 +17,5 @@ public class OrganizationFilterOptions {
     private Integer minEmployees;
     private Integer maxEmployees;
     private Boolean hasActiveContract;
+    private String status;
 }
