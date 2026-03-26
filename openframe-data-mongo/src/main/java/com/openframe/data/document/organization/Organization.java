@@ -100,25 +100,29 @@ public class Organization {
     private Instant updatedAt;
 
     /**
-     * Soft delete flag - when true, organization is considered deleted
+     * Organization status. Defaults to ACTIVE.
+     * ARCHIVED - organization is hidden from normal queries but remains in the database.
+     * This is used instead of deletion because devices with DELETED status may come back
+     * online and need their organization reference intact.
+     * DELETED - organization is soft deleted.
      */
     @Indexed
     @Builder.Default
-    private Boolean deleted = false;
+    private OrganizationStatus status = OrganizationStatus.ACTIVE;
 
     /**
-     * Timestamp when organization was soft deleted
+     * Timestamp when organization status was last changed (archived or deleted)
      */
-    private Instant deletedAt;
+    private Instant statusChangedAt;
 
     /**
      * Check if the contract is currently active
      */
     public boolean isContractActive() {
         LocalDate now = LocalDate.now();
-        return contractStartDate != null 
+        return contractStartDate != null
             && contractEndDate != null
-            && !now.isBefore(contractStartDate) 
+            && !now.isBefore(contractStartDate)
             && !now.isAfter(contractEndDate);
     }
 
@@ -126,7 +130,14 @@ public class Organization {
      * Check if organization is deleted (soft delete)
      */
     public boolean isDeleted() {
-        return Boolean.TRUE.equals(deleted);
+        return status == OrganizationStatus.DELETED;
+    }
+
+    /**
+     * Check if organization is archived
+     */
+    public boolean isArchived() {
+        return status == OrganizationStatus.ARCHIVED;
     }
 }
 

@@ -7,7 +7,6 @@ import com.openframe.external.mapper.OrganizationMapper;
 import com.openframe.api.service.OrganizationCommandService;
 import com.openframe.api.service.OrganizationQueryService;
 import com.openframe.core.dto.ErrorResponse;
-import com.openframe.data.exception.OrganizationHasMachinesException;
 import com.openframe.data.service.OrganizationService;
 import com.openframe.external.dto.organization.OrganizationsResponse;
 import com.openframe.external.exception.OrganizationNotFoundException;
@@ -243,23 +242,18 @@ public class OrganizationController {
         }
     }
 
+    @Deprecated
     @Operation(
-            summary = "Delete an organization",
-            description = "Delete an organization by ID. Cannot delete if organization has associated machines."
+            summary = "Delete an organization (Deprecated)",
+            description = "Organization deletion is no longer supported. Use POST /{id}/archive instead.",
+            deprecated = true
     )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "204", description = "Organization deleted successfully"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized - invalid or missing API key",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "Organization not found",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "409", description = "Cannot delete organization with associated machines",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "500", description = "Internal server error",
+            @ApiResponse(responseCode = "405", description = "Method not allowed - use archive instead",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @DeleteMapping("/{id}")
-    @ResponseStatus(NO_CONTENT)
+    @ResponseStatus(METHOD_NOT_ALLOWED)
     public void deleteOrganization(
             @Parameter(description = "Organization database ID", required = true)
             @PathVariable String id,
@@ -267,12 +261,65 @@ public class OrganizationController {
             @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
             @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
 
-        log.info("Deleting organization: {} - userId: {}, apiKeyId: {}", id, userId, apiKeyId);
+        throw new ResponseStatusException(METHOD_NOT_ALLOWED,
+                "Organization deletion is no longer supported. Use POST /api/v1/organizations/" + id + "/archive instead.");
+    }
+
+    @Operation(
+            summary = "Archive an organization",
+            description = "Archive an organization by ID. Cannot archive if organization has non-deleted machines."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Organization archived successfully"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized - invalid or missing API key",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "Organization not found",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "409", description = "Cannot archive organization with non-deleted machines",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "500", description = "Internal server error",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    @PostMapping("/{id}/archive")
+    @ResponseStatus(NO_CONTENT)
+    public void archiveOrganization(
+            @Parameter(description = "Organization database ID", required = true)
+            @PathVariable String id,
+
+            @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
+
+        log.info("Archiving organization: {} - userId: {}, apiKeyId: {}", id, userId, apiKeyId);
+
+        organizationCommandService.archiveOrganization(id);
+    }
+
+    @Operation(
+            summary = "Unarchive an organization",
+            description = "Restore an archived organization back to ACTIVE status."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Organization unarchived successfully"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized - invalid or missing API key",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "Organization not found or not archived",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "500", description = "Internal server error",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    @PostMapping("/{id}/unarchive")
+    @ResponseStatus(NO_CONTENT)
+    public void unarchiveOrganization(
+            @Parameter(description = "Organization database ID", required = true)
+            @PathVariable String id,
+
+            @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
+
+        log.info("Unarchiving organization: {} - userId: {}, apiKeyId: {}", id, userId, apiKeyId);
 
         try {
-            organizationCommandService.deleteOrganization(id);
-        } catch (OrganizationHasMachinesException e) {
-            throw new ResponseStatusException(CONFLICT, e.getMessage());
+            organizationCommandService.unarchiveOrganization(id);
         } catch (IllegalArgumentException e) {
             throw new OrganizationNotFoundException(id);
         }

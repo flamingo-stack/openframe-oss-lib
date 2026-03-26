@@ -32,6 +32,6 @@ public class OrganizationResponse {
     private Instant createdAt;
     private Instant updatedAt;
     private Boolean isDefault;
-    private Boolean deleted;
-    private Instant deletedAt;
+    private String status;
+    private Instant statusChangedAt;
 }
