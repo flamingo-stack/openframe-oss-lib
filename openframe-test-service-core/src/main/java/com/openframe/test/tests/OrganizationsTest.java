@@ -80,7 +80,7 @@ public class OrganizationsTest extends BaseTest {
         List<Organization> organizations = OrganizationApi.getOrganizations(false);
         assertThat(organizations).as("No Organization to update").isNotEmpty();
         CreateOrganizationRequest request = OrganizationGenerator.updateOrganizationRequest(false);
-        Organization organization = OrganizationApi.updateOrganization(organizations.getFirst().getId(), request);
+        Organization organization = OrganizationApi.updateOrganization(organizations.getFirst().getOrganizationId(), request);
         assertThat(organization.getId()).as("Organization id should not be null").isNotNull();
         assertThat(organization.getOrganizationId()).as("Organization organizationId should not be null").isNotNull();
         assertThat(organization.getIsDefault()).as("Organization should not be default").isFalse();

@@ -279,6 +279,19 @@ function renderAdvancedPageContainer({
       return (
         <div className="flex items-center justify-between md:flex-col md:items-start md:justify-start lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="flex flex-col gap-1 flex-1 min-w-0">
+            {/* Back Button */}
+            {backButton && (
+              <Button
+                onClick={backButton.onClick}
+                variant="ghost-subtle"
+                className="self-start justify-start hidden md:flex"
+                leftIcon={<ChevronLeft className="size-6" />}
+                noPadding
+              >
+                {backButton.label || 'Back'}
+              </Button>
+            )}
+
             {title && (
               <h1 className="text-h2 tracking-[-0.48px] text-ods-text-primary">
                 {title}
