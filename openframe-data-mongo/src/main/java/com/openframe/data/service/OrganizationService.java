@@ -119,11 +119,11 @@ public class OrganizationService {
             throw new IllegalArgumentException("The default organization {} cannot be deleted: " + id);
         }
         
-        // Check if any active machines are associated with this organization
-        // Allow deletion if all linked machines are in ARCHIVED or DELETED status
-        var excludedStatuses = EnumSet.of(DeviceStatus.ARCHIVED, DeviceStatus.DELETED);
+        // Check if any non-deleted machines are associated with this organization
+        // Allow deletion only if all linked devices are in DELETED status
+        var excludedStatuses = EnumSet.of(DeviceStatus.DELETED);
         if (machineRepository.existsByOrganizationIdAndStatusNotIn(organization.getOrganizationId(), excludedStatuses)) {
-            log.warn("Cannot delete organization {} - has active machines", organization.getOrganizationId());
+            log.warn("Cannot delete organization {} - has non-deleted machines", organization.getOrganizationId());
             throw new OrganizationHasMachinesException(organization.getOrganizationId());
         }
         
