@@ -18,14 +18,6 @@ public class OrganizationApi {
 
     private static final String ORGANIZATIONS = "api/organizations";
 
-    public static List<String> getOrganizationNames() {
-        Map<String, String> body = Map.ofEntries(Map.entry("query", ORGANIZATION_NAMES));
-        return given(RequestSpecHelper.getAuthorizedSpec())
-                .body(body).post(GRAPHQL)
-                .then().spec(graphqlSuccess())
-                .extract().jsonPath().getList("data.organizations.edges.node.name", String.class);
-    }
-
     public static List<Organization> listOrganizations() {
         Map<String, String> body = Map.of("query", OrganizationQueries.ORGANIZATIONS);
         return given(RequestSpecHelper.getAuthorizedSpec())
@@ -38,17 +30,6 @@ public class OrganizationApi {
         return listOrganizations().stream()
                 .filter(org -> Boolean.valueOf(isDefault).equals(org.getIsDefault()))
                 .toList();
-    }
-
-    public static Organization retrieveOrganization(String id) {
-        Map<String, Object> body = Map.of(
-                "query", FULL_ORGANIZATION,
-                "variables", Map.of("id", id)
-        );
-        return given(RequestSpecHelper.getAuthorizedSpec())
-                .body(body).post(GRAPHQL)
-                .then().spec(graphqlSuccess())
-                .extract().jsonPath().getObject("data.organization", Organization.class);
     }
 
     public static Organization retrieveOrganizationByOrganizationId(String organizationId) {
@@ -77,10 +58,11 @@ public class OrganizationApi {
                 .extract().as(Organization.class);
     }
 
-    public static void deleteOrganization(Organization organization) {
-        final String DELETE_ORGANIZATION = ORGANIZATIONS.concat("/").concat(organization.getOrganizationId());
+    public static void archiveOrganization(Organization organization) {
+        final String ARCHIVE_ORGANIZATION = ORGANIZATIONS.concat("/").concat(organization.getOrganizationId()).concat("/status");
         given(RequestSpecHelper.getAuthorizedSpec()).contentType(ContentType.JSON)
-                .delete(DELETE_ORGANIZATION)
+                .body(Map.of("status", "ARCHIVED"))
+                .patch(ARCHIVE_ORGANIZATION)
                 .then().statusCode(204);
     }
 }
