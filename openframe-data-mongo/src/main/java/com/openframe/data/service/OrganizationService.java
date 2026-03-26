@@ -97,68 +97,62 @@ public class OrganizationService {
     }
 
     /**
-     * Archive organization by ID.
-     * Only allows archiving if all associated machines are in DELETED status.
+     * Check if an organization can be archived.
+     * Returns true if all associated devices are in ARCHIVED or DELETED status (or no devices exist).
      *
      * @param id organization document ID
-     * @throws OrganizationHasMachinesException if non-deleted machines are associated with this organization
+     * @return true if organization can be archived
      */
-    public void archiveOrganization(String id) {
-        log.info("Attempting to archive organization with ID: {}", id);
-
+    public boolean canArchiveOrganization(String id) {
         Organization organization = organizationRepository.findByOrganizationId(id)
                 .orElseThrow(() -> new IllegalArgumentException("Organization not found with id: " + id));
 
-        if (organization.isArchived()) {
-            log.warn("Organization {} is already archived", id);
-            throw new IllegalArgumentException("Organization is already archived: " + id);
-        }
-
-        if (organization.isDeleted()) {
-            log.warn("Organization {} is deleted and cannot be archived", id);
-            throw new IllegalArgumentException("Organization is already deleted: " + id);
-        }
-
-        if (organization.getIsDefault()) {
-            log.warn("The default organization {} cannot be archived", id);
-            throw new IllegalArgumentException("The default organization cannot be archived: " + id);
-        }
-
-        // Check if any non-archived/non-deleted machines are associated with this organization
         var excludedStatuses = EnumSet.of(DeviceStatus.ARCHIVED, DeviceStatus.DELETED);
-        if (machineRepository.existsByOrganizationIdAndStatusNotIn(organization.getOrganizationId(), excludedStatuses)) {
-            log.warn("Cannot archive organization {} - has active devices", organization.getOrganizationId());
-            throw new OrganizationHasMachinesException(organization.getOrganizationId());
-        }
-
-        organization.setStatus(OrganizationStatus.ARCHIVED);
-        organization.setStatusChangedAt(Instant.now());
-        organizationRepository.save(organization);
-
-        log.info("Successfully archived organization with ID: {}", id);
+        return !machineRepository.existsByOrganizationIdAndStatusNotIn(organization.getOrganizationId(), excludedStatuses);
     }
 
     /**
-     * Restore an archived organization back to ACTIVE status.
+     * Update organization status.
+     * Supports transitions: ACTIVE → ARCHIVED (with device check) and ARCHIVED → ACTIVE.
      *
      * @param id organization document ID
+     * @param newStatus target status (ACTIVE or ARCHIVED)
+     * @throws OrganizationHasMachinesException if archiving and organization has active devices
      */
-    public void unarchiveOrganization(String id) {
-        log.info("Attempting to unarchive organization with ID: {}", id);
+    public void updateOrganizationStatus(String id, OrganizationStatus newStatus) {
+        log.info("Attempting to update organization {} status to {}", id, newStatus);
 
         Organization organization = organizationRepository.findByOrganizationId(id)
                 .orElseThrow(() -> new IllegalArgumentException("Organization not found with id: " + id));
 
-        if (!organization.isArchived()) {
-            log.warn("Organization {} is not archived", id);
-            throw new IllegalArgumentException("Organization is not archived: " + id);
+        if (organization.getStatus() == newStatus) {
+            log.warn("Organization {} is already in status {}", id, newStatus);
+            throw new IllegalArgumentException("Organization is already in status " + newStatus);
         }
 
-        organization.setStatus(OrganizationStatus.ACTIVE);
+        if (organization.getIsDefault()) {
+            log.warn("The default organization {} status cannot be changed", id);
+            throw new IllegalArgumentException("The default organization status cannot be changed");
+        }
+
+        if (newStatus == OrganizationStatus.ARCHIVED) {
+            // Check if any non-archived/non-deleted machines are associated with this organization
+            var excludedStatuses = EnumSet.of(DeviceStatus.ARCHIVED, DeviceStatus.DELETED);
+            if (machineRepository.existsByOrganizationIdAndStatusNotIn(organization.getOrganizationId(), excludedStatuses)) {
+                log.warn("Cannot archive organization {} - has active devices", organization.getOrganizationId());
+                throw new OrganizationHasMachinesException(organization.getOrganizationId());
+            }
+        }
+
+        if (newStatus == OrganizationStatus.ACTIVE && !organization.isArchived()) {
+            throw new IllegalArgumentException("Only archived organizations can be set to ACTIVE");
+        }
+
+        organization.setStatus(newStatus);
         organization.setStatusChangedAt(Instant.now());
         organizationRepository.save(organization);
 
-        log.info("Successfully unarchived organization with ID: {}", id);
+        log.info("Successfully updated organization {} status to {}", id, newStatus);
     }
 
     /**
