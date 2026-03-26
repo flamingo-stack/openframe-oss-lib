@@ -305,5 +305,9 @@ public interface SourceEventTypes {
         
         // Setup Experience
         String EDITED_SETUP_EXPERIENCE_SOFTWARE = "edited_setup_experience_software";
+
+        // Policy Membership
+        String POLICY_MEMBERSHIP_PASS = "policy_membership_pass";
+        String POLICY_MEMBERSHIP_FAIL = "policy_membership_fail";
     }
 }
