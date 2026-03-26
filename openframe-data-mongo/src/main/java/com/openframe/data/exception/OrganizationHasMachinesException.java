@@ -10,6 +10,6 @@ public class OrganizationHasMachinesException extends ConflictException {
 
     public OrganizationHasMachinesException(String organizationId) {
         super(ErrorCode.ORGANIZATION_HAS_MACHINES,
-                "Cannot archive organization because it has devices that must be archived or deleted first");
+                "This organization still has active devices. To archive it, you'll need to delete or archive all devices first.");
     }
 }
