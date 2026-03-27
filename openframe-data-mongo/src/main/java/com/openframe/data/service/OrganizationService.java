@@ -34,36 +34,36 @@ public class OrganizationService {
     private final MachineRepository machineRepository;
 
     /**
-     * Get organization by ID (excluding deleted and archived)
+     * Get organization by ID (excluding deleted)
      * @param id organization document ID
-     * @return Optional containing the organization if found and active
+     * @return Optional containing the organization if found and not deleted
      */
     public Optional<Organization> getOrganizationById(String id) {
         log.debug("Fetching organization by ID: {}", id);
         return organizationRepository.findById(id)
-                .filter(org -> org.getStatus() == OrganizationStatus.ACTIVE);
+                .filter(org -> !org.isDeleted());
     }
 
     /**
-     * Get organization by organizationId (excluding deleted and archived)
+     * Get organization by organizationId (excluding deleted)
      * @param organizationId unique organization identifier
-     * @return Optional containing the organization if found and active
+     * @return Optional containing the organization if found and not deleted
      */
     public Optional<Organization> getOrganizationByOrganizationId(String organizationId) {
         log.debug("Fetching organization by organizationId: {}", organizationId);
         return organizationRepository.findByOrganizationId(organizationId)
-                .filter(org -> org.getStatus() == OrganizationStatus.ACTIVE);
+                .filter(org -> !org.isDeleted());
     }
 
     /**
-     * Get organization by name (excluding deleted and archived)
+     * Get organization by name (excluding deleted)
      * @param name organization name
-     * @return Optional containing the organization if found and active
+     * @return Optional containing the organization if found and not deleted
      */
     public Optional<Organization> getOrganizationByName(String name) {
         log.debug("Fetching organization by name: {}", name);
         return organizationRepository.findByName(name)
-                .filter(org -> org.getStatus() == OrganizationStatus.ACTIVE);
+                .filter(org -> !org.isDeleted());
     }
 
     /**
