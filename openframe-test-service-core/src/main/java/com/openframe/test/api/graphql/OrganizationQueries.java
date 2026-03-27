@@ -2,8 +2,8 @@ package com.openframe.test.api.graphql;
 
 public class OrganizationQueries {
     public static final String ORGANIZATIONS = """
-            query {
-                organizations {
+            query($first: Int, $after: String) {
+                organizations(first: $first, after: $after) {
                     edges {
                         node {
                             id
@@ -48,6 +48,7 @@ public class OrganizationQueries {
                             statusChangedAt
                         }
                     }
+                    pageInfo { hasNextPage endCursor }
                 }
             }
             """;
