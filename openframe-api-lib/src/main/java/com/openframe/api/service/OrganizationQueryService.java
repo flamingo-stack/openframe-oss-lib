@@ -96,6 +96,7 @@ public class OrganizationQueryService {
                 .minEmployees(filterOptions.getMinEmployees())
                 .maxEmployees(filterOptions.getMaxEmployees())
                 .hasActiveContract(filterOptions.getHasActiveContract())
+                .status(filterOptions.getStatus())
                 .build();
     }
     

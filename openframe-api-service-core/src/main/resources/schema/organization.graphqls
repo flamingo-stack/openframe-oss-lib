@@ -74,6 +74,8 @@ input OrganizationFilterInput {
     minEmployees: Int
     maxEmployees: Int
     hasActiveContract: Boolean
+    # Filter by organization status (ACTIVE or ARCHIVED). Defaults to ACTIVE.
+    status: String
 }
 
 type OrganizationConnection {

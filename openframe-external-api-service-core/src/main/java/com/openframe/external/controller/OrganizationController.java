@@ -73,6 +73,9 @@ public class OrganizationController {
             @Parameter(description = "Filter by active contract status")
             @RequestParam(required = false) Boolean hasActiveContract,
 
+            @Parameter(description = "Filter by organization status (ACTIVE or ARCHIVED). Defaults to ACTIVE.")
+            @RequestParam(required = false) String status,
+
             @Parameter(description = "Search query for organization name and category")
             @RequestParam(required = false) String search,
 
@@ -91,8 +94,8 @@ public class OrganizationController {
             @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
             @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
 
-        log.info("Getting organizations - category: {}, minEmployees: {}, maxEmployees: {}, hasActiveContract: {}, search: {}, limit: {}, cursor: {}, sortField: {}, sortDirection: {} - userId: {}, apiKeyId: {}",
-                category, minEmployees, maxEmployees, hasActiveContract, search, limit, cursor, sortField, sortDirection, userId, apiKeyId);
+        log.info("Getting organizations - category: {}, minEmployees: {}, maxEmployees: {}, hasActiveContract: {}, status: {}, search: {}, limit: {}, cursor: {}, sortField: {}, sortDirection: {} - userId: {}, apiKeyId: {}",
+                category, minEmployees, maxEmployees, hasActiveContract, status, search, limit, cursor, sortField, sortDirection, userId, apiKeyId);
 
         // Build filter options directly from query parameters
         OrganizationFilterOptions filterOptions = OrganizationFilterOptions.builder()
@@ -100,6 +103,7 @@ public class OrganizationController {
                 .minEmployees(minEmployees)
                 .maxEmployees(maxEmployees)
                 .hasActiveContract(hasActiveContract)
+                .status(status)
                 .build();
 
         var result = organizationQueryService.queryOrganizations(
