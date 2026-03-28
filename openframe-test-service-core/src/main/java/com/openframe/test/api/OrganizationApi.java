@@ -6,10 +6,12 @@ import com.openframe.test.data.dto.organization.Organization;
 import com.openframe.test.helpers.RequestSpecHelper;
 import io.restassured.http.ContentType;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.openframe.test.api.graphql.OrganizationQueries.*;
+import static com.openframe.test.api.graphql.OrganizationQueries.ORGANIZATION_BY_ORGANIZATION_ID;
 import static com.openframe.test.config.EnvironmentConfig.GRAPHQL;
 import static com.openframe.test.helpers.RequestSpecHelper.graphqlSuccess;
 import static io.restassured.RestAssured.given;
@@ -19,11 +21,34 @@ public class OrganizationApi {
     private static final String ORGANIZATIONS = "api/organizations";
 
     public static List<Organization> listOrganizations() {
-        Map<String, String> body = Map.of("query", OrganizationQueries.ORGANIZATIONS);
-        return given(RequestSpecHelper.getAuthorizedSpec())
-                .body(body).post(GRAPHQL)
-                .then().spec(graphqlSuccess())
-                .extract().jsonPath().getList("data.organizations.edges.node", Organization.class);
+        List<Organization> allOrganizations = new ArrayList<>();
+        String cursor = null;
+        boolean hasNextPage = true;
+
+        while (hasNextPage) {
+            Map<String, Object> variables = new HashMap<>();
+            variables.put("first", 100);
+            if (cursor != null) {
+                variables.put("after", cursor);
+            }
+            Map<String, Object> body = Map.of(
+                    "query", OrganizationQueries.ORGANIZATIONS,
+                    "variables", variables
+            );
+
+            var response = given(RequestSpecHelper.getAuthorizedSpec())
+                    .body(body).post(GRAPHQL)
+                    .then().spec(graphqlSuccess())
+                    .extract().jsonPath();
+
+            List<Organization> page = response.getList("data.organizations.edges.node", Organization.class);
+            allOrganizations.addAll(page);
+
+            hasNextPage = response.getObject("data.organizations.pageInfo.hasNextPage", Boolean.class);
+            cursor = response.getString("data.organizations.pageInfo.endCursor");
+        }
+
+        return allOrganizations;
     }
 
     public static List<Organization> getOrganizations(boolean isDefault) {
