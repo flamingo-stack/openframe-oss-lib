@@ -41,7 +41,7 @@ public class ConnectorRecoveryManager {
 
     @Autowired
     public ConnectorRecoveryManager(DebeziumService debeziumService,
-                                    @Autowired(required = false) ConnectorAlertRepository connectorAlertRepository) {
+                                    ConnectorAlertRepository connectorAlertRepository) {
         this.debeziumService = debeziumService;
         this.connectorAlertRepository = connectorAlertRepository;
     }
