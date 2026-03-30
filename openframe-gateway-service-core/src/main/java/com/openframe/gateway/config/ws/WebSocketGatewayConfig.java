@@ -53,10 +53,11 @@ public class WebSocketGatewayConfig {
     @Primary
     public WebSocketClient proxyCleanupWebSocketClient(
             @Qualifier("reactorNettyWebSocketClient") WebSocketClient delegate,
+            WebSocketLoggingProperties loggingProperties,
             @Value("${openframe.gateway.websocket.proxy-cleanup.enabled:false}") boolean cleanupEnabled) {
         if (cleanupEnabled) {
             log.info("WebSocket proxy session cleanup is ENABLED");
-            return new ProxySessionCleanupWebSocketClient(delegate);
+            return new ProxySessionCleanupWebSocketClient(delegate, loggingProperties);
         }
         log.info("WebSocket proxy session cleanup is DISABLED");
         return delegate;
