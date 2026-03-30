@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import ReactPlayer from 'react-player';
+import { useImageEdgeColor } from '../../hooks/ui/use-image-edge-color';
 
 // Simple SVG icon components
 const Play = ({ size = 16, className }: { size?: number; className?: string }) => (
@@ -33,7 +34,9 @@ interface VideoPlayerProps {
   loop?: boolean;
   muted?: boolean;
   controls?: boolean;
-  useNativeAspectRatio?: boolean; // If true, video uses native dimensions instead of 16:9
+  useNativeAspectRatio?: boolean;
+  /** @deprecated No longer needed — play overlay always shows. Kept for backward compatibility. */
+  showPlayOverlay?: boolean;
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -48,28 +51,23 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   controls = true,
   useNativeAspectRatio = false,
 }) => {
-  const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [isPlaying, setIsPlaying] = useState(autoPlay);
   const [mounted, setMounted] = useState(false);
-  const [showPoster, setShowPoster] = useState(true);
+  const [hasStarted, setHasStarted] = useState(autoPlay);
+  const posterBgColor = useImageEdgeColor(poster);
 
   useEffect(() => {
     setMounted(true);
-    setIsLoading(false);
   }, []);
 
-  const handleReady = () => {
-    setIsLoading(false);
-  };
-
   const handleError = () => {
-    setIsLoading(false);
     setHasError(true);
   };
 
   const handlePlay = () => {
     setIsPlaying(true);
+    setHasStarted(true);
   };
 
   const handlePause = () => {
@@ -80,12 +78,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     setIsPlaying(false);
   };
 
-  const handlePosterClick = () => {
-    setShowPoster(false);
+  const handlePlayClick = () => {
+    setHasStarted(true);
     setIsPlaying(true);
   };
 
-  // Don't render until mounted to prevent hydration mismatch
+  // SSR placeholder — consistent loading skeleton
   if (!mounted) {
     return (
       <div className={`video-player-container ${className}`}>
@@ -93,10 +91,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           className="video-wrapper relative w-full"
           style={useNativeAspectRatio ? {} : { paddingBottom: '56.25%' }}
         >
-          <div className={useNativeAspectRatio ? "loading-overlay bg-ods-card border border-ods-border rounded-md flex items-center justify-center min-h-[200px]" : "loading-overlay absolute inset-0 bg-ods-card border border-ods-border rounded-md flex items-center justify-center"}>
-            <div className="loading-content flex flex-col items-center gap-3">
-              <Loader className="animate-spin text-ods-accent" size={32} />
-              <span className="font-sans text-sm text-ods-text-secondary">Loading video...</span>
+          <div className={useNativeAspectRatio
+            ? "bg-black rounded-md flex items-center justify-center min-h-[200px]"
+            : "absolute inset-0 bg-black rounded-md flex items-center justify-center"
+          }>
+            <div className="w-16 h-16 rounded-full bg-ods-accent flex items-center justify-center shadow-lg">
+              <Play size={24} className="ml-1 text-ods-text-on-accent" />
             </div>
           </div>
         </div>
@@ -133,33 +133,31 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         </div>
       )}
 
-      {/* Video Container - Conditionally applies 16:9 aspect ratio or native ratio */}
+      {/* Video Container */}
       <div
         className="video-wrapper relative w-full"
         style={useNativeAspectRatio ? {} : { paddingBottom: '56.25%' }}
       >
-        {/* Loading State */}
-        {isLoading && (
-          <div className={useNativeAspectRatio ? "loading-overlay bg-ods-card border border-ods-border rounded-md flex items-center justify-center z-10 min-h-[200px]" : "loading-overlay absolute inset-0 bg-ods-card border border-ods-border rounded-md flex items-center justify-center z-10"}>
-            <div className="loading-content flex flex-col items-center gap-3">
-              <Loader className="animate-spin text-ods-accent" size={32} />
-              <span className="font-sans text-sm text-ods-text-secondary">Loading video...</span>
-            </div>
-          </div>
-        )}
-
-        {/* Custom Poster Overlay - Single Click to Play */}
-        {showPoster && poster && !hasError && (
+        {/* Play button overlay — shown before user clicks play */}
+        {!hasStarted && !hasError && (
           <div
-            className={useNativeAspectRatio ? "relative cursor-pointer group z-20" : "absolute inset-0 cursor-pointer group z-20"}
-            onClick={handlePosterClick}
+            className={useNativeAspectRatio
+              ? "absolute inset-0 cursor-pointer group z-20"
+              : "absolute inset-0 cursor-pointer group z-20"
+            }
+            onClick={handlePlayClick}
           >
-            <img
-              src={poster}
-              alt={title || 'Video thumbnail'}
-              className={useNativeAspectRatio ? "w-full h-auto object-contain rounded-md" : "w-full h-full object-cover rounded-md"}
-            />
-            <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-all flex items-center justify-center">
+            {/* Poster image overlay (when provided) */}
+            {poster && (
+              <img
+                src={poster}
+                alt={title || 'Video thumbnail'}
+                className="w-full h-full object-contain rounded-md"
+                style={{ backgroundColor: posterBgColor }}
+              />
+            )}
+            {/* Play button — sits on top of poster or the video first frame */}
+            <div className={`absolute inset-0 ${poster ? 'bg-black/40' : 'bg-black/20'} group-hover:bg-black/50 transition-all flex items-center justify-center rounded-md`}>
               <div className="w-16 h-16 rounded-full bg-ods-accent hover:bg-ods-accent/90 transition-all flex items-center justify-center shadow-lg">
                 <Play size={24} className="ml-1 text-ods-text-on-accent" />
               </div>
@@ -167,17 +165,19 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           </div>
         )}
 
-        {/* Video Player */}
-        <div className={useNativeAspectRatio ? "video-player rounded-md overflow-hidden border border-ods-border bg-ods-background" : "video-player absolute inset-0 rounded-md overflow-hidden border border-ods-border bg-ods-background"}>
+        {/* Video Player — always rendered; shows first frame when no poster */}
+        <div className={useNativeAspectRatio
+          ? "video-player rounded-md overflow-hidden border border-ods-border bg-ods-background"
+          : "video-player absolute inset-0 rounded-md overflow-hidden border border-ods-border bg-ods-background"
+        }>
           <ReactPlayer
             url={url}
             width="100%"
             height={useNativeAspectRatio ? "auto" : "100%"}
-            controls={controls}
+            controls={hasStarted && controls}
             playing={isPlaying}
             loop={loop}
             muted={muted}
-            onReady={handleReady}
             onError={handleError}
             onPlay={handlePlay}
             onPause={handlePause}
@@ -185,7 +185,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             config={{
               file: {
                 attributes: {
-                  poster: poster || undefined,
                   controlsList: 'nodownload',
                   playsInline: true,
                 }

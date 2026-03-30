@@ -14,10 +14,10 @@ import java.util.List;
 import static com.openframe.test.data.generator.DeviceGenerator.*;
 import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
 
-@Tag("saas")
 @DisplayName("Devices")
 public class DevicesTest extends BaseTest {
 
+    @Tag("saas")
     @Tag("read")
     @Test
     @DisplayName("Get device filters")
@@ -39,6 +39,7 @@ public class DevicesTest extends BaseTest {
         assertThat(filters.getFilteredCount()).as("Device filter filteredCount should not be zero").isNotZero();
     }
 
+    @Tag("saas")
     @Tag("read")
     @Test
     @DisplayName("Get device")
@@ -69,6 +70,7 @@ public class DevicesTest extends BaseTest {
         });
     }
 
+    @Tag("saas")
     @Tag("read")
     @Test
     @DisplayName("Get fleet info")
@@ -120,6 +122,7 @@ public class DevicesTest extends BaseTest {
         }
     }
 
+    @Tag("saas")
     @Tag("read")
     @Test
     @DisplayName("Search device by hostname")
@@ -131,6 +134,7 @@ public class DevicesTest extends BaseTest {
         assertThat(device.getHostname()).as("Searched device hostname should match").isEqualTo(hostnames.getFirst());
     }
 
+    @Tag("saas")
     @Tag("read")
     @Test
     @DisplayName("Filter devices by OS")

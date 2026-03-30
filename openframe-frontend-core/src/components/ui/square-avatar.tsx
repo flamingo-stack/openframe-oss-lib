@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react";
+import Image from "next/image";
 import { cn } from "../../utils/cn";
 
 // Extract initials from a name (first letter of first and last word)
@@ -30,6 +31,13 @@ const SquareAvatar = React.forwardRef<HTMLDivElement, SquareAvatarProps>(
       xl: 'h-16 w-16'
     };
 
+    const sizePx = {
+      sm: 32,
+      md: 40,
+      lg: 48,
+      xl: 64
+    };
+
     const variantClasses = {
       square: 'rounded-md',
       round: 'rounded-full'
@@ -47,10 +55,12 @@ const SquareAvatar = React.forwardRef<HTMLDivElement, SquareAvatarProps>(
         {...props}
       >
         {src ? (
-          <img
+          <Image
             className="aspect-square h-full w-full object-cover"
             src={src}
-            alt={alt}
+            alt={alt || ''}
+            width={sizePx[size]}
+            height={sizePx[size]}
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-ods-bg">

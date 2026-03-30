@@ -1,29 +1,9 @@
 package com.openframe.test.api.graphql;
 
 public class OrganizationQueries {
-    public static final String ORGANIZATION_NAMES = """
-            query {
-                organizations {
-                    edges {
-                        node { name }
-                    }
-                }
-            }
-            """;
-
-    public static final String ORGANIZATION_IDS = """
-            query {
-                organizations {
-                    edges {
-                        node { id }
-                    }
-                }
-            }
-            """;
-
     public static final String ORGANIZATIONS = """
-            query {
-                organizations {
+            query($first: Int, $after: String) {
+                organizations(first: $first, after: $after) {
                     edges {
                         node {
                             id
@@ -64,17 +44,18 @@ public class OrganizationQueries {
                             createdAt
                             updatedAt
                             isDefault
-                            deleted
-                            deletedAt
+                            status
+                            statusChangedAt
                         }
                     }
+                    pageInfo { hasNextPage endCursor }
                 }
             }
             """;
 
-    public static final String FULL_ORGANIZATION = """
-            query($id: ID!) {
-                organization(id: $id) {
+    public static final String ORGANIZATION_BY_ORGANIZATION_ID = """
+            query($organizationId: String!) {
+                organizationByOrganizationId(organizationId: $organizationId) {
                     id
                     name
                     organizationId
@@ -113,8 +94,8 @@ public class OrganizationQueries {
                     createdAt
                     updatedAt
                     isDefault
-                    deleted
-                    deletedAt
+                    status
+                    statusChangedAt
                 }
             }
             """;

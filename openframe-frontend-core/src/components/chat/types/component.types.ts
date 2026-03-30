@@ -18,8 +18,10 @@ export interface ChatHeaderProps extends HTMLAttributes<HTMLDivElement> {
   userName?: string
   userTitle?: string
   userAvatar?: string
+  userIcon?: React.ReactNode
   onSettingsClick?: () => void
   onNewChat?: () => void
+  onClose?: () => void
   showNewChat?: boolean
   connectionStatus?: ConnectionStatus
   serverUrl?: string | null
@@ -38,6 +40,7 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
   content: string | MessageSegment[]
   name?: string
   assistantType?: AssistantType
+  assistantIcon?: React.ReactNode
   avatar?: string | null
   timestamp?: Date
   showAvatar?: boolean
@@ -59,6 +62,7 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
   showAvatars?: boolean
   contentClassName?: string
   assistantType?: AssistantType
+  assistantIcon?: React.ReactNode
   pendingApprovals?: MessageSegment[]
   onApprove?: (requestId?: string) => void | Promise<void>
   onReject?: (requestId?: string) => void | Promise<void>

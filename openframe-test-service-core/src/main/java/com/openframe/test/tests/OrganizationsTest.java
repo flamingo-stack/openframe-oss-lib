@@ -28,8 +28,6 @@ public class OrganizationsTest extends BaseTest {
         assertThat(organization.getIsDefault()).as("Organization should not be default").isFalse();
         assertThat(organization.getCreatedAt()).as("Organization createdAt should not be null").isNotNull();
         assertThat(organization.getUpdatedAt()).as("Organization updatedAt should not be null").isNotNull();
-        assertThat(organization.getDeleted()).as("Organization should not be deleted").isFalse();
-        assertThat(organization.getDeletedAt()).as("Organization deletedAt should be null").isNull();
         assertThat(organization.getContactInformation()).as("Organization contactInformation should not be null").isNotNull();
         assertThat(organization.getContactInformation().getMailingAddress())
                 .as("Mailing address should match physical address")
@@ -37,7 +35,7 @@ public class OrganizationsTest extends BaseTest {
         assertThat(organization).as("Created organization should match request")
                 .usingRecursiveComparison()
                 .ignoringFields("id", "organizationId", "isDefault", "createdAt",
-                        "updatedAt", "deleted", "deletedAt", "contactInformation.mailingAddress")
+                        "updatedAt", "status", "statusChangedAt", "contactInformation.mailingAddress")
                 .isEqualTo(request);
     }
 
@@ -52,7 +50,6 @@ public class OrganizationsTest extends BaseTest {
             assertThat(organization.getId()).as("Organization id should not be null").isNotNull();
             assertThat(organization.getOrganizationId()).as("Organization organizationId should not be null").isNotNull();
             assertThat(organization.getName()).as("Organization name should not be empty").isNotEmpty();
-            assertThat(organization.getCategory()).as("Organization category should not be empty").isNotEmpty();
             assertThat(organization.getCreatedAt()).as("Organization createdAt should not be null").isNotNull();
             assertThat(organization.getUpdatedAt()).as("Organization updatedAt should not be null").isNotNull();
         });
@@ -64,7 +61,7 @@ public class OrganizationsTest extends BaseTest {
     @DisplayName("Get Organization")
     public void testRetrieveOrganization() {
         List<Organization> organizations = OrganizationApi.listOrganizations();
-        Organization organization = OrganizationApi.retrieveOrganization(organizations.getFirst().getId());
+        Organization organization = OrganizationApi.retrieveOrganizationByOrganizationId(organizations.getFirst().getOrganizationId());
         assertThat(organization).as("No organization").isNotNull();
         assertThat(organization).as("Retrieved organization should match listed organization")
                 .usingRecursiveComparison()
@@ -80,31 +77,29 @@ public class OrganizationsTest extends BaseTest {
         List<Organization> organizations = OrganizationApi.getOrganizations(false);
         assertThat(organizations).as("No Organization to update").isNotEmpty();
         CreateOrganizationRequest request = OrganizationGenerator.updateOrganizationRequest(false);
-        Organization organization = OrganizationApi.updateOrganization(organizations.getFirst().getId(), request);
+        Organization organization = OrganizationApi.updateOrganization(organizations.getFirst().getOrganizationId(), request);
         assertThat(organization.getId()).as("Organization id should not be null").isNotNull();
         assertThat(organization.getOrganizationId()).as("Organization organizationId should not be null").isNotNull();
         assertThat(organization.getIsDefault()).as("Organization should not be default").isFalse();
         assertThat(organization.getCreatedAt()).as("Organization createdAt should not be null").isNotNull();
         assertThat(organization.getUpdatedAt()).as("Organization updatedAt should not be null").isNotNull();
-        assertThat(organization.getDeleted()).as("Organization should not be deleted").isFalse();
-        assertThat(organization.getDeletedAt()).as("Organization deletedAt should be null").isNull();
         assertThat(organization).as("Updated organization should match request")
                 .usingRecursiveComparison()
                 .ignoringFields("id", "organizationId", "isDefault", "createdAt",
-                        "updatedAt", "deleted", "deletedAt")
+                        "updatedAt", "status", "statusChangedAt")
                 .isEqualTo(request);
     }
 
     @Tag("delete")
     @Order(5)
     @Test
-    @DisplayName("Delete Organization")
-    public void testDeleteOrganization() {
+    @DisplayName("Archive Organization")
+    public void testArchiveOrganization() {
         List<Organization> organizations = OrganizationApi.getOrganizations(false);
-        assertThat(organizations).as("No Organization to delete").isNotEmpty();
+        assertThat(organizations).as("No Organization to archive").isNotEmpty();
         Organization organization = organizations.getFirst();
-        OrganizationApi.deleteOrganization(organization);
+        OrganizationApi.archiveOrganization(organization);
         organizations = OrganizationApi.getOrganizations(false);
-        assertThat(organizations).as("Deleted organization should not be in the list").doesNotContain(organization);
+        assertThat(organizations).as("Archived organization should not be in the list").doesNotContain(organization);
     }
 }

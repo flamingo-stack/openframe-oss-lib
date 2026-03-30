@@ -3,9 +3,10 @@ package com.openframe.api.controller;
 import com.openframe.api.dto.organization.CreateOrganizationRequest;
 import com.openframe.api.dto.organization.OrganizationResponse;
 import com.openframe.api.dto.organization.UpdateOrganizationRequest;
+import com.openframe.api.dto.organization.UpdateOrganizationStatusRequest;
 import com.openframe.api.mapper.OrganizationMapper;
 import com.openframe.api.service.OrganizationCommandService;
-import com.openframe.data.exception.OrganizationHasMachinesException;
+import com.openframe.data.service.OrganizationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
 @Slf4j
 public class OrganizationController {
 
+    private final OrganizationService organizationService;
     private final OrganizationCommandService organizationCommandService;
     private final OrganizationMapper organizationMapper;
 
@@ -66,23 +68,32 @@ public class OrganizationController {
     }
 
     /**
-     * DELETE /organizations/{id}
-     * Delete an organization.
-     * Throws 409 Conflict if organization has associated machines.
-     * 
+     * GET /organizations/{id}/can-archive
+     * Check if organization can be archived (no active devices linked).
+     *
      * @param id organization ID
+     * @return true if organization can be archived
      */
-    @DeleteMapping("/{id}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteOrganization(@PathVariable String id) {
-        log.info("Internal API: Deleting organization: {}", id);
+    @GetMapping("/{id}/can-archive")
+    @ResponseStatus(HttpStatus.OK)
+    public boolean canArchiveOrganization(@PathVariable String id) {
+        return organizationService.canArchiveOrganization(id);
+    }
 
-        try {
-            organizationCommandService.deleteOrganization(id);
-        } catch (OrganizationHasMachinesException e) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
-        } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-        }
+    /**
+     * PATCH /organizations/{id}/status
+     * Update organization status (ACTIVE or ARCHIVED).
+     * Archiving throws 409 Conflict if organization has active devices.
+     *
+     * @param id organization ID
+     * @param request status update request
+     */
+    @PatchMapping("/{id}/status")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void updateOrganizationStatus(
+            @PathVariable String id,
+            @Valid @RequestBody UpdateOrganizationStatusRequest request) {
+        log.info("Internal API: Updating organization {} status to {}", id, request.status());
+        organizationCommandService.updateOrganizationStatus(id, request);
     }
 }

@@ -35,7 +35,6 @@ public class OrganizationMapper {
                 .contractStartDate(request.contractStartDate())
                 .contractEndDate(request.contractEndDate())
                 .isDefault(false)
-                .deleted(false)
                 .build();
     }
 
@@ -112,8 +111,8 @@ public class OrganizationMapper {
                 .createdAt(organization.getCreatedAt())
                 .updatedAt(organization.getUpdatedAt())
                 .isDefault(organization.getIsDefault())
-                .deleted(organization.getDeleted())
-                .deletedAt(organization.getDeletedAt())
+                .status(organization.getStatus() != null ? organization.getStatus().name() : null)
+                .statusChangedAt(organization.getStatusChangedAt())
                 .build();
     }
 

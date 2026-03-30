@@ -15,6 +15,7 @@ import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 import java.time.Duration;
+import java.util.Map;
 
 /**
  * Configuration for Spring Cache with Redis
@@ -28,7 +29,7 @@ public class CacheConfig {
     @ConditionalOnMissingBean(CacheManager.class)
     public CacheManager cacheManager(RedisConnectionFactory redisConnectionFactory,
                                      OpenframeRedisKeyBuilder keyBuilder) {
-        RedisCacheConfiguration cacheConfiguration = RedisCacheConfiguration.defaultCacheConfig()
+        RedisCacheConfiguration defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
             .entryTtl(Duration.ofHours(6))
             .disableCachingNullValues()
             .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
@@ -37,9 +38,16 @@ public class CacheConfig {
                 // Ensures all cache keys are tenant-aware by default:
                 // <prefix>:<cacheName>::<key>
                 .computePrefixWith(cacheName -> keyBuilder.cacheKeyPrefix(null, cacheName));
-        
+
+        // Shorter TTL for Fleet caches — policies and queries can be renamed/deleted
+        RedisCacheConfiguration fleetCacheConfig = defaultConfig.entryTtl(Duration.ofHours(1));
+
         return RedisCacheManager.builder(redisConnectionFactory)
-            .cacheDefaults(cacheConfiguration)
+            .cacheDefaults(defaultConfig)
+            .withInitialCacheConfigurations(Map.of(
+                    "fleetPolicyCache", fleetCacheConfig,
+                    "fleetQueryCache", fleetCacheConfig
+            ))
             .build();
     }
 }

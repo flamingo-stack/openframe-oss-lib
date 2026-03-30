@@ -28,7 +28,7 @@ extend type Query {
 }
 
 # Tag key definition (not tied to a device)
-type Tag {
+type Tag implements Node {
     id: ID!
     key: String!
     description: String
@@ -142,7 +142,7 @@ type DeviceEdge {
     cursor: String!
 }
 
-type ToolConnection {
+type ToolConnection implements Node {
     id: ID!
     machineId: String!
     toolType: ToolType!
@@ -160,7 +160,7 @@ enum ConnectionStatus {
     ERROR
 }
 
-type InstalledAgent {
+type InstalledAgent implements Node {
     id: ID!
     machineId: String!
     agentType: String!

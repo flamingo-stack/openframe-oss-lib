@@ -5,9 +5,7 @@ import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.relay.NodeType;
 import graphql.relay.Relay;
-import com.openframe.api.service.DeviceService;
-import com.openframe.api.service.EventService;
-import com.openframe.api.service.ToolService;
+import com.openframe.api.service.*;
 import com.openframe.data.repository.tenant.TenantRepository;
 import com.openframe.data.service.OrganizationService;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +25,9 @@ public class NodeDataFetcher {
     private final OrganizationService organizationService;
     private final EventService eventService;
     private final ToolService toolService;
+    private final TagService tagService;
+    private final ToolConnectionService toolConnectionService;
+    private final InstalledAgentService installedAgentService;
 
     @Autowired(required = false)
     private TenantRepository tenantRepository;
@@ -61,6 +62,9 @@ public class NodeDataFetcher {
             case ORGANIZATION -> organizationService.getOrganizationByOrganizationId(globalId.getId()).orElse(null);
             case EVENT -> eventService.findById(globalId.getId()).orElse(null);
             case INTEGRATED_TOOL -> toolService.findById(globalId.getId()).orElse(null);
+            case TAG -> tagService.findById(globalId.getId()).orElse(null);
+            case TOOL_CONNECTION -> toolConnectionService.findById(globalId.getId()).orElse(null);
+            case INSTALLED_AGENT -> installedAgentService.getInstalledAgent(globalId.getId()).orElse(null);
             case TENANT -> tenantRepository != null
                     ? tenantRepository.findById(globalId.getId()).orElse(null)
                     : null;

@@ -26,6 +26,10 @@ public class TagService {
         this.machineTagRepository = machineTagRepository;
     }
 
+    public Optional<Tag> findById(String id) {
+        return tagRepository.findById(id);
+    }
+
     public List<Tag> listTags(String organizationId) {
         log.debug("Listing tags for org: {}", organizationId);
         return tagRepository.findByOrganizationId(organizationId);

@@ -56,6 +56,19 @@ export interface UseReleaseResult {
   isLoading: boolean;
 }
 
+export interface VideoDisplaySectionProps {
+  mainVideoUrl?: string | null;
+  youtubeUrl?: string | null;
+  highlightVideoUrl?: string | null;
+  highlightVideoThumbnail?: string | null;
+  mainVideoPoster?: string | null;
+  title?: string;
+  videoSummary?: string | null;
+  videoBites?: VideoTeaser[];
+  bitesTitle?: string;
+  filterPublishedBites?: boolean;
+}
+
 export interface ReleaseDetailPageProps {
   slug: string;
   initialData?: unknown; // Optional pre-fetched data for admin preview
@@ -66,6 +79,8 @@ export interface ReleaseDetailPageProps {
   RoadmapSection?: ComponentType<RoadmapSectionProps>;
   DeliverySection?: ComponentType<DeliverySectionProps>;
   VideoSection?: ComponentType<VideoSectionProps>;
+  /** Injectable video display section with tabs for full/highlight video + summary + bites */
+  VideoDisplaySection?: ComponentType<VideoDisplaySectionProps>;
   // API endpoints for fetching linked tasks
   roadmapApiEndpoint?: string;
   deliveryApiEndpoint?: string;
@@ -84,6 +99,7 @@ export function ReleaseDetailPage({
   RoadmapSection,
   DeliverySection,
   VideoSection,
+  VideoDisplaySection,
   roadmapApiEndpoint = '/api/roadmap',
   deliveryApiEndpoint = '/api/delivery'
 }: ReleaseDetailPageProps) {
@@ -311,49 +327,41 @@ export function ReleaseDetailPage({
           </div>
         )}
 
-        {/* YouTube Video Section - Full Width */}
-        {youtubeUrl && (() => {
-          const videoId = extractYouTubeId(youtubeUrl);
-          return videoId ? (
-              <YouTubeEmbed
-                videoId={videoId}
-                title={`${releaseTitle} - Video`}
-                showTitle={false}
-                showMeta={true}
-              />
-          ) : null;
-        })()}
-
-        {/* Main Video - Uploaded video for AI processing (fallback if no YouTube) */}
-        {!youtubeUrl && mainVideoUrl && (
-          <div className="flex justify-center w-full">
-            <div className="w-full max-w-3xl">
-              <VideoPlayer
-                url={mainVideoUrl}
-                controls={true}
-                muted={false}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Highlight Video - AI-generated highlight reel */}
-        {highlightVideoUrl && (
-          <div className="flex flex-col gap-4 w-full">
-            <p className="text-h5 tracking-[-0.28px] text-ods-text-secondary">
-              Video Highlights
-            </p>
-            <div className="flex justify-center w-full">
-              <div className="w-full max-w-3xl">
-                <VideoPlayer
-                  url={highlightVideoUrl}
-                  poster={highlightVideoThumbnail}
-                  controls={true}
-                  muted={false}
-                />
+        {/* Video Display Section - Injectable or fallback */}
+        {VideoDisplaySection ? (
+          <VideoDisplaySection
+            mainVideoUrl={mainVideoUrl}
+            youtubeUrl={youtubeUrl}
+            highlightVideoUrl={highlightVideoUrl}
+            highlightVideoThumbnail={highlightVideoThumbnail}
+            title={releaseTitle}
+            videoBites={videoBites}
+            bitesTitle="Video Clips"
+            filterPublishedBites={true}
+          />
+        ) : (
+          <>
+            {youtubeUrl && (() => {
+              const videoId = extractYouTubeId(youtubeUrl);
+              return videoId ? (
+                <YouTubeEmbed videoId={videoId} title={`${releaseTitle} - Video`} showTitle={false} showMeta={true} />
+              ) : null;
+            })()}
+            {!youtubeUrl && mainVideoUrl && (
+              <div className="flex justify-center w-full">
+                <div className="w-full max-w-3xl">
+                  <VideoPlayer url={mainVideoUrl} controls={true} muted={false} />
+                </div>
               </div>
-            </div>
-          </div>
+            )}
+            {highlightVideoUrl && (
+              <div className="flex justify-center w-full">
+                <div className="w-full max-w-3xl">
+                  <VideoPlayer url={highlightVideoUrl} poster={highlightVideoThumbnail} controls={true} muted={false} />
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* Content */}
@@ -402,8 +410,8 @@ export function ReleaseDetailPage({
           SimpleMarkdownRenderer={MarkdownRenderer}
         />
 
-        {/* Video Bites Section - Display video clips */}
-        {VideoSection && videoBites && videoBites.length > 0 && (
+        {/* Video Bites Section - Only when VideoDisplaySection is not handling it */}
+        {!VideoDisplaySection && VideoSection && videoBites && videoBites.length > 0 && (
           <VideoSection
             bites={videoBites}
             title="Video Clips"

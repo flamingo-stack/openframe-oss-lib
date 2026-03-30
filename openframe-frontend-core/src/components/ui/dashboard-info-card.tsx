@@ -1,8 +1,11 @@
 'use client'
 
+import type * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { cn } from '../../utils/cn'
+import { QuestionCircleIcon } from '../icons-v2-generated/signs-and-symbols/question-circle-icon'
 import { CircularProgress } from './circular-progress'
+import { FloatingTooltip } from './floating-tooltip'
 import { InteractiveCard } from './interactive-card'
 
 interface DashboardInfoCardProps {
@@ -18,6 +21,10 @@ interface DashboardInfoCardProps {
    * If both href and onClick are provided, href takes precedence
    */
   href?: string
+  /** Tooltip content shown on a question-mark icon next to the value */
+  tooltip?: React.ReactNode
+  /** Override the value text className (default: text-h2) */
+  valueClassName?: string
 }
 
 export function DashboardInfoCard({
@@ -28,7 +35,9 @@ export function DashboardInfoCard({
   progressColor,
   className,
   onClick,
-  href
+  href,
+  tooltip,
+  valueClassName
 }: DashboardInfoCardProps) {
   const router = href ? useRouter() : null
   const formattedValue = typeof value === 'number'
@@ -47,13 +56,20 @@ export function DashboardInfoCard({
 
         {/* Value and percentage */}
         <div className="flex items-center gap-2">
-          <p className="text-h2 text-ods-text-primary tracking-[-0.64px]">
+          <p className={cn("text-h2 text-ods-text-primary tracking-[-0.64px]", valueClassName)}>
             {formattedValue}
           </p>
           {percentage !== undefined && (
             <p className="text-h4 text-ods-text-secondary">
               {percentage}%
             </p>
+          )}
+          {tooltip && (
+            <FloatingTooltip content={tooltip} side="top">
+              <span className="cursor-help text-ods-text-secondary">
+                <QuestionCircleIcon size={20} />
+              </span>
+            </FloatingTooltip>
           )}
         </div>
       </div>

@@ -3,6 +3,7 @@ import { cn } from "../../utils/cn"
 import { SquareAvatar as Avatar } from "../ui/square-avatar"
 import { Button } from "../ui/button"
 import { PlusCircleIcon } from "../plus-circle-icon"
+import { XmarkIcon } from "../icons-v2-generated/signs-and-symbols/xmark-icon"
 import type { ConnectionIndicatorProps, ChatContainerProps, ChatHeaderProps } from "./types"
 
 const ConnectionIndicator: React.FC<ConnectionIndicatorProps> = ({ status }) => {
@@ -55,7 +56,7 @@ const ChatContainer = React.forwardRef<HTMLDivElement, ChatContainerProps>(
 ChatContainer.displayName = "ChatContainer"
 
 const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
-  ({ className, userName = 'Grace "Fae" Meadows', userTitle = "Your Personal Assistant", userAvatar, onSettingsClick, onNewChat, showNewChat = false, connectionStatus = 'disconnected', serverUrl = null, ...props }, ref) => {
+  ({ className, userName = 'Grace "Fae" Meadows', userTitle = "Your Personal Assistant", userAvatar, userIcon, onSettingsClick, onNewChat, onClose, showNewChat = false, connectionStatus = 'disconnected', serverUrl = null, ...props }, ref) => {
     return (
       <div
         ref={ref}
@@ -69,14 +70,20 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
         {...props}
       >
         <div className="flex items-center gap-3">
-          <Avatar
-            src={userAvatar}
-            alt={userName}
-            fallback="F"
-            size="md"
-            variant="round"
-            className="bg-gradient-to-br from-pink-400 to-pink-600"
-          />
+          {userIcon ? (
+            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-ods-accent">
+              {userIcon}
+            </div>
+          ) : (
+            <Avatar
+              src={userAvatar}
+              alt={userName}
+              fallback="F"
+              size="md"
+              variant="round"
+              className="bg-gradient-to-br from-pink-400 to-pink-600"
+            />
+          )}
           <div className="flex flex-col">
             <span className="text-base font-semibold text-ods-text-primary">{userName}</span>
             <div className="flex items-center gap-2">
@@ -89,17 +96,30 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
             </div>
           </div>
         </div>
-        {showNewChat && onNewChat && (
-          <Button
-            onClick={onNewChat}
-            variant="ghost"
-            size="sm"
-            leftIcon={<PlusCircleIcon className="w-5 h-5" whiteOverlay/>}
-            className="text-ods-text-primary hover:bg-ods-bg-hover"
-          >
-            New Chat
-          </Button>
-        )}
+        <div className="flex items-center gap-1">
+          {showNewChat && onNewChat && (
+            <Button
+              onClick={onNewChat}
+              variant="ghost"
+              size="sm"
+              leftIcon={<PlusCircleIcon className="w-5 h-5" whiteOverlay/>}
+              className="text-ods-text-primary hover:bg-ods-bg-hover"
+            >
+              New Chat
+            </Button>
+          )}
+          {onClose && (
+            <Button
+              onClick={onClose}
+              variant="ghost"
+              size="sm"
+              aria-label="Close"
+              className="text-ods-text-muted hover:text-ods-text-primary hover:bg-ods-bg-hover !p-1.5"
+            >
+              <XmarkIcon size={16} />
+            </Button>
+          )}
+        </div>
       </div>
     )
   }
