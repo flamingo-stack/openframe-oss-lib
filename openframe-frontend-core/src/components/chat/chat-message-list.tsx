@@ -9,7 +9,7 @@ import type { ChatMessageListProps } from "./types"
 const BOTTOM_THRESHOLD = 30 // px from bottom to be considered "at bottom"
 
 const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
-  ({ className, messages, dialogId, isLoading = false, isTyping = false, autoScroll = true, showAvatars = true, contentClassName, assistantType, pendingApprovals, hasNextPage, isFetchingNextPage, onLoadMore, ...props }, ref) => {
+  ({ className, messages, dialogId, isLoading = false, isTyping = false, autoScroll = true, showAvatars = true, contentClassName, assistantType, assistantIcon, pendingApprovals, hasNextPage, isFetchingNextPage, onLoadMore, ...props }, ref) => {
     const scrollRef = useRef<HTMLDivElement>(null)
     const sentinelRef = useRef<HTMLDivElement>(null)
     const onLoadMoreRef = useRef(onLoadMore)
@@ -306,6 +306,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                 avatar={showAvatars ? message.avatar : null}
                 showAvatar={showAvatars}
                 assistantType={message.assistantType || assistantType}
+                assistantIcon={message.role !== 'user' ? assistantIcon : undefined}
               />
             ))}
           </div>
@@ -325,6 +326,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
               timestamp={new Date()}
               showAvatar={showAvatars}
               assistantType={assistantType}
+              assistantIcon={assistantIcon}
               className="py-3"
             />
           </div>
