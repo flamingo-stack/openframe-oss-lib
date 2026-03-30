@@ -3,6 +3,7 @@ package com.openframe.gateway.config.ws;
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.reactive.socket.WebSocketHandler;
 import org.springframework.web.reactive.socket.WebSocketSession;
 import org.springframework.web.reactive.socket.server.WebSocketService;
