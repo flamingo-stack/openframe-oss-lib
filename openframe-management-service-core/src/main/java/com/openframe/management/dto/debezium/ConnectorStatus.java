@@ -43,6 +43,17 @@ public class ConnectorStatus {
                 .toList();
     }
 
+    /**
+     * Get the first line of the first failure trace, or "Unknown error" if none.
+     */
+    public String getFirstFailureTrace() {
+        return getFailedTasks().stream()
+                .map(TaskStatus::firstTraceLine)
+                .filter(line -> !"N/A".equals(line))
+                .findFirst()
+                .orElse("Unknown error");
+    }
+
     @Data
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Connector {

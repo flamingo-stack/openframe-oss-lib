@@ -1,11 +1,15 @@
 package com.openframe.management.service;
 
+import com.openframe.data.document.connector.ConnectorAlert;
+import com.openframe.data.document.connector.ConnectorAlertType;
+import com.openframe.data.repository.connector.ConnectorAlertRepository;
 import com.openframe.management.dto.debezium.ConnectorBackoffState;
 import com.openframe.management.dto.debezium.ConnectorStatus;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -17,7 +21,6 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class ConnectorRecoveryManager {
 
     private static final long BACKOFF_INCREMENT_MS = 2 * 60 * 1000L; // 2 minutes
@@ -33,7 +36,15 @@ public class ConnectorRecoveryManager {
     );
 
     private final DebeziumService debeziumService;
+    private final ConnectorAlertRepository connectorAlertRepository;
     private final ConcurrentHashMap<String, ConnectorBackoffState> backoffStates = new ConcurrentHashMap<>();
+
+    @Autowired
+    public ConnectorRecoveryManager(DebeziumService debeziumService,
+                                    @Autowired(required = false) ConnectorAlertRepository connectorAlertRepository) {
+        this.debeziumService = debeziumService;
+        this.connectorAlertRepository = connectorAlertRepository;
+    }
 
     /**
      * Check all connectors and recover any that are in a failed state.
@@ -71,6 +82,8 @@ public class ConnectorRecoveryManager {
             if (isNonRecoverable(status)) {
                 log.error("Connector '{}' has a non-recoverable error — skipping restart, manual intervention required",
                         connectorName);
+                createAlert(connectorName, ConnectorAlertType.NON_RECOVERABLE_ERROR,
+                        status.getFirstFailureTrace(), 0);
                 return;
             }
 
@@ -84,6 +97,7 @@ public class ConnectorRecoveryManager {
         if (backoffStates.containsKey(connectorName)) {
             log.info("Connector '{}' recovered successfully — resetting backoff state", connectorName);
             backoffStates.remove(connectorName);
+            resolveAlert(connectorName);
         }
     }
 
@@ -103,6 +117,9 @@ public class ConnectorRecoveryManager {
         if (backoff.getConsecutiveFailures() >= MAX_RECOVERY_ATTEMPTS) {
             log.error("Connector '{}' has failed {} times — max recovery attempts ({}) exceeded, manual intervention required",
                     connectorName, backoff.getConsecutiveFailures(), MAX_RECOVERY_ATTEMPTS);
+            createAlert(connectorName, ConnectorAlertType.MAX_RETRIES_EXCEEDED,
+                    "Max recovery attempts (" + MAX_RECOVERY_ATTEMPTS + ") exceeded",
+                    backoff.getConsecutiveFailures());
             return;
         }
 
@@ -143,5 +160,46 @@ public class ConnectorRecoveryManager {
             }
         }
         return false;
+    }
+
+    private void createAlert(String connectorName, ConnectorAlertType errorType, String errorMessage, int attempts) {
+        if (connectorAlertRepository == null) {
+            return;
+        }
+        try {
+            if (connectorAlertRepository.findByConnectorNameAndResolvedFalse(connectorName).isPresent()) {
+                log.debug("Active alert already exists for connector '{}'", connectorName);
+                return;
+            }
+            ConnectorAlert alert = ConnectorAlert.builder()
+                    .connectorName(connectorName)
+                    .errorType(errorType)
+                    .errorMessage(errorMessage)
+                    .attempts(attempts)
+                    .createdAt(Instant.now())
+                    .resolved(false)
+                    .build();
+            connectorAlertRepository.save(alert);
+            log.info("Created connector alert for '{}': {}", connectorName, errorType);
+        } catch (Exception e) {
+            log.warn("Failed to create connector alert for '{}'", connectorName, e);
+        }
+    }
+
+    private void resolveAlert(String connectorName) {
+        if (connectorAlertRepository == null) {
+            return;
+        }
+        try {
+            connectorAlertRepository.findByConnectorNameAndResolvedFalse(connectorName)
+                    .ifPresent(alert -> {
+                        alert.setResolved(true);
+                        alert.setResolvedAt(Instant.now());
+                        connectorAlertRepository.save(alert);
+                        log.info("Resolved connector alert for '{}'", connectorName);
+                    });
+        } catch (Exception e) {
+            log.warn("Failed to resolve connector alert for '{}'", connectorName, e);
+        }
     }
 }
