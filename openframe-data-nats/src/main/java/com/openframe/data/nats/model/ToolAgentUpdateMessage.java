@@ -12,5 +12,6 @@ public class ToolAgentUpdateMessage {
     private String version;
     private SessionType sessionType;
     private List<DownloadConfiguration> downloadConfigurations;
+    private AssetUpdate asset;
 
 }
