@@ -1,26 +1,42 @@
 package com.openframe.management.scheduler;
 
+import com.openframe.data.document.tool.IntegratedTool;
+import com.openframe.data.service.IntegratedToolService;
+import com.openframe.management.service.ConnectorRecoveryManager;
 import com.openframe.management.service.DebeziumService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
 @ConditionalOnProperty(name = "openframe.debezium.health-check.enabled", havingValue = "true")
 public class DebeziumHealthCheckScheduler {
 
     private final DebeziumService debeziumService;
+    private final ConnectorRecoveryManager recoveryManager;
+    private final IntegratedToolService integratedToolService;
+
+    @Autowired
+    public DebeziumHealthCheckScheduler(DebeziumService debeziumService,
+                                        ConnectorRecoveryManager recoveryManager,
+                                        @Autowired(required = false) IntegratedToolService integratedToolService) {
+        this.debeziumService = debeziumService;
+        this.recoveryManager = recoveryManager;
+        this.integratedToolService = integratedToolService;
+    }
 
     @PostConstruct
     public void init() {
-        log.info("DebeziumHealthCheckScheduler initialized with distributed locking");
+        log.info("DebeziumHealthCheckScheduler initialized with distributed locking and auto-recovery");
     }
 
     @Scheduled(fixedDelayString = "${openframe.debezium.health-check.interval:300000}")
@@ -30,7 +46,33 @@ public class DebeziumHealthCheckScheduler {
             lockAtLeastFor = "${openframe.debezium.health-check.lock-at-least-for:1m}"
     )
     public void checkAndRestartFailedTasks() {
-        log.debug("Checking Debezium connector health...");
-        debeziumService.checkAndRestartFailedTasks();
+        log.debug("Running Debezium health check with auto-recovery...");
+
+        if (integratedToolService != null) {
+            reconcileMissingConnectors();
+        }
+
+        recoveryManager.checkAndRecoverAll();
+    }
+
+    private void reconcileMissingConnectors() {
+        try {
+            List<IntegratedTool> tools = integratedToolService.getAllTools();
+            Set<String> expectedNames = debeziumService.extractExpectedConnectorNames(tools);
+            if (expectedNames.isEmpty()) {
+                return;
+            }
+
+            List<String> actualConnectors = debeziumService.listConnectors();
+            Set<String> missing = new HashSet<>(expectedNames);
+            missing.removeAll(new HashSet<>(actualConnectors));
+
+            if (!missing.isEmpty()) {
+                log.warn("Found {} missing connectors — reconciling: {}", missing.size(), missing);
+                debeziumService.reconcileMissingConnectors(tools, missing);
+            }
+        } catch (Exception e) {
+            log.error("Failed to reconcile missing connectors", e);
+        }
     }
 }
