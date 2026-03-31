@@ -91,12 +91,15 @@ public class IntegratedToolAgentInitializer {
 
     private void processConfigurationUpdate(IntegratedToolAgent existingAgent, IntegratedToolAgent newAgent) {
         String toolAgentId = newAgent.getId();
+        String existingVersion = existingAgent.getVersion();
+        String newVersion = newAgent.getVersion();
 
         if (newAgent.isReleaseVersion()) {
+            log.info("Skip update for release version {} {}", toolAgentId, existingVersion);
             return;
         }
 
-        boolean versionChanged = !Objects.equals(existingAgent.getVersion(), newAgent.getVersion());
+        boolean versionChanged = !Objects.equals(existingVersion, newVersion);
         boolean assetChanged = hasAssetChanges(existingAgent, newAgent);
 
         if (versionChanged || assetChanged) {
