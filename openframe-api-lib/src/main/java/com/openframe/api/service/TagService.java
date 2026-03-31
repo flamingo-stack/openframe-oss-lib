@@ -1,7 +1,6 @@
 package com.openframe.api.service;
 
 import com.openframe.api.dto.device.DeviceFilterOption;
-import com.openframe.api.dto.device.DeviceTag;
 import com.openframe.data.document.device.MachineTag;
 import com.openframe.data.document.tool.Tag;
 import com.openframe.data.repository.device.MachineTagRepository;
@@ -102,11 +101,11 @@ public class TagService {
     }
 
     /**
-     * Get enriched device tags for multiple machines (batch loading).
-     * Returns DeviceTag objects that combine Tag metadata with MachineTag values.
+     * Get tags for multiple machines (batch loading).
+     * Returns Tag objects enriched with per-device values from MachineTag.
      */
-    public List<List<DeviceTag>> getDeviceTagsForMachines(List<String> machineIds) {
-        log.debug("Getting device tags for {} machines", machineIds.size());
+    public List<List<Tag>> getTagsForMachines(List<String> machineIds) {
+        log.debug("Getting tags for {} machines", machineIds.size());
 
         if (machineIds.isEmpty()) {
             return new ArrayList<>();
@@ -116,7 +115,7 @@ public class TagService {
 
         if (allMachineTags.isEmpty()) {
             return machineIds.stream()
-                    .map(id -> new ArrayList<DeviceTag>())
+                    .map(id -> new ArrayList<Tag>())
                     .collect(Collectors.toList());
         }
 
@@ -135,7 +134,7 @@ public class TagService {
                     List<MachineTag> machineTags = machineTagsByMachineId
                             .getOrDefault(machineId, List.of());
                     return machineTags.stream()
-                            .map(mt -> buildDeviceTag(mt, tagsById.get(mt.getTagId())))
+                            .map(mt -> buildTag(mt, tagsById.get(mt.getTagId())))
                             .filter(Objects::nonNull)
                             .collect(Collectors.toList());
                 })
@@ -143,10 +142,10 @@ public class TagService {
     }
 
     /**
-     * Get enriched device tags for a single machine.
+     * Get tags for a single machine.
      */
-    public List<DeviceTag> getDeviceTagsForMachine(String machineId) {
-        log.debug("Getting device tags for machine: {}", machineId);
+    public List<Tag> getTagsForMachine(String machineId) {
+        log.debug("Getting tags for machine: {}", machineId);
 
         List<MachineTag> machineTags = machineTagRepository.findByMachineId(machineId);
         if (machineTags.isEmpty()) {
@@ -161,19 +160,19 @@ public class TagService {
                 .collect(Collectors.toMap(Tag::getId, tag -> tag));
 
         return machineTags.stream()
-                .map(mt -> buildDeviceTag(mt, tagsById.get(mt.getTagId())))
+                .map(mt -> buildTag(mt, tagsById.get(mt.getTagId())))
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
-    private DeviceTag buildDeviceTag(MachineTag machineTag, Tag tag) {
+    private Tag buildTag(MachineTag machineTag, Tag tag) {
         if (tag == null) {
             log.warn("Tag not found for machineTag: {}", machineTag.getTagId());
             return null;
         }
 
-        return DeviceTag.builder()
-                .tagId(tag.getId())
+        return Tag.builder()
+                .id(tag.getId())
                 .key(tag.getKey())
                 .description(tag.getDescription())
                 .color(tag.getColor())
