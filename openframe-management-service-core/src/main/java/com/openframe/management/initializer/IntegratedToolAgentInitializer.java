@@ -2,9 +2,11 @@ package com.openframe.management.initializer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
+import com.openframe.data.document.toolagent.ToolAgentAsset;
 import com.openframe.data.nats.publisher.ToolAgentUpdateUpdatePublisher;
 import com.openframe.data.service.IntegratedToolAgentService;
 import com.openframe.management.config.AgentConfigurationProperties;
+import io.micrometer.common.util.StringUtils;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,6 +14,13 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import static io.micrometer.common.util.StringUtils.isNotEmpty;
+import static org.springframework.util.CollectionUtils.isEmpty;
 
 @Component
 @RequiredArgsConstructor
@@ -71,7 +80,7 @@ public class IntegratedToolAgentInitializer {
         integratedToolAgentService.save(newAgent);
         log.info("Updated agent configuration: {} from {}", newAgent.getId(), filePath);
         
-        processVersionUpdate(existingAgent, newAgent);
+        processConfigurationUpdate(existingAgent, newAgent);
     }
 
     private void processNewAgent(IntegratedToolAgent agent, String filePath) {
@@ -80,21 +89,51 @@ public class IntegratedToolAgentInitializer {
         log.info("Created new agent configuration: {} from {}", agent.getId(), filePath);
     }
 
-    private void processVersionUpdate(IntegratedToolAgent existingAgent, IntegratedToolAgent newAgent) {
+    private void processConfigurationUpdate(IntegratedToolAgent existingAgent, IntegratedToolAgent newAgent) {
         String toolAgentId = newAgent.getId();
-        String existingVersion = existingAgent.getVersion();
-        String newVersion = newAgent.getVersion();
 
         if (newAgent.isReleaseVersion()) {
-           log.info("Skip update for release version {} {}", toolAgentId, existingVersion);
-           return;
+            return;
         }
 
-        if (!existingVersion.equals(newVersion)) {
-            log.info("Detected version update for {} from {} to {}", toolAgentId, existingVersion, newVersion);
+        boolean versionChanged = !Objects.equals(existingAgent.getVersion(), newAgent.getVersion());
+        boolean assetChanged = hasAssetChanges(existingAgent, newAgent);
+
+        if (versionChanged || assetChanged) {
+            log.info("Detected configuration update for {}: versionChanged={}, assetChanged={}", toolAgentId, versionChanged, assetChanged);
             toolAgentUpdatePublisher.publish(newAgent);
-            log.info("Processed version update for {}", newAgent.getId());
+            log.info("Processed configuration update for {}", toolAgentId);
         }
+    }
+
+    private boolean hasAssetChanges(IntegratedToolAgent existingAgent, IntegratedToolAgent newAgent) {
+        List<ToolAgentAsset> existingAssets = existingAgent.getAssets();
+        List<ToolAgentAsset> newAssets = newAgent.getAssets();
+
+        if (isEmpty(existingAssets) || isEmpty(newAssets)) {
+            return false;
+        }
+
+        Map<String, String> existingVersionsById = existingAssets.stream()
+                .filter(existingAsset -> isNotEmpty(existingAsset.getVersion()))
+                .collect(Collectors.toMap(ToolAgentAsset::getId, ToolAgentAsset::getVersion));
+
+        for (ToolAgentAsset newAsset : newAssets) {
+            if (StringUtils.isEmpty(newAgent.getVersion())) {
+                continue;
+            }
+
+            String existingVersion = existingVersionsById.get(newAsset.getId());
+            if (existingVersion == null) {
+                return true;
+            }
+
+            if (!existingVersion.equals(newAsset.getVersion())) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
 }
