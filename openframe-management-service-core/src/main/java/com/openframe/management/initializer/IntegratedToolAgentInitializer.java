@@ -125,7 +125,7 @@ public class IntegratedToolAgentInitializer {
 
             String existingVersion = existingVersionsById.get(newAsset.getId());
             if (existingVersion == null) {
-                return true;
+                continue;
             }
 
             if (!existingVersion.equals(newAsset.getVersion())) {
