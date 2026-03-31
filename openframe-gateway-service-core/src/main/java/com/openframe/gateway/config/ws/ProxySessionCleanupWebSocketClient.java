@@ -17,7 +17,7 @@ import java.util.List;
 @Slf4j
 public class ProxySessionCleanupWebSocketClient implements WebSocketClient {
 
-    private static final String LOG_PREFIX = "Debug ws proxy sessionId={} target={} | ";
+    private static final String LOG_PREFIX = "Debug ws proxy sessionId={} path={} | ";
     private static final Duration CLOSE_TIMEOUT = Duration.ofSeconds(5);
 
     private final WebSocketClient delegate;
@@ -34,7 +34,7 @@ public class ProxySessionCleanupWebSocketClient implements WebSocketClient {
     }
 
     private WebSocketHandler wrapHandler(URI targetUrl, WebSocketHandler handler) {
-        String target = targetUrl.toString();
+        String target = targetUrl.getPath();
         boolean debugPath = loggingProperties.isDebugPath(targetUrl.getPath());
 
         return new WebSocketHandler() {
