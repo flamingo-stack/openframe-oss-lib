@@ -8,7 +8,6 @@ import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.device.DeviceFilterInput;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.device.DeviceFilters;
-import com.openframe.api.dto.device.DeviceTag;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.SortInput;
@@ -19,6 +18,7 @@ import com.openframe.api.service.TagService;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.installedagents.InstalledAgent;
 import com.openframe.data.document.organization.Organization;
+import com.openframe.data.document.tool.Tag;
 import com.openframe.data.document.tool.ToolConnection;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -102,8 +102,8 @@ public class DeviceDataFetcher {
     }
 
     @DgsData(parentType = "Machine")
-    public CompletableFuture<List<DeviceTag>> tags(DgsDataFetchingEnvironment dfe) {
-        DataLoader<String, List<DeviceTag>> dataLoader = dfe.getDataLoader("tagDataLoader");
+    public CompletableFuture<List<Tag>> tags(DgsDataFetchingEnvironment dfe) {
+        DataLoader<String, List<Tag>> dataLoader = dfe.getDataLoader("tagDataLoader");
         Machine machine = dfe.getSource();
         return dataLoader.load(machine.getMachineId());
     }
