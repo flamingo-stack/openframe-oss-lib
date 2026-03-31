@@ -167,6 +167,53 @@ export const WithDescriptionDisabled: Story = {
 };
 
 /**
+ * Error state — red border to indicate validation failure.
+ */
+export const Error: Story = {
+  args: {
+    label: 'Send me an SMS if my email gets caught by spam filters',
+    description: 'I agree to receive recurring automated text messages at the phone number provided. Msg & data rates may apply.',
+    error: 'Please agree to SMS notifications to continue.',
+  },
+};
+
+/**
+ * Flamingo theme (pink accent) with error state.
+ */
+export const FlamingoError: Story = {
+  args: {
+    label: 'Send me an SMS if my email gets caught by spam filters',
+    description: 'I agree to receive recurring automated text messages at the phone number provided. Msg & data rates may apply.',
+    error: 'Please agree to SMS notifications to continue.',
+  },
+  decorators: [
+    (Story) => (
+      <div data-app-type="flamingo" style={{ width: '320px' }}>
+        <Story />
+      </div>
+    ),
+  ],
+};
+
+/**
+ * Flamingo theme (pink accent) checked.
+ */
+export const FlamingoChecked: Story = {
+  args: {
+    label: 'Send me an SMS if my email gets caught by spam filters',
+    description: 'I agree to receive recurring automated text messages at the phone number provided. Msg & data rates may apply.',
+    defaultChecked: true,
+  },
+  decorators: [
+    (Story) => (
+      <div data-app-type="flamingo" style={{ width: '320px' }}>
+        <Story />
+      </div>
+    ),
+  ],
+};
+
+/**
  * All variants displayed together for comparison.
  */
 export const AllVariants: Story = {
@@ -180,6 +227,7 @@ export const AllVariants: Story = {
       <CheckboxBlock label="Repeat Script Run" />
       <CheckboxBlock label="Disabled unchecked" disabled />
       <CheckboxBlock label="Disabled checked" disabled defaultChecked />
+      <CheckboxBlock label="Error state" error="This field is required." />
       <CheckboxBlock label="Run as User" description="Windows Only" />
       <CheckboxBlock label="Run as User" description="Windows Only" defaultChecked />
       <CheckboxBlock label="Run as User" description="Windows Only" disabled />

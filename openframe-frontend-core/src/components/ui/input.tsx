@@ -73,7 +73,9 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             // Disabled
             "disabled:cursor-not-allowed disabled:placeholder:text-ods-border",
             // Touch
-            "touch-manipulation"
+            "touch-manipulation",
+            // Autofill override
+            "[&:-webkit-autofill]:[-webkit-box-shadow:0_0_0_9999px_transparent_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:var(--color-text-primary)] [&:-webkit-autofill]:[caret-color:var(--color-text-primary)] [&:-webkit-autofill]:[transition:background-color_9999s_ease-in-out_0s]"
           )}
           ref={ref}
           {...props}
