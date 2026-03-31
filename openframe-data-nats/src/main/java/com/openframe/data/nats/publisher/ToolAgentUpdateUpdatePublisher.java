@@ -2,6 +2,7 @@ package com.openframe.data.nats.publisher;
 
 import com.openframe.data.document.clientconfiguration.PublishState;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
+import com.openframe.data.document.toolagent.ToolAgentAsset;
 import com.openframe.data.nats.mapper.DownloadConfigurationMapper;
 import com.openframe.data.nats.model.ToolAgentUpdateMessage;
 import com.openframe.data.service.IntegratedToolAgentService;
@@ -10,6 +11,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 import static java.lang.String.format;
 
@@ -69,7 +73,28 @@ public class ToolAgentUpdateUpdatePublisher {
         message.setDownloadConfigurations(
                 downloadConfigurationMapper.map(toolAgent.getDownloadConfigurations(), toolAgent.getVersion())
         );
+        message.setAssets(mapAssets(toolAgent.getAssets()));
         return message;
+    }
+
+    private List<ToolAgentUpdateMessage.AssetUpdate> mapAssets(List<ToolAgentAsset> assets) {
+        if (assets == null) {
+            return null;
+        }
+        return assets.stream()
+                .map(this::mapAsset)
+                .collect(Collectors.toList());
+    }
+
+    private ToolAgentUpdateMessage.AssetUpdate mapAsset(ToolAgentAsset asset) {
+        ToolAgentUpdateMessage.AssetUpdate assetUpdate = new ToolAgentUpdateMessage.AssetUpdate();
+        assetUpdate.setAssetId(asset.getId());
+        assetUpdate.setVersion(asset.getVersion());
+        assetUpdate.setExecutable(asset.isExecutable());
+        assetUpdate.setDownloadConfigurations(
+                downloadConfigurationMapper.map(asset.getDownloadConfigurations(), asset.getVersion())
+        );
+        return assetUpdate;
     }
 
     private void markAsPublished(String toolAgentId) {
