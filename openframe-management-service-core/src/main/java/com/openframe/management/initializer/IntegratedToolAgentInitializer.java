@@ -102,14 +102,18 @@ public class IntegratedToolAgentInitializer {
         boolean versionChanged = !Objects.equals(existingVersion, newVersion);
         boolean assetChanged = hasAssetChanges(existingAgent, newAgent);
 
+        if (versionChanged) {
+            log.info("Detected version update for tool {}: {} -> {}", toolAgentId, existingVersion, newVersion);
+        }
+
         if (versionChanged || assetChanged) {
-            log.info("Detected configuration update for {}: versionChanged={}, assetChanged={}", toolAgentId, versionChanged, assetChanged);
             toolAgentUpdatePublisher.publish(newAgent);
-            log.info("Processed configuration update for {}", toolAgentId);
+            log.info("Published configuration update for {}", toolAgentId);
         }
     }
 
     private boolean hasAssetChanges(IntegratedToolAgent existingAgent, IntegratedToolAgent newAgent) {
+        String toolAgentId = newAgent.getId();
         List<ToolAgentAsset> existingAssets = existingAgent.getAssets();
         List<ToolAgentAsset> newAssets = newAgent.getAssets();
 
@@ -122,7 +126,7 @@ public class IntegratedToolAgentInitializer {
                 .collect(Collectors.toMap(ToolAgentAsset::getId, ToolAgentAsset::getVersion));
 
         for (ToolAgentAsset newAsset : newAssets) {
-            if (StringUtils.isEmpty(newAgent.getVersion())) {
+            if (StringUtils.isEmpty(newAsset.getVersion())) {
                 continue;
             }
 
@@ -132,6 +136,8 @@ public class IntegratedToolAgentInitializer {
             }
 
             if (!existingVersion.equals(newAsset.getVersion())) {
+                log.info("Detected asset update for tool {}: asset {} version {} -> {}",
+                        toolAgentId, newAsset.getId(), existingVersion, newAsset.getVersion());
                 return true;
             }
         }
