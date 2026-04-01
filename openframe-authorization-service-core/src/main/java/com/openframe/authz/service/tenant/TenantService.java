@@ -2,7 +2,6 @@ package com.openframe.authz.service.tenant;
 
 import com.openframe.authz.service.validation.RegistrationValidationService;
 import com.openframe.data.document.tenant.Tenant;
-import com.openframe.data.document.tenant.TenantPlan;
 import com.openframe.data.document.tenant.TenantStatus;
 import com.openframe.data.repository.tenant.TenantRepository;
 import lombok.RequiredArgsConstructor;
