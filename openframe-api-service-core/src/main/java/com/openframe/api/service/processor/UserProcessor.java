@@ -1,6 +1,7 @@
 package com.openframe.api.service.processor;
 
 import com.openframe.api.dto.user.UserPageResponse;
+import com.openframe.api.dto.user.UserResponse;
 import com.openframe.data.document.user.User;
 
 /**
@@ -18,6 +19,8 @@ public interface UserProcessor {
     void postProcessUserDeleted(User user);
 
     void postProcessUserGet(UserPageResponse response);
+
+    void postProcessUserGet(UserResponse response);
 
     /**
      * Process after a user has been updated.
