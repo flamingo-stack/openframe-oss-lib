@@ -53,6 +53,13 @@ public class NatsStreamConfigurationInitializer {
                     .subjects(List.of("machine.*.installed-agent"))
                     .storageType(StorageType.File)
                     .retentionPolicy(RetentionPolicy.Limits)
+                    .build(),
+            // agent logs stream
+            StreamConfiguration.builder()
+                    .name("AGENT_LOGS")
+                    .subjects(List.of("agents.logs"))
+                    .storageType(StorageType.File)
+                    .retentionPolicy(RetentionPolicy.Limits)
                     .build()
     );
 
