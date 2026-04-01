@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useEffect, useRef } from 'react';
 import { WaitlistForm } from '../components/features/waitlist-form';
 import { Toaster } from '../components/ui/toaster';
 
@@ -23,6 +24,7 @@ const meta = {
     },
     geoApiUrl: null,
     privacyPolicyUrl: 'https://flamingo.ai/privacy',
+    termsOfServiceUrl: 'https://flamingo.ai/terms',
   },
 } satisfies Meta<typeof WaitlistForm>;
 
@@ -73,26 +75,18 @@ export const Success: Story = {
 };
 
 /**
- * With privacy policy link in the disclaimer.
- */
-export const WithPrivacyPolicy: Story = {
-  args: {
-    privacyPolicyUrl: 'https://flamingo.ai/privacy',
-  },
-};
-
-/**
  * Custom labels and hints.
  */
 export const CustomLabels: Story = {
   args: {
     submitLabel: 'Join Early Access',
     successLabel: 'Welcome aboard!',
-    defaultHint: 'We only use your info to send updates.',
+    smsCheckboxLabel: 'Notify me via SMS',
     genericEmailHint: 'Business emails only please.',
     invalidPhoneHint: 'Check your phone number.',
     consentText: 'By signing up, you agree to our terms.',
     privacyPolicyUrl: 'https://example.com/privacy',
+    termsOfServiceUrl: 'https://example.com/terms',
   },
 };
 
@@ -119,5 +113,39 @@ export const FailingRegistration: Story = {
       await new Promise((r) => setTimeout(r, 1000));
       throw new Error('Registration failed');
     },
+  },
+};
+
+/**
+ * Flamingo theme (pink accent) with checkbox error state.
+ * Phone is pre-filled and submit is auto-triggered to show the error.
+ */
+export const FlamingoWithCheckboxError: Story = {
+  args: {
+    defaultEmail: 'user@msp-company.com',
+    defaultPhone: '5551234567',
+    onRegister: async () => {
+      await new Promise((r) => setTimeout(r, 1500));
+    },
+  },
+  decorators: [
+    (Story) => (
+      <div data-app-type="flamingo">
+        <Story />
+        <Toaster />
+      </div>
+    ),
+  ],
+  render: function FlamingoError(args) {
+    const ref = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+      const btn = ref.current?.querySelector('button');
+      btn?.click();
+    }, []);
+    return (
+      <div ref={ref}>
+        <WaitlistForm {...args} />
+      </div>
+    );
   },
 };
