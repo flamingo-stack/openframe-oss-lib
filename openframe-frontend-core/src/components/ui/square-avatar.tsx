@@ -46,7 +46,7 @@ const SquareAvatar = React.forwardRef<HTMLDivElement, SquareAvatarProps>(
     return (
       <div
         className={cn(
-          "relative flex shrink-0 overflow-hidden border border-ods-border",
+          "relative flex items-center justify-center shrink-0 overflow-hidden border border-ods-border bg-ods-bg",
           sizeClasses[size],
           variantClasses[variant],
           className
@@ -54,20 +54,25 @@ const SquareAvatar = React.forwardRef<HTMLDivElement, SquareAvatarProps>(
         ref={ref}
         {...props}
       >
-        {src ? (
+        <div className={cn(
+          'flex items-center justify-center text-xs font-medium text-ods-text-secondary',
+          src && 'hidden'
+        )}>
+          {getInitials(fallback || alt) || '?'}
+        </div>
+        {src && (
           <Image
-            className="aspect-square h-full w-full object-cover"
+            className="absolute inset-0 h-full w-full object-cover"
             src={src}
             alt={alt || ''}
             width={sizePx[size]}
             height={sizePx[size]}
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              const el = e.currentTarget.previousElementSibling as HTMLElement;
+              if (el) el.classList.remove('hidden');
+            }}
           />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-ods-bg">
-            <span className="text-xs font-medium text-ods-text-secondary">
-              {getInitials(fallback || alt) || '?'}
-            </span>
-          </div>
         )}
       </div>
     )
