@@ -62,7 +62,7 @@ public class DeviceQueries {
                     registeredAt
                     updatedAt
                     tags {
-                        tagId
+                        id
                         key
                         description
                         color
