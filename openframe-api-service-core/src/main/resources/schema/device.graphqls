@@ -23,8 +23,8 @@ extend type Query {
     tagValueOptions(tagKey: String!): [DeviceFilterOption!]!
 
     # Autocomplete queries for tag key and value search
-    tagKeySuggestions(organizationId: String!, search: String!): [Tag!]!
-    tagValueSuggestions(organizationId: String!, tagKey: String!, search: String!): [String!]!
+    tagKeySuggestions(organizationId: String!, search: String, limit: Int): [Tag!]!
+    tagValueSuggestions(organizationId: String!, tagKey: String!, search: String, limit: Int): [String!]!
 }
 
 # Tag key definition (not tied to a device)

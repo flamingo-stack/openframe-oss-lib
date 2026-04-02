@@ -19,6 +19,8 @@ public class TagService {
 
     private final TagRepository tagRepository;
     private final MachineTagRepository machineTagRepository;
+    private static final int DEFAULT_LIMIT = 20;
+    private static final int MAX_LIMIT = 100;
 
     public TagService(TagRepository tagRepository, MachineTagRepository machineTagRepository) {
         this.tagRepository = tagRepository;
@@ -35,34 +37,55 @@ public class TagService {
     }
 
     /**
-     * Search tag keys by prefix for autocomplete.
-     * Returns tags whose key contains the search string (case-insensitive).
+     * Search tag keys for autocomplete with limit.
+     * If search is null or blank, returns all tags for the organization.
      */
-    public List<Tag> searchTagKeys(String organizationId, String search) {
-        log.debug("Searching tag keys for org: {}, search: {}", organizationId, search);
+    public List<Tag> searchTagKeys(String organizationId, String search, Integer limit) {
+        log.debug("Searching tag keys for org: {}, search: {}, limit: {}", organizationId, search, limit);
+
+        List<Tag> allMatches;
         if (search == null || search.isBlank()) {
-            return tagRepository.findByOrganizationId(organizationId);
+            allMatches = tagRepository.findByOrganizationId(organizationId);
+        } else {
+            allMatches = tagRepository.findByOrganizationIdAndKeyContainingIgnoreCase(organizationId, search);
         }
-        return tagRepository.findByOrganizationIdAndKeyContainingIgnoreCase(organizationId, search);
+
+        return allMatches.stream()
+                .limit(normalizeLimit(limit))
+                .toList();
     }
 
     /**
-     * Search tag values by prefix for autocomplete.
-     * Returns values from the tag's predefined options that contain the search string (case-insensitive).
+     * Search tag values for autocomplete with limit.
+     * If search is null or blank, returns all values for the tag key.
      */
-    public List<String> searchTagValues(String organizationId, String tagKey, String search) {
-        log.debug("Searching tag values for org: {}, key: {}, search: {}", organizationId, tagKey, search);
+    public List<String> searchTagValues(String organizationId, String tagKey, String search, Integer limit) {
+        log.debug("Searching tag values for org: {}, key: {}, search: {}, limit: {}",
+                organizationId, tagKey, search, limit);
+
         Tag tag = tagRepository.findValuesByKeyAndOrganizationId(tagKey, organizationId);
         if (tag == null || tag.getValues() == null || tag.getValues().isEmpty()) {
             return List.of();
         }
+
+        List<String> allMatches;
         if (search == null || search.isBlank()) {
-            return tag.getValues();
+            allMatches = tag.getValues();
+        } else {
+            String lowerSearch = search.toLowerCase();
+            allMatches = tag.getValues().stream()
+                    .filter(v -> v.toLowerCase().contains(lowerSearch))
+                    .toList();
         }
-        String lowerSearch = search.toLowerCase();
-        return tag.getValues().stream()
-                .filter(v -> v.toLowerCase().contains(lowerSearch))
+
+        return allMatches.stream()
+                .limit(normalizeLimit(limit))
                 .toList();
+    }
+
+    private int normalizeLimit(Integer limit) {
+        if (limit == null || limit < 1) return DEFAULT_LIMIT;
+        return Math.min(limit, MAX_LIMIT);
     }
 
     /**
