@@ -66,6 +66,7 @@
         <module>openframe-stream-service-core</module>
         <module>openframe-gateway-service-core</module>
         <module>openframe-test-service-core</module>
+        <module>openframe-fe-feature-flags</module>
     </modules>
 
     <dependencies>
