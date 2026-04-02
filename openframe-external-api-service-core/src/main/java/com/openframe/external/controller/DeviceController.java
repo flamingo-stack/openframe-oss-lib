@@ -1,12 +1,12 @@
 package com.openframe.external.controller;
 
-import com.openframe.api.dto.device.DeviceTag;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.service.DeviceFilterService;
 import com.openframe.api.service.DeviceService;
 import com.openframe.api.service.TagService;
 import com.openframe.core.dto.ErrorResponse;
 import com.openframe.data.document.device.DeviceStatus;
+import com.openframe.data.document.tool.Tag;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
@@ -126,7 +126,7 @@ public class DeviceController {
                     .map(Machine::getMachineId)
                     .collect(Collectors.toList());
             try {
-                List<List<DeviceTag>> tagsPerMachine = tagService.getDeviceTagsForMachines(machineIds);
+                List<List<Tag>> tagsPerMachine = tagService.getTagsForMachines(machineIds);
                 return deviceMapper.toDevicesResponseWithDeviceTags(result, tagsPerMachine);
             } catch (Exception e) {
                 log.error("Failed to load tags for devices", e);
@@ -163,7 +163,7 @@ public class DeviceController {
         Machine machine = deviceService.findByMachineId(machineId)
                 .orElseThrow(() -> new DeviceNotFoundException("Device not found with ID: " + machineId));
 
-        List<DeviceTag> deviceTags = tagService.getDeviceTagsForMachine(machine.getMachineId());
+        List<Tag> deviceTags = tagService.getTagsForMachine(machine.getMachineId());
         return deviceMapper.toDeviceResponse(machine, deviceTags);
     }
 
