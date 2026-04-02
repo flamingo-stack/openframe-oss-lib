@@ -5,5 +5,6 @@ package com.openframe.data.document.tenant;
  */
 public enum TenantStatus {
     ACTIVE,
-    INACTIVE
+    INACTIVE,
+    DELETED
 }
