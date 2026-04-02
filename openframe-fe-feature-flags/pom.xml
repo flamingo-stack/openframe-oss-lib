@@ -8,6 +8,7 @@
         <groupId>com.openframe.oss</groupId>
         <artifactId>openframe-oss-lib</artifactId>
         <version>${revision}</version>
+        <relativePath>../pom.xml</relativePath>
     </parent>
 
     <artifactId>openframe-fe-feature-flags</artifactId>
