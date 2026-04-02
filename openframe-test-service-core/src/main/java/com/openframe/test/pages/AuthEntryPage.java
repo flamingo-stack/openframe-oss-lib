@@ -3,6 +3,9 @@ package com.openframe.test.pages;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 
+import static com.microsoft.playwright.options.LoadState.NETWORKIDLE;
+import static com.openframe.test.config.EnvironmentConfig.getAuthUrl;
+
 /**
  * Step 1 – the public landing / auth entry page.
  * URL: https://openframe.build/auth/
@@ -16,7 +19,7 @@ import com.microsoft.playwright.Page;
  */
 public class AuthEntryPage {
 
-    public static final String URL = "https://openframe.build/auth/";
+    public static final String URL = getAuthUrl() + "auth/";
 
     private final Page page;
 
@@ -36,7 +39,7 @@ public class AuthEntryPage {
 
     public AuthEntryPage navigate() {
         page.navigate(URL);
-        page.waitForLoadState(com.microsoft.playwright.options.LoadState.NETWORKIDLE);
+        page.waitForLoadState(NETWORKIDLE);
         return this;
     }
 

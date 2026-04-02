@@ -20,6 +20,8 @@ import com.microsoft.playwright.options.WaitForSelectorState;
  */
 public class DevicesPage {
 
+    public static final String URL_FRAGMENT = "/devices/";
+
     private final Page page;
 
     // ── Selectors ────────────────────────────────────────────────────────────
@@ -119,7 +121,7 @@ public class DevicesPage {
 
     // A specific device row by its visible name text
     public Locator deviceRowByName(String name) {
-        return page.locator(DEVICE_ROW + ":has-text('" + name + "')");
+        return page.locator(DEVICE_ROW + ":has-text('" + name + "')").first();
     }
 
     // The three-dot menu button within a named row
@@ -314,6 +316,12 @@ public class DevicesPage {
                 url -> url.contains("/devices/details/"),
                 new Page.WaitForURLOptions().setTimeout(10_000)
         );
-        return new DeviceDetailsPage(page);
+        DeviceDetailsPage deviceDetailsPage = new DeviceDetailsPage(page);
+        page.waitForCondition(deviceDetailsPage::isLoaded);
+        return deviceDetailsPage;
+    }
+
+    public boolean isLoaded() {
+        return page.url().contains(URL_FRAGMENT) && addDeviceButton().isVisible();
     }
 }

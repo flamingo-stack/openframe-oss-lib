@@ -3,6 +3,8 @@ package com.openframe.test.pages;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 
+import static com.microsoft.playwright.options.WaitForSelectorState.VISIBLE;
+
 /**
  * Page Object for the Remote Desktop session page.
  * URL pattern: /devices/details/{deviceId}/remote-desktop/
@@ -120,9 +122,28 @@ public class RemoteDesktopPage {
     public RemoteDesktopPage waitForCanvasVisible(int timeoutMs) {
         remoteDesktopCanvas()
                 .waitFor(new Locator.WaitForOptions()
-                        .setState(com.microsoft.playwright.options.WaitForSelectorState.VISIBLE)
+                        .setState(VISIBLE)
                         .setTimeout(timeoutMs));
         return this;
+    }
+
+    public boolean waitForDesktop() {
+        page.waitForCondition(this::canvasIsNotBlank);
+        return true;
+    }
+
+    public boolean canvasIsNotBlank() {
+        Object isNonBlank = page.evaluate("""
+                    () => {
+                        const canvas = document.querySelector('canvas');
+                        const ctx = canvas.getContext('2d');
+                        const cx = Math.floor(canvas.width / 2);
+                        const cy = Math.floor(canvas.height / 2);
+                        const px = ctx.getImageData(cx, cy, 1, 1).data;
+                        return (px[0] > 0 || px[1] > 0 || px[2] > 0); // R, G, or B non-zero
+                    }
+                """);
+        return (Boolean) isNonBlank;
     }
 
     /**

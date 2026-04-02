@@ -177,8 +177,11 @@ public class NavigationSidebar {
     /**
      * Navigates to Devices.
      */
-    public void goToDevices() {
+    public DevicesPage goToDevices() {
         clickNavItem(devicesNavItem(), URL_DEVICES);
+        DevicesPage devicesPage = new DevicesPage(this.page);
+        page.waitForCondition(devicesPage::isLoaded);
+        return devicesPage;
     }
 
     /**

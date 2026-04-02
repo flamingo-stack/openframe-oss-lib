@@ -392,4 +392,8 @@ public class FileManagerPage {
         openRowContextMenuByName(rowName);
         clickContextMenuItem(menuItem);
     }
+
+    public boolean isLoaded() {
+        return this.getRowCount() > 0;
+    }
 }

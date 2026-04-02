@@ -106,7 +106,7 @@ public class RemoteShellPage {
      */
     public boolean isConnected() {
         String cls = page.locator(CONNECTION_STATUS).getAttribute("class");
-        return cls != null && cls.contains("text-ods-attention-green-success");
+        return cls != null && cls.contains("text-ods-attention-green-success") && !getTerminalOutput().isEmpty();
     }
 
     /**
@@ -148,10 +148,12 @@ public class RemoteShellPage {
      *
      * @param command the shell command to execute (e.g. "dir", "echo hello")
      */
-    public void typeCommand(String command) {
+    public void executeCommand(String command) {
+        List<String> terminalLines = this.getTerminalLines();
         page.locator(TERMINAL_INPUT).click();
-        page.locator(TERMINAL_INPUT).type(command);
+        page.locator(TERMINAL_INPUT).pressSequentially(command);
         page.keyboard().press("Enter");
+        page.waitForCondition(() -> this.getTerminalLines().size() > terminalLines.size());
     }
 
     /**
@@ -162,7 +164,7 @@ public class RemoteShellPage {
      */
     public void typeText(String text) {
         page.locator(TERMINAL_INPUT).click();
-        page.locator(TERMINAL_INPUT).type(text);
+        page.locator(TERMINAL_INPUT).pressSequentially(text);
     }
 
     /**

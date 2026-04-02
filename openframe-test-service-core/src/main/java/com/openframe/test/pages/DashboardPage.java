@@ -44,7 +44,7 @@ public class DashboardPage {
     // ── Queries ───────────────────────────────────────────────────────────
 
     public boolean isLoaded() {
-        return page.url().contains(URL_FRAGMENT) && userBadge().isVisible();
+        return page.url().contains(URL_FRAGMENT) && userBadge().isVisible() && sidebar().isVisible();
     }
 
     public String getCurrentUrl() {

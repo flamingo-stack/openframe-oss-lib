@@ -114,18 +114,24 @@ public class DeviceDetailsPage {
     /**
      * Opens the Remote Shell dropdown and clicks the "PowerShell" option.
      */
-    public void openRemoteShellPowerShell() {
+    public RemoteShellPage openRemoteShellPowerShell() {
         openRemoteShellMenu();
         clickMenuItemByText("PowerShell");
+        RemoteShellPage remoteShellPage = new RemoteShellPage(this.page);
+        page.waitForCondition(remoteShellPage::isConnected);
+        return remoteShellPage;
     }
 
     /**
      * Clicks "Manage Files" (navigates to the file manager sub-route).
      */
-    public void clickManageFiles() {
+    public FileManagerPage openFileManager() {
         page.locator("main button[role='link']")
                 .filter(new Locator.FilterOptions().setHasText("Manage Files"))
                 .click();
+        FileManagerPage fileManagerPage = new FileManagerPage(this.page);
+        page.waitForCondition(fileManagerPage::isLoaded);
+        return fileManagerPage;
     }
 
     // ── ⋯ More-actions menu ───────────────────────────────────────────────────
@@ -187,6 +193,10 @@ public class DeviceDetailsPage {
                         new Page.GetByRoleOptions().setName(tabName))
                 .getAttribute("class");
         return cls != null && cls.contains("bg-gradient-to-b");
+    }
+
+    public boolean isLoaded() {
+        return !getDeviceName().isEmpty() && !getDeviceStatus().isEmpty();
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
