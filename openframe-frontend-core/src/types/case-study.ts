@@ -110,6 +110,7 @@ export interface CaseStudyFilters {
   status?: string
   limit?: number
   offset?: number
+  ids?: (number | string)[]
 }
 
 export interface CaseStudyListResponse {

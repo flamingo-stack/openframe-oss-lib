@@ -194,6 +194,7 @@ export interface ProductReleaseFilters {
   status?: string
   limit?: number
   offset?: number
+  ids?: (number | string)[]
 }
 
 export interface ProductReleaseListResponse {
