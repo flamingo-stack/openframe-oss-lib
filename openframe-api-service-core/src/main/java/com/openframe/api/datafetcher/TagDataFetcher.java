@@ -41,17 +41,21 @@ public class TagDataFetcher {
     }
 
     @DgsQuery
-    public List<Tag> tagKeySuggestions(@InputArgument @NotBlank String organizationId,
-                                       @InputArgument @NotBlank String search) {
-        log.debug("Autocomplete tag keys for org: {}, search: {}", organizationId, search);
-        return tagService.searchTagKeys(organizationId, search);
+    public List<Tag> tagKeySuggestions(
+            @InputArgument @NotBlank String organizationId,
+            @InputArgument String search,
+            @InputArgument Integer limit) {
+        log.debug("Autocomplete tag keys for org: {}, search: {}, limit: {}", organizationId, search, limit);
+        return tagService.searchTagKeys(organizationId, search, limit);
     }
 
     @DgsQuery
-    public List<String> tagValueSuggestions(@InputArgument @NotBlank String organizationId,
-                                            @InputArgument @NotBlank String tagKey,
-                                            @InputArgument @NotBlank String search) {
-        log.debug("Autocomplete tag values for org: {}, key: {}, search: {}", organizationId, tagKey, search);
-        return tagService.searchTagValues(organizationId, tagKey, search);
+    public List<String> tagValueSuggestions(
+            @InputArgument @NotBlank String organizationId,
+            @InputArgument @NotBlank String tagKey,
+            @InputArgument String search,
+            @InputArgument Integer limit) {
+        log.debug("Autocomplete tag values for org: {}, key: {}, search: {}, limit: {}", organizationId, tagKey, search, limit);
+        return tagService.searchTagValues(organizationId, tagKey, search, limit);
     }
 }
