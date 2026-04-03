@@ -15,6 +15,8 @@ export interface AutocompleteOption<T = string> {
   value: T
 }
 
+export type AutocompleteInputChangeReason = 'input' | 'reset' | 'clear'
+
 interface AutocompleteBaseProps<T = string> {
   /** Available options to select from */
   options: AutocompleteOption<T>[]
@@ -44,12 +46,20 @@ interface AutocompleteBaseProps<T = string> {
   invalid?: boolean
   /** No options text */
   noOptionsText?: string
-  /** Callback when input value changes */
-  onInputChange?: (value: string) => void
+  /** Controlled input value. When provided, the component won't manage input state internally. */
+  inputValue?: string
+  /** Callback when input value changes (typing, selection, clearing). Fires in both controlled and uncontrolled modes. */
+  onInputChange?: (value: string, reason: AutocompleteInputChangeReason) => void
   /** Loading state */
   loading?: boolean
   /** Loading text */
   loadingText?: string
+  /** When true, shows a clickable "+ Create" option when no results match the input */
+  creatable?: boolean
+  /** Callback fired after a new option is created via creatable. Use it to persist the new option server-side, etc. */
+  onCreateOption?: (inputValue: string) => void
+  /** When true, disables built-in client-side filtering (useful when options are filtered server-side via onInputChange) */
+  disableClientFilter?: boolean
 }
 
 export interface AutocompleteSingleProps<T = string> extends AutocompleteBaseProps<T> {
@@ -118,9 +128,13 @@ function AutocompleteInner<T = string>(
     renderOption,
     invalid = false,
     noOptionsText = "No options",
+    inputValue: inputValueProp,
     onInputChange,
     loading = false,
     loadingText = "Loading...",
+    creatable = false,
+    onCreateOption,
+    disableClientFilter = false,
   } = props
 
   const multiple = props.multiple ?? false
@@ -139,7 +153,17 @@ function AutocompleteInner<T = string>(
     ? (props.value as T[])
     : (props.value != null ? [props.value as T] : [])
 
-  const [inputValue, setInputValue] = React.useState("")
+  const [internalInputValue, setInternalInputValue] = React.useState("")
+  const isInputControlled = inputValueProp !== undefined
+  const inputValue = isInputControlled ? inputValueProp : internalInputValue
+
+  const updateInputValue = (value: string, reason: AutocompleteInputChangeReason) => {
+    if (!isInputControlled) {
+      setInternalInputValue(value)
+    }
+    onInputChange?.(value, reason)
+  }
+
   const [isOpen, setIsOpen] = React.useState(false)
   const [highlightedIndex, setHighlightedIndex] = React.useState(-1)
   const containerRef = React.useRef<HTMLDivElement>(null)
@@ -179,6 +203,10 @@ function AutocompleteInner<T = string>(
 
   // Filter options based on inputValue
   const filteredOptions = React.useMemo(() => {
+    if (disableClientFilter) {
+      return options
+    }
+
     if (filterOptions) {
       return filterOptions(options, inputValue)
     }
@@ -191,7 +219,29 @@ function AutocompleteInner<T = string>(
     return options.filter(opt =>
       opt.label.toLowerCase().includes(lowerInput)
     )
-  }, [options, inputValue, filterOptions])
+  }, [options, inputValue, filterOptions, disableClientFilter])
+
+  // Show "+ Create" option when creatable is on, user typed something, and nothing matched
+  const showCreateOption = creatable && inputValue.trim().length > 0 && filteredOptions.length === 0
+
+  // Handle creating a new option
+  const handleCreate = () => {
+    const trimmed = inputValue.trim()
+    if (!trimmed) return
+
+    const newValue = trimmed as T
+
+    if (multiple) {
+      if (maxItems && valueArray.length >= maxItems) return
+      ;(props as AutocompleteMultipleProps<T>).onChange([...valueArray, newValue])
+    } else {
+      ;(props as AutocompleteSingleProps<T>).onChange(newValue)
+    }
+
+    updateInputValue("", 'reset')
+    setIsOpen(false)
+    onCreateOption?.(trimmed)
+  }
 
   // Reset highlighted index when options change
   React.useEffect(() => {
@@ -200,9 +250,7 @@ function AutocompleteInner<T = string>(
 
   // Handle input change
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value
-    setInputValue(newValue)
-    onInputChange?.(newValue)
+    updateInputValue(e.target.value, 'input')
     if (!isOpen) {
       setIsOpen(true)
     }
@@ -224,12 +272,12 @@ function AutocompleteInner<T = string>(
         ;(props as AutocompleteMultipleProps<T>).onChange([...valueArray, option.value])
       }
 
-      setInputValue("")
+      updateInputValue("", 'reset')
       inputRef.current?.focus()
     } else {
       // Single mode: select and close
       ;(props as AutocompleteSingleProps<T>).onChange(option.value)
-      setInputValue("")
+      updateInputValue("", 'reset')
       setIsOpen(false)
     }
   }
@@ -243,7 +291,7 @@ function AutocompleteInner<T = string>(
     } else {
       ;(props as AutocompleteSingleProps<T>).onChange(null)
     }
-    setInputValue("")
+    updateInputValue("", 'clear')
     inputRef.current?.focus()
   }
 
@@ -267,7 +315,9 @@ function AutocompleteInner<T = string>(
         break
       case "Enter":
         e.preventDefault()
-        if (highlightedIndex >= 0 && filteredOptions[highlightedIndex]) {
+        if (showCreateOption) {
+          handleCreate()
+        } else if (highlightedIndex >= 0 && filteredOptions[highlightedIndex]) {
           handleSelect(filteredOptions[highlightedIndex])
         } else if (freeSolo && inputValue.trim()) {
           const newOption: AutocompleteOption<T> = {
@@ -292,9 +342,8 @@ function AutocompleteInner<T = string>(
 
   // Handle popover open/close
   const handleOpenChange = (open: boolean) => {
-    if (!open && !multiple) {
-      // Reset inputValue when closing in single mode; display will show selected label
-      setInputValue("")
+    if (!open) {
+      updateInputValue("", 'reset')
     }
     setIsOpen(open)
   }
@@ -323,10 +372,6 @@ function AutocompleteInner<T = string>(
           onClick={() => {
             if (!disabled) {
               inputRef.current?.focus()
-              if (!multiple) {
-                // Clear input for fresh search in single mode
-                setInputValue("")
-              }
               setIsOpen(true)
             }
           }}
@@ -376,13 +421,7 @@ function AutocompleteInner<T = string>(
               value={inputDisplayValue}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              onFocus={() => {
-                if (!multiple) {
-                  // Clear input for fresh search in single mode
-                  setInputValue("")
-                }
-                setIsOpen(true)
-              }}
+              onFocus={() => setIsOpen(true)}
               placeholder={inputPlaceholder}
               disabled={disabled}
               className={innerInputStyles}
@@ -419,9 +458,7 @@ function AutocompleteInner<T = string>(
         className={cn(
           "z-50 w-[var(--radix-popover-trigger-width)] mt-1",
           "bg-ods-card border border-ods-border rounded-[4px]",
-          "data-[state=open]:animate-in data-[state=closed]:animate-out",
-          "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-          "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+          "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
           "data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2",
           dropdownClassName
         )}
@@ -446,13 +483,28 @@ function AutocompleteInner<T = string>(
                   {loadingText}
                 </div>
               ) : filteredOptions.length === 0 ? (
-                <div className="px-3 py-2 text-ods-text-secondary text-[14px]">
-                  {freeSolo && inputValue.trim() ? (
-                    <span>Press Enter to add &quot;{inputValue}&quot;</span>
-                  ) : (
-                    noOptionsText
-                  )}
-                </div>
+                showCreateOption ? (
+                  <div
+                    role="option"
+                    aria-selected={false}
+                    className={cn(
+                      "flex items-center h-11 md:h-12 px-4 cursor-pointer transition-colors",
+                      "text-[18px] font-medium leading-6 text-ods-accent",
+                      "hover:bg-ods-bg-hover"
+                    )}
+                    onClick={handleCreate}
+                  >
+                    + Create &quot;{inputValue.trim()}&quot;
+                  </div>
+                ) : (
+                  <div className="px-3 py-2 text-ods-text-secondary text-[14px]">
+                    {freeSolo && inputValue.trim() ? (
+                      <span>Press Enter to add &quot;{inputValue}&quot;</span>
+                    ) : (
+                      noOptionsText
+                    )}
+                  </div>
+                )
               ) : (
                 filteredOptions.map((option, index) => {
                   const isSelected = valueArray.includes(option.value)
