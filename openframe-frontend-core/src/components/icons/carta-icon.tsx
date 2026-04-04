@@ -3,7 +3,7 @@ interface CartaIconProps {
   color?: string;
 }
 
-export const CartaIcon = ({ className = 'w-6 h-6', color = 'var(--ods-accent)' }: CartaIconProps) => (
+export const CartaIcon = ({ className = 'w-6 h-6', color = 'var(--ods-system-greys-white)' }: CartaIconProps) => (
   <svg viewBox="0 0 301.1 131.3" fill={color} xmlns="http://www.w3.org/2000/svg" className={className}>
     <path d="M0,0v131.3h301.1V0H0z M293.1,123.3H8V8h285.1V123.3z M43.6,68.9c0-14.8,12.5-23.6,23.7-23.6c8,0,15.5,3,19.5,10l-7.5,4.4
       c-1.3-2-3.1-3.6-5.1-4.7c-2.1-1.1-4.4-1.7-6.7-1.7c-6.6,0-14.4,5.2-14.4,15.4c0,10,7.5,15.5,15,15.5c5.2,0,9.6-2.9,12.2-7.5

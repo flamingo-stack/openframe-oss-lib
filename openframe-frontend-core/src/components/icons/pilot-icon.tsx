@@ -3,7 +3,7 @@ interface PilotIconProps {
   color?: string;
 }
 
-export const PilotIcon = ({ className = 'w-6 h-6', color = 'var(--ods-accent)' }: PilotIconProps) => (
+export const PilotIcon = ({ className = 'w-6 h-6', color = 'var(--ods-system-greys-white)' }: PilotIconProps) => (
   <svg viewBox="0 0 156.8 83" fill={color} xmlns="http://www.w3.org/2000/svg" className={className}>
     <path d="M55.7,0C54.3,0,53,0.6,52,1.5c-1,1-1.6,2.3-1.6,3.7c0,0.7,0.1,1.4,0.4,2S51.5,8.5,52,9
       c0.5,0.5,1.1,0.9,1.7,1.1c0.6,0.3,1.3,0.4,2,0.4c1.4,0,2.7-0.6,3.6-1.6c1-1,1.5-2.3,1.5-3.7c0-1.4-0.5-2.7-1.5-3.7
