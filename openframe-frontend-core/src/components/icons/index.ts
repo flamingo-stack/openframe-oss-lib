@@ -203,3 +203,7 @@ export { G2Icon } from './g2-icon';
 export { CapterraIcon } from './capterra-icon';
 export { TrustpilotIcon } from './trustpilot-icon';
 export { GetAppIcon } from './getapp-icon';
+
+// Financial platform icons
+export { CartaIcon } from './carta-icon';
+export { PilotIcon } from './pilot-icon';
