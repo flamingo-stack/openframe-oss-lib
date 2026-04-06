@@ -82,6 +82,7 @@ export interface ChatMessageListRef {
 
 export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'onSubmit'> {
   onSend?: (message: string) => void
+  onStop?: () => void
   sending?: boolean
   awaitingResponse?: boolean
   reserveAvatarOffset?: boolean

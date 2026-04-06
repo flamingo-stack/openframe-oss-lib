@@ -2,13 +2,14 @@
 
 import { useState, useRef, useImperativeHandle, forwardRef, useCallback, useEffect, type KeyboardEvent, type ChangeEvent } from "react"
 import { cn } from "../../utils/cn"
-import { Send } from "lucide-react"
+import { Send01Icon } from "../icons-v2-generated/communication/send-01-icon"
+import { StopIcon } from "../icons-v2-generated/media-playback/stop-icon"
 import { Textarea } from "../ui/textarea"
 import { ChatTypingIndicator } from "./chat-typing-indicator"
 import type { ChatInputProps } from "./types"
 
 const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
-  ({ className, onSend, sending = false, awaitingResponse = false, placeholder = "Enter your request here...", reserveAvatarOffset = true, disabled = false, autoFocus = false, ...props }, ref) => {
+  ({ className, onSend, onStop, sending = false, awaitingResponse = false, placeholder = "Enter your request here...", reserveAvatarOffset = true, disabled = false, autoFocus = false, ...props }, ref) => {
     const [value, setValue] = useState('')
     const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -47,6 +48,12 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
       }
     }, [])
+
+    const handleStop = useCallback(() => {
+      if (onStop) {
+        onStop()
+      }
+    }, [onStop])
     
     // Show awaiting response state
     if (awaitingResponse) {
@@ -115,19 +122,34 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             {...props}
           />
           
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={sending || disabled || !value.trim()}
-            className={cn(
-              "rounded-md p-1.5 text-ods-text-secondary transition-all",
-              sending || disabled || !value.trim() ? "cursor-not-allowed opacity-40" : "hover:text-ods-text-primary active:scale-95",
-              "focus:outline-none"
-            )}
-            aria-label="Send message"
-          >
-            <Send className="h-5 w-5" />
-          </button>
+          {sending && onStop ? (
+            <button
+              type="button"
+              onClick={handleStop}
+              className={cn(
+                "rounded-md p-1.5 text-ods-text-secondary transition-all",
+                "hover:text-ods-accent active:scale-95",
+                "focus:outline-none"
+              )}
+              aria-label="Stop generation"
+            >
+              <StopIcon size={20} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={sending || disabled || !value.trim()}
+              className={cn(
+                "rounded-md p-1.5 text-ods-text-secondary transition-all",
+                sending || disabled || !value.trim() ? "cursor-not-allowed opacity-40" : "hover:text-ods-text-primary active:scale-95",
+                "focus:outline-none"
+              )}
+              aria-label="Send message"
+            >
+              <Send01Icon size={20} />
+            </button>
+          )}
         </div>
       </div>
     )
