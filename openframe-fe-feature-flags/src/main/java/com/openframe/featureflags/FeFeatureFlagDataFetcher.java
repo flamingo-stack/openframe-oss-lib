@@ -15,11 +15,11 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class FeFeatureFlagDataFetcher {
 
-    private final FeFeatureFlagProperties properties;
+    private final FeFeatureFlagService featureFlagService;
 
     @DgsQuery
     public List<FeFeatureFlag> feFeatureFlags(@InputArgument List<String> names) {
-        Map<String, Boolean> flags = properties.getFeFeatureFlag();
+        Map<String, Boolean> flags = featureFlagService.getEffectiveFlags();
 
         Collection<String> keys = (names == null || names.isEmpty())
                 ? flags.keySet()
