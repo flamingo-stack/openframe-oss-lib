@@ -2,6 +2,7 @@ package com.openframe.test.config;
 
 import com.openframe.test.data.dto.user.User;
 import lombok.extern.slf4j.Slf4j;
+import net.datafaker.Faker;
 
 @Slf4j
 public class UserConfig {
@@ -12,6 +13,10 @@ public class UserConfig {
     public static void configure(String email, String password) {
         UserConfig.email = email;
         UserConfig.password = password;
+    }
+
+    public static void random() {
+        email = new Faker().letterify("??????@flamingo.cx");
     }
 
     public static User getUser() {
