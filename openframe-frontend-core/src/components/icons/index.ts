@@ -21,7 +21,7 @@
 export { OpenmspLogo } from './openmsp-logo';
 export { OpenFrameLogo } from './openframe-logo';
 export { OpenFrameText } from './openframe-text';
-export { FlamingoLogo } from './flamingo-logo';
+export { FlamingoLogo, FLAMINGO_LOGO_SVG_PATH, FLAMINGO_LOGO_VIEWBOX } from './flamingo-logo';
 export { ElestioLogo } from './elestio-logo';
 export { MlgLogo } from './mlg-logo';
 export { MiamiCyberGangLogo } from './miami-cyber-gang-logo';
