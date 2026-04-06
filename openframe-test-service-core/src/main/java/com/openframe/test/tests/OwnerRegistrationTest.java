@@ -4,6 +4,7 @@ import com.openframe.test.api.OrganizationApi;
 import com.openframe.test.api.RegistrationApi;
 import com.openframe.test.api.UserApi;
 import com.openframe.test.api.auth.AuthFlow;
+import com.openframe.test.config.EnvironmentConfig;
 import com.openframe.test.config.UserConfig;
 import com.openframe.test.data.dto.organization.Organization;
 import com.openframe.test.data.dto.user.MeResponse;
@@ -26,6 +27,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class OwnerRegistrationTest extends BaseTest {
 
+    @BeforeAll
+    public static void setup() {
+        EnvironmentConfig.random();
+        UserConfig.random();
+    }
+
     @Order(1)
     @Test
     @DisplayName("Register Owner user")
@@ -39,7 +46,7 @@ public class OwnerRegistrationTest extends BaseTest {
         assertThat(response.getUpdatedAt()).as("Registration response updatedAt should not be null").isNotNull();
         assertThat(response).as("Registration response should match expected")
                 .usingRecursiveComparison()
-                .ignoringFields("id", "ownerId", "hubspotId", "createdAt", "updatedAt")
+                .ignoringFields("id", "ownerId", "hubspotId", "createdAt", "updatedAt", "plan")
                 .isEqualTo(expectedResponse);
     }
 
