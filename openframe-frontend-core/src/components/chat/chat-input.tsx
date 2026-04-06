@@ -2,8 +2,7 @@
 
 import { useState, useRef, useImperativeHandle, forwardRef, useCallback, useEffect, type KeyboardEvent, type ChangeEvent } from "react"
 import { cn } from "../../utils/cn"
-import { Send01Icon } from "../icons-v2-generated/communication/send-01-icon"
-import { StopIcon } from "../icons-v2-generated/media-playback/stop-icon"
+import { Send01Icon, StopIcon } from "../icons-v2-generated"
 import { Textarea } from "../ui/textarea"
 import { ChatTypingIndicator } from "./chat-typing-indicator"
 import type { ChatInputProps } from "./types"
