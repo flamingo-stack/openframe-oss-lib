@@ -340,6 +340,7 @@ export type ContentSourceType =
   | 'event'               // Luma events
   | 'podcast'             // Podcast episodes
   | 'webinar'             // Webinars
+  | 'investor_update'     // Investor updates
   | 'from_scratch';
 
 export type URLInjectionPreference = 'none' | 'in_post' | 'as_comment';
@@ -351,4 +352,6 @@ export interface ContentSourceOption {
   summary?: string;
   url?: string;
   published_at?: string;
+  /** Featured image or cover image URL from the source entity */
+  image_url?: string;
 }

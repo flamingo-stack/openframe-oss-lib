@@ -84,10 +84,12 @@ export function formatBytes(bytes: number, decimals = 2): string {
 /**
  * Platform URL mappings for production (with environment variable overrides)
  */
-function getPlatformProductionUrl(platform: string): string {
+export function getPlatformProductionUrl(platform: string): string {
   switch (platform) {
     case 'marketing-hub':
       return process.env.NEXT_PUBLIC_MARKETING_URL || 'https://marketing-hub.flamingo.so';
+    case 'company-hub':
+      return process.env.NEXT_PUBLIC_COMPANY_HUB_URL || 'https://company-hub.flamingo.so';
     case 'product-hub':
       return process.env.NEXT_PUBLIC_PRODUCT_URL || 'https://product-hub.flamingo.so';
     case 'revenue-hub':
