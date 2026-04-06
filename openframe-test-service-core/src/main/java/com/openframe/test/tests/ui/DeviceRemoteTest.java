@@ -4,14 +4,17 @@ import com.openframe.test.pages.DeviceDetailsPage;
 import com.openframe.test.pages.FileManagerPage;
 import com.openframe.test.pages.RemoteDesktopPage;
 import com.openframe.test.pages.RemoteShellPage;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@Tag("device")
 class DeviceRemoteTest extends BaseUITest {
 
     DeviceDetailsPage deviceDetailsPage;
@@ -21,23 +24,20 @@ class DeviceRemoteTest extends BaseUITest {
         deviceDetailsPage = navigationSidebar.goToDevices().openDevice("vm114267");
     }
 
-    @AfterEach
-    public void backToDevices() {
-        navigationSidebar.goToDevices();
-    }
-
     @Test
+    @DisplayName("Remote Shell: connect, execute command, and disconnect")
     public void testRemoteShell() {
         RemoteShellPage remoteShellPage = deviceDetailsPage.openRemoteShellPowerShell();
         List<String> terminalLines = remoteShellPage.getTerminalLines();
-        assertThat(terminalLines).isNotEmpty();
+        assertThat(terminalLines).as("Terminal should have output after connection").isNotEmpty();
         remoteShellPage.executeCommand("dir");
         List<String> commandOutput = remoteShellPage.getTerminalLines();
-        assertThat(commandOutput).hasSizeGreaterThan(terminalLines.size());
+        assertThat(commandOutput).as("Terminal output should grow after executing command").hasSizeGreaterThan(terminalLines.size());
         remoteShellPage.clickDisconnect();
     }
 
     @Test
+    @DisplayName("Remote Desktop: canvas is visible and desktop loads")
     public void testRemoteDesktop() {
         RemoteDesktopPage rdPage = deviceDetailsPage.openRemoteDesktop();
         assertThat(rdPage.remoteDesktopCanvas().isVisible())
@@ -47,9 +47,11 @@ class DeviceRemoteTest extends BaseUITest {
     }
 
     @Test
+    @DisplayName("File Manager: lists files in current folder")
     public void testRemoteFileManager() {
         FileManagerPage fileManagerPage = deviceDetailsPage.openFileManager();
-        List<String> rows = fileManagerPage.getAllRowNames();
-        assertThat(rows).isNotEmpty();
+        assertThat(fileManagerPage.getRowCount()).as("File manager should list at least one entry").isNotZero();
+        assertThat(fileManagerPage.getCurrentFolder()).as("Current folder path should not be empty").isNotEmpty();
+        assertThat(fileManagerPage.getRowName(0)).as("First row name should not be empty").isNotEmpty();
     }
 }

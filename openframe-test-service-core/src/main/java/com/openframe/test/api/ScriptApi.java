@@ -1,5 +1,6 @@
 package com.openframe.test.api;
 
+import com.openframe.test.data.dto.script.RunScriptRequest;
 import com.openframe.test.data.dto.script.Script;
 import io.restassured.http.ContentType;
 
@@ -12,6 +13,7 @@ public class ScriptApi {
 
     private static final String SCRIPTS = "tools/tactical-rmm/scripts/";
     private static final String SCRIPT = SCRIPTS + "{id}/";
+    private static final String RUN_SCRIPT = "tools/tactical-rmm/agents/actions/bulk/";
 
     public static List<Script> listScripts() {
         List<Script> scripts = given(getAuthorizedSpec())
@@ -42,6 +44,14 @@ public class ScriptApi {
         return given(getAuthorizedSpec())
                 .body(script)
                 .post(SCRIPTS)
+                .then().statusCode(200)
+                .extract().asString();
+    }
+
+    public static String runScript(RunScriptRequest request) {
+        return given(getAuthorizedSpec())
+                .body(request)
+                .post(RUN_SCRIPT)
                 .then().statusCode(200)
                 .extract().asString();
     }

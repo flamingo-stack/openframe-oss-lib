@@ -3,6 +3,7 @@ package com.openframe.test.pages;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -291,7 +292,7 @@ public class FileManagerPage {
      */
     public List<String> getAllRowNames() {
         int count = getRowCount();
-        List<String> names = new java.util.ArrayList<>();
+        List<String> names = new ArrayList<>();
         for (int i = 0; i < count; i++) {
             names.add(getRowName(i));
         }
@@ -394,6 +395,6 @@ public class FileManagerPage {
     }
 
     public boolean isLoaded() {
-        return this.getRowCount() > 0;
+        return this.getRowCount() > 0 && !this.getRowName(0).isEmpty();
     }
 }
