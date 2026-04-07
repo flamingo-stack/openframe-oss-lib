@@ -118,3 +118,14 @@ jobs:
           path: ${{ matrix.path }}/dist/
           retention-days: 1
           if-no-files-found: error
+
+
+  all-checks:
+    name: "All Checks"
+    needs: [test-java, test-node]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: exit 1
+      - run: echo "All checks passed"
