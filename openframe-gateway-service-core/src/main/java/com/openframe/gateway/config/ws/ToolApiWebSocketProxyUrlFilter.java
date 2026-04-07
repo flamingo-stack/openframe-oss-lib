@@ -1,10 +1,9 @@
 package com.openframe.gateway.config.ws;
 
-import com.openframe.core.service.ProxyUrlResolver;
 import com.openframe.gateway.service.ToolApiKeyHeadersResolver;
+import com.openframe.gateway.upstream.ToolUpstreamResolverRegistry;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.reactive.repository.tool.ReactiveIntegratedToolRepository;
-import com.openframe.data.service.ToolUrlService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
@@ -20,11 +19,10 @@ public class ToolApiWebSocketProxyUrlFilter extends ToolWebSocketProxyUrlFilter 
 
     public ToolApiWebSocketProxyUrlFilter(
             ReactiveIntegratedToolRepository toolRepository,
-            ToolUrlService toolUrlService,
-            ProxyUrlResolver proxyUrlResolver,
+            ToolUpstreamResolverRegistry upstreamRegistry,
             ToolApiKeyHeadersResolver apiKeyHeadersResolver
     ) {
-        super(toolRepository, toolUrlService, proxyUrlResolver);
+        super(toolRepository, upstreamRegistry);
         this.apiKeyHeadersResolver = apiKeyHeadersResolver;
     }
 
