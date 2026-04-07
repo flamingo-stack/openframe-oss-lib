@@ -1,11 +1,8 @@
 package com.openframe.gateway.config.ws;
 
-import com.openframe.core.service.ProxyUrlResolver;
 import com.openframe.data.document.tool.IntegratedTool;
-import com.openframe.data.document.tool.ToolUrl;
-import com.openframe.data.document.tool.ToolUrlType;
 import com.openframe.data.reactive.repository.tool.ReactiveIntegratedToolRepository;
-import com.openframe.data.service.ToolUrlService;
+import com.openframe.gateway.upstream.ToolUpstreamResolverRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
@@ -27,8 +24,7 @@ public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Orde
     public static final String ORIGINAL_AUTHORIZATION_ATTR = "originalAuthorization";
 
     private final ReactiveIntegratedToolRepository toolRepository;
-    private final ToolUrlService toolUrlService;
-    private final ProxyUrlResolver proxyUrlResolver;
+    private final ToolUpstreamResolverRegistry upstreamRegistry;
 
     @Override
     public int getOrder() {
@@ -45,11 +41,8 @@ public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Orde
 
         return getTool(toolId)
                 .flatMap(tool -> {
-                    ToolUrl toolUrl = toolUrlService.getUrlByToolType(tool, ToolUrlType.WS)
-                            .orElseThrow(() -> new IllegalArgumentException("Tool " + toolId + " have no web socket url"));
-
-                    String endpointPrefix = getEndpointPrefix();
-                    URI proxyUri = proxyUrlResolver.resolve(toolId, toolUrl.getUrl(), toolUrl.getPort(), requestUri, endpointPrefix);
+                    URI proxyUri = upstreamRegistry.resolve(toolId)
+                            .resolveWs(tool, request, getEndpointPrefix());
 
                     log.debug("Proxy web socket request: {}", proxyUri);
 
