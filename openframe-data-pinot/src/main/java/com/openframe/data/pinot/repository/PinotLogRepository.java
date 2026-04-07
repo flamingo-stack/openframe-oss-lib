@@ -11,6 +11,7 @@ import java.util.List;
 public interface PinotLogRepository {
 
     List<LogProjection> findLogs(
+            String tenantId,
             LocalDate startDate,
             LocalDate endDate,
             List<String> toolTypes,
@@ -25,6 +26,7 @@ public interface PinotLogRepository {
     );
 
     List<LogProjection> searchLogs(
+            String tenantId,
             LocalDate startDate,
             LocalDate endDate,
             List<String> toolTypes,
@@ -40,6 +42,7 @@ public interface PinotLogRepository {
     );
 
     List<String> getToolTypeOptions(
+            String tenantId,
             LocalDate startDate,
             LocalDate endDate,
             List<String> toolTypes,
@@ -49,6 +52,7 @@ public interface PinotLogRepository {
     );
 
     List<String> getEventTypeOptions(
+            String tenantId,
             LocalDate startDate,
             LocalDate endDate,
             List<String> toolTypes,
@@ -58,6 +62,7 @@ public interface PinotLogRepository {
     );
 
     List<String> getSeverityOptions(
+            String tenantId,
             LocalDate startDate,
             LocalDate endDate,
             List<String> toolTypes,
@@ -67,6 +72,7 @@ public interface PinotLogRepository {
     );
 
     List<String> getAvailableDateRanges(
+            String tenantId,
             List<String> toolTypes,
             List<String> eventTypes,
             List<String> severities,
@@ -74,6 +80,7 @@ public interface PinotLogRepository {
     );
 
     List<OrganizationOption> getOrganizationOptions(
+            String tenantId,
             LocalDate startDate,
             LocalDate endDate,
             List<String> toolTypes,

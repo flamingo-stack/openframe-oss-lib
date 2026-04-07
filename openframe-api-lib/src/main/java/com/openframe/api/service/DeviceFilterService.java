@@ -8,6 +8,7 @@ import com.openframe.data.document.organization.Organization;
 import com.openframe.data.pinot.repository.PinotDeviceRepository;
 import com.openframe.data.repository.organization.OrganizationRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -24,6 +25,9 @@ public class DeviceFilterService {
 
     private final PinotDeviceRepository pinotDeviceRepository;
     private final OrganizationRepository organizationRepository;
+
+    @Value("${TENANT_ID:oss}")
+    private String tenantId;
 
     public DeviceFilterService(PinotDeviceRepository pinotDeviceRepository,
                               OrganizationRepository organizationRepository) {
@@ -42,17 +46,17 @@ public class DeviceFilterService {
         List<String> tagKeyValues = buildTagKeyValuesFilter(filters);
 
         CompletableFuture<Map<String, Integer>> statusesFuture = CompletableFuture.supplyAsync(() ->
-                pinotDeviceRepository.getStatusFilterOptions(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
+                pinotDeviceRepository.getStatusFilterOptions(tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
         CompletableFuture<Map<String, Integer>> deviceTypesFuture = CompletableFuture.supplyAsync(() ->
-                pinotDeviceRepository.getDeviceTypeFilterOptions(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
+                pinotDeviceRepository.getDeviceTypeFilterOptions(tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
         CompletableFuture<Map<String, Integer>> osTypesFuture = CompletableFuture.supplyAsync(() ->
-                pinotDeviceRepository.getOsTypeFilterOptions(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
+                pinotDeviceRepository.getOsTypeFilterOptions(tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
         CompletableFuture<Map<String, Integer>> organizationsFuture = CompletableFuture.supplyAsync(() ->
-                pinotDeviceRepository.getOrganizationFilterOptions(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
+                pinotDeviceRepository.getOrganizationFilterOptions(tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
         CompletableFuture<Map<String, Integer>> tagKeysFuture = CompletableFuture.supplyAsync(() ->
-                pinotDeviceRepository.getTagKeyFilterOptions(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
+                pinotDeviceRepository.getTagKeyFilterOptions(tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
         CompletableFuture<Integer> filteredCountFuture = CompletableFuture.supplyAsync(() ->
-                pinotDeviceRepository.getFilteredDeviceCount(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
+                pinotDeviceRepository.getFilteredDeviceCount(tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
 
         return CompletableFuture.allOf(
                         statusesFuture, deviceTypesFuture, osTypesFuture,

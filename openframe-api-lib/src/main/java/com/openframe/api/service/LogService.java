@@ -13,6 +13,7 @@ import com.openframe.data.pinot.model.OrganizationOption;
 import com.openframe.data.pinot.repository.PinotLogRepository;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -29,6 +30,9 @@ public class LogService {
 
     private final PinotLogRepository pinotLogRepository;
     private final UnifiedLogEventRepository unifiedLogEventRepository;
+
+    @Value("${TENANT_ID:oss}")
+    private String tenantId;
 
 
     public GenericQueryResult<LogEvent> queryLogs(LogFilterCriteria filter, CursorPaginationCriteria paginationCriteria, String search, SortInput sort) {
@@ -57,6 +61,7 @@ public class LogService {
         if (search != null && !search.trim().isEmpty()) {
             log.debug("Using search functionality with term: {}", search);
             logs = pinotLogRepository.searchLogs(
+                    tenantId,
                     startDate, endDate,
                     toolTypes, eventTypes, severities,
                     organizationIds, deviceId,
@@ -65,6 +70,7 @@ public class LogService {
         } else {
             log.debug("Using exact field filtering");
             logs = pinotLogRepository.findLogs(
+                    tenantId,
                     startDate, endDate,
                     toolTypes, eventTypes, severities,
                     organizationIds, deviceId,
@@ -114,18 +120,22 @@ public class LogService {
         List<String> organizationIds = filters.getOrganizationIds();
 
         List<String> toolTypeOptions = pinotLogRepository.getToolTypeOptions(
+                tenantId,
                 startDate, endDate,
                 toolTypes, eventTypes, severities, organizationIds);
 
         List<String> eventTypeOptions = pinotLogRepository.getEventTypeOptions(
+                tenantId,
                 startDate, endDate,
                 toolTypes, eventTypes, severities, organizationIds);
 
         List<String> severityOptions = pinotLogRepository.getSeverityOptions(
+                tenantId,
                 startDate, endDate,
                 toolTypes, eventTypes, severities, organizationIds);
 
         List<OrganizationOption> dataOptions = pinotLogRepository.getOrganizationOptions(
+                tenantId,
                 startDate, endDate,
                 toolTypes, eventTypes, severities);
 

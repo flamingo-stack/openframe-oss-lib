@@ -48,11 +48,12 @@ public class PinotClientLogRepository implements PinotLogRepository {
     }
 
     @Override
-    public List<LogProjection> findLogs(LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes,
+    public List<LogProjection> findLogs(String tenantId, LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes,
                                         List<String> severities, List<String> organizationIds, String deviceId, String cursor, int limit,
                                         String sortField, String sortDirection) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable)
                 .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "organizationId", "organizationName", "summary", "eventTimestamp")
+                .whereEquals("tenantId", tenantId)
                 .whereDateRange("eventTimestamp", startDate, endDate)
                 .whereIn("toolType", toolTypes)
                 .whereIn("eventType", eventTypes)
@@ -67,11 +68,12 @@ public class PinotClientLogRepository implements PinotLogRepository {
     }
 
     @Override
-    public List<LogProjection> searchLogs(LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes,
+    public List<LogProjection> searchLogs(String tenantId, LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes,
                                           List<String> severities, List<String> organizationIds, String deviceId, String searchTerm, String cursor, int limit,
                                           String sortField, String sortDirection) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable)
                 .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "organizationId", "organizationName", "summary", "eventTimestamp")
+                .whereEquals("tenantId", tenantId)
                 .whereDateRange("eventTimestamp", startDate, endDate)
                 .whereIn("toolType", toolTypes)
                 .whereIn("eventType", eventTypes)
@@ -87,10 +89,11 @@ public class PinotClientLogRepository implements PinotLogRepository {
     }
 
     @Override
-    public List<String> getEventTypeOptions(LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes, List<String> severities, List<String> organizationIds) {
+    public List<String> getEventTypeOptions(String tenantId, LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes, List<String> severities, List<String> organizationIds) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable)
                 .select("eventType")
                 .distinct()
+                .whereEquals("tenantId", tenantId)
                 .whereDateRange("eventTimestamp", startDate, endDate)
                 .whereIn("toolType", toolTypes)
                 .whereIn("severity", severities)
@@ -101,10 +104,11 @@ public class PinotClientLogRepository implements PinotLogRepository {
     }
 
     @Override
-    public List<String> getSeverityOptions(LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes, List<String> severities, List<String> organizationIds) {
+    public List<String> getSeverityOptions(String tenantId, LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes, List<String> severities, List<String> organizationIds) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable)
                 .select("severity")
                 .distinct()
+                .whereEquals("tenantId", tenantId)
                 .whereDateRange("eventTimestamp", startDate, endDate)
                 .whereIn("toolType", toolTypes)
                 .whereIn("eventType", eventTypes)
@@ -115,10 +119,11 @@ public class PinotClientLogRepository implements PinotLogRepository {
     }
 
     @Override
-    public List<String> getToolTypeOptions(LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes, List<String> severities, List<String> organizationIds) {
+    public List<String> getToolTypeOptions(String tenantId, LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes, List<String> severities, List<String> organizationIds) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable)
                 .select("toolType")
                 .distinct()
+                .whereEquals("tenantId", tenantId)
                 .whereDateRange("eventTimestamp", startDate, endDate)
                 .whereIn("eventType", eventTypes)
                 .whereIn("severity", severities)
@@ -129,10 +134,11 @@ public class PinotClientLogRepository implements PinotLogRepository {
     }
 
     @Override
-    public List<String> getAvailableDateRanges(List<String> toolTypes, List<String> eventTypes, List<String> severities, List<String> organizationIds) {
+    public List<String> getAvailableDateRanges(String tenantId, List<String> toolTypes, List<String> eventTypes, List<String> severities, List<String> organizationIds) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable)
                 .select("ingestDay")
                 .distinct()
+                .whereEquals("tenantId", tenantId)
                 .whereIn("toolType", toolTypes)
                 .whereIn("eventType", eventTypes)
                 .whereIn("severity", severities)
@@ -143,11 +149,12 @@ public class PinotClientLogRepository implements PinotLogRepository {
     }
 
     @Override
-    public List<OrganizationOption> getOrganizationOptions(LocalDate startDate, LocalDate endDate,
+    public List<OrganizationOption> getOrganizationOptions(String tenantId, LocalDate startDate, LocalDate endDate,
                                                            List<String> toolTypes, List<String> eventTypes, List<String> severities) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable)
                 .select("organizationId", "organizationName")
                 .distinct()
+                .whereEquals("tenantId", tenantId)
                 .whereDateRange("eventTimestamp", startDate, endDate)
                 .whereIn("toolType", toolTypes)
                 .whereIn("eventType", eventTypes)

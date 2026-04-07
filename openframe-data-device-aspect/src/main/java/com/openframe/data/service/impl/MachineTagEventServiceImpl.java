@@ -36,6 +36,9 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
     @Value("${openframe.oss-tenant.kafka.topics.outbound.devices-topic}")
     private String machineEventsTopic;
 
+    @Value("${TENANT_ID:oss}")
+    private String tenantId;
+
     @Override
     public void processMachineSave(Machine machine) {
         try {
@@ -333,6 +336,7 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
         }
 
         return MachinePinotMessage.builder()
+                .tenantId(tenantId)
                 .machineId(machine.getMachineId())
                 .organizationId(machine.getOrganizationId())
                 .deviceType(machine.getType() != null ? machine.getType().toString() : null)

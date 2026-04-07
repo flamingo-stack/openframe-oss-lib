@@ -18,6 +18,9 @@ public class DebeziumKafkaMessageHandler extends DebeziumMessageHandler<Integrat
     @Value("${openframe.oss-tenant.kafka.topics.outbound.integrated-tool-events}")
     private String topic;
 
+    @Value("${TENANT_ID:oss}")
+    private String tenantId;
+
     protected final OssTenantRetryingKafkaProducer kafkaProducer;
 
     public DebeziumKafkaMessageHandler(OssTenantRetryingKafkaProducer kafkaProducer, ObjectMapper objectMapper) {
@@ -43,6 +46,7 @@ public class DebeziumKafkaMessageHandler extends DebeziumMessageHandler<Integrat
                     ? debeziumMessage.getUnifiedEventType().getSummary()
                     : debeziumMessage.getMessage() );
             message.setEventTimestamp(debeziumMessage.getEventTimestamp());
+            message.setTenantId(tenantId);
 
         } catch (Exception e) {
             log.error("Error processing Kafka message", e);

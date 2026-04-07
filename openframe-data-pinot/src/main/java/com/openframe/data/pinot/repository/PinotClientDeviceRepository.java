@@ -32,13 +32,14 @@ public class PinotClientDeviceRepository implements PinotDeviceRepository {
 
     @Override
     public Map<String, Integer> getStatusFilterOptions(
+            String tenantId,
             List<String> statuses,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
             List<String> tagKeyValues) {
-        String whereClause = buildWhereClauseExcluding(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, "status");
+        String whereClause = buildWhereClauseExcluding(tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, "status");
         return queryPinotForFilterOptions("SELECT status, COUNT(*) as count FROM \"" + devicesTable + "\"" +
                 (whereClause.isEmpty() ? "" : " WHERE " + whereClause) +
                 " GROUP BY status ORDER BY count DESC");
@@ -46,13 +47,14 @@ public class PinotClientDeviceRepository implements PinotDeviceRepository {
 
     @Override
     public Map<String, Integer> getDeviceTypeFilterOptions(
+            String tenantId,
             List<String> statuses,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
             List<String> tagKeyValues) {
-        String whereClause = buildWhereClauseExcluding(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, "deviceType");
+        String whereClause = buildWhereClauseExcluding(tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, "deviceType");
         return queryPinotForFilterOptions("SELECT deviceType, COUNT(*) as count FROM \"" + devicesTable + "\"" +
                 (whereClause.isEmpty() ? "" : " WHERE " + whereClause) +
                 " GROUP BY deviceType ORDER BY count DESC");
@@ -60,13 +62,14 @@ public class PinotClientDeviceRepository implements PinotDeviceRepository {
 
     @Override
     public Map<String, Integer> getOsTypeFilterOptions(
+            String tenantId,
             List<String> statuses,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
             List<String> tagKeyValues) {
-        String whereClause = buildWhereClauseExcluding(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, "osType");
+        String whereClause = buildWhereClauseExcluding(tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, "osType");
         return queryPinotForFilterOptions("SELECT osType, COUNT(*) as count FROM \"" + devicesTable + "\"" +
                 (whereClause.isEmpty() ? "" : " WHERE " + whereClause) +
                 " GROUP BY osType ORDER BY count DESC");
@@ -74,13 +77,14 @@ public class PinotClientDeviceRepository implements PinotDeviceRepository {
 
     @Override
     public Map<String, Integer> getOrganizationFilterOptions(
+            String tenantId,
             List<String> statuses,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
             List<String> tagKeyValues) {
-        String whereClause = buildWhereClauseExcluding(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, "organizationId");
+        String whereClause = buildWhereClauseExcluding(tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, "organizationId");
         return queryPinotForFilterOptions("SELECT organizationId, COUNT(*) as count FROM \"" + devicesTable + "\"" +
                 (whereClause.isEmpty() ? "" : " WHERE " + whereClause) +
                 " GROUP BY organizationId ORDER BY count DESC");
@@ -88,13 +92,14 @@ public class PinotClientDeviceRepository implements PinotDeviceRepository {
 
     @Override
     public Map<String, Integer> getTagKeyFilterOptions(
+            String tenantId,
             List<String> statuses,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
             List<String> tagKeyValues) {
-        String whereClause = buildWhereClauseExcluding(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, "tagKeyValues");
+        String whereClause = buildWhereClauseExcluding(tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, "tagKeyValues");
         return queryPinotForFilterOptions("SELECT tagKeyValues, COUNT(*) as count FROM \"" + devicesTable + "\"" +
                 (whereClause.isEmpty() ? "" : " WHERE " + whereClause) +
                 " GROUP BY tagKeyValues ORDER BY count DESC");
@@ -102,13 +107,14 @@ public class PinotClientDeviceRepository implements PinotDeviceRepository {
 
     @Override
     public int getFilteredDeviceCount(
+            String tenantId,
             List<String> statuses,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
             List<String> tagKeyValues) {
-        String whereClause = buildWhereClause(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues);
+        String whereClause = buildWhereClause(tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues);
         return queryPinotForCount("SELECT COUNT(*) FROM \"" + devicesTable + "\"" +
                 (whereClause.isEmpty() ? "" : " WHERE " + whereClause));
     }
@@ -167,10 +173,11 @@ public class PinotClientDeviceRepository implements PinotDeviceRepository {
         return value.replace("'", "''");
     }
 
-    private String buildWhereClause(List<String> statuses, List<String> deviceTypes,
+    private String buildWhereClause(String tenantId, List<String> statuses, List<String> deviceTypes,
                                     List<String> osTypes, List<String> organizationIds,
                                     List<String> tagKeys, List<String> tagKeyValues) {
         List<String> conditions = new ArrayList<>();
+        conditions.add("tenantId = '" + sanitize(tenantId) + "'");
         conditions.add("status != '" + DELETED.name() + "'");
 
         if (statuses != null && !statuses.isEmpty()) {
@@ -225,11 +232,12 @@ public class PinotClientDeviceRepository implements PinotDeviceRepository {
         return String.join(" AND ", conditions);
     }
 
-    private String buildWhereClauseExcluding(List<String> statuses, List<String> deviceTypes,
+    private String buildWhereClauseExcluding(String tenantId, List<String> statuses, List<String> deviceTypes,
                                              List<String> osTypes, List<String> organizationIds,
                                              List<String> tagKeys, List<String> tagKeyValues,
                                              String excludeField) {
         List<String> conditions = new ArrayList<>();
+        conditions.add("tenantId = '" + sanitize(tenantId) + "'");
         conditions.add("status != '" + DELETED.name() + "'");
 
         if (statuses != null && !statuses.isEmpty() && !"status".equals(excludeField)) {
