@@ -54,8 +54,8 @@ type DeviceFilterOption {
 }
 
 type TagFilterOption {
+    key: String!
     value: String!
-    label: String!
     count: Int!
 }
 
