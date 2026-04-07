@@ -6,6 +6,7 @@ interface HamburgerIconProps {
   className?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function HamburgerIcon({ width = 16, height = 16, className = '' }: HamburgerIconProps) {
   return (
     <svg 

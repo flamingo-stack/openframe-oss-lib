@@ -1,11 +1,13 @@
 import React from 'react'
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export interface CmdIconProps {
   size?: number
   className?: string
   color?: string
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const CmdIcon: React.FC<CmdIconProps> = ({ size = 16, className = '', color='white'}) => {
   return (
     <svg

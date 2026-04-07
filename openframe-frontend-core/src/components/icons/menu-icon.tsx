@@ -7,6 +7,7 @@ interface MenuIconProps {
   height?: number;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const MenuIcon: React.FC<MenuIconProps> = ({ 
   className = "", 
   width = 24, 

@@ -5,6 +5,7 @@ interface OpenFrameTextProps extends React.SVGProps<SVGSVGElement> {
   textColor?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const OpenFrameText = ({ 
   className, 
   textColor = '#1A1A1A',

@@ -435,7 +435,7 @@ export const AllVariants: Story = {
     const [multiValue3, setMultiValue3] = useState<string[]>(['enterprise', 'startup']);
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', width: '500px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         <Autocomplete
           options={sampleOptions}
           value={singleValue}

@@ -5,7 +5,7 @@ import { cn } from '../../utils/cn'
 import { useDebounce } from '../../hooks/ui/use-debounce'
 import { Filter02Icon, SearchIcon } from '../icons-v2-generated'
 import { Button, Input, PageError } from '../ui'
-import { MobileFilterModal, type FilterGroup, type SortConfig, type SortDirection } from '../ui/mobile-filter-sheet'
+import { FilterModal, type FilterGroup, type SortConfig, type SortDirection } from '../ui/filter-modal'
 import type { TableFilters } from '../ui/table/types'
 import { ListPageContainer, type PageActionButton } from './page-container'
 
@@ -31,6 +31,8 @@ export interface ListPageLayoutProps {
 }
 
 /**
+ * @deprecated Use `PageLayout` from `'../layout/page-layout'` instead.
+ *
  * Standardized Layout for List Pages
  *
  * A comprehensive layout component that provides 100% consistent structure
@@ -168,9 +170,9 @@ export function ListPageLayout({
         )}
       </div>
 
-      {/* Mobile Filter Sheet */}
+      {/* Mobile Filter Modal */}
       {hasMobileFilter && (
-        <MobileFilterModal
+        <FilterModal
           isOpen={mobileFilterOpen}
           onClose={() => setMobileFilterOpen(false)}
           title={mobileFilterTitle}
@@ -191,4 +193,5 @@ export function ListPageLayout({
 // Re-export PageActionButton type for convenience
 export type { PageActionButton } from './page-container'
 
+/** @deprecated Use `PageLayout` from `'../layout/page-layout'` instead. */
 export default ListPageLayout

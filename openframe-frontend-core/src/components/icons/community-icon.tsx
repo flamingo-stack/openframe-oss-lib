@@ -7,6 +7,7 @@ interface CommunityIconProps {
   height?: number;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const CommunityIcon: React.FC<CommunityIconProps> = ({
   className = "",
   width = 24,

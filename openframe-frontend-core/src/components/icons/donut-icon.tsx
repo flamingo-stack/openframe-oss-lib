@@ -1,3 +1,4 @@
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function DonutIcon({ className = '', color = 'white' }: { className?: string; color?: string }) {
   return (
     <svg

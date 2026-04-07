@@ -5,6 +5,7 @@ interface LinkedInIconProps extends React.SVGProps<SVGSVGElement> {
   size?: number;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function LinkedInIcon({ className = '', size = 24, color = 'white', ...props }: LinkedInIconProps) {
   return (
     <svg 

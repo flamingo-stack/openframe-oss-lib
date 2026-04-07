@@ -1,5 +1,6 @@
 import React from "react"
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export interface MingoIconProps extends React.SVGProps<SVGSVGElement> {
   color?: string;
   eyesColor?: string;
@@ -7,6 +8,7 @@ export interface MingoIconProps extends React.SVGProps<SVGSVGElement> {
   cornerColor?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function MingoIcon({ className, color = 'white', eyesColor, outerColor, cornerColor, ...props }: MingoIconProps) {
   return (
     <svg

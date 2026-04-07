@@ -10,6 +10,7 @@ interface CapterraIconProps {
   fourthColor?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function CapterraIcon({
   width = 2500,
   height = 2500,

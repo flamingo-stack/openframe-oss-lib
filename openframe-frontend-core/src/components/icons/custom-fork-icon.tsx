@@ -5,6 +5,7 @@ interface CustomForkIconProps {
   height?: number;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const CustomForkIcon = ({ 
   className, 
   fill = "#888888", 

@@ -5,6 +5,7 @@ import { cn } from '../../utils/cn';
  * HubSpot brand logo (solid orange)
  * Usage: <HubspotIcon className="h-4 w-4" />
  */
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function HubspotIcon({ className, fill = '#FF7A59', ...props }: React.SVGProps<SVGSVGElement>) {
   return (
     <svg

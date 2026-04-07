@@ -8,6 +8,7 @@ interface OpenmspLogoProps extends React.SVGProps<SVGSVGElement> {
   color?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function OpenmspLogo({ className = '', frontBubbleColor = '#000000', innerFrontBubbleColor = '#ffffff', backBubbleColor = '#ffffff', ...props }: OpenmspLogoProps) {
   return (
     <svg

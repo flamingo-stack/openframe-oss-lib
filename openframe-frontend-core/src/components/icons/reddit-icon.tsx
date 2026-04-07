@@ -7,6 +7,7 @@ interface RedditIconProps {
   variant?: 'original' | 'grayscale' | 'white'
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function RedditIcon({
   width = 24,
   height = 24,

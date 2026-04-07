@@ -31,6 +31,7 @@ interface ModalFooterProps {
   className?: string
 }
 
+/** @deprecated Use ModalV2 from './modal-v2' instead. */
 const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
   ({ isOpen, onClose, children, className }, ref) => {
     // Handle Escape key and scroll blocking
@@ -80,6 +81,7 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
 )
 Modal.displayName = "Modal"
 
+/** @deprecated Use ModalV2Content from './modal-v2' instead. */
 const ModalContent = React.forwardRef<HTMLDivElement, ModalContentProps>(
   ({ children, className }, ref) => (
     <div ref={ref} className={cn("overflow-y-auto min-h-0 flex-1", className)}>
@@ -89,6 +91,7 @@ const ModalContent = React.forwardRef<HTMLDivElement, ModalContentProps>(
 )
 ModalContent.displayName = "ModalContent"
 
+/** @deprecated Use ModalV2Header from './modal-v2' instead. */
 const ModalHeader = React.forwardRef<HTMLDivElement, ModalHeaderProps>(
   ({ children, className }, ref) => (
     <div 
@@ -101,6 +104,7 @@ const ModalHeader = React.forwardRef<HTMLDivElement, ModalHeaderProps>(
 )
 ModalHeader.displayName = "ModalHeader"
 
+/** @deprecated Use ModalV2Title from './modal-v2' instead. */
 const ModalTitle = React.forwardRef<HTMLHeadingElement, ModalTitleProps>(
   ({ children, className }, ref) => (
     <h2 
@@ -113,6 +117,7 @@ const ModalTitle = React.forwardRef<HTMLHeadingElement, ModalTitleProps>(
 )
 ModalTitle.displayName = "ModalTitle"
 
+/** @deprecated Use ModalV2Footer from './modal-v2' instead. */
 const ModalFooter = React.forwardRef<HTMLDivElement, ModalFooterProps>(
   ({ children, className }, ref) => (
     <div 
@@ -127,6 +132,8 @@ ModalFooter.displayName = "ModalFooter"
 
 export {
   Modal,
-  ModalContent, ModalFooter, ModalHeader,
+  ModalContent, 
+  ModalFooter, 
+  ModalHeader,
   ModalTitle
 }

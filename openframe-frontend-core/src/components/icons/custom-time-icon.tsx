@@ -5,6 +5,7 @@ interface CustomTimeIconProps {
   height?: number;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const CustomTimeIcon = ({ 
   className, 
   fill = "#888888", 

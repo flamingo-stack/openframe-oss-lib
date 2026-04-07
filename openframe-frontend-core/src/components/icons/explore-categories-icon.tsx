@@ -1,5 +1,6 @@
 import React from 'react';
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export interface ExploreCategoriesIconProps {
   color?: string;
   className?: string;
@@ -7,6 +8,7 @@ export interface ExploreCategoriesIconProps {
   height?: number;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function ExploreCategoriesIcon({ 
   className = "w-6 h-6",
   width,

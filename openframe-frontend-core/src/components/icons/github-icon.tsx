@@ -7,6 +7,7 @@ interface GitHubIconProps {
   height?: number;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const GitHubIcon: React.FC<GitHubIconProps> = ({
   className = "",
   width = 15,

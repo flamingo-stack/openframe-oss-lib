@@ -5,6 +5,7 @@ interface CustomLicenseIconProps {
   height?: number;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const CustomLicenseIcon = ({ 
   className, 
   fill = "#888888", 

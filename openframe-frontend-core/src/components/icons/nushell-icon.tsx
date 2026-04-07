@@ -1,11 +1,13 @@
 import React from 'react'
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export interface NushellIconProps {
   size?: number
   className?: string
   color?: string
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const NushellIcon: React.FC<NushellIconProps> = ({ size = 16, className = '', color = 'white' }) => {
   return (
     <svg xmlns="http://www.w3.org/2000/svg"

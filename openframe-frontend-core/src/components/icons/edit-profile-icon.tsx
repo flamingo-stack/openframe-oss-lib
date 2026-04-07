@@ -4,6 +4,7 @@ interface EditProfileIconProps extends React.SVGProps<SVGSVGElement> {
   className?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function EditProfileIcon({ className = '', ...props }: EditProfileIconProps) {
   return (
     <svg

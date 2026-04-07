@@ -11,6 +11,7 @@ interface LumaIconProps extends React.SVGProps<SVGSVGElement> {
  * Features a 4-pointed star shape representing the Luma logo
  * Default color is 'currentColor' for easy styling
  */
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function LumaIcon({ className = '', size = 24, color = 'currentColor', ...props }: LumaIconProps) {
   return (
     <svg

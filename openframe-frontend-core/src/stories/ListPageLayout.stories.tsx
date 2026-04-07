@@ -3,7 +3,7 @@ import { LayoutGrid, LayoutList, Plus, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
 import { ListPageLayout } from '../components/layout/list-page-layout'
 import { Button } from '../components/ui/button'
-import type { FilterGroup, SortConfig, SortDirection } from '../components/ui/mobile-filter-sheet'
+import type { FilterGroup, SortConfig, SortDirection } from '../components/ui/filter-modal'
 import { Table, type TableColumn, type TableFilters } from '../components/ui/table'
 
 interface Device {

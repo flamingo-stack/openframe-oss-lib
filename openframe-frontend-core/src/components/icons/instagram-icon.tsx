@@ -5,6 +5,7 @@ interface InstagramIconProps {
   className?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function InstagramIcon({ className ,
   color = 'white'
 }:  InstagramIconProps) {

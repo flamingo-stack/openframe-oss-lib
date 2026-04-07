@@ -206,10 +206,10 @@ const config: Config = {
       },
 
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
-        xs: "calc(var(--radius) - 6px)",
+        lg: "var(--radius)", // 8px
+        md: "calc(var(--radius) - 2px)", // 6px
+        sm: "calc(var(--radius) - 4px)", // 4px
+        xs: "calc(var(--radius) - 6px)", // 2px
       },
 
       fontFamily: {
