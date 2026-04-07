@@ -124,8 +124,8 @@ public class DeviceMapper extends BaseRestMapper {
         }
         return options.stream()
                 .map(option -> TagFilterItem.builder()
+                        .key(option.getKey())
                         .value(option.getValue())
-                        .label(option.getLabel())
                         .count(option.getCount())
                         .build())
                 .collect(Collectors.toList());
