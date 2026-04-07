@@ -55,7 +55,9 @@ public class UserService {
     public UserResponse getUserById(String id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + id));
-        return userMapper.toResponse(user);
+        UserResponse response = userMapper.toResponse(user);
+        userProcessor.postProcessUserGet(response);
+        return response;
     }
 
     public UserResponse updateUser(String id, UpdateUserRequest request) {

@@ -18,7 +18,7 @@ function normalizeContent(content: MessageContent): MessageSegment[] {
 }
 
 const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>(
-  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, ...props }, ref) => {
+  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, assistantIcon, ...props }, ref) => {
     const isUser = role === 'user'
     const isError = role === 'error'
 
@@ -77,10 +77,16 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       >
         {/* Avatar - optional */}
         {showAvatar && (
-          <SquareAvatar
-            {...avatarProps}
-            className={cn(avatarProps.className, "mt-0.5 drop-shadow-[0_4px_12px_rgba(0,0,0,0.35)]")}
-          />
+          !isUser && assistantIcon && !avatar ? (
+            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-ods-accent flex-shrink-0 mt-0.5 drop-shadow-[0_4px_12px_rgba(0,0,0,0.35)]">
+              {assistantIcon}
+            </div>
+          ) : (
+            <SquareAvatar
+              {...avatarProps}
+              className={cn(avatarProps.className, "mt-0.5 drop-shadow-[0_4px_12px_rgba(0,0,0,0.35)]")}
+            />
+          )
         )}
         
         {/* Message Content */}
@@ -171,6 +177,7 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     prevProps.timestamp?.getTime() === nextProps.timestamp?.getTime() &&
     prevProps.showAvatar === nextProps.showAvatar &&
     prevProps.assistantType === nextProps.assistantType &&
+    prevProps.assistantIcon === nextProps.assistantIcon &&
     prevProps.className === nextProps.className
   )
 })

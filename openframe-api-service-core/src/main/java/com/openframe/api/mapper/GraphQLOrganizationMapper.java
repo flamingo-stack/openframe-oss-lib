@@ -33,6 +33,7 @@ public class GraphQLOrganizationMapper {
                 .minEmployees(input.getMinEmployees())
                 .maxEmployees(input.getMaxEmployees())
                 .hasActiveContract(input.getHasActiveContract())
+                .status(input.getStatus())
                 .build();
     }
 

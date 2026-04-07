@@ -12,4 +12,5 @@ public class OrganizationFilterInput {
     private Integer minEmployees;
     private Integer maxEmployees;
     private Boolean hasActiveContract;
+    private String status;
 }

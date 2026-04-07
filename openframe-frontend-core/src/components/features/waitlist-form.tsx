@@ -2,6 +2,7 @@
 
 import { OpenFrameLogo } from '../icons'
 import { Button } from '../ui/button'
+import { CheckboxBlock } from '../ui/checkbox-block'
 import { Input } from '../ui/input'
 import { PhoneInput } from '../ui/phone-input'
 import { useToast } from '../../hooks/use-toast'
@@ -28,21 +29,25 @@ export interface WaitlistFormProps {
   isSuccess?: boolean
   /** Pre-filled email (e.g. from auth context) */
   defaultEmail?: string
+  /** Pre-filled phone (e.g. from user profile) */
+  defaultPhone?: string
   /** Geo-detection API endpoint. Defaults to "/api/geo". Set to null to disable. */
   geoApiUrl?: string | null
   /** Label on the submit button. Defaults to "Get Beta Access" */
   submitLabel?: string
   /** Label shown after success. Defaults to "You're in!" */
   successLabel?: string
-  /** Hint shown in the disclaimer box */
-  defaultHint?: string
+  /** Label shown on the SMS consent checkbox */
+  smsCheckboxLabel?: string
   /** Warning shown when a generic email domain is detected */
   genericEmailHint?: string
   /** Warning shown when phone validation fails */
   invalidPhoneHint?: string
-  /** URL for the privacy policy link in the disclaimer */
+  /** URL for the Terms of Service link in the consent text */
+  termsOfServiceUrl?: string
+  /** URL for the Privacy Policy link in the consent text */
   privacyPolicyUrl?: string
-  /** SMS consent text shown below the hint in the disclaimer box */
+  /** SMS consent text shown below the checkbox label */
   consentText?: string
 }
 
@@ -68,21 +73,25 @@ export function WaitlistForm({
   isSubmitting = false,
   isSuccess = false,
   defaultEmail = '',
+  defaultPhone = '',
   geoApiUrl = '/api/geo',
   submitLabel = 'Get Beta Access',
   successLabel = "You're in!",
-  defaultHint = "MSP spam filters are aggressive. Drop your number in case email fails.",
+  smsCheckboxLabel = "Send me an SMS if my email gets caught by spam filters",
   genericEmailHint = "Use a work email \u2014 personal emails may not be verified or approved.",
   invalidPhoneHint = "Invalid phone number format.",
+  termsOfServiceUrl,
   privacyPolicyUrl,
   consentText = "I agree to receive recurring automated text messages at the phone number provided. Msg & data rates may apply. Msg frequency varies. Reply HELP for help and STOP to cancel.",
 }: WaitlistFormProps) {
   const [email, setEmail] = useState(defaultEmail)
-  const [phone, setPhone] = useState('')
+  const [phone, setPhone] = useState(defaultPhone)
   const [countryCode, setCountryCode] = useState<CountryCode>('US')
   const { toast } = useToast()
+  const [smsConsent, setSmsConsent] = useState(false)
   const [isClient, setIsClient] = useState(false)
   const [isPhoneInvalid, setIsPhoneInvalid] = useState(false)
+  const [showConsentError, setShowConsentError] = useState(false)
 
   const isMailDomainGeneric = hasGenericEmailDomain(email)
 
@@ -117,6 +126,11 @@ export function WaitlistForm({
         description: 'Please enter a valid email address.',
         variant: 'destructive'
       })
+      return
+    }
+
+    if (phone.trim() && !smsConsent) {
+      setShowConsentError(true)
       return
     }
 
@@ -187,7 +201,10 @@ export function WaitlistForm({
         <PhoneInput
           value={phone}
           countryCode={countryCode}
-          onPhoneChange={setPhone}
+          onPhoneChange={(val) => {
+            setPhone(val)
+            if (!val.trim()) setShowConsentError(false)
+          }}
           onCountryChange={setCountryCode}
           onValidationChange={setIsPhoneInvalid}
           disabled={isSubmitting}
@@ -200,32 +217,45 @@ export function WaitlistForm({
           </p>
         )}
       </div>
-      {/* Disclaimer + Button Section */}
-      <div className="flex flex-col gap-4 items-end w-full">
+      {/* SMS Consent + Button Section */}
+      <div className="flex flex-col gap-[var(--spacing-system-l)] items-end w-full">
 
-        {/* Disclaimer Box */}
-        <div className="w-full rounded-[6px] border border-ods-border bg-ods-bg px-4 py-3">
-          <p className="text-h6 font-medium text-ods-text-primary leading-5">
-            {defaultHint}
-          </p>
-          <p className="text-h6 font-medium text-ods-text-secondary leading-5">
-            {consentText}
-            {privacyPolicyUrl && (
-              <>
-                &nbsp;
-                <a
-                  href={privacyPolicyUrl}
-                  className="text-[var(--color-accent-primary)] underline"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Privacy Policy
-                </a>
-                .
-              </>
-            )}
-          </p>
-        </div>
+        {/* SMS Consent Checkbox */}
+        <CheckboxBlock
+          checked={smsConsent}
+          onCheckedChange={(checked) => {
+            setSmsConsent(checked as boolean)
+            if (checked) setShowConsentError(false)
+          }}
+          error={showConsentError ? "Please agree to SMS notifications to continue." : undefined}
+          disabled={isSubmitting}
+          label={smsCheckboxLabel}
+          description={
+            <>
+              {consentText}{' View our '}
+              <a
+                href={termsOfServiceUrl || '#'}
+                className="text-[var(--color-accent-primary)] underline"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Terms of Service
+              </a>
+              {' and '}
+              <a
+                href={privacyPolicyUrl || '#'}
+                className="text-[var(--color-accent-primary)] underline"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Privacy Policy
+              </a>
+              .
+            </>
+          }
+        />
 
         {/* Submit Button — right-aligned */}
         <Button

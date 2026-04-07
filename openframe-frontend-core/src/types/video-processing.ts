@@ -97,3 +97,6 @@ export type VideoProcessingEntityType =
   | 'product_release'
   | 'marketing_campaign'
   | 'case_study'
+  | 'webinar'
+  | 'podcast_episode'
+  | 'investor_update'

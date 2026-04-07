@@ -1,16 +1,16 @@
 package com.openframe.external.controller;
 
 import com.openframe.api.dto.organization.*;
-import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.dto.shared.SortInput;
 import com.openframe.external.mapper.OrganizationMapper;
 import com.openframe.api.service.OrganizationCommandService;
 import com.openframe.api.service.OrganizationQueryService;
 import com.openframe.core.dto.ErrorResponse;
-import com.openframe.data.exception.OrganizationHasMachinesException;
 import com.openframe.data.service.OrganizationService;
 import com.openframe.external.dto.organization.OrganizationsResponse;
 import com.openframe.external.exception.OrganizationNotFoundException;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -24,7 +24,6 @@ import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 import static org.springframework.http.HttpStatus.*;
 
@@ -74,6 +73,9 @@ public class OrganizationController {
             @Parameter(description = "Filter by active contract status")
             @RequestParam(required = false) Boolean hasActiveContract,
 
+            @Parameter(description = "Filter by organization status (ACTIVE or ARCHIVED). Defaults to ACTIVE.")
+            @RequestParam(required = false) String status,
+
             @Parameter(description = "Search query for organization name and category")
             @RequestParam(required = false) String search,
 
@@ -92,8 +94,8 @@ public class OrganizationController {
             @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
             @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
 
-        log.info("Getting organizations - category: {}, minEmployees: {}, maxEmployees: {}, hasActiveContract: {}, search: {}, limit: {}, cursor: {}, sortField: {}, sortDirection: {} - userId: {}, apiKeyId: {}",
-                category, minEmployees, maxEmployees, hasActiveContract, search, limit, cursor, sortField, sortDirection, userId, apiKeyId);
+        log.info("Getting organizations - category: {}, minEmployees: {}, maxEmployees: {}, hasActiveContract: {}, status: {}, search: {}, limit: {}, cursor: {}, sortField: {}, sortDirection: {} - userId: {}, apiKeyId: {}",
+                category, minEmployees, maxEmployees, hasActiveContract, status, search, limit, cursor, sortField, sortDirection, userId, apiKeyId);
 
         // Build filter options directly from query parameters
         OrganizationFilterOptions filterOptions = OrganizationFilterOptions.builder()
@@ -101,6 +103,7 @@ public class OrganizationController {
                 .minEmployees(minEmployees)
                 .maxEmployees(maxEmployees)
                 .hasActiveContract(hasActiveContract)
+                .status(status)
                 .build();
 
         var result = organizationQueryService.queryOrganizations(
@@ -137,7 +140,7 @@ public class OrganizationController {
 
         log.info("Getting organization by ID: {} - userId: {}, apiKeyId: {}", id, userId, apiKeyId);
 
-        var organization = organizationService.getOrganizationById(id)
+        var organization = organizationService.getOrganizationByOrganizationId(id)
                 .orElseThrow(() -> new OrganizationNotFoundException(id));
 
         return organizationMapper.toResponse(organization);
@@ -244,37 +247,64 @@ public class OrganizationController {
     }
 
     @Operation(
-            summary = "Delete an organization",
-            description = "Delete an organization by ID. Cannot delete if organization has associated machines."
+            summary = "Check if organization can be archived",
+            description = "Returns true if all devices in the organization are archived or deleted. " +
+                    "Use this before showing the archive confirmation dialog."
     )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "204", description = "Organization deleted successfully"),
+            @ApiResponse(responseCode = "200", description = "Returns archivability status"),
             @ApiResponse(responseCode = "401", description = "Unauthorized - invalid or missing API key",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
             @ApiResponse(responseCode = "404", description = "Organization not found",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "409", description = "Cannot delete organization with associated machines",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
             @ApiResponse(responseCode = "500", description = "Internal server error",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
-    @DeleteMapping("/{id}")
-    @ResponseStatus(NO_CONTENT)
-    public void deleteOrganization(
+    @GetMapping("/{id}/can-archive")
+    @ResponseStatus(OK)
+    public boolean canArchiveOrganization(
             @Parameter(description = "Organization database ID", required = true)
             @PathVariable String id,
 
             @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
             @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
 
-        log.info("Deleting organization: {} - userId: {}, apiKeyId: {}", id, userId, apiKeyId);
+        log.info("Checking if organization {} can be archived - userId: {}, apiKeyId: {}", id, userId, apiKeyId);
 
-        try {
-            organizationCommandService.deleteOrganization(id);
-        } catch (OrganizationHasMachinesException e) {
-            throw new ResponseStatusException(CONFLICT, e.getMessage());
-        } catch (IllegalArgumentException e) {
-            throw new OrganizationNotFoundException(id);
-        }
+        return organizationService.canArchiveOrganization(id);
+    }
+
+    @Operation(
+            summary = "Update organization status",
+            description = "Update organization status to ACTIVE or ARCHIVED. Archiving is blocked if organization has active devices."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Organization status updated successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid status or transition",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Unauthorized - invalid or missing API key",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "Organization not found",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "409", description = "Cannot archive organization with active devices",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "500", description = "Internal server error",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    @PatchMapping("/{id}/status")
+    @ResponseStatus(NO_CONTENT)
+    public void updateOrganizationStatus(
+            @Parameter(description = "Organization database ID", required = true)
+            @PathVariable String id,
+
+            @Parameter(description = "Status update request")
+            @Valid @RequestBody UpdateOrganizationStatusRequest request,
+
+            @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
+
+        log.info("Updating organization {} status to {} - userId: {}, apiKeyId: {}", id, request.status(), userId, apiKeyId);
+
+        organizationCommandService.updateOrganizationStatus(id, request);
     }
 }

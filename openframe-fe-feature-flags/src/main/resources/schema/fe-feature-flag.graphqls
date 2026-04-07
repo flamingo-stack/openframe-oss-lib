@@ -1,0 +1,13 @@
+type FeFeatureFlag {
+    name: String!
+    enabled: Boolean!
+}
+
+extend type Query {
+    """
+    Get frontend feature flags by names.
+    Returns the requested flags with their enabled status.
+    Unknown flags default to false.
+    """
+    feFeatureFlags(names: [String!]): [FeFeatureFlag!]!
+}

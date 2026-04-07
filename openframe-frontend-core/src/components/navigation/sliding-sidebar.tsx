@@ -137,14 +137,14 @@ export function SlidingSidebar({ config }: SlidingSidebarProps) {
             leftIcon={item.icon}
             rightIcon={chevronIcon}
             className={cn(
-              "!w-full md:!w-full rounded-lg transition-colors",
+              "!w-full md:!w-full rounded-lg transition-colors overflow-hidden",
               level === 0 ? "pl-3" : "pl-6",
               item.isActive ? "bg-ods-accent text-ods-text-on-accent hover:bg-ods-accent/90" : "text-ods-text-primary hover:bg-ods-border"
             )}
           >
-            {item.label}
+            <span className="truncate">{item.label}</span>
             {item.badge !== undefined && (
-              <span className="ml-auto mr-2">{item.badge}</span>
+              <span className="ml-auto mr-2 flex-shrink-0">{item.badge}</span>
             )}
           </Button>
           
@@ -187,16 +187,16 @@ export function SlidingSidebar({ config }: SlidingSidebarProps) {
           }}
           leftIcon={item.icon}
           className={cn(
-            "!w-full md:!w-full rounded-lg transition-colors",
+            "!w-full md:!w-full rounded-lg transition-colors overflow-hidden",
             level === 0 ? "pl-3" : "pl-6",
             item.isActive
               ? "bg-ods-accent text-ods-text-on-accent hover:bg-ods-accent/90"
               : "text-ods-text-primary hover:bg-ods-border"
           )}
         >
-          {item.label}
+          <span className="truncate">{item.label}</span>
           {item.badge !== undefined && (
-            <span className="ml-auto">{item.badge}</span>
+            <span className="ml-auto flex-shrink-0">{item.badge}</span>
           )}
         </Button>
       )
@@ -213,16 +213,16 @@ export function SlidingSidebar({ config }: SlidingSidebarProps) {
         }}
         leftIcon={item.icon}
         className={cn(
-          "!w-full md:!w-full rounded-lg transition-colors",
+          "!w-full md:!w-full rounded-lg transition-colors overflow-hidden",
           level === 0 ? "pl-3" : "pl-6",
           item.isActive
             ? "bg-ods-accent text-ods-text-on-accent hover:bg-ods-accent/90"
             : "text-ods-text-primary hover:bg-ods-border"
         )}
       >
-        {item.label}
+        <span className="truncate">{item.label}</span>
         {item.badge !== undefined && (
-          <span className="ml-auto">{item.badge}</span>
+          <span className="ml-auto flex-shrink-0">{item.badge}</span>
         )}
       </Button>
     )
@@ -266,7 +266,7 @@ export function SlidingSidebar({ config }: SlidingSidebarProps) {
           velocity: config.isOpen ? 5 : -5
         }}
         className={cn(
-          "fixed top-0 bottom-0 z-[45] w-64 bg-ods-card border-ods-border flex flex-col shadow-xl",
+          "fixed top-0 bottom-0 z-[45] w-72 bg-ods-card border-ods-border flex flex-col shadow-xl",
           config.position === 'right' ? "right-0 border-l" : "left-0 border-r",
           config.className
         )}

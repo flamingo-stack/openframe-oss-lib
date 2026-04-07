@@ -31,13 +31,6 @@ public class Tenant extends CoreTenant{
     @Builder.Default
     private TenantStatus status = TenantStatus.ACTIVE;
 
-    /**
-     * Tenant plan (for future use)
-     */
-    @Deprecated
-    @Builder.Default
-    private TenantPlan plan = TenantPlan.FREE;
-
     @CreatedDate
     private LocalDateTime createdAt;
 

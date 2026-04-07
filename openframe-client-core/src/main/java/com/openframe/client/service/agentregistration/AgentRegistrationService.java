@@ -3,6 +3,7 @@ package com.openframe.client.service.agentregistration;
 import com.openframe.client.dto.agent.AgentRegistrationRequest;
 import com.openframe.client.dto.agent.AgentRegistrationResponse;
 import com.openframe.client.service.agentregistration.processor.AgentRegistrationProcessor;
+import com.openframe.client.service.InstalledAgentService;
 import com.openframe.client.service.validator.AgentRegistrationSecretValidator;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
@@ -14,6 +15,7 @@ import com.openframe.data.repository.oauth.OAuthClientRepository;
 import com.openframe.data.service.OrganizationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +32,7 @@ public class AgentRegistrationService {
 
     private static final String AGENT_ROLE = "AGENT";
     private static final String CLIENT_ID_TEMPLATE = "agent_%s";
+    private static final String OPENFRAME_CLIENT_AGENT_TYPE = "openframe-client";
 
     private final OAuthClientRepository oauthClientRepository;
     private final MachineRepository machineRepository;
@@ -41,6 +44,10 @@ public class AgentRegistrationService {
     private final AgentRegistrationToolInstallationService agentRegistrationToolInstallationService;
     private final AgentRegistrationProcessor agentRegistrationProcessor;
     private final RegistrationTagAssignmentService registrationTagAssignmentService;
+    private final InstalledAgentService installedAgentService;
+
+    @Value("${openframe.feature.save-installed-agent-on-registration:false}")
+    private boolean saveInstalledAgentOnRegistrationEnabled;
 
     @Transactional
     // TODO: two phase commit for the nats integration or other fallback
@@ -57,7 +64,8 @@ public class AgentRegistrationService {
         saveOAuthClient(machineId, clientId, clientSecret);
         Machine machine = saveMachine(machineId, request, resolvedOrganizationId);
 
-        // Assign tags from registration request (creates tags if they don't exist)
+        saveInstalledAgent(machineId, request);
+
         registrationTagAssignmentService.assignTags(machineId, resolvedOrganizationId, request.getTags());
 
         agentRegistrationToolInstallationService.process(machineId);
@@ -87,14 +95,6 @@ public class AgentRegistrationService {
         return format(CLIENT_ID_TEMPLATE, machineId);
     }
 
-    /**
-     * Resolve organization ID for the machine.
-     * If provided organizationId exists, use it.
-     * Otherwise, fallback to default organization.
-     * 
-     * @param requestedOrganizationId organizationId from registration request (can be null)
-     * @return resolved organizationId to use
-     */
     private String resolveOrganizationId(String requestedOrganizationId) {
         // If organizationId provided, check if it exists
         if (requestedOrganizationId != null && !requestedOrganizationId.isBlank()) {
@@ -115,18 +115,19 @@ public class AgentRegistrationService {
         return defaultOrgId;
     }
 
-    /**
-     * Get default organization ID.
-     * Returns organizationId of the organization with name {@link OrganizationService#DEFAULT_ORGANIZATION_NAME}.
-     * 
-     * @return default organization ID
-     * @throws IllegalStateException if default organization doesn't exist
-     */
     private String getDefaultOrganizationId() {
         return organizationService.getDefaultOrganization()
                 .map(Organization::getOrganizationId)
                 .orElseThrow(() -> new IllegalStateException(
                         "Default organization not found. Please ensure it was created during tenant registration."));
+    }
+
+    private void saveInstalledAgent(String machineId, AgentRegistrationRequest request) {
+        if (!saveInstalledAgentOnRegistrationEnabled) {
+            return;
+        }
+        String agentVersion = request.getAgentVersion();
+        installedAgentService.addInstalledAgent(machineId, OPENFRAME_CLIENT_AGENT_TYPE, agentVersion, false);
     }
 
     private Machine saveMachine(String machineId, AgentRegistrationRequest request, String organizationId) {

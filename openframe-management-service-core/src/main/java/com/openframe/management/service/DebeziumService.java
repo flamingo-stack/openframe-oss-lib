@@ -1,5 +1,7 @@
 package com.openframe.management.service;
 
+import com.openframe.data.document.tool.IntegratedTool;
+import com.openframe.management.dto.debezium.ConnectorStatus;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
@@ -10,16 +12,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
-import com.openframe.management.dto.debezium.ConnectorStatus;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Slf4j
 @Service
 public class DebeziumService {
 
     private final RestTemplate restTemplate = new RestTemplate();
+
     @Value("${openframe.debezium.base-url}")
     private String debeziumUrl;
     private String debeziumConnectorCreateUrl;
@@ -105,55 +105,55 @@ public class DebeziumService {
     }
 
     /**
-     * Restart a specific task of a connector.
+     * Restart connector and all failed tasks in a single call (KIP-745).
+     * POST /connectors/{name}/restart?includeTasks=true&onlyFailed=true
      */
-    public void restartTask(String connectorName, int taskId) {
-        String url = getDebeziumConnectorUrl(connectorName) + "/tasks/" + taskId + "/restart";
+    public void restartConnectorWithFailedTasks(String connectorName) {
+        String url = getDebeziumConnectorUrl(connectorName) + "/restart?includeTasks=true&onlyFailed=true";
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<Void> entity = new HttpEntity<>(headers);
         restTemplate.postForEntity(url, entity, Void.class);
-        log.info("Restarted task {} for connector {}", taskId, connectorName);
+        log.info("Triggered KIP-745 restart for connector '{}' (includeTasks=true, onlyFailed=true)", connectorName);
     }
 
     /**
-     * Check all connectors and restart any failed tasks.
+     * Extract expected connector names from IntegratedTool configurations.
      */
-    public void checkAndRestartFailedTasks() {
-        List<String> connectors = listConnectors();
-        if (connectors.isEmpty()) {
-            log.debug("No connectors found");
-            return;
-        }
-
-        for (String connector : connectors) {
-            checkConnectorAndRestartFailedTasks(connector);
-        }
-    }
-
-    /**
-     * Check a specific connector and restart failed tasks.
-     */
-    public void checkConnectorAndRestartFailedTasks(String connectorName) {
-        try {
-            ConnectorStatus status = getConnectorStatus(connectorName);
-            if (status == null || status.getTasks() == null) {
-                log.warn("Could not get status for connector {}", connectorName);
-                return;
-            }
-
-            for (ConnectorStatus.TaskStatus task : status.getTasks()) {
-                if ("FAILED".equals(task.getState())) {
-                    log.warn("Connector {} task {} is FAILED. Trace: {}",
-                            connectorName, task.getId(),
-                            task.getTrace() != null ? task.getTrace().split("\n")[0] : "N/A");
-
-                    restartTask(connectorName, task.getId());
+    @SuppressWarnings("unchecked")
+    public Set<String> extractExpectedConnectorNames(List<IntegratedTool> tools) {
+        Set<String> names = new HashSet<>();
+        for (IntegratedTool tool : tools) {
+            Object[] connectors = tool.getDebeziumConnectors();
+            if (connectors != null) {
+                for (Object connector : connectors) {
+                    Map<String, Object> map = (Map<String, Object>) connector;
+                    String name = (String) map.get("name");
+                    if (name != null) {
+                        names.add(name);
+                    }
                 }
             }
-        } catch (Exception e) {
-            log.error("Failed to check connector {}", connectorName, e);
         }
+        return names;
     }
 
+    /**
+     * Recreate connectors that are expected (in MongoDB) but missing from Kafka Connect.
+     */
+    @SuppressWarnings("unchecked")
+    public void reconcileMissingConnectors(List<IntegratedTool> tools, Set<String> missingNames) {
+        for (IntegratedTool tool : tools) {
+            Object[] connectors = tool.getDebeziumConnectors();
+            if (connectors == null) continue;
+            for (Object connector : connectors) {
+                Map<String, Object> map = (Map<String, Object>) connector;
+                String name = (String) map.get("name");
+                if (name != null && missingNames.contains(name)) {
+                    log.warn("Recreating missing connector '{}' from IntegratedTool '{}'", name, tool.getName());
+                    createOrUpdateDebeziumConnector(new Object[]{connector});
+                }
+            }
+        }
+    }
 }

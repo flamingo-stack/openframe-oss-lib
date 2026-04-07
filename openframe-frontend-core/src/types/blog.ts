@@ -9,6 +9,7 @@ export interface BlogAuthor {
   id: number;
   name?: string;
   avatar?: string;
+  bio?: string;
 }
 
 // Database Models
@@ -40,6 +41,7 @@ export interface BlogPost {
     id: number;
     full_name?: string;
     avatar_url?: string;
+    about?: string;
   };
   blog_post_platforms?: BlogPostPlatform[];
   blog_post_categories?: BlogPostCategory[];

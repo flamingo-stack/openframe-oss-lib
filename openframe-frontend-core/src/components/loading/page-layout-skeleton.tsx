@@ -128,34 +128,46 @@ export function SearchContainerSkeleton({
  * Category sidebar skeleton for filtering pages
  */
 export function CategorySidebarSkeleton({ className }: PageLayoutSkeletonProps) {
-  return (
-    <div className={cn("w-full lg:w-[320px] space-y-6", className)}>
-      <div className="bg-ods-card border border-ods-border rounded-lg p-4 md:p-6">
-        {/* Sidebar header */}
-        <TextSkeleton.Subheading className="mb-4 w-1/2" />
-        
-        {/* Category list */}
-        <div className="space-y-3">
-          {Array.from({ length: 8 }).map((_, index) => (
-            <div key={index} className="flex items-center justify-between">
-              <TextSkeleton.Body className="w-3/4" />
-              <TextSkeleton.Caption className="w-8" />
-            </div>
-          ))}
-        </div>
-      </div>
+  // Matches the actual MultiLevelNavigation sidebar with folder/file icons, README badges, and chevrons
+  const items = [
+    { type: 'file', width: 'w-20', hasBadge: false },
+    { type: 'folder', width: 'w-24', hasBadge: true },
+    { type: 'folder', width: 'w-20', hasBadge: true },
+    { type: 'folder', width: 'w-24', hasBadge: true },
+    { type: 'folder', width: 'w-16', hasBadge: true },
+    { type: 'folder', width: 'w-20', hasBadge: true },
+    { type: 'folder', width: 'w-28', hasBadge: true },
+    { type: 'folder', width: 'w-16', hasBadge: true },
+    { type: 'folder', width: 'w-24', hasBadge: true },
+    { type: 'file', width: 'w-28' },
+    { type: 'file', width: 'w-36' },
+  ]
 
-      {/* Additional filter sections */}
-      <div className="bg-ods-card border border-ods-border rounded-lg p-4 md:p-6">
-        <TextSkeleton.Subheading className="mb-4 w-1/3" />
-        <div className="space-y-2">
-          {Array.from({ length: 5 }).map((_, index) => (
-            <div key={index} className="flex items-center gap-2">
-              <UnifiedSkeleton variant="default" className="w-4 h-4" />
-              <TextSkeleton.Body className="w-2/3" />
+  return (
+    <div className={cn("w-full lg:w-[320px]", className)}>
+      {/* DATA ROOM label */}
+      <UnifiedSkeleton className="h-[14px] w-24 rounded mb-4" />
+
+      {/* Navigation items — each has card background matching actual MultiLevelNavigation */}
+      <div className="space-y-1.5">
+        {items.map((item, index) => (
+          <div
+            key={index}
+            className={cn(
+              "flex items-center justify-between py-4 px-4 rounded-lg border border-ods-border min-h-[50px]",
+              index === 0 ? "bg-ods-accent/20" : "bg-ods-card"
+            )}
+          >
+            <div className="flex items-center gap-2.5">
+              <UnifiedSkeleton className="w-4 h-4 shrink-0 rounded" />
+              <UnifiedSkeleton className={`h-[14px] ${item.width} rounded`} />
             </div>
-          ))}
-        </div>
+            <div className="flex items-center gap-2 h-[18px]">
+              {item.hasBadge && <UnifiedSkeleton className="h-[18px] w-14 rounded" />}
+              {item.type === 'folder' && <UnifiedSkeleton className="w-4 h-4 rounded" />}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )

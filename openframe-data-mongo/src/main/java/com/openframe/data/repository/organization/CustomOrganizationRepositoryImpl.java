@@ -45,13 +45,17 @@ public class CustomOrganizationRepositoryImpl implements CustomOrganizationRepos
         // Collect all criteria to combine them with $and
         List<Criteria> criteriaList = new ArrayList<>();
 
-        // Always exclude soft deleted organizations
-        criteriaList.add(new Criteria().orOperator(
-                Criteria.where("deleted").is(false),
-                Criteria.where("deleted").exists(false)
-        ));
-
         if (filter != null) {
+            // Status filter (defaults to ACTIVE if not specified)
+            if (filter.getStatus() != null) {
+                criteriaList.add(Criteria.where("status").is(filter.getStatus()));
+            } else {
+                criteriaList.add(new Criteria().orOperator(
+                        Criteria.where("status").is("ACTIVE"),
+                        Criteria.where("status").exists(false)
+                ));
+            }
+
             // Category filter
             if (filter.getCategory() != null) {
                 criteriaList.add(Criteria.where("category").regex("^" + filter.getCategory() + "$", "i"));
@@ -82,6 +86,12 @@ public class CustomOrganizationRepositoryImpl implements CustomOrganizationRepos
                         Criteria.where("contractEndDate").lt(now)
                 ));
             }
+        } else {
+            // No filter provided — default to ACTIVE status
+            criteriaList.add(new Criteria().orOperator(
+                    Criteria.where("status").is("ACTIVE"),
+                    Criteria.where("status").exists(false)
+            ));
         }
 
         // Search filter (name, organizationId or category)

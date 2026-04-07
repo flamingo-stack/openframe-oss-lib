@@ -276,6 +276,43 @@ export const MobileFirst: Story = {
 }
 
 /**
+ * Table with clickable rows and row actions.
+ * On hover the row highlights but the actions area keeps its own background,
+ * so the action buttons stay visually distinct.
+ */
+export const ClickableWithActions: Story = {
+  args: {
+    data: sampleUsers,
+    columns: [
+      { key: 'name', label: 'Name', width: 'min-w-[150px]' },
+      { key: 'email', label: 'Email', width: 'min-w-[200px]' },
+      { key: 'role', label: 'Role', hideAt: 'md' },
+      { key: 'status', label: 'Status', hideAt: 'lg' }
+    ] as TableColumn<User>[],
+    rowKey: 'id',
+    onRowClick: (item: User) => {
+      console.log('Row clicked:', item.name)
+    },
+    rowActions: [
+      {
+        label: 'Details',
+        variant: 'outline' as const,
+        onClick: (item: User) => {
+          console.log('Details:', item.name)
+        }
+      }
+    ]
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Hover over a row to see the highlight effect. The action button area preserves its own background and does not get highlighted together with the row.'
+      }
+    }
+  }
+}
+
+/**
  * Tablet-optimized table that shows only sortable/filterable columns on tablet (768px-1024px).
  * On tablet, only Name (sortable) and Status (filterable) columns are visible in the header.
  * All other columns appear only on desktop (1024px+).

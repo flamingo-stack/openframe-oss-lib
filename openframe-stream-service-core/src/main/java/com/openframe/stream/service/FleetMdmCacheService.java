@@ -5,10 +5,12 @@ import com.openframe.data.document.tool.IntegratedToolId;
 import com.openframe.data.service.IntegratedToolService;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
 import com.openframe.sdk.fleetmdm.model.Host;
+import com.openframe.sdk.fleetmdm.model.Policy;
 import com.openframe.sdk.fleetmdm.model.Query;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
@@ -61,24 +63,79 @@ public class FleetMdmCacheService {
      */
     @Cacheable(value = "fleetQueryCache", key = "#queryId", unless = "#result == null")
     public Query getQueryById(Long queryId) {
-        log.debug("Fetching query definition for query ID: {}", queryId);
+        log.debug("Cache miss for query_id: {}, calling Fleet MDM API", queryId);
         try {
             FleetMdmClient client = getFleetMdmClient();
-            return client != null ? client.getQueryById(queryId) : null;
+            if (client == null) {
+                log.warn("FleetMdmClient is not initialized, cannot fetch query_id: {}", queryId);
+                return null;
+            }
+            Query query = client.getQueryById(queryId);
+            if (query != null) {
+                log.debug("Successfully fetched query_id: {}, name: '{}'", queryId, query.getName());
+            } else {
+                log.warn("Fleet MDM API returned null for query_id: {} (query may have been deleted)", queryId);
+            }
+            return query;
         } catch (IOException | InterruptedException e) {
-            log.error("Error fetching query definition for query ID: {}", queryId, e);
+            log.error("Fleet MDM API call failed for query_id: {}. Cause: {}", queryId, e.getMessage(), e);
             return null;
+        }
+    }
+
+    /**
+     * Get policy definition from cache or Fleet MDM API
+     *
+     * @param policyId the policy ID
+     * @return the Policy object, or null if not found
+     */
+    /**
+     * Evict a policy from cache. Call when a policy mutation event is detected
+     * (edited_policy, deleted_policy, etc.) to ensure fresh data on next lookup.
+     *
+     * @param policyId the policy ID to evict
+     */
+    @CacheEvict(value = "fleetPolicyCache", key = "#policyId")
+    public void evictPolicyCache(Long policyId) {
+        log.debug("Evicted policy cache for policy_id: {}", policyId);
+    }
+
+    @Cacheable(value = "fleetPolicyCache", key = "#policyId", unless = "#result == null || !#result.isPresent()")
+    public Optional<Policy> getPolicyById(Long policyId) {
+        log.debug("Cache miss for policy_id: {}, calling Fleet MDM API", policyId);
+        try {
+            FleetMdmClient client = getFleetMdmClient();
+            if (client == null) {
+                log.warn("FleetMdmClient is not initialized, cannot fetch policy_id: {}", policyId);
+                return Optional.empty();
+            }
+            Optional<Policy> policy = Optional.ofNullable(client.getPolicyById(policyId));
+            policy.ifPresentOrElse(
+                    p -> log.debug("Successfully fetched policy_id: {}, name: '{}'", policyId, p.getName()),
+                    () -> log.warn("Fleet MDM API returned null for policy_id: {} (policy may have been deleted)", policyId)
+            );
+            return policy;
+        } catch (IOException | InterruptedException e) {
+            log.error("Fleet MDM API call failed for policy_id: {}. Cause: {}", policyId, e.getMessage(), e);
+            return Optional.empty();
         }
     }
 
     private FleetMdmClient getFleetMdmClient() {
         if (fleetMdmClient == null) {
             Optional<IntegratedTool> optionalFleetInfo = integratedToolService.getToolById(IntegratedToolId.FLEET_SERVER_ID.getValue());
-            log.info("FleetMdmClient is null, attempting to initialize with tool: {}", 
-                optionalFleetInfo.map(IntegratedTool::getCredentials).orElse(null));
-            optionalFleetInfo.ifPresent(integratedTool -> {
-                this.fleetMdmClient = new FleetMdmClient(baseUrl, integratedTool.getCredentials().getApiKey().getKey());
-            });
+            if (optionalFleetInfo.isEmpty()) {
+                log.warn("Fleet integration not found by ID '{}'. Query/policy name resolution will be unavailable.",
+                        IntegratedToolId.FLEET_SERVER_ID.getValue());
+                return null;
+            }
+            IntegratedTool tool = optionalFleetInfo.get();
+            if (tool.getCredentials() == null || tool.getCredentials().getApiKey() == null) {
+                log.warn("Fleet integration found but credentials/API key is missing. Query/policy name resolution will be unavailable.");
+                return null;
+            }
+            log.info("Initializing FleetMdmClient with baseUrl: {}", baseUrl);
+            this.fleetMdmClient = new FleetMdmClient(baseUrl, tool.getCredentials().getApiKey().getKey());
         }
         return fleetMdmClient;
     }

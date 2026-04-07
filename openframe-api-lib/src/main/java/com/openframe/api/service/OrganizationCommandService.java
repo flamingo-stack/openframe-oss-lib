@@ -2,8 +2,10 @@ package com.openframe.api.service;
 
 import com.openframe.api.dto.organization.CreateOrganizationRequest;
 import com.openframe.api.dto.organization.UpdateOrganizationRequest;
+import com.openframe.api.dto.organization.UpdateOrganizationStatusRequest;
 import com.openframe.api.mapper.OrganizationMapper;
 import com.openframe.data.document.organization.Organization;
+import com.openframe.data.document.organization.OrganizationStatus;
 import com.openframe.data.service.OrganizationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,8 +49,7 @@ public class OrganizationCommandService {
     public Organization updateOrganization(String id, UpdateOrganizationRequest request) {
         log.debug("Updating organization {} from request", id);
         
-        // Get existing organization
-        Organization existing = organizationService.getOrganizationById(id)
+        Organization existing = organizationService.getOrganizationByOrganizationId(id)
                 .orElseThrow(() -> new IllegalArgumentException("Organization not found with id: " + id));
         
         // Update with request data (only non-null fields)
@@ -57,13 +58,15 @@ public class OrganizationCommandService {
     }
 
     /**
-     * Delete an organization.
-     * Delegates to OrganizationService which performs machine association check.
-     * 
+     * Update organization status.
+     * Maps the DTO action to the domain status and delegates to OrganizationService.
+     *
      * @param id organization database ID
+     * @param request status update request
      */
-    public void deleteOrganization(String id) {
-        log.debug("Deleting organization {}", id);
-        organizationService.deleteOrganization(id);
+    public void updateOrganizationStatus(String id, UpdateOrganizationStatusRequest request) {
+        var newStatus = OrganizationStatus.valueOf(request.status().name());
+        log.debug("Updating organization {} status to {}", id, newStatus);
+        organizationService.updateOrganizationStatus(id, newStatus);
     }
 }
