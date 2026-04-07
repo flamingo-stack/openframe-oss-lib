@@ -15,6 +15,8 @@ import org.springframework.stereotype.Component;
 
 import java.util.UUID;
 
+import static com.openframe.authz.util.OidcUserUtils.resolvePictureUrl;
+
 @Component
 @RequiredArgsConstructor
 public class InviteSsoHandler implements SsoFlowHandler {
@@ -44,6 +46,7 @@ public class InviteSsoHandler implements SsoFlowHandler {
                 .firstName(givenName != null ? givenName : "")
                 .lastName(familyName != null ? familyName : "")
                 .password(UUID.randomUUID().toString())
+                .pictureUrl(resolvePictureUrl(user))
                 .switchTenant(Boolean.TRUE.equals(payload.switchTenant()))
                 .build();
 
