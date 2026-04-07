@@ -15,9 +15,11 @@ public class RunScriptTest extends BaseTest {
 
     @Test
     public void testBulkRun() {
-        List<Machine> devices = DeviceApi.getDevices(osAndStatusDevicesFilter("Windows", DeviceStatus.ONLINE));
+        List<Machine> devices = DeviceApi.getDevices(osAndStatusDevicesFilter("WINDOWS", DeviceStatus.ONLINE));
         assertThat(devices).as("Expect Windows device online").isNotEmpty();
-        String tacticalId = getTacticalId(devices.getFirst());
-
+        Machine device = DeviceApi.getDevice(devices.getFirst().getMachineId());
+        assertThat(device.getToolConnections()).isNotEmpty();
+        String tacticalId = getTacticalId(device);
+        assertThat(tacticalId).isNotEmpty();
     }
 }
