@@ -1,7 +1,8 @@
 package com.openframe.gateway.config.ws;
 
+import com.openframe.core.service.ProxyUrlResolver;
 import com.openframe.data.reactive.repository.tool.ReactiveIntegratedToolRepository;
-import com.openframe.gateway.upstream.ToolUpstreamResolverRegistry;
+import com.openframe.data.service.ToolUrlService;
 import org.springframework.stereotype.Component;
 
 import static com.openframe.gateway.config.ws.WebSocketGatewayConfig.TOOLS_AGENT_WS_ENDPOINT_PREFIX;
@@ -11,9 +12,10 @@ public class ToolAgentWebSocketProxyUrlFilter extends ToolWebSocketProxyUrlFilte
 
     public ToolAgentWebSocketProxyUrlFilter(
             ReactiveIntegratedToolRepository toolRepository,
-            ToolUpstreamResolverRegistry upstreamRegistry
+            ToolUrlService toolUrlService,
+            ProxyUrlResolver proxyUrlResolver
     ) {
-        super(toolRepository, upstreamRegistry);
+        super(toolRepository, toolUrlService, proxyUrlResolver);
     }
 
     @Override
