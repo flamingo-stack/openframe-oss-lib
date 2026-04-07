@@ -48,6 +48,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 import static com.openframe.authz.util.OidcUserUtils.resolveEmail;
+import static com.openframe.authz.util.OidcUserUtils.resolvePictureUrl;
 import static com.openframe.authz.util.OidcUserUtils.stringClaim;
 import static com.openframe.data.document.user.UserRole.ADMIN;
 import static java.util.Locale.ROOT;
@@ -212,6 +213,7 @@ public class SecurityConfig {
             }
 
             String normalizedEmail = email.toLowerCase(ROOT);
+            String pictureUrl = resolvePictureUrl(user);
 
             ssoConfigService
                     .getSSOConfig(tenantId, provider)
@@ -221,27 +223,39 @@ public class SecurityConfig {
                             return;
                         }
                         if (isEmailAllowedByDomains(cfg.getAllowedDomains(), email)) {
-                            if (userService.findActiveByEmailAndTenant(normalizedEmail, tenantId).isEmpty()) {
-                                AuthUser created = registerUser(userService, tenantId, email, user, provider);
-                                registrationProcessor.postProcessAutoProvision(created);
-                            }
+                            provisionOrRefresh(userService, registrationProcessor, tenantId, email, normalizedEmail, user, provider, pictureUrl);
                         }
                     }, () -> {
                         String domain = email.substring(email.lastIndexOf('@') + 1).toLowerCase(ROOT);
-                        if (userService
-                                .findActiveByEmailAndTenant(normalizedEmail, tenantId)
-                                .isEmpty()) {
-                            globalDomainPolicyLookup.findTenantIdByDomainIfAutoAllowed(domain)
-                                    .ifPresent(mappedTenantId -> {
-                                        if (tenantId.equals(mappedTenantId)) {
-                                            AuthUser created = registerUser(userService, tenantId, email, user, provider);
-                                            registrationProcessor.postProcessAutoProvision(created);
-                                        }
-                                    });
-                        }
+                        globalDomainPolicyLookup.findTenantIdByDomainIfAutoAllowed(domain)
+                                .ifPresent(mappedTenantId -> {
+                                    if (tenantId.equals(mappedTenantId)) {
+                                        provisionOrRefresh(userService, registrationProcessor, tenantId, email, normalizedEmail, user, provider, pictureUrl);
+                                    }
+                                });
                     });
         } catch (Exception ignored) {
             // Do not block login flow if provisioning has a non-critical issue
+        }
+    }
+
+    private void provisionOrRefresh(UserService userService,
+                                    RegistrationProcessor registrationProcessor,
+                                    String tenantId,
+                                    String email,
+                                    String normalizedEmail,
+                                    OidcUser user,
+                                    String provider,
+                                    String pictureUrl) {
+        var existing = userService.findActiveByEmailAndTenant(normalizedEmail, tenantId);
+        if (existing.isEmpty()) {
+            AuthUser created = registerUser(userService, tenantId, email, user, provider);
+            registrationProcessor.postProcessAutoProvision(created, pictureUrl);
+        } else if (pictureUrl != null && existing.get().getImageUrl() == null) {
+            // Returning SSO user without a known picture yet — push the picture to tenant-stream once.
+            // AuthUser.imageUrl gets populated later via the USER_UPDATED sync from the tenant cluster,
+            // so subsequent logins skip this branch.
+            registrationProcessor.postProcessAutoProvision(existing.get(), pictureUrl);
         }
     }
 

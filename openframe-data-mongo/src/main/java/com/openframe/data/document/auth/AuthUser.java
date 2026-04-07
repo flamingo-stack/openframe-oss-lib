@@ -36,6 +36,14 @@ public class AuthUser extends User {
 
     private Instant lastLogin;
 
+    /**
+     * Cached profile picture URL synced from the tenant cluster (USER_UPDATED events).
+     * Used by the auth-server to decide whether to push an SSO `picture` claim downstream
+     * on subsequent logins. Null means "no picture known yet" — does not necessarily mean
+     * the tenant cluster has no image (the cache may be stale until the next USER_UPDATED).
+     */
+    private String imageUrl;
+
     public String getFullName() {
         if (super.getFirstName() != null && super.getLastName() != null) {
             return super.getFirstName() + " " + super.getLastName();
