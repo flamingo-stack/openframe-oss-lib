@@ -1,10 +1,12 @@
 import React from 'react'
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export interface DevicesIconProps extends React.SVGProps<SVGSVGElement> {
   size?: number
   color?: string
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function DevicesIcon({ className = '', size = 20, color, style, ...rest }: DevicesIconProps) {
   return (
     <svg

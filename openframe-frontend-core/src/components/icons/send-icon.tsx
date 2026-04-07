@@ -3,6 +3,7 @@ interface SendIconProps {
   fill?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function SendIcon({ className = "w-6 h-6", fill = "#1A1A1A" }: SendIconProps) {
   return (
     <svg 

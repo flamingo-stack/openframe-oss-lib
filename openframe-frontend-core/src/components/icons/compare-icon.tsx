@@ -7,6 +7,7 @@ interface CompareIconProps {
   height?: number;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const CompareIcon: React.FC<CompareIconProps> = ({
   className = "",
   width = 24,

@@ -7,6 +7,7 @@ interface OpenSourceIconProps {
   height?: number;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const OpenSourceIcon: React.FC<OpenSourceIconProps> = ({
   className = "",
   width = 19,

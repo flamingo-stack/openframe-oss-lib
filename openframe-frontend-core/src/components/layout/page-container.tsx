@@ -107,15 +107,17 @@ function isAdvancedProps(props: PageContainerProps): props is AdvancedPageContai
 }
 
 /**
+ * @deprecated Use `PageLayout` from `'../layout/page-layout'` instead.
+ *
  * Unified Page Container Component
- * 
+ *
  * Supports both legacy layout patterns and advanced UI patterns:
- * 
+ *
  * LEGACY USAGE (backward compatible):
  * <PageContainer backgroundClassName="bg-gray-100">
  *   <h1>Your Content</h1>
  * </PageContainer>
- * 
+ *
  * ADVANCED USAGE (new features):
  * <PageContainer variant="detail" title="Page Title" backButton={{onClick: () => {}}}>
  *   <div>Your Content</div>
@@ -426,20 +428,24 @@ function renderAdvancedPageContainer({
   )
 }
 
-// Convenience exports for common page types (advanced mode only)
-export const ListPageContainer = (props: Omit<AdvancedPageContainerProps, 'variant'>) => 
+/** @deprecated Use `PageLayout` from `'../layout/page-layout'` instead. */
+export const ListPageContainer = (props: Omit<AdvancedPageContainerProps, 'variant'>) =>
   <PageContainer {...props} variant="list" />
 
-export const DetailPageContainer = (props: Omit<AdvancedPageContainerProps, 'variant'>) => 
+/** @deprecated Use `PageLayout` from `'../layout/page-layout'` instead. */
+export const DetailPageContainer = (props: Omit<AdvancedPageContainerProps, 'variant'>) =>
   <PageContainer {...props} variant="detail" />
 
-export const FormPageContainer = (props: Omit<AdvancedPageContainerProps, 'variant'>) => 
+/** @deprecated Use `PageLayout` from `'../layout/page-layout'` instead. */
+export const FormPageContainer = (props: Omit<AdvancedPageContainerProps, 'variant'>) =>
   <PageContainer {...props} variant="form" />
 
-export const ContentPageContainer = (props: Omit<AdvancedPageContainerProps, 'variant'>) => 
+/** @deprecated Use `PageLayout` from `'../layout/page-layout'` instead. */
+export const ContentPageContainer = (props: Omit<AdvancedPageContainerProps, 'variant'>) =>
   <PageContainer {...props} variant="content" />
 
 // Re-export PageActionButton type for convenience
 export type { PageActionButton } from '../ui/page-actions'
 
+/** @deprecated Use `PageLayout` from `'../layout/page-layout'` instead. */
 export default PageContainer;

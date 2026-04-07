@@ -9,6 +9,7 @@ interface MiamiCyberGangLogoFaceOnlyProps {
   className?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const MiamiCyberGangLogoFaceOnly: React.FC<MiamiCyberGangLogoFaceOnlyProps> = ({
   size = 64,
   originalPink = "var(--ods-accent, #F357BB)",

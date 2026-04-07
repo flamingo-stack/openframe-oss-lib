@@ -7,6 +7,7 @@ interface SunIconProps {
   height?: number;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const SunIcon: React.FC<SunIconProps> = ({
   className = "",
   width = 24,

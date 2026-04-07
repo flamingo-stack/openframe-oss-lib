@@ -1,7 +1,9 @@
 import React from "react"
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export interface FileTextIconProps extends React.SVGProps<SVGSVGElement> { }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function FileTextIcon({ className = "h-6 w-6", color = 'white', ...props }: FileTextIconProps) {
   return (
     <svg

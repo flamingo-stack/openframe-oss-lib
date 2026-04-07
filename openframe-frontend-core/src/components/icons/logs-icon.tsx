@@ -6,6 +6,7 @@ interface LogsIconProps {
   color?: string
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function LogsIcon({ className = '', size = 24, color = 'white' }: LogsIconProps) {
   return (
     <svg 

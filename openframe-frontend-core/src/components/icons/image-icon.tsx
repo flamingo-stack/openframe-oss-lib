@@ -3,6 +3,7 @@ interface ImageIconProps {
   color?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const ImageIcon = ({ className = 'w-6 h-6', color }: ImageIconProps) => (
   <svg viewBox="0 0 24 24" fill="none" className={className}>
     {/* Paste image icon SVG content here */}

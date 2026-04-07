@@ -1,9 +1,11 @@
 import React from "react"
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export interface ArchiveIconProps extends React.SVGProps<SVGSVGElement> {
   color?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function ArchiveIcon({ className = "h-6 w-6", color = 'white', ...props }: ArchiveIconProps) {
   return (
     <svg

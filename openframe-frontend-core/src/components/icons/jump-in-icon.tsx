@@ -6,6 +6,7 @@ interface JumpInIconProps {
   className?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const JumpInIcon: React.FC<JumpInIconProps> = ({
   size = 48,
   color = 'white',

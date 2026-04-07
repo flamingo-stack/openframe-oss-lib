@@ -6,6 +6,7 @@ interface UsersGroupIconProps {
   color?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const UsersGroupIcon: React.FC<UsersGroupIconProps> = ({
   className = '',
   size = 24,

@@ -6,6 +6,7 @@ interface FolderShieldIconProps {
   color?: string
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const FolderShieldIcon: React.FC<FolderShieldIconProps> = ({
   className = '',
   size = 24,

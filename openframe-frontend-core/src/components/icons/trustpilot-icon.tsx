@@ -8,6 +8,7 @@ interface TrustpilotIconProps {
   secondColor?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function TrustpilotIcon({
   width = 2500,
   height = 2500,

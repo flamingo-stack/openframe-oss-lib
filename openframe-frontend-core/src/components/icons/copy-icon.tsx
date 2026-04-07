@@ -1,11 +1,13 @@
 import React from 'react';
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export interface CopyIconProps {
   className?: string;
   size?: number;
   color?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function CopyIcon({
   className = '',
   size = 24,

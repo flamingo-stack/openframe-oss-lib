@@ -4,6 +4,7 @@ interface CheckCircleIconProps extends React.SVGProps<SVGSVGElement> {
   className?: string
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function CheckCircleIcon({ className, color = '#1A1A1A', ...props }: CheckCircleIconProps) {
   return (
     <svg 

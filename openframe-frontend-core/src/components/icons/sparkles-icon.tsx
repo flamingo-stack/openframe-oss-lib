@@ -6,6 +6,7 @@ interface SparklesIconProps {
   size?: number
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const SparklesIcon: React.FC<SparklesIconProps> = ({
   className = '',
   color = 'currentColor',

@@ -6,12 +6,14 @@ import { MonitorIcon } from '../../icons-v2-generated/devices/monitor-icon'
 
 export type DeviceType = 'desktop' | 'laptop' | 'mobile' | 'tablet' | 'server'
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export interface DeviceTypeIconProps {
   className?: string
   color?: string
   size?: number
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function getDeviceTypeIcon(
   type?: DeviceType,
   props?: DeviceTypeIconProps

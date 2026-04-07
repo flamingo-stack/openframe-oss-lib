@@ -7,6 +7,7 @@ interface VendorsIconProps {
   height?: number;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const VendorsIcon: React.FC<VendorsIconProps> = ({
   className = "",
   width = 24,

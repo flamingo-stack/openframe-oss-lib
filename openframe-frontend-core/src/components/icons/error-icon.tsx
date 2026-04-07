@@ -5,6 +5,7 @@ import { cn } from '../../utils/cn';
  * Error icon for displaying error states
  * Usage: <ErrorIcon className="h-12 w-12" />
  */
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function ErrorIcon({ className, fill = '#FF6B6B', ...props }: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
