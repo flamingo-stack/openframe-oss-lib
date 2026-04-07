@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import type { ButtonProps } from './button'
 import { cn } from '../../utils/cn'
 import { Ellipsis01Icon } from '../icons-v2-generated'
 import { Button } from './button'
@@ -16,7 +17,7 @@ export type PageActionButton = {
   label: string
   onClick: () => void
   icon?: React.ReactNode
-  variant?: 'primary' | 'outline'
+  variant?: ButtonProps['variant']
   disabled?: boolean
   loading?: boolean
   /** Show action only on mobile (below md). Default: visible on all screens. */
@@ -83,7 +84,7 @@ function IconButtonsVariant({
         {desktopActions.map((action, idx) => (
           <Button
             key={`${action.label}-${idx}`}
-            variant="outline"
+            variant={action.variant}
             onClick={action.onClick}
             disabled={action.disabled}
             loading={action.loading}
@@ -98,7 +99,7 @@ function IconButtonsVariant({
       <div className={cn('flex md:hidden', className)}>
         {isSingleAction && singleAction ? (
           <Button
-            variant="outline"
+            variant={singleAction.variant}
             size="icon"
             onClick={singleAction.onClick}
             disabled={singleAction.disabled}

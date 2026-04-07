@@ -66,7 +66,7 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
         <div 
           ref={ref}
           className={cn(
-            "relative z-10 w-full max-w-md mx-4 bg-ods-card border border-ods-border rounded-lg shadow-xl",
+            "relative z-10 w-full max-w-md mx-4 max-h-[90vh] flex flex-col overflow-hidden bg-ods-card border border-ods-border rounded-lg shadow-xl",
             className
           )}
           role="dialog"
@@ -82,7 +82,7 @@ Modal.displayName = "Modal"
 
 const ModalContent = React.forwardRef<HTMLDivElement, ModalContentProps>(
   ({ children, className }, ref) => (
-    <div ref={ref} className={cn("", className)}>
+    <div ref={ref} className={cn("overflow-y-auto min-h-0 flex-1", className)}>
       {children}
     </div>
   )
@@ -93,7 +93,7 @@ const ModalHeader = React.forwardRef<HTMLDivElement, ModalHeaderProps>(
   ({ children, className }, ref) => (
     <div 
       ref={ref} 
-      className={cn("px-6 py-4 border-b border-ods-border", className)}
+      className={cn("px-6 py-4 border-b border-ods-border shrink-0", className)}
     >
       {children}
     </div>
@@ -117,7 +117,7 @@ const ModalFooter = React.forwardRef<HTMLDivElement, ModalFooterProps>(
   ({ children, className }, ref) => (
     <div 
       ref={ref}
-      className={cn("px-6 py-4 flex justify-end gap-3", className)}
+      className={cn("px-6 py-4 flex justify-end gap-3 shrink-0", className)}
     >
       {children}
     </div>

@@ -22,6 +22,7 @@ export * from './radio-group'
 export * from './select'
 export * from './switch'
 export * from './tags-input'
+export * from './tags-manager'
 export * from './textarea'
 // Layout components
 export * from './alert-dialog'
@@ -68,6 +69,7 @@ export * from './dashboard-info-card'
 export * from './device-card'
 export * from './device-card-compact'
 export * from './feature-card'
+export * from './feature-list'
 export { FloatingTooltip } from './floating-tooltip'
 export * from './highlight-card'
 export * from './icons-block'
@@ -118,4 +120,20 @@ export * from './phone-input'
 
 // Search
 export * from './search-input'
+
+// Rich Text Editor
+export * from './rich-text-editor'
+
+// File Upload
+export * from './file-upload'
+
+// Ticket components
+export * from './ticket-status-tag'
+export * from './ticket-info-section'
+export * from './ticket-detail-section'
+export * from './ticket-attachments-list'
+export * from './ticket-knowledge-base-list'
+export * from './ticket-note-card'
+export * from './ticket-notes-section'
+export * from './ticket-description-viewer'
 
