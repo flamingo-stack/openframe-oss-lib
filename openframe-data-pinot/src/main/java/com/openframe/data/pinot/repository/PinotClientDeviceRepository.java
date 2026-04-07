@@ -94,10 +94,10 @@ public class PinotClientDeviceRepository implements PinotDeviceRepository {
             List<String> organizationIds,
             List<String> tagKeys,
             List<String> tagKeyValues) {
-        String whereClause = buildWhereClauseExcluding(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, "tags");
-        return queryPinotForFilterOptions("SELECT tags, COUNT(*) as count FROM \"" + devicesTable + "\"" +
+        String whereClause = buildWhereClauseExcluding(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, "tagKeyValues");
+        return queryPinotForFilterOptions("SELECT tagKeyValues, COUNT(*) as count FROM \"" + devicesTable + "\"" +
                 (whereClause.isEmpty() ? "" : " WHERE " + whereClause) +
-                " GROUP BY tags ORDER BY count DESC");
+                " GROUP BY tagKeyValues ORDER BY count DESC");
     }
 
     @Override

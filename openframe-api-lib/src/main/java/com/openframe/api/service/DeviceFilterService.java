@@ -129,11 +129,24 @@ public class DeviceFilterService {
             return new ArrayList<>();
         }
         return repositoryOptions.entrySet().stream()
-                .map(entry -> TagFilterOption.builder()
-                        .value(entry.getKey())
-                        .label(entry.getKey())
-                        .count(entry.getValue())
-                        .build())
+                .map(entry -> {
+                    String keyValue = entry.getKey();
+                    int colonIndex = keyValue.indexOf(':');
+                    String key;
+                    String value;
+                    if (colonIndex >= 0) {
+                        key = keyValue.substring(0, colonIndex);
+                        value = keyValue.substring(colonIndex + 1);
+                    } else {
+                        key = keyValue;
+                        value = keyValue;
+                    }
+                    return TagFilterOption.builder()
+                            .key(key)
+                            .value(value)
+                            .count(entry.getValue())
+                            .build();
+                })
                 .collect(Collectors.toList());
     }
 
