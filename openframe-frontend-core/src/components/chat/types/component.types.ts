@@ -25,6 +25,7 @@ export interface ChatHeaderProps extends HTMLAttributes<HTMLDivElement> {
   showNewChat?: boolean
   connectionStatus?: ConnectionStatus
   serverUrl?: string | null
+  headerActions?: React.ReactNode
 }
 
 // ========== Connection Indicator Props ==========
