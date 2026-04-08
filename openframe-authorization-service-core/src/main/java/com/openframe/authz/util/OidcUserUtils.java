@@ -29,6 +29,15 @@ public final class OidcUserUtils {
     public static String stringClaim(Object value) {
         return value instanceof String s && !s.isBlank() ? s : null;
     }
+
+    /**
+     * Resolve a profile picture URL from OIDC claims.
+     * Standard OIDC `picture` claim is provided by Google. Microsoft does not provide it via id_token claims
+     * (it requires a Microsoft Graph call to /me/photo/$value), so this returns null for Microsoft.
+     */
+    public static String resolvePictureUrl(OidcUser user) {
+        return stringClaim(user.getClaims().get("picture"));
+    }
 }
 
 

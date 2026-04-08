@@ -35,4 +35,10 @@ public class CoreUserRequest {
     )
     private String password;
 
+    /**
+     * Optional external profile picture URL captured from an SSO/OIDC `picture` claim.
+     * Not user-supplied via API; populated internally by SSO flow handlers.
+     */
+    private String pictureUrl;
+
 }
