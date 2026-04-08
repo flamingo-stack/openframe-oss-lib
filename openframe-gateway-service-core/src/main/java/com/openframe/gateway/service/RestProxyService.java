@@ -1,12 +1,9 @@
 package com.openframe.gateway.service;
 
-import com.openframe.core.service.ProxyUrlResolver;
 import com.openframe.data.document.tool.IntegratedTool;
-import com.openframe.data.document.tool.ToolUrl;
-import com.openframe.data.document.tool.ToolUrlType;
 import com.openframe.data.reactive.repository.tool.ReactiveIntegratedToolRepository;
-import com.openframe.data.service.ToolUrlService;
 import com.openframe.gateway.config.CurlLoggingHandler;
+import com.openframe.gateway.upstream.ToolUpstreamResolverRegistry;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.util.AttributeKey;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +23,6 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 
 import static com.openframe.core.constants.HttpHeaders.*;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
@@ -40,8 +36,7 @@ public class RestProxyService {
     private static final AttributeKey<URI> TARGET_URI_KEY = AttributeKey.valueOf("target_uri");
 
     private final ReactiveIntegratedToolRepository toolRepository;
-    private final ProxyUrlResolver proxyUrlResolver;
-    private final ToolUrlService toolUrlService;
+    private final ToolUpstreamResolverRegistry upstreamRegistry;
     private final ToolApiKeyHeadersResolver apiKeyHeadersResolver;
 
     public Mono<ResponseEntity<String>> proxyApiRequest(String toolId, ServerHttpRequest request, String body) {
@@ -52,15 +47,7 @@ public class RestProxyService {
                                 .just(ResponseEntity.badRequest().body("Tool " + tool.getName() + " is not enabled"));
                     }
 
-                    URI originalUri = request.getURI();
-
-                    Optional<ToolUrl> optionalToolUrl = toolUrlService.getUrlByToolType(tool, ToolUrlType.API);
-                    if (optionalToolUrl.isEmpty()) {
-                        return Mono.just(ResponseEntity.badRequest().body("Tool URL not found for tool: " + toolId));
-                    }
-                    ToolUrl toolUrl = optionalToolUrl.get();
-
-                    URI targetUri = proxyUrlResolver.resolve(toolId, toolUrl.getUrl(), toolUrl.getPort(), originalUri, "/tools");
+                    URI targetUri = upstreamRegistry.resolve(toolId).resolveRest(tool, request, "/tools");
                     log.debug("Proxying api request for tool: {}, url: {}", toolId, targetUri);
 
                     HttpMethod method = request.getMethod();
@@ -105,18 +92,8 @@ public class RestProxyService {
                         return Mono.just(response);
                     }
 
-                    URI originalUri = request.getURI();
-
-                    Optional<ToolUrl> optionalToolUrl = toolUrlService.getUrlByToolType(tool, ToolUrlType.API);
-                    if (optionalToolUrl.isEmpty()) {
-                        ResponseEntity<String> response = ResponseEntity.badRequest()
-                                .body("Tool URL not found for tool: " + toolId);
-                        return Mono.just(response);
-                    }
-                    ToolUrl toolUrl = optionalToolUrl.get();
-
-                    URI targetUri = proxyUrlResolver.resolve(toolId, toolUrl.getUrl(), toolUrl.getPort(), originalUri, "/tools/agent");
-                    log.debug("Proxying api request for tool: {}, url: {}", toolId, targetUri);
+                    URI targetUri = upstreamRegistry.resolve(toolId).resolveRest(tool, request, "/tools/agent");
+                    log.debug("Proxying agent request for tool: {}, url: {}", toolId, targetUri);
 
                     HttpMethod method = request.getMethod();
                     Map<String, String> headers = buildAgentRequestHeaders(request);
