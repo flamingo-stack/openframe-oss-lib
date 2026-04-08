@@ -1,5 +1,6 @@
 package com.openframe.sdk.tacticalrmm;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.sdk.tacticalrmm.exception.TacticalRmmApiException;
@@ -18,6 +19,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 public class TacticalRmmClient {
 
@@ -83,65 +85,53 @@ public class TacticalRmmClient {
             int timeout,
             boolean runAsUser
     ) {
-        // Validate parameters
-        if (tacticalServerUrl == null || tacticalServerUrl.trim().isEmpty()) {
-            throw new IllegalArgumentException("Tactical server URL cannot be null or empty");
-        }
-        if (apiKey == null || apiKey.trim().isEmpty()) {
-            throw new IllegalArgumentException("API key cannot be null or empty");
-        }
-        if (agentId == null || agentId.trim().isEmpty()) {
-            throw new IllegalArgumentException("Agent ID cannot be null or empty");
-        }
-        if (shell == null || shell.trim().isEmpty()) {
-            throw new IllegalArgumentException("Shell cannot be null or empty");
-        }
-        if (!shell.equals("cmd") && !shell.equals("powershell") && !shell.equals("bash")) {
-            throw new IllegalArgumentException("Shell must be one of: cmd, powershell, bash");
-        }
-        if (command == null || command.trim().isEmpty()) {
-            throw new IllegalArgumentException("Command cannot be null or empty");
-        }
+        validateRunCommandParams(tacticalServerUrl, apiKey, agentId, shell, command);
 
         try {
-            var requestBodyNode = objectMapper.createObjectNode();
-            requestBodyNode.put("shell", shell);
-            requestBodyNode.put("cmd", command);
-            requestBodyNode.put("timeout", timeout);
-            requestBodyNode.put("run_as_user", runAsUser);
-            String requestBody = objectMapper.writeValueAsString(requestBodyNode);
-
-            HttpRequest httpRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(tacticalServerUrl + RUN_COMMAND_URL + agentId + "/cmd/"))
-                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-                    .header("Content-Type", "application/json")
-                    .header("Accept", "application/json")
-                    .header("X-API-KEY", apiKey)
-                    .timeout(Duration.ofSeconds(timeout + 15)) // Add buffer to HTTP timeout
-                    .build();
-
+            HttpRequest httpRequest = buildRunCommandRequest(tacticalServerUrl, apiKey, agentId, shell, command, timeout, runAsUser);
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() == 401) {
-                throw new TacticalRmmApiException("Authentication failed. Please check your API key.", response.statusCode(), response.body());
-            } else if (response.statusCode() == 404) {
-                throw new TacticalRmmApiException("Agent not found with ID: " + agentId, response.statusCode(), response.body());
-            } else if (response.statusCode() != 200 && response.statusCode() != 201) {
-                throw new TacticalRmmApiException("Failed to execute command", response.statusCode(), response.body());
-            }
-
-            CommandResult result = new CommandResult();
-            String stdout = objectMapper.readValue(response.body(), String.class);
-            result.setStdout(stdout);
-            result.setAgentId(agentId);
-            result.setShell(shell);
-            result.setCommand(command);
-            result.setTimeout(timeout);
-            return result;
+            checkRunCommandResponse(response, agentId);
+            return parseCommandResult(response.body(), agentId, shell, command, timeout);
         } catch (TacticalRmmApiException e) {
             throw e;
         } catch (Exception e) {
             throw new TacticalRmmException("Failed to execute command on agent: " + agentId, e);
+        }
+    }
+
+    /**
+     * Same as {@link #runCommand} but uses non-blocking HTTP and returns a future.
+     * Cancelling the future attempts to abort the in-flight request.
+     */
+    public CompletableFuture<CommandResult> runCommandAsync(
+            String tacticalServerUrl,
+            String apiKey,
+            String agentId,
+            String shell,
+            String command,
+            int timeout,
+            boolean runAsUser
+    ) {
+        validateRunCommandParams(tacticalServerUrl, apiKey, agentId, shell, command);
+
+        try {
+            HttpRequest httpRequest = buildRunCommandRequest(tacticalServerUrl, apiKey, agentId, shell, command, timeout, runAsUser);
+
+            return httpClient
+                    .sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                    .thenApply(response -> {
+                        checkRunCommandResponse(response, agentId);
+                        try {
+                            return parseCommandResult(response.body(), agentId, shell, command, timeout);
+                        } catch (Exception e) {
+                            throw new TacticalRmmException("Failed to parse command response for agent: " + agentId, e);
+                        }
+                    });
+        } catch (Exception e) {
+            CompletableFuture<CommandResult> failed = new CompletableFuture<>();
+            failed.completeExceptionally(
+                    new TacticalRmmException("Failed to execute command on agent: " + agentId, e));
+            return failed;
         }
     }
 
@@ -218,7 +208,6 @@ public class TacticalRmmClient {
      * @return List of AgentListItem containing basic agent information
      */
     public List<AgentListItem> getAllAgents(String tacticalServerUrl, String apiKey) {
-        // Validate parameters
         if (tacticalServerUrl == null || tacticalServerUrl.trim().isEmpty()) {
             throw new IllegalArgumentException("Tactical server URL cannot be null or empty");
         }
@@ -503,6 +492,73 @@ public class TacticalRmmClient {
         }
     }
 
+    private void validateRunCommandParams(
+            String tacticalServerUrl, String apiKey,
+            String agentId, String shell, String command
+    ) {
+        if (tacticalServerUrl == null || tacticalServerUrl.trim().isEmpty()) {
+            throw new IllegalArgumentException("Tactical server URL cannot be null or empty");
+        }
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            throw new IllegalArgumentException("API key cannot be null or empty");
+        }
+        if (agentId == null || agentId.trim().isEmpty()) {
+            throw new IllegalArgumentException("Agent ID cannot be null or empty");
+        }
+        if (shell == null || shell.trim().isEmpty()) {
+            throw new IllegalArgumentException("Shell cannot be null or empty");
+        }
+        if (!shell.equals("cmd") && !shell.equals("powershell") && !shell.equals("bash")) {
+            throw new IllegalArgumentException("Shell must be one of: cmd, powershell, bash");
+        }
+        if (command == null || command.trim().isEmpty()) {
+            throw new IllegalArgumentException("Command cannot be null or empty");
+        }
+    }
+
+    private HttpRequest buildRunCommandRequest(
+            String tacticalServerUrl, String apiKey,
+            String agentId, String shell, String command,
+            int timeout, boolean runAsUser
+    ) throws JsonProcessingException {
+        var requestBodyNode = objectMapper.createObjectNode();
+        requestBodyNode.put("shell", shell);
+        requestBodyNode.put("cmd", command);
+        requestBodyNode.put("timeout", timeout);
+        requestBodyNode.put("run_as_user", runAsUser);
+        String requestBody = objectMapper.writeValueAsString(requestBodyNode);
+
+        return HttpRequest.newBuilder()
+                .uri(URI.create(tacticalServerUrl + RUN_COMMAND_URL + agentId + "/cmd/"))
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .header("Content-Type", "application/json")
+                .header("Accept", "application/json")
+                .header("X-API-KEY", apiKey)
+                .timeout(Duration.ofSeconds(timeout + 15))
+                .build();
+    }
+
+    private static void checkRunCommandResponse(HttpResponse<String> response, String agentId) {
+        if (response.statusCode() == 401) {
+            throw new TacticalRmmApiException("Authentication failed. Please check your API key.", response.statusCode(), response.body());
+        }
+        if (response.statusCode() == 404) {
+            throw new TacticalRmmApiException("Agent not found with ID: " + agentId, response.statusCode(), response.body());
+        }
+        if (response.statusCode() != 200 && response.statusCode() != 201) {
+            throw new TacticalRmmApiException("Failed to execute command", response.statusCode(), response.body());
+        }
+    }
+
+    private CommandResult parseCommandResult(String body, String agentId, String shell, String command, int timeout)
+            throws JsonProcessingException {
+        CommandResult result = new CommandResult();
+        String stdout = objectMapper.readValue(body, String.class);
+        result.setStdout(stdout);
+        result.setAgentId(agentId);
+        result.setShell(shell);
+        result.setCommand(command);
+        result.setTimeout(timeout);
+        return result;
+    }
 }
-
-
