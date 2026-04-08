@@ -8,6 +8,12 @@ import type { VideoTeaser, TranscriptWord, SpeakerMapping } from './video-proces
 export interface ChangelogEntry {
   title: string
   description?: string
+  /**
+   * Per-entry visibility flag. Optional so product releases (which always render
+   * publicly) remain backwards compatible. Investor updates require this field
+   * because each entry can be marked internal — see investor-update-utils.ts.
+   */
+  visibility?: 'public' | 'internal'
 }
 
 export interface ReleaseMedia {
