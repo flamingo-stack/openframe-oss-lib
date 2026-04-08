@@ -5,6 +5,7 @@ interface TelegramIconProps {
   className?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function TelegramIcon({ className ,
   color = 'white'
 }:  TelegramIconProps) {

@@ -6,6 +6,7 @@ interface MsIconProps {
   className?: string
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function MicrosoftIcon({ 
   width = 24, 
   height = 24, 

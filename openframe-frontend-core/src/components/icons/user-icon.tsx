@@ -7,6 +7,7 @@ interface UserIconProps {
   className?: string
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function UserIcon({ 
   width = 24, 
   height = 23, 

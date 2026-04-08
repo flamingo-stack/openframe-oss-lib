@@ -1,5 +1,6 @@
 import React from 'react'
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function ScriptIcon({ className = "w-5 h-5", size=22, color='white' }: { className?: string; size?: number; color?: string }) {
   return (
     <svg

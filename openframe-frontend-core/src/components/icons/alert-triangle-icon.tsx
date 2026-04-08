@@ -1,7 +1,9 @@
 import React from "react"
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export interface AlertTriangleIconProps extends React.SVGProps<SVGSVGElement> { }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function AlertTriangleIcon({ className = "h-6 w-6", color = 'white', ...props }: AlertTriangleIconProps) {
   return (
     <svg

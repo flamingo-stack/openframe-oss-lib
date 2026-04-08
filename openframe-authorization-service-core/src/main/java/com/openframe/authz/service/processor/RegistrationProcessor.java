@@ -44,12 +44,13 @@ public interface RegistrationProcessor {
     }
 
     /**
-     * Post-process hook for auto-provisioned registrations (SSO first-login).
-     * Called after a user has been automatically provisioned without an invitation.
+     * Post-process hook for auto-provisioned registrations (SSO first-login)
+     * and for refreshing profile data on subsequent SSO logins.
      *
-     * @param user The created user
+     * @param user       The user (newly created or already existing)
+     * @param pictureUrl Optional profile picture URL captured from the SSO `picture` claim
      */
-    default void postProcessAutoProvision(AuthUser user) {
+    default void postProcessAutoProvision(AuthUser user, String pictureUrl) {
         // Default no-op implementation
     }
 }

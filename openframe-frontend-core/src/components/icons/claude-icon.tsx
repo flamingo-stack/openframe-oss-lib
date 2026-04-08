@@ -4,6 +4,7 @@ import React from 'react';
 
 interface ClaudeIconProps extends React.SVGProps<SVGSVGElement> {}
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function ClaudeIcon(props: ClaudeIconProps) {
   return (
     <svg

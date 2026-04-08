@@ -3,6 +3,7 @@ interface ThumbsUpIconProps {
   color?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const ThumbsUpIcon = ({ className = 'w-6 h-6', color = "#F357BB" }: ThumbsUpIconProps) => (
   <svg width="23" height="23" viewBox="0 0 23 23" fill="none" className={className}>
     {/* Paste Figma SVG content here */}

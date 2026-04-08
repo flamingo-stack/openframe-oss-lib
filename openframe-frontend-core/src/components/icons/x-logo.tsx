@@ -4,6 +4,7 @@ interface XLogoProps extends React.SVGProps<SVGSVGElement> {
   className?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function XLogo({ className = '', color = 'white', ...props }: XLogoProps) {
   return (
     <svg

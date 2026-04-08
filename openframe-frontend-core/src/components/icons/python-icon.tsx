@@ -1,11 +1,13 @@
 import React from 'react'
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export interface PythonIconProps {
   size?: number
   className?: string
   color?: string
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const PythonIcon: React.FC<PythonIconProps> = ({ size = 16, className = '', color = 'white' }) => {
   return (
     <svg

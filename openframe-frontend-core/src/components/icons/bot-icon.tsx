@@ -1,9 +1,11 @@
 import React from "react"
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export interface BotIconProps extends React.SVGProps<SVGSVGElement> {
   color?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function BotIcon({ className = "h-6 w-6", color = 'white', ...props }: BotIconProps) {
   return (
     <svg

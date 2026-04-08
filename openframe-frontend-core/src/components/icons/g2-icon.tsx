@@ -7,6 +7,7 @@ interface G2IconProps {
   color?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function G2Icon({
   width = 2500,
   height = 2500,

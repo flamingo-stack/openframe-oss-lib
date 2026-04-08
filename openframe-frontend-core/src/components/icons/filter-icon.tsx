@@ -5,6 +5,7 @@ interface FilterIconProps {
   size?: number
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const FilterIcon: React.FC<FilterIconProps> = ({ className = '', size = 20 }) => {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">

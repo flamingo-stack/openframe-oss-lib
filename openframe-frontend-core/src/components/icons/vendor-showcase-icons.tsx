@@ -1,5 +1,6 @@
 import React from 'react';
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const VendorShowcaseMainIcon = ({ className }: { className?: string }) => (
   <svg
     width="200"
@@ -19,6 +20,7 @@ interface TransparentTrustedIconProps {
   size?: number;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const TransparentTrustedIcon: React.FC<TransparentTrustedIconProps> = ({
   className = '',
   color = '#F357BB',
@@ -38,6 +40,7 @@ export const TransparentTrustedIcon: React.FC<TransparentTrustedIconProps> = ({
   </svg>
 );
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const ModularHellIcon = ({ className, size = 38, color = "#5EFAF0" }: { className?: string, size: number, color: string }) => (
   <svg
     width={size}
@@ -54,6 +57,7 @@ export const ModularHellIcon = ({ className, size = 38, color = "#5EFAF0" }: { c
   </svg>
 );
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const RapidInnovationIcon = ({ className, size = 38, color = "#F357BB" }: { className?: string, size: number, color: string }) => (
   <svg
     width={size}
@@ -69,6 +73,7 @@ export const RapidInnovationIcon = ({ className, size = 38, color = "#F357BB" }:
   </svg>
 );
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const LowerTCOIcon = ({ className, size = 42, color = "#5EFAF0" }: { className?: string, size: number, color: string }) => (
   <svg
     width={size}

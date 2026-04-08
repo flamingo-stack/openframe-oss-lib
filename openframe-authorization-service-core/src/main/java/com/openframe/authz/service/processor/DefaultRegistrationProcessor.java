@@ -39,7 +39,7 @@ public class DefaultRegistrationProcessor implements RegistrationProcessor {
     }
 
     @Override
-    public void postProcessAutoProvision(AuthUser user) {
+    public void postProcessAutoProvision(AuthUser user, String pictureUrl) {
         // Default no-op implementation
         log.debug("Default post-processing auto-provision for user: {}", user.getId());
     }

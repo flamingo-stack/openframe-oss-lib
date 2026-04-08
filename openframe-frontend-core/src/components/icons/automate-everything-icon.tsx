@@ -1,5 +1,6 @@
 import React from 'react';
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const AutomateEverythingIcon = ({ className, ...props }: { className?: string } & React.SVGProps<SVGSVGElement>) => {
   return (
     <svg

@@ -5,6 +5,7 @@ interface GlobeIconProps {
   className?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function GlobeIcon({ className ,
   color = 'white'
 }:  GlobeIconProps) {

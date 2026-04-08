@@ -7,6 +7,7 @@ interface XIconProps {
   className?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function XIcon({ width = 16, height = 16, className = '' ,
   color = 'white'
 }:  XIconProps) {

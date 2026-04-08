@@ -11,6 +11,7 @@ interface FlamingoLogoProps extends React.SVGProps<SVGSVGElement> {
   fill?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function FlamingoLogo({ className = '', fill = 'var(--ods-flamingo-pink-base)', ...props }: FlamingoLogoProps) {
   return (
     <svg

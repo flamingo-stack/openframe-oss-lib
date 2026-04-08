@@ -8,6 +8,7 @@ interface InfoCircleIconProps {
   height?: number;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function InfoCircleIcon({
   className = "",
   color = 'currentColor',

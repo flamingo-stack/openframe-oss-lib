@@ -7,6 +7,7 @@ interface SearchIconProps {
   className?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function SearchIcon({
   width = 22,
   height = 22,

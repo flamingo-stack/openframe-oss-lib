@@ -7,6 +7,7 @@ interface HandDollarIconProps {
   color?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const HandDollarIcon: React.FC<HandDollarIconProps> = ({
   className = "",
   width = 24,

@@ -1,5 +1,6 @@
 import React from 'react';
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const OpenFrameLogo = ({ className, lowerPathColor, upperPathColor,  ...props }: { className?: string, lowerPathColor?: string, upperPathColor?: string } & React.SVGProps<SVGSVGElement>) => {
   return (
     <svg

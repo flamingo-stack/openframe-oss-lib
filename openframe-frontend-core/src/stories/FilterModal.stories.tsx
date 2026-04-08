@@ -2,18 +2,18 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { useState } from 'react'
 import { fn } from 'storybook/test'
 import { Button } from '../components/ui/button'
-import { MobileFilterModal, type FilterGroup, type SortConfig } from '../components/ui/mobile-filter-sheet'
+import { FilterModal, type FilterGroup, type SortConfig } from '../components/ui/filter-modal'
 import type { TableFilters } from '../components/ui/table/types'
 
 const meta = {
-  title: 'UI/MobileFilterModal',
-  component: MobileFilterModal,
+  title: 'UI/FilterModal',
+  component: FilterModal,
   parameters: {
     layout: 'centered',
     docs: {
       description: {
         component:
-          'A centered modal for filtering options. Displays filter groups with checkboxes, counts, and action buttons.',
+          'A modal for filtering and sorting options. Displays filter groups with checkboxes, counts, sort columns, and action buttons.',
       },
     },
   },
@@ -36,7 +36,7 @@ const meta = {
       description: 'Text for apply button',
     },
   },
-} satisfies Meta<typeof MobileFilterModal>
+} satisfies Meta<typeof FilterModal>
 
 export default meta
 type Story = StoryObj<typeof meta>
@@ -58,8 +58,18 @@ const defaultCurrentFilters: TableFilters = {
   statuses: ['active', 'inactive', 'decommissioned']
 }
 
+const defaultSortConfig: SortConfig = {
+  columns: [
+    { key: 'name', label: 'Name' },
+    { key: 'date', label: 'Date' },
+    { key: 'status', label: 'Status' },
+  ],
+  sortBy: 'name',
+  sortDirection: 'asc',
+}
+
 /**
- * Default MobileFilterModal with status filters (matching Figma design).
+ * Default FilterModal with status filters.
  */
 export const Default: Story = {
   args: {
@@ -84,8 +94,6 @@ export const Interactive: Story = {
 
     const handleFilterChange = (filters: TableFilters) => {
       setCurrentFilters(filters)
-      setIsOpen(false)
-      console.log('Applied filters:', filters)
     }
 
     const getActiveFilterCount = () => {
@@ -95,9 +103,9 @@ export const Interactive: Story = {
     return (
       <div className="flex flex-col items-center gap-4">
         <Button onClick={() => setIsOpen(true)} variant="outline">
-          Open Filters Modal ({getActiveFilterCount()} active)
+          Open Filters ({getActiveFilterCount()} active)
         </Button>
-        <MobileFilterModal
+        <FilterModal
           isOpen={isOpen}
           onClose={() => setIsOpen(false)}
           filterGroups={defaultFilterGroups}
@@ -117,7 +125,7 @@ export const Interactive: Story = {
 }
 
 /**
- * Multiple filter groups example.
+ * Multiple filter groups.
  */
 export const MultipleGroups: Story = {
   args: {
@@ -150,49 +158,37 @@ export const MultipleGroups: Story = {
           { id: 'linux', label: 'Linux' },
         ],
       },
-      {
-        id: 'locations',
-        title: 'Locations',
+        {
+        id: 'os',
+        title: 'Operating System',
         options: [
-          { id: 'usa', label: 'USA', count: 1500 },
-          { id: 'canada', label: 'Canada', count: 800 },
-          { id: 'uk', label: 'UK', count: 350 },
+          { id: 'windows', label: 'Windows' },
+          { id: 'macos', label: 'macOS' },
+          { id: 'linux', label: 'Linux' },
         ],
       },
-      {
-        id: 'departments',
-        title: 'Departments',
+        {
+        id: 'os',
+        title: 'Operating System',
         options: [
-          { id: 'hr', label: 'HR', count: 1500 },
-          { id: 'engineering', label: 'Engineering', count: 800 },
-          { id: 'marketing', label: 'Marketing', count: 350 },
+          { id: 'windows', label: 'Windows' },
+          { id: 'macos', label: 'macOS' },
+          { id: 'linux', label: 'Linux' },
         ],
       },
-      {
-        id: 'roles',
-        title: 'Roles',
+        {
+        id: 'os',
+        title: 'Operating System',
         options: [
-          { id: 'admin', label: 'Admin', count: 1500 },
-          { id: 'user', label: 'User', count: 800 },
-        ],
-      },
-      {
-        id: 'permissions',
-        title: 'Permissions',
-        options: [
-          { id: 'read', label: 'Read', count: 1500 },
-          { id: 'write', label: 'Write', count: 800 },
+          { id: 'windows', label: 'Windows' },
+          { id: 'macos', label: 'macOS' },
+          { id: 'linux', label: 'Linux' },
         ],
       },
     ],
     currentFilters: {
       statuses: ['active'],
       types: ['desktop', 'laptop'],
-      os: ['windows'],
-      locations: ['usa'],
-      departments: ['hr'],
-      roles: ['admin'],
-      permissions: ['read']
     },
     onFilterChange: fn(),
     onClose: fn(),
@@ -200,7 +196,7 @@ export const MultipleGroups: Story = {
 }
 
 /**
- * Without counts - simple filter list.
+ * Without counts — simple filter list.
  */
 export const WithoutCounts: Story = {
   args: {
@@ -225,18 +221,8 @@ export const WithoutCounts: Story = {
   },
 }
 
-const defaultSortConfig: SortConfig = {
-  columns: [
-    { key: 'name', label: 'Name' },
-    { key: 'date', label: 'Date' },
-    { key: 'status', label: 'Status' },
-  ],
-  sortBy: 'name',
-  sortDirection: 'asc',
-}
-
 /**
- * With sorting options.
+ * With sorting and filter groups combined.
  */
 export const WithSorting: Story = {
   args: {
@@ -252,7 +238,7 @@ export const WithSorting: Story = {
 }
 
 /**
- * Sorting only - no filters.
+ * Sorting only — no filter groups.
  */
 export const SortingOnly: Story = {
   args: {
@@ -289,9 +275,6 @@ export const InteractiveWithSorting: Story = {
 
     const handleFilterChange = (filters: TableFilters) => {
       setCurrentFilters(filters)
-      setIsOpen(false)
-      console.log('Applied filters:', filters)
-      console.log('Applied sort:', sortBy, sortDirection)
     }
 
     const handleSort = (column: string, direction: 'asc' | 'desc') => {
@@ -306,12 +289,12 @@ export const InteractiveWithSorting: Story = {
     return (
       <div className="flex flex-col items-center gap-4">
         <Button onClick={() => setIsOpen(true)} variant="outline">
-          Open Sort & Filters Modal ({getActiveFilterCount()} active)
+          Sort & Filter ({getActiveFilterCount()} active)
         </Button>
         <div className="text-sm text-ods-text-secondary">
-          Current sort: {sortBy} ({sortDirection})
+          Sort: {sortBy} ({sortDirection})
         </div>
-        <MobileFilterModal
+        <FilterModal
           isOpen={isOpen}
           onClose={() => setIsOpen(false)}
           filterGroups={defaultFilterGroups}
@@ -325,6 +308,20 @@ export const InteractiveWithSorting: Story = {
   },
   args: {
     isOpen: false,
+    filterGroups: defaultFilterGroups,
+    currentFilters: {},
+    onFilterChange: fn(),
+    onClose: fn(),
+  },
+}
+
+/**
+ * Empty state — no filters selected.
+ */
+export const EmptyFilters: Story = {
+  args: {
+    isOpen: true,
+    title: 'Sort and Filter',
     filterGroups: defaultFilterGroups,
     currentFilters: {},
     onFilterChange: fn(),

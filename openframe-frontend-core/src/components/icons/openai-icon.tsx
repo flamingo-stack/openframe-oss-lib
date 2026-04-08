@@ -6,6 +6,7 @@ interface OpenAiIconProps {
   color?: string
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function OpenAiIcon({
   className = '',
   size = 24,

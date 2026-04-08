@@ -6,6 +6,7 @@ interface PlusCircleIconProps extends React.SVGProps<SVGSVGElement> {
   iconSize?: number
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function PlusCircleIcon({ className, whiteOverlay = false, iconSize = 24, ...props }: PlusCircleIconProps) {
   return (
     <svg 
