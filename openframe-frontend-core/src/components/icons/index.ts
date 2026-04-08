@@ -21,7 +21,7 @@
 export { OpenmspLogo } from './openmsp-logo';
 export { OpenFrameLogo } from './openframe-logo';
 export { OpenFrameText } from './openframe-text';
-export { FlamingoLogo } from './flamingo-logo';
+export { FlamingoLogo, FLAMINGO_LOGO_SVG_PATH, FLAMINGO_LOGO_VIEWBOX } from './flamingo-logo';
 export { ElestioLogo } from './elestio-logo';
 export { MlgLogo } from './mlg-logo';
 export { MiamiCyberGangLogo } from './miami-cyber-gang-logo';
@@ -203,3 +203,7 @@ export { G2Icon } from './g2-icon';
 export { CapterraIcon } from './capterra-icon';
 export { TrustpilotIcon } from './trustpilot-icon';
 export { GetAppIcon } from './getapp-icon';
+
+// Financial platform icons
+export { CartaIcon } from './carta-icon';
+export { PilotIcon } from './pilot-icon';

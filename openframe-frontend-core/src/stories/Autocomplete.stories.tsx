@@ -285,6 +285,144 @@ export const Loading: Story = {
   },
 };
 
+// ─── Creatable Stories ───
+
+/**
+ * Single select with creatable — type a value that doesn't exist and click "+ Create".
+ */
+export const SingleCreatable: Story = {
+  render: function Render() {
+    const [options, setOptions] = useState(sampleOptions);
+    const [value, setValue] = useState<string | null>(null);
+    return (
+      <Autocomplete
+        options={options}
+        value={value}
+        onChange={setValue}
+        label="Industry (creatable)"
+        placeholder="Select or create..."
+        creatable
+        onCreateOption={(input) => {
+          setOptions((prev) => [...prev, { label: input, value: input }]);
+        }}
+      />
+    );
+  },
+};
+
+/**
+ * Multiple select with creatable — create new tags on the fly.
+ */
+export const MultipleCreatable: Story = {
+  render: function Render() {
+    const [options, setOptions] = useState(sampleOptions);
+    const [value, setValue] = useState<string[]>([]);
+    return (
+      <Autocomplete
+        multiple
+        options={options}
+        value={value}
+        onChange={setValue}
+        label="Tags (creatable)"
+        placeholder="Search or create..."
+        creatable
+        onCreateOption={(input) => {
+          setOptions((prev) => [...prev, { label: input, value: input }]);
+        }}
+      />
+    );
+  },
+};
+
+// ─── Server-Side Filter Stories ───
+
+/**
+ * Simulated server-side filtering — client filter disabled, options updated via onInputChange.
+ */
+export const ServerSideFilter: Story = {
+  render: function Render() {
+    const [value, setValue] = useState<string | null>(null);
+    const [filteredOpts, setFilteredOpts] = useState(sampleOptions);
+    const [loading, setLoading] = useState(false);
+
+    const handleInputChange = (input: string) => {
+      setLoading(true);
+      // simulate server delay
+      setTimeout(() => {
+        const lower = input.toLowerCase();
+        setFilteredOpts(
+          input
+            ? sampleOptions.filter((o) => o.label.toLowerCase().includes(lower))
+            : sampleOptions
+        );
+        setLoading(false);
+      }, 400);
+    };
+
+    return (
+      <Autocomplete
+        options={filteredOpts}
+        value={value}
+        onChange={setValue}
+        label="Server-side filter"
+        placeholder="Type to search..."
+        disableClientFilter
+        onInputChange={handleInputChange}
+        loading={loading}
+        loadingText="Searching..."
+      />
+    );
+  },
+};
+
+/**
+ * Server-side filter + creatable — create when the server returns no results.
+ */
+export const ServerSideFilterCreatable: Story = {
+  render: function Render() {
+    const [allOptions, setAllOptions] = useState(sampleOptions);
+    const [filteredOpts, setFilteredOpts] = useState(sampleOptions);
+    const [value, setValue] = useState<string[]>([]);
+    const [loading, setLoading] = useState(false);
+
+    const handleInputChange = (input: string) => {
+      setLoading(true);
+      setTimeout(() => {
+        const lower = input.toLowerCase();
+        setFilteredOpts(
+          input
+            ? allOptions.filter((o) => o.label.toLowerCase().includes(lower))
+            : allOptions
+        );
+        setLoading(false);
+      }, 400);
+    };
+
+    return (
+      <Autocomplete
+        multiple
+        options={filteredOpts}
+        value={value}
+        onChange={setValue}
+        label="Server filter + creatable"
+        placeholder="Search or create..."
+        disableClientFilter
+        creatable
+        onInputChange={handleInputChange}
+        onCreateOption={(input) => {
+          const newOpt = { label: input, value: input };
+          setAllOptions((prev) => [...prev, newOpt]);
+          setFilteredOpts((prev) => [...prev, newOpt]);
+        }}
+        loading={loading}
+        loadingText="Searching..."
+      />
+    );
+  },
+};
+
+// ─── Overview ───
+
 /**
  * All variants displayed together for comparison.
  */
@@ -297,7 +435,7 @@ export const AllVariants: Story = {
     const [multiValue3, setMultiValue3] = useState<string[]>(['enterprise', 'startup']);
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', width: '500px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         <Autocomplete
           options={sampleOptions}
           value={singleValue}

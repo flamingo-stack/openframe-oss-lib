@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class TagFilterOption {
+    private String key;
     private String value;
-    private String label;
     private Integer count;
 }

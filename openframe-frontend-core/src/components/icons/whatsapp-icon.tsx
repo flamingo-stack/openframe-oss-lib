@@ -6,6 +6,7 @@ interface WhatsAppIconProps {
   size?: number;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function WhatsAppIcon({ className = '', size = 24 ,
   color = 'white'
 }: WhatsAppIconProps) {

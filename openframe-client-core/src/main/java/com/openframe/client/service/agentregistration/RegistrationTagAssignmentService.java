@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * Handles tag creation and assignment during agent registration.
@@ -27,6 +28,8 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 public class RegistrationTagAssignmentService {
+
+    private static final Pattern TAG_PATTERN = Pattern.compile("^[a-zA-Z0-9_]+$");
 
     private final TagRepository tagRepository;
     private final MachineTagRepository machineTagRepository;
@@ -47,6 +50,7 @@ public class RegistrationTagAssignmentService {
 
         for (AgentRegistrationTagInput tagInput : tags) {
             try {
+                validateTag(tagInput);
                 Tag tag = findOrCreateTag(tagInput.getKey(), organizationId, tagInput.getValues(), now);
 
                 MachineTag machineTag = MachineTag.builder()
@@ -61,6 +65,21 @@ public class RegistrationTagAssignmentService {
             } catch (Exception e) {
                 log.error("Failed to assign tag '{}' to machine {} during registration: {}",
                         tagInput.getKey(), machineId, e.getMessage(), e);
+            }
+        }
+    }
+
+    private void validateTag(AgentRegistrationTagInput tagInput) {
+        if (tagInput.getKey() == null || !TAG_PATTERN.matcher(tagInput.getKey()).matches()) {
+            throw new IllegalArgumentException(
+                    "Invalid tag key '%s': must contain only alphanumeric characters and underscores".formatted(tagInput.getKey()));
+        }
+        if (tagInput.getValues() != null) {
+            for (String value : tagInput.getValues()) {
+                if (value == null || !TAG_PATTERN.matcher(value).matches()) {
+                    throw new IllegalArgumentException(
+                            "Invalid tag value '%s' for key '%s': must contain only alphanumeric characters and underscores".formatted(value, tagInput.getKey()));
+                }
             }
         }
     }

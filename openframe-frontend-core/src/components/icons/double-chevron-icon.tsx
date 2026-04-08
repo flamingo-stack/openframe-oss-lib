@@ -17,6 +17,7 @@ const rotationMap: Record<DoubleChevronDirection, string> = {
   down: '-rotate-90'
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function DoubleChevronIcon({ 
   className = '', 
   size = 20, 

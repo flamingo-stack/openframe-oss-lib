@@ -5,6 +5,7 @@ interface MlgLogoProps {
   size?: number;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const MlgLogo: React.FC<MlgLogoProps> = ({
   size = 240,
   color = 'white'

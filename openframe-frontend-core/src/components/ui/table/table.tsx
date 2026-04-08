@@ -35,7 +35,7 @@ function injectActionsColumn<T>(
           rowActions!.map((action, actionIndex) => (
             <Button
               key={actionIndex}
-              variant={action.variant || 'outline'}
+              variant='card'
               onClick={(e) => {
                 e.stopPropagation()
                 action.onClick(item)

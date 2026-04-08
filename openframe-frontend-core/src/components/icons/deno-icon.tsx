@@ -1,9 +1,11 @@
 import React from 'react'
+/** @deprecated Use icons from icons-v2-generated instead. */
 export interface DenoIconProps {
   size?: number
   className?: string
   color?: string
 }
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const DenoIcon: React.FC<DenoIconProps> = ({ size = 16, className = '', color = 'white' }) => {
   return (
     <svg

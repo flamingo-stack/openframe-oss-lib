@@ -99,3 +99,4 @@ export type VideoProcessingEntityType =
   | 'case_study'
   | 'webinar'
   | 'podcast_episode'
+  | 'investor_update'

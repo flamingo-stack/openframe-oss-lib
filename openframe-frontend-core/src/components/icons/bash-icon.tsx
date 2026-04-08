@@ -1,11 +1,13 @@
 import React from 'react'
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export interface BashIconProps {
   size?: number
   className?: string
   color?: string
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const BashIcon: React.FC<BashIconProps> = ({ size = 16, className = '' , color = 'white'}) => {
   return (
     <svg

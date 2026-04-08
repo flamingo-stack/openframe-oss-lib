@@ -3,6 +3,7 @@ interface ThumbsDownIconProps {
   color?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const ThumbsDownIcon = ({ className = 'w-6 h-6', color = "#5EFAF0" }: ThumbsDownIconProps) => (
   <svg width="23" height="23" viewBox="0 0 23 23" fill="none" className={className}>
     <path d="M15.0043 12.6255V1.125C15.0043 0.503681 15.508 1.43051e-06 16.1293 1.43051e-06C16.7506 1.43051e-06 17.2543 0.503681 17.2543 1.125V12.6255C17.2541 13.2466 16.7505 13.7505 16.1293 13.7505C15.5082 13.7505 15.0046 13.2466 15.0043 12.6255Z" fill={color} />

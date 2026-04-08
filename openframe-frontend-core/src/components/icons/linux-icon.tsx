@@ -1,7 +1,9 @@
 import React from "react"
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export interface LinuxIconProps extends React.SVGProps<SVGSVGElement> {}
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function LinuxIcon({ className, color = 'white', ...props }: LinuxIconProps) {
   return (
     <svg 

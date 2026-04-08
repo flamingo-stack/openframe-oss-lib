@@ -17,6 +17,7 @@ import { MiamiCyberGangLogoFaceOnly } from './miami-cyber-gang-logo-face-only';
  * Returns a JSX element for a known icon name, spreading any extra props.
  * Falls back to Megaphone if the name is not recognised.
  */
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function renderSvgIcon(
   name: string,
   props: React.SVGProps<SVGSVGElement | SVGElement> = {}

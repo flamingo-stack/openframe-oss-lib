@@ -7,6 +7,7 @@ interface CoinsIconProps {
   height?: number;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const CoinsIcon: React.FC<CoinsIconProps> = ({
   className = "",
   width = 20,

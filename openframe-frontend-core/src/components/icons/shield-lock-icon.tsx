@@ -6,6 +6,7 @@ interface ShieldLockIconProps {
   color?: string
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function ShieldLockIcon({
   className = '',
   size = 24,

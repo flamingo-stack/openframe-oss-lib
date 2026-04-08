@@ -22,9 +22,9 @@ const ConnectionIndicator: React.FC<ConnectionIndicatorProps> = ({ status }) => 
 
   return (
     <div className="flex items-center">
-      <div 
+      <output
         className={cn(
-          "w-2 h-2 rounded-full",
+          "w-2 h-2 rounded-full block",
           getStatusStyles()
         )}
         aria-label={`Connection status: ${status}`}
@@ -56,7 +56,7 @@ const ChatContainer = React.forwardRef<HTMLDivElement, ChatContainerProps>(
 ChatContainer.displayName = "ChatContainer"
 
 const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
-  ({ className, userName = 'Grace "Fae" Meadows', userTitle = "Your Personal Assistant", userAvatar, userIcon, onSettingsClick, onNewChat, onClose, showNewChat = false, connectionStatus = 'disconnected', serverUrl = null, ...props }, ref) => {
+  ({ className, userName = 'Grace "Fae" Meadows', userTitle = "Your Personal Assistant", userAvatar, userIcon, onSettingsClick, onNewChat, onClose, showNewChat = false, connectionStatus = 'disconnected', serverUrl = null, headerActions, ...props }, ref) => {
     return (
       <div
         ref={ref}
@@ -85,11 +85,11 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
             />
           )}
           <div className="flex flex-col">
-            <span className="text-base font-semibold text-ods-text-primary">{userName}</span>
+            <span className="text-h3">{userName}</span>
             <div className="flex items-center gap-2">
               {serverUrl && (
                 <>
-                  <span className="text-sm text-ods-text-secondary">{serverUrl}</span>
+                  <span className="text-h4 text-ods-text-secondary">{serverUrl}</span>
                   <ConnectionIndicator status={connectionStatus} />
                 </>
               )}
@@ -119,6 +119,7 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
               <XmarkIcon size={16} />
             </Button>
           )}
+          {headerActions}
         </div>
       </div>
     )

@@ -11,6 +11,7 @@ interface LivestormIconProps extends React.SVGProps<SVGSVGElement> {
  * Features 3 horizontal bars and a dot representing the Livestorm logo
  * Default color is 'currentColor' for easy styling
  */
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function LivestormIcon({
   className = '',
   size = 24,

@@ -1,9 +1,11 @@
 import React from "react"
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export interface NetworkIconProps extends React.SVGProps<SVGSVGElement> {
   color?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function NetworkIcon({ className = "h-6 w-6", color = 'white', ...props }: NetworkIconProps) {
   return (
     <svg

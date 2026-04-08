@@ -11,6 +11,7 @@ interface MiamiCyberGangLogoProps {
   className?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const MiamiCyberGangLogo: React.FC<MiamiCyberGangLogoProps> = ({
   size = 80,
   originalBlack = "var(--ods-text-primary, #212121)",

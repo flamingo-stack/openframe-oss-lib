@@ -1,7 +1,6 @@
 package com.openframe.api.service;
 
 import com.openframe.api.dto.device.DeviceFilterOption;
-import com.openframe.api.dto.device.DeviceTag;
 import com.openframe.data.document.device.MachineTag;
 import com.openframe.data.document.tool.Tag;
 import com.openframe.data.repository.device.MachineTagRepository;
@@ -20,6 +19,8 @@ public class TagService {
 
     private final TagRepository tagRepository;
     private final MachineTagRepository machineTagRepository;
+    private static final int DEFAULT_LIMIT = 20;
+    private static final int MAX_LIMIT = 100;
 
     public TagService(TagRepository tagRepository, MachineTagRepository machineTagRepository) {
         this.tagRepository = tagRepository;
@@ -36,34 +37,55 @@ public class TagService {
     }
 
     /**
-     * Search tag keys by prefix for autocomplete.
-     * Returns tags whose key contains the search string (case-insensitive).
+     * Search tag keys for autocomplete with limit.
+     * If search is null or blank, returns all tags for the organization.
      */
-    public List<Tag> searchTagKeys(String organizationId, String search) {
-        log.debug("Searching tag keys for org: {}, search: {}", organizationId, search);
+    public List<Tag> searchTagKeys(String organizationId, String search, Integer limit) {
+        log.debug("Searching tag keys for org: {}, search: {}, limit: {}", organizationId, search, limit);
+
+        List<Tag> allMatches;
         if (search == null || search.isBlank()) {
-            return tagRepository.findByOrganizationId(organizationId);
+            allMatches = tagRepository.findByOrganizationId(organizationId);
+        } else {
+            allMatches = tagRepository.findByOrganizationIdAndKeyContainingIgnoreCase(organizationId, search);
         }
-        return tagRepository.findByOrganizationIdAndKeyContainingIgnoreCase(organizationId, search);
+
+        return allMatches.stream()
+                .limit(normalizeLimit(limit))
+                .toList();
     }
 
     /**
-     * Search tag values by prefix for autocomplete.
-     * Returns values from the tag's predefined options that contain the search string (case-insensitive).
+     * Search tag values for autocomplete with limit.
+     * If search is null or blank, returns all values for the tag key.
      */
-    public List<String> searchTagValues(String organizationId, String tagKey, String search) {
-        log.debug("Searching tag values for org: {}, key: {}, search: {}", organizationId, tagKey, search);
+    public List<String> searchTagValues(String organizationId, String tagKey, String search, Integer limit) {
+        log.debug("Searching tag values for org: {}, key: {}, search: {}, limit: {}",
+                organizationId, tagKey, search, limit);
+
         Tag tag = tagRepository.findValuesByKeyAndOrganizationId(tagKey, organizationId);
         if (tag == null || tag.getValues() == null || tag.getValues().isEmpty()) {
             return List.of();
         }
+
+        List<String> allMatches;
         if (search == null || search.isBlank()) {
-            return tag.getValues();
+            allMatches = tag.getValues();
+        } else {
+            String lowerSearch = search.toLowerCase();
+            allMatches = tag.getValues().stream()
+                    .filter(v -> v.toLowerCase().contains(lowerSearch))
+                    .toList();
         }
-        String lowerSearch = search.toLowerCase();
-        return tag.getValues().stream()
-                .filter(v -> v.toLowerCase().contains(lowerSearch))
+
+        return allMatches.stream()
+                .limit(normalizeLimit(limit))
                 .toList();
+    }
+
+    private int normalizeLimit(Integer limit) {
+        if (limit == null || limit < 1) return DEFAULT_LIMIT;
+        return Math.min(limit, MAX_LIMIT);
     }
 
     /**
@@ -102,11 +124,11 @@ public class TagService {
     }
 
     /**
-     * Get enriched device tags for multiple machines (batch loading).
-     * Returns DeviceTag objects that combine Tag metadata with MachineTag values.
+     * Get tags for multiple machines (batch loading).
+     * Returns Tag objects enriched with per-device values from MachineTag.
      */
-    public List<List<DeviceTag>> getDeviceTagsForMachines(List<String> machineIds) {
-        log.debug("Getting device tags for {} machines", machineIds.size());
+    public List<List<Tag>> getTagsForMachines(List<String> machineIds) {
+        log.debug("Getting tags for {} machines", machineIds.size());
 
         if (machineIds.isEmpty()) {
             return new ArrayList<>();
@@ -116,7 +138,7 @@ public class TagService {
 
         if (allMachineTags.isEmpty()) {
             return machineIds.stream()
-                    .map(id -> new ArrayList<DeviceTag>())
+                    .map(id -> new ArrayList<Tag>())
                     .collect(Collectors.toList());
         }
 
@@ -135,7 +157,7 @@ public class TagService {
                     List<MachineTag> machineTags = machineTagsByMachineId
                             .getOrDefault(machineId, List.of());
                     return machineTags.stream()
-                            .map(mt -> buildDeviceTag(mt, tagsById.get(mt.getTagId())))
+                            .map(mt -> buildTag(mt, tagsById.get(mt.getTagId())))
                             .filter(Objects::nonNull)
                             .collect(Collectors.toList());
                 })
@@ -143,10 +165,10 @@ public class TagService {
     }
 
     /**
-     * Get enriched device tags for a single machine.
+     * Get tags for a single machine.
      */
-    public List<DeviceTag> getDeviceTagsForMachine(String machineId) {
-        log.debug("Getting device tags for machine: {}", machineId);
+    public List<Tag> getTagsForMachine(String machineId) {
+        log.debug("Getting tags for machine: {}", machineId);
 
         List<MachineTag> machineTags = machineTagRepository.findByMachineId(machineId);
         if (machineTags.isEmpty()) {
@@ -161,19 +183,19 @@ public class TagService {
                 .collect(Collectors.toMap(Tag::getId, tag -> tag));
 
         return machineTags.stream()
-                .map(mt -> buildDeviceTag(mt, tagsById.get(mt.getTagId())))
+                .map(mt -> buildTag(mt, tagsById.get(mt.getTagId())))
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
-    private DeviceTag buildDeviceTag(MachineTag machineTag, Tag tag) {
+    private Tag buildTag(MachineTag machineTag, Tag tag) {
         if (tag == null) {
             log.warn("Tag not found for machineTag: {}", machineTag.getTagId());
             return null;
         }
 
-        return DeviceTag.builder()
-                .tagId(tag.getId())
+        return Tag.builder()
+                .id(tag.getId())
                 .key(tag.getKey())
                 .description(tag.getDescription())
                 .color(tag.getColor())

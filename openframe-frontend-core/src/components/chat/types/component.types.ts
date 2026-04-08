@@ -25,6 +25,7 @@ export interface ChatHeaderProps extends HTMLAttributes<HTMLDivElement> {
   showNewChat?: boolean
   connectionStatus?: ConnectionStatus
   serverUrl?: string | null
+  headerActions?: React.ReactNode
 }
 
 // ========== Connection Indicator Props ==========
@@ -82,6 +83,7 @@ export interface ChatMessageListRef {
 
 export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'onSubmit'> {
   onSend?: (message: string) => void
+  onStop?: () => void
   sending?: boolean
   awaitingResponse?: boolean
   reserveAvatarOffset?: boolean

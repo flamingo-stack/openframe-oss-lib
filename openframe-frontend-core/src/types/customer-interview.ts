@@ -141,6 +141,7 @@ export interface CustomerInterviewFilters {
   status?: 'draft' | 'completed' | 'all'
   limit?: number
   offset?: number
+  ids?: (number | string)[]
 }
 
 export interface CustomerInterviewListResponse {

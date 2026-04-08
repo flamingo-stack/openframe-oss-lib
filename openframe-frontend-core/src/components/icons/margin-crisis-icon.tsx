@@ -7,6 +7,7 @@ interface MarginCrisisIconProps {
   strokeColor?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const MarginCrisisIcon: React.FC<MarginCrisisIconProps> = ({
   className = '',
   width = 148,

@@ -12,6 +12,7 @@ interface GetAppIconProps {
   sixthColor?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function GetAppIcon({
   width = 24,
   height = 24,

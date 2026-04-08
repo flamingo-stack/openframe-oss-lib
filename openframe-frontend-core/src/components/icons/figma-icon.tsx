@@ -3,6 +3,7 @@ interface FigmaIconProps {
   color?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const FigmaIcon = ({ className = 'w-6 h-6', color = "#000000" }: FigmaIconProps) => (
   <svg fill={color} width="800px" height="800px" viewBox="0 0 256 256"  xmlns="http://www.w3.org/2000/svg" className={className}>
     <path

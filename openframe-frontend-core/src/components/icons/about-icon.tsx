@@ -7,6 +7,7 @@ interface AboutIconProps {
   color?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function AboutIcon({
   width = 24,
   height = 24,

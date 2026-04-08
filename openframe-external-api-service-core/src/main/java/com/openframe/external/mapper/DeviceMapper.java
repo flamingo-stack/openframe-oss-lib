@@ -3,6 +3,7 @@ package com.openframe.external.mapper;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.device.*;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.tool.Tag;
 import com.openframe.external.dto.device.*;
 import org.springframework.stereotype.Component;
 
@@ -12,7 +13,7 @@ import java.util.stream.Collectors;
 @Component
 public class DeviceMapper extends BaseRestMapper {
 
-    public DeviceResponse toDeviceResponse(Machine machine, List<DeviceTag> deviceTags) {
+    public DeviceResponse toDeviceResponse(Machine machine, List<Tag> deviceTags) {
         return DeviceResponse.builder()
                 .id(machine.getId())
                 .machineId(machine.getMachineId())
@@ -53,13 +54,13 @@ public class DeviceMapper extends BaseRestMapper {
 
     public DevicesResponse toDevicesResponseWithDeviceTags(
             CountedGenericQueryResult<Machine> queryResult,
-            List<List<DeviceTag>> deviceTagsPerMachine) {
+            List<List<Tag>> deviceTagsPerMachine) {
         List<Machine> devices = queryResult.getItems();
 
         List<DeviceResponse> deviceResponses = java.util.stream.IntStream.range(0, devices.size())
                 .mapToObj(i -> {
                     Machine machine = devices.get(i);
-                    List<DeviceTag> deviceTags = i < deviceTagsPerMachine.size()
+                    List<Tag> deviceTags = i < deviceTagsPerMachine.size()
                             ? deviceTagsPerMachine.get(i) : List.of();
                     return toDeviceResponse(machine, deviceTags);
                 })
@@ -72,23 +73,23 @@ public class DeviceMapper extends BaseRestMapper {
                 .build();
     }
 
-    public DeviceTagResponse toDeviceTagResponse(DeviceTag deviceTag) {
+    public DeviceTagResponse toDeviceTagResponse(Tag tag) {
         return DeviceTagResponse.builder()
-                .tagId(deviceTag.getTagId())
-                .key(deviceTag.getKey())
-                .description(deviceTag.getDescription())
-                .color(deviceTag.getColor())
-                .values(deviceTag.getValues() != null ? deviceTag.getValues() : List.of())
-                .organizationId(deviceTag.getOrganizationId())
-                .createdAt(deviceTag.getCreatedAt())
+                .tagId(tag.getId())
+                .key(tag.getKey())
+                .description(tag.getDescription())
+                .color(tag.getColor())
+                .values(tag.getValues() != null ? tag.getValues() : List.of())
+                .organizationId(tag.getOrganizationId())
+                .createdAt(tag.getCreatedAt())
                 .build();
     }
 
-    private List<DeviceTagResponse> toDeviceTagResponses(List<DeviceTag> deviceTags) {
-        if (deviceTags == null) {
+    private List<DeviceTagResponse> toDeviceTagResponses(List<Tag> tags) {
+        if (tags == null) {
             return List.of();
         }
-        return deviceTags.stream()
+        return tags.stream()
                 .map(this::toDeviceTagResponse)
                 .collect(Collectors.toList());
     }
@@ -123,8 +124,8 @@ public class DeviceMapper extends BaseRestMapper {
         }
         return options.stream()
                 .map(option -> TagFilterItem.builder()
+                        .key(option.getKey())
                         .value(option.getValue())
-                        .label(option.getLabel())
                         .count(option.getCount())
                         .build())
                 .collect(Collectors.toList());
