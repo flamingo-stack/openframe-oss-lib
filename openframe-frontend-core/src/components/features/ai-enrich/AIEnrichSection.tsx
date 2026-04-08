@@ -7,6 +7,7 @@ import { AIEnrichButton } from './AIEnrichButton'
 import { AIWarningsSection } from './AIWarningsSection'
 import { Button } from '../../ui/button'
 import { Badge } from '../../ui/badge'
+import { Textarea } from '../../ui/textarea'
 import { CheckCircle, AlertCircle, Loader2, X } from 'lucide-react'
 
 export interface ConfidenceField {
@@ -70,6 +71,19 @@ export interface AIEnrichSectionProps {
   variant?: 'default' | 'compact'
   className?: string
   icon?: React.ReactNode
+
+  // Editor-provided custom instructions textarea (opt-in).
+  // When showCustomInstructions is true, a controlled <Textarea> is rendered
+  // above the action button. The parent owns the string — purely controlled.
+  // The same value is sent to the backend and injected into the Claude prompt
+  // via lib/utils/ai-instructions.ts → buildEditorFocusBlock().
+  showCustomInstructions?: boolean
+  customInstructions?: string
+  onCustomInstructionsChange?: (value: string) => void
+  customInstructionsLabel?: string
+  customInstructionsPlaceholder?: string
+  customInstructionsHelperText?: string
+  customInstructionsMaxLength?: number
 }
 
 export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
@@ -97,6 +111,13 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
   variant = 'default',
   className,
   icon,
+  showCustomInstructions = false,
+  customInstructions,
+  onCustomInstructionsChange,
+  customInstructionsLabel = 'Focus / additional instructions',
+  customInstructionsPlaceholder = "Optional — steer the AI. e.g. 'Lead with the new SSO + audit log features; downplay the minor UI tweaks.'",
+  customInstructionsHelperText,
+  customInstructionsMaxLength = 1000,
 }) => {
   const hasResults = status === 'success' || status === 'error'
   const shouldDisable = disabled || !canEnrich
@@ -126,6 +147,40 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
           )}
         </div>
       </div>
+
+      {/* Editor-provided custom instructions (opt-in) */}
+      {showCustomInstructions && (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label
+              htmlFor="ai-enrich-custom-instructions"
+              className="text-sm font-medium text-ods-text-primary font-['DM_Sans']"
+            >
+              {customInstructionsLabel}
+            </label>
+            {customInstructionsMaxLength !== undefined && (
+              <span className="text-xs text-ods-text-secondary font-['DM_Sans']">
+                {(customInstructions ?? '').length}/{customInstructionsMaxLength}
+              </span>
+            )}
+          </div>
+          <Textarea
+            id="ai-enrich-custom-instructions"
+            value={customInstructions ?? ''}
+            onChange={(e) => onCustomInstructionsChange?.(e.target.value)}
+            placeholder={customInstructionsPlaceholder}
+            disabled={loading}
+            maxLength={customInstructionsMaxLength}
+            rows={3}
+            className="resize-y"
+          />
+          {customInstructionsHelperText && (
+            <p className="text-xs text-ods-text-secondary font-['DM_Sans']">
+              {customInstructionsHelperText}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Row 2: Buttons */}
       <div className="flex flex-col gap-3">

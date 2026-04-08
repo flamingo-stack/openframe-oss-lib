@@ -120,6 +120,9 @@ export interface ProductRelease {
   created_at: string
   updated_at: string
 
+  // Editor-provided AI generation instructions (steers Generate Content prompt)
+  custom_instructions: string | null
+
   // Analytics
   view_count: number
   download_count: number
@@ -178,6 +181,7 @@ export interface CreateProductReleaseData {
   platforms: string[] // Array of platform IDs (UUIDs)
   featured_platform?: string // Platform ID for featured
   tags: number[] // Array of tag IDs
+  custom_instructions?: string | null
 }
 
 export type UpdateProductReleaseData = Partial<CreateProductReleaseData>
