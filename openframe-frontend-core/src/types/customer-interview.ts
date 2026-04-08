@@ -87,6 +87,9 @@ export interface CustomerInterview {
   /** Per-interview configuration options (JSONB) */
   config?: CustomerInterviewConfig
 
+  // Editor-provided AI generation instructions (steers Generate Case Study and video processing prompts)
+  custom_instructions: string | null
+
   // Timestamps
   created_at: string
   updated_at: string
@@ -128,6 +131,7 @@ export interface CreateCustomerInterviewData {
   platforms: string[] // Array of platform IDs (UUIDs)
   featured_platform?: string // Platform ID for featured
   config?: CustomerInterviewConfig
+  custom_instructions?: string | null
 }
 
 export type UpdateCustomerInterviewData = Partial<CreateCustomerInterviewData>

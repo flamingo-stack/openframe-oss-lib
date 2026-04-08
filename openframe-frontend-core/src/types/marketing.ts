@@ -22,6 +22,8 @@ export interface MarketingCampaign {
   content_source_id?: number | null;
   content_source_url?: string | null;
   future_blog_social_account_id?: number | null;  // For blog_post + new mode - target account for AI-generated blog
+  /** Editor-provided AI generation instructions (steers Generate Content / Image / Video / Workflow prompts) */
+  custom_instructions?: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -37,6 +39,7 @@ export interface CreateCampaignInput {
   content_source_id?: number;
   content_source_url?: string;
   future_blog_social_account_id?: number;  // For blog_post + new mode - target account for AI-generated blog
+  custom_instructions?: string | null;
 }
 
 export interface UpdateCampaignInput {
@@ -49,6 +52,7 @@ export interface UpdateCampaignInput {
   content_source_id?: number | null;
   content_source_url?: string | null;
   future_blog_social_account_id?: number | null;  // For blog_post + new mode - target account for AI-generated blog
+  custom_instructions?: string | null;
 }
 
 // =============================================================================
