@@ -13,12 +13,12 @@ import lombok.NoArgsConstructor;
 @Schema(description = "Tag filter item with count for REST API")
 public class TagFilterItem {
     
+    @Schema(description = "Tag key", example = "environment")
+    private String key;
+
     @Schema(description = "Tag value", example = "production")
     private String value;
-    
-    @Schema(description = "Tag display label", example = "Production")
-    private String label;
-    
+
     @Schema(description = "Count of devices with this tag", example = "15")
     private Integer count;
 }

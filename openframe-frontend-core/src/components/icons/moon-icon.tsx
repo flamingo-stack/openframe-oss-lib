@@ -7,6 +7,7 @@ interface MoonIconProps {
   height?: number;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const MoonIcon: React.FC<MoonIconProps> = ({
   className = "",
   width = 23,

@@ -16,6 +16,8 @@ import org.springframework.stereotype.Component;
 import java.util.Locale;
 import java.util.UUID;
 
+import static com.openframe.authz.util.OidcUserUtils.resolvePictureUrl;
+
 
 @Component
 @RequiredArgsConstructor
@@ -52,6 +54,7 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
                 .firstName(givenName != null ? givenName : "")
                 .lastName(familyName != null ? familyName : "")
                 .password(UUID.randomUUID().toString())
+                .pictureUrl(resolvePictureUrl(user))
                 .tenantName(payload.tenantName())
                 .tenantDomain(payload.tenantDomain().toLowerCase(Locale.ROOT))
                 .build();

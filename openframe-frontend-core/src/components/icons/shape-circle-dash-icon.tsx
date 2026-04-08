@@ -7,6 +7,7 @@ interface ShapeCircleDashIconProps {
   full?: boolean
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function ShapeCircleDashIcon({
   className = '',
   size = 24,

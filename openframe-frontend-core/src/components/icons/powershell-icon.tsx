@@ -1,11 +1,13 @@
 import React from 'react'
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export interface PowerShellIconProps {
   size?: number
   className?: string
   color?: string
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const PowerShellIcon: React.FC<PowerShellIconProps> = ({ size = 16, className = '', color = 'white' }) => {
   return (
 

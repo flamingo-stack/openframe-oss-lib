@@ -1,10 +1,12 @@
 
 import React from "react"
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export interface LaptopIconProps extends React.SVGProps<SVGSVGElement> {
   color?: string;
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function LaptopIcon({ className, color = 'white', ...props }: LaptopIconProps) {
   return (
     <svg

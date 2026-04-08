@@ -7,6 +7,7 @@ interface EyeIconProps {
   off?: boolean // when true show eye-off
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const EyeIcon: React.FC<EyeIconProps> = ({ className = '', size = 24, color = 'white', off = false }) => {
   if (off) {
     // eye-off

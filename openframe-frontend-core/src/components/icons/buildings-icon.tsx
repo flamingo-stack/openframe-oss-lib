@@ -6,6 +6,7 @@ interface BuildingsIconProps {
   color?: string
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function BuildingsIcon({
   className = '',
   size = 24,

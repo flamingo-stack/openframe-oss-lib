@@ -7,6 +7,7 @@ interface ShieldCheckIconProps {
   strokeWidth?: number
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function ShieldCheckIcon({
   className = '',
   size = 24,

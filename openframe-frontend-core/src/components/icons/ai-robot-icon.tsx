@@ -5,6 +5,7 @@ interface AiRobotIconProps {
   color?: string
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export const AiRobotIcon: React.FC<AiRobotIconProps> = ({ 
   className = '', 
   color = '#f357bb' 

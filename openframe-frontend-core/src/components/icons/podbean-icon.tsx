@@ -11,6 +11,7 @@ interface PodbeanIconProps extends React.SVGProps<SVGSVGElement> {
  * Features a podcast/wifi wave pattern with 2 arcs and a center circle
  * Default color is 'currentColor' for easy styling
  */
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function PodbeanIcon({
   className = '',
   size = 24,

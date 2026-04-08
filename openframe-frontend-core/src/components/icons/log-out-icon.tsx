@@ -6,6 +6,7 @@ interface LogOutIconProps {
   size?: number
 }
 
+/** @deprecated Use icons from icons-v2-generated instead. */
 export function LogOutIcon({ className = '', size = 20 ,
   color = 'white'
 }:  LogOutIconProps) {
