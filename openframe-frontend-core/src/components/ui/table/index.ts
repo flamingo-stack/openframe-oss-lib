@@ -1,5 +1,6 @@
 export { Table } from './table'
 export { TableCell } from './table-cell'
+export { TableColumnFilterDropdown, type TableColumnFilterDropdownProps } from './table-column-filter-dropdown'
 export { TableDescriptionCell } from './table-description-cell'
 export { TableEmptyState } from './table-empty-state'
 export { TableHeader } from './table-header'

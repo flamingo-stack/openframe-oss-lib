@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { Button } from "../ui"
 import { useEffect, useRef, useState } from "react"
 import { cn } from "../../utils/cn"
 
@@ -9,7 +10,8 @@ export interface FilterOption {
   id: string
   label: string
   value: string | number | boolean
-  type?: 'option' | 'separator'  // Add type for separator support
+  count?: number
+  type?: 'option' | 'separator'
 }
 
 export interface FilterSection {
@@ -32,11 +34,11 @@ export interface FiltersDropdownProps {
   /**
    * Currently applied filters to preserve state when reopening.
    * Pass the same filters that were applied via onApply callback.
-   * 
+   *
    * @example
    * ```tsx
    * const { appliedFilters, handleApply } = useFiltersDropdown(sections)
-   * 
+   *
    * <FiltersDropdown
    *   sections={sections}
    *   onApply={handleApply}
@@ -57,46 +59,42 @@ export interface FiltersDropdownProps {
 // Custom checkbox component
 const FilterCheckbox: React.FC<{
   checked: boolean
-  onChange: (checked: boolean) => void
   disabled?: boolean
   className?: string
-}> = ({ checked, onChange, disabled = false, className }) => {
+}> = ({ checked, disabled = false, className }) => {
   return (
-    <button
-      type="button"
+    <div
       role="checkbox"
       aria-checked={checked}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
       className={cn(
-        "relative h-[24px] w-[24px] rounded-[6px] transition-all duration-150 shrink-0",
-        checked ? "bg-[#ffc008]" : "bg-[#212121]",
-        !checked && "border-2 border-[#3a3a3a]",
-        disabled && "opacity-50 cursor-not-allowed",
+        "relative h-6 w-6 rounded-[6px] transition-all duration-150 shrink-0",
+        checked ? "bg-ods-accent" : "bg-ods-bg-secondary",
+        !checked && "border-2 border-ods-border",
+        disabled && "opacity-50",
         className
       )}
     >
       {checked && (
         <div className="absolute inset-0 flex items-center justify-center">
-          <svg 
-            width="14" 
-            height="10" 
-            viewBox="0 0 14 10" 
-            fill="none" 
+          <svg
+            width="14"
+            height="10"
+            viewBox="0 0 14 10"
+            fill="none"
             xmlns="http://www.w3.org/2000/svg"
-            className="text-[#212121]"
+            className="text-ods-text-on-accent"
           >
-            <path 
-              d="M1 5L5 9L13 1" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
+            <path
+              d="M1 5L5 9L13 1"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
               strokeLinejoin="round"
             />
           </svg>
         </div>
       )}
-    </button>
+    </div>
   )
 }
 
@@ -125,11 +123,11 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
       setIsMobile(false)
       return
     }
-    
+
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 640) // sm breakpoint
     }
-    
+
     checkMobile()
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
@@ -150,7 +148,7 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
       const spaceRight = viewportWidth - triggerRect.right
       const spaceLeft = triggerRect.left
       const spaceBelow = viewportHeight - triggerRect.bottom
-      
+
       let optimalPlacement = placement
 
       if (placement === "bottom-start" && spaceRight < dropdownWidth && spaceLeft >= dropdownWidth) {
@@ -166,7 +164,7 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
 
     calculateOptimalPlacement()
     window.addEventListener('resize', calculateOptimalPlacement)
-    
+
     return () => window.removeEventListener('resize', calculateOptimalPlacement)
   }, [isOpen, isMobile, placement])
 
@@ -195,7 +193,7 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
     const handleClickOutside = (event: MouseEvent) => {
       // Check if click is outside the entire component container
       if (
-        containerRef.current && 
+        containerRef.current &&
         !containerRef.current.contains(event.target as Node)
       ) {
         setIsOpen(false)
@@ -208,7 +206,7 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
       const timer = setTimeout(() => {
         document.addEventListener('mousedown', handleClickOutside)
       }, 0)
-      
+
       return () => {
         clearTimeout(timer)
         document.removeEventListener('mousedown', handleClickOutside)
@@ -231,7 +229,7 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
   const handleToggleOption = (sectionId: string, optionId: string, sectionType: string) => {
     setSelectedFilters(prev => {
       const current = prev[sectionId] || []
-      
+
       if (sectionType === "radio") {
         return {
           ...prev,
@@ -257,7 +255,7 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
     const allOptionIds = section.options.map(opt => opt.id)
     const currentSelection = selectedFilters[sectionId] || []
     const isAllSelected = allOptionIds.every(id => currentSelection.includes(id))
-    
+
     setSelectedFilters(prev => ({
       ...prev,
       [sectionId]: isAllSelected ? [] : allOptionIds
@@ -291,14 +289,14 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
       // Vertically position right under the trigger button
       return "top-full mt-2"
     }
-    
+
     // Desktop positioning based on placement prop
     const desktopClasses = {
       "bottom-start": "top-full left-0 mt-2",
       "bottom-end": "top-full right-0 mt-2",
       "bottom": "top-full left-1/2 -translate-x-1/2 mt-2"
     }
-    
+
     return desktopClasses[actualPlacement]
   }
 
@@ -314,16 +312,15 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
           ref={triggerRef as React.RefObject<HTMLButtonElement>}
           onClick={() => setIsOpen(!isOpen)}
           className={cn(
-            "font-mono font-medium text-xs uppercase tracking-[-0.24px]",
-            "text-[#888888] hover:text-[#fafafa] transition-colors",
-            "flex items-center gap-2"
+            "text-h5 transition-colors flex items-center gap-1.5",
+            getActiveFiltersCount() > 0
+              ? "text-ods-accent hover:text-ods-accent/80"
+              : "text-ods-text-secondary hover:text-ods-text-primary",
           )}
         >
           {triggerLabel}
           {getActiveFiltersCount() > 0 && (
-            <span className="bg-[#ffc008] text-[#212121] px-1.5 py-0.5 rounded text-[10px] font-bold">
-              {getActiveFiltersCount()}
-            </span>
+            <span className="size-1.5 rounded-full bg-ods-accent" />
           )}
         </button>
       )}
@@ -334,9 +331,9 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
           ref={dropdownRef}
           className={cn(
             "z-50",
-            isMobile 
-              ? "fixed w-[320px] left-1/2 -translate-x-1/2 ml-6" // Fixed positioning with center + sidebar offset
-              : "absolute w-[320px]", // Fixed width on desktop
+            isMobile
+              ? "fixed w-[320px] left-1/2 -translate-x-1/2 ml-6"
+              : "absolute w-[320px]",
             getDropdownPositionClasses(),
             dropdownClassName
           )}
@@ -344,13 +341,14 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
             top: triggerRef.current ? triggerRef.current.getBoundingClientRect().bottom + window.scrollY + 8 : 0
           } : undefined}
         >
-          <div className="bg-[#161616] rounded-[6px] border border-[#3a3a3a] p-4 shadow-xl">
+          <div className="bg-ods-bg rounded-md border border-ods-border p-4 shadow-xl flex flex-col">
+            <div className="flex-1 min-h-0 overflow-y-auto max-h-[250px]">
             {sections.map((section, sectionIndex) => {
               const sectionSelection = selectedFilters[section.id] || []
-              const allSelected = section.options.every(opt => 
+              const allSelected = section.options.every(opt =>
                 sectionSelection.includes(opt.id)
               )
-              
+
               return (
                 <div key={section.id} className={cn(
                   "space-y-2",
@@ -358,13 +356,13 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
                 )}>
                   {/* Section Header */}
                   <div className="flex items-center justify-between">
-                    <h3 className="font-['Azeret_Mono'] font-medium text-xs uppercase tracking-[-0.24px] text-[#888888]">
+                    <h3 className="text-h5 text-ods-text-secondary">
                       {section.title}
                     </h3>
                     {section.allowSelectAll && section.type === "checkbox" && (
                       <button
                         onClick={() => handleSelectAll(section.id, section)}
-                        className="font-['DM_Sans'] font-medium text-[14px] text-[#888888] hover:text-[#fafafa] underline transition-colors"
+                        className="text-h6 text-ods-text-secondary hover:text-ods-text-primary underline transition-colors"
                       >
                         {allSelected ? "Deselect All" : "Select All"}
                       </button>
@@ -372,7 +370,7 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
                   </div>
 
                   {/* Options Container */}
-                  <div className="bg-[#161616] rounded-[6px] border border-[#3a3a3a] overflow-hidden">
+                  <div className="bg-ods-bg rounded-md border border-ods-border overflow-hidden">
                     {section.options.map((option, index) => {
                       // Handle separator type
                       if (option.type === 'separator') {
@@ -388,28 +386,27 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
                       const isLast = index === section.options.length - 1
 
                       return (
-                        <div
+                        <button
+                          type="button"
                           key={`${section.id}-${option.id}-${index}`}
+                          onClick={() => handleToggleOption(section.id, option.id, section.type)}
                           className={cn(
-                            "flex items-center gap-2 px-2 py-2",
-                            isSelected ? "bg-[#212121]" : "bg-[#161616]",
-                            !isLast && "border-b border-[#3a3a3a]",
-                            "hover:bg-[#212121] transition-colors min-h-[40px]"
+                            "flex items-center gap-[var(--spacing-system-s)] p-[var(--spacing-system-s)] w-full text-left",
+                            isSelected ? "bg-ods-bg-secondary" : "bg-ods-bg",
+                            !isLast && "border-b border-ods-border",
+                            "hover:bg-ods-bg-hover transition-colors"
                           )}
                         >
-                          <FilterCheckbox
-                            checked={isSelected}
-                            onChange={() => handleToggleOption(section.id, option.id, section.type)}
-                          />
-                          <button
-                            onClick={() => handleToggleOption(section.id, option.id, section.type)}
-                            className="flex-1 text-left"
-                          >
-                            <span className="font-['DM_Sans'] font-medium text-[14px] text-[#fafafa] leading-[20px]">
-                              {option.label}
+                          <FilterCheckbox checked={isSelected} />
+                          <span className="flex-1 min-w-0 text-h4 text-ods-text-primary truncate">
+                            {option.label}
+                          </span>
+                          {option.count !== undefined && (
+                            <span className="shrink-0 text-h6 text-ods-text-secondary">
+                              {option.count.toLocaleString()}
                             </span>
-                          </button>
-                        </div>
+                          )}
+                        </button>
                       )
                     })}
                   </div>
@@ -417,20 +414,25 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
               )
             })}
 
+            </div>
             {/* Action Buttons */}
-            <div className="flex gap-3 mt-4">
-              <button
+            <div className="flex gap-3 mt-4 shrink-0">
+              <Button
+                variant="card"
                 onClick={handleReset}
-                className="flex-1 bg-[#212121] border border-[#3a3a3a] text-[#fafafa] font-['DM_Sans'] font-bold text-[14px] py-2 px-4 rounded-[6px] hover:bg-[#2a2a2a] transition-colors h-10"
+                size="default"
+                className="md:w-full!"
               >
                 Reset
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="primary"
                 onClick={handleApply}
-                className="flex-1 bg-[#ffc008] text-[#212121] font-['DM_Sans'] font-bold text-[14px] py-2 px-4 rounded-[6px] hover:bg-[#e6ac07] transition-colors h-10"
+                size="default"
+                className="md:w-full!"
               >
                 Apply
-              </button>
+              </Button>
             </div>
           </div>
         </div>
