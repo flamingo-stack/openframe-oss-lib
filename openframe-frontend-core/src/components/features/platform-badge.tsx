@@ -68,6 +68,31 @@ const platformColors = {
     border: 'border-[#F357BB]/30',
     text: 'text-[#F357BB]'
   },
+  'company-hub': {
+    bg: 'bg-[#f36666]/10',
+    border: 'border-[#f36666]/30',
+    text: 'text-[#f36666]'
+  },
+  'marketing-hub': {
+    bg: 'bg-[#F357BB]/10',
+    border: 'border-[#F357BB]/30',
+    text: 'text-[#F357BB]'
+  },
+  'product-hub': {
+    bg: 'bg-[#5EA62E]/10',
+    border: 'border-[#5EA62E]/30',
+    text: 'text-[#5EA62E]'
+  },
+  'revenue-hub': {
+    bg: 'bg-[#FFC008]/10',
+    border: 'border-[#FFC008]/30',
+    text: 'text-[#FFC008]'
+  },
+  'people-hub': {
+    bg: 'bg-[#5EFAF0]/10',
+    border: 'border-[#5EFAF0]/30',
+    text: 'text-[#5EFAF0]'
+  },
   'universal': {
     bg: 'bg-[#6B7280]/10',
     border: 'border-[#6B7280]/30',
@@ -92,6 +117,12 @@ const PlatformIcon = ({ platform, className }: { platform: string; className: st
       return <OpenFrameLogo className={className} />;
     case 'tmcg':
       return <MiamiCyberGangLogoFaceOnly size={size} className={className} />;
+    case 'company-hub':
+    case 'marketing-hub':
+    case 'product-hub':
+    case 'revenue-hub':
+    case 'people-hub':
+      return <FlamingoLogo className={className} fill="currentColor" />;
     default:
       return <Globe className={className} />;
   }
