@@ -1,6 +1,6 @@
-package com.openframe.data.repository.tool;
+package com.openframe.data.repository.tag;
 
-import com.openframe.data.document.tool.Tag;
+import com.openframe.data.document.tag.Tag;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;

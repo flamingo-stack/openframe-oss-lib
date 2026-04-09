@@ -1,4 +1,4 @@
-package com.openframe.data.document.tool;
+package com.openframe.data.document.tag;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -40,6 +40,8 @@ public class Tag {
      * UI behavior: if values is non-null and non-empty → show dropdown/checkboxes; otherwise → free-text input.
      */
     private List<String> values;
+
+    private TagEntityType entityType;
 
     private String organizationId;  // scope tags to organizations
     private Instant createdAt;

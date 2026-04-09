@@ -1,4 +1,4 @@
-package com.openframe.data.document.device;
+package com.openframe.data.document.tag;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,16 +16,17 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "machine_tags")
+@Document(collection = "tag_assignments")
 @CompoundIndexes({
-        @CompoundIndex(name = "machine_tag_idx", def = "{'machineId': 1, 'tagId': 1}", unique = true)
+        @CompoundIndex(name = "entity_tag_idx", def = "{'entityId': 1, 'tagId': 1, 'entityType': 1}", unique = true)
 })
-public class MachineTag {
+public class TagAssignment {
     @Id
     private String id;
 
-    private String machineId;
+    private String entityId;
     private String tagId;
+    private TagEntityType entityType;
 
     /**
      * Per-device values for the tag key (e.g., ["site1", "site2"] for key "site").
