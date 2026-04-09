@@ -34,9 +34,6 @@ public class DeviceTagResponse {
     @Schema(description = "Tag values assigned to this device", example = "[\"site1\", \"site2\"]")
     private List<String> values;
 
-    @Schema(description = "Organization ID that owns this tag")
-    private String organizationId;
-
     @Schema(description = "Timestamp when the tag was assigned to this device")
     private Instant createdAt;
 

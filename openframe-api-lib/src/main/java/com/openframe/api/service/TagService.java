@@ -32,24 +32,26 @@ public class TagService {
         return tagRepository.findById(id);
     }
 
-    public List<Tag> listTags(String organizationId) {
-        log.debug("Listing device tags for org: {}", organizationId);
-        return tagRepository.findByOrganizationIdAndEntityType(organizationId, TagEntityType.DEVICE);
+    /**
+     * List all device tags available across the tenant.
+     */
+    public List<Tag> listTags() {
+        log.debug("Listing device tags (tenant-wide)");
+        return tagRepository.findByEntityType(TagEntityType.DEVICE);
     }
 
     /**
      * Search tag keys for autocomplete with limit, scoped to DEVICE entity type.
-     * If search is null or blank, returns all device tags for the organization.
+     * If search is null or blank, returns all device tags.
      */
-    public List<Tag> searchTagKeys(String organizationId, String search, Integer limit) {
-        log.debug("Searching device tag keys for org: {}, search: {}, limit: {}", organizationId, search, limit);
+    public List<Tag> searchTagKeys(String search, Integer limit) {
+        log.debug("Searching device tag keys (tenant-wide): search: {}, limit: {}", search, limit);
 
         List<Tag> allMatches;
         if (search == null || search.isBlank()) {
-            allMatches = tagRepository.findByOrganizationIdAndEntityType(organizationId, TagEntityType.DEVICE);
+            allMatches = tagRepository.findByEntityType(TagEntityType.DEVICE);
         } else {
-            allMatches = tagRepository.findByOrganizationIdAndEntityTypeAndKeyContainingIgnoreCase(
-                    organizationId, TagEntityType.DEVICE, search);
+            allMatches = tagRepository.findByEntityTypeAndKeyContainingIgnoreCase(TagEntityType.DEVICE, search);
         }
 
         return allMatches.stream()
@@ -58,14 +60,14 @@ public class TagService {
     }
 
     /**
-     * Search tag values for autocomplete with limit.
+     * Search tag values for autocomplete with limit, scoped to DEVICE entity type.
      * If search is null or blank, returns all values for the tag key.
      */
-    public List<String> searchTagValues(String organizationId, String tagKey, String search, Integer limit) {
-        log.debug("Searching device tag values for org: {}, key: {}, search: {}, limit: {}",
-                organizationId, tagKey, search, limit);
+    public List<String> searchTagValues(String tagKey, String search, Integer limit) {
+        log.debug("Searching device tag values (tenant-wide): key: {}, search: {}, limit: {}",
+                tagKey, search, limit);
 
-        Tag tag = tagRepository.findValuesByKeyAndOrganizationIdAndEntityType(tagKey, organizationId, TagEntityType.DEVICE);
+        Tag tag = tagRepository.findValuesByKeyAndEntityType(tagKey, TagEntityType.DEVICE);
         if (tag == null || tag.getValues() == null || tag.getValues().isEmpty()) {
             return List.of();
         }
@@ -206,7 +208,6 @@ public class TagService {
                 .color(tag.getColor())
                 .values(assignment.getValues() != null ? assignment.getValues() : List.of())
                 .entityType(tag.getEntityType())
-                .organizationId(tag.getOrganizationId())
                 .createdAt(assignment.getTaggedAt())
                 .build();
     }

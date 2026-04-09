@@ -80,7 +80,6 @@ public class DeviceMapper extends BaseRestMapper {
                 .description(tag.getDescription())
                 .color(tag.getColor())
                 .values(tag.getValues() != null ? tag.getValues() : List.of())
-                .organizationId(tag.getOrganizationId())
                 .createdAt(tag.getCreatedAt())
                 .build();
     }
