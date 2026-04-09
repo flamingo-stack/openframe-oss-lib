@@ -185,7 +185,7 @@ class AgentRegistrationServiceTest {
         assertNotNull(response);
         assertEquals(MACHINE_ID, response.getMachineId());
 
-        verify(registrationTagAssignmentService).assignTags(eq(MACHINE_ID), eq("custom-uuid"), eq(tags));
+        verify(registrationTagAssignmentService).assignTags(eq(MACHINE_ID), eq(tags));
     }
 
     @Test
@@ -202,7 +202,7 @@ class AgentRegistrationServiceTest {
         AgentRegistrationResponse response = agentRegistrationService.register(INITIAL_KEY, request);
 
         assertNotNull(response);
-        verify(registrationTagAssignmentService).assignTags(eq(MACHINE_ID), eq("custom-uuid"), isNull());
+        verify(registrationTagAssignmentService).assignTags(eq(MACHINE_ID), isNull());
     }
 
     private AgentRegistrationRequest createTestRequest() {

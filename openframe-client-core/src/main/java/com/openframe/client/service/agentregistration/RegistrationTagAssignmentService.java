@@ -18,8 +18,9 @@ import java.util.regex.Pattern;
 
 /**
  * Handles tag creation and assignment during agent registration.
+ * Tags are tenant-wide and scoped by entity type (DEVICE here).
  * For each tag in the registration request:
- *   1. Finds existing Tag by key+org, or creates a new CUSTOM tag with DEVICE entity type
+ *   1. Finds existing Tag by key+entityType, or creates a new one with DEVICE entity type
  *   2. Creates a TagAssignment association with DEVICE entity type (AOP aspect fires → Kafka → Pinot)
  *
  * Uses repositories directly (not TagService) because openframe-client-core
@@ -38,11 +39,10 @@ public class RegistrationTagAssignmentService {
     /**
      * Creates tags (if they don't exist) and assigns them to the newly registered device.
      *
-     * @param machineId      the registered machine's ID
-     * @param organizationId the resolved organization ID
-     * @param tags           tags from the registration request
+     * @param machineId the registered machine's ID
+     * @param tags      tags from the registration request
      */
-    public void assignTags(String machineId, String organizationId, List<AgentRegistrationTagInput> tags) {
+    public void assignTags(String machineId, List<AgentRegistrationTagInput> tags) {
         if (tags == null || tags.isEmpty()) {
             return;
         }
@@ -52,7 +52,7 @@ public class RegistrationTagAssignmentService {
         for (AgentRegistrationTagInput tagInput : tags) {
             try {
                 validateTag(tagInput);
-                Tag tag = findOrCreateTag(tagInput.getKey(), organizationId, tagInput.getValues(), now);
+                Tag tag = findOrCreateTag(tagInput.getKey(), tagInput.getValues(), now);
 
                 TagAssignment assignment = TagAssignment.builder()
                         .entityId(machineId)
@@ -87,12 +87,12 @@ public class RegistrationTagAssignmentService {
     }
 
     /**
-     * Finds an existing tag by key and organization, or creates a new one with DEVICE entity type.
+     * Finds an existing tag by key and DEVICE entity type, or creates a new one.
      * If the tag already exists and new values are provided, appends any new values
      * to the tag's predefined options list (deduplicating).
      */
-    private Tag findOrCreateTag(String key, String organizationId, List<String> values, Instant now) {
-        Tag existing = tagRepository.findByKeyAndOrganizationIdAndEntityType(key, organizationId, TagEntityType.DEVICE);
+    private Tag findOrCreateTag(String key, List<String> values, Instant now) {
+        Tag existing = tagRepository.findByKeyAndEntityType(key, TagEntityType.DEVICE);
         if (existing != null) {
             if (values != null && !values.isEmpty()) {
                 List<String> existingValues = existing.getValues();
@@ -113,7 +113,6 @@ public class RegistrationTagAssignmentService {
                 .key(key)
                 .values(values)
                 .entityType(TagEntityType.DEVICE)
-                .organizationId(organizationId)
                 .createdAt(now)
                 .build();
 

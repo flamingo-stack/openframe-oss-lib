@@ -18,7 +18,7 @@ import java.util.List;
 @AllArgsConstructor
 @Document(collection = "tags")
 @CompoundIndexes({
-        @CompoundIndex(name = "key_org_entity_idx", def = "{'key': 1, 'organizationId': 1, 'entityType': 1}", unique = true)
+        @CompoundIndex(name = "key_entity_idx", def = "{'key': 1, 'entityType': 1}", unique = true)
 })
 public class Tag {
     @Id
@@ -26,7 +26,7 @@ public class Tag {
 
     /**
      * Tag key identifier (e.g., "site", "org_type", "primary_msp").
-     * Unique per organization (compound index with organizationId).
+     * Unique per entity type across the whole tenant (compound index with entityType).
      */
     private String key;
 
@@ -43,7 +43,6 @@ public class Tag {
 
     private TagEntityType entityType;
 
-    private String organizationId;  // scope tags to organizations
     private Instant createdAt;
     private String createdBy;
 }

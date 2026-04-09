@@ -28,9 +28,10 @@ public class MongoIndexConfig {
         // Drop stale 'name' unique index from tags collection (legacy schema)
         dropStaleIndex("tags", "name");
 
-        // Drop legacy 'key_org_idx' — replaced by 'key_org_entity_idx' that includes entityType,
-        // so the same key can be reused across entity types within one organization.
+        // Drop legacy org-scoped indexes — tags are now tenant-wide and uniqueness is
+        // enforced by {key, entityType} via 'key_entity_idx'.
         dropStaleIndex("tags", "key_org_idx");
+        dropStaleIndex("tags", "key_org_entity_idx");
     }
 
     private void dropStaleIndex(String collection, String indexName) {
