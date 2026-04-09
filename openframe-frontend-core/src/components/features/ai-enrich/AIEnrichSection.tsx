@@ -117,7 +117,7 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
   customInstructionsLabel = 'Focus / additional instructions',
   customInstructionsPlaceholder = "Optional — steer the AI. e.g. 'Lead with the new SSO + audit log features; downplay the minor UI tweaks.'",
   customInstructionsHelperText,
-  customInstructionsMaxLength = 1000,
+  customInstructionsMaxLength = 5000,
 }) => {
   const hasResults = status === 'success' || status === 'error'
   const shouldDisable = disabled || !canEnrich
