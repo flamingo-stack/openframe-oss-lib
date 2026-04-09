@@ -3,7 +3,7 @@ package com.openframe.external.mapper;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.device.*;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.tool.Tag;
+import com.openframe.data.document.tag.Tag;
 import com.openframe.external.dto.device.*;
 import org.springframework.stereotype.Component;
 

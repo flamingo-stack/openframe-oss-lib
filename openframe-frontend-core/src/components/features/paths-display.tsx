@@ -130,6 +130,7 @@ export const OPENFRAME_PATHS = {
     'C:\\Program Files\\OpenFrame',
     'C:\\Program Files\\TacticalAgent',
     'C:\\ProgramData\\OpenFrame',
+    'C:\\ProgramData\\OpenFrameInstall',
     'C:\\ProgramData\\TacticalRMM',
     'C:\\Program Files\\Orbit'
   ],
