@@ -92,7 +92,7 @@ public class RegistrationTagAssignmentService {
      * to the tag's predefined options list (deduplicating).
      */
     private Tag findOrCreateTag(String key, String organizationId, List<String> values, Instant now) {
-        Tag existing = tagRepository.findByKeyAndOrganizationId(key, organizationId);
+        Tag existing = tagRepository.findByKeyAndOrganizationIdAndEntityType(key, organizationId, TagEntityType.DEVICE);
         if (existing != null) {
             if (values != null && !values.isEmpty()) {
                 List<String> existingValues = existing.getValues();

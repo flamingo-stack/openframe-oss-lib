@@ -16,6 +16,8 @@ public interface TagRepository extends MongoRepository<Tag, String> {
 
     Tag findByKeyAndOrganizationId(String key, String organizationId);
 
+    Tag findByKeyAndOrganizationIdAndEntityType(String key, String organizationId, TagEntityType entityType);
+
     List<Tag> findByKeyIn(List<String> keys);
 
     List<Tag> findByKeyInAndEntityType(List<String> keys, TagEntityType entityType);
