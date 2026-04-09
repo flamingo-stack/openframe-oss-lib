@@ -4,7 +4,7 @@ import com.netflix.graphql.dgs.*;
 import graphql.relay.Relay;
 import com.openframe.api.dto.device.DeviceFilterOption;
 import com.openframe.api.service.TagService;
-import com.openframe.data.document.tool.Tag;
+import com.openframe.data.document.tag.Tag;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

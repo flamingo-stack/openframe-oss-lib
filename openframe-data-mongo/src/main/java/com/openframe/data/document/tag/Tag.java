@@ -1,4 +1,4 @@
-package com.openframe.data.document.tool;
+package com.openframe.data.document.tag;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,7 +18,7 @@ import java.util.List;
 @AllArgsConstructor
 @Document(collection = "tags")
 @CompoundIndexes({
-        @CompoundIndex(name = "key_org_idx", def = "{'key': 1, 'organizationId': 1}", unique = true)
+        @CompoundIndex(name = "key_org_entity_idx", def = "{'key': 1, 'organizationId': 1, 'entityType': 1}", unique = true)
 })
 public class Tag {
     @Id
@@ -40,6 +40,8 @@ public class Tag {
      * UI behavior: if values is non-null and non-empty → show dropdown/checkboxes; otherwise → free-text input.
      */
     private List<String> values;
+
+    private TagEntityType entityType;
 
     private String organizationId;  // scope tags to organizations
     private Instant createdAt;

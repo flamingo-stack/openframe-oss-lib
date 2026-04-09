@@ -10,12 +10,13 @@ import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.device.MachineTag;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
-import com.openframe.data.document.tool.Tag;
+import com.openframe.data.document.tag.Tag;
+import com.openframe.data.document.tag.TagAssignment;
+import com.openframe.data.document.tag.TagEntityType;
 import com.openframe.data.repository.device.MachineRepository;
-import com.openframe.data.repository.device.MachineTagRepository;
-import com.openframe.data.repository.tool.TagRepository;
+import com.openframe.data.repository.tag.TagAssignmentRepository;
+import com.openframe.data.repository.tag.TagRepository;
 import com.openframe.api.service.processor.DeviceStatusProcessor;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -40,7 +41,7 @@ public class DeviceService {
     
     private final MachineRepository machineRepository;
     private final TagRepository tagRepository;
-    private final MachineTagRepository machineTagRepository;
+    private final TagAssignmentRepository tagAssignmentRepository;
     private final DeviceStatusProcessor deviceStatusProcessor;
 
     public Optional<Machine> findByMachineId(@NotBlank String machineId) {
@@ -134,7 +135,7 @@ public class DeviceService {
         Set<String> resolvedTagIds = new HashSet<>();
 
         if (hasTagKeys) {
-            List<Tag> tagsByKey = tagRepository.findByKeyIn(filter.getTagKeys());
+            List<Tag> tagsByKey = tagRepository.findByKeyInAndEntityType(filter.getTagKeys(), TagEntityType.DEVICE);
             tagsByKey.forEach(tag -> resolvedTagIds.add(tag.getId()));
         }
 
@@ -142,22 +143,24 @@ public class DeviceService {
             return new ArrayList<>(); // Tag filters applied but nothing matched
         }
 
-        // 3. Get machine-tag associations with value filtering pushed to the query layer
-        List<MachineTag> machineTags;
+        // 3. Get tag assignments with value filtering pushed to the query layer, scoped to DEVICE entity type
+        List<TagAssignment> assignments;
         if (!resolvedTagIds.isEmpty() && hasTagValues) {
-            machineTags = machineTagRepository.findByTagIdInAndValuesContainingAny(
-                    new ArrayList<>(resolvedTagIds), filter.getTagValues());
+            assignments = tagAssignmentRepository.findByTagIdInAndValuesContainingAnyAndEntityType(
+                    new ArrayList<>(resolvedTagIds), filter.getTagValues(), TagEntityType.DEVICE);
         } else if (!resolvedTagIds.isEmpty()) {
-            machineTags = machineTagRepository.findByTagIdIn(new ArrayList<>(resolvedTagIds));
+            assignments = tagAssignmentRepository.findByTagIdInAndEntityType(
+                    new ArrayList<>(resolvedTagIds), TagEntityType.DEVICE);
         } else if (hasTagValues) {
-            machineTags = machineTagRepository.findByValuesContainingAny(filter.getTagValues());
+            assignments = tagAssignmentRepository.findByValuesContainingAnyAndEntityType(
+                    filter.getTagValues(), TagEntityType.DEVICE);
         } else {
             return new ArrayList<>();
         }
 
-        // 4. Return distinct machineIds
-        return machineTags.stream()
-                .map(MachineTag::getMachineId)
+        // 4. Return distinct machineIds (entityId for DEVICE assignments)
+        return assignments.stream()
+                .map(TagAssignment::getEntityId)
                 .distinct()
                 .collect(Collectors.toList());
     }
