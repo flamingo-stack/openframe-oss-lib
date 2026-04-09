@@ -18,7 +18,7 @@ import com.openframe.api.service.TagService;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.installedagents.InstalledAgent;
 import com.openframe.data.document.organization.Organization;
-import com.openframe.data.document.tool.Tag;
+import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tool.ToolConnection;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;

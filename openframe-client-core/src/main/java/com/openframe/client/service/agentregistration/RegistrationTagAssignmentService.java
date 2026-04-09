@@ -1,10 +1,11 @@
 package com.openframe.client.service.agentregistration;
 
 import com.openframe.client.dto.agent.AgentRegistrationTagInput;
-import com.openframe.data.document.device.MachineTag;
-import com.openframe.data.document.tool.Tag;
-import com.openframe.data.repository.device.MachineTagRepository;
-import com.openframe.data.repository.tool.TagRepository;
+import com.openframe.data.document.tag.Tag;
+import com.openframe.data.document.tag.TagAssignment;
+import com.openframe.data.document.tag.TagEntityType;
+import com.openframe.data.repository.tag.TagAssignmentRepository;
+import com.openframe.data.repository.tag.TagRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -18,8 +19,8 @@ import java.util.regex.Pattern;
 /**
  * Handles tag creation and assignment during agent registration.
  * For each tag in the registration request:
- *   1. Finds existing Tag by key+org, or creates a new CUSTOM tag
- *   2. Creates a MachineTag association (AOP aspect fires → Kafka → Pinot)
+ *   1. Finds existing Tag by key+org, or creates a new CUSTOM tag with DEVICE entity type
+ *   2. Creates a TagAssignment association with DEVICE entity type (AOP aspect fires → Kafka → Pinot)
  *
  * Uses repositories directly (not TagService) because openframe-client-core
  * does not depend on openframe-api-lib.
@@ -32,7 +33,7 @@ public class RegistrationTagAssignmentService {
     private static final Pattern TAG_PATTERN = Pattern.compile("^[a-zA-Z0-9_]+$");
 
     private final TagRepository tagRepository;
-    private final MachineTagRepository machineTagRepository;
+    private final TagAssignmentRepository tagAssignmentRepository;
 
     /**
      * Creates tags (if they don't exist) and assigns them to the newly registered device.
@@ -53,14 +54,15 @@ public class RegistrationTagAssignmentService {
                 validateTag(tagInput);
                 Tag tag = findOrCreateTag(tagInput.getKey(), organizationId, tagInput.getValues(), now);
 
-                MachineTag machineTag = MachineTag.builder()
-                        .machineId(machineId)
+                TagAssignment assignment = TagAssignment.builder()
+                        .entityId(machineId)
                         .tagId(tag.getId())
+                        .entityType(TagEntityType.DEVICE)
                         .values(tagInput.getValues() != null ? tagInput.getValues() : List.of())
                         .taggedAt(now)
                         .build();
 
-                machineTagRepository.save(machineTag);
+                tagAssignmentRepository.save(assignment);
                 log.info("Assigned tag '{}' to machine {} during registration", tagInput.getKey(), machineId);
             } catch (Exception e) {
                 log.error("Failed to assign tag '{}' to machine {} during registration: {}",
@@ -85,7 +87,7 @@ public class RegistrationTagAssignmentService {
     }
 
     /**
-     * Finds an existing tag by key and organization, or creates a new one.
+     * Finds an existing tag by key and organization, or creates a new one with DEVICE entity type.
      * If the tag already exists and new values are provided, appends any new values
      * to the tag's predefined options list (deduplicating).
      */
@@ -110,12 +112,13 @@ public class RegistrationTagAssignmentService {
         Tag tag = Tag.builder()
                 .key(key)
                 .values(values)
+                .entityType(TagEntityType.DEVICE)
                 .organizationId(organizationId)
                 .createdAt(now)
                 .build();
 
         Tag saved = tagRepository.save(tag);
-        log.info("Created tag '{}' (id={}) during registration", key, saved.getId());
+        log.info("Created tag '{}' (id={}) with DEVICE entity type during registration", key, saved.getId());
         return saved;
     }
 }

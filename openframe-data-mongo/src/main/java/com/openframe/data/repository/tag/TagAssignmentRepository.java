@@ -22,6 +22,10 @@ public interface TagAssignmentRepository extends MongoRepository<TagAssignment, 
 
     List<TagAssignment> findByTagIdIn(List<String> tagIds);
 
+    List<TagAssignment> findByTagIdInAndEntityType(List<String> tagIds, TagEntityType entityType);
+
+    List<TagAssignment> findByTagIdAndEntityType(String tagId, TagEntityType entityType);
+
     Optional<TagAssignment> findByEntityIdAndTagIdAndEntityType(String entityId, String tagId, TagEntityType entityType);
 
     List<TagAssignment> findByEntityIdInAndTagIdInAndEntityType(List<String> entityIds, List<String> tagIds, TagEntityType entityType);

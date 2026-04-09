@@ -1,8 +1,8 @@
 package com.openframe.data.aspect;
 
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.device.MachineTag;
-import com.openframe.data.document.tool.Tag;
+import com.openframe.data.document.tag.Tag;
+import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.service.MachineTagEventService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,7 +19,7 @@ import java.util.Map;
 
 /**
  * AOP aspect to intercept repository save operations and delegate to RepositoryEventService.
- * Handles Machine, MachineTag, and Tag entity changes.
+ * Handles Machine, TagAssignment, and Tag entity changes.
  */
 @Aspect
 @Component
@@ -68,65 +68,67 @@ public class MachineTagEventAspect {
     }
 
     /**
-     * Intercepts MachineTag repository save operations.
+     * Intercepts TagAssignment repository save operations.
      */
     @AfterReturning(
-            pointcut = "execution(* com.openframe.data.repository.device.MachineTagRepository.save(..)) && args(machineTag)",
+            pointcut = "execution(* com.openframe.data.repository.tag.TagAssignmentRepository.save(..)) && args(assignment)",
             returning = "result",
-            argNames = "joinPoint,machineTag,result"
+            argNames = "joinPoint,assignment,result"
     )
-    public void afterMachineTagSave(JoinPoint joinPoint, Object machineTag, Object result) {
+    public void afterTagAssignmentSave(JoinPoint joinPoint, Object assignment, Object result) {
         try {
-            log.debug("MachineTag save operation detected, delegating to service");
-            MachineTag machineTagEntity = (MachineTag) machineTag;
-            machineTagEventService.processMachineTagSave(machineTagEntity);
+            log.debug("TagAssignment save operation detected, delegating to service");
+            TagAssignment assignmentEntity = (TagAssignment) assignment;
+            machineTagEventService.processTagAssignmentSave(assignmentEntity);
         } catch (Exception e) {
-            log.error("Error in afterMachineTagSave aspect: {}", e.getMessage(), e);
+            log.error("Error in afterTagAssignmentSave aspect: {}", e.getMessage(), e);
         }
     }
 
     /**
-     * Intercepts MachineTag repository saveAll operations.
+     * Intercepts TagAssignment repository saveAll operations.
      */
     @AfterReturning(
-            pointcut = "execution(* com.openframe.data.repository.device.MachineTagRepository.saveAll(..)) && args(machineTags)",
+            pointcut = "execution(* com.openframe.data.repository.tag.TagAssignmentRepository.saveAll(..)) && args(assignments)",
             returning = "result",
-            argNames = "joinPoint,machineTags,result"
+            argNames = "joinPoint,assignments,result"
     )
-    public void afterMachineTagSaveAll(JoinPoint joinPoint, Object machineTags, Object result) {
+    public void afterTagAssignmentSaveAll(JoinPoint joinPoint, Object assignments, Object result) {
         try {
-            log.debug("MachineTag saveAll operation detected, delegating to service");
-            Iterable<MachineTag> machineTagEntities = (Iterable<MachineTag>) machineTags;
-            machineTagEventService.processMachineTagSaveAll(machineTagEntities);
+            log.debug("TagAssignment saveAll operation detected, delegating to service");
+            Iterable<TagAssignment> assignmentEntities = (Iterable<TagAssignment>) assignments;
+            machineTagEventService.processTagAssignmentSaveAll(assignmentEntities);
         } catch (Exception e) {
-            log.error("Error in afterMachineTagSaveAll aspect: {}", e.getMessage(), e);
+            log.error("Error in afterTagAssignmentSaveAll aspect: {}", e.getMessage(), e);
         }
     }
 
     /**
-     * Intercepts MachineTag repository deleteByMachineIdAndTagId operations.
-     * Uses @Around to capture affected machineId BEFORE the delete, then re-syncs to Pinot.
+     * Intercepts TagAssignment repository deleteByEntityIdAndTagIdAndEntityType operations.
+     * Uses @Around to capture affected entity BEFORE the delete, then re-syncs to Pinot.
      */
-    @Around("execution(* com.openframe.data.repository.device.MachineTagRepository.deleteByMachineIdAndTagId(..)) && args(machineId, tagId)")
-    public Object aroundMachineTagDelete(ProceedingJoinPoint joinPoint, String machineId, String tagId) throws Throwable {
+    @Around("execution(* com.openframe.data.repository.tag.TagAssignmentRepository.deleteByEntityIdAndTagIdAndEntityType(..)) && args(entityId, tagId, entityType)")
+    public Object aroundTagAssignmentDelete(ProceedingJoinPoint joinPoint, String entityId, String tagId, Object entityType) throws Throwable {
         try {
-            log.debug("MachineTag delete operation detected for machineId={}, tagId={}", machineId, tagId);
-            machineTagEventService.processMachineTagDelete(machineId, tagId);
+            log.debug("TagAssignment delete operation detected for entityId={}, tagId={}, entityType={}", entityId, tagId, entityType);
+            if (entityType != null && "DEVICE".equals(entityType.toString())) {
+                machineTagEventService.processTagAssignmentDelete(entityId, tagId);
+            }
         } catch (Exception e) {
-            log.error("Error in pre-delete processing for machineId={}, tagId={}: {}", machineId, tagId, e.getMessage(), e);
+            log.error("Error in pre-delete processing for entityId={}, tagId={}: {}", entityId, tagId, e.getMessage(), e);
         }
         return joinPoint.proceed();
     }
 
     /**
-     * Intercepts MachineTag repository deleteByTagId operations.
+     * Intercepts TagAssignment repository deleteByTagId operations.
      * Uses @Around to capture all affected machineIds BEFORE the delete, then re-syncs to Pinot.
      */
-    @Around("execution(* com.openframe.data.repository.device.MachineTagRepository.deleteByTagId(..)) && args(tagId)")
-    public Object aroundMachineTagDeleteByTagId(ProceedingJoinPoint joinPoint, String tagId) throws Throwable {
+    @Around("execution(* com.openframe.data.repository.tag.TagAssignmentRepository.deleteByTagId(..)) && args(tagId)")
+    public Object aroundTagAssignmentDeleteByTagId(ProceedingJoinPoint joinPoint, String tagId) throws Throwable {
         try {
-            log.debug("MachineTag deleteByTagId operation detected for tagId={}", tagId);
-            machineTagEventService.processMachineTagDeleteByTagId(tagId);
+            log.debug("TagAssignment deleteByTagId operation detected for tagId={}", tagId);
+            machineTagEventService.processTagAssignmentDeleteByTagId(tagId);
         } catch (Exception e) {
             log.error("Error in pre-delete processing for tagId={}: {}", tagId, e.getMessage(), e);
         }
@@ -137,7 +139,7 @@ public class MachineTagEventAspect {
      * Intercepts Tag repository save operations using @Around advice.
      * Captures original state before save and processes after successful save.
      */
-    @Around("execution(* com.openframe.data.repository.tool.TagRepository.save(..)) && args(tag)")
+    @Around("execution(* com.openframe.data.repository.tag.TagRepository.save(..)) && args(tag)")
     public Object aroundTagSave(ProceedingJoinPoint joinPoint, Object tag) throws Throwable {
         try {
             log.debug("Tag save operation detected, capturing state and delegating to service");
@@ -159,7 +161,7 @@ public class MachineTagEventAspect {
      * Intercepts Tag repository saveAll operations using @Around advice.
      * Captures original states before save and processes after successful save.
      */
-    @Around("execution(* com.openframe.data.repository.tool.TagRepository.saveAll(..)) && args(tags)")
+    @Around("execution(* com.openframe.data.repository.tag.TagRepository.saveAll(..)) && args(tags)")
     public Object aroundTagSaveAll(ProceedingJoinPoint joinPoint, Object tags) throws Throwable {
         try {
             log.debug("Tag saveAll operation detected, capturing states and delegating to service");
@@ -187,4 +189,3 @@ public class MachineTagEventAspect {
         }
     }
 }
-
