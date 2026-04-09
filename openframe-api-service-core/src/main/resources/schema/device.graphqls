@@ -17,14 +17,14 @@ extend type Query {
     # Get single device by machineId
     device(machineId: String!): Machine
 
-    # Tag key queries
-    tags(organizationId: String!): [Tag!]!
+    # Tag key queries (tenant-wide, scoped to DEVICE entity type)
+    tags: [Tag!]!
     # Tag value options for filter UI (returns distinct values for a tag key with device counts)
     tagValueOptions(tagKey: String!): [DeviceFilterOption!]!
 
-    # Autocomplete queries for tag key and value search
-    tagKeySuggestions(organizationId: String!, search: String, limit: Int): [Tag!]!
-    tagValueSuggestions(organizationId: String!, tagKey: String!, search: String, limit: Int): [String!]!
+    # Autocomplete queries for tag key and value search (tenant-wide, scoped to DEVICE entity type)
+    tagKeySuggestions(search: String, limit: Int): [Tag!]!
+    tagValueSuggestions(tagKey: String!, search: String, limit: Int): [String!]!
 }
 
 # Tag key definition (not tied to a device)
@@ -34,8 +34,14 @@ type Tag implements Node {
     description: String
     color: String
     values: [String!]
-    organizationId: String!
+    entityType: TagEntityType
     createdAt: Instant
+}
+
+enum TagEntityType {
+    DEVICE
+    TICKET
+    KNOWLEDGE_ARTICLE
 }
 
 type DeviceFilters {

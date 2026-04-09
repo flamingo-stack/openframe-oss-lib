@@ -421,6 +421,87 @@ export const ServerSideFilterCreatable: Story = {
   },
 };
 
+// ─── No Chevron Stories ───
+
+/**
+ * Single select without chevron icon.
+ */
+export const SingleNoChevron: Story = {
+  render: function Render() {
+    const [value, setValue] = useState<string | null>(null);
+    return (
+      <Autocomplete
+        options={sampleOptions}
+        value={value}
+        onChange={setValue}
+        label="No chevron"
+        placeholder="Select an industry..."
+        showChevron={false}
+      />
+    );
+  },
+};
+
+/**
+ * Multiple select without chevron icon.
+ */
+export const MultipleNoChevron: Story = {
+  render: function Render() {
+    const [value, setValue] = useState<string[]>(['enterprise', 'startup']);
+    return (
+      <Autocomplete
+        multiple
+        options={sampleOptions}
+        value={value}
+        onChange={setValue}
+        label="No chevron (multiple)"
+        placeholder="Search..."
+        showChevron={false}
+      />
+    );
+  },
+};
+
+// ─── Clear On Open Stories ───
+
+/**
+ * Single select that keeps the selected value text when opening the dropdown.
+ * Try selecting "Enterprise", then click the input again — the text stays so you can edit it.
+ */
+export const SingleKeepValueOnOpen: Story = {
+  render: function Render() {
+    const [value, setValue] = useState<string | null>('enterprise');
+    return (
+      <Autocomplete
+        options={sampleOptions}
+        value={value}
+        onChange={setValue}
+        label="Keep value on open"
+        placeholder="Select an industry..."
+        clearOnOpen={false}
+      />
+    );
+  },
+};
+
+/**
+ * Default behavior — input clears when opening (for comparison).
+ */
+export const SingleClearOnOpen: Story = {
+  render: function Render() {
+    const [value, setValue] = useState<string | null>('enterprise');
+    return (
+      <Autocomplete
+        options={sampleOptions}
+        value={value}
+        onChange={setValue}
+        label="Clears on open (default)"
+        placeholder="Select an industry..."
+      />
+    );
+  },
+};
+
 // ─── Overview ───
 
 /**

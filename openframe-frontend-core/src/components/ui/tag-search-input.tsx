@@ -119,9 +119,6 @@ export function TagSearchInput<T = string>({
       e.preventDefault()
       onSubmit(searchValue)
     }
-    if (e.key === "Backspace" && !searchValue && tags.length > 0) {
-      onTagRemove(tags[tags.length - 1].value)
-    }
     onKeyDown?.(e)
   }
 
