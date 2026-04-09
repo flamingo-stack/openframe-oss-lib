@@ -18,9 +18,10 @@ function normalizeContent(content: MessageContent): MessageSegment[] {
 }
 
 const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>(
-  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, assistantIcon, ...props }, ref) => {
+  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, authorType: authorTypeProp, assistantIcon, ...props }, ref) => {
     const isUser = role === 'user'
     const isError = role === 'error'
+    const authorType = authorTypeProp ?? (isUser ? 'user' : assistantType === 'mingo' ? 'mingo' : 'fae')
 
     const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set())
     
@@ -36,12 +37,12 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
         size: "sm" as const,
         variant: "round" as const,
         className: cn(
-          "flex-shrink-0 mt-1",
-          isUser 
+          "flex-shrink-0",
+          isUser
             ? "invisible"
             : isMingo
-            ? "bg-gradient-to-br from-cyan-400 to-cyan-600"
-            : "bg-gradient-to-br from-pink-400 to-pink-600"
+            ? "bg-ods-flamingo-cyan"
+            : "bg-ods-flamingo-pink"
         )
       }
     }
@@ -65,50 +66,55 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       })
     }
 
+    const isSystem = authorType === 'system'
+
     return (
       <div
         ref={ref}
         className={cn(
-          "flex flex-row items-start gap-4",
-          !isUser && "bg-ods-card/50 rounded-lg px-4 -mx-4",
+          "flex flex-row items-start gap-2 py-3",
           className
         )}
         {...props}
       >
-        {/* Avatar - optional */}
-        {showAvatar && (
-          !isUser && assistantIcon && !avatar ? (
-            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-ods-accent flex-shrink-0 mt-0.5 drop-shadow-[0_4px_12px_rgba(0,0,0,0.35)]">
+        {/* Avatar - optional, invisible spacer for system messages */}
+        {showAvatar && (isSystem ? (
+          <div className="w-12 flex-shrink-0" />
+        ) : !isUser && assistantIcon && !avatar ? (
+            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-ods-accent flex-shrink-0">
               {assistantIcon}
             </div>
           ) : (
             <SquareAvatar
               {...avatarProps}
-              className={cn(avatarProps.className, "mt-0.5 drop-shadow-[0_4px_12px_rgba(0,0,0,0.35)]")}
+              className={cn(avatarProps.className, "w-12 h-12")}
             />
           )
         )}
-        
+
         {/* Message Content */}
         <div className="flex flex-1 flex-col gap-1 min-w-0">
           {/* Name and Timestamp Row */}
-          <div className="flex items-center justify-between pr-2">
+          <div className="flex items-center justify-between gap-1">
             <span className={cn(
-              "text-sm font-semibold text-[18px]",
-              isUser ? "text-ods-text-secondary" : 
-              assistantType === 'mingo' ? "text-[var(--ods-flamingo-cyan-base)]" : "text-[var(--ods-flamingo-pink-base)]"
+              "font-mono text-h3 font-medium flex-1",
+              authorType === 'system' ? "text-ods-open-yellow" :
+              authorType === 'admin' ? "text-ods-open-yellow" :
+              authorType === 'mingo' ? "text-ods-flamingo-cyan" :
+              authorType === 'fae' ? "text-ods-flamingo-pink" :
+              "text-ods-text-secondary"
             )}>
-              {name || (isUser ? "User" : assistantType === 'mingo' ? "Mingo" : "Fae")}:
+              {name || (isUser ? "User" : assistantType === 'mingo' ? "Mingo" : "Fae")}{!isSystem && ':'}
             </span>
             {timestamp && (
-              <span className="text-xs text-ods-text-muted text-[18px]">
+              <span className="font-sans text-heading-5 font-medium text-ods-text-secondary shrink-0 whitespace-nowrap">
                 {timestamp.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
               </span>
             )}
           </div>
           
-          {/* Message segments */}
-          <div className="flex flex-col">
+          {/* Message segments — hidden for system messages */}
+          {!isSystem && <div className="flex flex-col">
             {isTyping && segments.length === 0 ? (
               <ChatTypingIndicator />
             ) : (
@@ -116,12 +122,10 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                 if (segment.type === 'text') {
                   return (
                     <div key={index} className={cn(
-                      "min-w-0 w-full overflow-hidden",
+                      "min-w-0 w-full overflow-hidden text-h4",
                       isError
                         ? "text-ods-error"
-                        : isUser
-                          ? "text-ods-text-primary"
-                          : "text-ods-text-primary"
+                        : "text-ods-text-primary"
                     )}>
                       <SimpleMarkdownRenderer content={segment.text} />
                     </div>
@@ -158,7 +162,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                 return null
               })
             )}
-          </div>
+          </div>}
         </div>
       </div>
     )
@@ -177,6 +181,7 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     prevProps.timestamp?.getTime() === nextProps.timestamp?.getTime() &&
     prevProps.showAvatar === nextProps.showAvatar &&
     prevProps.assistantType === nextProps.assistantType &&
+    prevProps.authorType === nextProps.authorType &&
     prevProps.assistantIcon === nextProps.assistantIcon &&
     prevProps.className === nextProps.className
   )

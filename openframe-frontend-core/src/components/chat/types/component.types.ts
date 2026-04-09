@@ -4,7 +4,7 @@
 
 import type { HTMLAttributes, TextareaHTMLAttributes } from 'react'
 import type { Message, MessageSegment, ApprovalRequestData, ToolExecutionData } from './message.types'
-import type { AssistantType, ConnectionStatus, ChatApprovalStatus } from './chat.types'
+import type { AssistantType, AuthorType, ConnectionStatus, ChatApprovalStatus } from './chat.types'
 
 // ========== Chat Container Props ==========
 
@@ -41,6 +41,7 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
   content: string | MessageSegment[]
   name?: string
   assistantType?: AssistantType
+  authorType?: AuthorType
   assistantIcon?: React.ReactNode
   avatar?: string | null
   timestamp?: Date

@@ -148,8 +148,24 @@ export function useRealtimeChunkProcessor(
           break
         }
 
+        case 'system': {
+          callbacks.onSystemMessage?.(action.text)
+          break
+        }
+
+        case 'direct_message': {
+          callbacks.onDirectMessage?.(action.text, {
+            ownerType: action.ownerType,
+            displayName: action.displayName,
+          })
+          break
+        }
+
         case 'message_request':
-          callbacks.onUserMessage?.(action.text)
+          callbacks.onUserMessage?.(action.text, {
+            ownerType: action.ownerType,
+            displayName: action.displayName,
+          })
           break
 
         default:

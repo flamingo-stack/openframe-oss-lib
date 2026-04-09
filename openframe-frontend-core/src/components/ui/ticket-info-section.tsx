@@ -11,6 +11,7 @@ import { type KnowledgeBaseArticle, TicketKnowledgeBaseList } from "./ticket-kno
 import type { TicketNote } from "./ticket-note-card"
 import { TicketNotesSection } from "./ticket-notes-section"
 import { TicketDescriptionViewer } from "./ticket-description-viewer"
+import { SimpleMarkdownRenderer } from "./simple-markdown-renderer"
 
 export interface TicketInfoSectionProps {
   /** Organization name and image */
@@ -197,7 +198,7 @@ export function TicketInfoSection({
           <div className="flex flex-col gap-4 p-4 bg-ods-bg border-b border-ods-border">
             {/* Description */}
             {description && (
-              <TicketDescriptionViewer content={description} />
+              <SimpleMarkdownRenderer content={description} />
             )}
 
             {/* Attachments */}
