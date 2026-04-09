@@ -332,7 +332,7 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
           className={cn(
             "z-50",
             isMobile
-              ? "fixed w-[320px] left-1/2 -translate-x-1/2 ml-6"
+              ? "fixed left-4 right-4 max-w-[320px] mx-auto"
               : "absolute w-[320px]",
             getDropdownPositionClasses(),
             dropdownClassName
@@ -341,7 +341,7 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
             top: triggerRef.current ? triggerRef.current.getBoundingClientRect().bottom + window.scrollY + 8 : 0
           } : undefined}
         >
-          <div className="bg-ods-bg rounded-md border border-ods-border p-4 shadow-xl flex flex-col">
+          <div className="bg-ods-bg rounded-md border border-ods-border p-4 shadow-xl flex flex-col overflow-hidden">
             <div className="flex-1 min-h-0 overflow-y-auto max-h-[250px]">
             {sections.map((section, sectionIndex) => {
               const sectionSelection = selectedFilters[section.id] || []
