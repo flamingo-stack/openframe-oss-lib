@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
+import { useState } from 'react'
 import { Button } from '../components/ui/button'
-import { Table, type TableColumn } from '../components/ui/table'
+import { Table, type TableColumn, type TableFilters } from '../components/ui/table'
 
 interface User {
   id: string
@@ -351,4 +352,98 @@ export const TabletOptimized: Story = {
       }
     }
   }
+}
+
+/**
+ * Table with column filters.
+ * Click the column label or filter icon to open the filter dropdown.
+ * Active filters highlight the column header with accent color.
+ */
+export const WithFilters: Story = {
+  render: function WithFiltersStory() {
+    const [filters, setFilters] = useState<TableFilters>({
+      status: ['active'],
+    })
+
+    const filteredUsers = sampleUsers.filter((user) => {
+      const statusFilter = filters.status
+      if (statusFilter && statusFilter.length > 0 && !statusFilter.includes(user.status)) {
+        return false
+      }
+      const roleFilter = filters.role
+      if (roleFilter && roleFilter.length > 0 && !roleFilter.includes(user.role)) {
+        return false
+      }
+      const deptFilter = filters.department
+      if (deptFilter && deptFilter.length > 0 && !deptFilter.includes(user.department)) {
+        return false
+      }
+      return true
+    })
+
+    const columns: TableColumn<User>[] = [
+      { key: 'name', label: 'Name', sortable: true, width: 'min-w-[150px]' },
+      { key: 'email', label: 'Email', width: 'min-w-[200px]', hideAt: 'xl' },
+      {
+        key: 'role',
+        label: 'Role',
+        filterable: true,
+        filterOptions: [
+          { id: 'Admin', label: 'Admin', value: 'Admin' },
+          { id: 'Developer', label: 'Developer', value: 'Developer' },
+          { id: 'Designer', label: 'Designer', value: 'Designer' },
+          { id: 'Manager', label: 'Manager', value: 'Manager' },
+        ],
+        width: 'min-w-[120px]',
+      },
+      {
+        key: 'status',
+        label: 'Status',
+        filterable: true,
+        filterOptions: [
+          { id: 'active', label: 'Active', value: 'active' },
+          { id: 'inactive', label: 'Inactive', value: 'inactive' },
+          { id: 'pending', label: 'Pending', value: 'pending' },
+        ],
+      },
+      {
+        key: 'department',
+        label: 'Department',
+        filterable: true,
+        filterOptions: [
+          { id: 'Engineering', label: 'Engineering', value: 'Engineering' },
+          { id: 'Design', label: 'Design', value: 'Design' },
+          { id: 'Product', label: 'Product', value: 'Product' },
+        ],
+        hideAt: 'lg',
+      },
+    ]
+
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="text-xs text-ods-text-secondary px-4">
+          Active filters: {Object.entries(filters).filter(([, v]) => v.length > 0).map(([k, v]) => `${k}: ${v.join(', ')}`).join(' | ') || 'none'}
+        </div>
+        <Table
+          data={filteredUsers}
+          columns={columns}
+          rowKey="id"
+          filters={filters}
+          onFilterChange={setFilters}
+        />
+      </div>
+    )
+  },
+  args: {
+    data: sampleUsers,
+    columns: [] as TableColumn<User>[],
+    rowKey: 'id',
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Click the column label or filter icon to open the dropdown. Active filters highlight the header with accent color. The table data is filtered client-side based on the selected values.',
+      },
+    },
+  },
 }

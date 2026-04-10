@@ -6,7 +6,7 @@ import com.openframe.api.service.DeviceService;
 import com.openframe.api.service.TagService;
 import com.openframe.core.dto.ErrorResponse;
 import com.openframe.data.document.device.DeviceStatus;
-import com.openframe.data.document.tool.Tag;
+import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.api.dto.device.DeviceFilterCriteria;

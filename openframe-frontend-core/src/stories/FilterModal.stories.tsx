@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { useState } from 'react'
 import { fn } from 'storybook/test'
 import { Button } from '../components/ui/button'
-import { FilterModal, type FilterGroup, type SortConfig } from '../components/ui/filter-modal'
+import { FilterModal, type FilterGroup, type SortConfig, type TagKeyConfig } from '../components/ui/filter-modal'
 import type { TableFilters } from '../components/ui/table/types'
 
 const meta = {
@@ -322,6 +322,148 @@ export const EmptyFilters: Story = {
   args: {
     isOpen: true,
     title: 'Sort and Filter',
+    filterGroups: defaultFilterGroups,
+    currentFilters: {},
+    onFilterChange: fn(),
+    onClose: fn(),
+  },
+}
+
+// ---------------------------------------------------------------------------
+// Tag Key:Value Filter stories
+// ---------------------------------------------------------------------------
+
+const defaultTagFilterKeys: TagKeyConfig[] = [
+  {
+    key: 'site',
+    label: 'Site',
+    values: [
+      { id: 'chicago', label: 'Chicago', count: 120 },
+      { id: 'new-york', label: 'New York', count: 85 },
+      { id: 'london', label: 'London', count: 42 },
+    ],
+  },
+  {
+    key: 'env',
+    label: 'Environment',
+    values: [
+      { id: 'production', label: 'Production', count: 310 },
+      { id: 'staging', label: 'Staging', count: 64 },
+      { id: 'development', label: 'Development', count: 28 },
+    ],
+  },
+  {
+    key: 'team',
+    label: 'Team',
+    values: [
+      { id: 'infra', label: 'Infrastructure' },
+      { id: 'platform', label: 'Platform' },
+      { id: 'security', label: 'Security' },
+    ],
+  },
+]
+
+/**
+ * With tag key:value filter section.
+ */
+export const WithTagFilter: Story = {
+  args: {
+    isOpen: true,
+    title: 'Sort and Filter',
+    filterGroups: defaultFilterGroups,
+    currentFilters: defaultCurrentFilters,
+    onFilterChange: fn(),
+    onClose: fn(),
+    tagFilterKeys: defaultTagFilterKeys,
+    selectedTags: ['site:chicago', 'env:production'],
+    onTagsChange: fn(),
+    tagFilterTitle: 'Tag Keys',
+  },
+}
+
+/**
+ * Tag filter only — no regular filter groups.
+ */
+export const TagFilterOnly: Story = {
+  args: {
+    isOpen: true,
+    title: 'Filter by Tags',
+    filterGroups: [],
+    currentFilters: {},
+    onFilterChange: fn(),
+    onClose: fn(),
+    tagFilterKeys: defaultTagFilterKeys,
+    selectedTags: [],
+    onTagsChange: fn(),
+  },
+}
+
+/**
+ * Full-featured: sorting + filters + tag filter combined.
+ */
+export const FullFeatured: Story = {
+  args: {
+    isOpen: true,
+    title: 'Sort and Filter',
+    filterGroups: defaultFilterGroups,
+    currentFilters: defaultCurrentFilters,
+    onFilterChange: fn(),
+    onClose: fn(),
+    sortConfig: defaultSortConfig,
+    onSort: fn(),
+    tagFilterKeys: defaultTagFilterKeys,
+    selectedTags: ['site:chicago', 'site:london', 'env:production'],
+    onTagsChange: fn(),
+    tagFilterTitle: 'Tag Keys',
+  },
+}
+
+/**
+ * Interactive example with tag key:value filter.
+ */
+export const InteractiveWithTags: Story = {
+  render: function InteractiveWithTagsStory() {
+    const [isOpen, setIsOpen] = useState(false)
+    const [currentFilters, setCurrentFilters] = useState<TableFilters>(defaultCurrentFilters)
+    const [selectedTags, setSelectedTags] = useState<string[]>(['site:chicago'])
+    const [sortBy, setSortBy] = useState<string>('name')
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+
+    const sortConfig: SortConfig = {
+      columns: [
+        { key: 'name', label: 'Name' },
+        { key: 'date', label: 'Date' },
+        { key: 'status', label: 'Status' },
+      ],
+      sortBy,
+      sortDirection,
+    }
+
+    return (
+      <div className="flex flex-col items-center gap-4">
+        <Button onClick={() => setIsOpen(true)} variant="outline">
+          Sort & Filter ({Object.values(currentFilters).flat().length} filters, {selectedTags.filter(t => !t.endsWith(':')).length} tags)
+        </Button>
+        <div className="text-sm text-ods-text-secondary">
+          Sort: {sortBy} ({sortDirection}) | Tags: {selectedTags.filter(t => !t.endsWith(':')).join(', ') || 'none'}
+        </div>
+        <FilterModal
+          isOpen={isOpen}
+          onClose={() => setIsOpen(false)}
+          filterGroups={defaultFilterGroups}
+          currentFilters={currentFilters}
+          onFilterChange={setCurrentFilters}
+          sortConfig={sortConfig}
+          onSort={(col, dir) => { setSortBy(col); setSortDirection(dir) }}
+          tagFilterKeys={defaultTagFilterKeys}
+          selectedTags={selectedTags}
+          onTagsChange={setSelectedTags}
+        />
+      </div>
+    )
+  },
+  args: {
+    isOpen: false,
     filterGroups: defaultFilterGroups,
     currentFilters: {},
     onFilterChange: fn(),

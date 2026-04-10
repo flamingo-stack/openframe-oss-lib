@@ -126,10 +126,10 @@ export function FilterModal({
         {/* Sort columns */}
         {sortConfig && sortConfig.columns.length > 0 && (
           <div className="flex flex-col gap-1">
-            <span className="text-h5 text-ods-text-secondary tracking-[-0.24px]">
+            <span className="text-h5 text-ods-text-secondary">
               {sortConfig.title || 'Sort By'}
             </span>
-            <div className="rounded-[6px] border border-ods-border overflow-hidden">
+            <div className="rounded-md border border-ods-border overflow-hidden">
               {sortConfig.columns.map((column) => (
                 <SortColumnItem
                   key={column.key}
@@ -148,10 +148,10 @@ export function FilterModal({
           const groupSelection = selectedFilters[group.id] || []
           return (
             <div key={group.id} className="flex flex-col gap-1">
-              <span className="text-h5 text-ods-text-secondary tracking-[-0.24px]">
+              <span className="text-h5 text-ods-text-secondary">
                 {group.title}
               </span>
-              <div className="rounded-[6px] border border-ods-border overflow-hidden">
+              <div className="rounded-md border border-ods-border overflow-hidden">
                 {group.options.map((option) => (
                   <FilterCheckboxItem
                     key={option.id}

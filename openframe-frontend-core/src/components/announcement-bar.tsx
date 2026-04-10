@@ -145,7 +145,7 @@ export function AnnouncementBar() {
     >
       <div className="flex items-center w-full max-w-full">
         {/* Mobile: Clickable content area, Desktop: Regular content */}
-        <div 
+        <div
           className={`flex flex-row gap-2 md:gap-4 items-center pl-4 md:pl-6 py-1.5 md:py-2 flex-1 min-w-0 ${
             announcement.cta_enabled && announcement.cta_url ? 'md:cursor-default cursor-pointer' : ''
           }`}
