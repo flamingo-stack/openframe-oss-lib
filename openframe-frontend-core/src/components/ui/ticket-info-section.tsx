@@ -10,7 +10,6 @@ import { type TicketAttachment, TicketAttachmentsList } from "./ticket-attachmen
 import { type KnowledgeBaseArticle, TicketKnowledgeBaseList } from "./ticket-knowledge-base-list"
 import type { TicketNote } from "./ticket-note-card"
 import { TicketNotesSection } from "./ticket-notes-section"
-import { TicketDescriptionViewer } from "./ticket-description-viewer"
 import { SimpleMarkdownRenderer } from "./simple-markdown-renderer"
 
 export interface TicketInfoSectionProps {

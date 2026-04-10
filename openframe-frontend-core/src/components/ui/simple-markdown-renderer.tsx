@@ -362,7 +362,7 @@ export const SimpleMarkdownRenderer: React.FC<SimpleMarkdownRendererProps> = ({
 
     // --- paragraph ---
     p: ({ children }: any) => (
-      <p className="md:text-h4 lg:text-h4 leading-relaxed my-4 text-ods-text-primary">
+      <p className="md:text-h4 lg:text-h4 leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary">
         {children}
       </p>
     ),
