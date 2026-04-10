@@ -215,6 +215,7 @@ jobs:
             echo "New version validated: $OLD_BASE → $NEW_VERSION"
           fi
           npm version "$NEW_VERSION" --no-git-tag-version
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
       - name: Publish ${{ env.NEW_VERSION }}
         if: steps.should_run.outputs.run == 'true'
