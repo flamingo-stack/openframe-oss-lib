@@ -216,7 +216,7 @@ jobs:
           fi
           npm version "$NEW_VERSION" --no-git-tag-version
 
-      - name: Publish to npm
+      - name: Publish ${{ env.NEW_VERSION }}
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
         run: npm publish --tag latest --access public
