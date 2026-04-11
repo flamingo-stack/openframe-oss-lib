@@ -3,7 +3,7 @@
 import { useState, useEffect, ComponentType } from 'react';
 import Link from 'next/link';
 import { Card, CardContent } from '../../ui/card';
-import { PageContainer } from '../../layout/page-container';
+import { ArticleDetailLayout } from '../../layout/article-detail-layout';
 import { ReleaseChangelogSection } from '../../ui/release-changelog-section';
 import { StatusBadge } from '../../ui/status-badge';
 import { SquareAvatar } from '../../ui/square-avatar';
@@ -203,12 +203,7 @@ export function ReleaseDetailPage({
   const improvements = release.improvements as ChangelogEntry[] | undefined;
 
   return (
-    <PageContainer
-      as="article"
-      backgroundClassName="bg-ods-bg"
-      contentPadding="py-6 md:py-10 px-6 md:px-20"
-      maxWidth="max-w-[1280px]"
-    >
+    <ArticleDetailLayout>
       <div className="space-y-6 md:space-y-8">
         {/* Title Block */}
         <div className="flex flex-col md:flex-row md:items-end gap-4 w-full">
@@ -554,6 +549,6 @@ export function ReleaseDetailPage({
           initialIndex={galleryIndex}
         />
       )}
-    </PageContainer>
+    </ArticleDetailLayout>
   );
 }
