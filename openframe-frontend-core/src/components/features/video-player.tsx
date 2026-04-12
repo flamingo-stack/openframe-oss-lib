@@ -797,7 +797,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         {captionsEnabled && activeText && hasStarted && (
           <div
             className="absolute left-[5%] right-[5%] text-center pointer-events-none z-10 transition-[bottom] duration-300 ease-in-out"
-            style={{ bottom: (showControls || !isPlaying) ? 72 : 16 }}
+            style={{ bottom: (showControls || !isPlaying) ? 52 : 12 }}
           >
             <span
               className="inline-block bg-black/80 text-white leading-relaxed px-4 py-1.5 rounded font-sans font-medium whitespace-pre-line"
@@ -821,10 +821,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             }`}
             onTouchEnd={(e) => { e.stopPropagation(); startHideTimer(); }}
           >
-            <div className="bg-gradient-to-t from-black/90 via-black/40 to-transparent pt-8 pb-2 px-3 rounded-b-md">
-              {/* Progress bar — 3-layer with 44px touch hit area, ARIA slider for screen readers */}
+            <div className="bg-gradient-to-t from-black/90 via-black/40 to-transparent pt-6 pb-1.5 px-2.5 rounded-b-md">
+              {/* Progress bar — YouTube standard: 4px track, 24px+ touch hit area */}
               <div
-                className="group/seek relative w-full h-11 cursor-pointer mb-1 flex items-center"
+                className="group/seek relative w-full h-6 cursor-pointer mb-0.5 flex items-center"
                 ref={progressBarRef}
                 role="slider"
                 aria-label="Video progress"
@@ -841,78 +841,78 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 onMouseLeave={() => setSeekPreview(null)}
                 onKeyDown={handleProgressKeyDown}
               >
-                {/* Seek preview tooltip (YouTube-style) */}
+                {/* Seek preview tooltip */}
                 {seekPreview && duration > 0 && (
                   <div
-                    className="absolute -top-8 -translate-x-1/2 bg-black/90 text-white text-xs font-mono px-2 py-0.5 rounded pointer-events-none whitespace-nowrap z-10"
+                    className="absolute -top-7 -translate-x-1/2 bg-black/90 text-white text-[11px] font-mono px-1.5 py-0.5 rounded pointer-events-none whitespace-nowrap z-10"
                     style={{ left: seekPreview.x }}
                   >
                     {formatTime(seekPreview.fraction * duration)}
                   </div>
                 )}
-                {/* Visual track (thin line, expands on hover) */}
-                <div className="absolute left-0 right-0 h-1 [@media(hover:hover)]:group-hover/seek:h-1.5 transition-all top-1/2 -translate-y-1/2">
+                {/* Visual track — 4px, expands to 5px on hover (YouTube standard) */}
+                <div className="absolute left-0 right-0 h-1 [@media(hover:hover)]:group-hover/seek:h-[5px] transition-all top-1/2 -translate-y-1/2">
                   <div className="absolute inset-0 bg-white/20 rounded-full" />
                   <div className="absolute inset-y-0 left-0 bg-white/40 rounded-full transition-all"
                     style={{ width: `${loaded * 100}%` }} />
                   <div className="absolute inset-y-0 left-0 bg-white rounded-full"
                     style={{ width: `${played * 100}%` }} />
                 </div>
-                {/* Scrub thumb — always visible on touch, hover on desktop, scales up on hover */}
-                <div className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-md opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/seek:opacity-100 [@media(hover:hover)]:group-hover/seek:scale-125 transition-all"
-                  style={{ left: `calc(${played * 100}% - 8px)` }} />
+                {/* Scrub thumb — 12px (YouTube standard: 13px) */}
+                <div className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-sm opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/seek:opacity-100 [@media(hover:hover)]:group-hover/seek:scale-110 transition-all"
+                  style={{ left: `calc(${played * 100}% - 6px)` }} />
               </div>
 
-              <div className="flex items-center justify-between">
+              {/* Controls row — 36px height (YouTube standard) */}
+              <div className="flex items-center justify-between h-9">
                 {/* Left: Play, Volume, Time */}
-                <div className="flex items-center gap-0.5">
-                  {/* Play/Pause — 44×44 touch target */}
+                <div className="flex items-center">
+                  {/* Play/Pause — 36×36 button, 20px icon */}
                   <Button variant="ghost" size="icon"
                     onClick={(e) => { e.stopPropagation(); setIsPlaying(prev => !prev); }}
-                    className="h-11 w-11 text-white hover:text-white/80 hover:bg-white/10"
+                    className="h-9 w-9 text-white hover:text-white/80 hover:bg-white/10"
                     aria-label={isPlaying ? 'Pause (Space)' : 'Play (Space)'}>
-                    {isPlaying ? <PauseIcon size={22} color="white" /> : <PlayIcon size={22} color="white" />}
+                    {isPlaying ? <PauseIcon size={20} color="white" /> : <PlayIcon size={20} color="white" />}
                   </Button>
 
                   {/* Volume: icon + hover-reveal slider */}
                   <div className="group/vol flex items-center">
                     <Button variant="ghost" size="icon"
                       onClick={(e) => { e.stopPropagation(); toggleMute(); }}
-                      className="h-11 w-11 text-white hover:text-white/80 hover:bg-white/10"
+                      className="h-9 w-9 text-white hover:text-white/80 hover:bg-white/10"
                       aria-label={isMuted ? 'Unmute (M)' : 'Mute (M)'}>
                       {isMuted || volume === 0
-                        ? <VolumeOffIcon size={22} color="white" />
+                        ? <VolumeOffIcon size={18} color="white" />
                         : volume < 0.5
-                          ? <VolumeDownIcon size={22} color="white" />
-                          : <VolumeUpIcon size={22} color="white" />
+                          ? <VolumeDownIcon size={18} color="white" />
+                          : <VolumeUpIcon size={18} color="white" />
                       }
                     </Button>
-                    {/* Volume slider — reveals on hover (desktop only, hidden on touch) */}
-                    <div className="w-0 overflow-hidden group-hover/vol:w-20 transition-all duration-200 flex items-center">
+                    <div className="w-0 overflow-hidden group-hover/vol:w-16 transition-all duration-200 flex items-center">
                       <Input
                         type="range" min={0} max={1} step={0.01}
                         value={isMuted ? 0 : volume}
                         onChange={handleVolumeChange}
                         onClick={(e) => e.stopPropagation()}
                         aria-label="Volume"
-                        className="w-16 ml-1"
+                        className="w-14 ml-1"
                         style={{ background: `linear-gradient(to right, white ${(isMuted ? 0 : volume) * 100}%, rgba(255,255,255,0.3) ${(isMuted ? 0 : volume) * 100}%)` }}
                       />
                     </div>
                   </div>
 
-                  {/* Time */}
-                  <span className="text-white/70 text-xs font-mono tabular-nums select-none ml-1">
+                  {/* Time — 12px font (YouTube standard) */}
+                  <span className="text-white/70 text-[12px] font-mono tabular-nums select-none ml-1.5">
                     {formatTime(played * duration)} / {formatTime(duration)}
                   </span>
                 </div>
 
-                {/* Right: CC, Fullscreen */}
-                <div className="flex items-center gap-0.5">
-                  {/* Playback speed */}
+                {/* Right: Speed, CC, Fullscreen */}
+                <div className="flex items-center">
+                  {/* Playback speed — compact text button */}
                   <Button variant="ghost" size="sm"
                     onClick={(e) => { e.stopPropagation(); cycleSpeed(); }}
-                    className={`h-11 min-w-[44px] px-2 text-xs font-bold rounded hover:bg-white/10 ${
+                    className={`h-9 px-1.5 text-[11px] font-bold rounded hover:bg-white/10 ${
                       playbackRate !== 1 ? 'text-white' : 'text-white/70 hover:text-white'
                     }`}
                     title="Playback speed"
@@ -923,7 +923,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   {hasCues && (
                     <Button variant="ghost" size="sm"
                       onClick={(e) => { e.stopPropagation(); setCaptionsEnabled(prev => !prev); }}
-                      className={`h-11 min-w-[44px] px-2 text-xs font-bold rounded ${
+                      className={`h-9 px-1.5 text-[11px] font-bold rounded ${
                         captionsEnabled ? 'bg-white text-black hover:bg-white/90' : 'text-white/50 hover:text-white hover:bg-white/10'
                       }`}
                       style={{ borderBottom: captionsEnabled ? '2px solid white' : '2px solid transparent' }}
@@ -935,10 +935,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
                   <Button variant="ghost" size="icon"
                     onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
-                    className="h-11 w-11 text-white/80 hover:text-white hover:bg-white/10"
+                    className="h-9 w-9 text-white/80 hover:text-white hover:bg-white/10"
                     title={isFullscreen ? 'Exit fullscreen (F)' : 'Fullscreen (F)'}
                     aria-label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}>
-                    {isFullscreen ? <Collapse01Icon size={22} color="white" /> : <Expand01Icon size={22} color="white" />}
+                    {isFullscreen ? <Collapse01Icon size={18} color="white" /> : <Expand01Icon size={18} color="white" />}
                   </Button>
                 </div>
               </div>
