@@ -121,10 +121,22 @@ function useVideoFirstFramePoster(
 }
 
 // =============================================================================
+// SRT → VTT conversion (for native <track> injection on iOS fullscreen)
+// =============================================================================
+
+function srtToVtt(srt: string): string {
+  return 'WEBVTT\n\n' + srt
+    .replace(/\r\n/g, '\n')
+    .replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
+}
+
+// =============================================================================
 // SRT Subtitle Overlay System
 // =============================================================================
 // react-player's config.file.tracks is broken (GitHub #1623, #1162, #329).
 // The industry standard is a custom subtitle overlay synced via onProgress.
+// On iOS native fullscreen, we inject a <track> element so the native player
+// shows captions (our overlay is not visible in webkitEnterFullscreen).
 
 interface SrtCue {
   from: number; // milliseconds
@@ -303,12 +315,47 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
   }, [isFullscreen]);
 
+  // Ref to track blob URL for cleanup
+  const nativeTrackBlobRef = useRef<string | null>(null);
+
   const enterNativeVideoFullscreen = useCallback(() => {
     const video = playerRef.current?.getInternalPlayer() as HTMLVideoElement | null;
-    if (video && (video as any).webkitEnterFullscreen) {
-      (video as any).webkitEnterFullscreen();
+    if (!video || !(video as any).webkitEnterFullscreen) return;
+
+    // Inject a native <track> element so iOS's built-in player shows captions
+    if (srtContent) {
+      // Clean up any previous track
+      const old = video.querySelector('track[data-native-cc]');
+      if (old) old.remove();
+      if (nativeTrackBlobRef.current) URL.revokeObjectURL(nativeTrackBlobRef.current);
+
+      const vtt = srtToVtt(srtContent);
+      const blob = new Blob([vtt], { type: 'text/vtt' });
+      const blobUrl = URL.createObjectURL(blob);
+      nativeTrackBlobRef.current = blobUrl;
+
+      const track = document.createElement('track');
+      track.kind = 'captions';
+      track.label = subtitleLabel || 'English';
+      track.srclang = 'en';
+      track.src = blobUrl;
+      track.default = true;
+      track.setAttribute('data-native-cc', 'true');
+      video.appendChild(track);
+
+      // Activate the track
+      requestAnimationFrame(() => {
+        for (let i = 0; i < video.textTracks.length; i++) {
+          if (video.textTracks[i].label === (subtitleLabel || 'English')) {
+            video.textTracks[i].mode = 'showing';
+            break;
+          }
+        }
+      });
     }
-  }, []);
+
+    (video as any).webkitEnterFullscreen();
+  }, [srtContent, subtitleLabel]);
 
   // =========================================================================
   // Volume
@@ -473,6 +520,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   useEffect(() => {
     setMounted(true);
+    return () => {
+      if (nativeTrackBlobRef.current) URL.revokeObjectURL(nativeTrackBlobRef.current);
+    };
   }, []);
 
   const handleError = () => {
