@@ -80,6 +80,8 @@ export interface VideoProcessingFields {
   highlight_video_thumbnail?: string | null
   highlight_video_duration_ms?: number | null
   highlight_video_source?: 'manual' | 'ai_generated' | null
+  /** Persisted first-frame thumbnail from main video upload (client-side canvas extraction) */
+  main_video_thumbnail?: string | null
   ai_transcript_formatted?: string
   speaker_mapping?: SpeakerMapping
   ai_confidence_transcript?: number | null

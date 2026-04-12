@@ -206,24 +206,10 @@ interface VideoPlayerProps {
   subtitleLabel?: string;
 }
 
-/**
- * When no explicit poster image is provided, append `#t=0.5` to direct video
- * file URLs (`.mp4`, `.webm`, `.mov`). This tells the browser to seek to
- * 0.5 seconds and display that frame as the native poster — turning the
- * default black rectangle into an actual preview of the video content.
- * Streaming URLs (YouTube, Vimeo, HLS) are left alone since they handle
- * their own posters. URLs that already carry a `#t=` hash are left alone.
- */
-function withFirstFramePoster(url: string, hasPoster: boolean): string {
-  if (hasPoster) return url;
-  if (!url || url.includes('#t=')) return url;
-  const isDirectVideoFile = /\.(mp4|webm|mov|m4v)(\?|$)/i.test(url);
-  if (!isDirectVideoFile) return url;
-  // Hash must come AFTER any query string: `...mp4?token=abc#t=3`
-  // Use 3s (not 0.5s) to skip fade-in intros that are common in
-  // screen recordings and presentation videos.
-  return `${url}#t=3`;
-}
+// NOTE: withFirstFramePoster (appending #t=3 to URLs) was removed.
+// The #t= media fragment caused playback to START at 3 seconds instead of 0.
+// Poster generation is now handled by useVideoFirstFramePoster (canvas extraction)
+// and the persisted main_video_thumbnail field — no URL hacks needed.
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   url,
@@ -406,17 +392,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   // (regardless of whether an explicit `poster` was provided). Rationale:
   // the caller may pass a branded OG placeholder as the immediate poster,
   // but we'd rather SWAP it to a real first frame once extraction
-  // succeeds. Extraction is short-circuited internally for non-file URLs
-  // (YouTube, Vimeo, HLS) and is a no-op once the user presses play.
-  const extractedPoster = useVideoFirstFramePoster(url, !hasStarted);
-  // Preference order: extracted frame (best, real content) → explicit
-  // poster prop (authored image or OG placeholder) → undefined.
-  const effectivePoster = extractedPoster || poster || undefined;
+  // Skip canvas extraction when an explicit poster is provided — avoids a
+  // redundant CDN request for the hidden video element (which causes slow
+  // page loads on cold CDN cache). Only extract when no poster exists.
+  const extractedPoster = useVideoFirstFramePoster(url, !hasStarted && !poster);
+  const effectivePoster = poster || extractedPoster || undefined;
   const posterBgColor = useImageEdgeColor(effectivePoster);
-  // Derive a playable URL that displays a real first frame via the
-  // native `#t=` hash as an additional fallback layer (works for short
-  // videos whose moov atom is at the start of the file).
-  const playableUrl = withFirstFramePoster(url, !!effectivePoster);
 
   useEffect(() => {
     setMounted(true);
@@ -526,7 +507,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         }>
           <ReactPlayer
             ref={playerRef}
-            url={playableUrl}
+            url={url}
             width="100%"
             height="100%"
             controls={false}

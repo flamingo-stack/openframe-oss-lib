@@ -36,6 +36,7 @@ export interface CustomerInterview {
   highlight_video_thumbnail?: string | null
   highlight_video_duration_ms?: number | null
   highlight_video_source?: 'manual' | 'ai_generated' | null
+  main_video_thumbnail?: string | null
 
   // Optional case study link
   case_study_id: number | null
@@ -120,6 +121,7 @@ export interface CreateCustomerInterviewData {
   user_id?: string // Customer UUID
   main_video_url?: string
   highlight_video_url?: string | null
+  main_video_thumbnail?: string | null
   teasers?: VideoTeaser[]
   case_study_id?: number | null
   seo_title?: string
