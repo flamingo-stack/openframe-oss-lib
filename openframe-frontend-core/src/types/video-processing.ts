@@ -75,6 +75,7 @@ export interface VideoProcessingFields {
   main_video_url: string | null
   transcript: string | null
   transcript_words_data?: TranscriptWord[]
+  srt_content?: string | null
   highlight_video_url?: string | null
   highlight_video_thumbnail?: string | null
   highlight_video_duration_ms?: number | null

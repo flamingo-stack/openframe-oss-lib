@@ -99,6 +99,7 @@ export interface ProductRelease {
   main_video_url: string | null
   transcript: string | null
   transcript_words_data?: TranscriptWord[]
+  srt_content?: string | null
   video_summary: string | null // AI-generated summary from video transcription
   video_bites: VideoTeaser[] // JSONB array of extracted video clips
   highlight_video_url: string | null
@@ -171,6 +172,7 @@ export interface CreateProductReleaseData {
   youtube_url?: string
   main_video_url?: string
   transcript?: string
+  srt_content?: string | null
   video_summary?: string // AI-generated summary from video transcription
   video_bites?: VideoTeaser[]
   highlight_video_url?: string | null

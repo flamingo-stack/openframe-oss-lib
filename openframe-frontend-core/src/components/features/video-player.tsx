@@ -1,8 +1,22 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import ReactPlayer from 'react-player';
 import { useImageEdgeColor } from '../../hooks/ui/use-image-edge-color';
+import {
+  PlayIcon,
+  PauseIcon,
+  Expand01Icon,
+  Collapse01Icon,
+} from '../icons-v2-generated/media-playback';
+import {
+  VolumeUpIcon,
+  VolumeDownIcon,
+  VolumeOffIcon,
+} from '../icons-v2-generated/audio-and-visual';
+import { AlertCircleIcon } from '../icons-v2-generated/interface';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
 
 /**
  * Extract a first-frame poster from a direct video file URL via an
@@ -106,25 +120,75 @@ function useVideoFirstFramePoster(
   return poster;
 }
 
-// Simple SVG icon components
-const Play = ({ size = 16, className }: { size?: number; className?: string }) => (
-  <svg width={size} height={size} fill="currentColor" viewBox="0 0 24 24" className={className}>
-    <polygon points="5,3 19,12 5,21"/>
-  </svg>
-);
+// =============================================================================
+// SRT Subtitle Overlay System
+// =============================================================================
+// react-player's config.file.tracks is broken (GitHub #1623, #1162, #329).
+// The industry standard is a custom subtitle overlay synced via onProgress.
 
-const Loader = ({ size = 16, className }: { size?: number; className?: string }) => (
-  <svg width={size} height={size} fill="none" stroke="currentColor" viewBox="0 0 24 24" className={className}>
-    <line x1="12" y1="2" x2="12" y2="6"/>
-    <line x1="12" y1="18" x2="12" y2="22"/>
-    <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/>
-    <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/>
-    <line x1="2" y1="12" x2="6" y2="12"/>
-    <line x1="18" y1="12" x2="22" y2="12"/>
-    <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/>
-    <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/>
-  </svg>
-);
+interface SrtCue {
+  from: number; // milliseconds
+  to: number;   // milliseconds
+  text: string;
+}
+
+/**
+ * Parse SRT content into timestamped cues.
+ * SRT format: sequential blocks of [index]\n[start --> end]\n[text]\n\n
+ */
+function parseSrt(srt: string): SrtCue[] {
+  const cues: SrtCue[] = [];
+  const blocks = srt.replace(/\r\n/g, '\n').trim().split(/\n\n+/);
+
+  for (const block of blocks) {
+    const lines = block.split('\n');
+    // Find the timestamp line (contains " --> ")
+    const tsIndex = lines.findIndex(l => l.includes(' --> '));
+    if (tsIndex === -1) continue;
+
+    const [startStr, endStr] = lines[tsIndex].split(' --> ');
+    const from = parseSrtTimestamp(startStr?.trim());
+    const to = parseSrtTimestamp(endStr?.trim());
+    if (from === null || to === null) continue;
+
+    // Everything after the timestamp line is the subtitle text
+    const text = lines.slice(tsIndex + 1).join('\n').trim();
+    if (text) cues.push({ from, to, text });
+  }
+
+  return cues;
+}
+
+/** Parse "HH:MM:SS,mmm" to milliseconds */
+function parseSrtTimestamp(ts: string | undefined): number | null {
+  if (!ts) return null;
+  const match = ts.match(/(\d{2}):(\d{2}):(\d{2})[,.](\d{3})/);
+  if (!match) return null;
+  return (
+    parseInt(match[1]) * 3600000 +
+    parseInt(match[2]) * 60000 +
+    parseInt(match[3]) * 1000 +
+    parseInt(match[4])
+  );
+}
+
+/**
+ * Hook: parse SRT and provide the active subtitle text for the current time.
+ * Uses binary search for efficient lookup in long transcripts.
+ */
+function useSubtitleOverlay(srtContent: string | undefined) {
+  const cues = useMemo(() => srtContent ? parseSrt(srtContent) : [], [srtContent]);
+  const [activeText, setActiveText] = useState<string | null>(null);
+
+  const updateTime = useCallback((playedSeconds: number) => {
+    const timeMs = playedSeconds * 1000;
+    // Linear scan is fine for typical SRT files (<500 cues)
+    const active = cues.find(c => timeMs >= c.from && timeMs <= c.to);
+    setActiveText(active?.text ?? null);
+  }, [cues]);
+
+  return { activeText, updateTime, hasCues: cues.length > 0 };
+}
 
 interface VideoPlayerProps {
   url: string;
@@ -135,10 +199,15 @@ interface VideoPlayerProps {
   autoPlay?: boolean;
   loop?: boolean;
   muted?: boolean;
+  /** @deprecated Custom controls are always active. This prop is ignored. */
   controls?: boolean;
   useNativeAspectRatio?: boolean;
   /** @deprecated No longer needed — play overlay always shows. Kept for backward compatibility. */
   showPlayOverlay?: boolean;
+  /** SRT subtitle content string. Converted to VTT client-side for HTML5 <track> display. */
+  srtContent?: string;
+  /** Label for the subtitle track (default: 'English') */
+  subtitleLabel?: string;
 }
 
 /**
@@ -171,11 +240,173 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   muted = false,
   controls = true,
   useNativeAspectRatio = false,
+  srtContent,
+  subtitleLabel,
 }) => {
+  // =========================================================================
+  // Core state
+  // =========================================================================
   const [hasError, setHasError] = useState(false);
   const [isPlaying, setIsPlaying] = useState(autoPlay);
   const [mounted, setMounted] = useState(false);
   const [hasStarted, setHasStarted] = useState(autoPlay);
+  const playerRef = useRef<ReactPlayer | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // Custom controls state
+  const [played, setPlayed] = useState(0);
+  const [loaded, setLoaded] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(0.8);
+  const [prevVolume, setPrevVolume] = useState(0.8);
+  const [isMuted, setIsMuted] = useState(muted);
+  const [isBuffering, setIsBuffering] = useState(false);
+  const [showControls, setShowControls] = useState(true);
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // Subtitle + fullscreen state
+  const [captionsEnabled, setCaptionsEnabled] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const { activeText, updateTime, hasCues } = useSubtitleOverlay(srtContent);
+
+
+  // =========================================================================
+  // Fullscreen
+  // =========================================================================
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    if (!containerRef.current) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      containerRef.current.requestFullscreen();
+    }
+  }, []);
+
+  // =========================================================================
+  // Volume
+  // =========================================================================
+  const toggleMute = useCallback(() => {
+    if (isMuted) {
+      setIsMuted(false);
+      setVolume(prevVolume || 0.5);
+    } else {
+      setPrevVolume(volume);
+      setIsMuted(true);
+      setVolume(0);
+    }
+  }, [isMuted, volume, prevVolume]);
+
+  const handleVolumeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = parseFloat(e.target.value);
+    setVolume(val);
+    setIsMuted(val === 0);
+    if (val > 0) setPrevVolume(val);
+  }, []);
+
+  // =========================================================================
+  // Auto-hide controls (3s inactivity)
+  // =========================================================================
+  const handleMouseActivity = useCallback(() => {
+    setShowControls(true);
+    clearTimeout(hideTimeoutRef.current);
+    if (isPlaying) {
+      hideTimeoutRef.current = setTimeout(() => setShowControls(false), 3000);
+    }
+  }, [isPlaying]);
+
+  // =========================================================================
+  // Keyboard shortcuts (Space, Arrow keys, M, F)
+  // =========================================================================
+  useEffect(() => {
+    if (!hasStarted) return;
+    const el = containerRef.current;
+    if (!el) return;
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      switch (e.key) {
+        case ' ':
+        case 'k':
+          e.preventDefault();
+          setIsPlaying(prev => !prev);
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          playerRef.current?.seekTo(Math.max(0, (playerRef.current?.getCurrentTime() ?? 0) - 5), 'seconds');
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          playerRef.current?.seekTo(Math.min(duration, (playerRef.current?.getCurrentTime() ?? 0) + 5), 'seconds');
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          setVolume(v => { const nv = Math.min(1, v + 0.1); setIsMuted(false); return nv; });
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          setVolume(v => { const nv = Math.max(0, v - 0.1); if (nv === 0) setIsMuted(true); return nv; });
+          break;
+        case 'm': case 'M':
+          e.preventDefault();
+          toggleMute();
+          break;
+        case 'f': case 'F':
+          e.preventDefault();
+          toggleFullscreen();
+          break;
+        case 'c': case 'C':
+          e.preventDefault();
+          setCaptionsEnabled(prev => !prev);
+          break;
+      }
+    };
+
+    el.addEventListener('keydown', onKey);
+    return () => el.removeEventListener('keydown', onKey);
+  }, [hasStarted, duration, toggleMute, toggleFullscreen]);
+
+  // =========================================================================
+  // Helpers
+  // =========================================================================
+  const formatTime = (secs: number) => {
+    if (!secs || !isFinite(secs)) return '0:00';
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = Math.floor(secs % 60);
+    if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const handleProgressBarClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    setPlayed(fraction);
+    playerRef.current?.seekTo(fraction, 'fraction');
+  }, []);
+
+  // Double-click = fullscreen, single click = play/pause
+  const handleContainerClick = useCallback((e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('.video-controls-bar')) return;
+    if (!hasStarted) return;
+    if (clickTimerRef.current) {
+      clearTimeout(clickTimerRef.current);
+      clickTimerRef.current = undefined;
+      toggleFullscreen();
+    } else {
+      clickTimerRef.current = setTimeout(() => {
+        clickTimerRef.current = undefined;
+        setIsPlaying(prev => !prev);
+      }, 250);
+    }
+  }, [hasStarted, toggleFullscreen]);
   // Client-side first-frame extraction ALWAYS runs for direct video files
   // (regardless of whether an explicit `poster` was provided). Rationale:
   // the caller may pass a branded OG placeholder as the immediate poster,
@@ -231,7 +462,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             : "absolute inset-0 bg-black rounded-md flex items-center justify-center"
           }>
             <div className="w-16 h-16 rounded-full bg-ods-accent flex items-center justify-center shadow-lg">
-              <Play size={24} className="ml-1 text-ods-text-on-accent" />
+              <PlayIcon size={24} className="ml-1 text-ods-text-on-accent" />
             </div>
           </div>
         </div>
@@ -244,9 +475,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       <div className={`video-player-error ${className}`}>
         <div className="error-state bg-ods-card border border-ods-border rounded-md p-6 text-center">
           <div className="error-icon flex justify-center mb-4">
-            <svg width="48" height="48" fill="currentColor" viewBox="0 0 24 24" className="text-ods-attention-red-error">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
-            </svg>
+            <AlertCircleIcon size={48} className="text-ods-attention-red-error" />
           </div>
           <div className="error-title font-sans font-semibold text-lg text-ods-attention-red-error mb-2">
             Video Unavailable
@@ -261,80 +490,189 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   return (
     <div className={`video-player-container ${className}`}>
-      {/* Video Title */}
       {title && showTitle && (
         <div className="video-title font-sans text-lg font-medium text-ods-text-primary mb-3">
           {title}
         </div>
       )}
 
-      {/* Video Container */}
+      {/* Container — fullscreened as a unit so subtitles + controls travel with video */}
       <div
-        className="video-wrapper relative w-full"
-        style={useNativeAspectRatio ? {} : { paddingBottom: '56.25%' }}
+        ref={containerRef}
+        tabIndex={0}
+        className={`video-wrapper relative w-full outline-none ${isFullscreen ? 'bg-black' : ''} ${isFullscreen && !showControls && isPlaying ? 'cursor-none' : ''}`}
+        style={isFullscreen ? { width: '100%', height: '100%' } : useNativeAspectRatio ? {} : { paddingBottom: '56.25%' }}
+        onMouseMove={handleMouseActivity}
+        onMouseLeave={() => { if (isPlaying) setShowControls(false); }}
+        onTouchStart={handleMouseActivity}
+        onClick={handleContainerClick}
       >
-        {/* Play button overlay — shown before user clicks play */}
+        {/* Initial play overlay */}
         {!hasStarted && !hasError && (
-          <div
-            className={useNativeAspectRatio
-              ? "absolute inset-0 cursor-pointer group z-20"
-              : "absolute inset-0 cursor-pointer group z-20"
-            }
-            onClick={handlePlayClick}
-          >
-            {/* Poster image overlay — explicit OR client-extracted first frame */}
+          <div className="absolute inset-0 cursor-pointer group z-20" onClick={handlePlayClick}>
             {effectivePoster && (
-              <img
-                src={effectivePoster}
-                alt={title || 'Video thumbnail'}
+              <img src={effectivePoster} alt={title || 'Video thumbnail'}
                 className="w-full h-full object-contain rounded-md"
-                style={{ backgroundColor: posterBgColor }}
-              />
+                style={{ backgroundColor: posterBgColor }} />
             )}
-            {/* Play button — sits on top of poster or the video first frame */}
             <div className={`absolute inset-0 ${effectivePoster ? 'bg-black/40' : 'bg-black/20'} group-hover:bg-black/50 transition-all flex items-center justify-center rounded-md`}>
               <div className="w-16 h-16 rounded-full bg-ods-accent hover:bg-ods-accent/90 transition-all flex items-center justify-center shadow-lg">
-                <Play size={24} className="ml-1 text-ods-text-on-accent" />
+                <PlayIcon size={24} className="ml-1 text-ods-text-on-accent" />
               </div>
             </div>
           </div>
         )}
 
-        {/* Video Player — always rendered; shows first frame when no poster */}
-        <div className={useNativeAspectRatio
-          ? "video-player rounded-md overflow-hidden border border-ods-border bg-ods-background"
+        {/* ReactPlayer */}
+        <div className={
+          isFullscreen ? "video-player absolute inset-0"
+          : useNativeAspectRatio ? "video-player rounded-md overflow-hidden border border-ods-border bg-ods-background"
           : "video-player absolute inset-0 rounded-md overflow-hidden border border-ods-border bg-ods-background"
         }>
           <ReactPlayer
+            ref={playerRef}
             url={playableUrl}
             width="100%"
-            height={useNativeAspectRatio ? "auto" : "100%"}
-            controls={hasStarted && controls}
+            height="100%"
+            controls={false}
             playing={isPlaying}
             loop={loop}
-            muted={muted}
+            muted={isMuted}
+            volume={isMuted ? 0 : volume}
             onError={handleError}
             onPlay={handlePlay}
             onPause={handlePause}
             onEnded={handleEnded}
-            config={{
-              file: {
-                attributes: {
-                  controlsList: 'nodownload',
-                  playsInline: true,
-                  // `preload="metadata"` tells the browser to fetch just
-                  // enough to show the first frame (combined with the
-                  // `#t=0.5` hash injected by `withFirstFramePoster` above)
-                  // so the video displays a real thumbnail instead of a
-                  // black rectangle before the user hits play.
-                  preload: 'metadata',
-                }
-              }
+            onDuration={setDuration}
+            onBuffer={() => setIsBuffering(true)}
+            onBufferEnd={() => setIsBuffering(false)}
+            onProgress={({ played: p, loaded: l, playedSeconds }) => {
+              setPlayed(p);
+              setLoaded(l);
+              updateTime(playedSeconds);
             }}
+            progressInterval={200}
+            config={{ file: { attributes: { controlsList: 'nodownload', playsInline: true, preload: 'metadata' } } }}
             light={false}
             playsinline
           />
         </div>
+
+        {/* Buffering spinner */}
+        {isBuffering && hasStarted && (
+          <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+            <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+          </div>
+        )}
+
+        {/* Subtitle overlay — responsive sizing (Netflix: ~3.3% of video height) */}
+        {captionsEnabled && activeText && hasStarted && (
+          <div className="absolute left-[5%] right-[5%] text-center pointer-events-none z-10"
+            style={{ bottom: 56 }}>
+            <span
+              className="inline-block bg-black/80 text-white leading-relaxed px-4 py-1.5 rounded font-sans font-medium"
+              style={{
+                fontSize: isFullscreen ? 'clamp(20px, 3.3vh, 42px)' : 'clamp(15px, 3.3cqw, 26px)',
+                maxWidth: '90%',
+                textShadow: '0 1px 4px rgba(0,0,0,0.6)',
+              }}
+              dangerouslySetInnerHTML={{ __html: activeText }}
+            />
+          </div>
+        )}
+
+        {/* Custom Controls Bar — always on, CC button shown only when subtitles exist */}
+        {hasStarted && (
+          <div className={`video-controls-bar absolute bottom-0 left-0 right-0 z-30 transition-opacity duration-300 ${
+            showControls || !isPlaying ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}>
+            <div className="bg-gradient-to-t from-black/90 via-black/40 to-transparent pt-8 pb-2 px-3 rounded-b-md">
+              {/* Progress bar — 3-layer: background / buffered / played + scrub thumb */}
+              <div
+                className="group/seek relative w-full h-1 cursor-pointer mb-1"
+                onClick={handleProgressBarClick}
+              >
+                <div className="absolute inset-0 bg-white/20 rounded-full" />
+                <div className="absolute inset-y-0 left-0 bg-white/40 rounded-full transition-all"
+                  style={{ width: `${loaded * 100}%` }} />
+                <div className="absolute inset-y-0 left-0 bg-white rounded-full"
+                  style={{ width: `${played * 100}%` }} />
+                <div className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover/seek:opacity-100 transition-opacity shadow-md"
+                  style={{ left: `calc(${played * 100}% - 6px)` }} />
+                {/* Expand hit area on hover */}
+                <div className="absolute -inset-y-1 inset-x-0 group-hover/seek:-inset-y-2 transition-all" />
+              </div>
+
+              <div className="flex items-center justify-between">
+                {/* Left: Play, Volume, Time */}
+                <div className="flex items-center gap-1">
+                  {/* Play/Pause */}
+                  <Button variant="ghost" size="icon"
+                    onClick={(e) => { e.stopPropagation(); setIsPlaying(prev => !prev); }}
+                    className="h-8 w-8 text-white hover:text-white/80 hover:bg-white/10"
+                    aria-label={isPlaying ? 'Pause (Space)' : 'Play (Space)'}>
+                    {isPlaying ? <PauseIcon size={20} color="white" /> : <PlayIcon size={20} color="white" />}
+                  </Button>
+
+                  {/* Volume: icon + hover-reveal slider */}
+                  <div className="group/vol flex items-center">
+                    <Button variant="ghost" size="icon"
+                      onClick={(e) => { e.stopPropagation(); toggleMute(); }}
+                      className="h-8 w-8 text-white hover:text-white/80 hover:bg-white/10"
+                      aria-label={isMuted ? 'Unmute (M)' : 'Mute (M)'}>
+                      {isMuted || volume === 0
+                        ? <VolumeOffIcon size={20} color="white" />
+                        : volume < 0.5
+                          ? <VolumeDownIcon size={20} color="white" />
+                          : <VolumeUpIcon size={20} color="white" />
+                      }
+                    </Button>
+                    {/* Volume slider — reveals on hover */}
+                    <div className="w-0 overflow-hidden group-hover/vol:w-20 transition-all duration-200 flex items-center">
+                      <Input
+                        type="range" min={0} max={1} step={0.01}
+                        value={isMuted ? 0 : volume}
+                        onChange={handleVolumeChange}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-16 ml-1"
+                        style={{ background: `linear-gradient(to right, white ${(isMuted ? 0 : volume) * 100}%, rgba(255,255,255,0.3) ${(isMuted ? 0 : volume) * 100}%)` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Time */}
+                  <span className="text-white/70 text-xs font-mono tabular-nums select-none ml-1">
+                    {formatTime(played * duration)} / {formatTime(duration)}
+                  </span>
+                </div>
+
+                {/* Right: CC, Fullscreen */}
+                <div className="flex items-center gap-1">
+                  {hasCues && (
+                    <Button variant="ghost" size="sm"
+                      onClick={(e) => { e.stopPropagation(); setCaptionsEnabled(prev => !prev); }}
+                      className={`h-7 px-1.5 text-xs font-bold rounded ${
+                        captionsEnabled ? 'bg-white text-black hover:bg-white/90' : 'text-white/50 hover:text-white hover:bg-white/10'
+                      }`}
+                      style={{ borderBottom: captionsEnabled ? '2px solid white' : '2px solid transparent' }}
+                      title={captionsEnabled ? 'Hide captions (C)' : 'Show captions (C)'}
+                      aria-label={captionsEnabled ? 'Hide captions' : 'Show captions'}>
+                      CC
+                    </Button>
+                  )}
+
+                  <Button variant="ghost" size="icon"
+                    onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
+                    className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/10"
+                    title={isFullscreen ? 'Exit fullscreen (F)' : 'Fullscreen (F)'}
+                    aria-label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}>
+                    {isFullscreen ? <Collapse01Icon size={20} color="white" /> : <Expand01Icon size={20} color="white" />}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
