@@ -68,6 +68,7 @@ export interface VideoDisplaySectionProps {
   bitesTitle?: string;
   filterPublishedBites?: boolean;
   srtContent?: string | null;
+  captionsUrl?: string | null;
 }
 
 export interface ReleaseDetailPageProps {
@@ -335,6 +336,7 @@ export function ReleaseDetailPage({
             bitesTitle="Video Clips"
             filterPublishedBites={true}
             srtContent={release?.srt_content as string | null | undefined}
+            captionsUrl={release?.captionsUrl as string | undefined}
           />
         ) : (
           <>
@@ -347,7 +349,7 @@ export function ReleaseDetailPage({
             {!youtubeUrl && mainVideoUrl && (
               <div className="flex justify-center w-full">
                 <div className="w-full max-w-3xl">
-                  <VideoPlayer url={mainVideoUrl} srtContent={release?.srt_content as string | undefined} />
+                  <VideoPlayer url={mainVideoUrl} srtContent={release?.srt_content as string | undefined} captionsUrl={release?.captionsUrl as string | undefined} />
                 </div>
               </div>
             )}

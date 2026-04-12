@@ -120,17 +120,6 @@ function useVideoFirstFramePoster(
   return poster;
 }
 
-// =============================================================================
-// SRT → VTT conversion (for native <track> injection on iOS fullscreen)
-// =============================================================================
-
-function srtToVtt(srt: string): string {
-  // trimStart() is critical — iOS Safari rejects VTT with leading whitespace
-  return ('WEBVTT\n\n' + srt
-    .replace(/\r\n/g, '\n')
-    .replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2')).trimStart();
-}
-
 /**
  * Global CSS injection for iOS Safari native fullscreen captions.
  * Safari hides ::-webkit-media-text-track-container in fullscreen by default.
@@ -238,6 +227,9 @@ interface VideoPlayerProps {
   useNativeAspectRatio?: boolean;
   /** SRT subtitle content string. Parsed and rendered as overlay synced via onProgress. */
   srtContent?: string;
+  /** HTTPS URL to a VTT/SRT captions file. Required for iOS native fullscreen subtitles
+   *  (iOS Safari does not support blob: URLs for <track> elements). */
+  captionsUrl?: string;
   /** Label for the subtitle track (default: 'English') */
   subtitleLabel?: string;
 }
@@ -266,6 +258,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   muted = false,
   useNativeAspectRatio = false,
   srtContent,
+  captionsUrl,
   subtitleLabel,
 }) => {
   // =========================================================================
@@ -320,9 +313,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
   }, []);
 
-  // Ref to track blob URL for cleanup
-  const nativeTrackBlobRef = useRef<string | null>(null);
-
   /** Activate all caption/subtitle tracks on a video element */
   const activateCaptionTracks = useCallback((video: HTMLVideoElement) => {
     for (let i = 0; i < video.textTracks.length; i++) {
@@ -336,7 +326,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
    * iOS native fullscreen with caption support.
    * Steps (validated against Plyr, Video.js, Mux, Vidstack source):
    * 1. Inject CSS to force ::-webkit-media-text-track-container visible
-   * 2. Create <track> element with VTT blob URL
+   * 2. Create <track> element with real HTTPS captionsUrl
    * 3. Append to <video> with default attribute
    * 4. Set textTrack.mode = 'showing'
    * 5. Wait for track to load THEN call webkitEnterFullscreen
@@ -347,7 +337,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     ensureWebkitCaptionCSS();
 
-    if (!srtContent) {
+    // Determine the captions source URL for native iOS fullscreen.
+    // iOS Safari does NOT support blob: URLs for <track> elements (WebKit TextTrackLoader limitation).
+    // A real HTTPS URL is required. captionsUrl is served by /api/captions/[entityType]/[entityId].
+    const trackSrc = captionsUrl || null;
+
+    if (!trackSrc) {
+      // No captions URL available — enter fullscreen without subtitles
       try { (video as any).webkitEnterFullscreen(); } catch { /* requires user gesture */ }
       return;
     }
@@ -355,15 +351,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     // Clean up previous track + timer
     const old = video.querySelector('track[data-native-cc]');
     if (old) old.remove();
-    if (nativeTrackBlobRef.current) URL.revokeObjectURL(nativeTrackBlobRef.current);
     clearTimeout(iosFullscreenTimerRef.current);
 
-    // Create VTT blob and <track> element
-    const vtt = srtToVtt(srtContent);
-    const blob = new Blob([vtt], { type: 'text/vtt' });
-    const blobUrl = URL.createObjectURL(blob);
-    nativeTrackBlobRef.current = blobUrl;
-
+    // Create <track> element with real HTTPS URL
     const track = document.createElement('track');
     track.kind = 'captions';
     track.label = subtitleLabel || 'English';
@@ -372,10 +362,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     track.setAttribute('data-native-cc', 'true');
 
     video.appendChild(track);
-    track.src = blobUrl;
+    track.src = trackSrc;
 
     // Wait for track to load, then enter fullscreen
-    // Guard prevents double-fire (load event + fallback timeout)
     let entered = false;
     const doFullscreen = () => {
       if (entered) return;
@@ -389,7 +378,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       track.removeEventListener('load', doFullscreen);
       doFullscreen();
     }, 500);
-  }, [srtContent, subtitleLabel, activateCaptionTracks]);
+  }, [captionsUrl, subtitleLabel, activateCaptionTracks]);
 
   const toggleFullscreen = useCallback(() => {
     const container = containerRef.current;
@@ -539,6 +528,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   // =========================================================================
   const progressBarRef = useRef<HTMLDivElement | null>(null);
   const isDraggingRef = useRef(false);
+  const dragListenersRef = useRef<{ move: (e: MouseEvent) => void; up: () => void } | null>(null);
 
   const seekToClientX = useCallback((clientX: number) => {
     const rect = progressBarRef.current?.getBoundingClientRect();
@@ -555,6 +545,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     isDraggingRef.current = true;
     seekToClientX(e.clientX);
 
+    // Clean up any existing listeners first
+    if (dragListenersRef.current) {
+      document.removeEventListener('mousemove', dragListenersRef.current.move);
+      document.removeEventListener('mouseup', dragListenersRef.current.up);
+    }
+
     const onMouseMove = (ev: MouseEvent) => {
       if (!isDraggingRef.current) return;
       seekToClientX(ev.clientX);
@@ -563,7 +559,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       isDraggingRef.current = false;
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
+      dragListenersRef.current = null;
     };
+    dragListenersRef.current = { move: onMouseMove, up: onMouseUp };
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
   }, [seekToClientX]);
@@ -632,12 +630,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   useEffect(() => {
     setMounted(true);
     return () => {
-      // Clean up all pending timers, blob URLs, and drag state on unmount
+      // Clean up all pending timers, drag listeners, and state on unmount
       clearTimeout(clickTimerRef.current);
       clearTimeout(hideTimeoutRef.current);
       clearTimeout(iosFullscreenTimerRef.current);
       isDraggingRef.current = false;
-      if (nativeTrackBlobRef.current) URL.revokeObjectURL(nativeTrackBlobRef.current);
+      if (dragListenersRef.current) {
+        document.removeEventListener('mousemove', dragListenersRef.current.move);
+        document.removeEventListener('mouseup', dragListenersRef.current.up);
+        dragListenersRef.current = null;
+      }
     };
   }, []);
 
