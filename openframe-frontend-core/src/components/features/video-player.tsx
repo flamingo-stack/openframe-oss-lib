@@ -199,12 +199,8 @@ interface VideoPlayerProps {
   autoPlay?: boolean;
   loop?: boolean;
   muted?: boolean;
-  /** @deprecated Custom controls are always active. This prop is ignored. */
-  controls?: boolean;
   useNativeAspectRatio?: boolean;
-  /** @deprecated No longer needed — play overlay always shows. Kept for backward compatibility. */
-  showPlayOverlay?: boolean;
-  /** SRT subtitle content string. Converted to VTT client-side for HTML5 <track> display. */
+  /** SRT subtitle content string. Parsed and rendered as overlay synced via onProgress. */
   srtContent?: string;
   /** Label for the subtitle track (default: 'English') */
   subtitleLabel?: string;
@@ -238,7 +234,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   autoPlay = false,
   loop = false,
   muted = false,
-  controls = true,
   useNativeAspectRatio = false,
   srtContent,
   subtitleLabel,
