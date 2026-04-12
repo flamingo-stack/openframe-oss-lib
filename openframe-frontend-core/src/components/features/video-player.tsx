@@ -28,7 +28,7 @@ import { Input } from '../ui/input';
  * Sequence:
  *   1. Create hidden `<video>` with `crossOrigin="anonymous"` (REQUIRED
  *      before setting src, otherwise the canvas is tainted).
- *   2. `loadedmetadata` → seek to `min(0.5s, 5% of duration)`.
+ *   2. `loadedmetadata` → seek to 10% of duration (clamped 2s–30s).
  *   3. `seeked` → draw the frame to a canvas → export as data URL.
  *   4. Clean up the hidden video immediately.
  *
@@ -125,9 +125,33 @@ function useVideoFirstFramePoster(
 // =============================================================================
 
 function srtToVtt(srt: string): string {
-  return 'WEBVTT\n\n' + srt
+  // trimStart() is critical — iOS Safari rejects VTT with leading whitespace
+  return ('WEBVTT\n\n' + srt
     .replace(/\r\n/g, '\n')
-    .replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
+    .replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2')).trimStart();
+}
+
+/**
+ * Global CSS injection for iOS Safari native fullscreen captions.
+ * Safari hides ::-webkit-media-text-track-container in fullscreen by default.
+ * This forces it visible. Injected once, persists for the page lifetime.
+ */
+let webkitCaptionCSSInjected = false;
+function ensureWebkitCaptionCSS() {
+  if (webkitCaptionCSSInjected || typeof document === 'undefined') return;
+  const style = document.createElement('style');
+  style.textContent = `
+    video::-webkit-media-text-track-container {
+      display: block !important;
+      visibility: visible !important;
+      overflow: visible !important;
+    }
+    video::-webkit-media-text-track-display {
+      white-space: pre-line;
+    }
+  `;
+  document.head.appendChild(style);
+  webkitCaptionCSSInjected = true;
 }
 
 // =============================================================================
@@ -186,7 +210,7 @@ function parseSrtTimestamp(ts: string | undefined): number | null {
 
 /**
  * Hook: parse SRT and provide the active subtitle text for the current time.
- * Uses linear scan — performant for typical SRT files (<1000 cues).
+ * Uses linear scan — performant for typical SRT files (< 500 cues).
  */
 function useSubtitleOverlay(srtContent: string | undefined) {
   const cues = useMemo(() => srtContent ? parseSrt(srtContent) : [], [srtContent]);
@@ -218,10 +242,18 @@ interface VideoPlayerProps {
   subtitleLabel?: string;
 }
 
-// NOTE: withFirstFramePoster (appending #t=3 to URLs) was removed.
-// The #t= media fragment caused playback to START at 3 seconds instead of 0.
-// Poster generation is now handled by useVideoFirstFramePoster (canvas extraction)
-// and the persisted main_video_thumbnail field — no URL hacks needed.
+/** Playback speed options */
+const SPEED_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
+
+/** Format seconds to M:SS or H:MM:SS display */
+function formatTime(secs: number): string {
+  if (!secs || !isFinite(secs)) return '0:00';
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = Math.floor(secs % 60);
+  if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   url,
@@ -257,6 +289,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [showControls, setShowControls] = useState(true);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const clickTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const iosFullscreenTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Subtitle + fullscreen state
   const [captionsEnabled, setCaptionsEnabled] = useState(true);
@@ -287,75 +320,98 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
   }, []);
 
+  // Ref to track blob URL for cleanup
+  const nativeTrackBlobRef = useRef<string | null>(null);
+
+  /** Activate all caption/subtitle tracks on a video element */
+  const activateCaptionTracks = useCallback((video: HTMLVideoElement) => {
+    for (let i = 0; i < video.textTracks.length; i++) {
+      if (video.textTracks[i].kind === 'captions' || video.textTracks[i].kind === 'subtitles') {
+        video.textTracks[i].mode = 'showing';
+      }
+    }
+  }, []);
+
+  /**
+   * iOS native fullscreen with caption support.
+   * Steps (validated against Plyr, Video.js, Mux, Vidstack source):
+   * 1. Inject CSS to force ::-webkit-media-text-track-container visible
+   * 2. Create <track> element with VTT blob URL
+   * 3. Append to <video> with default attribute
+   * 4. Set textTrack.mode = 'showing'
+   * 5. Wait for track to load THEN call webkitEnterFullscreen
+   */
+  const enterNativeVideoFullscreen = useCallback(() => {
+    const video = playerRef.current?.getInternalPlayer() as HTMLVideoElement | null;
+    if (!video || !(video as any).webkitEnterFullscreen) return;
+
+    ensureWebkitCaptionCSS();
+
+    if (!srtContent) {
+      try { (video as any).webkitEnterFullscreen(); } catch { /* requires user gesture */ }
+      return;
+    }
+
+    // Clean up previous track + timer
+    const old = video.querySelector('track[data-native-cc]');
+    if (old) old.remove();
+    if (nativeTrackBlobRef.current) URL.revokeObjectURL(nativeTrackBlobRef.current);
+    clearTimeout(iosFullscreenTimerRef.current);
+
+    // Create VTT blob and <track> element
+    const vtt = srtToVtt(srtContent);
+    const blob = new Blob([vtt], { type: 'text/vtt' });
+    const blobUrl = URL.createObjectURL(blob);
+    nativeTrackBlobRef.current = blobUrl;
+
+    const track = document.createElement('track');
+    track.kind = 'captions';
+    track.label = subtitleLabel || 'English';
+    track.srclang = 'en';
+    track.default = true;
+    track.setAttribute('data-native-cc', 'true');
+
+    video.appendChild(track);
+    track.src = blobUrl;
+
+    // Wait for track to load, then enter fullscreen
+    // Guard prevents double-fire (load event + fallback timeout)
+    let entered = false;
+    const doFullscreen = () => {
+      if (entered) return;
+      entered = true;
+      activateCaptionTracks(video);
+      try { (video as any).webkitEnterFullscreen(); } catch { /* requires user gesture */ }
+    };
+
+    track.addEventListener('load', doFullscreen, { once: true });
+    iosFullscreenTimerRef.current = setTimeout(() => {
+      track.removeEventListener('load', doFullscreen);
+      doFullscreen();
+    }, 500);
+  }, [srtContent, subtitleLabel, activateCaptionTracks]);
+
   const toggleFullscreen = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
 
     if (isFullscreen) {
-      // Exit fullscreen
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-      } else if ((document as any).webkitExitFullscreen) {
-        (document as any).webkitExitFullscreen();
-      }
+      try {
+        if (document.exitFullscreen) document.exitFullscreen();
+        else if ((document as any).webkitExitFullscreen) (document as any).webkitExitFullscreen();
+      } catch { /* exit may fail if not in fullscreen */ }
       return;
     }
 
-    // Enter fullscreen — try container first (desktop/Android), then native video (iOS)
+    // Enter — try container first (desktop/Android), then native video (iOS)
     if (container.requestFullscreen) {
-      container.requestFullscreen().catch(() => {
-        // Fullscreen API failed on container — try native video element (iOS)
-        enterNativeVideoFullscreen();
-      });
+      container.requestFullscreen().catch(() => enterNativeVideoFullscreen());
     } else if ((container as any).webkitRequestFullscreen) {
       (container as any).webkitRequestFullscreen();
     } else {
-      // No container fullscreen support (iOS Safari) — use native video fullscreen
       enterNativeVideoFullscreen();
     }
-  }, [isFullscreen]);
-
-  // Ref to track blob URL for cleanup
-  const nativeTrackBlobRef = useRef<string | null>(null);
-
-  const enterNativeVideoFullscreen = useCallback(() => {
-    const video = playerRef.current?.getInternalPlayer() as HTMLVideoElement | null;
-    if (!video || !(video as any).webkitEnterFullscreen) return;
-
-    // Inject a native <track> element so iOS's built-in player shows captions
-    if (srtContent) {
-      // Clean up any previous track
-      const old = video.querySelector('track[data-native-cc]');
-      if (old) old.remove();
-      if (nativeTrackBlobRef.current) URL.revokeObjectURL(nativeTrackBlobRef.current);
-
-      const vtt = srtToVtt(srtContent);
-      const blob = new Blob([vtt], { type: 'text/vtt' });
-      const blobUrl = URL.createObjectURL(blob);
-      nativeTrackBlobRef.current = blobUrl;
-
-      const track = document.createElement('track');
-      track.kind = 'captions';
-      track.label = subtitleLabel || 'English';
-      track.srclang = 'en';
-      track.src = blobUrl;
-      track.default = true;
-      track.setAttribute('data-native-cc', 'true');
-      video.appendChild(track);
-
-      // Activate the track
-      requestAnimationFrame(() => {
-        for (let i = 0; i < video.textTracks.length; i++) {
-          if (video.textTracks[i].label === (subtitleLabel || 'English')) {
-            video.textTracks[i].mode = 'showing';
-            break;
-          }
-        }
-      });
-    }
-
-    (video as any).webkitEnterFullscreen();
-  }, [srtContent, subtitleLabel]);
+  }, [isFullscreen, enterNativeVideoFullscreen]);
 
   // =========================================================================
   // Volume
@@ -463,21 +519,81 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   // =========================================================================
   // Helpers
   // =========================================================================
-  const formatTime = (secs: number) => {
-    if (!secs || !isFinite(secs)) return '0:00';
-    const h = Math.floor(secs / 3600);
-    const m = Math.floor((secs % 3600) / 60);
-    const s = Math.floor(secs % 60);
-    if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  };
 
-  const handleProgressBarClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    e.stopPropagation();
-    const rect = e.currentTarget.getBoundingClientRect();
-    const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  // Seek preview tooltip
+  const [seekPreview, setSeekPreview] = useState<{ fraction: number; x: number } | null>(null);
+
+  // Playback speed
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const cycleSpeed = useCallback(() => {
+    setPlaybackRate(prev => {
+      const idx = SPEED_OPTIONS.indexOf(prev as typeof SPEED_OPTIONS[number]);
+      return SPEED_OPTIONS[(idx + 1) % SPEED_OPTIONS.length];
+    });
+  }, []);
+
+  // =========================================================================
+  // Progress bar: click-to-seek, drag-to-scrub (desktop), touch-to-scrub (mobile)
+  // YouTube pattern: mouseDown starts tracking, mouseMove on document updates,
+  // mouseUp stops tracking. This allows dragging outside the bar.
+  // =========================================================================
+  const progressBarRef = useRef<HTMLDivElement | null>(null);
+  const isDraggingRef = useRef(false);
+
+  const seekToClientX = useCallback((clientX: number) => {
+    const rect = progressBarRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const fraction = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
     setPlayed(fraction);
     playerRef.current?.seekTo(fraction, 'fraction');
+  }, []);
+
+  // Desktop: mouseDown on bar starts drag, mouseMove/mouseUp on document
+  const handleProgressMouseDown = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    isDraggingRef.current = true;
+    seekToClientX(e.clientX);
+
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!isDraggingRef.current) return;
+      seekToClientX(ev.clientX);
+    };
+    const onMouseUp = () => {
+      isDraggingRef.current = false;
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, [seekToClientX]);
+
+  // Mobile: touchStart + touchMove on the bar
+  const handleProgressTouchStart = useCallback((e: React.TouchEvent) => {
+    e.stopPropagation();
+    const touch = e.touches[0];
+    if (touch) seekToClientX(touch.clientX);
+  }, [seekToClientX]);
+
+  const handleProgressTouchMove = useCallback((e: React.TouchEvent) => {
+    e.stopPropagation();
+    const touch = e.touches[0];
+    if (touch) seekToClientX(touch.clientX);
+  }, [seekToClientX]);
+
+  const handleProgressKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); playerRef.current?.seekTo(Math.min(duration, (playerRef.current?.getCurrentTime() ?? 0) + 5), 'seconds'); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); playerRef.current?.seekTo(Math.max(0, (playerRef.current?.getCurrentTime() ?? 0) - 5), 'seconds'); }
+    if (e.key === 'Home') { e.preventDefault(); e.stopPropagation(); playerRef.current?.seekTo(0, 'seconds'); }
+    if (e.key === 'End') { e.preventDefault(); e.stopPropagation(); playerRef.current?.seekTo(duration, 'seconds'); }
+  }, [duration]);
+
+  const handleProgressHover = useCallback((e: React.MouseEvent) => {
+    if (isDraggingRef.current) return; // Don't update tooltip while dragging
+    const rect = e.currentTarget.getBoundingClientRect();
+    const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const x = Math.max(30, Math.min(rect.width - 30, e.clientX - rect.left));
+    setSeekPreview({ fraction, x });
   }, []);
 
   // Desktop: Double-click = fullscreen, single click = play/pause
@@ -507,13 +623,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (!hasStarted) return;
     handleTouchToggle();
   }, [hasStarted, handleTouchToggle]);
-  // Client-side first-frame extraction ALWAYS runs for direct video files
-  // (regardless of whether an explicit `poster` was provided). Rationale:
-  // the caller may pass a branded OG placeholder as the immediate poster,
-  // but we'd rather SWAP it to a real first frame once extraction
-  // Skip canvas extraction when an explicit poster is provided — avoids a
-  // redundant CDN request for the hidden video element (which causes slow
-  // page loads on cold CDN cache). Only extract when no poster exists.
+
+  // Extract first frame as poster when no explicit poster provided
   const extractedPoster = useVideoFirstFramePoster(url, !hasStarted && !poster);
   const effectivePoster = poster || extractedPoster || undefined;
   const posterBgColor = useImageEdgeColor(effectivePoster);
@@ -521,31 +632,42 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   useEffect(() => {
     setMounted(true);
     return () => {
+      // Clean up all pending timers, blob URLs, and drag state on unmount
+      clearTimeout(clickTimerRef.current);
+      clearTimeout(hideTimeoutRef.current);
+      clearTimeout(iosFullscreenTimerRef.current);
+      isDraggingRef.current = false;
       if (nativeTrackBlobRef.current) URL.revokeObjectURL(nativeTrackBlobRef.current);
     };
   }, []);
 
-  const handleError = () => {
-    setHasError(true);
-  };
+  // Re-activate caption tracks when iOS enters native fullscreen
+  // (belt-and-suspenders — ensures tracks stay visible)
+  useEffect(() => {
+    if (!hasStarted) return;
+    const video = playerRef.current?.getInternalPlayer() as HTMLVideoElement | null;
+    if (!video) return;
 
-  const handlePlay = () => {
-    setIsPlaying(true);
-    setHasStarted(true);
-  };
+    const onBeginFS = () => activateCaptionTracks(video);
 
-  const handlePause = () => {
-    setIsPlaying(false);
-  };
+    video.addEventListener('webkitbeginfullscreen', onBeginFS);
+    return () => video.removeEventListener('webkitbeginfullscreen', onBeginFS);
+  }, [hasStarted, activateCaptionTracks]);
 
-  const handleEnded = () => {
-    setIsPlaying(false);
-  };
+  const handleError = useCallback(() => setHasError(true), []);
+  const handlePlay = useCallback(() => { setIsPlaying(true); setHasStarted(true); }, []);
+  const handlePause = useCallback(() => setIsPlaying(false), []);
+  const handleEnded = useCallback(() => setIsPlaying(false), []);
+  const handlePlayClick = useCallback(() => { setHasStarted(true); setIsPlaying(true); }, []);
 
-  const handlePlayClick = () => {
-    setHasStarted(true);
-    setIsPlaying(true);
-  };
+  const handleProgress = useCallback(({ played: p, loaded: l, playedSeconds }: { played: number; loaded: number; playedSeconds: number }) => {
+    setPlayed(p);
+    setLoaded(l);
+    updateTime(playedSeconds);
+  }, [updateTime]);
+
+  const handleBuffer = useCallback(() => setIsBuffering(true), []);
+  const handleBufferEnd = useCallback(() => setIsBuffering(false), []);
 
   // SSR placeholder — consistent loading skeleton
   if (!mounted) {
@@ -610,7 +732,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           : { paddingBottom: '56.25%' }
         }
         onMouseMove={handleMouseMove}
-        onMouseLeave={() => { if (isPlaying) setShowControls(false); }}
+        onMouseLeave={startHideTimer}
         onTouchEnd={handleContainerTouchEnd}
         onClick={handleContainerClick}
       >
@@ -643,6 +765,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             height="100%"
             controls={false}
             playing={isPlaying}
+            playbackRate={playbackRate}
             loop={loop}
             muted={isMuted}
             volume={isMuted ? 0 : volume}
@@ -651,13 +774,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             onPause={handlePause}
             onEnded={handleEnded}
             onDuration={setDuration}
-            onBuffer={() => setIsBuffering(true)}
-            onBufferEnd={() => setIsBuffering(false)}
-            onProgress={({ played: p, loaded: l, playedSeconds }) => {
-              setPlayed(p);
-              setLoaded(l);
-              updateTime(playedSeconds);
-            }}
+            onBuffer={handleBuffer}
+            onBufferEnd={handleBufferEnd}
+            onProgress={handleProgress}
             progressInterval={200}
             config={{ file: { attributes: { controlsList: 'nodownload', playsInline: true, preload: 'metadata' } } }}
             light={false}
@@ -704,19 +823,31 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               {/* Progress bar — 3-layer with 44px touch hit area, ARIA slider for screen readers */}
               <div
                 className="group/seek relative w-full h-11 cursor-pointer mb-1 flex items-center"
+                ref={progressBarRef}
                 role="slider"
                 aria-label="Video progress"
                 aria-valuenow={Math.round(played * 100)}
+                aria-valuetext={`${formatTime(played * duration)} of ${formatTime(duration)}`}
                 aria-valuemin={0}
                 aria-valuemax={100}
                 tabIndex={0}
-                onClick={handleProgressBarClick}
+                onMouseDown={handleProgressMouseDown}
+                onTouchStart={handleProgressTouchStart}
+                onTouchMove={handleProgressTouchMove}
                 onTouchEnd={(e) => e.stopPropagation()}
-                onKeyDown={(e) => {
-                  if (e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); playerRef.current?.seekTo(Math.min(duration, (playerRef.current?.getCurrentTime() ?? 0) + 5), 'seconds'); }
-                  if (e.key === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); playerRef.current?.seekTo(Math.max(0, (playerRef.current?.getCurrentTime() ?? 0) - 5), 'seconds'); }
-                }}
+                onMouseMove={handleProgressHover}
+                onMouseLeave={() => setSeekPreview(null)}
+                onKeyDown={handleProgressKeyDown}
               >
+                {/* Seek preview tooltip (YouTube-style) */}
+                {seekPreview && duration > 0 && (
+                  <div
+                    className="absolute -top-8 -translate-x-1/2 bg-black/90 text-white text-xs font-mono px-2 py-0.5 rounded pointer-events-none whitespace-nowrap z-10"
+                    style={{ left: seekPreview.x }}
+                  >
+                    {formatTime(seekPreview.fraction * duration)}
+                  </div>
+                )}
                 {/* Visual track (thin line, expands on hover) */}
                 <div className="absolute left-0 right-0 h-1 [@media(hover:hover)]:group-hover/seek:h-1.5 transition-all top-1/2 -translate-y-1/2">
                   <div className="absolute inset-0 bg-white/20 rounded-full" />
@@ -776,6 +907,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
                 {/* Right: CC, Fullscreen */}
                 <div className="flex items-center gap-0.5">
+                  {/* Playback speed */}
+                  <Button variant="ghost" size="sm"
+                    onClick={(e) => { e.stopPropagation(); cycleSpeed(); }}
+                    className={`h-11 min-w-[44px] px-2 text-xs font-bold rounded hover:bg-white/10 ${
+                      playbackRate !== 1 ? 'text-white' : 'text-white/70 hover:text-white'
+                    }`}
+                    title="Playback speed"
+                    aria-label={`Playback speed ${playbackRate}x`}>
+                    {playbackRate}x
+                  </Button>
+
                   {hasCues && (
                     <Button variant="ghost" size="sm"
                       onClick={(e) => { e.stopPropagation(); setCaptionsEnabled(prev => !prev); }}
