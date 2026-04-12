@@ -249,19 +249,23 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   // Subtitle + fullscreen state
   const [captionsEnabled, setCaptionsEnabled] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isCSSFullscreen, setIsCSSFullscreen] = useState(false);
   const { activeText, updateTime, hasCues } = useSubtitleOverlay(srtContent);
 
   // =========================================================================
-  // Fullscreen — real API on desktop, CSS simulation on iOS/mobile
-  // iOS Safari doesn't support Element.requestFullscreen() on divs.
-  // CSS simulation (fixed 100vw×100vh) preserves custom controls + subtitles.
+  // Fullscreen — industry standard dual-mode (Plyr / Video.js / Vidstack pattern)
+  //
+  // Desktop/Android: container.requestFullscreen() — custom controls survive
+  // iOS Safari: video.webkitEnterFullscreen() — native iOS controls take over
+  //
+  // Every battle-tested player (Plyr, Video.js, Vidstack, YouTube mobile web)
+  // surrenders custom controls to iOS in fullscreen. The Fullscreen API doesn't
+  // support divs on iOS, and CSS simulation has too many edge cases (notch,
+  // address bar, orientation). Native iOS fullscreen is the correct UX.
   // =========================================================================
   useEffect(() => {
     const onChange = () => {
       const fsEl = document.fullscreenElement || (document as any).webkitFullscreenElement;
       setIsFullscreen(!!fsEl);
-      if (!fsEl) setIsCSSFullscreen(false);
     };
     document.addEventListener('fullscreenchange', onChange);
     document.addEventListener('webkitfullscreenchange', onChange);
@@ -271,41 +275,40 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
   }, []);
 
-  // Escape key exits CSS fullscreen
-  useEffect(() => {
-    if (!isCSSFullscreen) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setIsCSSFullscreen(false); setIsFullscreen(false); } };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [isCSSFullscreen]);
-
   const toggleFullscreen = useCallback(() => {
-    const el = containerRef.current;
-    if (!el) return;
+    const container = containerRef.current;
+    if (!container) return;
 
     if (isFullscreen) {
-      // Exit
-      if (isCSSFullscreen) {
-        setIsCSSFullscreen(false);
-        setIsFullscreen(false);
-      } else if (document.exitFullscreen) {
+      // Exit fullscreen
+      if (document.exitFullscreen) {
         document.exitFullscreen();
       } else if ((document as any).webkitExitFullscreen) {
         (document as any).webkitExitFullscreen();
       }
-    } else {
-      // Enter — try real API first, fall back to CSS simulation (iOS)
-      if (el.requestFullscreen) {
-        el.requestFullscreen().catch(() => { setIsCSSFullscreen(true); setIsFullscreen(true); });
-      } else if ((el as any).webkitRequestFullscreen) {
-        (el as any).webkitRequestFullscreen();
-      } else {
-        // iOS Safari / browsers without div fullscreen: CSS simulation
-        setIsCSSFullscreen(true);
-        setIsFullscreen(true);
-      }
+      return;
     }
-  }, [isFullscreen, isCSSFullscreen]);
+
+    // Enter fullscreen — try container first (desktop/Android), then native video (iOS)
+    if (container.requestFullscreen) {
+      container.requestFullscreen().catch(() => {
+        // Fullscreen API failed on container — try native video element (iOS)
+        enterNativeVideoFullscreen();
+      });
+    } else if ((container as any).webkitRequestFullscreen) {
+      (container as any).webkitRequestFullscreen();
+    } else {
+      // No container fullscreen support (iOS Safari) — use native video fullscreen
+      enterNativeVideoFullscreen();
+    }
+  }, [isFullscreen]);
+
+  const enterNativeVideoFullscreen = useCallback(() => {
+    const video = playerRef.current?.getInternalPlayer() as HTMLVideoElement | null;
+    if (video && (video as any).webkitEnterFullscreen) {
+      (video as any).webkitEnterFullscreen();
+    }
+  }, []);
 
   // =========================================================================
   // Volume
@@ -541,21 +544,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         </div>
       )}
 
-      {/* Container — fullscreened as a unit so subtitles + controls travel with video.
-          CSS fullscreen (fixed position) is used on iOS where requestFullscreen() isn't supported on divs. */}
+      {/* Container — fullscreened via Fullscreen API (desktop/Android) so custom controls + subtitles travel with video.
+          On iOS Safari, native video.webkitEnterFullscreen() is used (Apple's controls take over — industry standard). */}
       <div
         ref={containerRef}
         tabIndex={0}
         role="region"
         aria-label={title || 'Video player'}
         className={`video-wrapper relative w-full outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 focus-visible:ring-offset-black ${
-          isCSSFullscreen ? 'fixed inset-0 z-[9999] bg-black' : ''
-        } ${isFullscreen && !isCSSFullscreen ? 'bg-black' : ''} ${
-          isFullscreen && !showControls && isPlaying ? 'cursor-none' : ''
-        }`}
+          isFullscreen ? 'bg-black' : ''
+        } ${isFullscreen && !showControls && isPlaying ? 'cursor-none' : ''}`}
         style={
-          isCSSFullscreen ? { width: '100vw', height: '100vh' }
-          : isFullscreen ? { width: '100%', height: '100%' }
+          isFullscreen ? { width: '100%', height: '100%' }
           : useNativeAspectRatio ? {}
           : { paddingBottom: '56.25%' }
         }
