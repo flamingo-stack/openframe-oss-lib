@@ -97,8 +97,27 @@ export function parseChunkToAction(chunk: unknown): ParsedChunkAction | null {
       return {
         action: 'message_request',
         text: String(data.text || ''),
+        ownerType: typeof data.ownerType === 'string' ? data.ownerType : undefined,
+        displayName: typeof data.displayName === 'string' ? data.displayName : undefined,
       }
-      
+
+    case MESSAGE_TYPE.SYSTEM:
+      if (typeof data.text === 'string') {
+        return { action: 'system', text: data.text }
+      }
+      return null
+
+    case MESSAGE_TYPE.DIRECT_MESSAGE:
+      if (typeof data.text === 'string') {
+        return {
+          action: 'direct_message',
+          text: data.text,
+          ownerType: typeof data.ownerType === 'string' ? data.ownerType : undefined,
+          displayName: typeof data.displayName === 'string' ? data.displayName : undefined,
+        }
+      }
+      return null
+
     default:
       return null
   }

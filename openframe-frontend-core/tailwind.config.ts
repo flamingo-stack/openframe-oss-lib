@@ -194,6 +194,13 @@ const config: Config = {
             visited: "var(--color-link-visited)",
           },
 
+          // Brand colors (theme-independent)
+          flamingo: {
+            pink: "var(--ods-flamingo-pink-base)",
+            cyan: "var(--ods-flamingo-cyan-base)",
+          },
+          "open-yellow": "var(--ods-open-yellow-base)",
+
           // Adaptive platform color
           current: "var(--ods-current)",
         },
