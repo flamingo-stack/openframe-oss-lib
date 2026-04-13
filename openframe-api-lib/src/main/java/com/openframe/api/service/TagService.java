@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -193,6 +194,54 @@ public class TagService {
                 .map(assignment -> buildTag(assignment, tagsById.get(assignment.getTagId())))
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public Tag createTag(String key, TagEntityType entityType, String description, String color) {
+        log.info("Creating tag '{}' with entityType: {}", key, entityType);
+
+        Tag tag = Tag.builder()
+                .key(key)
+                .entityType(entityType)
+                .description(description)
+                .color(color)
+                .createdAt(Instant.now())
+                .build();
+
+        return tagRepository.save(tag);
+    }
+
+    @Transactional
+    public Tag updateTag(String tagId, String key, String description, String color) {
+        log.info("Updating tag: {}", tagId);
+
+        Tag tag = tagRepository.findById(tagId)
+                .orElseThrow(() -> new IllegalArgumentException("Tag not found: " + tagId));
+
+        if (key != null) {
+            tag.setKey(key);
+        }
+        if (description != null) {
+            tag.setDescription(description);
+        }
+        if (color != null) {
+            tag.setColor(color);
+        }
+
+        return tagRepository.save(tag);
+    }
+
+    @Transactional
+    public void deleteTag(String tagId) {
+        log.info("Deleting tag: {}", tagId);
+
+        if (!tagRepository.existsById(tagId)) {
+            throw new IllegalArgumentException("Tag not found: " + tagId);
+        }
+
+        tagAssignmentRepository.deleteByTagId(tagId);
+        tagRepository.deleteById(tagId);
+        log.info("Tag deleted with cascade: {}", tagId);
     }
 
     private Tag buildTag(TagAssignment assignment, Tag tag) {
