@@ -5,7 +5,7 @@
 
 import type { ChunkData, NatsMessageType, FetchChunksFunction } from './network.types'
 import type { ChatType, ChatApprovalStatus } from './chat.types'
-import type { MessageSegment } from './message.types'
+import type { MessageSegment, TokenUsageData } from './message.types'
 
 // ========== Hook Options ==========
 
@@ -85,6 +85,8 @@ export interface RealtimeChunkCallbacks {
   onError?: (error: string, details?: string) => void
   /** Called when a user message request is received (echo) */
   onUserMessage?: (text: string) => void
+  /** Called when TOKEN_USAGE chunk is received with token stats */
+  onTokenUsage?: (data: TokenUsageData) => void
   /** Callback for approval actions */
   onApprove?: (requestId?: string) => Promise<void> | void
   /** Callback for rejection actions */

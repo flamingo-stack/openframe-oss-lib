@@ -18,6 +18,9 @@ export const MESSAGE_TYPE = {
   MESSAGE_END: 'MESSAGE_END',
   MESSAGE_REQUEST: 'MESSAGE_REQUEST',
   AI_METADATA: 'AI_METADATA',
+  TOKEN_USAGE: 'TOKEN_USAGE',
+  CONTEXT_COMPACTION_START: 'CONTEXT_COMPACTION_START',
+  CONTEXT_COMPACTION_END: 'CONTEXT_COMPACTION_END',
 } as const
 
 export type MessageType = typeof MESSAGE_TYPE[keyof typeof MESSAGE_TYPE]
@@ -134,6 +137,13 @@ export interface AIMetadataMessageData extends MessageDataBase {
   providerName?: string
   provider?: string
   contextWindow?: number
+}
+
+export interface TokenUsageData {
+  inputTokensSize: number
+  outputTokensSize: number
+  totalTokensSize: number
+  contextSize: number
 }
 
 export type MessageData =
