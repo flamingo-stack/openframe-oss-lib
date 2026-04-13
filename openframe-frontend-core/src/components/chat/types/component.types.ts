@@ -84,7 +84,7 @@ export interface ChatMessageListRef {
 
 export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'onSubmit'> {
   onSend?: (message: string) => void
-  onStop?: () => void
+  onStop?: () => void | Promise<void>
   sending?: boolean
   awaitingResponse?: boolean
   reserveAvatarOffset?: boolean
@@ -144,6 +144,7 @@ export interface ModelDisplayProps extends HTMLAttributes<HTMLDivElement> {
   modelName?: string
   displayName?: string
   contextWindow?: number
+  usedTokens?: number
   showIcon?: boolean
 }
 

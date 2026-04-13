@@ -57,6 +57,8 @@ export interface FileUploadProps {
   icon?: React.ReactNode
   /** Max height for the file list area (e.g., 200 or "200px"). When set, the file list scrolls independently. */
   maxListHeight?: number | string
+  /** Custom file picker function. When provided, this is called instead of the native HTML file input dialog. */
+  onOpenFilePicker?: () => Promise<File | File[] | undefined>
 }
 
 function formatFileSize(bytes: number): string {
@@ -84,6 +86,7 @@ export function FileUpload({
   className,
   icon,
   maxListHeight,
+  onOpenFilePicker,
 }: FileUploadProps) {
   const [dragActive, setDragActive] = React.useState(false)
   const [validationError, setValidationError] = React.useState<string | null>(null)
@@ -172,10 +175,21 @@ export function FileUpload({
     }
   }
 
-  const openDialog = () => {
-    if (!disabled) {
-      fileInputRef.current?.click()
+  const openDialog = async () => {
+    if (disabled) return
+
+    if (onOpenFilePicker) {
+      const result = await onOpenFilePicker()
+      if (result) {
+        const fileArray = Array.isArray(result) ? result : [result]
+        if (fileArray.length > 0) {
+          handleFiles(fileArray)
+        }
+      }
+      return
     }
+
+    fileInputRef.current?.click()
   }
 
   const displayError = error || validationError || undefined
