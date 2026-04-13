@@ -7,8 +7,8 @@ import com.openframe.api.dto.device.TagFilterOption;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.pinot.repository.PinotDeviceRepository;
 import com.openframe.data.repository.organization.OrganizationRepository;
+import com.openframe.data.service.TenantIdProvider;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -25,14 +25,14 @@ public class DeviceFilterService {
 
     private final PinotDeviceRepository pinotDeviceRepository;
     private final OrganizationRepository organizationRepository;
-
-    @Value("${TENANT_ID:oss}")
-    private String tenantId;
+    private final TenantIdProvider tenantIdProvider;
 
     public DeviceFilterService(PinotDeviceRepository pinotDeviceRepository,
-                              OrganizationRepository organizationRepository) {
+                              OrganizationRepository organizationRepository,
+                              TenantIdProvider tenantIdProvider) {
         this.pinotDeviceRepository = pinotDeviceRepository;
         this.organizationRepository = organizationRepository;
+        this.tenantIdProvider = tenantIdProvider;
     }
 
     public CompletableFuture<DeviceFilters> getDeviceFilters(DeviceFilterCriteria filters) {
@@ -44,6 +44,8 @@ public class DeviceFilterService {
         List<String> organizationIds = filters != null ? filters.getOrganizationIds() : emptyList();
         List<String> tagKeys = filters != null ? filters.getTagKeys() : emptyList();
         List<String> tagKeyValues = buildTagKeyValuesFilter(filters);
+
+        String tenantId = tenantIdProvider.getTenantId();
 
         CompletableFuture<Map<String, Integer>> statusesFuture = CompletableFuture.supplyAsync(() ->
                 pinotDeviceRepository.getStatusFilterOptions(tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));

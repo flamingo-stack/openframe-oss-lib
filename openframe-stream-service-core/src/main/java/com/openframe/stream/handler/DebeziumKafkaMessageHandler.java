@@ -1,6 +1,7 @@
 package com.openframe.stream.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.openframe.data.service.TenantIdProvider;
 import com.openframe.kafka.producer.retry.OssTenantRetryingKafkaProducer;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
@@ -18,14 +19,14 @@ public class DebeziumKafkaMessageHandler extends DebeziumMessageHandler<Integrat
     @Value("${openframe.oss-tenant.kafka.topics.outbound.integrated-tool-events}")
     private String topic;
 
-    @Value("${TENANT_ID:oss}")
-    private String tenantId;
-
     protected final OssTenantRetryingKafkaProducer kafkaProducer;
+    private final TenantIdProvider tenantIdProvider;
 
-    public DebeziumKafkaMessageHandler(OssTenantRetryingKafkaProducer kafkaProducer, ObjectMapper objectMapper) {
+    public DebeziumKafkaMessageHandler(OssTenantRetryingKafkaProducer kafkaProducer, ObjectMapper objectMapper,
+                                       TenantIdProvider tenantIdProvider) {
         super(objectMapper);
         this.kafkaProducer = kafkaProducer;
+        this.tenantIdProvider = tenantIdProvider;
     }
 
     @Override
@@ -46,7 +47,7 @@ public class DebeziumKafkaMessageHandler extends DebeziumMessageHandler<Integrat
                     ? debeziumMessage.getUnifiedEventType().getSummary()
                     : debeziumMessage.getMessage() );
             message.setEventTimestamp(debeziumMessage.getEventTimestamp());
-            message.setTenantId(tenantId);
+            message.setTenantId(tenantIdProvider.getTenantId());
 
         } catch (Exception e) {
             log.error("Error processing Kafka message", e);
@@ -82,7 +83,22 @@ public class DebeziumKafkaMessageHandler extends DebeziumMessageHandler<Integrat
 
     @Override
     protected boolean isValidMessage(DeserializedDebeziumMessage message) {
-        return message.getIsVisible();
+        if (!message.getIsVisible()) {
+            return false;
+        }
+
+        // Skip messages that predate the current tenant — protects against stale Kafka messages
+        // from a previous customer on a recycled cluster.
+        if (message.getEventTimestamp() != null) {
+            long tenantCreatedAt = tenantIdProvider.getTenantCreatedAtMillis();
+            if (tenantCreatedAt > 0 && message.getEventTimestamp() < tenantCreatedAt) {
+                log.debug("Skipping stale message (eventTimestamp={} < tenantCreatedAt={})",
+                        message.getEventTimestamp(), tenantCreatedAt);
+                return false;
+            }
+        }
+
+        return true;
     }
 
     protected String getTopic() {

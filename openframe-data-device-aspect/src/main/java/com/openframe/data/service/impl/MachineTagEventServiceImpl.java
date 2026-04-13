@@ -8,6 +8,7 @@ import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
 import com.openframe.data.service.MachineTagEventService;
+import com.openframe.data.service.TenantIdProvider;
 import com.openframe.kafka.model.MachinePinotMessage;
 import com.openframe.kafka.producer.retry.OssTenantRetryingKafkaProducer;
 import lombok.RequiredArgsConstructor;
@@ -33,12 +34,10 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
     private final TagAssignmentRepository tagAssignmentRepository;
     private final TagRepository tagRepository;
     private final OssTenantRetryingKafkaProducer ossTenantKafkaProducer;
+    private final TenantIdProvider tenantIdProvider;
 
     @Value("${openframe.oss-tenant.kafka.topics.outbound.devices-topic}")
     private String machineEventsTopic;
-
-    @Value("${TENANT_ID:oss}")
-    private String tenantId;
 
     @Override
     public void processMachineSave(Machine machine) {
@@ -348,7 +347,7 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
         }
 
         return MachinePinotMessage.builder()
-                .tenantId(tenantId)
+                .tenantId(tenantIdProvider.getTenantId())
                 .machineId(machine.getMachineId())
                 .organizationId(machine.getOrganizationId())
                 .deviceType(machine.getType() != null ? machine.getType().toString() : null)
