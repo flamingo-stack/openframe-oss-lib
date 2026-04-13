@@ -21,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Main client for working with Fleet MDM REST API
@@ -195,43 +196,85 @@ public class FleetMdmClient {
      * @throws FleetMdmApiException if the API returns an error
      */
     public QueryResult runQuery(long hostId, String query) throws IOException, InterruptedException {
-        if (query == null || query.trim().isEmpty()) {
-            throw new IllegalArgumentException("Query cannot be null or empty");
-        }
+        validateQuery(query);
 
         try {
-            // Create request body
-            String requestBody = MAPPER.writeValueAsString(
-                    MAPPER.createObjectNode().put("query", query)
-            );
-
-            HttpRequest request = addHeaders(HttpRequest.newBuilder()
-                    .uri(URI.create(baseUrl + HOSTS_URL + "/" + hostId + "/query"))
-                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-                    .header("Content-Type", "application/json"))
-                    .timeout(Duration.ofSeconds(90)) // Increased timeout for legitimate multi-query cases
-                    .build();
-
+            HttpRequest request = buildRunQueryRequest(hostId, query);
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() == 401) {
-                throw new FleetMdmApiException("Authentication failed. Please check your API token.", response.statusCode(), response.body());
-            } else if (response.statusCode() == 404) {
-                throw new FleetMdmApiException("Host not found with ID: " + hostId, response.statusCode(), response.body());
-            } else if (response.statusCode() != 200) {
-                throw new FleetMdmApiException("Failed to execute query", response.statusCode(), response.body());
-            }
-
-            QueryResult result = MAPPER.readValue(response.body(), QueryResult.class);
-            if (result.getQuery() == null) {
-                result.setQuery(query);
-            }
-            return result;
+            checkRunQueryResponse(response, hostId);
+            return parseQueryResult(response.body(), query);
         } catch (FleetMdmApiException e) {
             throw e;
         } catch (Exception e) {
             throw new FleetMdmException("Failed to execute query on host: " + hostId, e);
         }
+    }
+
+    /**
+     * Same as {@link #runQuery} but uses non-blocking HTTP and returns a future.
+     * Cancelling the future attempts to abort the in-flight request.
+     */
+    public CompletableFuture<QueryResult> runQueryAsync(long hostId, String query) {
+        validateQuery(query);
+
+        try {
+            HttpRequest request = buildRunQueryRequest(hostId, query);
+
+            return httpClient
+                    .sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                    .thenApply(response -> {
+                        checkRunQueryResponse(response, hostId);
+                        try {
+                            return parseQueryResult(response.body(), query);
+                        } catch (Exception e) {
+                            throw new FleetMdmException("Failed to parse query response for host: " + hostId, e);
+                        }
+                    });
+        } catch (Exception e) {
+            CompletableFuture<QueryResult> failed = new CompletableFuture<>();
+            failed.completeExceptionally(
+                    new FleetMdmException("Failed to execute query on host: " + hostId, e));
+            return failed;
+        }
+    }
+
+    private static void validateQuery(String query) {
+        if (query == null || query.trim().isEmpty()) {
+            throw new IllegalArgumentException("Query cannot be null or empty");
+        }
+    }
+
+    private HttpRequest buildRunQueryRequest(long hostId, String query) throws IOException {
+        String requestBody = MAPPER.writeValueAsString(
+                MAPPER.createObjectNode().put("query", query)
+        );
+
+        return addHeaders(HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + HOSTS_URL + "/" + hostId + "/query"))
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .header("Content-Type", "application/json"))
+                .timeout(Duration.ofSeconds(90))
+                .build();
+    }
+
+    private static void checkRunQueryResponse(HttpResponse<String> response, long hostId) {
+        if (response.statusCode() == 401) {
+            throw new FleetMdmApiException("Authentication failed. Please check your API token.", response.statusCode(), response.body());
+        }
+        if (response.statusCode() == 404) {
+            throw new FleetMdmApiException("Host not found with ID: " + hostId, response.statusCode(), response.body());
+        }
+        if (response.statusCode() != 200) {
+            throw new FleetMdmApiException("Failed to execute query", response.statusCode(), response.body());
+        }
+    }
+
+    private static QueryResult parseQueryResult(String body, String query) throws IOException {
+        QueryResult result = MAPPER.readValue(body, QueryResult.class);
+        if (result.getQuery() == null) {
+            result.setQuery(query);
+        }
+        return result;
     }
 
     /**

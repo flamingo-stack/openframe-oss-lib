@@ -8,6 +8,12 @@ import type { VideoTeaser, TranscriptWord, SpeakerMapping } from './video-proces
 export interface ChangelogEntry {
   title: string
   description?: string
+  /**
+   * Per-entry visibility flag. Optional so product releases (which always render
+   * publicly) remain backwards compatible. Investor updates require this field
+   * because each entry can be marked internal — see investor-update-utils.ts.
+   */
+  visibility?: 'public' | 'internal'
 }
 
 export interface ReleaseMedia {
@@ -93,12 +99,14 @@ export interface ProductRelease {
   main_video_url: string | null
   transcript: string | null
   transcript_words_data?: TranscriptWord[]
+  srt_content?: string | null
   video_summary: string | null // AI-generated summary from video transcription
   video_bites: VideoTeaser[] // JSONB array of extracted video clips
   highlight_video_url: string | null
   highlight_video_thumbnail: string | null
   highlight_video_duration_ms: number | null
   highlight_video_source: 'manual' | 'ai_generated' | null
+  main_video_thumbnail: string | null
   ai_transcript_formatted?: string
   speaker_mapping?: SpeakerMapping
   ai_confidence_transcript: number | null
@@ -119,6 +127,9 @@ export interface ProductRelease {
   // Timestamps
   created_at: string
   updated_at: string
+
+  // Editor-provided AI generation instructions (steers Generate Content prompt)
+  custom_instructions: string | null
 
   // Analytics
   view_count: number
@@ -162,12 +173,14 @@ export interface CreateProductReleaseData {
   youtube_url?: string
   main_video_url?: string
   transcript?: string
+  srt_content?: string | null
   video_summary?: string // AI-generated summary from video transcription
   video_bites?: VideoTeaser[]
   highlight_video_url?: string | null
   highlight_video_thumbnail?: string | null
   highlight_video_duration_ms?: number | null
   highlight_video_source?: 'manual' | 'ai_generated' | null
+  main_video_thumbnail?: string | null
   seo_title?: string
   seo_description?: string
   seo_keywords?: string
@@ -178,6 +191,7 @@ export interface CreateProductReleaseData {
   platforms: string[] // Array of platform IDs (UUIDs)
   featured_platform?: string // Platform ID for featured
   tags: number[] // Array of tag IDs
+  custom_instructions?: string | null
 }
 
 export type UpdateProductReleaseData = Partial<CreateProductReleaseData>

@@ -6,12 +6,23 @@
 import {
   MESSAGE_TYPE,
   OWNER_TYPE,
+  type AuthorType,
   type HistoricalMessage,
   type ProcessedMessage,
   type MessageProcessingOptions,
   type MessageData,
+  type MessageOwner,
 } from '../types'
 import { MessageSegmentAccumulator, createMessageSegmentAccumulator } from './message-segment-accumulator'
+
+function getOwnerDisplayName(owner?: MessageOwner): string {
+  if (owner?.type === OWNER_TYPE.ADMIN && owner.user) {
+    const { firstName, lastName } = owner.user
+    const name = [firstName, lastName].filter(Boolean).join(' ')
+    if (name) return name
+  }
+  return owner?.type === OWNER_TYPE.ADMIN ? 'Admin' : 'You'
+}
 
 /**
  * Result type for historical message processing
@@ -60,6 +71,7 @@ export function processHistoricalMessages(
         content: accumulator.getSegments(),
         name: assistantName,
         assistantType,
+        authorType: assistantType as AuthorType,
         timestamp: currentAssistantTimestamp || new Date(),
         avatar: assistantAvatar,
       })
@@ -80,19 +92,40 @@ export function processHistoricalMessages(
       ? [msg.messageData]
       : []
 
+    // Check for system messages first (standalone, never accumulated)
+    const hasSystemData = messageDataArray.some((data) => data.type === MESSAGE_TYPE.SYSTEM)
+    if (hasSystemData) {
+      flushAssistantMessage()
+      messageDataArray.forEach((data) => {
+        if (data.type === MESSAGE_TYPE.SYSTEM && 'text' in data && data.text) {
+          processedMessages.push({
+            id: msg.id,
+            role: 'user',
+            content: '',
+            name: data.text,
+            authorType: 'system',
+            timestamp: new Date(msg.createdAt),
+          })
+        }
+      })
+      return
+    }
+
     const isUserMessage =
       msg.owner?.type === OWNER_TYPE.CLIENT || msg.owner?.type === OWNER_TYPE.ADMIN
 
     if (isUserMessage) {
       flushAssistantMessage()
 
+      const userAuthorType: AuthorType = msg.owner?.type === OWNER_TYPE.ADMIN ? 'admin' : 'user'
       messageDataArray.forEach((data) => {
         if (data.type === MESSAGE_TYPE.TEXT && 'text' in data && data.text) {
           processedMessages.push({
             id: msg.id,
             role: 'user',
             content: data.text,
-            name: msg.owner?.type === OWNER_TYPE.ADMIN ? 'Admin' : 'You',
+            name: getOwnerDisplayName(msg.owner),
+            authorType: userAuthorType,
             timestamp: new Date(msg.createdAt),
           })
         }
@@ -321,6 +354,7 @@ export function processHistoricalMessagesWithErrors(
         content: accumulator.getSegments(),
         name: assistantName,
         assistantType,
+        authorType: assistantType as AuthorType,
         timestamp: currentAssistantTimestamp || new Date(),
         avatar: assistantAvatar,
       })
@@ -340,19 +374,40 @@ export function processHistoricalMessagesWithErrors(
       ? [msg.messageData]
       : []
 
+    // Check for system messages first (standalone, never accumulated)
+    const hasSystemData = messageDataArray.some((data) => data.type === MESSAGE_TYPE.SYSTEM)
+    if (hasSystemData) {
+      flushAssistantMessage()
+      messageDataArray.forEach((data) => {
+        if (data.type === MESSAGE_TYPE.SYSTEM && 'text' in data && data.text) {
+          processedMessages.push({
+            id: msg.id,
+            role: 'user',
+            content: '',
+            name: data.text,
+            authorType: 'system',
+            timestamp: new Date(msg.createdAt),
+          })
+        }
+      })
+      return
+    }
+
     const isUserMessage =
       msg.owner?.type === OWNER_TYPE.CLIENT || msg.owner?.type === OWNER_TYPE.ADMIN
 
     if (isUserMessage) {
       flushAssistantMessage()
 
+      const userAuthorType: AuthorType = msg.owner?.type === OWNER_TYPE.ADMIN ? 'admin' : 'user'
       messageDataArray.forEach((data) => {
         if (data.type === MESSAGE_TYPE.TEXT && 'text' in data && data.text) {
           processedMessages.push({
             id: msg.id,
             role: 'user',
             content: data.text,
-            name: msg.owner?.type === OWNER_TYPE.ADMIN ? 'Admin' : 'You',
+            name: getOwnerDisplayName(msg.owner),
+            authorType: userAuthorType,
             timestamp: new Date(msg.createdAt),
           })
         }

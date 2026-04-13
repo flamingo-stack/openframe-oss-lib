@@ -1,24 +1,20 @@
-'use client'
-
 import type * as React from 'react'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { cn } from '../../utils/cn'
 import { QuestionCircleIcon } from '../icons-v2-generated/signs-and-symbols/question-circle-icon'
 import { CircularProgress } from './circular-progress'
 import { FloatingTooltip } from './floating-tooltip'
-import { InteractiveCard } from './interactive-card'
 
-interface DashboardInfoCardProps {
+export interface DashboardInfoCardProps {
   title: string
   value: string | number
   percentage?: number
   showProgress?: boolean
   progressColor?: string
   className?: string
-  onClick?: () => void
   /**
-   * Navigation URL (uses router.push for client-side navigation without prefetching)
-   * If both href and onClick are provided, href takes precedence
+   * Navigation URL — renders the card as a Next.js Link
+   * When provided, cursor becomes pointer and hover accent styles are applied
    */
   href?: string
   /** Tooltip content shown on a question-mark icon next to the value */
@@ -34,17 +30,14 @@ export function DashboardInfoCard({
   showProgress = false,
   progressColor,
   className,
-  onClick,
   href,
   tooltip,
   valueClassName
 }: DashboardInfoCardProps) {
-  const router = href ? useRouter() : null
   const formattedValue = typeof value === 'number'
     ? value.toLocaleString()
     : value
 
-  // Card content (reused in both Link and InteractiveCard)
   const cardContent = (
     <>
       {/* Content section */}
@@ -84,40 +77,33 @@ export function DashboardInfoCard({
     </>
   )
 
-  const handleCardClick = () => {
-    if (href && router) {
-      router.push(href)
-    }
-  }
+  const baseClassName = 'bg-ods-card border border-ods-border rounded-[6px] p-4 flex gap-3 items-center transition-all'
 
   if (href) {
     return (
-      <InteractiveCard
-        onClick={handleCardClick}
+      <Link
+        href={href}
         className={cn(
-          'bg-ods-card border border-ods-border rounded-[6px] p-4 flex gap-3 items-center',
-          'cursor-pointer transition-all group',
+          baseClassName,
+          'cursor-pointer group',
           'hover:border-ods-accent',
-          '[&:hover_h3]:text-ods-accent',
           '[&:hover_.text-ods-text-primary]:text-ods-accent',
           className
         )}
       >
         {cardContent}
-      </InteractiveCard>
+      </Link>
     )
   }
 
-  // Otherwise, render as InteractiveCard with onClick
   return (
-    <InteractiveCard
-      onClick={onClick}
+    <div
       className={cn(
-        'bg-ods-card border border-ods-border rounded-[6px] p-4 flex gap-3 items-center',
+        baseClassName,
         className
       )}
     >
       {cardContent}
-    </InteractiveCard>
+    </div>
   )
 }

@@ -4,7 +4,8 @@ import com.netflix.graphql.dgs.*;
 import graphql.relay.Relay;
 import com.openframe.api.dto.device.DeviceFilterOption;
 import com.openframe.api.service.TagService;
-import com.openframe.data.document.tool.Tag;
+import com.openframe.data.document.tag.Tag;
+import com.openframe.data.document.tag.TagEntityType;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,9 +30,9 @@ public class TagDataFetcher {
     }
 
     @DgsQuery
-    public List<Tag> tags(@InputArgument @NotBlank String organizationId) {
-        log.debug("Fetching tags for org: {}", organizationId);
-        return tagService.listTags(organizationId);
+    public List<Tag> tags() {
+        log.debug("Fetching device tags (tenant-wide)");
+        return tagService.listTags();
     }
 
     @DgsQuery
@@ -42,20 +43,48 @@ public class TagDataFetcher {
 
     @DgsQuery
     public List<Tag> tagKeySuggestions(
-            @InputArgument @NotBlank String organizationId,
             @InputArgument String search,
             @InputArgument Integer limit) {
-        log.debug("Autocomplete tag keys for org: {}, search: {}, limit: {}", organizationId, search, limit);
-        return tagService.searchTagKeys(organizationId, search, limit);
+        log.debug("Autocomplete device tag keys (tenant-wide): search: {}, limit: {}", search, limit);
+        return tagService.searchTagKeys(search, limit);
     }
 
     @DgsQuery
     public List<String> tagValueSuggestions(
-            @InputArgument @NotBlank String organizationId,
             @InputArgument @NotBlank String tagKey,
             @InputArgument String search,
             @InputArgument Integer limit) {
-        log.debug("Autocomplete tag values for org: {}, key: {}, search: {}, limit: {}", organizationId, tagKey, search, limit);
-        return tagService.searchTagValues(organizationId, tagKey, search, limit);
+        log.debug("Autocomplete device tag values (tenant-wide): key: {}, search: {}, limit: {}", tagKey, search, limit);
+        return tagService.searchTagValues(tagKey, search, limit);
+    }
+
+    @DgsMutation
+    public Tag createTag(
+            @InputArgument @NotBlank String key,
+            @InputArgument @NotBlank String entityType,
+            @InputArgument String description,
+            @InputArgument String color) {
+        log.info("Creating tag '{}' with entityType: {}", key, entityType);
+        TagEntityType type = TagEntityType.valueOf(entityType);
+        return tagService.createTag(key, type, description, color);
+    }
+
+    @DgsMutation
+    public Tag updateTag(
+            @InputArgument @NotBlank String id,
+            @InputArgument String key,
+            @InputArgument String description,
+            @InputArgument String color) {
+        String rawId = RELAY.fromGlobalId(id).getId();
+        log.info("Updating tag with global ID: {}, rawId: {}", id, rawId);
+        return tagService.updateTag(rawId, key, description, color);
+    }
+
+    @DgsMutation
+    public boolean deleteTag(@InputArgument @NotBlank String id) {
+        String rawId = RELAY.fromGlobalId(id).getId();
+        log.info("Deleting tag with global ID: {}, rawId: {}", id, rawId);
+        tagService.deleteTag(rawId);
+        return true;
     }
 }

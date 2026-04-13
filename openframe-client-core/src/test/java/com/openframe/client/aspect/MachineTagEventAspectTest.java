@@ -2,8 +2,9 @@ package com.openframe.client.aspect;
 
 import com.openframe.data.aspect.MachineTagEventAspect;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.device.MachineTag;
-import com.openframe.data.document.tool.Tag;
+import com.openframe.data.document.tag.Tag;
+import com.openframe.data.document.tag.TagAssignment;
+import com.openframe.data.document.tag.TagEntityType;
 import com.openframe.data.service.MachineTagEventService;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.junit.jupiter.api.BeforeEach;
@@ -74,40 +75,43 @@ class MachineTagEventAspectTest {
     }
 
     @Test
-    void testMachineTagSaveAspect() {
+    void testTagAssignmentSaveAspect() {
         // Arrange
-        MachineTag machineTag = new MachineTag();
-        machineTag.setId("machine-tag-1");
-        machineTag.setMachineId("machine-1");
-        machineTag.setTagId("tag-1");
+        TagAssignment assignment = new TagAssignment();
+        assignment.setId("assignment-1");
+        assignment.setEntityId("machine-1");
+        assignment.setTagId("tag-1");
+        assignment.setEntityType(TagEntityType.DEVICE);
 
         // Act - directly call the aspect method
-        machineTagEventAspect.afterMachineTagSave(null, machineTag, machineTag);
+        machineTagEventAspect.afterTagAssignmentSave(null, assignment, assignment);
 
         // Assert
-        verify(machineTagEventService, times(1)).processMachineTagSave(machineTag);
+        verify(machineTagEventService, times(1)).processTagAssignmentSave(assignment);
     }
 
     @Test
-    void testMachineTagSaveAllAspect() {
+    void testTagAssignmentSaveAllAspect() {
         // Arrange
-        MachineTag machineTag1 = new MachineTag();
-        machineTag1.setId("machine-tag-1");
-        machineTag1.setMachineId("machine-1");
-        machineTag1.setTagId("tag-1");
+        TagAssignment assignment1 = new TagAssignment();
+        assignment1.setId("assignment-1");
+        assignment1.setEntityId("machine-1");
+        assignment1.setTagId("tag-1");
+        assignment1.setEntityType(TagEntityType.DEVICE);
 
-        MachineTag machineTag2 = new MachineTag();
-        machineTag2.setId("machine-tag-2");
-        machineTag2.setMachineId("machine-2");
-        machineTag2.setTagId("tag-2");
+        TagAssignment assignment2 = new TagAssignment();
+        assignment2.setId("assignment-2");
+        assignment2.setEntityId("machine-2");
+        assignment2.setTagId("tag-2");
+        assignment2.setEntityType(TagEntityType.DEVICE);
 
-        List<MachineTag> machineTags = Arrays.asList(machineTag1, machineTag2);
+        List<TagAssignment> assignments = Arrays.asList(assignment1, assignment2);
 
         // Act - directly call the aspect method
-        machineTagEventAspect.afterMachineTagSaveAll(null, machineTags, machineTags);
+        machineTagEventAspect.afterTagAssignmentSaveAll(null, assignments, assignments);
 
         // Assert
-        verify(machineTagEventService, times(1)).processMachineTagSaveAll(machineTags);
+        verify(machineTagEventService, times(1)).processTagAssignmentSaveAll(assignments);
     }
 
     @Test
@@ -231,62 +235,62 @@ class MachineTagEventAspectTest {
     // --- Delete interception tests ---
 
     @Test
-    void testMachineTagDelete_DelegatesToServiceBeforeProceed() throws Throwable {
+    void testTagAssignmentDelete_DelegatesToServiceBeforeProceed() throws Throwable {
         // Arrange
-        String machineId = "machine-1";
+        String entityId = "machine-1";
         String tagId = "tag-1";
         when(proceedingJoinPoint.proceed()).thenReturn(null);
 
         // Act
-        machineTagEventAspect.aroundMachineTagDelete(proceedingJoinPoint, machineId, tagId);
+        machineTagEventAspect.aroundTagAssignmentDelete(proceedingJoinPoint, entityId, tagId, TagEntityType.DEVICE);
 
         // Assert - service called before proceed
         var inOrder = inOrder(machineTagEventService, proceedingJoinPoint);
-        inOrder.verify(machineTagEventService).processMachineTagDelete(machineId, tagId);
+        inOrder.verify(machineTagEventService).processTagAssignmentDelete(entityId, tagId);
         inOrder.verify(proceedingJoinPoint).proceed();
     }
 
     @Test
-    void testMachineTagDeleteByTagId_DelegatesToServiceBeforeProceed() throws Throwable {
+    void testTagAssignmentDeleteByTagId_DelegatesToServiceBeforeProceed() throws Throwable {
         // Arrange
         String tagId = "tag-1";
         when(proceedingJoinPoint.proceed()).thenReturn(null);
 
         // Act
-        machineTagEventAspect.aroundMachineTagDeleteByTagId(proceedingJoinPoint, tagId);
+        machineTagEventAspect.aroundTagAssignmentDeleteByTagId(proceedingJoinPoint, tagId);
 
         // Assert - service called before proceed
         var inOrder = inOrder(machineTagEventService, proceedingJoinPoint);
-        inOrder.verify(machineTagEventService).processMachineTagDeleteByTagId(tagId);
+        inOrder.verify(machineTagEventService).processTagAssignmentDeleteByTagId(tagId);
         inOrder.verify(proceedingJoinPoint).proceed();
     }
 
     @Test
-    void testMachineTagDelete_ProceedsEvenWhenServiceThrows() throws Throwable {
+    void testTagAssignmentDelete_ProceedsEvenWhenServiceThrows() throws Throwable {
         // Arrange
-        String machineId = "machine-1";
+        String entityId = "machine-1";
         String tagId = "tag-1";
         doThrow(new RuntimeException("Kafka error"))
-                .when(machineTagEventService).processMachineTagDelete(machineId, tagId);
+                .when(machineTagEventService).processTagAssignmentDelete(entityId, tagId);
         when(proceedingJoinPoint.proceed()).thenReturn(null);
 
         // Act - should not throw
-        machineTagEventAspect.aroundMachineTagDelete(proceedingJoinPoint, machineId, tagId);
+        machineTagEventAspect.aroundTagAssignmentDelete(proceedingJoinPoint, entityId, tagId, TagEntityType.DEVICE);
 
         // Assert - delete still proceeds despite service error
         verify(proceedingJoinPoint, times(1)).proceed();
     }
 
     @Test
-    void testMachineTagDeleteByTagId_ProceedsEvenWhenServiceThrows() throws Throwable {
+    void testTagAssignmentDeleteByTagId_ProceedsEvenWhenServiceThrows() throws Throwable {
         // Arrange
         String tagId = "tag-1";
         doThrow(new RuntimeException("Kafka error"))
-                .when(machineTagEventService).processMachineTagDeleteByTagId(tagId);
+                .when(machineTagEventService).processTagAssignmentDeleteByTagId(tagId);
         when(proceedingJoinPoint.proceed()).thenReturn(null);
 
         // Act - should not throw
-        machineTagEventAspect.aroundMachineTagDeleteByTagId(proceedingJoinPoint, tagId);
+        machineTagEventAspect.aroundTagAssignmentDeleteByTagId(proceedingJoinPoint, tagId);
 
         // Assert - delete still proceeds despite service error
         verify(proceedingJoinPoint, times(1)).proceed();
@@ -300,7 +304,7 @@ class MachineTagEventAspectTest {
         Machine machine = new Machine();
         machine.setId("machine-1");
         machine.setHostname("test-machine");
-        
+
         doThrow(new RuntimeException("Service error"))
             .when(machineTagEventService).processMachineSave(machine);
 
@@ -312,21 +316,22 @@ class MachineTagEventAspectTest {
     }
 
     @Test
-    void testErrorHandling_MachineTagSave() {
+    void testErrorHandling_TagAssignmentSave() {
         // Arrange
-        MachineTag machineTag = new MachineTag();
-        machineTag.setId("machine-tag-1");
-        machineTag.setMachineId("machine-1");
-        machineTag.setTagId("tag-1");
-        
+        TagAssignment assignment = new TagAssignment();
+        assignment.setId("assignment-1");
+        assignment.setEntityId("machine-1");
+        assignment.setTagId("tag-1");
+        assignment.setEntityType(TagEntityType.DEVICE);
+
         doThrow(new RuntimeException("Service error"))
-            .when(machineTagEventService).processMachineTagSave(machineTag);
+            .when(machineTagEventService).processTagAssignmentSave(assignment);
 
         // Act & Assert - should not throw exception
-        machineTagEventAspect.afterMachineTagSave(null, machineTag, machineTag);
+        machineTagEventAspect.afterTagAssignmentSave(null, assignment, assignment);
 
         // Should still call the service
-        verify(machineTagEventService, times(1)).processMachineTagSave(machineTag);
+        verify(machineTagEventService, times(1)).processTagAssignmentSave(assignment);
     }
 
     @Test
@@ -336,7 +341,7 @@ class MachineTagEventAspectTest {
         tag.setId("tag-1");
         tag.setKey("test-tag");
         tag.setColor("#FF0000");
-        
+
         when(proceedingJoinPoint.proceed()).thenThrow(new RuntimeException("Database error"));
 
         // Act & Assert - should propagate the exception
@@ -359,4 +364,4 @@ class MachineTagEventAspectTest {
         // Should not call the service due to ClassCastException
         verify(machineTagEventService, never()).processMachineSave(any());
     }
-} 
+}

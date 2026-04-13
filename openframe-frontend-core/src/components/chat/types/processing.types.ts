@@ -18,8 +18,10 @@ export type ParsedChunkAction =
   | { action: 'tool_execution'; segment: ToolExecutionSegment }
   | { action: 'approval_request'; requestId: string; command: string; explanation?: string; approvalType: string }
   | { action: 'approval_result'; requestId: string; approved: boolean; approvalType: string }
-  | { action: 'message_request'; text: string }
+  | { action: 'message_request'; text: string; ownerType?: string; displayName?: string }
   | { action: 'token_usage'; data: TokenUsageData }
+  | { action: 'direct_message'; text: string; ownerType?: string; displayName?: string }
+  | { action: 'system'; text: string }
 
 // ========== Accumulator State ==========
 
