@@ -1,5 +1,4 @@
 export { AcornIcon } from './acorn-icon';
-export { AppleIcon } from './apple-icon';
 export { AvocadoIcon } from './avocado-icon';
 export { BagelIcon } from './bagel-icon';
 export { BananaIcon } from './banana-icon';

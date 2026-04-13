@@ -50,6 +50,8 @@ export interface ChunkData {
   providerName?: string
   provider?: string
   contextWindow?: number
+  ownerType?: string
+  displayName?: string
   [key: string]: any
 }
 

@@ -3,7 +3,7 @@
  * Contains all message structures, segments, and content types
  */
 
-import type { AssistantType, ChatApprovalStatus, MessageOwner } from './chat.types'
+import type { AssistantType, AuthorType, ChatApprovalStatus, MessageOwner } from './chat.types'
 
 // ========== Message Type Definitions ==========
 
@@ -18,6 +18,8 @@ export const MESSAGE_TYPE = {
   MESSAGE_END: 'MESSAGE_END',
   MESSAGE_REQUEST: 'MESSAGE_REQUEST',
   AI_METADATA: 'AI_METADATA',
+  DIRECT_MESSAGE: 'DIRECT_MESSAGE',
+  SYSTEM: 'SYSTEM',
 } as const
 
 export type MessageType = typeof MESSAGE_TYPE[keyof typeof MESSAGE_TYPE]
@@ -136,6 +138,11 @@ export interface AIMetadataMessageData extends MessageDataBase {
   contextWindow?: number
 }
 
+export interface SystemMessageData extends MessageDataBase {
+  type: 'SYSTEM'
+  text?: string
+}
+
 export type MessageData =
   | TextMessageData
   | ExecutingToolMessageData
@@ -144,6 +151,7 @@ export type MessageData =
   | ApprovalResultMessageData
   | ErrorMessageData
   | AIMetadataMessageData
+  | SystemMessageData
 
 // ========== Historical Message Types ==========
 
@@ -164,6 +172,7 @@ export interface ProcessedMessage {
   content: MessageContent
   name?: string
   assistantType?: AssistantType
+  authorType?: AuthorType
   timestamp: Date
   avatar?: string
 }
@@ -176,6 +185,7 @@ export interface Message {
   content: MessageContent
   name?: string
   assistantType?: AssistantType
+  authorType?: AuthorType
   timestamp?: Date
   avatar?: string | null
 }

@@ -99,12 +99,14 @@ export interface ProductRelease {
   main_video_url: string | null
   transcript: string | null
   transcript_words_data?: TranscriptWord[]
+  srt_content?: string | null
   video_summary: string | null // AI-generated summary from video transcription
   video_bites: VideoTeaser[] // JSONB array of extracted video clips
   highlight_video_url: string | null
   highlight_video_thumbnail: string | null
   highlight_video_duration_ms: number | null
   highlight_video_source: 'manual' | 'ai_generated' | null
+  main_video_thumbnail: string | null
   ai_transcript_formatted?: string
   speaker_mapping?: SpeakerMapping
   ai_confidence_transcript: number | null
@@ -171,12 +173,14 @@ export interface CreateProductReleaseData {
   youtube_url?: string
   main_video_url?: string
   transcript?: string
+  srt_content?: string | null
   video_summary?: string // AI-generated summary from video transcription
   video_bites?: VideoTeaser[]
   highlight_video_url?: string | null
   highlight_video_thumbnail?: string | null
   highlight_video_duration_ms?: number | null
   highlight_video_source?: 'manual' | 'ai_generated' | null
+  main_video_thumbnail?: string | null
   seo_title?: string
   seo_description?: string
   seo_keywords?: string

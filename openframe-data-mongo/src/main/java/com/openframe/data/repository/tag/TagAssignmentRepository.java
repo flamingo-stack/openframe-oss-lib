@@ -18,6 +18,8 @@ public interface TagAssignmentRepository extends MongoRepository<TagAssignment, 
 
     void deleteByEntityIdAndTagIdAndEntityType(String entityId, String tagId, TagEntityType entityType);
 
+    void deleteByEntityIdAndEntityType(String entityId, TagEntityType entityType);
+
     List<TagAssignment> findByEntityIdInAndEntityType(List<String> entityIds, TagEntityType entityType);
 
     List<TagAssignment> findByTagIdIn(List<String> tagIds);
