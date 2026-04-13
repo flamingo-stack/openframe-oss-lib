@@ -122,7 +122,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                 if (segment.type === 'text') {
                   return (
                     <div key={index} className={cn(
-                      "min-w-0 w-full overflow-hidden text-h4",
+                      "min-w-0 w-full break-words text-h4",
                       isError
                         ? "text-ods-error"
                         : "text-ods-text-primary"

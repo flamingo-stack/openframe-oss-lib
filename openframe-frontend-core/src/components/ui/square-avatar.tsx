@@ -22,7 +22,7 @@ interface SquareAvatarProps extends React.HTMLAttributes<HTMLDivElement> {
   variant?: 'square' | 'round';
 }
 
-const SquareAvatar = React.forwardRef<HTMLDivElement, SquareAvatarProps>(
+const SquareAvatar = React.memo(React.forwardRef<HTMLDivElement, SquareAvatarProps>(
   ({ className, src, alt, size = 'md', fallback, variant = 'square', ...props }, ref) => {
     const sizeClasses = {
       sm: 'h-8 w-8',
@@ -77,7 +77,7 @@ const SquareAvatar = React.forwardRef<HTMLDivElement, SquareAvatarProps>(
       </div>
     )
   }
-)
+))
 SquareAvatar.displayName = "SquareAvatar"
 
 export { SquareAvatar };
