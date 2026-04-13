@@ -494,7 +494,7 @@ export const SimpleMarkdownRenderer: React.FC<SimpleMarkdownRendererProps> = ({
   return (
     <div className={`simple-markdown-renderer ${className}`}>
       <style dangerouslySetInnerHTML={{ __html: mermaidStyles }} />
-      <div className="content-wrapper max-w-none">
+      <div className="content-wrapper max-w-none break-words">
         <article className="prose prose-lg max-w-none">
           <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkBreaks]}
