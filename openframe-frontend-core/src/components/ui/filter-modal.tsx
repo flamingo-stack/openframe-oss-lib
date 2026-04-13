@@ -3,9 +3,11 @@
 import { useEffect, useState } from 'react'
 
 import { cn } from '../../utils/cn'
+import { Filter02Icon } from '../icons-v2-generated/sort-and-filter/filter-02-icon'
 import { Button } from './button'
 import { FilterCheckboxItem } from './filter-checkbox-item'
 import { ModalV2, ModalV2Content, ModalV2Footer, ModalV2Header, ModalV2Title } from './modal-v2'
+import { Skeleton } from './skeleton'
 import { SortColumnItem, type SortConfig, type SortDirection } from './sort-column-item'
 import { TagKeyValueFilter, type TagKeyConfig } from './tag-key-value-filter'
 import type { TableFilters } from './table/types'
@@ -47,6 +49,12 @@ export interface FilterModalProps {
   onTagsChange?: (tags: string[]) => void
   /** Title for the tag keys section */
   tagFilterTitle?: string
+  /** Show skeleton loading state */
+  isLoading?: boolean
+  /** Text shown in empty state title */
+  emptyStateTitle?: string
+  /** Text shown in empty state description */
+  emptyStateDescription?: string
 }
 
 export function FilterModal({
@@ -66,6 +74,9 @@ export function FilterModal({
   selectedTags,
   onTagsChange,
   tagFilterTitle,
+  isLoading = false,
+  emptyStateTitle = 'No filters available',
+  emptyStateDescription = 'There are no filter options to display at the moment',
 }: FilterModalProps) {
   const [selectedFilters, setSelectedFilters] = useState<TableFilters>(() => {
     return { ...currentFilters }
@@ -111,18 +122,62 @@ export function FilterModal({
     return sortConfig?.sortBy === columnKey ? sortConfig.sortDirection : undefined
   }
 
+  const hasSort = !!sortConfig && sortConfig.columns.length > 0
+  const hasFilterGroups = filterGroups.length > 0
+  const hasTagFilter = !!tagFilterKeys && tagFilterKeys.length > 0 && !!onTagsChange
+  const isEmpty = !isLoading && !hasSort && !hasFilterGroups && !hasTagFilter
+
   return (
     <ModalV2
       isOpen={isOpen}
       onClose={onClose}
-      className={cn('max-w-none max-h-[80vh]', className)}
+      className={cn('max-w-none max-h-[90vh]', className)}
     >
       <ModalV2Header>
         <ModalV2Title>{title}</ModalV2Title>
       </ModalV2Header>
 
-      <ModalV2Content className="flex-1 min-h-0 flex flex-col md:bg-ods-bg md:border md:border-ods-border md:rounded-md md:px-3">
+      <ModalV2Content
+        className={cn(
+          'flex-1 min-h-0 flex flex-col',
+          !isEmpty && 'md:bg-ods-bg md:border md:border-ods-border md:rounded-md md:px-3',
+        )}
+      >
         <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-4 md:py-3">
+        {isLoading ? (
+          <>
+            {[0, 1].map((group) => (
+              <div key={group} className="flex flex-col gap-1">
+                <Skeleton className="h-5 w-24" />
+                <div className="rounded-md border border-ods-border overflow-hidden">
+                  {[0, 1, 2].map((row) => (
+                    <div
+                      key={row}
+                      className="flex items-center gap-3 px-4 py-3 bg-ods-card border-b border-ods-border last:border-b-0"
+                    >
+                      <Skeleton className="h-6 w-6 rounded-[6px] shrink-0" />
+                      <Skeleton className="h-4 flex-1 max-w-[60%]" />
+                      <Skeleton className="h-4 w-10 shrink-0" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </>
+        ) : isEmpty ? (
+          <div className="flex flex-col items-center justify-center gap-6 h-[240px] p-6">
+            <Filter02Icon className="text-ods-text-secondary" size={24} />
+            <div className="flex flex-col items-center text-center text-ods-text-secondary">
+              <p className="text-h4">
+                {emptyStateTitle}
+              </p>
+              <p className="text-h6">
+                {emptyStateDescription}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <>
         {/* Sort columns */}
         {sortConfig && sortConfig.columns.length > 0 && (
           <div className="flex flex-col gap-1">
@@ -174,6 +229,8 @@ export function FilterModal({
             onTagsChange={setPendingTags}
             keysTitle={tagFilterTitle}
           />
+        )}
+          </>
         )}
         </div>
       </ModalV2Content>
