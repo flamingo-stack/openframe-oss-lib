@@ -68,10 +68,16 @@ export interface TranscribeAndSummarizeCombinedSectionProps {
   transcriptPlaceholder?: string;
   /** Minimum height for transcript textarea */
   transcriptMinHeight?: number;
+  /** SRT subtitle content */
+  subtitles?: string;
+  /** Callback when subtitles change */
+  onSubtitlesChange?: (value: string) => void;
   /** Whether fields are disabled */
   disabled?: boolean;
   /** Additional class name */
   className?: string;
+  /** Whether SRT subtitles were generated alongside transcription */
+  hasSubtitles?: boolean;
 }
 
 /**
@@ -115,8 +121,11 @@ export function TranscribeAndSummarizeCombinedSection({
   transcriptHelperText = "Full video transcript with speaker diarization and timestamps",
   transcriptPlaceholder = "**[00:00] Speaker Name:** Text here...",
   transcriptMinHeight,
+  subtitles,
+  onSubtitlesChange,
   disabled = false,
   className = '',
+  hasSubtitles = false,
 }: TranscribeAndSummarizeCombinedSectionProps) {
   const defaultButtonLabel = hasResult ? "Regenerate" : "Generate";
 
@@ -141,7 +150,7 @@ export function TranscribeAndSummarizeCombinedSection({
         isCancelling={isCancelling}
       />
 
-      {/* 2. Transcript & Summary Editor */}
+      {/* 2. Transcript, Summary & Subtitles Editor */}
       <TranscriptSummaryEditor
         videoSummary={videoSummary}
         onVideoSummaryChange={onVideoSummaryChange}
@@ -157,6 +166,8 @@ export function TranscribeAndSummarizeCombinedSection({
         transcriptHelperText={transcriptHelperText}
         transcriptPlaceholder={transcriptPlaceholder}
         transcriptMinHeight={transcriptMinHeight}
+        subtitles={subtitles}
+        onSubtitlesChange={onSubtitlesChange}
         disabled={disabled}
       />
     </div>

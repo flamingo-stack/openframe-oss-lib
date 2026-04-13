@@ -32,6 +32,39 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, type, invalid = false, startAdornment, endAdornment, label, error, errorVariant = "error", loading = false, ...props }, ref) => {
     const isInvalid = invalid || !!error
 
+    // Range inputs get a clean slider rendering — no label wrapper, borders, or adornments
+    if (type === 'range') {
+      const rangeInput = (
+        <input
+          type="range"
+          className={cn(
+            "w-full cursor-pointer appearance-none rounded-full bg-white/30 h-1",
+            // Webkit (Chrome/Safari) thumb
+            "[&::-webkit-slider-thumb]:appearance-none",
+            "[&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3",
+            "[&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white",
+            "[&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-sm",
+            // Firefox thumb
+            "[&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3",
+            "[&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white",
+            "[&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer",
+            // Firefox track
+            "[&::-moz-range-track]:bg-transparent",
+            // Disabled
+            "disabled:cursor-not-allowed disabled:opacity-50",
+            className
+          )}
+          ref={ref}
+          {...props}
+        />
+      )
+      return label ? (
+        <FieldWrapper label={label} error={error} errorVariant={errorVariant}>
+          {rangeInput}
+        </FieldWrapper>
+      ) : rangeInput
+    }
+
     const content = (
       <label
         data-invalid={isInvalid || undefined}
