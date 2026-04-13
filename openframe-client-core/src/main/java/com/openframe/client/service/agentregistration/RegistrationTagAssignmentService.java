@@ -4,6 +4,7 @@ import com.openframe.client.dto.agent.AgentRegistrationTagInput;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
+import com.openframe.data.document.tag.TagValidation;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +15,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.regex.Pattern;
 
 /**
  * Handles tag creation and assignment during agent registration.
@@ -30,8 +30,6 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 @Slf4j
 public class RegistrationTagAssignmentService {
-
-    private static final Pattern TAG_PATTERN = Pattern.compile("^[a-zA-Z0-9_]+$");
 
     private final TagRepository tagRepository;
     private final TagAssignmentRepository tagAssignmentRepository;
@@ -51,7 +49,9 @@ public class RegistrationTagAssignmentService {
 
         for (AgentRegistrationTagInput tagInput : tags) {
             try {
-                validateTag(tagInput);
+                TagValidation.validateKey(tagInput.getKey());
+                TagValidation.validateValues(tagInput.getValues(), tagInput.getKey());
+
                 Tag tag = findOrCreateTag(tagInput.getKey(), tagInput.getValues(), now);
 
                 TagAssignment assignment = TagAssignment.builder()
@@ -67,21 +67,6 @@ public class RegistrationTagAssignmentService {
             } catch (Exception e) {
                 log.error("Failed to assign tag '{}' to machine {} during registration: {}",
                         tagInput.getKey(), machineId, e.getMessage(), e);
-            }
-        }
-    }
-
-    private void validateTag(AgentRegistrationTagInput tagInput) {
-        if (tagInput.getKey() == null || !TAG_PATTERN.matcher(tagInput.getKey()).matches()) {
-            throw new IllegalArgumentException(
-                    "Invalid tag key '%s': must contain only alphanumeric characters and underscores".formatted(tagInput.getKey()));
-        }
-        if (tagInput.getValues() != null) {
-            for (String value : tagInput.getValues()) {
-                if (value == null || !TAG_PATTERN.matcher(value).matches()) {
-                    throw new IllegalArgumentException(
-                            "Invalid tag value '%s' for key '%s': must contain only alphanumeric characters and underscores".formatted(value, tagInput.getKey()));
-                }
             }
         }
     }

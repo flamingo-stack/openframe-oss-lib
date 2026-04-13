@@ -24,7 +24,7 @@ export { NextIcon } from './next-icon';
 export { PauseCircleIcon } from './pause-circle-icon';
 export { PauseIcon } from './pause-icon';
 export { PlayCircleIcon } from './play-circle-icon';
-export { PlayIcon } from './play-icon';
+export { PlayIcon, PLAY_ICON_PATH } from './play-icon';
 export { PreviousIcon } from './previous-icon';
 export { RecordingCircleIcon } from './recording-circle-icon';
 export { RecordingIcon } from './recording-icon';
