@@ -48,11 +48,23 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       }
     }, [])
 
-    const handleStop = useCallback(() => {
-      if (onStop) {
-        onStop()
+    const [isStopping, setIsStopping] = useState(false)
+
+    useEffect(() => {
+      if (!sending) {
+        setIsStopping(false)
       }
-    }, [onStop])
+    }, [sending])
+
+    const handleStop = useCallback(async () => {
+      if (!onStop || isStopping) return
+      setIsStopping(true)
+      try {
+        await onStop()
+      } catch {
+        setIsStopping(false)
+      }
+    }, [onStop, isStopping])
     
     // Show awaiting response state
     if (awaitingResponse) {
@@ -125,9 +137,10 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             <button
               type="button"
               onClick={handleStop}
+              disabled={isStopping}
               className={cn(
                 "rounded-md p-1.5 text-ods-text-secondary transition-all",
-                "hover:text-ods-accent active:scale-95",
+                isStopping ? "cursor-not-allowed opacity-40" : "hover:text-ods-accent active:scale-95",
                 "focus:outline-none"
               )}
               aria-label="Stop generation"

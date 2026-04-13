@@ -306,6 +306,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                 avatar={showAvatars ? message.avatar : null}
                 showAvatar={showAvatars}
                 assistantType={message.assistantType || assistantType}
+                authorType={message.authorType}
                 assistantIcon={message.role !== 'user' ? assistantIcon : undefined}
               />
             ))}

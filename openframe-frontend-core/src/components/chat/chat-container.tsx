@@ -71,7 +71,7 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
       >
         <div className="flex items-center gap-3">
           {userIcon ? (
-            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-ods-accent">
+            <div className="flex items-center justify-center w-16 h-16 rounded-full bg-ods-accent">
               {userIcon}
             </div>
           ) : (
@@ -79,9 +79,9 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
               src={userAvatar}
               alt={userName}
               fallback="F"
-              size="md"
+              size="xl"
               variant="round"
-              className="bg-gradient-to-br from-pink-400 to-pink-600"
+              className="bg-ods-flamingo-pink"
             />
           )}
           <div className="flex flex-col">

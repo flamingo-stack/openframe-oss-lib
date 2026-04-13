@@ -58,6 +58,7 @@ export * from '../chat'
 export * from '../layout/list-page-layout'
 export * from '../layout/page-container'
 export * from '../layout/page-layout'
+export * from '../layout/article-detail-layout'
 export { ToggleGroup, ToggleGroupItem } from '../toggle-group'
 export * from './actions-menu'
 export * from './benefit-card'
@@ -128,8 +129,8 @@ export * from './hidden-tags-popup'
 export * from './tag-search-input'
 export * from './tag-key-value-filter'
 
-// Rich Text Editor
-export * from './rich-text-editor'
+// Markdown Editor (MDEditor-based)
+export * from './markdown-editor'
 
 // File Upload
 export * from './file-upload'
@@ -142,5 +143,5 @@ export * from './ticket-attachments-list'
 export * from './ticket-knowledge-base-list'
 export * from './ticket-note-card'
 export * from './ticket-notes-section'
-export * from './ticket-description-viewer'
+export * from './simple-markdown-renderer'
 

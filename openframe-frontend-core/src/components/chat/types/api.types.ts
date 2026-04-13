@@ -84,7 +84,11 @@ export interface RealtimeChunkCallbacks {
   /** Called when an error is received */
   onError?: (error: string, details?: string) => void
   /** Called when a user message request is received (echo) */
-  onUserMessage?: (text: string) => void
+  onUserMessage?: (text: string, metadata?: { ownerType?: string; displayName?: string }) => void
+  /** Called when a direct message is received (immediately displayed) */
+  onDirectMessage?: (text: string, metadata?: { ownerType?: string; displayName?: string }) => void
+  /** Called when a system message is received (e.g. "User joined the chat") */
+  onSystemMessage?: (text: string) => void
   /** Callback for approval actions */
   onApprove?: (requestId?: string) => Promise<void> | void
   /** Callback for rejection actions */
