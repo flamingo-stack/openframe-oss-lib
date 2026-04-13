@@ -81,7 +81,13 @@ export type ErrorSegment = {
   details?: string
 }
 
-export type MessageSegment = TextSegment | ToolExecutionSegment | ApprovalRequestSegment | ErrorSegment
+export type ContextCompactionSegment = {
+  type: 'context_compaction'
+  status: 'started' | 'completed'
+  summary?: string
+}
+
+export type MessageSegment = TextSegment | ToolExecutionSegment | ApprovalRequestSegment | ErrorSegment | ContextCompactionSegment
 
 export type MessageContent = string | MessageSegment[]
 
@@ -153,6 +159,15 @@ export interface SystemMessageData extends MessageDataBase {
   text?: string
 }
 
+export interface ContextCompactionStartMessageData extends MessageDataBase {
+  type: 'CONTEXT_COMPACTION_START'
+}
+
+export interface ContextCompactionEndMessageData extends MessageDataBase {
+  type: 'CONTEXT_COMPACTION_END'
+  summary?: string
+}
+
 export type MessageData =
   | TextMessageData
   | ExecutingToolMessageData
@@ -162,6 +177,8 @@ export type MessageData =
   | ErrorMessageData
   | AIMetadataMessageData
   | SystemMessageData
+  | ContextCompactionStartMessageData
+  | ContextCompactionEndMessageData
 
 // ========== Historical Message Types ==========
 

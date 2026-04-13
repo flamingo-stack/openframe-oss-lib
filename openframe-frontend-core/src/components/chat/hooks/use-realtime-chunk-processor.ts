@@ -173,6 +173,14 @@ export function useRealtimeChunkProcessor(
           callbacks.onTokenUsage?.(action.data)
           break
 
+        case 'context_compaction_start':
+          callbacks.onContextCompactionStart?.()
+          break
+
+        case 'context_compaction_end':
+          callbacks.onContextCompactionEnd?.(action.summary)
+          break
+
         default:
           // Unknown action - ignore
           break

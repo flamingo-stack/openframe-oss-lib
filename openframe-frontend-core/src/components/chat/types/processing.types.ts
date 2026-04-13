@@ -22,6 +22,8 @@ export type ParsedChunkAction =
   | { action: 'token_usage'; data: TokenUsageData }
   | { action: 'direct_message'; text: string; ownerType?: string; displayName?: string }
   | { action: 'system'; text: string }
+  | { action: 'context_compaction_start' }
+  | { action: 'context_compaction_end'; summary?: string }
 
 // ========== Accumulator State ==========
 

@@ -115,6 +115,15 @@ export function parseChunkToAction(chunk: unknown): ParsedChunkAction | null {
         },
       }
 
+    case MESSAGE_TYPE.CONTEXT_COMPACTION_START:
+      return { action: 'context_compaction_start' }
+
+    case MESSAGE_TYPE.CONTEXT_COMPACTION_END:
+      return {
+        action: 'context_compaction_end',
+        summary: typeof data.text === 'string' ? data.text : undefined,
+      }
+
     case MESSAGE_TYPE.SYSTEM:
       if (typeof data.text === 'string') {
         return { action: 'system', text: data.text }

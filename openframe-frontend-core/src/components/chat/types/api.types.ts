@@ -91,6 +91,10 @@ export interface RealtimeChunkCallbacks {
   onDirectMessage?: (text: string, metadata?: { ownerType?: string; displayName?: string }) => void
   /** Called when a system message is received (e.g. "User joined the chat") */
   onSystemMessage?: (text: string) => void
+  /** Called when context compaction (summarization) starts */
+  onContextCompactionStart?: () => void
+  /** Called when context compaction (summarization) ends */
+  onContextCompactionEnd?: (summary?: string) => void
   /** Callback for approval actions */
   onApprove?: (requestId?: string) => Promise<void> | void
   /** Callback for rejection actions */

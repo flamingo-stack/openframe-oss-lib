@@ -7,6 +7,7 @@ import { ChatTypingIndicator } from "./chat-typing-indicator"
 import { ToolExecutionDisplay } from "./tool-execution-display"
 import { ApprovalRequestMessage } from "./approval-request-message"
 import { ErrorMessageDisplay } from "./error-message-display"
+import { ContextCompactionDisplay } from "./context-compaction-display"
 import { SimpleMarkdownRenderer } from "../ui/simple-markdown-renderer"
 import type { MessageSegment, MessageContent, ChatMessageEnhancedProps } from "./types"
 
@@ -113,8 +114,8 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
             )}
           </div>
           
-          {/* Message segments — hidden for system messages */}
-          {!isSystem && <div className="flex flex-col">
+          {/* Message segments — hidden for system messages without content */}
+          {(!isSystem || segments.length > 0) && <div className="flex flex-col">
             {isTyping && segments.length === 0 ? (
               <ChatTypingIndicator />
             ) : (
@@ -156,6 +157,14 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                       key={index}
                       title={segment.title}
                       details={segment.details}
+                    />
+                  )
+                } else if (segment.type === 'context_compaction') {
+                  return (
+                    <ContextCompactionDisplay
+                      key={index}
+                      status={segment.status}
+                      summary={segment.summary}
                     />
                   )
                 }
