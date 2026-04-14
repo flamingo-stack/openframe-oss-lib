@@ -18,7 +18,7 @@
     <dependencies>
         <dependency>
             <groupId>com.openframe.oss</groupId>
-            <artifactId>openframe-data-mongo</artifactId>
+            <artifactId>openframe-data-mongo-sync</artifactId>
         </dependency>
 
         <dependency>

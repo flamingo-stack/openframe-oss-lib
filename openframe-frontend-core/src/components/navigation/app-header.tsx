@@ -1,5 +1,6 @@
 'use client'
 
+import React from 'react'
 import { Bell } from 'lucide-react'
 import { useMdUp } from '../../hooks/ui/use-media-query'
 import { cn } from '../../utils/cn'
@@ -33,7 +34,7 @@ export interface AppHeaderProps {
   onToggleMobileMenu?: () => void
 }
 
-export function AppHeader({
+export const AppHeader = React.memo(function AppHeader({
   showSearch,
   onSearch,
   showOrganizations,
@@ -190,6 +191,6 @@ export function AppHeader({
       )}
     </header>
   )
-}
+})
 
 export default AppHeader
