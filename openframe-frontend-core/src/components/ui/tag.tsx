@@ -7,7 +7,7 @@ import { cn } from "../../utils/cn"
 
 const tagVariants = cva(
   [
-    "text-h5 inline-flex items-center justify-center gap-2 h-8 px-2 rounded-[6px]",
+    "text-h5 h-8 inline-flex items-center justify-center gap-[var(--spacing-system-xxs)] p-[var(--spacing-system-xsf)] rounded-md",
     "transition-colors duration-150",
   ],
   {
@@ -50,6 +50,13 @@ const tagVariants = cva(
   }
 )
 
+const disabledTagClasses = [
+  "bg-[var(--ods-system-greys-soft-grey)] text-[var(--ods-system-greys-grey)]",
+  "border-transparent",
+  "cursor-not-allowed",
+  "pointer-events-none",
+]
+
 export interface TagProps
   extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children'>,
     VariantProps<typeof tagVariants> {
@@ -57,6 +64,7 @@ export interface TagProps
   labelClassName?: string
   icon?: React.ReactNode
   onClose?: () => void
+  disabled?: boolean
 }
 
 function Tag({
@@ -66,11 +74,17 @@ function Tag({
   onClose,
   className,
   labelClassName,
+  disabled,
   ...props
 }: TagProps) {
   return (
     <div
-      className={cn(tagVariants({ variant }), className)}
+      className={cn(
+        tagVariants({ variant }),
+        disabled && disabledTagClasses,
+        className
+      )}
+      aria-disabled={disabled || undefined}
       {...props}
     >
       {icon && (
@@ -82,11 +96,15 @@ function Tag({
       {onClose && (
         <button
           type="button"
+          disabled={disabled}
           onClick={(e) => {
             e.stopPropagation()
             onClose()
           }}
-          className="flex items-center justify-center size-5 shrink-0 rounded-full opacity-70 hover:opacity-100 transition-opacity"
+          className={cn(
+            "flex items-center justify-center size-5 shrink-0 rounded-full opacity-70 transition-opacity",
+            disabled ? "cursor-not-allowed" : "hover:opacity-100"
+          )}
           aria-label="Remove"
         >
           <XmarkCircleIcon className="size-4" />
