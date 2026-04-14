@@ -137,6 +137,13 @@ export interface ErrorMessageDisplayProps extends HTMLAttributes<HTMLDivElement>
   details?: string
 }
 
+// ========== Context Compaction Display Props ==========
+
+export interface ContextCompactionDisplayProps extends HTMLAttributes<HTMLDivElement> {
+  status: 'started' | 'completed'
+  summary?: string
+}
+
 // ========== Model Display Props ==========
 
 export interface ModelDisplayProps extends HTMLAttributes<HTMLDivElement> {

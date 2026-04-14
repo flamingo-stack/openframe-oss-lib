@@ -18,6 +18,9 @@ export const MESSAGE_TYPE = {
   MESSAGE_END: 'MESSAGE_END',
   MESSAGE_REQUEST: 'MESSAGE_REQUEST',
   AI_METADATA: 'AI_METADATA',
+  TOKEN_USAGE: 'TOKEN_USAGE',
+  CONTEXT_COMPACTION_START: 'CONTEXT_COMPACTION_START',
+  CONTEXT_COMPACTION_END: 'CONTEXT_COMPACTION_END',
   DIRECT_MESSAGE: 'DIRECT_MESSAGE',
   SYSTEM: 'SYSTEM',
 } as const
@@ -78,7 +81,13 @@ export type ErrorSegment = {
   details?: string
 }
 
-export type MessageSegment = TextSegment | ToolExecutionSegment | ApprovalRequestSegment | ErrorSegment
+export type ContextCompactionSegment = {
+  type: 'context_compaction'
+  status: 'started' | 'completed'
+  summary?: string
+}
+
+export type MessageSegment = TextSegment | ToolExecutionSegment | ApprovalRequestSegment | ErrorSegment | ContextCompactionSegment
 
 export type MessageContent = string | MessageSegment[]
 
@@ -138,9 +147,25 @@ export interface AIMetadataMessageData extends MessageDataBase {
   contextWindow?: number
 }
 
+export interface TokenUsageData {
+  inputTokensSize: number
+  outputTokensSize: number
+  totalTokensSize: number
+  contextSize: number
+}
+
 export interface SystemMessageData extends MessageDataBase {
   type: 'SYSTEM'
   text?: string
+}
+
+export interface ContextCompactionStartMessageData extends MessageDataBase {
+  type: 'CONTEXT_COMPACTION_START'
+}
+
+export interface ContextCompactionEndMessageData extends MessageDataBase {
+  type: 'CONTEXT_COMPACTION_END'
+  summary?: string
 }
 
 export type MessageData =
@@ -152,6 +177,8 @@ export type MessageData =
   | ErrorMessageData
   | AIMetadataMessageData
   | SystemMessageData
+  | ContextCompactionStartMessageData
+  | ContextCompactionEndMessageData
 
 // ========== Historical Message Types ==========
 
