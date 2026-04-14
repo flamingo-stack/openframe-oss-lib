@@ -12,6 +12,7 @@ import type {
   MessageSegment,
   ToolExecutionSegment,
   ApprovalRequestSegment,
+  ContextCompactionSegment,
   ErrorSegment,
   PendingApproval,
   AccumulatorState,
@@ -296,10 +297,81 @@ export class MessageSegmentAccumulator {
   }
 
   /**
+   * Add a context compaction segment with 'started' status
+   */
+  addContextCompaction(): MessageSegment[] {
+    this.segments.push({ type: 'context_compaction', status: 'started' })
+    return this.getSegments()
+  }
+
+  /**
+   * Complete a context compaction segment
+   */
+  completeContextCompaction(summary?: string): MessageSegment[] {
+    const existingIndex = this.segments.findIndex(
+      (s): s is ContextCompactionSegment =>
+        s.type === 'context_compaction' && s.status === 'started'
+    )
+
+    const completedSegment: ContextCompactionSegment = {
+      type: 'context_compaction',
+      status: 'completed',
+      summary,
+    }
+
+    if (existingIndex !== -1) {
+      this.segments[existingIndex] = completedSegment
+    } else {
+      this.segments.push(completedSegment)
+    }
+
+    return this.getSegments()
+  }
+
+  /**
    * Add an error segment
    */
   addError(title: string, details?: string): MessageSegment[] {
     this.segments.push({ type: 'error', title, details })
+    return this.getSegments()
+  }
+
+  /**
+   * Reset and replay a full segment array through the accumulator.
+   */
+  replaySegments(segments: MessageSegment[]): MessageSegment[] {
+    this.reset()
+    for (const segment of segments) {
+      switch (segment.type) {
+        case 'text':
+          if (segment.text) this.appendText(segment.text)
+          break
+        case 'tool_execution':
+          this.addToolExecution(segment)
+          break
+        case 'approval_request': {
+          const { data, status } = segment
+          this.addApprovalRequest(
+            data.requestId || '',
+            data.command,
+            data.explanation,
+            data.approvalType || '',
+            status,
+          )
+          break
+        }
+        case 'error':
+          this.addError(segment.title, segment.details)
+          break
+        case 'context_compaction':
+          if (segment.status === 'started') {
+            this.addContextCompaction()
+          } else if (segment.status === 'completed') {
+            this.completeContextCompaction(segment.summary)
+          }
+          break
+      }
+    }
     return this.getSegments()
   }
 

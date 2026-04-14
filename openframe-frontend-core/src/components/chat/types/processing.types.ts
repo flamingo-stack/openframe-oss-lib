@@ -3,7 +3,7 @@
  * Contains types for message parsing, accumulation, and processing
  */
 
-import type { MessageSegment, ProcessedMessage, ToolExecutionSegment } from './message.types'
+import type { MessageSegment, ProcessedMessage, ToolExecutionSegment, TokenUsageData } from './message.types'
 import type { ChatApprovalStatus, AssistantType } from './chat.types'
 import type { ChunkData, NatsMessageType } from './network.types'
 
@@ -19,8 +19,11 @@ export type ParsedChunkAction =
   | { action: 'approval_request'; requestId: string; command: string; explanation?: string; approvalType: string }
   | { action: 'approval_result'; requestId: string; approved: boolean; approvalType: string }
   | { action: 'message_request'; text: string; ownerType?: string; displayName?: string }
+  | { action: 'token_usage'; data: TokenUsageData }
   | { action: 'direct_message'; text: string; ownerType?: string; displayName?: string }
   | { action: 'system'; text: string }
+  | { action: 'context_compaction_start' }
+  | { action: 'context_compaction_end'; summary?: string }
 
 // ========== Accumulator State ==========
 

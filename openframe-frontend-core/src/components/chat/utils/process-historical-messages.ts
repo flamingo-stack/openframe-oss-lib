@@ -24,6 +24,25 @@ function getOwnerDisplayName(owner?: MessageOwner): string {
   return owner?.type === OWNER_TYPE.ADMIN ? 'Admin' : 'You'
 }
 
+function pushStandaloneMessages(
+  processedMessages: ProcessedMessage[],
+  msg: HistoricalMessage,
+  messageDataArray: MessageData[],
+): void {
+  messageDataArray.forEach((data) => {
+    if (data.type === MESSAGE_TYPE.SYSTEM && 'text' in data && data.text) {
+      processedMessages.push({
+        id: msg.id,
+        role: 'user',
+        content: '',
+        name: data.text,
+        authorType: 'system',
+        timestamp: new Date(msg.createdAt),
+      })
+    }
+  })
+}
+
 /**
  * Result type for historical message processing
  */
@@ -92,22 +111,12 @@ export function processHistoricalMessages(
       ? [msg.messageData]
       : []
 
-    // Check for system messages first (standalone, never accumulated)
-    const hasSystemData = messageDataArray.some((data) => data.type === MESSAGE_TYPE.SYSTEM)
-    if (hasSystemData) {
+    const hasStandaloneData = messageDataArray.some((data) =>
+      data.type === MESSAGE_TYPE.SYSTEM
+    )
+    if (hasStandaloneData) {
       flushAssistantMessage()
-      messageDataArray.forEach((data) => {
-        if (data.type === MESSAGE_TYPE.SYSTEM && 'text' in data && data.text) {
-          processedMessages.push({
-            id: msg.id,
-            role: 'user',
-            content: '',
-            name: data.text,
-            authorType: 'system',
-            timestamp: new Date(msg.createdAt),
-          })
-        }
-      })
+      pushStandaloneMessages(processedMessages, msg, messageDataArray)
       return
     }
 
@@ -283,6 +292,16 @@ function processMessageData(
       }
       break
 
+    case MESSAGE_TYPE.CONTEXT_COMPACTION_START:
+      accumulator.addContextCompaction()
+      break
+
+    case MESSAGE_TYPE.CONTEXT_COMPACTION_END: {
+      const summary = 'summary' in data && typeof data.summary === 'string' ? data.summary : undefined
+      accumulator.completeContextCompaction(summary)
+      break
+    }
+
     default:
       // Unknown message type - ignore
       break
@@ -374,22 +393,12 @@ export function processHistoricalMessagesWithErrors(
       ? [msg.messageData]
       : []
 
-    // Check for system messages first (standalone, never accumulated)
-    const hasSystemData = messageDataArray.some((data) => data.type === MESSAGE_TYPE.SYSTEM)
-    if (hasSystemData) {
+    const hasStandaloneData = messageDataArray.some((data) =>
+      data.type === MESSAGE_TYPE.SYSTEM
+    )
+    if (hasStandaloneData) {
       flushAssistantMessage()
-      messageDataArray.forEach((data) => {
-        if (data.type === MESSAGE_TYPE.SYSTEM && 'text' in data && data.text) {
-          processedMessages.push({
-            id: msg.id,
-            role: 'user',
-            content: '',
-            name: data.text,
-            authorType: 'system',
-            timestamp: new Date(msg.createdAt),
-          })
-        }
-      })
+      pushStandaloneMessages(processedMessages, msg, messageDataArray)
       return
     }
 
