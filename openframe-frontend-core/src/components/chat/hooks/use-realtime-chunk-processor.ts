@@ -173,7 +173,6 @@ export function useRealtimeChunkProcessor(
           break
 
         case 'token_usage':
-          console.log('[ChunkProcessor] token_usage action, calling onTokenUsage', action.data, !!callbacks.onTokenUsage)
           callbacks.onTokenUsage?.(action.data)
           break
 

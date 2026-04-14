@@ -12,9 +12,7 @@ export function parseChunkToAction(chunk: unknown): ParsedChunkAction | null {
   
   const data = chunk as ChunkData
   const type = String(data.type || '')
-  
-  console.log('[ChunkParser] chunk received:', type, data)
-  
+
   switch (type) {
     case MESSAGE_TYPE.MESSAGE_START:
       return { action: 'message_start' }
@@ -104,7 +102,6 @@ export function parseChunkToAction(chunk: unknown): ParsedChunkAction | null {
       }
 
     case MESSAGE_TYPE.TOKEN_USAGE:
-      console.log('[ChunkParser] TOKEN_USAGE chunk parsed', data);
       return {
         action: 'token_usage',
         data: {
