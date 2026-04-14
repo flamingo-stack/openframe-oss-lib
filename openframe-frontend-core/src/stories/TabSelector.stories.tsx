@@ -160,6 +160,23 @@ export const WithDisabled: Story = {
 };
 
 /**
+ * Entire selector disabled via the top-level `disabled` prop.
+ */
+export const Disabled: Story = {
+  args: {
+    value: 'tab1',
+    items: basicItems,
+    variant: 'primary',
+    disabled: true,
+    onValueChange: () => {},
+  },
+  render: function Render(args) {
+    const [value, setValue] = useState(args.value);
+    return <TabSelector {...args} value={value} onValueChange={setValue} />;
+  },
+};
+
+/**
  * Two tabs only.
  */
 export const TwoTabs: Story = {
