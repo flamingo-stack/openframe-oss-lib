@@ -14,6 +14,7 @@ export function TableRow<T = any>({
   onClick,
   className,
   index,
+  compact,
   selectable,
   selected,
   onSelect
@@ -69,7 +70,7 @@ export function TableRow<T = any>({
       )}
       onClick={handleRowClick}
     >
-      <div className={cn('flex items-center gap-4 px-4 py-0', ROW_HEIGHT_DESKTOP)}>
+      <div className={cn('flex items-center gap-4 px-4', compact ? 'py-2' : cn('py-0', ROW_HEIGHT_DESKTOP))}>
         {/* Selection checkbox */}
         {selectable && (
           <div className="flex items-center justify-center w-10 shrink-0" data-no-row-click>

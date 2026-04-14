@@ -8,7 +8,7 @@ import { ChatTypingIndicator } from "./chat-typing-indicator"
 import type { ChatInputProps } from "./types"
 
 const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
-  ({ className, onSend, onStop, sending = false, awaitingResponse = false, placeholder = "Enter your request here...", reserveAvatarOffset = true, disabled = false, autoFocus = false, ...props }, ref) => {
+  ({ className, onSend, onStop, sending = false, awaitingResponse = false, placeholder = "Enter your Request...", reserveAvatarOffset = true, disabled = false, autoFocus = false, ...props }, ref) => {
     const [value, setValue] = useState('')
     const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -48,11 +48,23 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       }
     }, [])
 
-    const handleStop = useCallback(() => {
-      if (onStop) {
-        onStop()
+    const [isStopping, setIsStopping] = useState(false)
+
+    useEffect(() => {
+      if (!sending) {
+        setIsStopping(false)
       }
-    }, [onStop])
+    }, [sending])
+
+    const handleStop = useCallback(async () => {
+      if (!onStop || isStopping) return
+      setIsStopping(true)
+      try {
+        await onStop()
+      } catch {
+        setIsStopping(false)
+      }
+    }, [onStop, isStopping])
     
     // Show awaiting response state
     if (awaitingResponse) {
@@ -96,8 +108,7 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         <div
           className={cn(
             "relative flex items-center gap-2",
-            "rounded-lg bg-ods-card border border-ods-border",
-            "px-3 py-1.5",
+            "rounded-md bg-ods-card border border-ods-border",
             "transition-colors",
             "text-left text-ods-text-primary",
           )}
@@ -111,8 +122,8 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             disabled={sending || disabled}
             rows={1}
             className={cn(
-              "flex-1 resize-none bg-transparent px-0 border-none focus-visible:ring-0",
-              "font-dm-sans text-[18px] font-normal leading-[24px]",
+              "flex-1 resize-none bg-transparent px-3 border-none focus-visible:ring-0",
+              "font-dm-sans text-[18px] font-medium leading-[24px]",
               "placeholder:text-ods-text-secondary",
               "overflow-hidden text-ellipsis",
               "min-h-[20px] max-h-[160px] focus:outline-none",
@@ -125,14 +136,15 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             <button
               type="button"
               onClick={handleStop}
+              disabled={isStopping}
               className={cn(
-                "rounded-md p-1.5 text-ods-text-secondary transition-all",
-                "hover:text-ods-accent active:scale-95",
+                "rounded-md px-3 text-ods-text-secondary transition-all",
+                isStopping ? "cursor-not-allowed opacity-40" : "hover:text-ods-accent active:scale-95",
                 "focus:outline-none"
               )}
               aria-label="Stop generation"
             >
-              <StopIcon size={20} />
+              <StopIcon size={24} />
             </button>
           ) : (
             <button
@@ -140,13 +152,13 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               onClick={handleSubmit}
               disabled={sending || disabled || !value.trim()}
               className={cn(
-                "rounded-md p-1.5 text-ods-text-secondary transition-all",
+                "rounded-md px-3 text-ods-text-secondary transition-all",
                 sending || disabled || !value.trim() ? "cursor-not-allowed opacity-40" : "hover:text-ods-text-primary active:scale-95",
                 "focus:outline-none"
               )}
               aria-label="Send message"
             >
-              <Send01Icon size={20} />
+              <Send01Icon size={24} />
             </button>
           )}
         </div>

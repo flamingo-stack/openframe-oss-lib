@@ -36,6 +36,7 @@ export interface CustomerInterview {
   highlight_video_thumbnail?: string | null
   highlight_video_duration_ms?: number | null
   highlight_video_source?: 'manual' | 'ai_generated' | null
+  main_video_thumbnail?: string | null
 
   // Optional case study link
   case_study_id: number | null
@@ -76,6 +77,7 @@ export interface CustomerInterview {
 
   // Word-level transcript data for video processing
   transcript_words_data?: TranscriptWord[]
+  srt_content?: string | null
 
   // Incentive mention exclusion ranges (computed during transcription)
   incentive_excluded_ranges?: ExcludedRange[]
@@ -115,9 +117,11 @@ export interface CreateCustomerInterviewData {
   slug: string
   video_summary?: string // AI-generated summary from video transcription (Markdown supported)
   transcript?: string // Markdown supported
+  srt_content?: string | null // SRT subtitle content
   user_id?: string // Customer UUID
   main_video_url?: string
   highlight_video_url?: string | null
+  main_video_thumbnail?: string | null
   teasers?: VideoTeaser[]
   case_study_id?: number | null
   seo_title?: string

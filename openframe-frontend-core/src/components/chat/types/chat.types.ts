@@ -41,6 +41,18 @@ export const ASSISTANT_TYPE = {
 
 export type AssistantType = typeof ASSISTANT_TYPE[keyof typeof ASSISTANT_TYPE]
 
+// ========== Author Type Definitions ==========
+
+export const AUTHOR_TYPE = {
+  USER: 'user',
+  ADMIN: 'admin',
+  FAE: 'fae',
+  MINGO: 'mingo',
+  SYSTEM: 'system',
+} as const
+
+export type AuthorType = typeof AUTHOR_TYPE[keyof typeof AUTHOR_TYPE]
+
 // ========== Approval Status Definitions ==========
 
 export const APPROVAL_STATUS = {
@@ -71,4 +83,9 @@ export interface MessageOwner {
   machineId?: string
   userId?: string
   model?: string
+  user?: {
+    id: string
+    firstName?: string
+    lastName?: string
+  }
 }

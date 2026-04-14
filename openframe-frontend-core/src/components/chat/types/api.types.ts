@@ -5,7 +5,7 @@
 
 import type { ChunkData, NatsMessageType, FetchChunksFunction } from './network.types'
 import type { ChatType, ChatApprovalStatus } from './chat.types'
-import type { MessageSegment } from './message.types'
+import type { MessageSegment, TokenUsageData } from './message.types'
 
 // ========== Hook Options ==========
 
@@ -72,6 +72,13 @@ export interface UseNatsDialogSubscriptionReturn {
   reconnectionCount: number
 }
 
+export interface SegmentsUpdateMetadata {
+  /** Segments should be appended to the last assistant message */
+  append?: boolean
+  /** The update was triggered by context compaction */
+  isCompacting?: boolean
+}
+
 export interface RealtimeChunkCallbacks {
   /** Called when MESSAGE_START is received */
   onStreamStart?: () => void
@@ -80,11 +87,17 @@ export interface RealtimeChunkCallbacks {
   /** Called when AI_METADATA is received */
   onMetadata?: (metadata: { modelName: string; providerName: string; contextWindow: number }) => void
   /** Called when segments are updated */
-  onSegmentsUpdate?: (segments: MessageSegment[]) => void
+  onSegmentsUpdate?: (segments: MessageSegment[], metadata?: SegmentsUpdateMetadata) => void
   /** Called when an error is received */
   onError?: (error: string, details?: string) => void
   /** Called when a user message request is received (echo) */
-  onUserMessage?: (text: string) => void
+  onUserMessage?: (text: string, metadata?: { ownerType?: string; displayName?: string }) => void
+  /** Called when TOKEN_USAGE chunk is received with token stats */
+  onTokenUsage?: (data: TokenUsageData) => void
+  /** Called when a direct message is received (immediately displayed) */
+  onDirectMessage?: (text: string, metadata?: { ownerType?: string; displayName?: string }) => void
+  /** Called when a system message is received (e.g. "User joined the chat") */
+  onSystemMessage?: (text: string) => void
   /** Callback for approval actions */
   onApprove?: (requestId?: string) => Promise<void> | void
   /** Callback for rejection actions */
