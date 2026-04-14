@@ -146,7 +146,7 @@ public class DevicesTest extends BaseTest {
         });
     }
 
-    @Tag("update")
+    @Tag("archive")
     @Test
     @DisplayName("Archive device")
     public void testArchiveDevice() {
@@ -158,7 +158,7 @@ public class DevicesTest extends BaseTest {
         assertThat(ids).as("Archived device should not be in listed devices").doesNotContain(device.getMachineId());
     }
 
-    @Tag("delete")
+    @Tag("archive")
     @Test
     @DisplayName("Delete device")
     public void testDeleteDevice() {

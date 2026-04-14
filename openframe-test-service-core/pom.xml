@@ -40,6 +40,7 @@
         <mongodb.version>5.6.0</mongodb.version>
         <jedis.version>7.2.0</jedis.version>
         <slack.version>1.40.3</slack.version>
+        <playwright.version>1.44.0</playwright.version>
     </properties>
 
     <dependencies>
@@ -77,6 +78,12 @@
             <groupId>io.rest-assured</groupId>
             <artifactId>rest-assured</artifactId>
             <version>${rest-assured.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.microsoft.playwright</groupId>
+            <artifactId>playwright</artifactId>
+            <version>${playwright.version}</version>
         </dependency>
 
         <!-- AssertJ for Fluent Assertions -->
