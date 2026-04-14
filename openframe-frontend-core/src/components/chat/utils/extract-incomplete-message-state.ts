@@ -53,6 +53,12 @@ export function extractIncompleteMessageState(
           hasIncompleteState = true
         }
         break
+
+      case 'context_compaction':
+        if (segment.status === 'started') {
+          hasIncompleteState = true
+        }
+        break
     }
   })
 

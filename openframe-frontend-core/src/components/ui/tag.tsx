@@ -78,7 +78,7 @@ function Tag({
           {icon}
         </span>
       )}
-      <span className={cn("shrink-0", labelClassName)}>{label}</span>
+      <span className={cn("truncate", labelClassName)}>{label}</span>
       {onClose && (
         <button
           type="button"

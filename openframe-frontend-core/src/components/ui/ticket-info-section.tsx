@@ -210,9 +210,9 @@ export function TicketInfoSection({
             {/* Tags */}
             {tags && tags.length > 0 && (
               <TicketDetailSection label="Tags">
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 min-w-0">
                   {tags.map(tag => (
-                    <Tag key={tag} label={tag} variant="outline" />
+                    <Tag key={tag} label={tag} variant="outline" className="max-w-full" />
                   ))}
                 </div>
               </TicketDetailSection>
