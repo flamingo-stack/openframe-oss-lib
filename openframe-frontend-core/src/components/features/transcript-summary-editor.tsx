@@ -5,6 +5,7 @@ import { Sparkles } from 'lucide-react';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Badge } from '../ui/badge';
+import { StandardCcIcon } from '../icons-v2-generated';
 import { ConfidenceBadge } from './ai-enrich/ConfidenceBadge';
 
 export interface TranscriptSummaryEditorProps {
@@ -38,6 +39,18 @@ export interface TranscriptSummaryEditorProps {
   videoSummaryMinHeight?: number;
   /** Minimum height for transcript textarea */
   transcriptMinHeight?: number;
+  /** SRT subtitle content */
+  subtitles?: string;
+  /** Callback when subtitles change */
+  onSubtitlesChange?: (value: string) => void;
+  /** Custom label for subtitles field */
+  subtitlesLabel?: string;
+  /** Custom helper text for subtitles */
+  subtitlesHelperText?: string;
+  /** Custom placeholder for subtitles */
+  subtitlesPlaceholder?: string;
+  /** Minimum height for subtitles textarea */
+  subtitlesMinHeight?: number;
   /** Whether the fields are disabled */
   disabled?: boolean;
   /** Additional class name for the container */
@@ -66,6 +79,12 @@ export function TranscriptSummaryEditor({
   transcriptPlaceholder = '**[00:00] Speaker Name:** Text here...',
   videoSummaryMinHeight = 200,
   transcriptMinHeight = 300,
+  subtitles,
+  onSubtitlesChange,
+  subtitlesLabel = 'Subtitles (SRT)',
+  subtitlesHelperText = 'SRT subtitle content generated from transcription. Editable for fine-tuning.',
+  subtitlesPlaceholder = '1\n00:00:00,000 --> 00:00:02,500\nHello, welcome to...',
+  subtitlesMinHeight = 200,
   disabled = false,
   className = '',
 }: TranscriptSummaryEditorProps) {
@@ -146,6 +165,38 @@ export function TranscriptSummaryEditor({
           />
         </div>
       </div>
+
+      {/* Subtitles Editor — only shown when subtitles content exists or handler provided */}
+      {(subtitles || onSubtitlesChange) && (
+        <div>
+          <div className="mb-2">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="subtitles">{subtitlesLabel}</Label>
+              {isAIGenerated && subtitles && (
+                <Badge variant="secondary" className="flex items-center gap-1">
+                  <StandardCcIcon size={12} />
+                  AI Generated
+                </Badge>
+              )}
+            </div>
+            <p className="text-xs text-ods-text-secondary mt-1">{subtitlesHelperText}</p>
+          </div>
+          <div
+            className="rounded-lg border border-ods-border bg-ods-background-secondary overflow-hidden"
+            style={{ minHeight: `${subtitlesMinHeight}px` }}
+          >
+            <Textarea
+              id="subtitles"
+              value={subtitles || ''}
+              onChange={(e) => onSubtitlesChange?.(e.target.value)}
+              placeholder={subtitlesPlaceholder}
+              disabled={disabled || !onSubtitlesChange}
+              className="h-full w-full resize-none border-0 bg-transparent text-ods-text-primary placeholder:text-ods-text-secondary/50 focus:ring-0 focus:outline-none p-4 font-mono text-sm"
+              style={{ minHeight: `${subtitlesMinHeight}px`, lineHeight: '1.6' }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { Button, Input, Textarea, Label } from '../ui';
-import { Trash2, Plus, ChevronDown, ChevronUp } from 'lucide-react';
+import { Trash2, Plus, ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import type { ChangelogEntry } from '../../types/product-release';
 
@@ -12,6 +12,12 @@ interface ChangelogManagerProps {
   className?: string;
   /** Expand all items - useful after AI enrichment fills entries */
   expandAll?: boolean;
+  /**
+   * When true, render a per-entry public/internal visibility toggle (Eye/EyeOff icon)
+   * in each entry's header. New entries default to 'public'. Used by investor updates
+   * — leave undefined for product releases so they keep their existing UX.
+   */
+  showVisibilityToggle?: boolean;
 }
 
 export function ChangelogManager({
@@ -19,7 +25,8 @@ export function ChangelogManager({
   entries,
   onChange,
   className = '',
-  expandAll = false
+  expandAll = false,
+  showVisibilityToggle = false,
 }: ChangelogManagerProps) {
   const [expandedIndices, setExpandedIndices] = useState<Set<number>>(new Set());
 
@@ -33,11 +40,19 @@ export function ChangelogManager({
   const addEntry = () => {
     const newEntry: ChangelogEntry = {
       title: '',
-      description: ''
+      description: '',
+      ...(showVisibilityToggle && { visibility: 'public' as const }),
     };
     onChange([...entries, newEntry]);
     // Expand the newly added entry
     setExpandedIndices(prev => new Set([...prev, entries.length]));
+  };
+
+  const toggleVisibility = (index: number) => {
+    const updated = [...entries];
+    const current = updated[index].visibility ?? 'public';
+    updated[index] = { ...updated[index], visibility: current === 'public' ? 'internal' : 'public' };
+    onChange(updated);
   };
 
   const removeEntry = (index: number) => {
@@ -118,6 +133,27 @@ export function ChangelogManager({
                   </p>
                 )}
               </div>
+
+              {showVisibilityToggle && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => toggleVisibility(index)}
+                  className="shrink-0"
+                  title={
+                    (entry.visibility ?? 'public') === 'public'
+                      ? 'Visible to investors'
+                      : 'Internal only'
+                  }
+                >
+                  {(entry.visibility ?? 'public') === 'public' ? (
+                    <Eye className="h-4 w-4 text-ods-accent" />
+                  ) : (
+                    <EyeOff className="h-4 w-4 text-ods-text-secondary" />
+                  )}
+                </Button>
+              )}
 
               <Button
                 type="button"

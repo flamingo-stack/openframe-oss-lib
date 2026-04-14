@@ -66,7 +66,7 @@ public class AgentRegistrationService {
 
         saveInstalledAgent(machineId, request);
 
-        registrationTagAssignmentService.assignTags(machineId, resolvedOrganizationId, request.getTags());
+        registrationTagAssignmentService.assignTags(machineId, request.getTags());
 
         agentRegistrationToolInstallationService.process(machineId);
 

@@ -41,6 +41,11 @@ export const platformDisplayNames = {
   flamingo: 'Flamingo',
   'flamingo-teaser': 'Flamingo Teaser',
   'admin-hub': 'Admin Hub',
+  'marketing-hub': 'Marketing Hub',
+  'product-hub': 'Product Hub',
+  'revenue-hub': 'Revenue Hub',
+  'people-hub': 'People Hub',
+  'company-hub': 'Company Hub',
   tmcg: 'TMCG',
   universal: 'Universal'
 };
@@ -75,6 +80,11 @@ export const platformHexColors = {
   universal: '#FFC008',
   'admin-hub': '#FFC008',
   'flamingo-teaser': '#F59E0B',
+  'marketing-hub': '#F357BB',
+  'product-hub': '#5EA62E',
+  'revenue-hub': '#FFC008',
+  'people-hub': '#5EFAF0',
+  'company-hub': '#f36666',
   tmcg: '#FF6B6B'
 };
 
@@ -86,6 +96,11 @@ export const platformIconNames = {
   universal: 'globe',
   'admin-hub': 'flamingo-logo',
   'flamingo-teaser': 'flamingo-logo',
+  'marketing-hub': 'flamingo-logo',
+  'product-hub': 'flamingo-logo',
+  'revenue-hub': 'flamingo-logo',
+  'people-hub': 'flamingo-logo',
+  'company-hub': 'flamingo-logo',
   tmcg: 'tmcg-logo'
 };
 

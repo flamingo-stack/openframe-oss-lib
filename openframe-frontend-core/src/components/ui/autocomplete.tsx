@@ -22,6 +22,7 @@ import { CheckIcon } from "../icons-v2-generated/signs-and-symbols/check-icon"
 import { XmarkCircleIcon } from "../icons-v2-generated/signs-and-symbols/xmark-circle-icon"
 import { Chevron02DownIcon } from "../icons-v2-generated/arrows/chevron-02-down-icon"
 
+import { Loader2 } from "lucide-react"
 import { cn } from "../../utils/cn"
 import { useAutoLimitTags } from "../../hooks/ui/use-auto-limit-tags"
 import { FieldWrapper } from "./field-wrapper"
@@ -78,6 +79,10 @@ interface AutocompleteBaseProps<T = string> {
   onCreateOption?: (inputValue: string) => void
   /** When true, disables built-in client-side filtering (useful when options are filtered server-side via onInputChange) */
   disableClientFilter?: boolean
+  /** Whether to show the chevron icon. Default true */
+  showChevron?: boolean
+  /** Whether to clear the input when the dropdown opens (single mode only). Default true */
+  clearOnOpen?: boolean
 }
 
 export interface AutocompleteSingleProps<T = string> extends AutocompleteBaseProps<T> {
@@ -141,6 +146,8 @@ function AutocompleteInner<T = string>(
     creatable = false,
     onCreateOption,
     disableClientFilter = false,
+    showChevron = true,
+    clearOnOpen = true,
   } = props
 
   const multiple = props.multiple ?? false
@@ -182,7 +189,7 @@ function AutocompleteInner<T = string>(
 
   // Get selected options
   const selectedOptions = useMemo(() => {
-    return valueArray.map(v => options.find(opt => opt.value === v)).filter(Boolean) as AutocompleteOption<T>[]
+    return valueArray.map(v => options.find(opt => opt.value === v) ?? { label: String(v), value: v })
   }, [valueArray, options])
 
   // Single mode: the currently selected option
@@ -223,8 +230,18 @@ function AutocompleteInner<T = string>(
     return () => document.removeEventListener("mousedown", handleClick)
   }, [showHiddenTags])
 
+  // Synchronously open dropdown, pre-filling input when clearOnOpen is false
+  const openDropdown = () => {
+    if (!multiple && !clearOnOpen && selectedOption) {
+      updateInputValue(selectedOption.label, 'reset')
+    }
+    setShowHiddenTags(false)
+    setIsOpen(true)
+  }
+
   // Input display value:
   // - Single mode, closed, has selection → show selected label
+  // - Single mode, open, clearOnOpen=false → show inputValue (pre-filled with label)
   // - Otherwise → show inputValue (what user is typing)
   const inputDisplayValue = !multiple && !isOpen && selectedOption
     ? selectedOption.label
@@ -262,9 +279,9 @@ function AutocompleteInner<T = string>(
 
     if (multiple) {
       if (maxItems && valueArray.length >= maxItems) return
-      ;(props as AutocompleteMultipleProps<T>).onChange([...valueArray, newValue])
+      (props as AutocompleteMultipleProps<T>).onChange([...valueArray, newValue])
     } else {
-      ;(props as AutocompleteSingleProps<T>).onChange(newValue)
+      (props as AutocompleteSingleProps<T>).onChange(newValue)
     }
 
     updateInputValue("", 'reset')
@@ -293,12 +310,12 @@ function AutocompleteInner<T = string>(
       const isSelected = valueArray.includes(option.value)
 
       if (isSelected) {
-        ;(props as AutocompleteMultipleProps<T>).onChange(valueArray.filter(v => v !== option.value))
+        (props as AutocompleteMultipleProps<T>).onChange(valueArray.filter(v => v !== option.value))
       } else {
         if (maxItems && valueArray.length >= maxItems) {
           return
         }
-        ;(props as AutocompleteMultipleProps<T>).onChange([...valueArray, option.value])
+        (props as AutocompleteMultipleProps<T>).onChange([...valueArray, option.value])
       }
 
       updateInputValue("", 'reset')
@@ -306,7 +323,9 @@ function AutocompleteInner<T = string>(
     } else {
       // Single mode: select and close
       ;(props as AutocompleteSingleProps<T>).onChange(option.value)
-      updateInputValue("", 'reset')
+      // When clearOnOpen is false, keep the label as inputValue so
+      // filteredOptions is pre-computed before the next open (prevents flicker)
+      updateInputValue(clearOnOpen ? "" : option.label, 'reset')
       setIsOpen(false)
     }
   }
@@ -320,8 +339,11 @@ function AutocompleteInner<T = string>(
     } else {
       ;(props as AutocompleteSingleProps<T>).onChange(null)
     }
-    updateInputValue("", 'clear')
-    autoLimitTags.inputRef.current?.focus()
+    if (!isInputControlled) {
+      setInternalInputValue("")
+    }
+    onInputChange?.("", 'clear')
+    setIsOpen(false)
   }
 
   // Handle keyboard navigation
@@ -330,7 +352,7 @@ function AutocompleteInner<T = string>(
       case "ArrowDown":
         e.preventDefault()
         if (!isOpen) {
-          setIsOpen(true)
+          openDropdown()
         }
         setHighlightedIndex(prev =>
           prev < filteredOptions.length - 1 ? prev + 1 : 0
@@ -356,26 +378,30 @@ function AutocompleteInner<T = string>(
           handleSelect(newOption)
         }
         break
-      case "Escape":
+      case "Escape": {
+        // Restore label when clearOnOpen is false, same as handleOpenChange close
+        const resetValue = !multiple && !clearOnOpen && selectedOption ? selectedOption.label : ""
+        updateInputValue(resetValue, 'reset')
         setIsOpen(false)
         setHighlightedIndex(-1)
         break
+      }
       case "Backspace":
-        if (multiple && !inputValue && valueArray.length > 0) {
-          // Remove last tag in multiple mode
-          ;(props as AutocompleteMultipleProps<T>).onChange(valueArray.slice(0, -1))
-        }
         break
     }
   }
 
   // Handle popover open/close
   const handleOpenChange = (open: boolean) => {
-    if (!open) {
-      updateInputValue("", 'reset')
+    if (open) {
+      openDropdown()
+    } else {
+      // When clearOnOpen is false and there's a selection, restore the label
+      // so filteredOptions stays pre-computed for the next open
+      const resetValue = !multiple && !clearOnOpen && selectedOption ? selectedOption.label : ""
+      updateInputValue(resetValue, 'reset')
+      setIsOpen(false)
     }
-    if (open) setShowHiddenTags(false)
-    setIsOpen(open)
   }
 
   const canAddMore = multiple ? (!maxItems || valueArray.length < maxItems) : true
@@ -400,7 +426,7 @@ function AutocompleteInner<T = string>(
           onClick={() => {
             if (!disabled) {
               autoLimitTags.inputRef.current?.focus()
-              setIsOpen(true)
+              openDropdown()
             }
           }}
         >
@@ -466,7 +492,7 @@ function AutocompleteInner<T = string>(
                 value={inputDisplayValue}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
-                onFocus={() => setIsOpen(true)}
+                onFocus={() => openDropdown()}
                 placeholder={inputPlaceholder}
                 disabled={disabled}
                 className={innerInputStyles}
@@ -476,7 +502,7 @@ function AutocompleteInner<T = string>(
 
           {/* Clear / Chevron — pinned right */}
           <div className="flex items-center gap-1 shrink-0 pr-3">
-            {showClearAll && hasValue && !disabled && isOpen && (
+            {showClearAll && (hasValue || inputValue.length > 0) && !disabled && isOpen && (
               <button
                 type="button"
                 onClick={handleClearAll}
@@ -486,15 +512,24 @@ function AutocompleteInner<T = string>(
                 <XmarkCircleIcon className="text-ods-text-secondary size-4 md:size-6" />
               </button>
             )}
-            <Chevron02DownIcon
-              className={cn(
-                "transition-all duration-200 size-4 md:size-6",
-                "text-ods-text-secondary",
-                isOpen && "rotate-180",
-                isOpen && !isInvalid && "text-ods-accent",
-                isInvalid && "text-ods-error"
-              )}
-            />
+            {loading ? (
+              <Loader2
+                className={cn(
+                  "animate-spin size-4 md:size-6",
+                  isInvalid ? "text-ods-error" : isOpen ? "text-ods-accent" : "text-ods-text-secondary"
+                )}
+              />
+            ) : showChevron && (
+              <Chevron02DownIcon
+                className={cn(
+                  "transition-all duration-200 size-4 md:size-6",
+                  "text-ods-text-secondary",
+                  isOpen && "rotate-180",
+                  isOpen && !isInvalid && "text-ods-accent",
+                  isInvalid && "text-ods-error"
+                )}
+              />
+            )}
           </div>
         </div>
       </PopoverPrimitive.Anchor>
@@ -521,7 +556,7 @@ function AutocompleteInner<T = string>(
         }}
       >
         <ScrollAreaPrimitive.Root className="overflow-hidden">
-          <ScrollAreaPrimitive.Viewport className="max-h-[240px] w-full">
+          <ScrollAreaPrimitive.Viewport className="max-h-[240px] w-full [&>div]:!block">
             <div role="listbox">
               {loading ? (
                 <div className="px-3 py-2 text-ods-text-secondary text-[14px]">
@@ -533,13 +568,13 @@ function AutocompleteInner<T = string>(
                     role="option"
                     aria-selected={false}
                     className={cn(
-                      "flex items-center h-11 md:h-12 px-4 cursor-pointer transition-colors",
+                      "flex items-center h-11 md:h-12 px-4 cursor-pointer transition-colors min-w-0",
                       "text-[18px] font-medium leading-6 text-ods-accent",
                       "hover:bg-ods-bg-hover"
                     )}
                     onClick={handleCreate}
                   >
-                    + Create &quot;{inputValue.trim()}&quot;
+                    <span className="truncate">+ Create &quot;{inputValue.trim()}&quot;</span>
                   </div>
                 ) : (
                   <div className="px-3 py-2 text-ods-text-secondary text-[14px]">

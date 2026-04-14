@@ -3,7 +3,7 @@
 import { useState, useEffect, ComponentType } from 'react';
 import Link from 'next/link';
 import { Card, CardContent } from '../../ui/card';
-import { PageContainer } from '../../layout/page-container';
+import { ArticleDetailLayout } from '../../layout/article-detail-layout';
 import { ReleaseChangelogSection } from '../../ui/release-changelog-section';
 import { StatusBadge } from '../../ui/status-badge';
 import { SquareAvatar } from '../../ui/square-avatar';
@@ -67,6 +67,8 @@ export interface VideoDisplaySectionProps {
   videoBites?: VideoTeaser[];
   bitesTitle?: string;
   filterPublishedBites?: boolean;
+  srtContent?: string | null;
+  captionsUrl?: string | null;
 }
 
 export interface ReleaseDetailPageProps {
@@ -203,12 +205,7 @@ export function ReleaseDetailPage({
   const improvements = release.improvements as ChangelogEntry[] | undefined;
 
   return (
-    <PageContainer
-      as="article"
-      backgroundClassName="bg-ods-bg"
-      contentPadding="py-6 md:py-10 px-6 md:px-20"
-      maxWidth="max-w-[1280px]"
-    >
+    <ArticleDetailLayout>
       <div className="space-y-6 md:space-y-8">
         {/* Title Block */}
         <div className="flex flex-col md:flex-row md:items-end gap-4 w-full">
@@ -311,7 +308,7 @@ export function ReleaseDetailPage({
                 }}
               >
                 {mediaItem.media_type === 'video' || mediaItem.media_type === 'demo' ? (
-                  <video src={mediaItem.media_url} className="w-full h-full object-cover" controls preload="metadata" />
+                  <VideoPlayer url={mediaItem.media_url} useNativeAspectRatio={false} />
                 ) : (
                   <img src={mediaItem.media_url} alt={mediaItem.title || `Media ${index + 1}`} className="w-full h-full object-cover" />
                 )}
@@ -338,6 +335,8 @@ export function ReleaseDetailPage({
             videoBites={videoBites}
             bitesTitle="Video Clips"
             filterPublishedBites={true}
+            srtContent={release?.srt_content as string | null | undefined}
+            captionsUrl={release?.captionsUrl as string | undefined}
           />
         ) : (
           <>
@@ -350,14 +349,14 @@ export function ReleaseDetailPage({
             {!youtubeUrl && mainVideoUrl && (
               <div className="flex justify-center w-full">
                 <div className="w-full max-w-3xl">
-                  <VideoPlayer url={mainVideoUrl} controls={true} muted={false} />
+                  <VideoPlayer url={mainVideoUrl} srtContent={release?.srt_content as string | undefined} captionsUrl={release?.captionsUrl as string | undefined} />
                 </div>
               </div>
             )}
             {highlightVideoUrl && (
               <div className="flex justify-center w-full">
                 <div className="w-full max-w-3xl">
-                  <VideoPlayer url={highlightVideoUrl} poster={highlightVideoThumbnail} controls={true} muted={false} />
+                  <VideoPlayer url={highlightVideoUrl} poster={highlightVideoThumbnail} />
                 </div>
               </div>
             )}
@@ -554,6 +553,6 @@ export function ReleaseDetailPage({
           initialIndex={galleryIndex}
         />
       )}
-    </PageContainer>
+    </ArticleDetailLayout>
   );
 }

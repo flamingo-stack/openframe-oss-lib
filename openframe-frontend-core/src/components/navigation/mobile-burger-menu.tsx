@@ -31,7 +31,7 @@ export interface MobileBurgerMenuProps {
   onLogout?: () => void
 }
 
-export function MobileBurgerMenu({
+export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
   isOpen,
   onClose,
   config,
@@ -276,4 +276,4 @@ export function MobileBurgerMenu({
       </div>
     </>
   )
-}
+})

@@ -77,6 +77,7 @@ export { ReclaimProfitsIcon } from './reclaim-profits-icon';
 // Brand and social icons
 export { GitHubIcon } from './github-icon';
 export { SlackIcon } from './slack-icon';
+export { ClickUpIcon } from './clickup-icon';
 export { MicrosoftIcon } from './ms-icon';
 export { GoogleLogo } from './google-logo';
 export { RedditIcon } from './reddit-icon';

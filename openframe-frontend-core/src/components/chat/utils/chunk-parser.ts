@@ -12,7 +12,7 @@ export function parseChunkToAction(chunk: unknown): ParsedChunkAction | null {
   
   const data = chunk as ChunkData
   const type = String(data.type || '')
-  
+
   switch (type) {
     case MESSAGE_TYPE.MESSAGE_START:
       return { action: 'message_start' }
@@ -97,8 +97,47 @@ export function parseChunkToAction(chunk: unknown): ParsedChunkAction | null {
       return {
         action: 'message_request',
         text: String(data.text || ''),
+        ownerType: typeof data.ownerType === 'string' ? data.ownerType : undefined,
+        displayName: typeof data.displayName === 'string' ? data.displayName : undefined,
       }
-      
+
+    case MESSAGE_TYPE.TOKEN_USAGE:
+      return {
+        action: 'token_usage',
+        data: {
+          inputTokensSize: data.inputTokensSize ?? 0,
+          outputTokensSize: data.outputTokensSize ?? 0,
+          totalTokensSize: data.totalTokensSize ?? 0,
+          contextSize: data.contextSize ?? 0,
+        },
+      }
+
+    case MESSAGE_TYPE.CONTEXT_COMPACTION_START:
+      return { action: 'context_compaction_start' }
+
+    case MESSAGE_TYPE.CONTEXT_COMPACTION_END:
+      return {
+        action: 'context_compaction_end',
+        summary: typeof data.text === 'string' ? data.text : undefined,
+      }
+
+    case MESSAGE_TYPE.SYSTEM:
+      if (typeof data.text === 'string') {
+        return { action: 'system', text: data.text }
+      }
+      return null
+
+    case MESSAGE_TYPE.DIRECT_MESSAGE:
+      if (typeof data.text === 'string') {
+        return {
+          action: 'direct_message',
+          text: data.text,
+          ownerType: typeof data.ownerType === 'string' ? data.ownerType : undefined,
+          displayName: typeof data.displayName === 'string' ? data.displayName : undefined,
+        }
+      }
+      return null
+
     default:
       return null
   }

@@ -25,12 +25,12 @@ public class GatewayTrafficMetrics {
 
     public void webSocketOpened(String sessionId, String path, String sub) {
         int count = activeWebSocketConnections.incrementAndGet();
-        log.info(LOG_PREFIX + "WebSocket opened, active={}", sessionId, path, sub, count);
+        log.debug(LOG_PREFIX + "WebSocket opened, active={}", sessionId, path, sub, count);
     }
 
     public void webSocketClosed(String sessionId, String path, String sub) {
         int count = activeWebSocketConnections.updateAndGet(v -> v > 0 ? v - 1 : 0);
-        log.info(LOG_PREFIX + "WebSocket closed, active={}", sessionId, path, sub, count);
+        log.debug(LOG_PREFIX + "WebSocket closed, active={}", sessionId, path, sub, count);
     }
 
 }

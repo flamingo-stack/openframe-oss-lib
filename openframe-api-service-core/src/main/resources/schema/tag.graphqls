@@ -1,0 +1,33 @@
+extend type Query {
+    # Tag key queries (tenant-wide, scoped to DEVICE entity type)
+    tags: [Tag!]!
+    # Tag value options for filter UI (returns distinct values for a tag key with device counts)
+    tagValueOptions(tagKey: String!): [DeviceFilterOption!]!
+
+    # Autocomplete queries for tag key and value search (tenant-wide, scoped to DEVICE entity type)
+    tagKeySuggestions(search: String, limit: Int): [Tag!]!
+    tagValueSuggestions(tagKey: String!, search: String, limit: Int): [String!]!
+}
+
+extend type Mutation {
+    createTag(key: String!, entityType: String!, description: String, color: String): Tag!
+    updateTag(id: ID!, key: String, description: String, color: String): Tag!
+    deleteTag(id: ID!): Boolean!
+}
+
+# Tag key definition (shared across all entity types)
+type Tag implements Node {
+    id: ID!
+    key: String!
+    description: String
+    color: String
+    values: [String!]
+    entityType: TagEntityType
+    createdAt: Instant
+}
+
+enum TagEntityType {
+    DEVICE
+    TICKET
+    KNOWLEDGE_ARTICLE
+}

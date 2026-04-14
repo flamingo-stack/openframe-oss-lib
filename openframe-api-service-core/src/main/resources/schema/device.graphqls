@@ -16,26 +16,6 @@ extend type Query {
 
     # Get single device by machineId
     device(machineId: String!): Machine
-
-    # Tag key queries
-    tags(organizationId: String!): [Tag!]!
-    # Tag value options for filter UI (returns distinct values for a tag key with device counts)
-    tagValueOptions(tagKey: String!): [DeviceFilterOption!]!
-
-    # Autocomplete queries for tag key and value search
-    tagKeySuggestions(organizationId: String!, search: String, limit: Int): [Tag!]!
-    tagValueSuggestions(organizationId: String!, tagKey: String!, search: String, limit: Int): [String!]!
-}
-
-# Tag key definition (not tied to a device)
-type Tag implements Node {
-    id: ID!
-    key: String!
-    description: String
-    color: String
-    values: [String!]
-    organizationId: String!
-    createdAt: Instant
 }
 
 type DeviceFilters {

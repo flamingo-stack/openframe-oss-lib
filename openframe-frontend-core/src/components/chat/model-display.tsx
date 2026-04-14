@@ -2,10 +2,8 @@
 
 import React from 'react';
 import { cn } from '../../utils/cn';
-import { ClaudeIcon } from '../icons/claude-icon';
-import { OpenAiIcon } from '../icons/openai-icon';
-import { GoogleGeminiIcon } from '../icons/google-gemini-icon';
 import type { ModelDisplayProps } from './types';
+import { AnthropicLogoGreyIcon, GeminiLogoGreyIcon, OpenaiLogoGreyIcon } from '../icons-v2-generated';
 
 const getProviderIcon = (provider?: string) => {
   if (!provider) return null;
@@ -15,24 +13,36 @@ const getProviderIcon = (provider?: string) => {
   switch (providerLower) {
     case 'anthropic':
     case 'claude':
-      return <ClaudeIcon className="w-4 h-4" />;
+      return <AnthropicLogoGreyIcon className="w-4 h-4" />;
     case 'openai':
-      return <OpenAiIcon size={16} color="currentColor" />;
+      return <OpenaiLogoGreyIcon size={16} color="currentColor" />;
     case 'google':
     case 'gemini':
     case 'google-gemini':
     case 'google_gemini':
-      return <GoogleGeminiIcon size={16} />;
+      return <GeminiLogoGreyIcon size={16} />;
     default:
       return null;
   }
 };
 
+const formatTokenCount = (count: number): string => {
+  if (count >= 1_000_000) {
+    const val = count / 1_000_000;
+    return Number.isInteger(val) ? `${val}M` : `${val.toFixed(1)}M`;
+  }
+  if (count >= 1_000) {
+    const val = count / 1_000;
+    return Number.isInteger(val) ? `${val}K` : `${val.toFixed(1)}K`;
+  }
+  return String(count);
+};
+
 const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
-  ({ className, provider, modelName, displayName, ...props }, ref) => {
+  ({ className, provider, modelName, displayName, usedTokens, contextWindow, ...props }, ref) => {
     const icon = getProviderIcon(provider);
     const name = displayName || modelName;
-    
+
     return (
       <div
         ref={ref}
@@ -51,6 +61,11 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
         <span className="font-dm-sans font-medium">
           {name}
         </span>
+        {usedTokens != null && contextWindow != null && (
+          <span className="font-dm-sans text-xs opacity-70 ml-auto">
+            {formatTokenCount(usedTokens)}/{formatTokenCount(contextWindow)} tokens used
+          </span>
+        )}
       </div>
     );
   }

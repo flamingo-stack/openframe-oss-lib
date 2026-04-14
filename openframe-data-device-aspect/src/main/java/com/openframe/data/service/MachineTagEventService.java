@@ -1,8 +1,8 @@
 package com.openframe.data.service;
 
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.device.MachineTag;
-import com.openframe.data.document.tool.Tag;
+import com.openframe.data.document.tag.Tag;
+import com.openframe.data.document.tag.TagAssignment;
 
 /**
  * Service interface for handling repository events and sending Kafka messages.
@@ -27,20 +27,20 @@ public interface MachineTagEventService {
     void processMachineSaveAll(Iterable<Machine> machines);
 
     /**
-     * Processes machineTag save event.
+     * Processes tag assignment save event.
      * Fetches associated machine and tag data, then sends MachinePinotMessage.
      *
-     * @param machineTag the machineTag entity that was saved
+     * @param assignment the tag assignment entity that was saved
      */
-    void processMachineTagSave(MachineTag machineTag);
+    void processTagAssignmentSave(TagAssignment assignment);
 
     /**
-     * Processes machineTag saveAll event.
-     * Processes each machineTag in the collection and sends MachinePinotMessage for each affected machine.
+     * Processes tag assignment saveAll event.
+     * Processes each assignment in the collection and sends MachinePinotMessage for each affected machine.
      *
-     * @param machineTags the collection of machineTag entities that were saved
+     * @param assignments the collection of tag assignment entities that were saved
      */
-    void processMachineTagSaveAll(Iterable<MachineTag> machineTags);
+    void processTagAssignmentSaveAll(Iterable<TagAssignment> assignments);
 
     /**
      * Processes tag save event.
@@ -59,22 +59,21 @@ public interface MachineTagEventService {
     void processTagSaveAll(Iterable<Tag> tags);
 
     /**
-     * Processes machineTag delete event for a single device.
+     * Processes tag assignment delete event for a single device.
      * Must be called BEFORE the delete so affected machineId can be resolved.
      * Re-syncs the machine to Pinot without the removed tag.
      *
      * @param machineId the machine from which the tag is being removed
      * @param tagId     the tag being removed
      */
-    void processMachineTagDelete(String machineId, String tagId);
+    void processTagAssignmentDelete(String machineId, String tagId);
 
     /**
-     * Processes bulk machineTag delete by tagId.
+     * Processes bulk tag assignment delete by tagId.
      * Must be called BEFORE the delete so affected machineIds can be resolved.
      * Re-syncs all affected machines to Pinot without the removed tag.
      *
      * @param tagId the tag being removed from all devices
      */
-    void processMachineTagDeleteByTagId(String tagId);
+    void processTagAssignmentDeleteByTagId(String tagId);
 }
-

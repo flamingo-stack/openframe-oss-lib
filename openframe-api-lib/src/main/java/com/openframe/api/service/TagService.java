@@ -1,14 +1,16 @@
 package com.openframe.api.service;
 
 import com.openframe.api.dto.device.DeviceFilterOption;
-import com.openframe.data.document.device.MachineTag;
-import com.openframe.data.document.tool.Tag;
-import com.openframe.data.repository.device.MachineTagRepository;
-import com.openframe.data.repository.tool.TagRepository;
+import com.openframe.data.document.tag.Tag;
+import com.openframe.data.document.tag.TagAssignment;
+import com.openframe.data.document.tag.TagEntityType;
+import com.openframe.data.repository.tag.TagAssignmentRepository;
+import com.openframe.data.repository.tag.TagRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -18,36 +20,39 @@ import java.util.stream.Collectors;
 public class TagService {
 
     private final TagRepository tagRepository;
-    private final MachineTagRepository machineTagRepository;
+    private final TagAssignmentRepository tagAssignmentRepository;
     private static final int DEFAULT_LIMIT = 20;
     private static final int MAX_LIMIT = 100;
 
-    public TagService(TagRepository tagRepository, MachineTagRepository machineTagRepository) {
+    public TagService(TagRepository tagRepository, TagAssignmentRepository tagAssignmentRepository) {
         this.tagRepository = tagRepository;
-        this.machineTagRepository = machineTagRepository;
+        this.tagAssignmentRepository = tagAssignmentRepository;
     }
 
     public Optional<Tag> findById(String id) {
         return tagRepository.findById(id);
     }
 
-    public List<Tag> listTags(String organizationId) {
-        log.debug("Listing tags for org: {}", organizationId);
-        return tagRepository.findByOrganizationId(organizationId);
+    /**
+     * List all device tags available across the tenant.
+     */
+    public List<Tag> listTags() {
+        log.debug("Listing device tags (tenant-wide)");
+        return tagRepository.findByEntityType(TagEntityType.DEVICE);
     }
 
     /**
-     * Search tag keys for autocomplete with limit.
-     * If search is null or blank, returns all tags for the organization.
+     * Search tag keys for autocomplete with limit, scoped to DEVICE entity type.
+     * If search is null or blank, returns all device tags.
      */
-    public List<Tag> searchTagKeys(String organizationId, String search, Integer limit) {
-        log.debug("Searching tag keys for org: {}, search: {}, limit: {}", organizationId, search, limit);
+    public List<Tag> searchTagKeys(String search, Integer limit) {
+        log.debug("Searching device tag keys (tenant-wide): search: {}, limit: {}", search, limit);
 
         List<Tag> allMatches;
         if (search == null || search.isBlank()) {
-            allMatches = tagRepository.findByOrganizationId(organizationId);
+            allMatches = tagRepository.findByEntityType(TagEntityType.DEVICE);
         } else {
-            allMatches = tagRepository.findByOrganizationIdAndKeyContainingIgnoreCase(organizationId, search);
+            allMatches = tagRepository.findByEntityTypeAndKeyContainingIgnoreCase(TagEntityType.DEVICE, search);
         }
 
         return allMatches.stream()
@@ -56,14 +61,14 @@ public class TagService {
     }
 
     /**
-     * Search tag values for autocomplete with limit.
+     * Search tag values for autocomplete with limit, scoped to DEVICE entity type.
      * If search is null or blank, returns all values for the tag key.
      */
-    public List<String> searchTagValues(String organizationId, String tagKey, String search, Integer limit) {
-        log.debug("Searching tag values for org: {}, key: {}, search: {}, limit: {}",
-                organizationId, tagKey, search, limit);
+    public List<String> searchTagValues(String tagKey, String search, Integer limit) {
+        log.debug("Searching device tag values (tenant-wide): key: {}, search: {}, limit: {}",
+                tagKey, search, limit);
 
-        Tag tag = tagRepository.findValuesByKeyAndOrganizationId(tagKey, organizationId);
+        Tag tag = tagRepository.findValuesByKeyAndEntityType(tagKey, TagEntityType.DEVICE);
         if (tag == null || tag.getValues() == null || tag.getValues().isEmpty()) {
             return List.of();
         }
@@ -95,19 +100,20 @@ public class TagService {
     public List<DeviceFilterOption> getTagValueOptions(String tagKey) {
         log.debug("Getting tag value options for key: {}", tagKey);
 
-        List<Tag> tags = tagRepository.findByKeyIn(List.of(tagKey));
+        List<Tag> tags = tagRepository.findByKeyInAndEntityType(List.of(tagKey), TagEntityType.DEVICE);
         if (tags.isEmpty()) {
             return List.of();
         }
 
         List<String> tagIds = tags.stream().map(Tag::getId).toList();
 
-        List<MachineTag> machineTags = machineTagRepository.findByTagIdIn(tagIds);
+        List<TagAssignment> tagAssignments = tagAssignmentRepository
+                .findByTagIdInAndEntityType(tagIds, TagEntityType.DEVICE);
 
         Map<String, Integer> valueCounts = new LinkedHashMap<>();
-        for (MachineTag mt : machineTags) {
-            if (mt.getValues() != null) {
-                for (String value : mt.getValues()) {
+        for (TagAssignment assignment : tagAssignments) {
+            if (assignment.getValues() != null) {
+                for (String value : assignment.getValues()) {
                     valueCounts.merge(value, 1, Integer::sum);
                 }
             }
@@ -125,7 +131,7 @@ public class TagService {
 
     /**
      * Get tags for multiple machines (batch loading).
-     * Returns Tag objects enriched with per-device values from MachineTag.
+     * Returns Tag objects enriched with per-device values from TagAssignment.
      */
     public List<List<Tag>> getTagsForMachines(List<String> machineIds) {
         log.debug("Getting tags for {} machines", machineIds.size());
@@ -134,19 +140,20 @@ public class TagService {
             return new ArrayList<>();
         }
 
-        List<MachineTag> allMachineTags = machineTagRepository.findByMachineIdIn(machineIds);
+        List<TagAssignment> allAssignments = tagAssignmentRepository
+                .findByEntityIdInAndEntityType(machineIds, TagEntityType.DEVICE);
 
-        if (allMachineTags.isEmpty()) {
+        if (allAssignments.isEmpty()) {
             return machineIds.stream()
                     .map(id -> new ArrayList<Tag>())
                     .collect(Collectors.toList());
         }
 
-        Map<String, List<MachineTag>> machineTagsByMachineId = allMachineTags.stream()
-                .collect(Collectors.groupingBy(MachineTag::getMachineId));
+        Map<String, List<TagAssignment>> assignmentsByEntityId = allAssignments.stream()
+                .collect(Collectors.groupingBy(TagAssignment::getEntityId));
 
-        Set<String> allTagIds = allMachineTags.stream()
-                .map(MachineTag::getTagId)
+        Set<String> allTagIds = allAssignments.stream()
+                .map(TagAssignment::getTagId)
                 .collect(Collectors.toSet());
         List<Tag> allTags = tagRepository.findAllById(new ArrayList<>(allTagIds));
         Map<String, Tag> tagsById = allTags.stream()
@@ -154,10 +161,10 @@ public class TagService {
 
         return machineIds.stream()
                 .map(machineId -> {
-                    List<MachineTag> machineTags = machineTagsByMachineId
+                    List<TagAssignment> assignments = assignmentsByEntityId
                             .getOrDefault(machineId, List.of());
-                    return machineTags.stream()
-                            .map(mt -> buildTag(mt, tagsById.get(mt.getTagId())))
+                    return assignments.stream()
+                            .map(assignment -> buildTag(assignment, tagsById.get(assignment.getTagId())))
                             .filter(Objects::nonNull)
                             .collect(Collectors.toList());
                 })
@@ -170,27 +177,76 @@ public class TagService {
     public List<Tag> getTagsForMachine(String machineId) {
         log.debug("Getting tags for machine: {}", machineId);
 
-        List<MachineTag> machineTags = machineTagRepository.findByMachineId(machineId);
-        if (machineTags.isEmpty()) {
+        List<TagAssignment> assignments = tagAssignmentRepository
+                .findByEntityIdAndEntityType(machineId, TagEntityType.DEVICE);
+        if (assignments.isEmpty()) {
             return new ArrayList<>();
         }
 
-        List<String> tagIds = machineTags.stream()
-                .map(MachineTag::getTagId)
+        List<String> tagIds = assignments.stream()
+                .map(TagAssignment::getTagId)
                 .toList();
         List<Tag> tags = tagRepository.findAllById(tagIds);
         Map<String, Tag> tagsById = tags.stream()
                 .collect(Collectors.toMap(Tag::getId, tag -> tag));
 
-        return machineTags.stream()
-                .map(mt -> buildTag(mt, tagsById.get(mt.getTagId())))
+        return assignments.stream()
+                .map(assignment -> buildTag(assignment, tagsById.get(assignment.getTagId())))
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
-    private Tag buildTag(MachineTag machineTag, Tag tag) {
+    @Transactional
+    public Tag createTag(String key, TagEntityType entityType, String description, String color) {
+        log.info("Creating tag '{}' with entityType: {}", key, entityType);
+
+        Tag tag = Tag.builder()
+                .key(key)
+                .entityType(entityType)
+                .description(description)
+                .color(color)
+                .createdAt(Instant.now())
+                .build();
+
+        return tagRepository.save(tag);
+    }
+
+    @Transactional
+    public Tag updateTag(String tagId, String key, String description, String color) {
+        log.info("Updating tag: {}", tagId);
+
+        Tag tag = tagRepository.findById(tagId)
+                .orElseThrow(() -> new IllegalArgumentException("Tag not found: " + tagId));
+
+        if (key != null) {
+            tag.setKey(key);
+        }
+        if (description != null) {
+            tag.setDescription(description);
+        }
+        if (color != null) {
+            tag.setColor(color);
+        }
+
+        return tagRepository.save(tag);
+    }
+
+    @Transactional
+    public void deleteTag(String tagId) {
+        log.info("Deleting tag: {}", tagId);
+
+        if (!tagRepository.existsById(tagId)) {
+            throw new IllegalArgumentException("Tag not found: " + tagId);
+        }
+
+        tagAssignmentRepository.deleteByTagId(tagId);
+        tagRepository.deleteById(tagId);
+        log.info("Tag deleted with cascade: {}", tagId);
+    }
+
+    private Tag buildTag(TagAssignment assignment, Tag tag) {
         if (tag == null) {
-            log.warn("Tag not found for machineTag: {}", machineTag.getTagId());
+            log.warn("Tag not found for assignment: {}", assignment.getTagId());
             return null;
         }
 
@@ -199,9 +255,9 @@ public class TagService {
                 .key(tag.getKey())
                 .description(tag.getDescription())
                 .color(tag.getColor())
-                .values(machineTag.getValues() != null ? machineTag.getValues() : List.of())
-                .organizationId(tag.getOrganizationId())
-                .createdAt(machineTag.getTaggedAt())
+                .values(assignment.getValues() != null ? assignment.getValues() : List.of())
+                .entityType(tag.getEntityType())
+                .createdAt(assignment.getTaggedAt())
                 .build();
     }
 }
