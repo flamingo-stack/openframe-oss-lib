@@ -194,8 +194,11 @@ public class NavigationSidebar {
     /**
      * Navigates to Monitoring.
      */
-    public void goToMonitoring() {
+    public MonitoringPage goToMonitoring() {
         clickNavItem(monitoringNavItem(), URL_MONITORING);
+        MonitoringPage monitoringPage = new MonitoringPage(this.page);
+        page.waitForCondition(monitoringPage::isTotalPoliciesCardVisible);
+        return monitoringPage;
     }
 
     /**

@@ -5,6 +5,7 @@ import com.openframe.test.api.ScriptApi;
 import com.openframe.test.data.dto.device.DeviceStatus;
 import com.openframe.test.data.dto.device.Machine;
 import com.openframe.test.data.dto.script.*;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
@@ -18,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 public class RunScriptTest extends BaseTest {
 
+    @Tag("device")
     @Test
     public void testBulkRun() {
         List<Machine> devices = DeviceApi.getDevices(osAndStatusDevicesFilter("WINDOWS", DeviceStatus.ONLINE));
@@ -31,6 +33,7 @@ public class RunScriptTest extends BaseTest {
         assertThat(runScriptResponse).as("Expect script execution started").contains("will now be run");
     }
 
+    @Tag("device")
     @Test
     public void testScheduleScript() {
         List<Machine> devices = DeviceApi.getDevices(osAndStatusDevicesFilter("WINDOWS", DeviceStatus.ONLINE));
@@ -47,6 +50,7 @@ public class RunScriptTest extends BaseTest {
         assertThat(assignDeviceResponse.getTaskResultsCreated()).as("Assigned task not zero").isNotZero();
     }
 
+    @Tag("scheduled")
     @Test
     public void testScheduleExecution() {
         List<ScriptSchedule> schedules = ScriptApi.getScriptSchedules();
