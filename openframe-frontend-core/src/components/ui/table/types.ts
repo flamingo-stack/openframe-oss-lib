@@ -91,6 +91,8 @@ export interface TableProps<T = any> {
   containerClassName?: string
   headerClassName?: string
   rowClassName?: string | ((item: T, index: number) => string)
+  /** Compact mode: smaller row height for dense data lists */
+  compact?: boolean
 
   // Interactions
   onRowClick?: (item: T) => void
@@ -181,6 +183,7 @@ export interface TableRowProps<T = any> {
   className?: string | ((item: T, index: number) => string)
   index: number
   isMobile?: boolean
+  compact?: boolean
   // Selection
   selectable?: boolean
   selected?: boolean
