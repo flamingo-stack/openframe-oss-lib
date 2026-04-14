@@ -47,6 +47,8 @@ export function useRealtimeChunkProcessor(
     }
   }, [initialState, callbacks])
 
+  const isInStreamRef = useRef(false)
+
   // Track pending escalated approvals
   const pendingEscalatedRef = useRef<Map<string, { command: string; explanation?: string; approvalType: string }>>(
     new Map()
@@ -61,13 +63,15 @@ export function useRealtimeChunkProcessor(
 
       switch (action.action) {
         case 'message_start':
+          isInStreamRef.current = true
           callbacks.onStreamStart?.()
-          // Reset accumulator for new message
           accumulator.resetSegments()
           break
 
         case 'message_end':
+          isInStreamRef.current = false
           callbacks.onStreamEnd?.()
+          accumulator.resetSegments()
           break
 
         case 'metadata':
@@ -173,13 +177,19 @@ export function useRealtimeChunkProcessor(
           callbacks.onTokenUsage?.(action.data)
           break
 
-        case 'context_compaction_start':
-          callbacks.onContextCompactionStart?.()
+        case 'context_compaction_start': {
+          const standalone = !isInStreamRef.current
+          const segments = accumulator.addContextCompaction()
+          callbacks.onSegmentsUpdate?.(segments, standalone ? { append: true, isCompacting: true } : undefined)
           break
+        }
 
-        case 'context_compaction_end':
-          callbacks.onContextCompactionEnd?.(action.summary)
+        case 'context_compaction_end': {
+          const standalone = !isInStreamRef.current
+          const segments = accumulator.completeContextCompaction(action.summary)
+          callbacks.onSegmentsUpdate?.(segments, standalone ? { append: true, isCompacting: true } : undefined)
           break
+        }
 
         default:
           // Unknown action - ignore

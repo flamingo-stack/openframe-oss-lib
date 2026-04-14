@@ -115,7 +115,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           </div>
           
           {/* Message segments — hidden for system messages without content */}
-          {(!isSystem || segments.length > 0) && <div className="flex flex-col">
+          {(!isSystem || segments.length > 0) && <div className="flex flex-col gap-2">
             {isTyping && segments.length === 0 ? (
               <ChatTypingIndicator />
             ) : (
