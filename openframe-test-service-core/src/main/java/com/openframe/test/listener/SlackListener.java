@@ -54,6 +54,7 @@ public class SlackListener implements TestExecutionListener {
                     testsFailed++;
                     String message = testExecutionResult.getThrowable()
                             .map(Throwable::getMessage)
+                            .map(SlackListener::truncateMessage)
                             .orElse("Unknown error");
                     testResults.add(":x: " + testIdentifier.getDisplayName() + ": " + message);
                 }
@@ -74,10 +75,15 @@ public class SlackListener implements TestExecutionListener {
         }
     }
 
+    private static String truncateMessage(String message) {
+        String firstLine = message.split("\n", 2)[0];
+        return firstLine.length() > 300 ? firstLine.substring(0, 300) + "..." : firstLine;
+    }
+
     public void sendResults(String tag, String domain, String baseUrl) {
         String env = domain.equals("localhost") ? "https://localhost" : String.format("`https://%s.%s`", domain, baseUrl);
         StringBuilder summary = new StringBuilder();
-        summary.append("*Test Report*").append(testsFailed == 0 ? " :large_green_circle:" : " :red_circle:").append("\n\n");
+        summary.append("*Test Report*").append(testsFailed == 0 && testsSucceeded > 0 ? " :large_green_circle:" : " :red_circle:").append("\n\n");
         summary.append(String.format("Environment: %s\n", env));
         summary.append(String.format("Tag: %s", tag));
 
@@ -87,6 +93,8 @@ public class SlackListener implements TestExecutionListener {
             for (String result : testResults) {
                 details.append(result).append("\n");
             }
+        } else {
+            summary.append("\n :x: No test results\n");
         }
 
         slackClient.postThreadedReport(summary.toString(), details.toString());
