@@ -139,7 +139,7 @@ export function TicketInfoSection({
         </div>
 
         {/* User */}
-        <InfoCell value={user || "Unassigned"} label="User" />
+        <InfoCell value={assigned?.name || 'Unassigned'} label="Assigned" />
 
         {/* Device */}
         <InfoCell
@@ -184,9 +184,6 @@ export function TicketInfoSection({
           {/* Second info row: Assigned + Created */}
           {(assigned || createdAt) && (
             <div className="grid grid-cols-2 gap-4 px-4 py-3 bg-ods-bg border-b border-ods-border items-center">
-              {assigned && (
-                <InfoCell value={assigned.name} label="Assigned" />
-              )}
               {createdAt && (
                 <InfoCell value={createdAt} label="Created" />
               )}
