@@ -16,6 +16,7 @@ type SharedConnection = {
   connectPromise: Promise<void> | null
   refCount: number
   closeTimer: ReturnType<typeof setTimeout> | null
+  retryTimer: ReturnType<typeof setTimeout> | null
 }
 
 let shared: SharedConnection | null = null
@@ -74,6 +75,13 @@ export function useNatsDialogSubscription({
     onBeforeReconnectRef.current = onBeforeReconnect
   }, [onBeforeReconnect])
 
+  const hadConnectionBeforeRef = useRef(false)
+
+  const getNatsWsUrlRef = useRef(getNatsWsUrl)
+  useEffect(() => {
+    getNatsWsUrlRef.current = getNatsWsUrl
+  }, [getNatsWsUrl])
+
   const acquireClient = useCallback((url: string): SharedConnection => {
     if (shared?.wsUrl !== url) {
       // Close existing connection if URL changed
@@ -92,13 +100,11 @@ export function useNatsDialogSubscription({
         user,
         pass,
         connectTimeoutMs: NETWORK_CONFIG.CONNECT_TIMEOUT_MS,
-        reconnect: true,
-        maxReconnectAttempts: -1, // Unlimited reconnection attempts
-        reconnectTimeWaitMs: NETWORK_CONFIG.RECONNECT_TIME_WAIT_MS,
+        reconnect: false,
         pingIntervalMs: NETWORK_CONFIG.PING_INTERVAL_MS,
         maxPingOut: NETWORK_CONFIG.MAX_PING_OUT,
       })
-      shared = { wsUrl: url, client, connectPromise: null, refCount: 0, closeTimer: null }
+      shared = { wsUrl: url, client, connectPromise: null, refCount: 0, closeTimer: null, retryTimer: null }
     }
 
     shared.refCount += 1
@@ -116,7 +122,13 @@ export function useNatsDialogSubscription({
     shared.closeTimer = setTimeout(() => {
       const s = shared
       shared = null
-      s && void s.client.close().catch(() => {})
+      if (s) {
+        if (s.retryTimer) {
+          clearTimeout(s.retryTimer)
+          s.retryTimer = null
+        }
+        void s.client.close().catch(() => {})
+      }
     }, NETWORK_CONFIG.SHARED_CLOSE_DELAY_MS)
   }, [])
 
@@ -155,46 +167,94 @@ export function useNatsDialogSubscription({
 
     clientRef.current = client
     setIsConnected(false)
-    
-    let hasConnected = false
-    let wasDisconnected = false
+
+    let closed = false
+    let retryAttempt = 0
+
+    function scheduleRetry() {
+      if (closed) return
+      if (shared !== sharedConn) return
+
+      if (sharedConn.retryTimer) {
+        clearTimeout(sharedConn.retryTimer)
+        sharedConn.retryTimer = null
+      }
+
+      const delay = Math.min(
+        NETWORK_CONFIG.RETRY_INITIAL_DELAY_MS * (NETWORK_CONFIG.RETRY_BACKOFF_MULTIPLIER ** retryAttempt),
+        NETWORK_CONFIG.RETRY_MAX_DELAY_MS
+      )
+      const jitteredDelay = delay * (0.5 + Math.random() * 0.5)
+      retryAttempt++
+
+      sharedConn.retryTimer = setTimeout(async () => {
+        sharedConn.retryTimer = null
+        if (closed) return
+        if (shared !== sharedConn) return
+
+        try {
+          await onBeforeReconnectRef.current?.()
+        } catch {
+          // Token refresh failed; still try to reconnect
+        }
+
+        if (closed) return
+        if (shared !== sharedConn) return
+
+        const freshUrl = getNatsWsUrlRef.current()
+        if (freshUrl !== wsUrl) return
+
+        try {
+          sharedConn.connectPromise = null
+          sharedConn.connectPromise = client.connect()
+          await sharedConn.connectPromise
+          if (!closed && shared === sharedConn) {
+            retryAttempt = 0
+            setIsConnected(true)
+          }
+        } catch {
+          sharedConn.connectPromise = null
+          if (!closed && shared === sharedConn) {
+            scheduleRetry()
+          }
+        }
+      }, jitteredDelay)
+    }
 
     const unsubscribeStatus = client.onStatus((event) => {
       const connected = event.status === 'connected'
       const disconnected = ['closed', 'disconnected', 'error'].includes(event.status)
       if (connected) {
         setIsConnected(true)
-        if (!hasConnected) {
-          hasConnected = true
-          onConnectRef.current?.()
-        } else if (wasDisconnected) {
+        if (hadConnectionBeforeRef.current) {
           setReconnectionCount(c => c + 1)
-          onConnectRef.current?.()
         }
-        wasDisconnected = false
+        hadConnectionBeforeRef.current = true
+        retryAttempt = 0
+        onConnectRef.current?.()
       }
       if (disconnected) {
         setIsConnected(false)
-        wasDisconnected = true
-        hasConnected = false
         onDisconnectRef.current?.()
-        onBeforeReconnectRef.current?.()
+        scheduleRetry()
       }
     })
 
-    let closed = false
     ;(async () => {
       try {
         sharedConn.connectPromise ||= client.connect()
         await sharedConn.connectPromise
         if (!closed) {
           setIsConnected(true)
+          hadConnectionBeforeRef.current = true
         }
-      } catch (e) {
+      } catch {
         sharedConn.connectPromise = null
-        setIsConnected(false)
-        onDisconnectRef.current?.()
-        await client.close().catch(() => {})
+        if (!closed) {
+          setIsConnected(false)
+          onDisconnectRef.current?.()
+          scheduleRetry()
+        }
       }
     })()
 
@@ -203,6 +263,11 @@ export function useNatsDialogSubscription({
       setIsConnected(false)
       setIsSubscribed(false)
       unsubscribeStatus()
+
+      if (sharedConn.retryTimer) {
+        clearTimeout(sharedConn.retryTimer)
+        sharedConn.retryTimer = null
+      }
 
       // Unsubscribe all subscriptions
       subscriptionRefs.current.forEach((sub) => {

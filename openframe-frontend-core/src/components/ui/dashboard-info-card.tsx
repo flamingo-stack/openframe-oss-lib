@@ -2,7 +2,7 @@ import type * as React from 'react'
 import Link from 'next/link'
 import { cn } from '../../utils/cn'
 import { QuestionCircleIcon } from '../icons-v2-generated/signs-and-symbols/question-circle-icon'
-import { CircularProgress } from './circular-progress'
+import { CircularProgress, type CircularProgressVariant } from './circular-progress'
 import { FloatingTooltip } from './floating-tooltip'
 
 export interface DashboardInfoCardProps {
@@ -10,7 +10,7 @@ export interface DashboardInfoCardProps {
   value: string | number
   percentage?: number
   showProgress?: boolean
-  progressColor?: string
+  progressVariant?: CircularProgressVariant
   className?: string
   /**
    * Navigation URL — renders the card as a Next.js Link
@@ -28,7 +28,7 @@ export function DashboardInfoCard({
   value,
   percentage,
   showProgress = false,
-  progressColor,
+  progressVariant,
   className,
   href,
   tooltip,
@@ -43,18 +43,18 @@ export function DashboardInfoCard({
       {/* Content section */}
       <div className="flex-1 flex flex-col">
         {/* Title */}
-        <p className="text-h5 text-ods-text-secondary tracking-[-0.28px]">
+        <p className="text-h5 text-ods-text-secondary">
           {title}
         </p>
 
         {/* Value and percentage */}
-        <div className="flex items-center gap-2">
-          <p className={cn("text-h2 text-ods-text-primary tracking-[-0.64px]", valueClassName)}>
+        <div className="flex items-center gap-[var(--spacing-system-xs)]">
+          <p className={cn("text-h2 text-ods-text-primary", valueClassName)}>
             {formattedValue}
           </p>
           {percentage !== undefined && (
             <p className="text-h4 text-ods-text-secondary">
-              {percentage}%
+              ({percentage}%)
             </p>
           )}
           {tooltip && (
@@ -71,13 +71,14 @@ export function DashboardInfoCard({
       {showProgress && percentage !== undefined && (
         <CircularProgress
           percentage={percentage}
-          color={progressColor}
+          variant={progressVariant}
+          showLabel={false}
         />
       )}
     </>
   )
 
-  const baseClassName = 'bg-ods-card border border-ods-border rounded-[6px] p-4 flex gap-3 items-center transition-all'
+  const baseClassName = 'bg-ods-card border border-ods-border rounded-sm p-[var(--spacing-system-m)] flex gap-[var(--spacing-system-s)] items-center transition-all'
 
   if (href) {
     return (
