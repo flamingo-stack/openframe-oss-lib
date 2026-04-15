@@ -2,6 +2,7 @@ package com.openframe.management.listener;
 
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.service.IntegratedToolService;
+import com.openframe.data.service.TenantIdProvider;
 import com.openframe.management.service.DebeziumService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,12 +20,15 @@ public class DebeziumConnectorInitializer {
 
     private final DebeziumService debeziumService;
     private final IntegratedToolService integratedToolService;
+    private final TenantIdProvider tenantIdProvider;
 
     @Autowired
     public DebeziumConnectorInitializer(DebeziumService debeziumService,
-                                        @Autowired(required = false) IntegratedToolService integratedToolService) {
+                                        @Autowired(required = false) IntegratedToolService integratedToolService,
+                                        TenantIdProvider tenantIdProvider) {
         this.debeziumService = debeziumService;
         this.integratedToolService = integratedToolService;
+        this.tenantIdProvider = tenantIdProvider;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -36,11 +40,16 @@ public class DebeziumConnectorInitializer {
     /**
      * Initializes Debezium connectors from MongoDB if no connectors exist.
      * Fetches all IntegratedTools with debeziumConnectors configured and creates them.
+     * Only runs if a tenant is registered — prevents creating connectors on empty clusters.
      */
     public void initializeConnectorsIfEmpty() {
-        //todo check that tenantId exist if no don't create
         if (integratedToolService == null) {
             log.debug("IntegratedToolService is not available, skipping connector initialization");
+            return;
+        }
+
+        if (!tenantIdProvider.isTenantRegistered()) {
+            log.info("No tenant registered yet, skipping Debezium connector initialization");
             return;
         }
 

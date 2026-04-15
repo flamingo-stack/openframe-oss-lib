@@ -6,11 +6,16 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.util.Optional;
+import java.util.List;
 
 /**
  * Provides the real tenant ID from MongoDB for use in Pinot shared tables.
  * Falls back to the cluster-level TENANT_ID env var for OSS or pre-registration.
+ *
+ * In-memory cache: once a tenant is found, it's cached for the pod's lifetime.
+ * Safe because there is exactly one tenant per cluster and it doesn't change
+ * while the pod is alive (cluster recycling destroys the pod).
+ * Pre-registration calls keep hitting MongoDB until a tenant appears, then cache forever.
  */
 @Service
 @RequiredArgsConstructor
@@ -21,10 +26,11 @@ public class TenantIdProvider {
     @Value("${TENANT_ID:oss}")
     private String fallbackTenantId;
 
+    private volatile Tenant cachedTenant;
+
     public String getTenantId() {
-        return findTenant()
-                .map(Tenant::getId)
-                .orElse(fallbackTenantId);
+        Tenant tenant = getCachedTenant();
+        return tenant != null ? tenant.getId() : fallbackTenantId;
     }
 
     /**
@@ -32,10 +38,25 @@ public class TenantIdProvider {
      * Used to defer operations (e.g. Debezium connector creation) until a tenant exists.
      */
     public boolean isTenantRegistered() {
-        return tenantRepository.count() > 0;
+        return getCachedTenant() != null;
     }
 
-    private Optional<Tenant> findTenant() {
-        return Optional.ofNullable(tenantRepository.findAll().getFirst());
+    /**
+     * Returns the cached tenant, falling back to a MongoDB query if no cache is populated.
+     * Caches the tenant permanently on first successful find — the tenant doesn't change
+     * during pod lifetime.
+     */
+    private Tenant getCachedTenant() {
+        Tenant tenant = cachedTenant;
+        if (tenant != null) {
+            return tenant;
+        }
+        List<Tenant> tenants = tenantRepository.findAll();
+        if (tenants.isEmpty()) {
+            return null;
+        }
+        tenant = tenants.getFirst();
+        cachedTenant = tenant;
+        return tenant;
     }
 }

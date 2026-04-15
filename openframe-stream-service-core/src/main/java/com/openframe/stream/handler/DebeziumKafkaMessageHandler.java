@@ -93,22 +93,7 @@ public class DebeziumKafkaMessageHandler extends DebeziumMessageHandler<Integrat
 
     @Override
     protected boolean isValidMessage(DeserializedDebeziumMessage message) {
-        if (!message.getIsVisible()) {
-            return false;
-        }
-
-        // Skip messages older than the retention window — protects against stale Kafka messages
-        // (e.g. from a previous customer on a recycled cluster) and matches Pinot's table retention.
-        if (message.getEventTimestamp() != null) {
-            long retentionThreshold = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(retentionDays);
-            if (message.getEventTimestamp() < retentionThreshold) {
-                log.debug("Skipping stale message (eventTimestamp={} < retentionThreshold={}, retentionDays={})",
-                        message.getEventTimestamp(), retentionThreshold, retentionDays);
-                return false;
-            }
-        }
-
-        return true;
+        return message.getIsVisible();
     }
 
     protected String getTopic() {
