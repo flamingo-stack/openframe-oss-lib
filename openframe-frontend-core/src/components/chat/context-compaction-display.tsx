@@ -74,8 +74,8 @@ const ContextCompactionDisplay = forwardRef<HTMLDivElement, ContextCompactionDis
                   <Chevron02UpIcon className="w-4 h-4 text-ods-text-secondary shrink-0" />
                 </div>
                 {summary && (
-                  <div className="text-sm font-medium text-ods-text-primary">
-                    <SimpleMarkdownRenderer content={summary} />
+                  <div className="p-3 text-sm font-medium text-ods-text-primary">
+                    <SimpleMarkdownRenderer content={summary} textSize="compact" />
                   </div>
                 )}
               </div>
