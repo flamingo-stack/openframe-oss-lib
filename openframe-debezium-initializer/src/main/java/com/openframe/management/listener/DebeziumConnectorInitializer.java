@@ -38,6 +38,7 @@ public class DebeziumConnectorInitializer {
      * Fetches all IntegratedTools with debeziumConnectors configured and creates them.
      */
     public void initializeConnectorsIfEmpty() {
+        //todo check that tenantId exist if no don't create
         if (integratedToolService == null) {
             log.debug("IntegratedToolService is not available, skipping connector initialization");
             return;

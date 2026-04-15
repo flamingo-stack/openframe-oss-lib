@@ -12,12 +12,22 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.util.concurrent.TimeUnit;
+
 @Slf4j
 @Component
 public class DebeziumKafkaMessageHandler extends DebeziumMessageHandler<IntegratedToolEvent, DeserializedDebeziumMessage> {
 
     @Value("${openframe.oss-tenant.kafka.topics.outbound.integrated-tool-events}")
     private String topic;
+
+    /**
+     * Retention window in days for incoming events. Messages older than this are skipped —
+     * protects against stale Kafka messages (e.g. from a previous customer on a recycled cluster)
+     * and matches Pinot's logs table retention.
+     */
+    @Value("${openframe.stream.event.retention-days:60}")
+    private int retentionDays;
 
     protected final OssTenantRetryingKafkaProducer kafkaProducer;
     private final TenantIdProvider tenantIdProvider;
@@ -87,13 +97,13 @@ public class DebeziumKafkaMessageHandler extends DebeziumMessageHandler<Integrat
             return false;
         }
 
-        // Skip messages that predate the current tenant — protects against stale Kafka messages
-        // from a previous customer on a recycled cluster.
+        // Skip messages older than the retention window — protects against stale Kafka messages
+        // (e.g. from a previous customer on a recycled cluster) and matches Pinot's table retention.
         if (message.getEventTimestamp() != null) {
-            long tenantCreatedAt = tenantIdProvider.getTenantCreatedAtMillis();
-            if (tenantCreatedAt > 0 && message.getEventTimestamp() < tenantCreatedAt) {
-                log.debug("Skipping stale message (eventTimestamp={} < tenantCreatedAt={})",
-                        message.getEventTimestamp(), tenantCreatedAt);
+            long retentionThreshold = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(retentionDays);
+            if (message.getEventTimestamp() < retentionThreshold) {
+                log.debug("Skipping stale message (eventTimestamp={} < retentionThreshold={}, retentionDays={})",
+                        message.getEventTimestamp(), retentionThreshold, retentionDays);
                 return false;
             }
         }

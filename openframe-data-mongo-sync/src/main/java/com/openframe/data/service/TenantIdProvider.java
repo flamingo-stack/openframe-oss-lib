@@ -6,14 +6,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.time.ZoneOffset;
 import java.util.Optional;
 
 /**
  * Provides the real tenant ID from MongoDB for use in Pinot shared tables.
  * Falls back to the cluster-level TENANT_ID env var for OSS or pre-registration.
- * Also exposes tenant creation time for filtering stale messages from previous tenants
- * on recycled clusters.
  */
 @Service
 @RequiredArgsConstructor
@@ -31,18 +28,14 @@ public class TenantIdProvider {
     }
 
     /**
-     * Returns the current tenant's creation timestamp in epoch millis.
-     * Used to filter out stale Kafka messages from a previous tenant on a recycled cluster.
-     * Returns 0 if no tenant is registered (accept all messages).
+     * Returns true if a tenant is registered in MongoDB.
+     * Used to defer operations (e.g. Debezium connector creation) until a tenant exists.
      */
-    public long getTenantCreatedAtMillis() {
-        return findTenant()
-                .map(Tenant::getCreatedAt)
-                .map(createdAt -> createdAt.toInstant(ZoneOffset.UTC).toEpochMilli())
-                .orElse(0L);
+    public boolean isTenantRegistered() {
+        return tenantRepository.count() > 0;
     }
 
     private Optional<Tenant> findTenant() {
-        return tenantRepository.findAll().stream().findFirst();
+        return Optional.ofNullable(tenantRepository.findAll().getFirst());
     }
 }
