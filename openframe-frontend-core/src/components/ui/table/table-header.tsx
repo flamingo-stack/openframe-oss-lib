@@ -134,7 +134,10 @@ export function TableHeader<T = any>({
                   onClick={() => handleSort(column)}
                 >
                   {column.renderHeader ? (
-                    column.renderHeader()
+                    <>
+                      {column.renderHeader()}
+                      {getSortIcon(column)}
+                    </>
                   ) : (
                     <>
                       <span className="font-medium text-[12px] leading-[16px] text-ods-text-secondary uppercase">

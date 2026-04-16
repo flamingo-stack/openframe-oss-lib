@@ -128,7 +128,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                         ? "text-ods-error"
                         : "text-ods-text-primary"
                     )}>
-                      <SimpleMarkdownRenderer content={segment.text} />
+                      <SimpleMarkdownRenderer content={segment.text} textSize="compact" />
                     </div>
                   )
                 } else if (segment.type === 'tool_execution') {

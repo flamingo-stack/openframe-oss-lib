@@ -22,7 +22,7 @@ public class DeviceApi {
     private static final String DEVICES = "api/devices/{machineId}";
     private static final String FLEET_HOST = "tools/fleetmdm-server/api/latest/fleet/hosts/{fleetId}";
     private static final String TACTICAL_AGENT = "tools/tactical-rmm/agents/{tacticalId}/";
-    private static final String MESH_DEVICE = "tools/meshcentral-server/api/deviceinfo";
+    private static final String MESH_DEVICE = "tools/meshcentral-server/api/devicestatus";
 
     public static List<String> getDeviceHostnames(DeviceFilterInput filter) {
         Map<String, Object> body = new HashMap<>();
