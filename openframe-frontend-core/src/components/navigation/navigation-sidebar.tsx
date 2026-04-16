@@ -14,9 +14,14 @@ const STORAGE_KEY = 'of.navigationSidebar.minimized'
 
 export interface NavigationSidebarProps {
   config: NavigationSidebarConfig
+  /**
+   * When true, all navigation items are disabled and visually dimmed.
+   * The collapse/expand toggle button remains interactive.
+   */
+  disabled?: boolean
 }
 
-export function NavigationSidebar({ config }: NavigationSidebarProps) {
+export function NavigationSidebar({ config, disabled = false }: NavigationSidebarProps) {
 
   const isLgUp = useLgUp() ?? false
 
@@ -68,16 +73,23 @@ export function NavigationSidebar({ config }: NavigationSidebarProps) {
       <button
         key={item.id}
         onClick={(event) => handleItemClick(item, event)}
+        disabled={disabled}
         className={cn(
           "w-full flex items-center transition-all duration-200 relative",
           "p-4",
           // Hover and default states
-          !isActive && "hover:bg-ods-bg-hover text-ods-text-primary [&_svg]:fill-ods-text-secondary",
+          !isActive && !disabled && "hover:bg-ods-bg-hover text-ods-text-primary [&_svg]:fill-ods-text-secondary",
+          !isActive && disabled && "text-ods-text-secondary [&_svg]:fill-ods-text-secondary",
           // Active state
-          isActive && [
+          isActive && !disabled && [
             "bg-[var(--ods-open-yellow-light)] text-ods-accent",
             "[&_svg]:fill-ods-accent"
           ],
+          isActive && disabled && [
+            "text-ods-text-secondary [&_svg]:fill-ods-text-secondary"
+          ],
+          // Disabled state - dim and prevent interaction
+          disabled && "cursor-not-allowed opacity-50",
           // Layout - proper centering in minimized mode
           isMinimized && !inOverlay
             ? "justify-center"
@@ -88,7 +100,7 @@ export function NavigationSidebar({ config }: NavigationSidebarProps) {
         aria-current={isActive ? 'page' : undefined}
       >
         {/* Active indicator */}
-        {isActive && (
+        {isActive && !disabled && (
           <div
             className="absolute left-0 top-0 bottom-0 w-1 bg-ods-accent"
             aria-hidden="true"
@@ -104,7 +116,7 @@ export function NavigationSidebar({ config }: NavigationSidebarProps) {
           )}
         >
           {cloneElement(item.icon as React.ReactElement<any>, {
-            color: isActive ? "text-ods-accent" : "text-ods-text-secondary"
+            color: isActive && !disabled ? "text-ods-accent" : "text-ods-text-secondary"
           })}
         </div>
 
@@ -126,7 +138,7 @@ export function NavigationSidebar({ config }: NavigationSidebarProps) {
             className={cn(
               "text-sm flex-shrink-0",
               "transition-colors duration-200",
-              isActive ? "text-[#ffc008]" : "text-[#888888]"
+              isActive && !disabled ? "text-[#ffc008]" : "text-[#888888]"
             )}
           >
             {item.badge}
@@ -134,7 +146,7 @@ export function NavigationSidebar({ config }: NavigationSidebarProps) {
         )}
       </button>
     )
-  }, [minimized, isLgUp, handleItemClick])
+  }, [minimized, isLgUp, handleItemClick, disabled])
 
   // Memoize items separation
   const { primaryItems, secondaryItems } = useMemo(() => ({
