@@ -2,7 +2,7 @@
 
 import { cn } from '../../utils/cn'
 
-export type CircularProgressVariant = 'success' | 'warning' | 'error' | 'info'
+export type CircularProgressVariant = 'success' | 'warning' | 'error' | 'info' | 'accent'
 
 interface CircularProgressProps {
   percentage: number                    // 0-100
@@ -10,25 +10,32 @@ interface CircularProgressProps {
   size?: number                         // Default: 56
   strokeWidth?: number                  // Default: 10
   showLabel?: boolean                   // Show percentage text in center (default: true)
+  labelFormat?: 'percent' | 'value'    // 'percent' = "70%", 'value' = "70" (default: 'percent')
   className?: string
 }
+
+const SUBTLE_TRACK = 'rgba(255, 255, 255, 0.06)'
 
 const variantColors: Record<CircularProgressVariant, { progress: string; track: string }> = {
   success: {
     progress: 'var(--color-success)',
-    track: 'var(--color-success-secondary)',
+    track: SUBTLE_TRACK,
   },
   warning: {
     progress: 'var(--color-warning)',
-    track: 'var(--color-warning-secondary)',
+    track: SUBTLE_TRACK,
   },
   error: {
     progress: 'var(--color-error)',
-    track: 'var(--color-error-secondary)',
+    track: SUBTLE_TRACK,
   },
   info: {
     progress: 'var(--ods-system-greys-white)',
-    track: 'var(--ods-system-greys-soft-grey)',
+    track: SUBTLE_TRACK,
+  },
+  accent: {
+    progress: 'var(--ods-flamingo-cyan-base)',
+    track: SUBTLE_TRACK,
   },
 }
 
@@ -38,6 +45,7 @@ export function CircularProgress({
   size = 56,
   strokeWidth = 10,
   showLabel = true,
+  labelFormat = 'percent',
   className
 }: CircularProgressProps) {
   const normalizedPercentage = Math.min(100, Math.max(0, percentage))
@@ -76,8 +84,8 @@ export function CircularProgress({
       </svg>
       {showLabel && (
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-xs font-medium text-ods-text-secondary">
-            {Math.round(normalizedPercentage)}%
+          <span className="font-medium text-ods-text-primary" style={{ fontSize: size <= 40 ? 10 : 12 }}>
+            {Math.round(normalizedPercentage)}{labelFormat === 'percent' ? '%' : ''}
           </span>
         </div>
       )}
