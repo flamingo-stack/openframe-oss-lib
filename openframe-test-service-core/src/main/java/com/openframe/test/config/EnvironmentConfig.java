@@ -89,7 +89,7 @@ public class EnvironmentConfig {
 
     public static String getUserDomain() {
         loadEnv();
-        return testUserDomain.contains("localhost") ? "localhost" : testUserDomain + "." + testBaseUrl;
+        return getEnvMode().equals(OSS) ? "localhost" : testUserDomain + "." + testBaseUrl;
     }
 
     public static String getRegistrationUrl() {
