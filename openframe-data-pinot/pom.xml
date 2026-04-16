@@ -19,10 +19,36 @@
         <dependency>
             <groupId>org.apache.pinot</groupId>
             <artifactId>pinot-java-client</artifactId>
+            <exclusions>
+                <!-- Pinot pulls in log4j-slf4j2-impl which conflicts with Spring Boot's log4j-to-slf4j.
+                     Exclude Pinot's logging bridges so Spring Boot's logging config is used. -->
+                <exclusion>
+                    <groupId>org.apache.logging.log4j</groupId>
+                    <artifactId>log4j-slf4j2-impl</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.logging.log4j</groupId>
+                    <artifactId>log4j-slf4j-impl</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.logging.log4j</groupId>
+                    <artifactId>log4j-1.2-api</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-data-mongo-sync</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>
