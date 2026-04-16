@@ -15,6 +15,7 @@ public class RegistrationApi {
 
     public static UserRegistrationResponse registerUser(UserRegistrationRequest user) {
         Response response = given()
+                .log().ifValidationFails()
                 .relaxedHTTPSValidation()
                 .contentType(ContentType.JSON)
                 .body(user).post(REGISTER);
