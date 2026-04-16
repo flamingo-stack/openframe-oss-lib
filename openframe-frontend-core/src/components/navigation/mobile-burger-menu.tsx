@@ -29,6 +29,11 @@ export interface MobileBurgerMenuProps {
   onEditProfile?: () => void
   /** Callback when logout button is clicked */
   onLogout?: () => void
+  /**
+   * When true, all interactive items inside the menu (nav items, action buttons,
+   * logout) are disabled. The burger toggle and backdrop click to close still work.
+   */
+  disabled?: boolean
 }
 
 export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
@@ -38,7 +43,8 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
   user,
   onSearchUser,
   onEditProfile,
-  onLogout
+  onLogout,
+  disabled = false,
 }: MobileBurgerMenuProps) {
   // Prevent body scroll when menu is open
   useEffect(() => {
@@ -87,14 +93,17 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
       <button
         key={item.id}
         onClick={() => handleItemClick(item)}
+        disabled={disabled}
         className={cn(
           "flex items-center gap-1 p-3 relative",
           "transition-colors duration-200",
           "bg-ods-card border border-ods-border rounded-md",
-          "hover:bg-ods-hover",
+          !disabled && "hover:bg-ods-hover",
           isGridItem ? "flex-1 min-w-0" : "w-full",
           // Active state
-          isActive && "border-ods-accent"
+          isActive && !disabled && "border-ods-accent",
+          // Disabled state
+          disabled && "cursor-not-allowed opacity-50"
         )}
         aria-current={isActive ? 'page' : undefined}
       >
@@ -103,7 +112,7 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
           <div className="flex-shrink-0 size-4 flex items-center justify-center">
             {React.cloneElement(item.icon as React.ReactElement<any>, {
               size: 16,
-              color: isActive ? "var(--color-accent-primary)" : "var(--color-text-secondary)"
+              color: isActive && !disabled ? "var(--color-accent-primary)" : "var(--color-text-secondary)"
             })}
           </div>
         )}
@@ -111,7 +120,7 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
         {/* Label */}
         <span className={cn(
           "font-['DM_Sans'] font-medium text-sm leading-5 flex-1 text-left truncate",
-          isActive ? "text-ods-accent" : "text-ods-text-primary"
+          isActive && !disabled ? "text-ods-accent" : "text-ods-text-primary"
         )}>
           {item.label}
         </span>
@@ -182,7 +191,13 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 flex flex-col gap-4">
           {/* User Card */}
           {user && (
-            <div className="flex items-center gap-3 p-3 bg-ods-card border border-ods-border rounded-md">
+            <div
+              className={cn(
+                "flex items-center gap-3 p-3 bg-ods-card border border-ods-border rounded-md",
+                disabled && "pointer-events-none opacity-50"
+              )}
+              aria-disabled={disabled || undefined}
+            >
               <SquareAvatar
                 src={user.userAvatarUrl || undefined}
                 alt={user.userName || 'User'}
@@ -257,7 +272,12 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
           {onLogout && (
             <button
               onClick={onLogout}
-              className="w-full flex items-center gap-1 p-3 bg-ods-card border border-ods-border rounded-md hover:bg-ods-hover transition-colors"
+              disabled={disabled}
+              className={cn(
+                "w-full flex items-center gap-1 p-3 bg-ods-card border border-ods-border rounded-md transition-colors",
+                !disabled && "hover:bg-ods-hover",
+                disabled && "cursor-not-allowed opacity-50"
+              )}
             >
               <Logout02Icon className="size-4 text-ods-error" />
               <span className="font-['DM_Sans'] font-medium text-sm leading-5 flex-1 text-left text-ods-text-primary">

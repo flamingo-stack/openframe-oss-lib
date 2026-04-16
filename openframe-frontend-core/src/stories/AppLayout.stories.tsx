@@ -367,6 +367,61 @@ export const Interactive: Story = {
 }
 
 /**
+ * Disabled state - only the mobile burger menu toggle and the sidebar collapse/expand
+ * button remain interactive. All other navigation, header controls, and main content
+ * are visually dimmed and cannot be interacted with.
+ */
+export const Disabled: Story = {
+  args: {
+    disabled: true,
+    mobileBurgerMenuProps: {
+      user: {
+        userName: 'Alex Developer',
+        userEmail: 'alex@openframe.dev',
+        userAvatarUrl: 'https://github.com/shadcn.png',
+        userRole: 'Admin',
+      },
+      onSearchUser: fn(),
+      onEditProfile: fn(),
+      onLogout: fn(),
+    },
+    headerProps: {
+      showSearch: true,
+      onSearch: fn(),
+      showOrganizations: true,
+      organizations: [
+        { id: '1', name: 'Acme Corp' },
+        { id: '2', name: 'Tech Startup' },
+      ],
+      selectedOrgId: '1',
+      onOrgChange: fn(),
+      showNotifications: true,
+      unreadCount: 3,
+      showUser: true,
+      userName: 'Alex Developer',
+      userEmail: 'alex@openframe.dev',
+      onProfile: fn(),
+      onLogout: fn(),
+    },
+    children: (
+      <div className="p-4">
+        <h1 className="text-2xl font-semibold text-ods-text-primary mb-4">
+          Disabled Layout
+        </h1>
+        <p className="text-ods-text-secondary mb-2">
+          Try clicking nav items, search, organizations, the user menu, or any
+          content here — they are all inert.
+        </p>
+        <p className="text-ods-text-secondary">
+          Only the burger menu (mobile) and the sidebar collapse/expand toggle at
+          the bottom of the sidebar remain interactive.
+        </p>
+      </div>
+    ),
+  },
+}
+
+/**
  * Example mimicking a typical dashboard page.
  */
 export const DashboardExample: Story = {
