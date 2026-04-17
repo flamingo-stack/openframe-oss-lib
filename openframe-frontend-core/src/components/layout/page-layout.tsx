@@ -54,7 +54,7 @@ export function PageLayout({
       className={cn('flex flex-col w-full', BACKGROUND[background], PADDING[padding], className)}
     >
       {hasHeader && (
-        <div className="flex items-end justify-between md:flex-col md:items-start md:justify-start lg:flex-row lg:items-end lg:justify-between gap-[var(--spacing-system-m)]">
+        <div className="flex items-end justify-between md:flex-col md:items-start md:justify-start lg:flex-row lg:items-end lg:justify-between gap-[var(--spacing-system-m)] mb-[var(--spacing-system-l)]">
           <div className="flex flex-col gap-2 flex-1 min-w-0">
             {backButton && (
               <Button
@@ -83,7 +83,7 @@ export function PageLayout({
         </div>
       )}
 
-      <div className={cn('flex-1 gap-[var(--spacing-system-l)]', needsBottomPadding && 'pb-28 md:pb-0', contentClassName)}>
+      <div className={cn('flex flex-col flex-1 gap-[var(--spacing-system-l)]', needsBottomPadding && 'pb-28 md:pb-0', contentClassName)}>
         {children}
       </div>
     </div>

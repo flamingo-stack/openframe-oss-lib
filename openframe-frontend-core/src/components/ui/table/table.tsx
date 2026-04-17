@@ -66,6 +66,7 @@ export function Table<T = any>({
   containerClassName,
   headerClassName,
   rowClassName,
+  compact,
   onRowClick,
   rowActions,
   renderRowActions,
@@ -223,6 +224,7 @@ export function Table<T = any>({
                 onClick={onRowClick}
                 className={getRowClassName(item, index)}
                 index={index}
+                compact={compact}
                 selectable={selectable}
                 selected={isRowSelected(item)}
                 onSelect={handleSelectRow}

@@ -111,6 +111,34 @@ export const AllWithClose: Story = {
   ),
 };
 
+export const Disabled: Story = {
+  args: { variant: 'primary', label: 'Tag', disabled: true },
+};
+
+export const DisabledWithIconAndClose: Story = {
+  args: {
+    variant: 'primary',
+    label: 'Tag',
+    icon: <Smile className="size-5" />,
+    onClose: () => {},
+    disabled: true,
+  },
+};
+
+export const AllDisabled: Story = {
+  render: () => (
+    <div className="flex flex-wrap gap-3">
+      <Tag variant="primary" label="Primary" disabled />
+      <Tag variant="outline" label="Outline" disabled />
+      <Tag variant="success" label="Success" disabled />
+      <Tag variant="warning" label="Warning" disabled />
+      <Tag variant="error" label="Error" disabled />
+      <Tag variant="critical" label="Critical" disabled />
+      <Tag variant="grey" label="Grey" disabled />
+    </div>
+  ),
+};
+
 export const AllWithIconAndClose: Story = {
   render: () => (
     <div className="flex flex-wrap gap-3">

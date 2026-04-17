@@ -10,11 +10,17 @@ import { NavigationSidebar } from './navigation-sidebar'
 export interface AppLayoutProps {
   children: React.ReactNode
   sidebarConfig: NavigationSidebarConfig
-  headerProps: Omit<AppHeaderProps, 'isMobileMenuOpen' | 'onToggleMobileMenu'>
+  headerProps: Omit<AppHeaderProps, 'isMobileMenuOpen' | 'onToggleMobileMenu' | 'disabled'>
   loadingFallback?: React.ReactNode
   mainClassName?: string
   className?: string
-  mobileBurgerMenuProps: Omit<MobileBurgerMenuProps, 'isOpen' | 'onClose' | 'config'>
+  mobileBurgerMenuProps: Omit<MobileBurgerMenuProps, 'isOpen' | 'onClose' | 'config' | 'disabled'>
+  /**
+   * When true, disables navigation/header chrome interactions except the mobile
+   * burger menu toggle and the sidebar collapse/expand button. Main content
+   * (`children`) is not affected and stays fully interactive.
+   */
+  disabled?: boolean
 }
 
 export function AppLayout({
@@ -25,6 +31,7 @@ export function AppLayout({
   mainClassName,
   className,
   mobileBurgerMenuProps,
+  disabled = false,
 }: AppLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
@@ -38,13 +45,14 @@ export function AppLayout({
 
   return (
     <div className={cn("flex h-screen bg-ods-bg", className)}>
-      <NavigationSidebar config={sidebarConfig} />
+      <NavigationSidebar config={sidebarConfig} disabled={disabled} />
       {/* Mobile Burger Menu - opens below header */}
       <MobileBurgerMenu
         {...mobileBurgerMenuProps}
         isOpen={mobileMenuOpen}
         onClose={handleCloseMobileMenu}
         config={sidebarConfig}
+        disabled={disabled}
       />
 
       {/* Main Content Area */}
@@ -53,6 +61,7 @@ export function AppLayout({
           {...headerProps}
           isMobileMenuOpen={mobileMenuOpen}
           onToggleMobileMenu={handleToggleMobileMenu}
+          disabled={disabled}
         />
 
         {/* Main Content */}
