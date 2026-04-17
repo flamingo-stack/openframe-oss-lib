@@ -235,6 +235,20 @@ export function useNatsDialogSubscription({
       }
       if (disconnected) {
         setIsConnected(false)
+        setIsSubscribed(false)
+        
+        subscriptionRefs.current.forEach((sub) => {
+          try {
+            sub?.unsubscribe()
+          } catch {
+            // ignore
+          }
+        })
+        subscriptionRefs.current.clear()
+        lastSubscribedDialogIdRef.current = null
+        abortControllerRef.current?.abort()
+        abortControllerRef.current = null
+
         onDisconnectRef.current?.()
         scheduleRetry()
       }
