@@ -1,10 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { CheckIcon } from "../icons-v2-generated/signs-and-symbols/check-icon"
-import { PencilIcon } from "../icons-v2-generated/design/pencil-icon"
-import { TrashIcon } from "../icons-v2-generated/interface/trash-icon"
-import { XmarkIcon } from "../icons-v2-generated/signs-and-symbols/xmark-icon"
+import { CheckIcon, PenEditIcon, TrashIcon, XmarkIcon } from "../icons-v2-generated"
 import { cn } from "../../utils/cn"
 import { Input } from "./input"
 import { SquareAvatar } from "./square-avatar"
@@ -124,7 +121,7 @@ export function TicketNoteCard({ note, onEdit, onDelete, className }: TicketNote
               className="text-ods-text-secondary hover:text-ods-text-primary transition-colors"
               aria-label="Edit note"
             >
-              <PencilIcon className="size-6" />
+              <PenEditIcon className="size-6" />
             </button>
           )}
         </div>

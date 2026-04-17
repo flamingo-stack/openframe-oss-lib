@@ -32,6 +32,11 @@ export interface AppHeaderProps {
   isMobileMenuOpen: boolean
   /** Callback to toggle mobile menu */
   onToggleMobileMenu?: () => void
+  /**
+   * When true, all header controls are disabled and visually dimmed
+   * EXCEPT the mobile burger menu toggle, which remains interactive.
+   */
+  disabled?: boolean
 }
 
 export const AppHeader = React.memo(function AppHeader({
@@ -51,10 +56,13 @@ export const AppHeader = React.memo(function AppHeader({
   onLogout,
   className,
   isMobileMenuOpen,
-  onToggleMobileMenu
-}: AppHeaderProps) {  
+  onToggleMobileMenu,
+  disabled = false,
+}: AppHeaderProps) {
   const isMdUp = useMdUp() ?? false
-  
+
+  const dimmedClass = disabled ? 'pointer-events-none opacity-50' : ''
+
   return (
     <header
       className={cn(
@@ -85,7 +93,7 @@ export const AppHeader = React.memo(function AppHeader({
       {showSearch ? (
         <HeaderGlobalSearch
           onSubmit={onSearch}
-          className="hidden md:flex"
+          className={cn("hidden md:flex", dimmedClass)}
         />
       ) : <div className="hidden md:flex w-full" />}
 
@@ -94,7 +102,8 @@ export const AppHeader = React.memo(function AppHeader({
         <HeaderButton
           icon={<SearchIcon className="w-4 h-4 md:w-6 md:h-6" />}
           aria-label="Search"
-          className="md:hidden"
+          className={cn("md:hidden", dimmedClass)}
+          disabled={disabled}
         />
       )}
 
@@ -104,14 +113,14 @@ export const AppHeader = React.memo(function AppHeader({
           organizations={organizations}
           selectedOrgId={selectedOrgId}
           onOrgChange={onOrgChange}
-          className="hidden lg:flex"
+          className={cn("hidden lg:flex", dimmedClass)}
         />
       )}
 
       {isMdUp && showUser && (
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <HeaderButton 
+          <DropdownMenuTrigger asChild disabled={disabled}>
+            <HeaderButton
               icon={<SquareAvatar
                 src={userAvatarUrl || undefined}
                 alt={userName || 'User'}
@@ -120,6 +129,8 @@ export const AppHeader = React.memo(function AppHeader({
                 className="shrink-0 w-8 h-8 md:w-10 md:h-10"
               />}
               aria-label="User"
+              disabled={disabled}
+              className={dimmedClass}
             />
           </DropdownMenuTrigger>
           <DropdownMenuContent
@@ -187,6 +198,8 @@ export const AppHeader = React.memo(function AppHeader({
             </div>
           }
           aria-label="Notifications"
+          disabled={disabled}
+          className={dimmedClass}
         />
       )}
     </header>

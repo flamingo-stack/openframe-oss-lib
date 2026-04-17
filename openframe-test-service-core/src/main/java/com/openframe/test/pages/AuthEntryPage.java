@@ -2,6 +2,7 @@ package com.openframe.test.pages;
 
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
+import com.microsoft.playwright.options.WaitUntilState;
 
 import static com.microsoft.playwright.options.LoadState.NETWORKIDLE;
 import static com.openframe.test.config.EnvironmentConfig.getAuthUrl;
@@ -38,7 +39,9 @@ public class AuthEntryPage {
     // ── Navigation ────────────────────────────────────────────────────────
 
     public AuthEntryPage navigate() {
-        page.navigate(URL);
+        page.navigate(URL, new Page.NavigateOptions()
+                .setWaitUntil(WaitUntilState.DOMCONTENTLOADED)
+                .setTimeout(60_000));
         page.waitForLoadState(NETWORKIDLE);
         return this;
     }

@@ -40,7 +40,6 @@ export const platformDisplayNames = {
   openframe: 'OpenFrame',
   flamingo: 'Flamingo',
   'flamingo-teaser': 'Flamingo Teaser',
-  'admin-hub': 'Admin Hub',
   'marketing-hub': 'Marketing Hub',
   'product-hub': 'Product Hub',
   'revenue-hub': 'Revenue Hub',
@@ -56,7 +55,6 @@ export const platformDescriptions = {
   openframe: 'AI-driven open-source security operations center (SOC) and endpoint detection platform for MSPs.',
   flamingo: 'AI-driven open-source OS for MSPs. Swap bloated vendor tools for open ones. Automate the boring crap. Take your margin back.',
   'flamingo-teaser': 'Preview of Flamingo - the AI-driven open-source OS for MSPs.',
-  'admin-hub': 'Administrative interface for managing Flamingo platform services and configurations.',
   tmcg: 'The Miami Cyber Gang - A cybersecurity community focused on education and collaboration.',
   universal: 'Cross-platform universal content.'
 };
@@ -67,7 +65,6 @@ export const platformSlogans = {
   openframe: 'Open-Source Security Operations',
   flamingo: 'Open-Source OS for MSPs',
   'flamingo-teaser': 'Coming Soon: Open-Source OS for MSPs',
-  'admin-hub': 'Manage Your Platform',
   tmcg: 'Miami Cyber Community',
   universal: 'Universal Platform'
 };
@@ -78,7 +75,6 @@ export const platformHexColors = {
   openframe: '#FFC008',
   flamingo: '#FF6B9D',
   universal: '#FFC008',
-  'admin-hub': '#FFC008',
   'flamingo-teaser': '#F59E0B',
   'marketing-hub': '#F357BB',
   'product-hub': '#5EA62E',
@@ -94,7 +90,6 @@ export const platformIconNames = {
   openframe: 'openframe-logo',
   flamingo: 'flamingo-logo',
   universal: 'globe',
-  'admin-hub': 'flamingo-logo',
   'flamingo-teaser': 'flamingo-logo',
   'marketing-hub': 'flamingo-logo',
   'product-hub': 'flamingo-logo',
@@ -207,7 +202,6 @@ export function getPlatformIconComponent(platformName: string, className: string
       return <OpenmspLogo className={className} color="#f1f1f1" />;
     case 'flamingo':
     case 'flamingo-teaser':
-    case 'admin-hub':
       return <FlamingoLogo className={`${className} text-white`} />;
     case 'marketing-hub':
       return <FlamingoLogo className={className} fill="var(--ods-flamingo-pink-base)" />;
