@@ -127,7 +127,6 @@ export const WithSeparator: Story = {
           { id: 'openmsp', label: 'OpenMSP', value: 'openmsp' },
           { id: 'sep', label: '', value: '', type: 'separator' },
           { id: 'flamingo', label: 'Flamingo', value: 'flamingo' },
-          { id: 'admin-hub', label: 'Admin Hub', value: 'admin-hub' },
         ],
         allowSelectAll: true,
       },

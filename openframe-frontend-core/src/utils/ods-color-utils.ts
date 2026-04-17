@@ -6,7 +6,7 @@
 
 import { colorTokens as odsTokens } from './ods-color-tokens-stub';
 
-export type Platform = 'openmsp' | 'admin-hub' | 'openframe' | 'flamingo';
+export type Platform = 'openmsp' | 'openframe' | 'flamingo';
 export type ColorCategory = 'open' | 'flamingo' | 'system' | 'attention';
 export type ColorVariant = 'base' | 'hover' | 'active' | 'focus' | 'disabled';
 
@@ -30,7 +30,6 @@ export function getPlatformAccentColor(platform?: Platform): string {
   
   const platformColors = {
     'openmsp': 'var(--ods-open-yellow-base)',         // CSS variable instead of hex
-    'admin-hub': 'var(--ods-flamingo-pink-base)',     // CSS variable instead of hex
     'openframe': 'var(--ods-open-yellow-base)',       // CSS variable instead of hex
     'flamingo': 'var(--ods-flamingo-pink-base)'       // CSS variable instead of hex
   };
@@ -185,7 +184,6 @@ export function getPlatformConfig(platform?: Platform) {
     isLightTheme: currentPlatform === 'flamingo',
     brandName: {
       'openmsp': 'OpenMSP',
-      'admin-hub': 'Flamingo Hub',
       'openframe': 'OpenFrame',
       'flamingo': 'Flamingo'
     }[currentPlatform]
