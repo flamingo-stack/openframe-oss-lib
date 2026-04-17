@@ -75,7 +75,6 @@ If you need granular control, you can import specific files:
 The styles automatically adapt based on your `NEXT_PUBLIC_APP_TYPE` environment variable:
 
 - **openmsp**: Yellow accent (#FFC008), dark theme
-- **admin-hub**: Pink accent (#F357BB), dark theme
 - **flamingo**: Pink accent (#F357BB), light theme
 - **openframe**: Cyan accent (#5EFAF0), dark theme
 - **flamingo-teaser**: Yellow accent (#FFC008), dark theme
