@@ -40,8 +40,10 @@ type Organization implements Node {
 }
 
 type OrganizationImage {
-    # URL to access the logo image
+    # URL to access the logo image (relative path via backend proxy)
     imageUrl: String!,
+    # Direct presigned URL to the image in cloud storage
+    presignedImageUrl: String,
     hash: String,
     sourceType: String!
 }
