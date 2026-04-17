@@ -86,26 +86,26 @@ export function formatBytes(bytes: number, decimals = 2): string {
  */
 export function getPlatformProductionUrl(platform: string): string {
   switch (platform) {
+    // *-hub platforms — env var convention: NEXT_PUBLIC_<NAME>_HUB_URL
     case 'marketing-hub':
-      return process.env.NEXT_PUBLIC_MARKETING_URL || 'https://marketing-hub.flamingo.so';
+      return process.env.NEXT_PUBLIC_MARKETING_HUB_URL || 'https://marketing-hub.flamingo.so';
     case 'company-hub':
       return process.env.NEXT_PUBLIC_COMPANY_HUB_URL || 'https://company-hub.flamingo.so';
     case 'product-hub':
-      return process.env.NEXT_PUBLIC_PRODUCT_URL || 'https://product-hub.flamingo.so';
+      return process.env.NEXT_PUBLIC_PRODUCT_HUB_URL || 'https://product-hub.flamingo.so';
     case 'revenue-hub':
-      return process.env.NEXT_PUBLIC_REVENUE_URL || 'https://revenue-hub.flamingo.so';
+      return process.env.NEXT_PUBLIC_REVENUE_HUB_URL || 'https://revenue-hub.flamingo.so';
     case 'people-hub':
-      return process.env.NEXT_PUBLIC_PEOPLE_URL || 'https://people-hub.flamingo.so';
-    case 'admin-hub':
-      return process.env.NEXT_PUBLIC_ADMIN_URL || 'https://admin-hub.flamingo.so';
+      return process.env.NEXT_PUBLIC_PEOPLE_HUB_URL || 'https://people-hub.flamingo.so';
+    // Standalone platforms — env var convention: NEXT_PUBLIC_<NAME>_URL
     case 'openmsp':
-      return process.env.NEXT_PUBLIC_PLATFORM_URL || 'https://www.openmsp.ai';
+      return process.env.NEXT_PUBLIC_OPENMSP_URL || 'https://www.openmsp.ai';
     case 'flamingo':
       return process.env.NEXT_PUBLIC_FLAMINGO_URL || 'https://www.flamingo.run';
     case 'tmcg':
       return process.env.NEXT_PUBLIC_TMCG_URL || 'https://www.tmcg.miami';
     case 'flamingo-teaser':
-      return process.env.NEXT_PUBLIC_TEASER_URL || 'https://www.flamingo.cx';
+      return process.env.NEXT_PUBLIC_FLAMINGO_TEASER_URL || 'https://www.flamingo.cx';
     case 'openframe':
       return process.env.NEXT_PUBLIC_OPENFRAME_URL || 'https://openframe.ai';
     case 'universal':
@@ -150,9 +150,10 @@ export function getAllPlatformBaseDomains(): string[] {
   }
 
   // Case 3: PRODUCTION - extract from ALL platforms using getPlatformProductionUrl
-  // Platform identifiers match switch cases in getPlatformProductionUrl
+  // Platform identifiers MUST match switch cases in getPlatformProductionUrl —
+  // otherwise the corresponding domain is omitted from cookie scope.
   const platformIdentifiers = [
-    'marketing-hub', 'product-hub', 'revenue-hub', 'people-hub', 'admin-hub',
+    'marketing-hub', 'company-hub', 'product-hub', 'revenue-hub', 'people-hub',
     'openmsp', 'flamingo', 'tmcg', 'flamingo-teaser', 'openframe', 'universal'
   ]
 
@@ -190,22 +191,27 @@ export function getAllPlatformBaseDomains(): string[] {
  * 4. Production fallback (current app or openmsp)
  * 5. Development (http://localhost:3000)
  *
- * Environment Variables (optional overrides):
- * - NEXT_PUBLIC_MARKETING_URL   -> marketing-hub.flamingo.so
- * - NEXT_PUBLIC_PRODUCT_URL     -> product-hub.flamingo.so
- * - NEXT_PUBLIC_REVENUE_URL     -> revenue-hub.flamingo.so
- * - NEXT_PUBLIC_PEOPLE_URL      -> people-hub.flamingo.so
- * - NEXT_PUBLIC_ADMIN_URL       -> admin-hub.flamingo.so
- * - NEXT_PUBLIC_PLATFORM_URL    -> www.openmsp.ai
- * - NEXT_PUBLIC_FLAMINGO_URL    -> flamingo.run
- * - NEXT_PUBLIC_TMCG_URL        -> tmcg.miami
- * - NEXT_PUBLIC_TEASER_URL      -> flamingo.cx
- * - NEXT_PUBLIC_OPENFRAME_URL   -> openframe.ai
+ * Environment Variables (optional overrides — only set when production domain
+ * differs from the hardcoded default):
+ *
+ * Hub deployments (NEXT_PUBLIC_<NAME>_HUB_URL):
+ * - NEXT_PUBLIC_MARKETING_HUB_URL  -> marketing-hub.flamingo.so
+ * - NEXT_PUBLIC_COMPANY_HUB_URL    -> company-hub.flamingo.so
+ * - NEXT_PUBLIC_PRODUCT_HUB_URL    -> product-hub.flamingo.so
+ * - NEXT_PUBLIC_REVENUE_HUB_URL    -> revenue-hub.flamingo.so
+ * - NEXT_PUBLIC_PEOPLE_HUB_URL     -> people-hub.flamingo.so
+ *
+ * Standalone platforms (NEXT_PUBLIC_<NAME>_URL):
+ * - NEXT_PUBLIC_OPENMSP_URL          -> www.openmsp.ai
+ * - NEXT_PUBLIC_FLAMINGO_URL         -> www.flamingo.run
+ * - NEXT_PUBLIC_TMCG_URL             -> www.tmcg.miami
+ * - NEXT_PUBLIC_FLAMINGO_TEASER_URL  -> www.flamingo.cx
+ * - NEXT_PUBLIC_OPENFRAME_URL        -> openframe.ai
  *
  * @example
  * getBaseUrl() // Current app URL
- * getBaseUrl('flamingo') // https://flamingo.run (production) or http://localhost:3000 (dev)
- * getBaseUrl('openmsp') // https://www.openmsp.ai (or NEXT_PUBLIC_PLATFORM_URL if set)
+ * getBaseUrl('flamingo') // https://www.flamingo.run (production) or http://localhost:3000 (dev)
+ * getBaseUrl('openmsp') // https://www.openmsp.ai (or NEXT_PUBLIC_OPENMSP_URL if set)
  */
 export function getBaseUrl(platform?: string): string {
   // In development, always use localhost (regardless of platform)

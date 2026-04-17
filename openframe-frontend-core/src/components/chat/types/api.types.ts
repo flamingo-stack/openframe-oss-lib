@@ -85,7 +85,7 @@ export interface RealtimeChunkCallbacks {
   /** Called when MESSAGE_END is received */
   onStreamEnd?: () => void
   /** Called when AI_METADATA is received */
-  onMetadata?: (metadata: { modelName: string; providerName: string; contextWindow: number }) => void
+  onMetadata?: (metadata: { modelDisplayName: string; modelName: string; providerName: string; contextWindow: number }) => void
   /** Called when segments are updated */
   onSegmentsUpdate?: (segments: MessageSegment[], metadata?: SegmentsUpdateMetadata) => void
   /** Called when an error is received */
@@ -106,6 +106,8 @@ export interface RealtimeChunkCallbacks {
   onEscalatedApproval?: (requestId: string, data: { command: string; explanation?: string; approvalType: string }) => void
   /** Called when an escalated approval result is received */
   onEscalatedApprovalResult?: (requestId: string, approved: boolean, data: { command: string; explanation?: string; approvalType: string }) => void
+  /** Called when a DIALOG_CLOSED chunk is received */
+  onDialogClosed?: () => void
 }
 
 export interface UseRealtimeChunkProcessorOptions {
