@@ -1,0 +1,65 @@
+extend type Query {
+    assignedItemCounts(itemId: ID!): [AssignedItemCount!]!
+    assignedItems(
+        itemId: ID!
+        targetType: AssignmentTargetType!
+        search: String
+        sort: SortInput
+        first: Int
+        after: String
+    ): ItemAssignmentConnection!
+}
+
+extend type Mutation {
+    assignItem(itemId: ID!, targetType: AssignmentTargetType!, targetId: ID!): ItemAssignment!
+    unassignItem(itemId: ID!, targetType: AssignmentTargetType!, targetId: ID!): Boolean!
+    unassignAllByType(itemId: ID!, targetType: AssignmentTargetType!): Boolean!
+}
+
+type ItemAssignment implements Node {
+    id: ID!
+    targetType: AssignmentTargetType!
+    displayName: String!
+    createdAt: Instant
+    target: AssignableTarget
+}
+
+type ItemAssignmentConnection {
+    edges: [ItemAssignmentEdge!]!
+    pageInfo: PageInfo!
+    filteredCount: Int!
+}
+
+type ItemAssignmentEdge {
+    node: ItemAssignment!
+    cursor: String!
+}
+
+type AssignedItemCount {
+    targetType: AssignmentTargetType!
+    count: Int!
+}
+
+interface AssignableTarget {
+    id: ID!
+}
+
+enum AssignmentTargetType {
+    ORGANIZATION
+    DEVICE
+    TICKET
+    KNOWLEDGE_ARTICLE
+}
+
+# Extend existing types to implement AssignableTarget
+extend type Organization implements AssignableTarget
+extend type Machine implements AssignableTarget
+
+# Minimal Ticket for AssignableTarget resolution. Full type in ai-agent (ticket.graphqls).
+# TODO: Remove after Apollo Federation migration — single shared Ticket type.
+type Ticket implements AssignableTarget & Node {
+    id: ID!
+    ticketNumber: Int
+    title: String
+    status: String
+}
