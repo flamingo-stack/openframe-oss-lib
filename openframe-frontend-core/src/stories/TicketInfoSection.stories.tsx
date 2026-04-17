@@ -71,7 +71,7 @@ export const Collapsed: Story = {
     organization: { name: 'Acme Corp' },
     user: 'Unassigned',
     device: { name: 'WIN-SERVER-01', icon: <Monitor className="size-4" /> },
-    statusTag: { label: 'TECH REQUIRED', variant: 'primary' },
+    status: 'TECH_REQUIRED',
     expanded: false,
   },
 };
@@ -84,7 +84,7 @@ export const Expanded: Story = {
     organization: { name: 'Acme Corp' },
     user: 'Unassigned',
     device: { name: 'WIN-SERVER-01', icon: <Monitor className="size-4" /> },
-    statusTag: { label: 'TECH REQUIRED', variant: 'primary' },
+    status: 'TECH_REQUIRED',
     expanded: true,
     assigned: { name: 'Roman Smith', statusTag: { label: 'Status', variant: 'primary' } },
     createdAt: '2025/07/12, 22:27',
@@ -107,7 +107,7 @@ export const Interactive: Story = {
     organization: { name: 'Acme Corp' },
     user: 'John Doe',
     device: { name: 'LINUX-WEB-02', icon: <Monitor className="size-4" />, onClick: () => alert('Navigate to device') },
-    statusTag: { label: 'ACTIVE', variant: 'success' },
+    status: 'ACTIVE',
   },
   render: function InteractiveStory(args) {
     const [expanded, setExpanded] = useState(false);
@@ -139,7 +139,7 @@ export const Minimal: Story = {
     organization: { name: 'Unassigned' },
     user: 'Unassigned',
     device: { name: 'Unassigned' },
-    statusTag: { label: 'ACTIVE', variant: 'success' },
+    status: 'ACTIVE',
     expanded: true,
     assigned: { name: 'Unassigned' },
     createdAt: '2025/01/01, 00:00',

@@ -190,6 +190,10 @@ export function useRealtimeChunkProcessor(
           break
         }
 
+        case 'dialog_closed':
+          callbacks.onDialogClosed?.()
+          break
+
         default:
           // Unknown action - ignore
           break

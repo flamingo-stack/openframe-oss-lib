@@ -2,15 +2,25 @@
 
 import * as React from "react"
 import { Chevron02DownIcon } from "../icons-v2-generated/arrows/chevron-02-down-icon"
+import { PenEditIcon } from "../icons-v2-generated/design/pen-edit-icon"
+import { UserIcon } from "../icons-v2-generated/users/user-icon"
 import { cn } from "../../utils/cn"
+import { Autocomplete, type AutocompleteOption } from "./autocomplete"
 import { SquareAvatar } from "./square-avatar"
-import { Tag, type TagProps } from "./tag"
+import { Tag } from "./tag"
+import { TicketStatusTag } from "./ticket-status-tag"
 import { TicketDetailSection } from "./ticket-detail-section"
 import { type TicketAttachment, TicketAttachmentsList } from "./ticket-attachments-list"
 import { type KnowledgeBaseArticle, TicketKnowledgeBaseList } from "./ticket-knowledge-base-list"
 import type { TicketNote } from "./ticket-note-card"
 import { TicketNotesSection } from "./ticket-notes-section"
 import { SimpleMarkdownRenderer } from "./simple-markdown-renderer"
+
+export interface TicketAssigneeOption {
+  value: string
+  label: string
+  imageUrl?: string
+}
 
 export interface TicketInfoSectionProps {
   /** Organization name and image */
@@ -27,10 +37,7 @@ export interface TicketInfoSectionProps {
     onClick?: () => void
   }
   /** Status tag */
-  statusTag?: {
-    label: string
-    variant?: TagProps["variant"]
-  }
+  status?: string
   /** Expand button click handler */
   onExpand?: () => void
   /** Whether the section is expanded */
@@ -40,10 +47,17 @@ export interface TicketInfoSectionProps {
 
   // --- Expanded view props ---
 
-  /** Assigned person info */
+  /** Assigned person info with inline dropdown */
   assigned?: {
-    name: string
-    statusTag?: { label: string; variant?: TagProps["variant"] }
+    currentAssignee?: {
+      id: string
+      name: string
+      avatarSrc?: string
+    }
+    options: TicketAssigneeOption[]
+    isLoading?: boolean
+    isPending?: boolean
+    onAssign: (userId: string | null) => void
   }
   /** Created date string */
   createdAt?: string
@@ -97,11 +111,106 @@ function InfoCell({ value, label, icon, onClick }: {
   )
 }
 
+function AssignedDropdown({ assigned }: { assigned: NonNullable<TicketInfoSectionProps['assigned']> }) {
+  const [isEditing, setIsEditing] = React.useState(false)
+  const hasAssignee = !!assigned.currentAssignee
+
+  const renderOption = React.useCallback((option: AutocompleteOption) => {
+    const opt = option as TicketAssigneeOption
+    return (
+      <div className="flex items-center gap-3 w-full min-w-0">
+        <SquareAvatar
+          src={opt.imageUrl}
+          alt={opt.label}
+          fallback={opt.label}
+          size="sm"
+          variant="round"
+          className="h-6 w-6 shrink-0"
+        />
+        <span className="truncate">{opt.label}</span>
+      </div>
+    )
+  }, [])
+
+  if (!isEditing) {
+    return hasAssignee ? (
+      <div className="flex items-center gap-2 min-w-0">
+        <SquareAvatar
+          src={assigned.currentAssignee!.avatarSrc}
+          alt={assigned.currentAssignee!.name}
+          fallback={assigned.currentAssignee!.name || "User"}
+          size="md"
+          variant="round"
+          className="shrink-0"
+        />
+        <div className="flex-1 min-w-0 overflow-hidden">
+          <div className="flex flex-col justify-center">
+            <div className="flex items-center gap-1 w-full min-w-0">
+              <button
+                type="button"
+                onClick={() => setIsEditing(true)}
+                className="flex items-center gap-1 cursor-pointer group text-left"
+              >
+                <PenEditIcon className="size-4 shrink-0 text-ods-text-secondary group-hover:text-ods-accent transition-colors" />
+                <span className="text-h4 text-ods-text-primary truncate">{assigned.currentAssignee!.name}</span>
+              </button>
+            </div>
+            <span className="text-h6 text-ods-text-secondary truncate">Assigned</span>
+          </div>
+        </div>
+      </div>
+    ) : (
+      <div className="min-w-0">
+        <button
+          type="button"
+          onClick={() => setIsEditing(true)}
+          className="flex items-center gap-1 text-h4 text-ods-accent underline truncate cursor-pointer hover:opacity-80 transition-opacity text-left"
+        >
+          <UserIcon className="size-4 shrink-0" />
+          <span>Assign User</span>
+        </button>
+        <span className="text-h6 text-ods-text-secondary truncate block">Assigned</span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-w-0">
+      <Autocomplete
+        options={assigned.options}
+        value={assigned.currentAssignee?.id ?? null}
+        onChange={(val) => {
+          assigned.onAssign(val)
+          setIsEditing(false)
+        }}
+        placeholder="Search users..."
+        loading={assigned.isLoading}
+        showChevron={false}
+        startAdornment={
+          hasAssignee ? (
+            <SquareAvatar
+              src={assigned.currentAssignee!.avatarSrc}
+              alt={assigned.currentAssignee!.name}
+              fallback={assigned.currentAssignee!.name || "User"}
+              size="sm"
+              variant="round"
+              className="h-6 w-6"
+            />
+          ) : (
+            <UserIcon className="size-5 text-ods-text-secondary" />
+          )
+        }
+        renderOption={renderOption}
+      />
+      <span className="text-h6 text-ods-text-secondary truncate block mt-0.5">Assigned</span>
+    </div>
+  )
+}
+
 export function TicketInfoSection({
   organization,
-  user,
   device,
-  statusTag,
+  status,
   onExpand,
   expanded = false,
   className,
@@ -138,8 +247,20 @@ export function TicketInfoSection({
           <InfoCell value={organization?.name || "Unassigned"} label="Organization" />
         </div>
 
-        {/* User */}
-        <InfoCell value={assigned?.name || 'Unassigned'} label="Assigned" />
+        {/* Assigned */}
+        <div className="min-w-0">
+          {assigned ? (
+            <AssignedDropdown assigned={assigned} />
+          ) : (
+            <div className="min-w-0">
+              <div className="flex items-center gap-1 text-h4 text-ods-text-secondary">
+                <UserIcon className="size-4 shrink-0" />
+                <span className="truncate">Unassigned</span>
+              </div>
+              <span className="text-h6 text-ods-text-secondary truncate block">Assigned</span>
+            </div>
+          )}
+        </div>
 
         {/* Device */}
         <InfoCell
@@ -151,9 +272,9 @@ export function TicketInfoSection({
 
         {/* Status tag + expand button */}
         <div className="flex items-center gap-4 min-w-0">
-          {statusTag && (
+          {status && (
             <div className="min-w-0">
-              <Tag label={statusTag.label} variant={statusTag.variant} />
+              <TicketStatusTag status={status} />
             </div>
           )}
           {onExpand && (
@@ -181,12 +302,10 @@ export function TicketInfoSection({
       {/* Expanded content */}
       {expanded && (
         <>
-          {/* Second info row: Assigned + Created */}
-          {(assigned || createdAt) && (
+          {/* Second info row: Created */}
+          {createdAt && (
             <div className="grid grid-cols-2 gap-4 px-4 py-3 bg-ods-bg border-b border-ods-border items-center">
-              {createdAt && (
-                <InfoCell value={createdAt} label="Created" />
-              )}
+              <InfoCell value={createdAt} label="Created" />
             </div>
           )}
 
