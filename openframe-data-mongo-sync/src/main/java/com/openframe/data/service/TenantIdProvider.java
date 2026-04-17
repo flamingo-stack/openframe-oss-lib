@@ -26,7 +26,7 @@ public class TenantIdProvider {
     @Value("${TENANT_ID:oss}")
     private String fallbackTenantId;
 
-    private volatile Tenant cachedTenant;
+    private Tenant cachedTenant;
 
     public String getTenantId() {
         Tenant tenant = getCachedTenant();
