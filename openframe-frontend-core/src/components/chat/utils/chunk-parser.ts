@@ -25,6 +25,7 @@ export function parseChunkToAction(chunk: unknown): ParsedChunkAction | null {
       if (typeof data.modelName === 'string' && typeof providerName === 'string') {
         return {
           action: 'metadata',
+          modelDisplayName: data.modelDisplayName,
           modelName: data.modelName,
           providerName,
           contextWindow: typeof data.contextWindow === 'number' ? data.contextWindow : 0,
@@ -137,6 +138,9 @@ export function parseChunkToAction(chunk: unknown): ParsedChunkAction | null {
         }
       }
       return null
+
+    case MESSAGE_TYPE.DIALOG_CLOSED:
+      return { action: 'dialog_closed' }
 
     default:
       return null
