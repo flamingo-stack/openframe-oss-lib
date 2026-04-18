@@ -703,6 +703,196 @@ public class TacticalRmmClient {
         }
     }
 
+    public CompletableFuture<List<TacticalScript>> getAllScriptsDetailedAsync(String tacticalServerUrl, String apiKey) {
+        HttpRequest httpRequest = HttpRequest.newBuilder()
+                .uri(URI.create(tacticalServerUrl + "/scripts/"))
+                .GET()
+                .header("Content-Type", "application/json")
+                .header("Accept", "application/json")
+                .header("X-API-KEY", apiKey)
+                .timeout(Duration.ofSeconds(30))
+                .build();
+        return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    checkSuccess(response, "list TacticalRMM scripts", null);
+                    try {
+                        TypeReference<List<TacticalScript>> typeRef = new TypeReference<>() {};
+                        return objectMapper.readValue(response.body(), typeRef);
+                    } catch (Exception e) {
+                        throw new TacticalRmmException("Failed to parse scripts list response", e);
+                    }
+                });
+    }
+
+    public CompletableFuture<TacticalScript> getScriptDetailedAsync(String tacticalServerUrl, String apiKey, String scriptId) {
+        HttpRequest httpRequest = HttpRequest.newBuilder()
+                .uri(URI.create(tacticalServerUrl + "/scripts/" + scriptId + "/"))
+                .GET()
+                .header("Content-Type", "application/json")
+                .header("Accept", "application/json")
+                .header("X-API-KEY", apiKey)
+                .timeout(Duration.ofSeconds(30))
+                .build();
+        return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    checkSuccess(response, "get TacticalRMM script", scriptId);
+                    try {
+                        return objectMapper.readValue(response.body(), TacticalScript.class);
+                    } catch (Exception e) {
+                        throw new TacticalRmmException("Failed to parse script response: " + scriptId, e);
+                    }
+                });
+    }
+
+    public CompletableFuture<TacticalScript> createScriptDetailedAsync(String tacticalServerUrl, String apiKey, CreateScriptRequest request) {
+        try {
+            String requestBody = objectMapper.writeValueAsString(request);
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(tacticalServerUrl + "/scripts/"))
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .header("Content-Type", "application/json")
+                    .header("Accept", "application/json")
+                    .header("X-API-KEY", apiKey)
+                    .timeout(Duration.ofSeconds(30))
+                    .build();
+            return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                    .thenCompose(response -> {
+                        checkSuccess(response, "create TacticalRMM script", null);
+                        return getAllScriptsDetailedAsync(tacticalServerUrl, apiKey)
+                                .thenApply(scripts -> scripts.stream()
+                                        .filter(s -> request.getName() != null && request.getName().equalsIgnoreCase(s.getName()))
+                                        .findFirst()
+                                        .orElseGet(() -> {
+                                            TacticalScript stub = new TacticalScript();
+                                            stub.setName(request.getName());
+                                            stub.setShell(request.getShell());
+                                            stub.setCategory(request.getCategory());
+                                            return stub;
+                                        }));
+                    });
+        } catch (Exception e) {
+            CompletableFuture<TacticalScript> failed = new CompletableFuture<>();
+            failed.completeExceptionally(new TacticalRmmException("Failed to create TacticalRMM script", e));
+            return failed;
+        }
+    }
+
+    public CompletableFuture<TacticalScript> updateScriptDetailedAsync(String tacticalServerUrl, String apiKey, String scriptId, CreateScriptRequest request) {
+        try {
+            String requestBody = objectMapper.writeValueAsString(request);
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(tacticalServerUrl + "/scripts/" + scriptId + "/"))
+                    .PUT(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .header("Content-Type", "application/json")
+                    .header("Accept", "application/json")
+                    .header("X-API-KEY", apiKey)
+                    .timeout(Duration.ofSeconds(30))
+                    .build();
+            return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                    .thenCompose(response -> {
+                        checkSuccess(response, "update TacticalRMM script", scriptId);
+                        return getScriptDetailedAsync(tacticalServerUrl, apiKey, scriptId);
+                    });
+        } catch (Exception e) {
+            CompletableFuture<TacticalScript> failed = new CompletableFuture<>();
+            failed.completeExceptionally(new TacticalRmmException("Failed to update TacticalRMM script: " + scriptId, e));
+            return failed;
+        }
+    }
+
+    public CompletableFuture<List<TacticalScheduledTask>> listScriptSchedulesAsync(String tacticalServerUrl, String apiKey) {
+        HttpRequest httpRequest = HttpRequest.newBuilder()
+                .uri(URI.create(tacticalServerUrl + "/script-schedules/"))
+                .GET()
+                .header("Content-Type", "application/json")
+                .header("Accept", "application/json")
+                .header("X-API-KEY", apiKey)
+                .timeout(Duration.ofSeconds(30))
+                .build();
+        return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    checkSuccess(response, "list script schedules", null);
+                    try {
+                        TypeReference<List<TacticalScheduledTask>> typeRef = new TypeReference<>() {};
+                        return objectMapper.readValue(response.body(), typeRef);
+                    } catch (Exception e) {
+                        throw new TacticalRmmException("Failed to parse script schedules response", e);
+                    }
+                });
+    }
+
+    public CompletableFuture<TacticalScheduledTask> getScriptScheduleAsync(String tacticalServerUrl, String apiKey, String scheduleId) {
+        HttpRequest httpRequest = HttpRequest.newBuilder()
+                .uri(URI.create(tacticalServerUrl + "/script-schedules/" + scheduleId + "/"))
+                .GET()
+                .header("Content-Type", "application/json")
+                .header("Accept", "application/json")
+                .header("X-API-KEY", apiKey)
+                .timeout(Duration.ofSeconds(30))
+                .build();
+        return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    checkSuccess(response, "get script schedule", scheduleId);
+                    try {
+                        return objectMapper.readValue(response.body(), TacticalScheduledTask.class);
+                    } catch (Exception e) {
+                        throw new TacticalRmmException("Failed to parse script schedule response: " + scheduleId, e);
+                    }
+                });
+    }
+
+    public CompletableFuture<TacticalScheduledTask> createScriptScheduleAsync(String tacticalServerUrl, String apiKey, CreateScriptScheduleRequest request) {
+        try {
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(tacticalServerUrl + "/script-schedules/"))
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(request)))
+                    .header("Content-Type", "application/json")
+                    .header("Accept", "application/json")
+                    .header("X-API-KEY", apiKey)
+                    .timeout(Duration.ofSeconds(30))
+                    .build();
+            return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                    .thenApply(response -> {
+                        checkSuccess(response, "create script schedule", null);
+                        try {
+                            return objectMapper.readValue(response.body(), TacticalScheduledTask.class);
+                        } catch (Exception e) {
+                            throw new TacticalRmmException("Failed to parse create schedule response", e);
+                        }
+                    });
+        } catch (Exception e) {
+            CompletableFuture<TacticalScheduledTask> failed = new CompletableFuture<>();
+            failed.completeExceptionally(new TacticalRmmException("Failed to create script schedule: " + request.getName(), e));
+            return failed;
+        }
+    }
+
+    public CompletableFuture<TacticalScheduledTask> updateScriptScheduleAsync(String tacticalServerUrl, String apiKey, int scheduleId, UpdateScriptScheduleRequest request) {
+        try {
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(tacticalServerUrl + "/script-schedules/" + scheduleId + "/"))
+                    .PUT(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(request)))
+                    .header("Content-Type", "application/json")
+                    .header("Accept", "application/json")
+                    .header("X-API-KEY", apiKey)
+                    .timeout(Duration.ofSeconds(30))
+                    .build();
+            return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                    .thenApply(response -> {
+                        checkSuccess(response, "update script schedule", String.valueOf(scheduleId));
+                        try {
+                            return objectMapper.readValue(response.body(), TacticalScheduledTask.class);
+                        } catch (Exception e) {
+                            throw new TacticalRmmException("Failed to parse update schedule response", e);
+                        }
+                    });
+        } catch (Exception e) {
+            CompletableFuture<TacticalScheduledTask> failed = new CompletableFuture<>();
+            failed.completeExceptionally(new TacticalRmmException("Failed to update script schedule: " + scheduleId, e));
+            return failed;
+        }
+    }
+
     private HttpRequest buildRunCommandRequest(
             String tacticalServerUrl, String apiKey,
             String agentId, String shell, String command,
