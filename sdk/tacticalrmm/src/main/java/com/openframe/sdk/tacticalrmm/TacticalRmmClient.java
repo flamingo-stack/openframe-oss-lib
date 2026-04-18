@@ -676,32 +676,6 @@ public class TacticalRmmClient {
     }
 
     /**
-     * Assign agents to an existing script schedule.
-     */
-    public void addScriptScheduleAgents(String tacticalServerUrl, String apiKey, int scheduleId, List<String> hostIds) {
-        try {
-            var body = objectMapper.createObjectNode();
-            var agentsArray = body.putArray("agents");
-            hostIds.forEach(agentsArray::add);
-
-            HttpRequest httpRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(tacticalServerUrl + "/script-schedules/" + scheduleId + "/agents/"))
-                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
-                    .header("Content-Type", "application/json")
-                    .header("Accept", "application/json")
-                    .header("X-API-KEY", apiKey)
-                    .timeout(Duration.ofSeconds(30))
-                    .build();
-            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-            checkSuccess(response, "add agents to script schedule", String.valueOf(scheduleId));
-        } catch (TacticalRmmApiException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new TacticalRmmException("Failed to add agents to script schedule: " + scheduleId, e);
-        }
-    }
-
-    /**
      * Update an existing script schedule.
      */
     public TacticalScheduledTask updateScriptSchedule(
