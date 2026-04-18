@@ -455,10 +455,9 @@ public class FleetMdmClient {
         try {
             HttpResponse<String> response = sendRequest(QUERIES_URL, "GET", null);
             checkResponse(response, "list Fleet scheduled queries");
-            List<Query> all = MAPPER.convertValue(
+            return MAPPER.convertValue(
                     requireNode(response.body(), "queries"),
                     MAPPER.getTypeFactory().constructCollectionType(List.class, Query.class));
-            return all.stream().filter(q -> q.getInterval() != null && q.getInterval() > 0).toList();
         } catch (FleetMdmApiException e) {
             throw e;
         } catch (Exception e) {

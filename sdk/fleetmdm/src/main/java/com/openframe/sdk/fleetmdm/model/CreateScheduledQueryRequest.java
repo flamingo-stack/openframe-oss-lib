@@ -17,8 +17,4 @@ public class CreateScheduledQueryRequest {
     private Integer interval;
     private String platform;
 
-    @JsonProperty("automations_enabled")
-    private Boolean automationsEnabled;
-
-    private String logging;
 }

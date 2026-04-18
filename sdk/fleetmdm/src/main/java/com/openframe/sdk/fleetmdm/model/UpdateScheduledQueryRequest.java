@@ -15,5 +15,4 @@ public class UpdateScheduledQueryRequest {
     private String description;
     private Integer interval;
     private String platform;
-    private String logging;
 }
