@@ -17,6 +17,7 @@ import com.openframe.sdk.tacticalrmm.model.TacticalScript;
 import com.openframe.sdk.tacticalrmm.model.CreateScriptScheduleRequest;
 import com.openframe.sdk.tacticalrmm.model.UpdateScriptScheduleRequest;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -64,6 +65,7 @@ public class TacticalRmmClient {
             }
 
             String body = response.body();
+
             return RegistrationSecretParser.parse(body);
         } catch (Exception e) {
             throw new TacticalRmmException("Failed to process get agent registration secret request", e);
@@ -95,6 +97,7 @@ public class TacticalRmmClient {
             HttpRequest httpRequest = buildRunCommandRequest(tacticalServerUrl, apiKey, agentId, shell, command, timeout, runAsUser);
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             checkRunCommandResponse(response, agentId);
+
             return parseCommandResult(response.body(), agentId, shell, command, timeout);
         } catch (TacticalRmmApiException e) {
             throw e;
@@ -240,6 +243,7 @@ public class TacticalRmmClient {
             TypeReference<List<AgentListItem>> typeRef =
                     new TypeReference<>() {
                     };
+
             return objectMapper.readValue(response.body(), typeRef);
         } catch (TacticalRmmApiException e) {
             throw e;
@@ -284,6 +288,7 @@ public class TacticalRmmClient {
             TypeReference<List<ScriptListItem>> typeRef =
                     new TypeReference<>() {
                     };
+
             return objectMapper.readValue(response.body(), typeRef);
         } catch (TacticalRmmApiException e) {
             throw e;
@@ -512,6 +517,7 @@ public class TacticalRmmClient {
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             checkSuccess(response, "list TacticalRMM scripts", null);
             TypeReference<List<TacticalScript>> typeRef = new TypeReference<>() {};
+
             return objectMapper.readValue(response.body(), typeRef);
         } catch (TacticalRmmApiException e) {
             throw e;
@@ -535,6 +541,7 @@ public class TacticalRmmClient {
                     .build();
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             checkSuccess(response, "get TacticalRMM script", scriptId);
+
             return objectMapper.readValue(response.body(), TacticalScript.class);
         } catch (TacticalRmmApiException e) {
             throw e;
@@ -560,6 +567,7 @@ public class TacticalRmmClient {
                     .build();
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             checkSuccess(response, "create TacticalRMM script", null);
+
             return getAllScriptsDetailed(tacticalServerUrl, apiKey).stream()
                     .filter(s -> request.getName() != null && request.getName().equalsIgnoreCase(s.getName()))
                     .findFirst()
@@ -593,6 +601,7 @@ public class TacticalRmmClient {
                     .build();
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             checkSuccess(response, "update TacticalRMM script", scriptId);
+
             return getScriptDetailed(tacticalServerUrl, apiKey, scriptId);
         } catch (TacticalRmmApiException e) {
             throw e;
@@ -617,6 +626,7 @@ public class TacticalRmmClient {
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             checkSuccess(response, "list script schedules", null);
             TypeReference<List<TacticalScheduledTask>> typeRef = new TypeReference<>() {};
+
             return objectMapper.readValue(response.body(), typeRef);
         } catch (TacticalRmmApiException e) {
             throw e;
@@ -640,6 +650,7 @@ public class TacticalRmmClient {
                     .build();
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             checkSuccess(response, "get script schedule", scheduleId);
+
             return objectMapper.readValue(response.body(), TacticalScheduledTask.class);
         } catch (TacticalRmmApiException e) {
             throw e;
@@ -667,6 +678,7 @@ public class TacticalRmmClient {
                     .build();
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             checkSuccess(response, "create script schedule", null);
+
             return objectMapper.readValue(response.body(), TacticalScheduledTask.class);
         } catch (TacticalRmmApiException e) {
             throw e;
@@ -695,6 +707,7 @@ public class TacticalRmmClient {
                     .build();
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             checkSuccess(response, "update script schedule", String.valueOf(scheduleId));
+
             return objectMapper.readValue(response.body(), TacticalScheduledTask.class);
         } catch (TacticalRmmApiException e) {
             throw e;
@@ -715,8 +728,10 @@ public class TacticalRmmClient {
         return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     checkSuccess(response, "list TacticalRMM scripts", null);
+
                     try {
                         TypeReference<List<TacticalScript>> typeRef = new TypeReference<>() {};
+
                         return objectMapper.readValue(response.body(), typeRef);
                     } catch (Exception e) {
                         throw new TacticalRmmException("Failed to parse scripts list response", e);
@@ -736,6 +751,7 @@ public class TacticalRmmClient {
         return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     checkSuccess(response, "get TacticalRMM script", scriptId);
+
                     try {
                         return objectMapper.readValue(response.body(), TacticalScript.class);
                     } catch (Exception e) {
@@ -758,6 +774,7 @@ public class TacticalRmmClient {
             return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                     .thenCompose(response -> {
                         checkSuccess(response, "create TacticalRMM script", null);
+
                         return getAllScriptsDetailedAsync(tacticalServerUrl, apiKey)
                                 .thenApply(scripts -> scripts.stream()
                                         .filter(s -> request.getName() != null && request.getName().equalsIgnoreCase(s.getName()))
@@ -791,6 +808,7 @@ public class TacticalRmmClient {
             return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                     .thenCompose(response -> {
                         checkSuccess(response, "update TacticalRMM script", scriptId);
+
                         return getScriptDetailedAsync(tacticalServerUrl, apiKey, scriptId);
                     });
         } catch (Exception e) {
@@ -812,8 +830,10 @@ public class TacticalRmmClient {
         return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     checkSuccess(response, "list script schedules", null);
+
                     try {
                         TypeReference<List<TacticalScheduledTask>> typeRef = new TypeReference<>() {};
+
                         return objectMapper.readValue(response.body(), typeRef);
                     } catch (Exception e) {
                         throw new TacticalRmmException("Failed to parse script schedules response", e);
@@ -833,6 +853,7 @@ public class TacticalRmmClient {
         return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     checkSuccess(response, "get script schedule", scheduleId);
+
                     try {
                         return objectMapper.readValue(response.body(), TacticalScheduledTask.class);
                     } catch (Exception e) {
@@ -854,6 +875,7 @@ public class TacticalRmmClient {
             return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                     .thenApply(response -> {
                         checkSuccess(response, "create script schedule", null);
+
                         try {
                             return objectMapper.readValue(response.body(), TacticalScheduledTask.class);
                         } catch (Exception e) {
@@ -880,6 +902,7 @@ public class TacticalRmmClient {
             return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                     .thenApply(response -> {
                         checkSuccess(response, "update script schedule", String.valueOf(scheduleId));
+
                         try {
                             return objectMapper.readValue(response.body(), TacticalScheduledTask.class);
                         } catch (Exception e) {
@@ -898,7 +921,7 @@ public class TacticalRmmClient {
             String agentId, String shell, String command,
             int timeout, boolean runAsUser
     ) throws JsonProcessingException {
-        var requestBodyNode = objectMapper.createObjectNode();
+        ObjectNode requestBodyNode = objectMapper.createObjectNode();
         requestBodyNode.put("shell", shell);
         requestBodyNode.put("cmd", command);
         requestBodyNode.put("timeout", timeout);
