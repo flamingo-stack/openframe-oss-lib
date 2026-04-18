@@ -43,6 +43,13 @@ public class DeviceGenerator {
                 DeviceStatus.MAINTENANCE);
     }
 
+    public static DeviceFilterInput osAndStatusDevicesFilter(String os, DeviceStatus... statuses) {
+        return DeviceFilterInput.builder()
+                .osTypes(List.of(os))
+                .statuses(List.of(statuses))
+                .build();
+    }
+
     public static DeviceFilterInput statusDevicesFilter(DeviceStatus... statuses) {
         return DeviceFilterInput.builder()
                 .statuses(List.of(statuses))

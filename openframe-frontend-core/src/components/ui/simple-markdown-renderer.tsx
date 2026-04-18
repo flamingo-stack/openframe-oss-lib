@@ -8,6 +8,7 @@ import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
 import Image from 'next/image';
 import { AlertCircleIcon } from '../icons-v2-generated';
+import { cn } from '../../utils/cn';
 
 // ---------------------------------------------------------------------------
 // Mermaid styles (responsive)
@@ -178,6 +179,73 @@ function extractText(node: any): string {
 }
 
 // ---------------------------------------------------------------------------
+// Text size configuration
+// ---------------------------------------------------------------------------
+export type TextSizeElement =
+  | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
+  | 'p' | 'li' | 'blockquote' | 'code' | 'th' | 'td';
+
+export type TextSizeClassMap = Partial<Record<TextSizeElement, string>>;
+export type TextSizePreset = 'default' | 'compact' | 'large';
+export type TextSizeConfig =
+  | TextSizePreset
+  | TextSizeClassMap
+  | { preset: TextSizePreset; overrides: TextSizeClassMap };
+
+const TEXT_SIZE_PRESETS: Record<TextSizePreset, Record<TextSizeElement, string>> = {
+  default: {
+    h1: 'text-heading-1',
+    h2: 'text-heading-2',
+    h3: 'text-2xl md:text-3xl',
+    h4: 'text-xl',
+    h5: 'text-lg md:text-xl',
+    h6: 'text-base md:text-lg',
+    p: 'md:text-h4 lg:text-h4',
+    li: 'text-base md:text-lg',
+    blockquote: 'text-lg',
+    code: 'text-[14px]',
+    th: 'text-xs md:text-sm',
+    td: 'text-xs md:text-sm',
+  },
+  compact: {
+    h1: 'text-heading-2',
+    h2: 'text-heading-3',
+    h3: 'text-xl md:text-2xl',
+    h4: 'text-lg md:text-xl',
+    h5: 'text-base md:text-lg',
+    h6: 'text-sm md:text-base',
+    p: 'text-base md:text-lg',
+    li: 'text-base md:text-lg',
+    blockquote: 'text-base md:text-lg',
+    code: 'text-[13px]',
+    th: 'text-xs md:text-sm',
+    td: 'text-xs md:text-sm',
+  },
+  large: {
+    h1: 'text-heading-1',
+    h2: 'text-heading-1',
+    h3: 'text-heading-2',
+    h4: 'text-2xl md:text-3xl',
+    h5: 'text-xl md:text-2xl',
+    h6: 'text-lg md:text-xl',
+    p: 'text-h3',
+    li: 'text-lg md:text-xl',
+    blockquote: 'text-xl md:text-2xl',
+    code: 'text-[16px]',
+    th: 'text-sm md:text-base',
+    td: 'text-sm md:text-base',
+  },
+};
+
+function resolveTextSizeConfig(config?: TextSizeConfig): Record<TextSizeElement, string> {
+  const defaultSizes = TEXT_SIZE_PRESETS.default;
+  if (!config) return defaultSizes;
+  if (typeof config === 'string') return TEXT_SIZE_PRESETS[config];
+  if ('preset' in config) return { ...TEXT_SIZE_PRESETS[config.preset], ...config.overrides };
+  return { ...defaultSizes, ...config };
+}
+
+// ---------------------------------------------------------------------------
 // Resolved link result used by onResolveLink callback
 // ---------------------------------------------------------------------------
 export interface ResolveLinkResult {
@@ -214,6 +282,15 @@ export interface SimpleMarkdownRendererProps {
   preprocessContent?: (content: string) => string;
   /** Merge additional or override react-markdown component renderers */
   componentOverrides?: Partial<Components>;
+  /**
+   * Configure text sizing for all rendered elements.
+   * - `"default"` — current behavior (large article-style typography)
+   * - `"compact"` — smaller sizes for sidebars, cards, changelogs
+   * - `"large"` — extra-large sizes for hero/landing content
+   * - `{ p: "text-sm", h1: "text-2xl" }` — per-element overrides (merged onto default)
+   * - `{ preset: "compact", overrides: { h1: "text-heading-1" } }` — preset + tweaks
+   */
+  textSize?: TextSizeConfig;
 }
 
 // ---------------------------------------------------------------------------
@@ -230,8 +307,12 @@ export const SimpleMarkdownRenderer: React.FC<SimpleMarkdownRendererProps> = ({
   onResolveLink,
   preprocessContent,
   componentOverrides,
+  textSize,
 }) => {
   const idCountsRef = useRef<Record<string, number>>({});
+
+  // ---- text sizes ----
+  const textSizes = useMemo(() => resolveTextSizeConfig(textSize), [textSize]);
 
   // ---- section ID map ----
   const sectionIdMap = useMemo(() => {
@@ -314,9 +395,8 @@ export const SimpleMarkdownRenderer: React.FC<SimpleMarkdownRendererProps> = ({
             <div className="p-4">
               <pre className="overflow-x-auto">
                 <code
-                  className={`language-${language} hljs`}
+                  className={cn(`language-${language} hljs`, textSizes.code)}
                   style={{
-                    fontSize: '14px',
                     fontFamily: "JetBrains Mono', 'SF Mono', Consolas, monospace",
                     background: 'transparent',
                     color: 'var(--ods-text-primary)',
@@ -346,23 +426,23 @@ export const SimpleMarkdownRenderer: React.FC<SimpleMarkdownRendererProps> = ({
     // --- blockquote ---
     blockquote: ({ children }: any) => (
       <blockquote className="border-l-4 border-ods-accent ml-0 pl-6 my-8 py-4 rounded-r-lg bg-ods-bg-secondary">
-        <div className="font-sans text-lg leading-relaxed text-ods-text-secondary">
+        <div className={cn('font-sans leading-relaxed text-ods-text-secondary', textSizes.blockquote)}>
           {children}
         </div>
       </blockquote>
     ),
 
     // --- headings ---
-    h1: makeHeading('h1', 1, 'font-sans font-bold text-heading-1 mt-8 mb-4 first:mt-0 text-ods-text-primary'),
-    h2: makeHeading('h2', 2, 'font-sans font-semibold text-heading-2 mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border'),
-    h3: makeHeading('h3', 3, 'font-sans font-semibold text-2xl md:text-3xl mt-6 mb-3 text-ods-text-primary'),
-    h4: makeHeading('h4', 4, 'font-sans font-semibold text-xl mt-4 mb-2 text-ods-text-primary'),
-    h5: makeHeading('h5', 5, 'font-sans font-semibold text-lg md:text-xl mt-3 mb-2 text-ods-text-primary'),
-    h6: makeHeading('h6', 6, 'font-sans font-semibold text-base md:text-lg mt-3 mb-1 text-ods-text-primary'),
+    h1: makeHeading('h1', 1, cn('font-sans font-bold mt-8 mb-4 first:mt-0 text-ods-text-primary', textSizes.h1)),
+    h2: makeHeading('h2', 2, cn('font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border', textSizes.h2)),
+    h3: makeHeading('h3', 3, cn('font-sans font-semibold mt-6 mb-3 text-ods-text-primary', textSizes.h3)),
+    h4: makeHeading('h4', 4, cn('font-sans font-semibold mt-4 mb-2 text-ods-text-primary', textSizes.h4)),
+    h5: makeHeading('h5', 5, cn('font-sans font-semibold mt-3 mb-2 text-ods-text-primary', textSizes.h5)),
+    h6: makeHeading('h6', 6, cn('font-sans font-semibold mt-3 mb-1 text-ods-text-primary', textSizes.h6)),
 
     // --- paragraph ---
     p: ({ children }: any) => (
-      <p className="md:text-h4 lg:text-h4 leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary">
+      <p className={cn('leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary', textSizes.p)}>
         {children}
       </p>
     ),
@@ -459,7 +539,7 @@ export const SimpleMarkdownRenderer: React.FC<SimpleMarkdownRendererProps> = ({
       <ol className="list-decimal list-outside my-4 ml-8 space-y-2 text-ods-text-primary">{children}</ol>
     ),
     li: ({ children }: any) => (
-      <li className="text-base md:text-lg leading-relaxed pl-2">{children}</li>
+      <li className={cn('leading-relaxed pl-2', textSizes.li)}>{children}</li>
     ),
 
     // --- tables ---
@@ -474,12 +554,12 @@ export const SimpleMarkdownRenderer: React.FC<SimpleMarkdownRendererProps> = ({
       <thead className="bg-ods-bg-secondary">{children}</thead>
     ),
     th: ({ children }: any) => (
-      <th className="px-2 md:px-4 py-3 text-left text-xs md:text-sm font-semibold text-ods-accent border-r last:border-r-0 break-words border-ods-border">
+      <th className={cn('px-2 md:px-4 py-3 text-left font-semibold text-ods-accent border-r last:border-r-0 break-words border-ods-border', textSizes.th)}>
         {children}
       </th>
     ),
     td: ({ children }: any) => (
-      <td className="px-2 md:px-4 py-3 text-xs md:text-sm border-r last:border-r-0 border-b break-words whitespace-normal text-ods-text-primary border-ods-border">
+      <td className={cn('px-2 md:px-4 py-3 border-r last:border-r-0 border-b break-words whitespace-normal text-ods-text-primary border-ods-border', textSizes.td)}>
         {children}
       </td>
     ),
@@ -489,12 +569,12 @@ export const SimpleMarkdownRenderer: React.FC<SimpleMarkdownRendererProps> = ({
 
     // --- merge overrides ---
     ...componentOverrides,
-  }), [makeHeading, brokenLinks, propCurrentPath, onInternalLinkClick, onResolveLink, componentOverrides]);
+  }), [makeHeading, brokenLinks, propCurrentPath, onInternalLinkClick, onResolveLink, componentOverrides, textSizes]);
 
   return (
     <div className={`simple-markdown-renderer ${className}`}>
       <style dangerouslySetInnerHTML={{ __html: mermaidStyles }} />
-      <div className="content-wrapper max-w-none">
+      <div className="content-wrapper max-w-none break-words">
         <article className="prose prose-lg max-w-none">
           <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkBreaks]}

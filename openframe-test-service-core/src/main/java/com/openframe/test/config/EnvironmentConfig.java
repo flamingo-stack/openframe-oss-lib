@@ -26,14 +26,7 @@ public class EnvironmentConfig {
     }
 
     public static void random() {
-        String baseUrlVar = System.getenv("TEST_BASE_URL");
-        if (baseUrlVar != null && !baseUrlVar.trim().isEmpty()) {
-            testBaseUrl = baseUrlVar.trim();
-        } else {
-            throw new RuntimeException("TEST_BASE_URL environment variable is not set");
-        }
         testUserDomain = new Faker().letterify("test-??????");
-        envLoaded = true;
     }
 
     private static void loadEnv() {
@@ -89,7 +82,7 @@ public class EnvironmentConfig {
 
     public static String getUserDomain() {
         loadEnv();
-        return testUserDomain.contains("localhost") ? "localhost" : testUserDomain + "." + testBaseUrl;
+        return getEnvMode().equals(OSS) ? "localhost" : testUserDomain + "." + testBaseUrl;
     }
 
     public static String getRegistrationUrl() {

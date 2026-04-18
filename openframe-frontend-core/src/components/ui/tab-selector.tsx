@@ -27,6 +27,8 @@ export interface TabSelectorProps {
   variant?: 'primary' | 'secondary'
   /** Optional label displayed above the selector */
   label?: string
+  /** Disable the entire selector (overrides per-item enabled state) */
+  disabled?: boolean
   /** Additional CSS classes for the root container */
   className?: string
 }
@@ -37,10 +39,14 @@ export function TabSelector({
   items,
   variant = 'primary',
   label,
+  disabled,
   className,
 }: TabSelectorProps) {
   return (
-    <div className={cn('flex flex-col gap-1', className)}>
+    <div
+      className={cn('flex flex-col gap-1', disabled && 'opacity-50', className)}
+      aria-disabled={disabled || undefined}
+    >
       {label && (
         <p className="text-ods-text-primary text-h3">
           {label}
@@ -49,7 +55,7 @@ export function TabSelector({
       <div className="flex w-full bg-ods-bg border border-ods-border rounded-md p-1 gap-1 h-12">
         {items.map((item) => {
           const isActive = value === item.id
-          const isDisabled = item.disabled
+          const isDisabled = disabled || item.disabled
 
           return (
             <button
@@ -60,7 +66,9 @@ export function TabSelector({
               className={cn(
                 'flex flex-1 items-center justify-center gap-2 rounded-xs p-2 text-h4 transition-colors duration-200 whitespace-nowrap',
                 isDisabled
-                  ? 'opacity-50 cursor-not-allowed bg-transparent text-ods-text-secondary'
+                  ? isActive
+                    ? 'cursor-not-allowed bg-ods-bg-surface text-ods-text-secondary [font-weight:700]'
+                    : 'cursor-not-allowed bg-transparent text-ods-text-secondary'
                   : isActive
                     ? variant === 'primary'
                       ? 'bg-ods-accent text-ods-text-on-accent cursor-default [font-weight:700]'

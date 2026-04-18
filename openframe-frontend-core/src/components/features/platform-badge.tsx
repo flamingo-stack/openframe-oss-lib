@@ -58,11 +58,6 @@ const platformColors = {
     border: 'border-[#00D9D9]/30',
     text: 'text-[#00D9D9]'
   },
-  'admin-hub': {
-    bg: 'bg-[#8B5CF6]/10',
-    border: 'border-[#8B5CF6]/30',
-    text: 'text-[#8B5CF6]'
-  },
   'tmcg': {
     bg: 'bg-[#F357BB]/10',
     border: 'border-[#F357BB]/30',
@@ -110,8 +105,6 @@ const PlatformIcon = ({ platform, className }: { platform: string; className: st
       return <OpenmspLogo className={className} frontBubbleColor="currentColor" innerFrontBubbleColor="#000000" backBubbleColor="currentColor" />;
     case 'flamingo':
     case 'flamingo-teaser':
-      return <FlamingoLogo className={className} />;
-    case 'admin-hub':
       return <FlamingoLogo className={className} />;
     case 'openframe':
       return <OpenFrameLogo className={className} />;

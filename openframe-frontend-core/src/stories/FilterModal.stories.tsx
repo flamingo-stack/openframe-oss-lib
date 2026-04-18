@@ -329,6 +329,53 @@ export const EmptyFilters: Story = {
   },
 }
 
+/**
+ * Empty state — no filter options available at all.
+ */
+export const NoFiltersAvailable: Story = {
+  args: {
+    isOpen: true,
+    title: 'Tags Filter',
+    filterGroups: [],
+    currentFilters: {},
+    onFilterChange: fn(),
+    onClose: fn(),
+  },
+}
+
+/**
+ * Fully empty — no sort columns, no filter groups, no tags.
+ */
+export const FullyEmpty: Story = {
+  args: {
+    isOpen: true,
+    title: 'Sort and Filter',
+    filterGroups: [],
+    currentFilters: {},
+    sortConfig: undefined,
+    tagFilterKeys: [],
+    selectedTags: [],
+    onTagsChange: fn(),
+    onFilterChange: fn(),
+    onClose: fn(),
+  },
+}
+
+/**
+ * Loading state — skeleton placeholders while filter data is fetched.
+ */
+export const Loading: Story = {
+  args: {
+    isOpen: true,
+    title: 'Sort and Filter',
+    filterGroups: [],
+    currentFilters: {},
+    onFilterChange: fn(),
+    onClose: fn(),
+    isLoading: true,
+  },
+}
+
 // ---------------------------------------------------------------------------
 // Tag Key:Value Filter stories
 // ---------------------------------------------------------------------------

@@ -37,7 +37,6 @@ export function renderSvgIcon(
     'openmsp-logo':   (p) => <OpenmspLogo {...p} color="#f1f1f1" />,
     'flamingo': (p)=> <FlamingoLogo {...p} />,
     'flamingo-logo': (p)=> <FlamingoLogo {...p} />,
-    'admin-hub-logo': (p)=> <FlamingoLogo {...p} />,
     'tmcg-logo': (p) => <MiamiCyberGangLogoFaceOnly size={24} {...p} />,
     'universal': (p) => <Globe {...p} />,
   };
