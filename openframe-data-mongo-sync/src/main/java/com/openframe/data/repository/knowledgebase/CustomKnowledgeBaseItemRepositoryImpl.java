@@ -3,6 +3,7 @@ package com.openframe.data.repository.knowledgebase;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseArticleStatus;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItemType;
+import org.springframework.util.StringUtils;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -22,11 +23,11 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
         Criteria criteria = Criteria.where("type").is(KnowledgeBaseItemType.ARTICLE)
                 .and("status").is(KnowledgeBaseArticleStatus.PUBLISHED);
 
-        if (folderId != null && !folderId.isBlank()) {
+        if (StringUtils.hasText(folderId)) {
             criteria = criteria.and("parentId").is(folderId);
         }
 
-        if (search != null && !search.isBlank()) {
+        if (StringUtils.hasText(search)) {
             criteria = criteria.orOperator(
                     Criteria.where("name").regex(search, "i"),
                     Criteria.where("summary").regex(search, "i")

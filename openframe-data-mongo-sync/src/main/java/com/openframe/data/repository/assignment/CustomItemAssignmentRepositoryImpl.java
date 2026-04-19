@@ -3,6 +3,7 @@ package com.openframe.data.repository.assignment;
 import com.openframe.data.document.assignment.AssignmentTargetType;
 import com.openframe.data.document.assignment.ItemAssignment;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.StringUtils;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.springframework.data.domain.Sort;
@@ -46,7 +47,7 @@ public class CustomItemAssignmentRepositoryImpl implements CustomItemAssignmentR
         query.addCriteria(Criteria.where(FIELD_ITEM_ID).is(itemId));
         query.addCriteria(Criteria.where(FIELD_TARGET_TYPE).is(targetType));
 
-        if (search != null && !search.trim().isEmpty()) {
+        if (StringUtils.hasText(search)) {
             query.addCriteria(Criteria.where(FIELD_DISPLAY_NAME).regex(search.trim(), "i"));
         }
 
@@ -59,7 +60,7 @@ public class CustomItemAssignmentRepositoryImpl implements CustomItemAssignmentR
         boolean isDesc = SORT_DESC.equalsIgnoreCase(sortDirection);
         Sort.Direction direction = isDesc ? Sort.Direction.DESC : Sort.Direction.ASC;
 
-        if (cursor != null && !cursor.trim().isEmpty()) {
+        if (StringUtils.hasText(cursor)) {
             try {
                 ObjectId cursorId = new ObjectId(cursor);
                 applyCursorCriteria(query, cursorId, sortField, isDesc);
