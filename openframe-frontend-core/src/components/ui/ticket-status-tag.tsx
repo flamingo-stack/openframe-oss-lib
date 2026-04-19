@@ -35,7 +35,7 @@ const STATUS_CONFIG: Record<TicketStatus, TicketStatusConfig> = {
   RESOLVED: {
     label: 'Resolved',
     variant: 'outline',
-    icon: <CheckCircleIcon size={16} className="text-ods-attention-green-success" />,
+    icon: <CheckCircleIcon size={16} color="var(--ods-attention-green-success)" />,
   },
   ARCHIVED: {
     label: 'Archived',
@@ -89,9 +89,9 @@ export function getTicketStatusConfig(status: string): TicketStatusConfig {
  * Returns just the label and variant for use with the Tag component.
  * Drop-in replacement for the getTicketStatusTag utility in openframe-frontend.
  */
-export function getTicketStatusTag(status: string): { label: string; variant: TagVariant } {
+export function getTicketStatusTag(status: string): { label: string; variant: TagVariant; icon?: React.ReactNode } {
   const config = getTicketStatusConfig(status)
-  return { label: config.label, variant: config.variant }
+  return { label: config.label, variant: config.variant, icon: config.icon }
 }
 
 // ---------------------------------------------------------------------------

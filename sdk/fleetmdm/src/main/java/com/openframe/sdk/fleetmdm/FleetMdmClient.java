@@ -10,6 +10,10 @@ import com.openframe.sdk.fleetmdm.model.HostSearchResponse;
 import com.openframe.sdk.fleetmdm.model.QueryResult;
 import com.openframe.sdk.fleetmdm.model.Policy;
 import com.openframe.sdk.fleetmdm.model.Query;
+import com.openframe.sdk.fleetmdm.model.CreatePolicyRequest;
+import com.openframe.sdk.fleetmdm.model.UpdatePolicyRequest;
+import com.openframe.sdk.fleetmdm.model.CreateScheduledQueryRequest;
+import com.openframe.sdk.fleetmdm.model.UpdateScheduledQueryRequest;
 
 import java.io.IOException;
 import java.net.URI;
@@ -365,6 +369,297 @@ public class FleetMdmClient {
         }
 
         return MAPPER.treeToValue(MAPPER.readTree(response.body()).path("policy"), Policy.class);
+    }
+
+    /**
+     * Create a global policy.
+     */
+    public Policy createPolicy(CreatePolicyRequest request) {
+        try {
+            HttpResponse<String> response = sendRequest(POLICIES_URL, "POST", MAPPER.writeValueAsString(request));
+            checkResponse(response, "create Fleet policy");
+            return MAPPER.treeToValue(requireNode(response.body(), "policy"), Policy.class);
+        } catch (FleetMdmApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new FleetMdmException("Failed to create Fleet policy", e);
+        }
+    }
+
+    /**
+     * List all global policies.
+     */
+    public List<Policy> listPolicies() {
+        try {
+            HttpResponse<String> response = sendRequest(POLICIES_URL, "GET", null);
+            checkResponse(response, "list Fleet policies");
+            return MAPPER.convertValue(
+                    requireNode(response.body(), "policies"),
+                    MAPPER.getTypeFactory().constructCollectionType(List.class, Policy.class));
+        } catch (FleetMdmApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new FleetMdmException("Failed to list Fleet policies", e);
+        }
+    }
+
+    /**
+     * Get a policy by numeric ID.
+     */
+    public Policy getPolicy(long policyId) {
+        try {
+            HttpResponse<String> response = sendRequest(POLICIES_URL + "/" + policyId, "GET", null);
+            checkResponse(response, "get Fleet policy");
+            return MAPPER.treeToValue(requireNode(response.body(), "policy"), Policy.class);
+        } catch (FleetMdmApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new FleetMdmException("Failed to get Fleet policy: " + policyId, e);
+        }
+    }
+
+    /**
+     * Update an existing policy.
+     */
+    public Policy updatePolicy(long policyId, UpdatePolicyRequest request) {
+        try {
+            HttpResponse<String> response = sendRequest(POLICIES_URL + "/" + policyId, "PATCH", MAPPER.writeValueAsString(request));
+            checkResponse(response, "update Fleet policy");
+            return MAPPER.treeToValue(requireNode(response.body(), "policy"), Policy.class);
+        } catch (FleetMdmApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new FleetMdmException("Failed to update Fleet policy: " + policyId, e);
+        }
+    }
+
+    /**
+     * Create a scheduled query.
+     */
+    public Query createScheduledQuery(CreateScheduledQueryRequest request) {
+        try {
+            HttpResponse<String> response = sendRequest(QUERIES_URL, "POST", MAPPER.writeValueAsString(request));
+            checkResponse(response, "create Fleet scheduled query");
+            return MAPPER.treeToValue(requireNode(response.body(), "query"), Query.class);
+        } catch (FleetMdmApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new FleetMdmException("Failed to create Fleet scheduled query", e);
+        }
+    }
+
+    /**
+     * List all scheduled queries (interval > 0).
+     */
+    public List<Query> listScheduledQueries() {
+        try {
+            HttpResponse<String> response = sendRequest(QUERIES_URL, "GET", null);
+            checkResponse(response, "list Fleet scheduled queries");
+            return MAPPER.convertValue(
+                    requireNode(response.body(), "queries"),
+                    MAPPER.getTypeFactory().constructCollectionType(List.class, Query.class));
+        } catch (FleetMdmApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new FleetMdmException("Failed to list Fleet scheduled queries", e);
+        }
+    }
+
+    /**
+     * Get a scheduled query by numeric ID.
+     */
+    public Query getScheduledQuery(long queryId) {
+        try {
+            HttpResponse<String> response = sendRequest(QUERIES_URL + "/" + queryId, "GET", null);
+            checkResponse(response, "get Fleet scheduled query");
+            return MAPPER.treeToValue(requireNode(response.body(), "query"), Query.class);
+        } catch (FleetMdmApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new FleetMdmException("Failed to get Fleet scheduled query: " + queryId, e);
+        }
+    }
+
+    /**
+     * Update an existing scheduled query.
+     */
+    public Query updateScheduledQuery(long queryId, UpdateScheduledQueryRequest request) {
+        try {
+            HttpResponse<String> response = sendRequest(QUERIES_URL + "/" + queryId, "PATCH", MAPPER.writeValueAsString(request));
+            checkResponse(response, "update Fleet scheduled query");
+            return MAPPER.treeToValue(requireNode(response.body(), "query"), Query.class);
+        } catch (FleetMdmApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new FleetMdmException("Failed to update Fleet scheduled query: " + queryId, e);
+        }
+    }
+
+    public CompletableFuture<Policy> createPolicyAsync(CreatePolicyRequest request) {
+        try {
+            HttpRequest httpRequest = buildRequest(POLICIES_URL, "POST", MAPPER.writeValueAsString(request));
+            return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                    .thenApply(response -> {
+                        checkResponse(response, "create Fleet policy");
+                        try {
+                            return MAPPER.treeToValue(requireNode(response.body(), "policy"), Policy.class);
+                        } catch (Exception e) {
+                            throw new FleetMdmException("Failed to parse create policy response", e);
+                        }
+                    });
+        } catch (Exception e) {
+            CompletableFuture<Policy> failed = new CompletableFuture<>();
+            failed.completeExceptionally(new FleetMdmException("Failed to create Fleet policy", e));
+            return failed;
+        }
+    }
+
+    public CompletableFuture<List<Policy>> listPoliciesAsync() {
+        HttpRequest httpRequest = buildRequest(POLICIES_URL, "GET", null);
+        return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    checkResponse(response, "list Fleet policies");
+                    try {
+                        return MAPPER.convertValue(
+                                requireNode(response.body(), "policies"),
+                                MAPPER.getTypeFactory().constructCollectionType(List.class, Policy.class));
+                    } catch (Exception e) {
+                        throw new FleetMdmException("Failed to parse list policies response", e);
+                    }
+                });
+    }
+
+    public CompletableFuture<Policy> getPolicyAsync(long policyId) {
+        HttpRequest httpRequest = buildRequest(POLICIES_URL + "/" + policyId, "GET", null);
+        return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    checkResponse(response, "get Fleet policy");
+                    try {
+                        return MAPPER.treeToValue(requireNode(response.body(), "policy"), Policy.class);
+                    } catch (Exception e) {
+                        throw new FleetMdmException("Failed to parse get policy response", e);
+                    }
+                });
+    }
+
+    public CompletableFuture<Policy> updatePolicyAsync(long policyId, UpdatePolicyRequest request) {
+        try {
+            HttpRequest httpRequest = buildRequest(POLICIES_URL + "/" + policyId, "PATCH", MAPPER.writeValueAsString(request));
+            return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                    .thenApply(response -> {
+                        checkResponse(response, "update Fleet policy");
+                        try {
+                            return MAPPER.treeToValue(requireNode(response.body(), "policy"), Policy.class);
+                        } catch (Exception e) {
+                            throw new FleetMdmException("Failed to parse update policy response", e);
+                        }
+                    });
+        } catch (Exception e) {
+            CompletableFuture<Policy> failed = new CompletableFuture<>();
+            failed.completeExceptionally(new FleetMdmException("Failed to update Fleet policy: " + policyId, e));
+            return failed;
+        }
+    }
+
+    public CompletableFuture<Query> createScheduledQueryAsync(CreateScheduledQueryRequest request) {
+        try {
+            HttpRequest httpRequest = buildRequest(QUERIES_URL, "POST", MAPPER.writeValueAsString(request));
+            return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                    .thenApply(response -> {
+                        checkResponse(response, "create Fleet scheduled query");
+                        try {
+                            return MAPPER.treeToValue(requireNode(response.body(), "query"), Query.class);
+                        } catch (Exception e) {
+                            throw new FleetMdmException("Failed to parse create scheduled query response", e);
+                        }
+                    });
+        } catch (Exception e) {
+            CompletableFuture<Query> failed = new CompletableFuture<>();
+            failed.completeExceptionally(new FleetMdmException("Failed to create Fleet scheduled query", e));
+            return failed;
+        }
+    }
+
+    public CompletableFuture<List<Query>> listScheduledQueriesAsync() {
+        HttpRequest httpRequest = buildRequest(QUERIES_URL, "GET", null);
+        return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    checkResponse(response, "list Fleet scheduled queries");
+                    try {
+                        return MAPPER.convertValue(
+                                requireNode(response.body(), "queries"),
+                                MAPPER.getTypeFactory().constructCollectionType(List.class, Query.class));
+                    } catch (Exception e) {
+                        throw new FleetMdmException("Failed to parse list scheduled queries response", e);
+                    }
+                });
+    }
+
+    public CompletableFuture<Query> getScheduledQueryAsync(long queryId) {
+        HttpRequest httpRequest = buildRequest(QUERIES_URL + "/" + queryId, "GET", null);
+        return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    checkResponse(response, "get Fleet scheduled query");
+                    try {
+                        return MAPPER.treeToValue(requireNode(response.body(), "query"), Query.class);
+                    } catch (Exception e) {
+                        throw new FleetMdmException("Failed to parse get scheduled query response", e);
+                    }
+                });
+    }
+
+    public CompletableFuture<Query> updateScheduledQueryAsync(long queryId, UpdateScheduledQueryRequest request) {
+        try {
+            HttpRequest httpRequest = buildRequest(QUERIES_URL + "/" + queryId, "PATCH", MAPPER.writeValueAsString(request));
+            return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                    .thenApply(response -> {
+                        checkResponse(response, "update Fleet scheduled query");
+                        try {
+                            return MAPPER.treeToValue(requireNode(response.body(), "query"), Query.class);
+                        } catch (Exception e) {
+                            throw new FleetMdmException("Failed to parse update scheduled query response", e);
+                        }
+                    });
+        } catch (Exception e) {
+            CompletableFuture<Query> failed = new CompletableFuture<>();
+            failed.completeExceptionally(new FleetMdmException("Failed to update Fleet scheduled query: " + queryId, e));
+            return failed;
+        }
+    }
+
+    private HttpRequest buildRequest(String path, String method, String body) {
+        HttpRequest.Builder builder = addHeaders(HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + path))
+                .header("Content-Type", "application/json"))
+                .timeout(Duration.ofSeconds(30));
+        switch (method) {
+            case "POST"  -> builder.POST(HttpRequest.BodyPublishers.ofString(body == null ? "" : body));
+            case "PATCH" -> builder.method("PATCH", HttpRequest.BodyPublishers.ofString(body == null ? "" : body));
+            default      -> builder.GET();
+        }
+        return builder.build();
+    }
+
+    private HttpResponse<String> sendRequest(String path, String method, String body) throws Exception {
+        return httpClient.send(buildRequest(path, method, body), HttpResponse.BodyHandlers.ofString());
+    }
+
+    private static void checkResponse(HttpResponse<String> response, String action) {
+        if (response.statusCode() >= 200 && response.statusCode() < 300) {
+            return;
+        }
+        String body = response.body() == null ? "" : response.body().trim();
+        throw new FleetMdmApiException(action + " failed with HTTP " + response.statusCode()
+                + (body.isEmpty() ? "" : ": " + body), response.statusCode(), body);
+    }
+
+    private static JsonNode requireNode(String responseBody, String fieldName) throws Exception {
+        JsonNode root = MAPPER.readTree(responseBody);
+        JsonNode node = root.get(fieldName);
+        if (node == null || node.isNull()) {
+            throw new FleetMdmException("Fleet response missing field \"" + fieldName + "\". Body: " + responseBody);
+        }
+        return node;
     }
 
     private HttpRequest.Builder addHeaders(HttpRequest.Builder builder) {

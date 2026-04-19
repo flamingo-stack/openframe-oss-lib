@@ -13,7 +13,7 @@ export type ParsedChunkAction =
   | { action: 'message_start' }
   | { action: 'message_end' }
   | { action: 'error'; error: string; details?: string }
-  | { action: 'metadata'; modelName: string; providerName: string; contextWindow: number }
+  | { action: 'metadata'; modelDisplayName: string; modelName: string; providerName: string; contextWindow: number }
   | { action: 'text'; text: string }
   | { action: 'tool_execution'; segment: ToolExecutionSegment }
   | { action: 'approval_request'; requestId: string; command: string; explanation?: string; approvalType: string }
@@ -24,6 +24,7 @@ export type ParsedChunkAction =
   | { action: 'system'; text: string }
   | { action: 'context_compaction_start' }
   | { action: 'context_compaction_end'; summary?: string }
+  | { action: 'dialog_closed' }
 
 // ========== Accumulator State ==========
 
