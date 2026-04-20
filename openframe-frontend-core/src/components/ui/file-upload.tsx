@@ -321,8 +321,8 @@ export function FileUpload({
             {icon || <ImagePlusIcon className="size-6 text-ods-text-primary" />}
           </div>
           <div className="flex flex-1 flex-col font-['DM_Sans'] font-medium min-w-0">
-            <span className="text-[18px] leading-6 text-ods-text-primary">{label}</span>
-            <span className="text-[14px] leading-5 text-ods-text-secondary">{description}</span>
+            <span className="text-heading-4 text-ods-text-primary">{label}</span>
+            <span className="text-heading-5 text-ods-text-secondary">{description}</span>
           </div>
         </button>
       )}
@@ -347,21 +347,21 @@ export function FileUpload({
                     )}
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-[14px] font-medium text-ods-text-primary truncate">
+                      <p className="text-heading-5 font-medium text-ods-text-primary truncate">
                         {entry.fileName}
                       </p>
                       <div className="flex items-center gap-2">
-                        <span className="text-[12px] text-ods-text-secondary">
+                        <span className="text-heading-6 text-ods-text-secondary">
                           {formatFileSize(entry.fileSize)}
                         </span>
                         {entry.status === "uploading" && (
-                          <span className="flex items-center gap-1 text-[12px] text-ods-text-secondary">
+                          <span className="flex items-center gap-1 text-heading-6 text-ods-text-secondary">
                             <Loader2 className="size-3 animate-spin" />
                             Uploading...
                           </span>
                         )}
                         {entry.status === "error" && (
-                          <span className="text-[12px] text-[var(--ods-attention-red-error)]">
+                          <span className="text-heading-6 text-[var(--ods-attention-red-error)]">
                             {entry.error || "Upload failed"}
                           </span>
                         )}
@@ -385,10 +385,10 @@ export function FileUpload({
                     className="flex items-center gap-3 p-3 rounded-[6px] bg-ods-card border border-ods-border"
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-[14px] font-medium text-ods-text-primary truncate">
+                      <p className="text-heading-5 font-medium text-ods-text-primary truncate">
                         {file.name}
                       </p>
-                      <p className="text-[12px] text-ods-text-secondary">
+                      <p className="text-heading-6 text-ods-text-secondary">
                         {formatFileSize(file.size)}
                       </p>
                     </div>
@@ -420,7 +420,7 @@ export function FileUpload({
               className={cn(
                 "flex items-center justify-center gap-2 p-3 rounded-[6px]",
                 "border border-dashed",
-                "text-[14px] font-medium",
+                "text-heading-5 font-medium",
                 "transition-colors duration-200",
                 dragActive
                   ? "border-ods-accent bg-ods-accent/5 text-ods-text-primary"
