@@ -57,8 +57,12 @@ export interface FileUploadProps {
   icon?: React.ReactNode
   /** Max height for the file list area (e.g., 200 or "200px"). When set, the file list scrolls independently. */
   maxListHeight?: number | string
-  /** Custom file picker function. When provided, this is called instead of the native HTML file input dialog. */
-  onOpenFilePicker?: () => Promise<File | File[] | undefined>
+  /**
+   * When true, files dropped anywhere in the window are routed to this component,
+   * and the browser's default file-open behavior is suppressed. Use on screens/modals
+   * where this is the only drop target. Default: false.
+   */
+  acceptWindowDrops?: boolean
 }
 
 function formatFileSize(bytes: number): string {
@@ -67,6 +71,31 @@ function formatFileSize(bytes: number): string {
   const sizes = ["B", "KB", "MB", "GB"]
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
+}
+
+function matchesAccept(file: File, accept: string): boolean {
+  if (!accept || accept === "*/*") return true
+  const patterns = accept
+    .split(",")
+    .map((p) => p.trim().toLowerCase())
+    .filter(Boolean)
+  if (patterns.length === 0) return true
+  const fileType = (file.type || "").toLowerCase()
+  const fileName = file.name.toLowerCase()
+  return patterns.some((pattern) => {
+    if (pattern.startsWith(".")) return fileName.endsWith(pattern)
+    if (pattern.endsWith("/*")) return fileType.startsWith(pattern.slice(0, -1))
+    return fileType === pattern
+  })
+}
+
+function dragHasFiles(e: DragEvent): boolean {
+  const types = e.dataTransfer?.types
+  if (!types) return false
+  for (let i = 0; i < types.length; i++) {
+    if (types[i] === "Files") return true
+  }
+  return false
 }
 
 export function FileUpload({
@@ -86,7 +115,7 @@ export function FileUpload({
   className,
   icon,
   maxListHeight,
-  onOpenFilePicker,
+  acceptWindowDrops = false,
 }: FileUploadProps) {
   const [dragActive, setDragActive] = React.useState(false)
   const [validationError, setValidationError] = React.useState<string | null>(null)
@@ -99,42 +128,64 @@ export function FileUpload({
     return Array.isArray(value) ? value : [value]
   }, [value])
 
-  const validateFile = (file: File): string | null => {
-    if (file.size > maxSize) {
-      return `File "${file.name}" exceeds maximum size of ${formatFileSize(maxSize)}`
-    }
-    return null
-  }
+  const currentCount = isManaged ? managedFiles.length : files.length
 
-  const handleFiles = (newFiles: FileList | File[]) => {
-    setValidationError(null)
-    const fileArray = Array.from(newFiles)
+  const validateFiles = (
+    incoming: File[],
+  ): { accepted: File[]; error: string | null } => {
+    if (incoming.length === 0) return { accepted: [], error: null }
 
-    for (const file of fileArray) {
-      const err = validateFile(file)
-      if (err) {
-        setValidationError(err)
-        return
+    const candidates = multiple ? incoming : incoming.slice(0, 1)
+
+    for (const file of candidates) {
+      if (!matchesAccept(file, accept)) {
+        return { accepted: [], error: `File "${file.name}" is not an accepted type` }
+      }
+      if (file.size > maxSize) {
+        return {
+          accepted: [],
+          error: `File "${file.name}" exceeds maximum size of ${formatFileSize(maxSize)}`,
+        }
       }
     }
 
-    if (isManaged) {
-      // In managed mode, pass new files via onChange for the consumer to upload.
-      // Don't accumulate — each batch is independent.
-      onChange(multiple ? fileArray : fileArray[0])
-    } else if (multiple) {
-      const combined = [...files, ...fileArray]
-      const limited = combined.slice(0, maxFiles)
-      onChange(limited)
-    } else {
-      onChange(fileArray[0])
+    if (multiple && currentCount + candidates.length > maxFiles) {
+      return {
+        accepted: [],
+        error: `You can attach at most ${maxFiles} ${maxFiles === 1 ? "file" : "files"}`,
+      }
     }
 
-    // Reset input so the same file can be re-selected
+    return { accepted: candidates, error: null }
+  }
+
+  const handleFiles = (incoming: FileList | File[]) => {
+    setValidationError(null)
+    const fileArray = Array.from(incoming)
+    if (fileArray.length === 0) return
+
+    const { accepted, error: validationErr } = validateFiles(fileArray)
+    if (validationErr) {
+      setValidationError(validationErr)
+      return
+    }
+    if (accepted.length === 0) return
+
+    if (isManaged) {
+      onChange(multiple ? accepted : accepted[0])
+    } else if (multiple) {
+      onChange([...files, ...accepted])
+    } else {
+      onChange(accepted[0])
+    }
+
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
   }
+
+  const handleFilesRef = React.useRef(handleFiles)
+  handleFilesRef.current = handleFiles
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault()
@@ -157,6 +208,56 @@ export function FileUpload({
     }
   }
 
+  React.useEffect(() => {
+    if (!acceptWindowDrops || disabled) return
+
+    let dragCounter = 0
+
+    const onWindowDragEnter = (e: DragEvent) => {
+      if (!dragHasFiles(e)) return
+      e.preventDefault()
+      dragCounter++
+      if (dragCounter === 1) setDragActive(true)
+    }
+    const onWindowDragOver = (e: DragEvent) => {
+      if (!dragHasFiles(e)) return
+      e.preventDefault()
+    }
+    const onWindowDragLeave = (e: DragEvent) => {
+      if (!dragHasFiles(e)) return
+      e.preventDefault()
+      dragCounter = Math.max(0, dragCounter - 1)
+      if (dragCounter === 0) setDragActive(false)
+    }
+    const onWindowDrop = (e: DragEvent) => {
+      if (!dragHasFiles(e)) return
+      e.preventDefault()
+      dragCounter = 0
+      setDragActive(false)
+      if (e.dataTransfer?.files?.length) {
+        handleFilesRef.current(e.dataTransfer.files)
+      }
+    }
+    const onWindowDragEnd = () => {
+      dragCounter = 0
+      setDragActive(false)
+    }
+
+    window.addEventListener("dragenter", onWindowDragEnter)
+    window.addEventListener("dragover", onWindowDragOver)
+    window.addEventListener("dragleave", onWindowDragLeave)
+    window.addEventListener("drop", onWindowDrop)
+    window.addEventListener("dragend", onWindowDragEnd)
+
+    return () => {
+      window.removeEventListener("dragenter", onWindowDragEnter)
+      window.removeEventListener("dragover", onWindowDragOver)
+      window.removeEventListener("dragleave", onWindowDragLeave)
+      window.removeEventListener("drop", onWindowDrop)
+      window.removeEventListener("dragend", onWindowDragEnd)
+    }
+  }, [acceptWindowDrops, disabled])
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.length) {
       handleFiles(e.target.files)
@@ -177,24 +278,13 @@ export function FileUpload({
 
   const openDialog = async () => {
     if (disabled) return
-
-    if (onOpenFilePicker) {
-      const result = await onOpenFilePicker()
-      if (result) {
-        const fileArray = Array.isArray(result) ? result : [result]
-        if (fileArray.length > 0) {
-          handleFiles(fileArray)
-        }
-      }
-      return
-    }
-
     fileInputRef.current?.click()
   }
 
   const displayError = error || validationError || undefined
   const hasFiles = isManaged ? managedFiles.length > 0 : files.length > 0
-  const fileCount = isManaged ? managedFiles.length : files.length
+  const fileCount = currentCount
+  const canAddMore = multiple && fileCount < maxFiles
 
   return (
     <FieldWrapper label={fieldLabel} error={displayError} className={className}>
@@ -208,16 +298,18 @@ export function FileUpload({
         disabled={disabled}
       />
 
-      {/* Dropzone — always show when no files, or in managed mode (always allow adding) */}
+      {/* Primary dropzone */}
       {!hasFiles && (
-        <div
+        <button
+          type="button"
           onDragEnter={handleDrag}
           onDragLeave={handleDrag}
           onDragOver={handleDrag}
           onDrop={handleDrop}
           onClick={openDialog}
+          disabled={disabled}
           className={cn(
-            "flex items-center gap-2 p-3 rounded-[6px] border border-dashed cursor-pointer",
+            "flex w-full items-center gap-2 p-3 rounded-[6px] border border-dashed cursor-pointer text-left",
             "transition-colors duration-200",
             "bg-ods-card border-ods-border",
             dragActive && "border-ods-accent bg-ods-accent/5",
@@ -232,14 +324,17 @@ export function FileUpload({
             <span className="text-[18px] leading-6 text-ods-text-primary">{label}</span>
             <span className="text-[14px] leading-5 text-ods-text-secondary">{description}</span>
           </div>
-        </div>
+        </button>
       )}
 
       {/* File list */}
       {hasFiles && (
         <div className="flex flex-col gap-2">
           <div
-            className="flex flex-col gap-2"
+            className={cn(
+              "flex flex-col gap-2 rounded-[6px] transition-colors duration-200",
+              dragActive && "bg-ods-accent/5",
+            )}
             style={maxListHeight ? { maxHeight: typeof maxListHeight === "number" ? `${maxListHeight}px` : maxListHeight, overflowY: "auto" } : undefined}
           >
             {isManaged
@@ -313,18 +408,24 @@ export function FileUpload({
           </div>
 
           {/* Add more button */}
-          {multiple && fileCount < maxFiles && (
+          {canAddMore && (
             <button
               type="button"
               onClick={openDialog}
+              onDragEnter={handleDrag}
+              onDragLeave={handleDrag}
+              onDragOver={handleDrag}
+              onDrop={handleDrop}
               disabled={disabled}
               className={cn(
                 "flex items-center justify-center gap-2 p-3 rounded-[6px]",
-                "border border-dashed border-ods-border",
-                "text-[14px] font-medium text-ods-text-secondary",
-                "hover:border-ods-accent/30 hover:text-ods-text-primary",
+                "border border-dashed",
+                "text-[14px] font-medium",
                 "transition-colors duration-200",
-                disabled && "opacity-50 cursor-not-allowed"
+                dragActive
+                  ? "border-ods-accent bg-ods-accent/5 text-ods-text-primary"
+                  : "border-ods-border text-ods-text-secondary hover:border-ods-accent/30 hover:text-ods-text-primary",
+                disabled && "opacity-50 cursor-not-allowed",
               )}
             >
               Add more files
