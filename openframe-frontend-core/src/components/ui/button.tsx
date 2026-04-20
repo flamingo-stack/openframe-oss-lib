@@ -37,7 +37,7 @@ const buttonVariants = cva(
         // Special variant for submit product buttons (header usage)
         submit: "border border-ods-border bg-transparent text-ods-text-primary hover:bg-ods-bg-hover focus:bg-ods-bg-hover focus-visible:ring-2 focus-visible:ring-ods-focus disabled:border-ods-disabled disabled:text-ods-text-disabled",
         // Destructive variant for dangerous actions
-        destructive: "bg-ods-error text-ods-text-on-dark hover:bg-ods-error-hover active:bg-ods-error-active focus-visible:ring-2 focus-visible:ring-ods-focus disabled:bg-ods-disabled disabled:text-ods-text-disabled",
+        destructive: "bg-ods-error text-black hover:bg-ods-error-hover active:bg-ods-error-active focus-visible:ring-2 focus-visible:ring-ods-focus disabled:bg-ods-disabled disabled:text-ods-text-disabled",
         // Success variant for positive actions
         success: "bg-ods-success text-ods-text-on-dark hover:bg-ods-success-hover active:bg-ods-success-active focus-visible:ring-2 focus-visible:ring-ods-focus disabled:bg-ods-disabled disabled:text-ods-text-disabled",
         // Warning variant for cautionary actions
