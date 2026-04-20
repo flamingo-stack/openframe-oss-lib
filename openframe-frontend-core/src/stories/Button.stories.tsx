@@ -491,6 +491,44 @@ export const AllVariants: Story = {
 };
 
 /**
+ * All variants displayed in disabled state.
+ */
+export const AllVariantsDisabled: Story = {
+  args: {
+    children: 'Button',
+    disabled: true,
+  },
+  render: () => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '400px' }}>
+      <Button variant="primary" disabled>Primary</Button>
+      <Button variant="secondary" disabled>Secondary</Button>
+      <Button variant="white" disabled>White</Button>
+      <Button variant="outline" disabled>Outline</Button>
+      <Button variant="ghost" disabled>Ghost</Button>
+      <Button variant="ghost-nav" disabled>Ghost Nav</Button>
+      <Button variant="transparent" disabled>Transparent</Button>
+      <Button variant="link" disabled>Link</Button>
+      <Button variant="search" disabled>Search</Button>
+      <Button variant="submit" disabled>Submit</Button>
+      <Button variant="destructive" disabled>Destructive</Button>
+      <Button variant="success" disabled>Success</Button>
+      <Button variant="warning" disabled>Warning</Button>
+      <Button variant="info" disabled>Info</Button>
+      <Button variant="flamingo-primary" disabled>Flamingo Primary</Button>
+      <Button variant="flamingo-secondary" disabled>Flamingo Secondary</Button>
+      <Button variant="footer-link" disabled>Footer Link</Button>
+      <Button variant="filter" disabled>Filter</Button>
+      <Button variant="filter-active" disabled>Filter Active</Button>
+      <Button variant="section" size="section" disabled>Section</Button>
+      <Button variant="section-active" size="section" disabled>Section Active</Button>
+      <Button variant="table-display" disabled>Table Display</Button>
+      <Button variant="device-action" disabled>Device Action</Button>
+      <Button variant="card" disabled>Card</Button>
+    </div>
+  ),
+};
+
+/**
  * All size variants displayed together.
  */
 export const AllSizes: Story = {
