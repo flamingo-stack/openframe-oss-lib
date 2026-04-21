@@ -50,6 +50,24 @@ export interface UseNatsDialogSubscriptionOptions {
     user?: string
     pass?: string
   }
+  /**
+   * Reconnection backoff tuning. All fields optional; omitted values fall back to NETWORK_CONFIG defaults.
+   * Schedule: the first `fastRetries` attempts use `fastRetryDelayMs`, then exponential
+   * `initialDelayMs * multiplier ** (attempt - fastRetries)` capped at `maxDelayMs`. ±50% jitter is
+   * always applied on top.
+   */
+  reconnectionBackoff?: {
+    /** Attempts to fire at `fastRetryDelayMs` before exponential phase kicks in. Default: 0. */
+    fastRetries?: number
+    /** Delay used during the fast-retry phase. Default: NETWORK_CONFIG.RETRY_INITIAL_DELAY_MS. */
+    fastRetryDelayMs?: number
+    /** Base delay for the exponential phase. Default: NETWORK_CONFIG.RETRY_INITIAL_DELAY_MS. */
+    initialDelayMs?: number
+    /** Upper cap on any single retry delay. Default: NETWORK_CONFIG.RETRY_MAX_DELAY_MS. */
+    maxDelayMs?: number
+    /** Per-attempt multiplier during exponential phase. Default: NETWORK_CONFIG.RETRY_BACKOFF_MULTIPLIER. */
+    multiplier?: number
+  }
 }
 
 // ========== Hook Return Types ==========

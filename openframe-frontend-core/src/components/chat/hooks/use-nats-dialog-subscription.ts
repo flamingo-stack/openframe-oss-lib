@@ -41,6 +41,7 @@ export function useNatsDialogSubscription({
   onBeforeReconnect,
   getNatsWsUrl,
   clientConfig = {},
+  reconnectionBackoff,
 }: UseNatsDialogSubscriptionOptions): UseNatsDialogSubscriptionReturn {
   const [isConnected, setIsConnected] = useState(false)
   const [isSubscribed, setIsSubscribed] = useState(false)
@@ -81,6 +82,11 @@ export function useNatsDialogSubscription({
   useEffect(() => {
     getNatsWsUrlRef.current = getNatsWsUrl
   }, [getNatsWsUrl])
+
+  const reconnectionBackoffRef = useRef(reconnectionBackoff)
+  useEffect(() => {
+    reconnectionBackoffRef.current = reconnectionBackoff
+  }, [reconnectionBackoff])
 
   const acquireClient = useCallback((url: string): SharedConnection => {
     if (shared?.wsUrl !== url) {
@@ -180,10 +186,16 @@ export function useNatsDialogSubscription({
         sharedConn.retryTimer = null
       }
 
-      const delay = Math.min(
-        NETWORK_CONFIG.RETRY_INITIAL_DELAY_MS * (NETWORK_CONFIG.RETRY_BACKOFF_MULTIPLIER ** retryAttempt),
-        NETWORK_CONFIG.RETRY_MAX_DELAY_MS
-      )
+      const cfg = reconnectionBackoffRef.current ?? {}
+      const fastRetries = cfg.fastRetries ?? 0
+      const fastDelay = cfg.fastRetryDelayMs ?? NETWORK_CONFIG.RETRY_INITIAL_DELAY_MS
+      const baseDelay = cfg.initialDelayMs ?? NETWORK_CONFIG.RETRY_INITIAL_DELAY_MS
+      const maxDelay = cfg.maxDelayMs ?? NETWORK_CONFIG.RETRY_MAX_DELAY_MS
+      const multiplier = cfg.multiplier ?? NETWORK_CONFIG.RETRY_BACKOFF_MULTIPLIER
+
+      const delay = retryAttempt < fastRetries
+        ? fastDelay
+        : Math.min(baseDelay * (multiplier ** (retryAttempt - fastRetries)), maxDelay)
       const jitteredDelay = delay * (0.5 + Math.random() * 0.5)
       retryAttempt++
 
