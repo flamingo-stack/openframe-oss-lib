@@ -3,14 +3,7 @@
 import React from 'react'
 import type { ButtonProps } from './button'
 import { cn } from '../../utils/cn'
-import { Ellipsis01Icon } from '../icons-v2-generated'
 import { Button } from './button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from './dropdown-menu'
 import { MoreActionsMenu, type MoreActionsItem } from './more-actions-menu'
 
 export type PageActionButton = {
@@ -197,63 +190,19 @@ function MenuPrimaryVariant({
         ))}
       </div>
 
-      {/* Mobile: Fixed bottom bar — full-width menu button + primary buttons */}
-      <div className={cn(
-        'fixed md:hidden bottom-0 left-0 right-0 z-50',
-        'bg-ods-card border-t border-ods-border',
-        'flex items-start pt-6 pb-6 px-6',
-        gapClass
-      )}>
-        {menuActions.length > 0 && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                className="flex-1"
-                aria-label="More actions"
-                centerIcon={<Ellipsis01Icon size={24} className="text-ods-text-primary" />}
-              />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="start"
-              side="top"
-              sideOffset={6}
-              className="bg-ods-card border border-ods-border p-0 rounded-[4px] min-w-[200px]"
-            >
-              {menuActions.map((item, idx) => (
-                <DropdownMenuItem
-                  key={`mobile-menu-${item.label}-${idx}`}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (!item.disabled) item.onClick()
-                  }}
-                  disabled={item.disabled}
-                  className="flex items-center gap-2 px-4 py-3 bg-ods-bg hover:bg-ods-bg-hover focus:bg-ods-bg-hover border-b border-ods-border last:border-b-0 rounded-none cursor-pointer data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed"
-                >
-                  {item.icon && (
-                    <div className={cn(item.danger ? 'text-ods-error' : 'text-ods-text-secondary', '[&_svg]:size-6 [&_svg]:shrink-0')}>{item.icon}</div>
-                  )}
-                  <span className={`font-medium text-[18px] leading-6 ${item.danger ? 'text-ods-text-primary' : 'text-ods-text-primary'}`}>
-                    {item.label}
-                  </span>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-        {actions.map((action, idx) => (
-          <Button
-            key={`mobile-${action.label}-${idx}`}
-            variant={action.variant || 'primary'}
-            onClick={action.onClick}
-            disabled={action.disabled}
-            loading={action.loading}
-            leftIcon={action.icon}
-            className="flex-1"
-          >
-            {action.label}
-          </Button>
-        ))}
+      {/* Mobile: single "..." menu with primary actions merged in */}
+      <div className={cn('flex md:hidden', className)}>
+        <MoreActionsMenu
+          items={[
+            ...actions.map<MoreActionsItem>(action => ({
+              label: action.label,
+              onClick: action.onClick,
+              icon: action.icon,
+              disabled: action.disabled
+            })),
+            ...menuActions
+          ]}
+        />
       </div>
     </>
   )

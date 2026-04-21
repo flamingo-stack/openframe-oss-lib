@@ -25,29 +25,29 @@ const buttonVariants = cva(
         // Outline variant for Submit Product buttons and secondary actions
         outline: "border border-ods-border bg-transparent text-ods-text-primary hover:bg-ods-bg-hover active:bg-ods-bg-active focus-visible:ring-2 focus-visible:ring-ods-focus disabled:border-ods-disabled disabled:text-ods-text-secondary disabled:bg-ods-disabled disabled:cursor-not-allowed disabled:shadow-none",
         // Transparent variant for ghost-like actions (ButtonFull transparent)
-        transparent: "bg-transparent text-ods-text-primary hover:bg-ods-bg-hover active:bg-ods-bg-active focus-visible:ring-2 focus-visible:ring-ods-focus disabled:text-ods-text-disabled !w-auto whitespace-nowrap !text-base",
+        transparent: "bg-transparent text-ods-text-primary hover:bg-ods-bg-hover active:bg-ods-bg-active focus-visible:ring-2 focus-visible:ring-ods-focus disabled:text-ods-text-secondary !w-auto whitespace-nowrap !text-base",
         // Ghost variant for subtle interactions
-        ghost: "bg-transparent text-ods-text-primary hover:bg-ods-bg-hover active:bg-ods-bg-active focus-visible:ring-2 focus-visible:ring-ods-focus disabled:text-ods-text-disabled !w-auto whitespace-nowrap !text-base",
+        ghost: "bg-transparent text-ods-text-primary hover:bg-ods-bg-hover active:bg-ods-bg-active focus-visible:ring-2 focus-visible:ring-ods-focus disabled:text-ods-text-secondary !w-auto whitespace-nowrap !text-base",
         // Ghost navigation variant - left-aligned for navigation menus
-        "ghost-nav": "bg-transparent text-ods-text-primary hover:bg-ods-bg-hover active:bg-ods-bg-active focus-visible:ring-2 focus-visible:ring-ods-focus disabled:text-ods-text-disabled justify-start !w-auto whitespace-nowrap !text-base",
+        "ghost-nav": "bg-transparent text-ods-text-primary hover:bg-ods-bg-hover active:bg-ods-bg-active focus-visible:ring-2 focus-visible:ring-ods-focus disabled:text-ods-text-secondary justify-start !w-auto whitespace-nowrap !text-base",
         // Link variant for text-like buttons
-        link: "bg-transparent text-ods-link underline-offset-4 hover:underline hover:text-ods-link-hover focus-visible:ring-2 focus-visible:ring-ods-focus disabled:text-ods-text-disabled text-[12px] md:text-[14px]",
+        link: "bg-transparent text-ods-link underline-offset-4 hover:underline hover:text-ods-link-hover focus-visible:ring-2 focus-visible:ring-ods-focus disabled:text-ods-text-secondary text-[12px] md:text-[14px]",
         // Search variant for search containers
-        search: "bg-ods-card border border-ods-border text-ods-text-primary hover:bg-ods-bg-hover hover:border-ods-border focus-visible:ring-2 focus-visible:ring-ods-focus disabled:bg-ods-disabled disabled:text-ods-text-disabled",
+        search: "bg-ods-card border border-ods-border text-ods-text-primary hover:bg-ods-bg-hover hover:border-ods-border focus-visible:ring-2 focus-visible:ring-ods-focus disabled:bg-ods-disabled disabled:text-ods-text-secondary",
         // Special variant for submit product buttons (header usage)
-        submit: "border border-ods-border bg-transparent text-ods-text-primary hover:bg-ods-bg-hover focus:bg-ods-bg-hover focus-visible:ring-2 focus-visible:ring-ods-focus disabled:border-ods-disabled disabled:text-ods-text-disabled",
+        submit: "border border-ods-border bg-transparent text-ods-text-primary hover:bg-ods-bg-hover focus:bg-ods-bg-hover focus-visible:ring-2 focus-visible:ring-ods-focus disabled:border-ods-disabled disabled:text-ods-text-secondary",
         // Destructive variant for dangerous actions
-        destructive: "bg-ods-error text-ods-text-on-dark hover:bg-ods-error-hover active:bg-ods-error-active focus-visible:ring-2 focus-visible:ring-ods-focus disabled:bg-ods-disabled disabled:text-ods-text-disabled",
+        destructive: "bg-ods-error text-black hover:bg-ods-error-hover active:bg-ods-error-active focus-visible:ring-2 focus-visible:ring-ods-focus disabled:bg-ods-disabled disabled:text-ods-text-secondary",
         // Success variant for positive actions
-        success: "bg-ods-success text-ods-text-on-dark hover:bg-ods-success-hover active:bg-ods-success-active focus-visible:ring-2 focus-visible:ring-ods-focus disabled:bg-ods-disabled disabled:text-ods-text-disabled",
+        success: "bg-ods-success text-ods-text-on-dark hover:bg-ods-success-hover active:bg-ods-success-active focus-visible:ring-2 focus-visible:ring-ods-focus disabled:bg-ods-disabled disabled:text-ods-text-secondary",
         // Warning variant for cautionary actions
-        warning: "bg-ods-warning text-ods-text-on-accent hover:bg-ods-warning-hover active:bg-ods-warning-active focus-visible:ring-2 focus-visible:ring-ods-focus disabled:bg-ods-disabled disabled:text-ods-text-disabled",
+        warning: "bg-ods-warning text-ods-text-on-accent hover:bg-ods-warning-hover active:bg-ods-warning-active focus-visible:ring-2 focus-visible:ring-ods-focus disabled:bg-ods-disabled disabled:text-ods-text-secondary",
         // Info variant for informational actions
-        info: "bg-ods-info text-ods-text-on-dark hover:bg-ods-info-hover active:bg-ods-info-active focus-visible:ring-2 focus-visible:ring-ods-focus disabled:bg-ods-disabled disabled:text-ods-text-disabled",
+        info: "bg-ods-info text-ods-text-on-dark hover:bg-ods-info-hover active:bg-ods-info-active focus-visible:ring-2 focus-visible:ring-ods-focus disabled:bg-ods-disabled disabled:text-ods-text-secondary",
         // Flamingo primary variant - pink background with black text
-        "flamingo-primary": "bg-[var(--ods-flamingo-pink-base)] text-[var(--ods-system-greys-black)] hover:bg-[var(--ods-flamingo-pink-hover)] active:bg-[var(--ods-flamingo-pink-active)] focus-visible:ring-2 focus-visible:ring-ods-focus disabled:bg-ods-disabled disabled:text-ods-text-disabled",
+        "flamingo-primary": "bg-[var(--ods-flamingo-pink-base)] text-[var(--ods-system-greys-black)] hover:bg-[var(--ods-flamingo-pink-hover)] active:bg-[var(--ods-flamingo-pink-active)] focus-visible:ring-2 focus-visible:ring-ods-focus disabled:bg-ods-disabled disabled:text-ods-text-secondary",
         // Flamingo secondary variant - dark background with border
-        "flamingo-secondary": "bg-[var(--ods-system-greys-black)] border border-[var(--ods-system-greys-soft-grey)] text-[var(--ods-system-greys-white)] hover:border-[var(--ods-system-greys-grey)] hover:bg-[var(--ods-system-greys-dark-grey)] active:bg-[var(--ods-system-greys-grey)] focus-visible:ring-2 focus-visible:ring-ods-focus disabled:bg-ods-disabled disabled:text-ods-text-disabled",
+        "flamingo-secondary": "bg-[var(--ods-system-greys-black)] border border-[var(--ods-system-greys-soft-grey)] text-[var(--ods-system-greys-white)] hover:border-[var(--ods-system-greys-grey)] hover:bg-[var(--ods-system-greys-dark-grey)] active:bg-[var(--ods-system-greys-grey)] focus-visible:ring-2 focus-visible:ring-ods-focus disabled:bg-ods-disabled disabled:text-ods-text-secondary",
         // Footer link variant - minimal spacing, left-aligned, no gap
         "footer-link": "!gap-0 !p-0 !h-auto bg-transparent text-ods-text-primary hover:text-ods-accent-primary transition-colors justify-start font-body font-medium !text-md md:!text-md leading-[1.33] mb-1",
         // Filter variant - for category/filter buttons in sidebars
@@ -62,7 +62,7 @@ const buttonVariants = cva(
         "device-action": "bg-ods-card border border-ods-border hover:bg-ods-bg-hover text-ods-text-primary px-4 py-3 rounded-[6px] text-h3 tracking-[-0.36px] disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-ods-card disabled:text-ods-text-secondary",
         card: "bg-ods-card border border-ods-border hover:bg-ods-bg-hover text-ods-text-primary px-4 py-3 rounded-[6px] text-h3 tracking-[-0.36px] disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-ods-card disabled:text-ods-text-secondary",
         // Ghost subtle variant - no background change on hover/click, only text/icon turns white
-        "ghost-subtle": "bg-transparent text-ods-text-secondary hover:bg-transparent hover:text-white active:bg-transparent active:text-white [&_svg]:transition-colors [&_svg]:text-ods-text-secondary [&:hover_svg]:text-white [&:active_svg]:text-white focus-visible:ring-2 focus-visible:ring-ods-focus disabled:text-ods-text-disabled !w-auto whitespace-nowrap !text-base cursor-pointer transition-colors",
+        "ghost-subtle": "bg-transparent text-ods-text-secondary hover:bg-transparent hover:text-white active:bg-transparent active:text-white [&_svg]:transition-colors [&_svg]:text-ods-text-secondary [&:hover_svg]:text-white [&:active_svg]:text-white focus-visible:ring-2 focus-visible:ring-ods-focus disabled:text-ods-text-secondary !w-auto whitespace-nowrap !text-base cursor-pointer transition-colors",
       },
       size: {
         // Small size for secondary actions
