@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef, useEffect } from 'react'
+import { useCallback, useRef } from 'react'
 import {
   type ChunkData,
   type BufferedChunk,
@@ -15,8 +15,8 @@ import {
 /**
  * Creates a unique key for sequence tracking
  */
-function makeSeqKey(messageType: NatsMessageType, sequenceId: number): string {
-  return `${messageType}:${sequenceId}`
+function makeSeqKey(messageType: NatsMessageType, chunkType: string, sequenceId: number): string {
+  return `${messageType}:${chunkType}:${sequenceId}`
 }
 
 /**
@@ -62,23 +62,24 @@ export function useChunkCatchup({
 }: UseChunkCatchupOptions): UseChunkCatchupReturn {
   const processedSequenceKeys = useRef<Set<string>>(new Set())
   const lastSequenceId = useRef<number | null>(null)
-  
+
   const fetchingInProgress = useRef(false)
   const lastFetchParams = useRef<{ dialogId: string; fromSequenceId?: number | null } | null>(null)
-  
+
   // Buffer for NATS chunks that arrive during catchup
   const chunkBuffer = useRef<BufferedChunk[]>([])
   const bufferUntilInitialCatchupComplete = useRef(false)
   const hasCompletedInitialCatchup = useRef(false)
-  
-  const onChunkReceivedRef = useRef(onChunkReceived)
-  useEffect(() => {
-    onChunkReceivedRef.current = onChunkReceived
-  }, [onChunkReceived])
 
-  /**
-   * Process a chunk, optionally buffering it if catchup is in progress
-   */
+  const dialogIdRef = useRef(dialogId)
+  dialogIdRef.current = dialogId
+  const chatTypesRef = useRef(chatTypes)
+  chatTypesRef.current = chatTypes
+  const fetchChunksRef = useRef(fetchChunks)
+  fetchChunksRef.current = fetchChunks
+  const onChunkReceivedRef = useRef(onChunkReceived)
+  onChunkReceivedRef.current = onChunkReceived
+
   const processChunk = useCallback((
     chunk: ChunkData,
     messageType: NatsMessageType,
@@ -88,13 +89,13 @@ export function useChunkCatchup({
       chunkBuffer.current.push({ chunk, messageType })
       return true
     }
-    
+
     if (chunk.sequenceId !== undefined && chunk.sequenceId !== null) {
+      const chunkType = typeof chunk.type === 'string' ? chunk.type : ''
+      processedSequenceKeys.current.add(makeSeqKey(messageType, chunkType, chunk.sequenceId))
       lastSequenceId.current = chunk.sequenceId
     }
-    
-    // Don't check for duplicates here - let all chunks through
-    // Deduplication only happens during catchup merge
+
     onChunkReceivedRef.current(chunk, messageType)
     return true
   }, [])
@@ -122,34 +123,38 @@ export function useChunkCatchup({
    * Fetch and process chunks from the API
    */
   const catchUpChunks = useCallback(async (fromSequenceId?: number | null) => {
+    const dialogId = dialogIdRef.current
+    const chatTypes = chatTypesRef.current
+    const fetchChunks = fetchChunksRef.current
+
     if (!dialogId) {
       return
     }
-    
+
     if (hasCompletedInitialCatchup.current) {
       return
     }
-    
+
     if (fetchingInProgress.current) {
       return
     }
-    
+
     if (lastFetchParams.current &&
         lastFetchParams.current.dialogId === dialogId &&
         lastFetchParams.current.fromSequenceId === fromSequenceId) {
       return
     }
-    
+
     if (!fetchChunks) {
       bufferUntilInitialCatchupComplete.current = false
       hasCompletedInitialCatchup.current = true
       flushBufferedRealtimeChunks()
       return
     }
-    
+
     fetchingInProgress.current = true
     lastFetchParams.current = { dialogId, fromSequenceId }
-    
+
     try {
       // Fetch chunks for all configured chat types
       const chunkPromises = chatTypes.map(async (chatType) => {
@@ -240,7 +245,10 @@ export function useChunkCatchup({
       // Process the chunks
       chunksToProcess.forEach(({ chunk, messageType }) => {
         if (chunk.sequenceId !== undefined && chunk.sequenceId !== null) {
-          processedSequenceKeys.current.add(makeSeqKey(messageType, chunk.sequenceId))
+          const chunkType = typeof chunk.type === 'string' ? chunk.type : ''
+          const key = makeSeqKey(messageType, chunkType, chunk.sequenceId)
+          if (processedSequenceKeys.current.has(key)) return
+          processedSequenceKeys.current.add(key)
           lastSequenceId.current = chunk.sequenceId
         }
         onChunkReceivedRef.current(chunk, messageType)
@@ -259,7 +267,7 @@ export function useChunkCatchup({
         flushBufferedRealtimeChunks()
       }
     }
-  }, [dialogId, chatTypes, fetchChunks, flushBufferedRealtimeChunks])
+  }, [flushBufferedRealtimeChunks])
 
   /**
    * Reset all tracking state
@@ -293,14 +301,14 @@ export function useChunkCatchup({
    * Use after reconnection to fetch any messages missed during the disconnect.
    */
   const resetAndCatchUp = useCallback(async () => {
-    if (!dialogId) return
+    if (!dialogIdRef.current) return
     const fromSeq = lastSequenceId.current
     hasCompletedInitialCatchup.current = false
     lastFetchParams.current = null
     bufferUntilInitialCatchupComplete.current = true
     chunkBuffer.current = []
     await catchUpChunks(fromSeq)
-  }, [dialogId, catchUpChunks])
+  }, [catchUpChunks])
 
   return {
     catchUpChunks,

@@ -1,48 +1,37 @@
 import { toast as sonnerToast } from 'sonner'
+import { showToast, type ToastVariant } from '../components/ui/toaster'
 
 export interface ToastOptions {
   title?: string
   description?: string
-  variant?: 'default' | 'success' | 'destructive' | 'info' | 'warning'
+  variant?: 'default' | 'success' | 'destructive' | 'info' | 'warning' | 'error'
   duration?: number
+  dismissible?: boolean
+}
+
+const normalizeVariant = (variant: ToastOptions['variant']): ToastVariant => {
+  if (variant === 'destructive') return 'error'
+  if (!variant) return 'default'
+  return variant
 }
 
 export const toast = (options: ToastOptions | string) => {
   if (typeof options === 'string') {
-    sonnerToast(options)
-    return
+    return showToast({ title: options })
   }
 
-  const { title, description, variant = 'default', duration } = options
-
-  const message = title || ''
-  const opts = {
+  const { title, description, variant, duration, dismissible } = options
+  return showToast({
+    title,
     description,
+    variant: normalizeVariant(variant),
     duration,
-  }
-
-  switch (variant) {
-    case 'success':
-      sonnerToast.success(message, opts)
-      break
-    case 'destructive':
-      sonnerToast.error(message, opts)
-      break
-    case 'info':
-      sonnerToast.info(message, opts)
-      break
-    case 'warning':
-      sonnerToast.warning(message, opts)
-      break
-    default:
-      sonnerToast(message, opts)
-  }
+    dismissible,
+  })
 }
 
-export const useToast = () => {
-  return {
-    toast,
-    // Direct access to sonner methods if needed
-    ...sonnerToast,
-  }
-}
+export const useToast = () => ({
+  toast,
+  dismiss: sonnerToast.dismiss,
+  promise: sonnerToast.promise,
+})

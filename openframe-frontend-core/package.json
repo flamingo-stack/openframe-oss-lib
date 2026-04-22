@@ -79,6 +79,7 @@
       "default": "./dist/utils/index.js"
     },
     "./styles": {
+      "types": "./src/styles/index.d.ts",
       "import": "./src/styles/index.css",
       "require": "./src/styles/index.css",
       "default": "./src/styles/index.css"
