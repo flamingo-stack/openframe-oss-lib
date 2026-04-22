@@ -11,14 +11,24 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
   ({ className, onSend, onStop, sending = false, awaitingResponse = false, placeholder = "Enter your Request...", reserveAvatarOffset = true, disabled = false, autoFocus = false, ...props }, ref) => {
     const [value, setValue] = useState('')
     const textareaRef = useRef<HTMLTextAreaElement>(null)
+    const shouldRefocusRef = useRef(false)
+    const prevSendingRef = useRef(sending)
+    const prevAwaitingResponseRef = useRef(awaitingResponse)
 
     useImperativeHandle(ref, () => textareaRef.current!)
 
+    const focusTextarea = useCallback(() => {
+      if (disabled) return
+      const el = textareaRef.current
+      if (!el || el.disabled) return
+      el.focus()
+    }, [disabled])
+
     useEffect(() => {
-      if (autoFocus && textareaRef.current) {
-        textareaRef.current.focus()
+      if (autoFocus) {
+        focusTextarea()
       }
-    }, [autoFocus])
+    }, [autoFocus, focusTextarea])
 
     const handleSubmit = useCallback(() => {
       const message = value.trim()
@@ -29,8 +39,11 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         if (textareaRef.current) {
           textareaRef.current.style.height = 'auto'
         }
+
+        shouldRefocusRef.current = true
+        focusTextarea()
       }
-    }, [value, sending, disabled, onSend])
+    }, [value, sending, disabled, onSend, focusTextarea])
 
     const handleKeyDown = useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -55,6 +68,25 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         setIsStopping(false)
       }
     }, [sending])
+
+    useEffect(() => {
+      const wasSending = prevSendingRef.current
+      prevSendingRef.current = sending
+      if (wasSending && !sending && shouldRefocusRef.current && !awaitingResponse && !disabled) {
+        shouldRefocusRef.current = false
+        focusTextarea()
+      }
+    }, [sending, awaitingResponse, disabled, focusTextarea])
+
+    useEffect(() => {
+      const wasAwaiting = prevAwaitingResponseRef.current
+      prevAwaitingResponseRef.current = awaitingResponse
+      if (wasAwaiting && !awaitingResponse && shouldRefocusRef.current && !disabled) {
+        shouldRefocusRef.current = false
+        const id = requestAnimationFrame(() => focusTextarea())
+        return () => cancelAnimationFrame(id)
+      }
+    }, [awaitingResponse, disabled, focusTextarea])
 
     const handleStop = useCallback(async () => {
       if (!onStop || isStopping) return

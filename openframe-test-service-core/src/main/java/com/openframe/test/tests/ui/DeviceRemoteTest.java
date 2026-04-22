@@ -15,6 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 
 @Tag("device")
+@Tag("remote")
 class DeviceRemoteTest extends BaseUITest {
 
     DeviceDetailsPage deviceDetailsPage;
