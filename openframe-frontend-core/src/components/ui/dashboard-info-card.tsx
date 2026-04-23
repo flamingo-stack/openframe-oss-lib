@@ -2,8 +2,9 @@ import type * as React from 'react'
 import Link from 'next/link'
 import { cn } from '../../utils/cn'
 import { QuestionCircleIcon } from '../icons-v2-generated/signs-and-symbols/question-circle-icon'
-import { CircularProgress, type CircularProgressVariant } from './circular-progress'
+import { CircularProgress, type CircularProgressOverflow, type CircularProgressVariant } from './circular-progress'
 import { FloatingTooltip } from './floating-tooltip'
+import { Tag } from './tag'
 
 export interface DashboardInfoCardProps {
   title: string
@@ -11,6 +12,12 @@ export interface DashboardInfoCardProps {
   percentage?: number
   showProgress?: boolean
   progressVariant?: CircularProgressVariant
+  /**
+   * How the progress ring treats values over 100. Forwarded to `CircularProgress`.
+   * Default: `'clamp'` — existing behavior (clamped to 0–100).
+   * Use `'wrap'` for overage/overflow semantics (excess rendered as a red arc).
+   */
+  progressOverflow?: CircularProgressOverflow
   className?: string
   /**
    * Navigation URL — renders the card as a Next.js Link
@@ -29,6 +36,7 @@ export function DashboardInfoCard({
   percentage,
   showProgress = false,
   progressVariant,
+  progressOverflow,
   className,
   href,
   tooltip,
@@ -53,9 +61,13 @@ export function DashboardInfoCard({
             {formattedValue}
           </p>
           {percentage !== undefined && (
-            <p className="text-h4 text-ods-text-secondary">
-              ({percentage}%)
-            </p>
+            progressVariant === 'warning' || progressVariant === 'error' ? (
+              <Tag variant={progressVariant} label={`${percentage}%`} />
+            ) : (
+              <p className="text-h4 text-ods-text-secondary">
+                ({percentage}%)
+              </p>
+            )
           )}
           {tooltip && (
             <FloatingTooltip content={tooltip} side="top">
@@ -72,6 +84,7 @@ export function DashboardInfoCard({
         <CircularProgress
           percentage={percentage}
           variant={progressVariant}
+          overflow={progressOverflow}
           showLabel={false}
         />
       )}

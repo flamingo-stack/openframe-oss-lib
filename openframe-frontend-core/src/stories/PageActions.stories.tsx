@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { fn } from 'storybook/test'
-import { ColorsIcon, PlusCircleIcon, PlayCircleIcon, CheckCircleIcon, PenEditIcon, CalendarDaysIcon, VialIcon } from '../components/icons-v2-generated'
+import { ColorsIcon, PlusCircleIcon, PlayCircleIcon, CheckCircleIcon, PenEditIcon, CalendarDaysIcon, VialIcon, TerminalIcon, TrashIcon } from '../components/icons-v2-generated'
 import { PageActions } from '../components/ui/page-actions'
 
 const meta = {
@@ -374,6 +374,103 @@ export const MobileOnlyActions: Story = {
       description: {
         story:
           'Use the `showOnlyMobile` prop to hide specific actions on desktop. They will still appear in the mobile menu or bottom bar.',
+      },
+    },
+  },
+}
+
+/**
+ * Link actions — any action can render as a Next.js `<Link>` by providing `href`.
+ * The `<a>` element lands in the DOM (crawler-visible) and clicking routes
+ * client-side. Mix freely with onClick-only actions; use `openInNewTab` for
+ * external links.
+ */
+export const LinkActions: Story = {
+  args: {
+    variant: 'menu-primary',
+    actions: [
+      {
+        label: 'Open Docs',
+        href: '/docs',
+        variant: 'primary',
+        icon: <PlayCircleIcon size={24} />,
+      },
+    ],
+    menuActions: [
+      {
+        label: 'GitHub',
+        href: 'https://github.com/flamingo',
+        openInNewTab: true,
+        icon: <PenEditIcon size={24} />,
+      },
+      {
+        label: 'Changelog',
+        href: '/changelog',
+        icon: <CalendarDaysIcon size={24} />,
+      },
+      {
+        label: 'Run Diagnostics',
+        onClick: fn(),
+        icon: <VialIcon size={24} />,
+      },
+    ],
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Primary action navigates to `/docs` via Next Link. Menu has two link actions (internal + external in new tab) and one onClick-only action. Inspect the DOM — link actions render as real `<a href>` inside the dropdown menu.',
+      },
+    },
+  },
+}
+
+/**
+ * Split button — a primary action with a chevron that opens a dropdown of
+ * alternatives. Matches the Figma device-page pattern where "Remote Shell"
+ * sits next to a "..." menu, and the chevron reveals CMD / Power Shell.
+ *
+ * On mobile everything collapses into a single "..." menu.
+ */
+export const SplitButtonWithMenu: Story = {
+  args: {
+    variant: 'menu-primary',
+    actions: [
+      {
+        label: 'Remote Shell',
+        dropdownItems: [
+          {
+            label: 'CMD',
+            onClick: fn(),
+            icon: <TerminalIcon size={24} />,
+          },
+          {
+            label: 'Power Shell',
+            onClick: fn(),
+            icon: <TerminalIcon size={24} />,
+          },
+        ],
+      },
+    ],
+    menuActions: [
+      {
+        label: 'Edit Device',
+        onClick: fn(),
+        icon: <PenEditIcon size={24} />,
+      },
+      {
+        label: 'Delete Device',
+        onClick: fn(),
+        icon: <TrashIcon size={24} />,
+        danger: true,
+      },
+    ],
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Provide `dropdownItems` on a primary action to render a split button. The main label fires `onClick`; the chevron opens a dropdown of alternatives. On mobile the main action and its dropdown items are flattened into the "..." menu alongside `menuActions`.',
       },
     },
   },
