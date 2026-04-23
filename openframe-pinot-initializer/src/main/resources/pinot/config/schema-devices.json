@@ -3,6 +3,11 @@
   "primaryKeyColumns": ["machineId"],
   "dimensionFieldSpecs": [
     {
+      "name": "tenantId",
+      "dataType": "STRING",
+      "singleValueField": true
+    },
+    {
       "name": "machineId",
       "dataType": "STRING",
       "singleValueField": true

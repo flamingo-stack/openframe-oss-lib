@@ -2,6 +2,7 @@
   "schemaName": "${pinot.tables.logs.name}",
   "primaryKeyColumns": ["toolEventId"],
   "dimensionFieldSpecs": [
+    { "name": "tenantId",           "dataType": "STRING", "singleValueField": true },
     { "name": "toolEventId",        "dataType": "STRING", "singleValueField": true },
     { "name": "userId",             "dataType": "STRING", "singleValueField": true },
     { "name": "deviceId",           "dataType": "STRING", "singleValueField": true },

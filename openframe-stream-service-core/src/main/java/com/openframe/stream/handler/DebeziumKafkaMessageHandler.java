@@ -1,6 +1,7 @@
 package com.openframe.stream.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.openframe.data.service.TenantIdProvider;
 import com.openframe.kafka.producer.retry.OssTenantRetryingKafkaProducer;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
@@ -11,6 +12,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.util.concurrent.TimeUnit;
+
 @Slf4j
 @Component
 public class DebeziumKafkaMessageHandler extends DebeziumMessageHandler<IntegratedToolEvent, DeserializedDebeziumMessage> {
@@ -18,11 +21,22 @@ public class DebeziumKafkaMessageHandler extends DebeziumMessageHandler<Integrat
     @Value("${openframe.oss-tenant.kafka.topics.outbound.integrated-tool-events}")
     private String topic;
 
-    protected final OssTenantRetryingKafkaProducer kafkaProducer;
+    /**
+     * Retention window in days for incoming events. Messages older than this are skipped —
+     * protects against stale Kafka messages (e.g. from a previous customer on a recycled cluster)
+     * and matches Pinot's logs table retention.
+     */
+    @Value("${openframe.stream.event.retention-days:60}")
+    private int retentionDays;
 
-    public DebeziumKafkaMessageHandler(OssTenantRetryingKafkaProducer kafkaProducer, ObjectMapper objectMapper) {
+    protected final OssTenantRetryingKafkaProducer kafkaProducer;
+    private final TenantIdProvider tenantIdProvider;
+
+    public DebeziumKafkaMessageHandler(OssTenantRetryingKafkaProducer kafkaProducer, ObjectMapper objectMapper,
+                                       TenantIdProvider tenantIdProvider) {
         super(objectMapper);
         this.kafkaProducer = kafkaProducer;
+        this.tenantIdProvider = tenantIdProvider;
     }
 
     @Override
@@ -43,6 +57,7 @@ public class DebeziumKafkaMessageHandler extends DebeziumMessageHandler<Integrat
                     ? debeziumMessage.getUnifiedEventType().getSummary()
                     : debeziumMessage.getMessage() );
             message.setEventTimestamp(debeziumMessage.getEventTimestamp());
+            message.setTenantId(tenantIdProvider.getTenantId());
 
         } catch (Exception e) {
             log.error("Error processing Kafka message", e);
