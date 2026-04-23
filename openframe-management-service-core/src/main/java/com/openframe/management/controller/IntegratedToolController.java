@@ -4,7 +4,7 @@ import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.IntegratedToolService;
 import com.openframe.management.hook.IntegratedToolPostSaveHook;
-import com.openframe.management.service.DebeziumService;
+import com.openframe.debezium.service.DebeziumService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

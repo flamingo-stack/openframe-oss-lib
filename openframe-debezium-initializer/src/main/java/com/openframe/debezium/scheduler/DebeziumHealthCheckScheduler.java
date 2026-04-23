@@ -1,10 +1,10 @@
-package com.openframe.management.scheduler;
+package com.openframe.debezium.scheduler;
 
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.service.IntegratedToolService;
 import com.openframe.data.service.TenantIdProvider;
-import com.openframe.management.service.ConnectorRecoveryManager;
-import com.openframe.management.service.DebeziumService;
+import com.openframe.debezium.service.ConnectorRecoveryManager;
+import com.openframe.debezium.service.DebeziumService;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.beans.factory.annotation.Autowired;

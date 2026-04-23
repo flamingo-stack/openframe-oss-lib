@@ -1,7 +1,7 @@
-package com.openframe.management.service;
+package com.openframe.debezium.service;
 
 import com.openframe.data.document.tool.IntegratedTool;
-import com.openframe.management.dto.debezium.ConnectorStatus;
+import com.openframe.debezium.dto.ConnectorStatus;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
