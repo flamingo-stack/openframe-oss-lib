@@ -142,56 +142,62 @@ export function Header({ config, platform }: HeaderProps) {
             {item.label}
           </Button>
           
-          {isOpen && (
-            <div
-              ref={(el) => { dropdownRefs.current[item.id] = el }}
-              className={cn(
-                "absolute top-full left-0 mt-1",
-                item.dropdownClassName ? "" : "bg-ods-card border border-ods-border",
-                "rounded-lg shadow-xl z-[9999]",
-                item.id === 'community' ? "min-w-[240px]" : "min-w-[220px]",
-                item.dropdownClassName || ''
-              )}
-            >
-              <div className="p-2">
-                {item.children.map((child, index) => (
-                  <Button 
-                    key={child.id}
-                    variant="ghost" 
-                    size="sm" 
-                    href={child.href} // Use href for navigation
-                    leftIcon={child.icon} 
-                    rightIcon={child.badge}
-                    onClick={() => {
-                      // Always close dropdown when any item is clicked
-                      setOpenDropdowns(prev => ({ ...prev, [item.id]: false }))
-                      // If there's a custom onClick, call it too
-                      if (child.onClick) {
-                        child.onClick()
-                      }
-                    }}
-                    className={cn(
-                      "flex justify-start w-full",
-                      index < (item.children?.length ?? 0) - 1 && "mb-1",
-                      "text-ods-text-primary", // All dropdown items use primary text color
-                      child.isActive && 'bg-ods-bg-hover' // Active dropdown items get gray background
-                    )}
-                    {...(child.isExternal && { isExternal: true })}
-                  >
-                    {child.label}
-                  </Button>
-                ))}
-              </div>
-              {item.dropdownContent && (
-                <>
-                  {item.showDropdownDivider !== false && <div className="h-px my-2 mx-2 bg-ods-border" />}
-                  <div className="px-2 pb-2">
-                    {item.dropdownContent}
-                  </div>
-                </>
-              )}
+          {/* Always render dropdown in DOM so crawlers see child <a> links;
+              toggle visibility via CSS. `invisible` (visibility:hidden) also
+              removes anchors from tab order and the accessibility tree. */}
+          <div
+            ref={(el) => { dropdownRefs.current[item.id] = el }}
+            aria-hidden={!isOpen}
+            className={cn(
+              "absolute top-full left-0 mt-1",
+              item.dropdownClassName ? "" : "bg-ods-card border border-ods-border",
+              "rounded-lg shadow-xl z-[9999]",
+              item.id === 'community' ? "min-w-[240px]" : "min-w-[220px]",
+              "transition-opacity duration-150",
+              isOpen
+                ? "opacity-100 visible pointer-events-auto"
+                : "opacity-0 invisible pointer-events-none",
+              item.dropdownClassName || ''
+            )}
+          >
+            <div className="p-2">
+              {item.children.map((child, index) => (
+                <Button
+                  key={child.id}
+                  variant="ghost"
+                  size="sm"
+                  href={child.href} // Use href for navigation
+                  leftIcon={child.icon}
+                  rightIcon={child.badge}
+                  onClick={() => {
+                    // Always close dropdown when any item is clicked
+                    setOpenDropdowns(prev => ({ ...prev, [item.id]: false }))
+                    // If there's a custom onClick, call it too
+                    if (child.onClick) {
+                      child.onClick()
+                    }
+                  }}
+                  className={cn(
+                    "flex justify-start w-full",
+                    index < (item.children?.length ?? 0) - 1 && "mb-1",
+                    "text-ods-text-primary", // All dropdown items use primary text color
+                    child.isActive && 'bg-ods-bg-hover' // Active dropdown items get gray background
+                  )}
+                  {...(child.isExternal && { isExternal: true })}
+                >
+                  {child.label}
+                </Button>
+              ))}
             </div>
-          )}
+            {item.dropdownContent && (
+              <>
+                {item.showDropdownDivider !== false && <div className="h-px my-2 mx-2 bg-ods-border" />}
+                <div className="px-2 pb-2">
+                  {item.dropdownContent}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )
     }
