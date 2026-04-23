@@ -40,11 +40,19 @@ export function DropdownButton({
 }: DropdownButtonProps) {
   const [open, setOpen] = React.useState(false)
 
+  const handleOpenChange = React.useCallback(
+    (next: boolean) => {
+      if (disabled) return
+      setOpen(next)
+    },
+    [disabled]
+  )
+
   return (
     <MoreActionsMenu
       items={items}
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={handleOpenChange}
       align={align}
       side={side}
       ariaLabel={ariaLabel || label}
@@ -53,6 +61,7 @@ export function DropdownButton({
           type="button"
           disabled={disabled}
           aria-label={ariaLabel || label}
+          onPointerDown={disabled ? (e) => e.preventDefault() : undefined}
           className={cn(
             'inline-flex h-12 items-stretch rounded-md border border-ods-border overflow-hidden transition-colors',
             'text-ods-text-primary',
