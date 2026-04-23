@@ -1,9 +1,9 @@
-package com.openframe.management.listener;
+package com.openframe.debezium.listener;
 
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.service.IntegratedToolService;
 import com.openframe.data.service.TenantIdProvider;
-import com.openframe.management.service.DebeziumService;
+import com.openframe.debezium.service.DebeziumService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

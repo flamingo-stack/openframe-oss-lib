@@ -1,4 +1,4 @@
-package com.openframe.management.dto.debezium;
+package com.openframe.debezium.dto;
 
 import java.time.Instant;
 
