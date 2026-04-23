@@ -266,7 +266,7 @@ const MenuItem: React.FC<MenuItemProps> = ({
 						ref={submenuRef}
 						role="menu"
 						data-actions-submenu
-						className="fixed z-[9999] min-w-[256px] bg-ods-bg border border-ods-border rounded-md shadow-xl overflow-hidden pointer-events-auto"
+						className="fixed z-[9999] min-w-[256px] bg-ods-bg border border-ods-border rounded-md shadow-xl overflow-hidden"
 						style={{
 							top: `${submenuPosition.top}px`,
 							left: `${submenuPosition.left}px`,
@@ -360,7 +360,7 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
 	);
 
 	return (
-		<DropdownMenu open={open} onOpenChange={setOpen}>
+		<DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
 			<DropdownMenuTrigger asChild>
 				{customTrigger ?? (
 					<Button
