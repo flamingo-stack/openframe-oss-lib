@@ -3,6 +3,7 @@ package com.openframe.data.service;
 import com.openframe.data.document.tenant.Tenant;
 import com.openframe.data.repository.tenant.TenantRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -17,6 +18,7 @@ import java.util.List;
  * while the pod is alive (cluster recycling destroys the pod).
  * Pre-registration calls keep hitting MongoDB until a tenant appears, then cache forever.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TenantIdProvider {
@@ -27,10 +29,18 @@ public class TenantIdProvider {
     private String fallbackTenantId;
 
     private Tenant cachedTenant;
+    private boolean fallbackLogged;
 
     public String getTenantId() {
         Tenant tenant = getCachedTenant();
-        return tenant != null ? tenant.getId() : fallbackTenantId;
+        if (tenant != null) {
+            return tenant.getId();
+        }
+        if (!fallbackLogged) {
+            log.warn("TenantIdProvider: no tenant found in MongoDB, falling back to TENANT_ID={}", fallbackTenantId);
+            fallbackLogged = true;
+        }
+        return fallbackTenantId;
     }
 
     /**
@@ -57,6 +67,7 @@ public class TenantIdProvider {
         }
         tenant = tenants.getFirst();
         cachedTenant = tenant;
+        log.info("TenantIdProvider: cached tenant from MongoDB id={} name={}", tenant.getId(), tenant.getName());
         return tenant;
     }
 }
