@@ -272,19 +272,26 @@ export const MenuPrimary: Story = {
     ],
     menuActions: [
       {
-        label: 'Edit Script',
-        onClick: fn(),
-        icon: <PenEditIcon size={24} />,
-      },
-      {
-        label: 'Schedule Script',
-        onClick: fn(),
-        icon: <CalendarDaysIcon size={24} />,
-      },
-      {
-        label: 'Test Script',
-        onClick: fn(),
-        icon: <VialIcon size={24} />,
+        items: [
+          {
+            id: 'edit-script',
+            label: 'Edit Script',
+            onClick: fn(),
+            icon: <PenEditIcon size={24} />,
+          },
+          {
+            id: 'schedule-script',
+            label: 'Schedule Script',
+            onClick: fn(),
+            icon: <CalendarDaysIcon size={24} />,
+          },
+          {
+            id: 'test-script',
+            label: 'Test Script',
+            onClick: fn(),
+            icon: <VialIcon size={24} />,
+          },
+        ],
       },
     ],
   },
@@ -306,9 +313,13 @@ export const MenuPrimarySingleAction: Story = {
     ],
     menuActions: [
       {
-        label: 'Delete',
-        onClick: fn(),
-        danger: true,
+        items: [
+          {
+            id: 'delete',
+            label: 'Delete',
+            onClick: fn(),
+          },
+        ],
       },
     ],
   },
@@ -330,14 +341,20 @@ export const MenuPrimaryLoading: Story = {
     ],
     menuActions: [
       {
-        label: 'Edit Script',
-        onClick: fn(),
-        icon: <PenEditIcon size={24} />,
-      },
-      {
-        label: 'Schedule Script',
-        onClick: fn(),
-        icon: <CalendarDaysIcon size={24} />,
+        items: [
+          {
+            id: 'edit-script',
+            label: 'Edit Script',
+            onClick: fn(),
+            icon: <PenEditIcon size={24} />,
+          },
+          {
+            id: 'schedule-script',
+            label: 'Schedule Script',
+            onClick: fn(),
+            icon: <CalendarDaysIcon size={24} />,
+          },
+        ],
       },
     ],
   },
@@ -398,20 +415,26 @@ export const LinkActions: Story = {
     ],
     menuActions: [
       {
-        label: 'GitHub',
-        href: 'https://github.com/flamingo',
-        openInNewTab: true,
-        icon: <PenEditIcon size={24} />,
-      },
-      {
-        label: 'Changelog',
-        href: '/changelog',
-        icon: <CalendarDaysIcon size={24} />,
-      },
-      {
-        label: 'Run Diagnostics',
-        onClick: fn(),
-        icon: <VialIcon size={24} />,
+        items: [
+          {
+            id: 'github',
+            label: 'GitHub',
+            href: 'https://github.com/flamingo',
+            icon: <PenEditIcon size={24} />,
+          },
+          {
+            id: 'changelog',
+            label: 'Changelog',
+            href: '/changelog',
+            icon: <CalendarDaysIcon size={24} />,
+          },
+          {
+            id: 'run-diagnostics',
+            label: 'Run Diagnostics',
+            onClick: fn(),
+            icon: <VialIcon size={24} />,
+          },
+        ],
       },
     ],
   },
@@ -438,13 +461,16 @@ export const SplitButtonWithMenu: Story = {
     actions: [
       {
         label: 'Remote Shell',
-        dropdownItems: [
+        variant: 'card',
+        submenu: [
           {
+            id: 'cmd',
             label: 'CMD',
             onClick: fn(),
             icon: <TerminalIcon size={24} />,
           },
           {
+            id: 'power-shell',
             label: 'Power Shell',
             onClick: fn(),
             icon: <TerminalIcon size={24} />,
@@ -454,15 +480,20 @@ export const SplitButtonWithMenu: Story = {
     ],
     menuActions: [
       {
-        label: 'Edit Device',
-        onClick: fn(),
-        icon: <PenEditIcon size={24} />,
-      },
-      {
-        label: 'Delete Device',
-        onClick: fn(),
-        icon: <TrashIcon size={24} />,
-        danger: true,
+        items: [
+          {
+            id: 'edit-device',
+            label: 'Edit Device',
+            onClick: fn(),
+            icon: <PenEditIcon size={24} />,
+          },
+          {
+            id: 'delete-device',
+            label: 'Delete Device',
+            onClick: fn(),
+            icon: <TrashIcon size={24} />,
+          },
+        ],
       },
     ],
   },
@@ -470,7 +501,7 @@ export const SplitButtonWithMenu: Story = {
     docs: {
       description: {
         story:
-          'Provide `dropdownItems` on a primary action to render a split button. The main label fires `onClick`; the chevron opens a dropdown of alternatives. On mobile the main action and its dropdown items are flattened into the "..." menu alongside `menuActions`.',
+          'Provide `submenu` on an action to render a split button with a chevron that opens a dropdown of alternatives. On mobile the submenu items are flattened into the "..." menu alongside `menuActions`.',
       },
     },
   },
