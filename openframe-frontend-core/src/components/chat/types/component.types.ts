@@ -14,6 +14,12 @@ export interface ChatContainerProps extends HTMLAttributes<HTMLDivElement> {
 
 // ========== Chat Header Props ==========
 
+export interface ChatHeaderTicketInfo {
+  title: React.ReactNode
+  meta?: React.ReactNode
+  status?: string
+}
+
 export interface ChatHeaderProps extends HTMLAttributes<HTMLDivElement> {
   userName?: string
   userTitle?: string
@@ -22,10 +28,12 @@ export interface ChatHeaderProps extends HTMLAttributes<HTMLDivElement> {
   onSettingsClick?: () => void
   onNewChat?: () => void
   onClose?: () => void
+  onBack?: () => void
   showNewChat?: boolean
   connectionStatus?: ConnectionStatus
   serverUrl?: string | null
   headerActions?: React.ReactNode
+  ticketInfo?: ChatHeaderTicketInfo
 }
 
 // ========== Connection Indicator Props ==========

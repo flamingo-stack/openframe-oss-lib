@@ -4,7 +4,6 @@ import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
 import { ExternalLink } from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import React from "react"
 
 import { cn } from "../../utils/cn"
@@ -61,6 +60,12 @@ const buttonVariants = cva(
         // Device action variant - for device detail page action buttons
         "device-action": "bg-ods-card border border-ods-border hover:bg-ods-bg-hover text-ods-text-primary px-4 py-3 rounded-[6px] text-h3 tracking-[-0.36px] disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-ods-card disabled:text-ods-text-secondary",
         card: "bg-ods-card border border-ods-border hover:bg-ods-bg-hover text-ods-text-primary px-4 py-3 rounded-[6px] text-h3 tracking-[-0.36px] disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-ods-card disabled:text-ods-text-secondary",
+        // Split-action variant — card-styled trigger for a label + chevron
+        // split button. The rightIcon wrapper (last child) becomes a stretched
+        // "chevron section" with a full-height divider on its left edge, so
+        // the trigger visually reads as two linked surfaces inside one click
+        // target. Used by PageActions for `submenu` actions.
+        "split-action": "bg-ods-card border border-ods-border hover:bg-ods-bg-hover text-ods-text-primary rounded-[6px] text-h3 tracking-[-0.36px] !h-12 !pl-4 !pr-0 !py-0 !gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-ods-card disabled:text-ods-text-secondary [&>span:last-child]:self-stretch [&>span:last-child]:flex [&>span:last-child]:items-center [&>span:last-child]:border-l [&>span:last-child]:border-ods-border [&>span:last-child]:px-3",
         // Ghost subtle variant - no background change on hover/click, only text/icon turns white
         "ghost-subtle": "bg-transparent text-ods-text-secondary hover:bg-transparent hover:text-white active:bg-transparent active:text-white [&_svg]:transition-colors [&_svg]:text-ods-text-secondary [&:hover_svg]:text-white [&:active_svg]:text-white focus-visible:ring-2 focus-visible:ring-ods-focus disabled:text-ods-text-secondary !w-auto whitespace-nowrap !text-base cursor-pointer transition-colors",
       },
@@ -68,9 +73,9 @@ const buttonVariants = cva(
         // Small size for secondary actions
         sm: "h-10 px-2 md:px-6 py-2 text-sm",
         // Default size for most buttons (ButtonFull default)
-        default: "h-12 px-2 md:px-8 py-3 text-base",
+        default: "h-12 px-2 md:px-4 py-3 text-base",
         // Large size for prominent CTAs (ButtonFull lg) - adjusted for better text/icon fit
-        lg: "min-h-[48px] px-2 md:px-8 py-3 text-base",
+        lg: "min-h-[48px] px-2 md:px-4 py-3 text-base",
         // Icon-only buttons - fixed square size on all breakpoints
         icon: "!w-11 !h-11 md:!w-12 md:!h-12 p-0 shrink-0",
         // Icon-only large buttons (like hamburger menu) - fixed square size on all breakpoints
@@ -105,10 +110,11 @@ interface ButtonProps
    */
   openInNewTab?: boolean
   /**
-   * URL for dual-mode navigation without Next.js Link prefetching.
-   * Button content navigates same-tab, external icon (showExternalLinkOnHover) opens new tab.
+   * Forwarded to next/link's `prefetch`. Pass `false` to disable prefetching
+   * (useful for dropdown/table row actions where prefetching every row is wasteful).
+   * Defaults to Next's own default (auto-prefetch on viewport).
    */
-  navigateUrl?: string
+  prefetch?: boolean
   leftIcon?: React.ReactNode
   rightIcon?: React.ReactNode
   /**
@@ -142,8 +148,7 @@ interface ButtonProps
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, href, openInNewTab = false, navigateUrl, leftIcon, rightIcon, centerIcon, loading, children, disabled, onClick, fullWidthOnMobile, alignment = 'center', showExternalLinkOnHover, noPadding, ...props }, ref) => {
-    const router = navigateUrl ? useRouter() : null
+  ({ className, variant, size, asChild = false, href, openInNewTab = false, prefetch, leftIcon, rightIcon, centerIcon, loading, children, disabled, onClick, fullWidthOnMobile, alignment = 'center', showExternalLinkOnHover, noPadding, ...props }, ref) => {
     const isDisabled = disabled || loading
 
     const isCenterIconOnly = !!centerIcon && !children && !leftIcon && !rightIcon
@@ -213,65 +218,36 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       )
     }
     
-    // When navigateUrl is provided, render dual-navigation button without prefetching
-    if (navigateUrl) {
-      const handleSameTabClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-        if (onClick) {
-          onClick(e)
-        }
-        if (!isDisabled && !e.defaultPrevented && router) {
-          router.push(navigateUrl)
-        }
-      }
-
-      const handleNewTabClick = (e: React.MouseEvent) => {
-        e.preventDefault()
-        e.stopPropagation()
-        window.open(navigateUrl, '_blank', 'noopener,noreferrer')
-      }
-
-      return (
-        <button
-          className={cn(composedClassName, showExternalLinkOnHover && 'group')}
-          ref={ref}
-          disabled={isDisabled}
-          onClick={handleSameTabClick}
-          role="link"
-          {...props}
-        >
-          {renderContent()}
-          {showExternalLinkOnHover && !isDisabled && (
-            <span
-              className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto hover:text-ods-text-primary"
-              onClick={handleNewTabClick}
-            >
-              <ExternalLink className="w-4 h-4 text-ods-text-secondary transition-colors cursor-pointer pointer-events-auto" />
-            </span>
-          )}
-        </button>
-      )
-    }
-
-    // When href is provided, render as Next.js Link for client-side navigation
+    // href → render as next/link. Native <a> gets right-click /
+    // middle-click / cmd+click for free. Pass prefetch={false} to
+    // opt out of Next's prefetch (useful for dropdown/row actions).
     if (href) {
-      // Handle onClick type conversion for Link component
-      const handleLinkClick = onClick
-        ? (e: React.MouseEvent<HTMLAnchorElement>) => {
-            onClick(e as unknown as React.MouseEvent<HTMLButtonElement>)
-          }
-        : undefined
-
-      // Handle external link icon click
       const handleExternalClick = (e: React.MouseEvent) => {
         e.preventDefault()
         e.stopPropagation()
         window.open(href, '_blank', 'noopener,noreferrer')
       }
 
+      const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+        if (isDisabled) {
+          e.preventDefault()
+          e.stopPropagation()
+          return
+        }
+        if (onClick) {
+          onClick(e as unknown as React.MouseEvent<HTMLButtonElement>)
+        }
+      }
+
       return (
         <Link
           href={href}
-          className={cn(composedClassName, showExternalLinkOnHover && 'group', isDisabled ? "pointer-events-none cursor-not-allowed opacity-50 text-ods-text-secondary" : '')}
+          prefetch={prefetch}
+          className={cn(
+            composedClassName,
+            showExternalLinkOnHover && 'group',
+            isDisabled ? 'pointer-events-none cursor-not-allowed opacity-50 text-ods-text-secondary' : ''
+          )}
           aria-disabled={isDisabled}
           tabIndex={isDisabled ? -1 : undefined}
           target={openInNewTab ? '_blank' : undefined}
@@ -284,9 +260,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
               className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto hover:text-ods-text-primary"
               onClick={handleExternalClick}
             >
-              <ExternalLink
-                className="w-4 h-4 text-ods-text-secondary transition-colors cursor-pointer pointer-events-auto"
-              />
+              <ExternalLink className="w-4 h-4 text-ods-text-secondary transition-colors cursor-pointer pointer-events-auto" />
             </span>
           )}
         </Link>

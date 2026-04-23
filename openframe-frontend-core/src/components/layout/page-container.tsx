@@ -4,7 +4,7 @@ import { ChevronLeft } from 'lucide-react'
 import React from 'react'
 import { cn } from '../../utils/cn'
 import { Button } from '../ui/button'
-import { MoreActionsItem } from '../ui/more-actions-menu'
+import type { ActionsMenuGroup } from '../ui/actions-menu'
 import { PageActions, type PageActionButton } from '../ui/page-actions'
 
 // Legacy interface for backward compatibility (layout version)
@@ -71,7 +71,7 @@ interface AdvancedPageContainerProps {
   /**
    * Page action menu items configuration
    */
-  menuActions?: MoreActionsItem[]
+  menuActions?: ActionsMenuGroup[]
   /**
    * Custom header content (overrides title/subtitle)
    */

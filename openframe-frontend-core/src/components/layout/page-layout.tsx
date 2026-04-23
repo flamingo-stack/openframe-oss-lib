@@ -3,8 +3,8 @@
 import { ChevronLeft } from 'lucide-react'
 import React from 'react'
 import { cn } from '../../utils/cn'
+import type { ActionsMenuGroup } from '../ui/actions-menu'
 import { Button } from '../ui/button'
-import type { MoreActionsItem } from '../ui/more-actions-menu'
 import { PageActions, type PageActionButton } from '../ui/page-actions'
 
 const PADDING = { none: '', sm: 'p-4', md: 'p-6', lg: 'p-8' } as const
@@ -18,7 +18,8 @@ export interface PageLayoutProps {
   headerActions?: React.ReactNode
   actions?: PageActionButton[]
   actionsVariant?: 'icon-buttons' | 'primary-buttons' | 'menu-primary'
-  menuActions?: MoreActionsItem[]
+  actionsGap?: 'sm' | 'md' | 'lg'
+  menuActions?: ActionsMenuGroup[]
   padding?: keyof typeof PADDING
   background?: keyof typeof BACKGROUND
   className?: string
@@ -38,6 +39,7 @@ export function PageLayout({
   headerActions,
   actions,
   actionsVariant = 'icon-buttons',
+  actionsGap,
   menuActions,
   padding = 'none',
   background = 'transparent',
@@ -76,7 +78,7 @@ export function PageLayout({
             <div className="flex gap-2 items-center shrink-0">
               {headerActions}
               {hasActions && (
-                <PageActions variant={actionsVariant} actions={actions} menuActions={menuActions} />
+                <PageActions variant={actionsVariant} actions={actions} menuActions={menuActions} gap={actionsGap} />
               )}
             </div>
           )}

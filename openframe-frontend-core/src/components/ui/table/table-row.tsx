@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import React from 'react'
 import { cn } from '../../../utils/cn'
 import { Checkbox } from '../checkbox'
@@ -12,6 +13,7 @@ export function TableRow<T = any>({
   item,
   columns,
   onClick,
+  href,
   className,
   index,
   compact,
@@ -19,6 +21,8 @@ export function TableRow<T = any>({
   selected,
   onSelect
 }: TableRowProps<T>) {
+  const isLinkMode = Boolean(href) && !onClick
+
   const handleRowClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement
     if (target.closest('[data-no-row-click]')) {
@@ -65,15 +69,29 @@ export function TableRow<T = any>({
     <div
       className={cn(
         'relative rounded-[6px] bg-ods-card border border-ods-border overflow-hidden',
-        onClick && 'cursor-pointer hover:bg-ods-bg-active transition-colors',
+        (onClick || isLinkMode) && 'cursor-pointer hover:bg-ods-bg-active transition-colors',
         typeof className === 'function' ? className(item, index) : className
       )}
-      onClick={handleRowClick}
+      onClick={isLinkMode ? undefined : handleRowClick}
     >
-      <div className={cn('flex items-center gap-4 px-4', compact ? 'py-2' : cn('py-0', ROW_HEIGHT_DESKTOP))}>
+      {isLinkMode && href && (
+        <Link
+          href={href}
+          prefetch={false}
+          className="absolute inset-0"
+          aria-label="View details"
+        />
+      )}
+      <div
+        className={cn(
+          'relative flex items-center gap-4 px-4',
+          compact ? 'py-2' : cn('py-0', ROW_HEIGHT_DESKTOP),
+          isLinkMode && 'pointer-events-none'
+        )}
+      >
         {/* Selection checkbox */}
         {selectable && (
-          <div className="flex items-center justify-center w-10 shrink-0" data-no-row-click>
+          <div className="flex items-center justify-center w-10 shrink-0 pointer-events-auto" data-no-row-click>
             <Checkbox
               checked={selected}
               onCheckedChange={handleSelect}
