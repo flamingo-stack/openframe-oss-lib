@@ -4,17 +4,76 @@ import React from 'react'
 import type { ButtonProps } from './button'
 import { cn } from '../../utils/cn'
 import { Button } from './button'
+import { DropdownButton } from './dropdown-button'
 import { MoreActionsMenu, type MoreActionsItem } from './more-actions-menu'
 
 export type PageActionButton = {
   label: string
-  onClick: () => void
+  /** Click handler. Optional when `href` is provided. */
+  onClick?: () => void
+  /** If set, the action renders as a Next.js Link (real <a href> in the DOM). */
+  href?: string
+  /** Only relevant with `href` — opens the link in a new tab. */
+  openInNewTab?: boolean
   icon?: React.ReactNode
   variant?: ButtonProps['variant']
   disabled?: boolean
   loading?: boolean
   /** Show action only on mobile (below md). Default: visible on all screens. */
   showOnlyMobile?: boolean
+  /**
+   * When set, renders the action as a split button on desktop — main label on
+   * the left, chevron on the right that opens a dropdown of alternatives.
+   * On mobile these items are flattened into the main "..." menu.
+   */
+  dropdownItems?: MoreActionsItem[]
+}
+
+function actionToMenuItem(action: PageActionButton): MoreActionsItem {
+  return {
+    label: action.label,
+    onClick: action.onClick,
+    href: action.href,
+    openInNewTab: action.openInNewTab,
+    icon: action.icon,
+    disabled: action.disabled
+  }
+}
+
+function actionToMenuItems(action: PageActionButton): MoreActionsItem[] {
+  // When `dropdownItems` is set the label itself is not an action — it's just
+  // the trigger. Only the dropdown items are clickable targets, so those are
+  // what we surface in the mobile "..." menu.
+  if (action.dropdownItems && action.dropdownItems.length > 0) {
+    return action.dropdownItems
+  }
+  return [actionToMenuItem(action)]
+}
+
+function ActionButton({ action }: { action: PageActionButton }) {
+  if (action.dropdownItems && action.dropdownItems.length > 0) {
+    return (
+      <DropdownButton
+        label={action.label}
+        icon={action.icon}
+        items={action.dropdownItems}
+        disabled={!!(action.disabled || action.loading)}
+      />
+    )
+  }
+  return (
+    <Button
+      variant={action.variant}
+      onClick={action.onClick}
+      href={action.href}
+      openInNewTab={action.openInNewTab}
+      disabled={action.disabled}
+      loading={action.loading}
+      leftIcon={action.icon}
+    >
+      {action.label}
+    </Button>
+  )
 }
 
 export interface PageActionsProps {
@@ -60,14 +119,9 @@ function IconButtonsVariant({
 }) {
   const desktopActions = actions.filter(a => !a.showOnlyMobile)
 
-  const menuItems: MoreActionsItem[] = actions.map(action => ({
-    label: action.label,
-    onClick: action.onClick,
-    icon: action.icon,
-    disabled: action.disabled
-  }))
+  const menuItems: MoreActionsItem[] = actions.flatMap(actionToMenuItems)
 
-  const isSingleAction = actions.length === 1
+  const isSingleAction = actions.length === 1 && !actions[0].dropdownItems?.length
   const singleAction = isSingleAction ? actions[0] : null
 
   return (
@@ -75,16 +129,7 @@ function IconButtonsVariant({
       {/* Desktop: Show all buttons with icons */}
       <div className={cn('hidden md:flex items-center', gapClass, className)}>
         {desktopActions.map((action, idx) => (
-          <Button
-            key={`${action.label}-${idx}`}
-            variant={action.variant}
-            onClick={action.onClick}
-            disabled={action.disabled}
-            loading={action.loading}
-            leftIcon={action.icon}
-          >
-            {action.label}
-          </Button>
+          <ActionButton key={`${action.label}-${idx}`} action={action} />
         ))}
       </div>
 
@@ -95,6 +140,8 @@ function IconButtonsVariant({
             variant={singleAction.variant}
             size="icon"
             onClick={singleAction.onClick}
+            href={singleAction.href}
+            openInNewTab={singleAction.openInNewTab}
             disabled={singleAction.disabled}
             loading={singleAction.loading}
             centerIcon={singleAction.icon}
@@ -135,16 +182,7 @@ function PrimaryButtonsVariant({
       {/* Desktop: Normal layout (outline left, primary right) */}
       <div className={cn('hidden md:flex items-center', gapClass, className)}>
         {desktopActions.map((action, idx) => (
-          <Button
-            key={`desktop-${action.label}-${idx}`}
-            variant={action.variant}
-            onClick={action.onClick}
-            disabled={action.disabled}
-            loading={action.loading}
-            leftIcon={action.icon}
-          >
-            {action.label}
-          </Button>
+          <ActionButton key={`desktop-${action.label}-${idx}`} action={action} />
         ))}
       </div>
 
@@ -177,16 +215,10 @@ function MenuPrimaryVariant({
       <div className={cn('hidden md:flex items-center', gapClass, className)}>
         {menuActions.length > 0 && <MoreActionsMenu items={menuActions} />}
         {desktopActions.map((action, idx) => (
-          <Button
+          <ActionButton
             key={`desktop-${action.label}-${idx}`}
-            variant={action.variant || 'primary'}
-            onClick={action.onClick}
-            disabled={action.disabled}
-            loading={action.loading}
-            leftIcon={action.icon}
-          >
-            {action.label}
-          </Button>
+            action={{ ...action, variant: action.variant || 'primary' }}
+          />
         ))}
       </div>
 
@@ -194,12 +226,7 @@ function MenuPrimaryVariant({
       <div className={cn('flex md:hidden', className)}>
         <MoreActionsMenu
           items={[
-            ...actions.map<MoreActionsItem>(action => ({
-              label: action.label,
-              onClick: action.onClick,
-              icon: action.icon,
-              disabled: action.disabled
-            })),
+            ...actions.flatMap(actionToMenuItems),
             ...menuActions
           ]}
         />
@@ -227,6 +254,8 @@ function MobileBottomActions({
           key={`mobile-${action.label}-${idx}`}
           variant={action.variant}
           onClick={action.onClick}
+          href={action.href}
+          openInNewTab={action.openInNewTab}
           leftIcon={action.icon}
           disabled={action.disabled}
           loading={action.loading}

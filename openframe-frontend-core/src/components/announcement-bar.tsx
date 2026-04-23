@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { X } from 'lucide-react';
 import { Button } from './ui/button';
 import { renderSvgIcon } from './icon-utils';
@@ -118,10 +119,12 @@ export function AnnouncementBar() {
 
     if (announcement.icon_type === 'png' && announcement.icon_png_url) {
       return (
-        <img
+        <Image
           src={announcement.icon_png_url}
           alt="Announcement icon"
-          className="relative shrink-0 w-6 h-6 md:w-8 md:h-8"
+          width={32}
+          height={32}
+          className="relative shrink-0"
           aria-hidden
         />
       );
