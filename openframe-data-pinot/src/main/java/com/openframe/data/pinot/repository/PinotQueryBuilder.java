@@ -12,8 +12,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-//TODO need to be unified for Pinot device functionality
 public class PinotQueryBuilder {
+
+    private static final String TENANT_ID_FIELD = "tenantId";
 
     public static final int FIRST_COLUMN_INDEX = 0;
     public static final int FIRST_RESULT_SET_INDEX = 0;
@@ -74,9 +75,25 @@ public class PinotQueryBuilder {
 
     private final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern(DATE_FORMAT_PATTERN);
 
-    public PinotQueryBuilder(String tableName) {
+    /**
+     * Creates a query builder for the given table, scoped to a specific tenant.
+     * The {@code tenantId} is mandatory — every query built by this instance
+     * automatically includes a {@code tenantId = '...'} filter as its first condition.
+     *
+     * @throws PinotQueryException if {@code tenantId} is null or blank
+     */
+    public PinotQueryBuilder(String tableName, String tenantId) {
         validateTableName(tableName);
+        validateTenantId(tenantId);
         this.tableName = tableName;
+        // Automatically scope all queries to the current tenant.
+        this.whereConditions.add(TENANT_ID_FIELD + SQL_EQUALS + SINGLE_QUOTE + escapeSqlValue(tenantId) + SINGLE_QUOTE);
+    }
+
+    private static void validateTenantId(String tenantId) {
+        if (tenantId == null || tenantId.isBlank()) {
+            throw new PinotQueryException("tenantId is required for all Pinot queries — refusing to build a tenant-less query");
+        }
     }
 
     public PinotQueryBuilder select(String... columns) {

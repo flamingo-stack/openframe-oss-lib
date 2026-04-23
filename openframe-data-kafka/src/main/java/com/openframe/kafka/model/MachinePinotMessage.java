@@ -17,6 +17,7 @@ import java.util.List;
 @AllArgsConstructor
 public class MachinePinotMessage implements KafkaMessage {
 
+    private String tenantId;
     private String machineId;
     private String organizationId;
     private String deviceType;

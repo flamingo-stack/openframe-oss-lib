@@ -4,6 +4,7 @@ import lombok.Data;
 
 @Data
 public class IntegratedToolEvent implements KafkaMessage {
+    private String tenantId;
     private String toolEventId;
     private String userId;
     private String deviceId;

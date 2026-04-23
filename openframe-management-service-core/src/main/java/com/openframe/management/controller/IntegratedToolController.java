@@ -1,6 +1,7 @@
 package com.openframe.management.controller;
 
 import com.openframe.data.document.tool.IntegratedTool;
+import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.IntegratedToolService;
 import com.openframe.management.hook.IntegratedToolPostSaveHook;
 import com.openframe.management.service.DebeziumService;
@@ -23,6 +24,7 @@ public class IntegratedToolController {
 
     private final IntegratedToolService toolService;
     private final DebeziumService debeziumService;
+    private final TenantIdProvider tenantIdProvider;
     private final List<IntegratedToolPostSaveHook> postSaveHooks;
 
     @GetMapping
@@ -56,7 +58,17 @@ public class IntegratedToolController {
 
             IntegratedTool savedTool = toolService.saveTool(tool);
             log.info("Successfully saved tool configuration for: {}", id);
-            debeziumService.createOrUpdateDebeziumConnector(savedTool.getDebeziumConnectors());
+
+            // Defer Kafka Connect connector creation until a tenant is registered.
+            // Pre-registration: tool + connector templates saved to MongoDB only.
+            // Post-registration (redeploy/config change): apply to Kafka Connect immediately.
+            if (!tenantIdProvider.isTenantRegistered()) {
+                log.info("No tenant registered yet — Debezium connectors saved to MongoDB, " +
+                        "will be applied when tenant registers");
+            } else {
+                debeziumService.createOrUpdateDebeziumConnector(savedTool.getDebeziumConnectors());
+            }
+
             for (IntegratedToolPostSaveHook hook : postSaveHooks) {
                 try {
                     hook.onToolSaved(id, savedTool);
@@ -71,4 +83,4 @@ public class IntegratedToolController {
                     .body(Map.of("status", "error", "message", e.getMessage()));
         }
     }
-} 
+}

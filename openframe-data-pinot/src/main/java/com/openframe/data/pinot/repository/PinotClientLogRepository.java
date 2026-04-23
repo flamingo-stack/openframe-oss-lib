@@ -2,28 +2,22 @@ package com.openframe.data.pinot.repository;
 
 import com.openframe.data.pinot.model.LogProjection;
 import com.openframe.data.pinot.model.OrganizationOption;
-import com.openframe.data.pinot.repository.exception.PinotQueryException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pinot.client.Connection;
-import org.apache.pinot.client.ResultSet;
-import org.apache.pinot.client.ResultSetGroup;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 @Slf4j
 @Repository
-public class PinotClientLogRepository implements PinotLogRepository {
+public class PinotClientLogRepository extends AbstractPinotRepository implements PinotLogRepository {
 
     private static final List<String> SORTABLE_COLUMNS = List.of(
             "eventTimestamp",
@@ -38,20 +32,18 @@ public class PinotClientLogRepository implements PinotLogRepository {
     private static final String DEFAULT_SORT_COLUMN = "eventTimestamp";
     private static final String PRIMARY_KEY_FIELD = "toolEventId";
 
-    private final Connection pinotConnection;
-
     @Value("${pinot.tables.logs.name:logs}")
     private String logsTable;
 
     public PinotClientLogRepository(@Qualifier("pinotBrokerConnection") Connection pinotConnection) {
-        this.pinotConnection = pinotConnection;
+        super(pinotConnection);
     }
 
     @Override
-    public List<LogProjection> findLogs(LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes,
+    public List<LogProjection> findLogs(String tenantId, LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes,
                                         List<String> severities, List<String> organizationIds, String deviceId, String cursor, int limit,
                                         String sortField, String sortDirection) {
-        PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable)
+        PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable, tenantId)
                 .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "organizationId", "organizationName", "summary", "eventTimestamp")
                 .whereDateRange("eventTimestamp", startDate, endDate)
                 .whereIn("toolType", toolTypes)
@@ -67,10 +59,10 @@ public class PinotClientLogRepository implements PinotLogRepository {
     }
 
     @Override
-    public List<LogProjection> searchLogs(LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes,
+    public List<LogProjection> searchLogs(String tenantId, LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes,
                                           List<String> severities, List<String> organizationIds, String deviceId, String searchTerm, String cursor, int limit,
                                           String sortField, String sortDirection) {
-        PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable)
+        PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable, tenantId)
                 .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "organizationId", "organizationName", "summary", "eventTimestamp")
                 .whereDateRange("eventTimestamp", startDate, endDate)
                 .whereIn("toolType", toolTypes)
@@ -87,8 +79,8 @@ public class PinotClientLogRepository implements PinotLogRepository {
     }
 
     @Override
-    public List<String> getEventTypeOptions(LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes, List<String> severities, List<String> organizationIds) {
-        PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable)
+    public List<String> getEventTypeOptions(String tenantId, LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes, List<String> severities, List<String> organizationIds) {
+        PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable, tenantId)
                 .select("eventType")
                 .distinct()
                 .whereDateRange("eventTimestamp", startDate, endDate)
@@ -97,12 +89,12 @@ public class PinotClientLogRepository implements PinotLogRepository {
                 .whereIn("organizationId", organizationIds)
                 .orderBy("eventType");
 
-        return queryPinotForFilterOptions(queryBuilder.build());
+        return executeSingleColumnQuery(queryBuilder.build());
     }
 
     @Override
-    public List<String> getSeverityOptions(LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes, List<String> severities, List<String> organizationIds) {
-        PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable)
+    public List<String> getSeverityOptions(String tenantId, LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes, List<String> severities, List<String> organizationIds) {
+        PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable, tenantId)
                 .select("severity")
                 .distinct()
                 .whereDateRange("eventTimestamp", startDate, endDate)
@@ -111,12 +103,12 @@ public class PinotClientLogRepository implements PinotLogRepository {
                 .whereIn("organizationId", organizationIds)
                 .orderBy("severity");
 
-        return queryPinotForFilterOptions(queryBuilder.build());
+        return executeSingleColumnQuery(queryBuilder.build());
     }
 
     @Override
-    public List<String> getToolTypeOptions(LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes, List<String> severities, List<String> organizationIds) {
-        PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable)
+    public List<String> getToolTypeOptions(String tenantId, LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes, List<String> severities, List<String> organizationIds) {
+        PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable, tenantId)
                 .select("toolType")
                 .distinct()
                 .whereDateRange("eventTimestamp", startDate, endDate)
@@ -125,12 +117,12 @@ public class PinotClientLogRepository implements PinotLogRepository {
                 .whereIn("organizationId", organizationIds)
                 .orderBy("toolType");
 
-        return queryPinotForFilterOptions(queryBuilder.build());
+        return executeSingleColumnQuery(queryBuilder.build());
     }
 
     @Override
-    public List<String> getAvailableDateRanges(List<String> toolTypes, List<String> eventTypes, List<String> severities, List<String> organizationIds) {
-        PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable)
+    public List<String> getAvailableDateRanges(String tenantId, List<String> toolTypes, List<String> eventTypes, List<String> severities, List<String> organizationIds) {
+        PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable, tenantId)
                 .select("ingestDay")
                 .distinct()
                 .whereIn("toolType", toolTypes)
@@ -139,13 +131,13 @@ public class PinotClientLogRepository implements PinotLogRepository {
                 .whereIn("organizationId", organizationIds)
                 .orderBy("ingestDay");
 
-        return queryPinotForFilterOptions(queryBuilder.build());
+        return executeSingleColumnQuery(queryBuilder.build());
     }
 
     @Override
-    public List<OrganizationOption> getOrganizationOptions(LocalDate startDate, LocalDate endDate,
+    public List<OrganizationOption> getOrganizationOptions(String tenantId, LocalDate startDate, LocalDate endDate,
                                                            List<String> toolTypes, List<String> eventTypes, List<String> severities) {
-        PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable)
+        PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable, tenantId)
                 .select("organizationId", "organizationName")
                 .distinct()
                 .whereDateRange("eventTimestamp", startDate, endDate)
@@ -154,7 +146,19 @@ public class PinotClientLogRepository implements PinotLogRepository {
                 .whereIn("severity", severities)
                 .orderBy("organizationName");
 
-        return queryPinotForOrganizationOptions(queryBuilder.build());
+        return executeQuery(queryBuilder.build(), resultSet -> rowIndex -> {
+            String organizationId = resultSet.getString(rowIndex, 0);
+            String organizationName = resultSet.getString(rowIndex, 1);
+            if (organizationId == null || organizationId.trim().isEmpty()) {
+                return null;
+            }
+            return OrganizationOption.builder()
+                    .id(organizationId)
+                    .name(organizationName != null ? organizationName : organizationId)
+                    .build();
+        }).stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -170,29 +174,9 @@ public class PinotClientLogRepository implements PinotLogRepository {
         return DEFAULT_SORT_COLUMN;
     }
 
-    private List<OrganizationOption> queryPinotForOrganizationOptions(String query) {
-        return executeQuery(query, resultSet -> rowIndex -> {
-            String organizationId = resultSet.getString(rowIndex, 0); // organizationId
-            String organizationName = resultSet.getString(rowIndex, 1); // organizationName
-
-            // Skip null or empty organizations
-            if (organizationId == null || organizationId.trim().isEmpty()) {
-                return null;
-            }
-
-            return OrganizationOption.builder()
-                    .id(organizationId)
-                    .name(organizationName != null ? organizationName : organizationId)
-                    .build();
-        }).stream()
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
-    }
-
     private List<LogProjection> executeLogQuery(String query) {
         return executeQuery(query, resultSet -> {
             Map<String, Integer> columnIndexMap = buildColumnIndexMap(resultSet);
-
             return rowIndex -> {
                 LogProjection projection = new LogProjection();
                 projection.toolEventId = resultSet.getString(rowIndex, columnIndexMap.get("toolEventId"));
@@ -211,36 +195,4 @@ public class PinotClientLogRepository implements PinotLogRepository {
             };
         });
     }
-
-    private List<String> queryPinotForFilterOptions(String query) {
-        return executeQuery(query, resultSet -> rowIndex -> {
-            String value = resultSet.getString(rowIndex, PinotQueryBuilder.FIRST_COLUMN_INDEX);
-            return (value != null && !value.isEmpty()) ? value : null;
-        }).stream()
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
-    }
-
-    private Map<String, Integer> buildColumnIndexMap(ResultSet resultSet) {
-        Map<String, Integer> columnIndexMap = new HashMap<>();
-        for (int i = 0; i < resultSet.getColumnCount(); i++) {
-            columnIndexMap.put(resultSet.getColumnName(i), i);
-        }
-        return columnIndexMap;
-    }
-
-    private <T> List<T> executeQuery(String query, Function<ResultSet, Function<Integer, T>> mapper) {
-        try {
-            log.debug("Executing query: {}", query);
-            ResultSetGroup resultSetGroup = pinotConnection.execute(query);
-            ResultSet resultSet = resultSetGroup.getResultSet(PinotQueryBuilder.FIRST_RESULT_SET_INDEX);
-
-            return IntStream.range(0, resultSet.getRowCount())
-                    .mapToObj(i -> mapper.apply(resultSet).apply(i))
-                    .collect(Collectors.toList());
-        } catch (Exception e) {
-            log.error("Error executing query: {}", query, e);
-            throw new PinotQueryException("Failed to execute query: " + e.getMessage(), e);
-        }
-    }
-} 
+}
