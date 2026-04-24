@@ -25,6 +25,10 @@ interface TabNavigationProps {
   tabs: TabItem[]
   className?: string
   shadowClassName?: string // Tailwind class for shadow gradient color, e.g. "from-black" or "from-red-500"
+  /** Force the right-edge gradient to always render, independent of scroll state. */
+  showRightGradient?: boolean
+  /** Force the left-edge gradient to always render, independent of scroll state. */
+  showLeftGradient?: boolean
 
   // URL sync mode
   urlSync?: boolean | TabNavigationUrlSyncOptions
@@ -40,6 +44,8 @@ export function TabNavigation({
   tabs,
   className,
   shadowClassName,
+  showRightGradient = false,
+  showLeftGradient = false,
   urlSync = false,
   defaultTab,
   children
@@ -135,9 +141,26 @@ export function TabNavigation({
     }
   }, [updateScrollShadows])
 
+  const leftFade = canScrollLeft || showLeftGradient
+  const rightFade = canScrollRight || showRightGradient
+
+  const borderStyle: React.CSSProperties = (() => {
+    const c = 'var(--color-border-default)'
+    if (leftFade && rightFade) {
+      return { background: `linear-gradient(to right, transparent 0, ${c} 40px, ${c} calc(100% - 40px), transparent 100%)` }
+    }
+    if (leftFade) {
+      return { background: `linear-gradient(to right, transparent 0, ${c} 40px, ${c} 100%)` }
+    }
+    if (rightFade) {
+      return { background: `linear-gradient(to right, ${c} 0, ${c} calc(100% - 40px), transparent 100%)` }
+    }
+    return { background: c }
+  })()
+
   return (
     <>
-      <div className={cn("relative w-full h-14 border-b border-ods-border", className)}>
+      <div className={cn("relative w-full h-14", className)}>
         <div ref={scrollRef} className="flex gap-1 items-center justify-start h-full overflow-x-auto overflow-y-hidden">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id
@@ -185,13 +208,16 @@ export function TabNavigation({
 
         </div>
 
-        {/* Fade shadows — only visible when content overflows in that direction */}
-        {canScrollLeft && (
+        {/* Fade shadows — visible when content overflows or when forced via props */}
+        {leftFade && (
           <div className={cn("absolute left-0 top-0 w-10 h-14 pointer-events-none bg-gradient-to-r to-transparent", shadowClassName || "from-ods-bg")} />
         )}
-        {canScrollRight && (
+        {rightFade && (
           <div className={cn("absolute right-0 top-0 w-10 h-14 pointer-events-none bg-gradient-to-l to-transparent", shadowClassName || "from-ods-bg")} />
         )}
+
+        {/* Bottom border — a gradient-capable 1px line that fades to transparent on any edge that has an active fade shadow. */}
+        <div className="absolute bottom-0 left-0 right-0 h-px pointer-events-none" style={borderStyle} />
       </div>
 
       {/* Render children with active tab if provided */}

@@ -2,6 +2,7 @@
 
 import { type ReactNode, useEffect, useRef } from 'react'
 import { cn } from '../../../utils/cn'
+import { Chevron02RightIcon } from '../../icons-v2-generated'
 import { Pagination } from '../../pagination'
 import { Button } from '../button'
 import { CursorPagination } from '../cursor-pagination'
@@ -12,47 +13,78 @@ import { ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE, TableCardSkeleton } from './tabl
 import type { RowAction, TableColumn, TableProps } from './types'
 
 /**
- * Injects a synthetic actions column into the columns array when row actions exist
+ * Injects synthetic columns (row actions and/or row-level chevron link) at the end of the columns array.
  */
-function injectActionsColumn<T>(
+function injectSyntheticColumns<T>(
   columns: TableColumn<T>[],
   rowActions?: RowAction<T>[],
   renderRowActions?: (item: T) => ReactNode,
+  rowHref?: (item: T) => string | null | undefined,
 ): TableColumn<T>[] {
   const hasActions = Boolean(rowActions?.length) || Boolean(renderRowActions)
-  if (!hasActions) return columns
+  const result = [...columns]
 
-  const actionsColumn: TableColumn<T> = {
-    key: '__actions__',
-    label: '',
-    width: 'min-w-[100px] w-auto shrink-0 flex-none',
-    align: 'right',
-    renderCell: (item: T) => (
-      <div className="flex gap-2 items-center justify-end" data-no-row-click>
-        {renderRowActions ? (
-          renderRowActions(item)
-        ) : (
-          rowActions!.map((action, actionIndex) => (
-            <Button
-              key={actionIndex}
-              variant='card'
-              onClick={(e) => {
-                e.stopPropagation()
-                action.onClick(item)
-              }}
-              leftIcon={action.icon && action.label ? action.icon : undefined}
-              centerIcon={action.icon && !action.label ? action.icon : undefined}
-              className={action.className}
-            >
-              {action.label}
-            </Button>
-          ))
-        )}
-      </div>
-    ),
+  if (hasActions) {
+    const actionsColumn: TableColumn<T> = {
+      key: '__actions__',
+      label: '',
+      width: 'min-w-[100px] w-auto shrink-0 flex-none',
+      align: 'right',
+      renderCell: (item: T) => (
+        <div className="flex gap-2 items-center justify-end pointer-events-auto" data-no-row-click>
+          {renderRowActions ? (
+            renderRowActions(item)
+          ) : (
+            rowActions!.map((action, actionIndex) => (
+              <Button
+                key={actionIndex}
+                variant='card'
+                onClick={(e) => {
+                  e.stopPropagation()
+                  action.onClick(item)
+                }}
+                leftIcon={action.icon && action.label ? action.icon : undefined}
+                centerIcon={action.icon && !action.label ? action.icon : undefined}
+                className={action.className}
+              >
+                {action.label}
+              </Button>
+            ))
+          )}
+        </div>
+      ),
+    }
+    result.push(actionsColumn)
   }
 
-  return [...columns, actionsColumn]
+  if (rowHref) {
+    const chevronColumn: TableColumn<T> = {
+      key: '__chevron__',
+      label: '',
+      width: 'w-12 shrink-0 flex-none',
+      align: 'right',
+      renderCell: (item: T) => {
+        const href = rowHref(item)
+        if (!href) return null
+        return (
+          <div className="flex items-center justify-end pointer-events-auto" data-no-row-click>
+            <Button
+              href={href}
+              prefetch={false}
+              variant="outline"
+					    size="icon"
+              centerIcon={<Chevron02RightIcon className="w-5 h-5" />}
+              aria-label="View details"
+              className="bg-ods-card"
+            />
+          </div>
+        )
+      },
+    }
+    result.push(chevronColumn)
+  }
+
+  return result
 }
 
 export function Table<T = any>({
@@ -70,6 +102,7 @@ export function Table<T = any>({
   onRowClick,
   rowActions,
   renderRowActions,
+  rowHref,
   sortBy,
   sortDirection,
   onSort,
@@ -87,8 +120,11 @@ export function Table<T = any>({
   stickyHeader,
   stickyHeaderOffset,
 }: TableProps<T>) {
-  // Inject synthetic actions column if needed
-  const columnsWithActions = injectActionsColumn(columns, rowActions, renderRowActions)
+  const columnsWithActions = injectSyntheticColumns(columns, rowActions, renderRowActions, rowHref)
+  const getRowHref = (item: T): string | undefined => {
+    if (onRowClick || !rowHref) return undefined
+    return rowHref(item) ?? undefined
+  }
   const getRowKey = (item: T, index: number): string => {
     if (typeof rowKey === 'function') {
       return rowKey(item)
@@ -211,6 +247,7 @@ export function Table<T = any>({
             columns={columns}
             rows={skeletonRows}
             hasActions={Boolean(rowActions) && rowActions!.length > 0}
+            hasChevron={Boolean(rowHref)}
           />
         ) : data.length === 0 ? (
           <TableEmptyState message={emptyMessage} />
@@ -222,6 +259,7 @@ export function Table<T = any>({
                 item={item}
                 columns={columnsWithActions}
                 onClick={onRowClick}
+                href={getRowHref(item)}
                 className={getRowClassName(item, index)}
                 index={index}
                 compact={compact}
@@ -236,6 +274,7 @@ export function Table<T = any>({
                 columns={columns}
                 rows={infiniteScroll.skeletonRows ?? 3}
                 hasActions={Boolean(rowActions) && rowActions!.length > 0}
+                hasChevron={Boolean(rowHref)}
               />
             )}
             {/* Infinite scroll: sentinel element */}
