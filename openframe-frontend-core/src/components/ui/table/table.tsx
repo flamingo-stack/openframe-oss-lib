@@ -73,7 +73,7 @@ function injectSyntheticColumns<T>(
               prefetch={false}
               variant="outline"
 					    size="icon"
-              centerIcon={<Chevron02RightIcon className="w-5 h-5" />}
+              centerIcon={<Chevron02RightIcon className="w-6 h-6" />}
               aria-label="View details"
               className="bg-ods-card"
             />

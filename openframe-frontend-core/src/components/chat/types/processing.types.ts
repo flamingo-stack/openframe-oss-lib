@@ -15,6 +15,7 @@ export type ParsedChunkAction =
   | { action: 'error'; error: string; details?: string }
   | { action: 'metadata'; modelDisplayName: string; modelName: string; providerName: string; contextWindow: number }
   | { action: 'text'; text: string }
+  | { action: 'thinking'; text: string }
   | { action: 'tool_execution'; segment: ToolExecutionSegment }
   | { action: 'approval_request'; requestId: string; command: string; explanation?: string; approvalType: string }
   | { action: 'approval_result'; requestId: string; approved: boolean; approvalType: string }
@@ -36,9 +37,8 @@ export interface PendingApproval {
 
 export interface AccumulatorState {
   segments: MessageSegment[]
-  currentTextBuffer: string
   pendingApprovals: Map<string, PendingApproval>
-  executingTools: Map<string, { 
+  executingTools: Map<string, {
     integratedToolType: string
     toolFunction: string
     parameters?: Record<string, any>

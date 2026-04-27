@@ -9,6 +9,7 @@ import type { AssistantType, AuthorType, ChatApprovalStatus, MessageOwner } from
 
 export const MESSAGE_TYPE = {
   TEXT: 'TEXT',
+  THINKING: 'THINKING',
   EXECUTING_TOOL: 'EXECUTING_TOOL',
   EXECUTED_TOOL: 'EXECUTED_TOOL',
   APPROVAL_REQUEST: 'APPROVAL_REQUEST',
@@ -63,6 +64,11 @@ export type TextSegment = {
   text: string
 }
 
+export type ThinkingSegment = {
+  type: 'thinking'
+  text: string
+}
+
 export type ToolExecutionSegment = {
   type: 'tool_execution'
   data: ToolExecutionData
@@ -88,7 +94,7 @@ export type ContextCompactionSegment = {
   summary?: string
 }
 
-export type MessageSegment = TextSegment | ToolExecutionSegment | ApprovalRequestSegment | ErrorSegment | ContextCompactionSegment
+export type MessageSegment = TextSegment | ThinkingSegment | ToolExecutionSegment | ApprovalRequestSegment | ErrorSegment | ContextCompactionSegment
 
 export type MessageContent = string | MessageSegment[]
 
@@ -100,6 +106,11 @@ export interface MessageDataBase {
 
 export interface TextMessageData extends MessageDataBase {
   type: 'TEXT'
+  text?: string
+}
+
+export interface ThinkingMessageData extends MessageDataBase {
+  type: 'THINKING'
   text?: string
 }
 
@@ -171,6 +182,7 @@ export interface ContextCompactionEndMessageData extends MessageDataBase {
 
 export type MessageData =
   | TextMessageData
+  | ThinkingMessageData
   | ExecutingToolMessageData
   | ExecutedToolMessageData
   | ApprovalRequestMessageData
