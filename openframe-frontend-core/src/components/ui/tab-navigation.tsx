@@ -160,8 +160,8 @@ export function TabNavigation({
 
   return (
     <>
-      <div className={cn("relative w-full h-14", className)}>
-        <div ref={scrollRef} className="flex gap-1 items-center justify-start h-full overflow-x-auto overflow-y-hidden">
+      <div className={cn("relative w-full", className)}>
+        <div ref={scrollRef} className="flex gap-[var(--spacing-system-xxs)] items-center justify-start h-full overflow-x-auto overflow-y-hidden">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id
 
@@ -171,7 +171,7 @@ export function TabNavigation({
                 type="button"
                 onClick={() => handleTabChange(tab.id)}
                 className={cn(
-                  "flex gap-1 items-center justify-center p-4 relative shrink-0 h-14 cursor-pointer",
+                  "flex gap-[var(--spacing-system-xxs)] items-center justify-center p-[var(--spacing-system-m)] relative shrink-0 cursor-pointer",
                   "transition-all duration-200 bg-transparent border-none outline-none",
                   isActive
                     ? 'bg-gradient-to-b from-[rgba(255,255,255,0)] to-[rgba(255,255,255,0.1)]'
@@ -180,7 +180,7 @@ export function TabNavigation({
               >
                 <div className="relative flex items-center justify-center">
                   <tab.icon
-                    className={cn("h-6 w-6 transition-colors", isActive ? 'text-ods-accent' : 'text-ods-text-secondary')}
+                    className={cn("h-4 w-4 md:h-6 md:w-6 transition-colors", isActive ? 'text-ods-accent' : 'text-ods-text-secondary')}
                   />
                   {tab.indicator && (
                     <div className={cn(

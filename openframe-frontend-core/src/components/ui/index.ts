@@ -110,17 +110,20 @@ export {
   QueryReportTable, QueryReportTableHeader,
   QueryReportTableRow, QueryReportTableSkeleton,
   deriveColumns, exportToCSV
-} from './table'
+} from './query-report-table'
 
 export type {
   QueryReportTableProps, QueryReportTableHeaderProps,
   QueryReportTableRowProps, QueryReportTableSkeletonProps,
   QueryResultRow
-} from './table'
+} from './query-report-table'
 
 // Pagination components
 export { CursorPagination, CursorPaginationSimple } from './cursor-pagination'
 export type { CursorPaginationProps } from './cursor-pagination'
+
+// DataTable (headless, TanStack Table-based) — replacement for legacy `Table`.
+export * from './data-table'
 
 // Phone input
 export * from './phone-input'

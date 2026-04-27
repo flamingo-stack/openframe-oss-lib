@@ -3,6 +3,7 @@
 import React from 'react'
 import { cn } from '../../../utils/cn'
 
+/** @deprecated Use `data-table` instead. */
 export interface TableTimestampCellProps {
   /**
    * The timestamp to display (can be a Date, ISO string, or formatted string)
@@ -56,36 +57,7 @@ function formatTimestampValue(timestamp: string | Date): string {
   return String(timestamp)
 }
 
-/**
- * TableTimestampCell
- *
- * A reusable component for displaying timestamp and ID in table cells.
- * Shows timestamp as primary text and ID as secondary text below.
- * Uses ODS design tokens for consistent styling.
- *
- * @example
- * ```tsx
- * // Basic usage
- * <TableTimestampCell
- *   timestamp="2024-01-15T10:30:00Z"
- *   id="abc123"
- * />
- *
- * // With ID label
- * <TableTimestampCell
- *   timestamp={new Date()}
- *   id="log-123"
- *   idLabel="Log ID"
- * />
- *
- * // Pre-formatted timestamp
- * <TableTimestampCell
- *   timestamp="1/15/2024, 10:30:00 AM"
- *   id="chat-456"
- *   formatTimestamp={false}
- * />
- * ```
- */
+/** @deprecated Use `data-table` instead. */
 export function TableTimestampCell({
   timestamp,
   id,
