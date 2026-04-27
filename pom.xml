@@ -21,7 +21,7 @@
     <url>https://github.com/flamingo-stack/openframe-oss-lib</url>
 
     <properties>
-        <revision>999-SNAPSHOT</revision>
+        <revision>5.65.2</revision>
         <java.version>21</java.version>
         <lombok.version>1.18.30</lombok.version>
         <spring-data-mongodb.version>4.2.0</spring-data-mongodb.version>
@@ -58,6 +58,8 @@
         <module>openframe-client-core</module>
         <module>openframe-api-service-core</module>
         <module>openframe-management-service-core</module>
+        <module>openframe-pinot-initializer</module>
+        <module>openframe-debezium-initializer</module>
         <module>sdk/fleetmdm</module>
         <module>sdk/tacticalrmm</module>
         <module>openframe-tactical-sdk</module>
@@ -181,6 +183,16 @@
             <dependency>
                 <groupId>com.openframe.oss</groupId>
                 <artifactId>openframe-management-service-core</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openframe.oss</groupId>
+                <artifactId>openframe-pinot-initializer</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openframe.oss</groupId>
+                <artifactId>openframe-debezium-initializer</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>

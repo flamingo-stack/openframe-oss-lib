@@ -7,10 +7,8 @@ interface FlamingoLogoProps extends React.SVGProps<SVGSVGElement> {
 }
 
 export function FlamingoLogo({ className = '', color="var(--ods-flamingo-pink-base)" ,size=120, ...props }: FlamingoLogoProps) {
-  const uniqueId = React.useId();
-  
   return (
-    <svg 
+    <svg
       width={size}
       height={size} 
       viewBox="0 0 121 120" 

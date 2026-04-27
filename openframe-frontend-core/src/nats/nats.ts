@@ -240,6 +240,7 @@ function mapNatsTypeToStatus(type: unknown): NatsStatus | null {
 export function createNatsClient(options: NatsClientOptions): NatsClient {
   let nc: NatsConnection | null = null
   let statusLoopAbort: AbortController | null = null
+  let connectInFlight: Promise<void> | null = null
 
   const backoff = options.exponentialBackoff
     ? createExponentialBackoffHandler(options.exponentialBackoff)
@@ -259,43 +260,52 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
 
   async function connect(): Promise<void> {
     if (nc && !nc.isClosed()) return
+    if (connectInFlight) return connectInFlight
     assertClientSide()
 
-    emitStatus({ status: 'connecting' })
-
-    const nats = await importNats()
-    const conn = await nats.connect(mapOptionsToConnectionOptions(options, backoff))
-    nc = conn
-
-    emitStatus({ status: 'connected' })
-
-    statusLoopAbort = new AbortController()
-    const signal = statusLoopAbort.signal
-
-    ;(async () => {
+    connectInFlight = (async () => {
       try {
-        for await (const s of conn.status()) {
-          if (signal.aborted) return
-          const mapped = mapNatsTypeToStatus((s as any)?.type)
-          if (mapped) {
-            if (mapped === 'connected' && backoff) {
-              backoff.reset()
+        emitStatus({ status: 'connecting' })
+
+        const nats = await importNats()
+        const conn = await nats.connect(mapOptionsToConnectionOptions(options, backoff))
+        nc = conn
+
+        emitStatus({ status: 'connected' })
+
+        statusLoopAbort = new AbortController()
+        const signal = statusLoopAbort.signal
+
+        ;(async () => {
+          try {
+            for await (const s of conn.status()) {
+              if (signal.aborted) return
+              const mapped = mapNatsTypeToStatus((s as any)?.type)
+              if (mapped) {
+                if (mapped === 'connected' && backoff) {
+                  backoff.reset()
+                }
+                emitStatus({ status: mapped, data: (s as any)?.data })
+                if (mapped === 'closed') {
+                  nc = null
+                }
+              }
             }
-            emitStatus({ status: mapped, data: (s as any)?.data })
-            if (mapped === 'closed') {
+          } catch (e) {
+            if (!signal.aborted) {
+              emitStatus({ status: 'error', data: e })
               nc = null
             }
           }
-        }
-      } catch (e) {
-        if (!signal.aborted) {
-          emitStatus({ status: 'error', data: e })
-          nc = null
-        }
+        })().catch(() => {
+          // ignore
+        })
+      } finally {
+        connectInFlight = null
       }
-    })().catch(() => {
-      // ignore
-    })
+    })()
+
+    return connectInFlight
   }
 
   async function close(): Promise<void> {

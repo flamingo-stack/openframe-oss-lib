@@ -102,6 +102,13 @@ export interface TableProps<T = any> {
   // Custom renderer for the actions area (e.g., kebab/dots menu)
   renderRowActions?: (item: T) => ReactNode
 
+  /**
+   * When provided, renders a right-pointing chevron link at the end of every row
+   * pointing at rowHref(item). Uses the shared Button component with href support,
+   * so middle-click / Cmd+click / right-click "open in new tab" work natively.
+   */
+  rowHref?: (item: T) => string | null | undefined
+
   // Sorting
   sortBy?: string
   sortDirection?: 'asc' | 'desc'
@@ -180,6 +187,7 @@ export interface TableRowProps<T = any> {
   item: T
   columns: TableColumn<T>[]
   onClick?: (item: T) => void
+  href?: string
   className?: string | ((item: T, index: number) => string)
   index: number
   isMobile?: boolean
@@ -201,6 +209,7 @@ export interface TableCardSkeletonProps {
   columns: TableColumn[]
   rows?: number // Number of skeleton rows to display (default: 10)
   hasActions?: boolean
+  hasChevron?: boolean
   className?: string
   rowClassName?: string // Additional classes for each skeleton row
 }

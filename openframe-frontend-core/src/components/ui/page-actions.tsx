@@ -1,33 +1,128 @@
 'use client'
 
 import React from 'react'
-import type { ButtonProps } from './button'
 import { cn } from '../../utils/cn'
-import { Ellipsis01Icon } from '../icons-v2-generated'
+import { Chevron02DownIcon } from '../icons-v2-generated'
+import { ActionsMenuDropdown, type ActionsMenuGroup, type ActionsMenuItem } from './actions-menu'
+import type { ButtonProps } from './button'
 import { Button } from './button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from './dropdown-menu'
-import { MoreActionsMenu, type MoreActionsItem } from './more-actions-menu'
 
 export type PageActionButton = {
-  label: string
-  onClick: () => void
+  /** Button label. Omit to render an icon-only button (icon becomes `centerIcon`). */
+  label?: string
+  /** Accessible name. Required for icon-only buttons (when `label` is omitted). */
+  ariaLabel?: string
+  /** Click handler. Optional when `href` or `submenu` is provided. */
+  onClick?: () => void
   icon?: React.ReactNode
   variant?: ButtonProps['variant']
   disabled?: boolean
   loading?: boolean
   /** Show action only on mobile (below md). Default: visible on all screens. */
   showOnlyMobile?: boolean
+  /**
+   * Render the desktop button as icon-only (label hidden, icon centered). The full
+   * label still appears in the mobile "..." dropdown. The desktop icon is forced to
+   * `text-ods-text-primary`; the mobile row keeps the caller-provided icon color.
+   */
+  iconOnlyOnDesktop?: boolean
+  /** Render as a link (next/link). Mutually exclusive with `submenu`. */
+  href?: string
+  /** Forwarded to next/link's prefetch. Only applies when `href` is set. */
+  prefetch?: boolean
+  /** Open link in a new tab. Only applies when `href` is set. */
+  openInNewTab?: boolean
+  /** Render a split button with a chevron opening a dropdown. Mutually exclusive with `href`/`onClick`. */
+  submenu?: ActionsMenuItem[]
+}
+
+function actionKey(action: PageActionButton, idx: number) {
+  return `${action.label ?? action.ariaLabel ?? 'action'}-${idx}`
+}
+
+function actionToMenuItems(action: PageActionButton, idx: number): ActionsMenuItem[] {
+  if (action.submenu && action.submenu.length > 0) {
+    // When a split-button action collapses into the merged mobile "..." menu,
+    // its chevron disappears and its children become sibling rows. Prefix
+    // each child with the parent label.
+    if (!action.label) return action.submenu
+    return action.submenu.map(item => ({
+      ...item,
+      label: `${action.label} (${item.label})`,
+    }))
+  }
+
+  if (!action.label) return []
+  return [{
+    id: `action-${idx}`,
+    label: action.label,
+    icon: action.icon,
+    onClick: action.onClick,
+    disabled: action.disabled,
+    href: action.href,
+  }]
+}
+
+function ActionButton({ action }: { action: PageActionButton }) {
+  if (action.submenu && action.submenu.length > 0) {
+    return (
+      <ActionsMenuDropdown
+        groups={[{ items: action.submenu }]}
+        customTrigger={
+          <Button
+            variant="split-action"
+            disabled={action.disabled}
+            loading={action.loading}
+            leftIcon={action.icon}
+            rightIcon={<Chevron02DownIcon className="h-4 w-4" />}
+          >
+            {action.label}
+          </Button>
+        }
+      />
+    )
+  }
+
+  if (!action.label || action.iconOnlyOnDesktop) {
+    const centerIcon = action.iconOnlyOnDesktop
+      ? <span className="inline-flex [&_svg]:!text-ods-text-primary">{action.icon}</span>
+      : action.icon
+    return (
+      <Button
+        variant={action.variant}
+        size="icon"
+        href={action.href}
+        prefetch={action.prefetch}
+        openInNewTab={action.openInNewTab}
+        onClick={action.onClick}
+        disabled={action.disabled}
+        loading={action.loading}
+        centerIcon={centerIcon}
+        aria-label={action.label ?? action.ariaLabel}
+      />
+    )
+  }
+
+  return (
+    <Button
+      variant={action.variant}
+      href={action.href}
+      prefetch={action.prefetch}
+      openInNewTab={action.openInNewTab}
+      onClick={action.onClick}
+      disabled={action.disabled}
+      loading={action.loading}
+      leftIcon={action.icon}
+    >
+      {action.label}
+    </Button>
+  )
 }
 
 export interface PageActionsProps {
   variant?: 'icon-buttons' | 'primary-buttons' | 'menu-primary'
   actions: PageActionButton[]
-  menuActions?: MoreActionsItem[]
+  menuActions?: ActionsMenuGroup[]
   className?: string
   gap?: 'sm' | 'md' | 'lg'
 }
@@ -37,7 +132,7 @@ export function PageActions({
   actions,
   menuActions,
   className,
-  gap = 'md'
+  gap = 'sm'
 }: PageActionsProps) {
   const gapClasses = {
     sm: 'gap-2',
@@ -46,7 +141,7 @@ export function PageActions({
   }
 
   if (variant === 'icon-buttons') {
-    return <IconButtonsVariant actions={actions} className={className} gapClass={gapClasses[gap]} />
+    return <IconButtonsVariant actions={actions} menuActions={menuActions} className={className} gapClass={gapClasses[gap]} />
   }
 
   if (variant === 'menu-primary') {
@@ -58,57 +153,54 @@ export function PageActions({
 
 function IconButtonsVariant({
   actions,
+  menuActions,
   className,
   gapClass
 }: {
   actions: PageActionButton[]
+  menuActions?: ActionsMenuGroup[]
   className?: string
   gapClass: string
 }) {
   const desktopActions = actions.filter(a => !a.showOnlyMobile)
+  const hasMenuActions = !!menuActions && menuActions.some(g => g.items.length > 0)
 
-  const menuItems: MoreActionsItem[] = actions.map(action => ({
-    label: action.label,
-    onClick: action.onClick,
-    icon: action.icon,
-    disabled: action.disabled
-  }))
-
-  const isSingleAction = actions.length === 1
+  const isSingleAction = actions.length === 1 && !actions[0].submenu?.length
   const singleAction = isSingleAction ? actions[0] : null
+  const useSingleActionMobile = isSingleAction && !hasMenuActions
 
   return (
     <>
-      {/* Desktop: Show all buttons with icons */}
+      {/* Desktop: Show all buttons with icons, plus an overflow menu at the end */}
       <div className={cn('hidden md:flex items-center', gapClass, className)}>
         {desktopActions.map((action, idx) => (
-          <Button
-            key={`${action.label}-${idx}`}
-            variant={action.variant}
-            onClick={action.onClick}
-            disabled={action.disabled}
-            loading={action.loading}
-            leftIcon={action.icon}
-          >
-            {action.label}
-          </Button>
+          <ActionButton key={actionKey(action, idx)} action={action} />
         ))}
+        {hasMenuActions && <ActionsMenuDropdown groups={menuActions} />}
       </div>
 
-      {/* Mobile: Show single icon button or MoreActionsMenu */}
+      {/* Mobile: Show single icon button, or one merged ActionsMenu with every item */}
       <div className={cn('flex md:hidden', className)}>
-        {isSingleAction && singleAction ? (
+        {useSingleActionMobile && singleAction ? (
           <Button
             variant={singleAction.variant}
             size="icon"
             onClick={singleAction.onClick}
+            href={singleAction.href}
+            prefetch={singleAction.prefetch}
+            openInNewTab={singleAction.openInNewTab}
             disabled={singleAction.disabled}
             loading={singleAction.loading}
             centerIcon={singleAction.icon}
-            aria-label={singleAction.label}
+            aria-label={singleAction.label ?? singleAction.ariaLabel}
           />
         ) : (
-          <MoreActionsMenu items={menuItems} />
+          <ActionsMenuDropdown
+            groups={[
+              { items: actions.flatMap(actionToMenuItems) },
+              ...(menuActions ?? [])
+            ]}
+          />
         )}
       </div>
     </>
@@ -142,16 +234,7 @@ function PrimaryButtonsVariant({
       {/* Desktop: Normal layout (outline left, primary right) */}
       <div className={cn('hidden md:flex items-center', gapClass, className)}>
         {desktopActions.map((action, idx) => (
-          <Button
-            key={`desktop-${action.label}-${idx}`}
-            variant={action.variant}
-            onClick={action.onClick}
-            disabled={action.disabled}
-            loading={action.loading}
-            leftIcon={action.icon}
-          >
-            {action.label}
-          </Button>
+          <ActionButton key={`desktop-${actionKey(action, idx)}`} action={action} />
         ))}
       </div>
 
@@ -162,8 +245,8 @@ function PrimaryButtonsVariant({
 }
 
 /**
- * Menu + primary variant - shows MoreActionsMenu ("...") + primary button on desktop,
- * all actions move to a fixed bottom bar on mobile
+ * Menu + primary variant - shows menu ("...") + primary button on desktop,
+ * all actions move to a single "..." menu on mobile
  */
 function MenuPrimaryVariant({
   actions,
@@ -172,88 +255,34 @@ function MenuPrimaryVariant({
   gapClass
 }: {
   actions: PageActionButton[]
-  menuActions: MoreActionsItem[]
+  menuActions: ActionsMenuGroup[]
   className?: string
   gapClass: string
 }) {
   const desktopActions = actions.filter(a => !a.showOnlyMobile)
+  const hasMenuActions = menuActions.some(g => g.items.length > 0)
 
   return (
     <>
-      {/* Desktop: MoreActionsMenu + primary buttons */}
+      {/* Desktop: menu dropdown + action buttons */}
       <div className={cn('hidden md:flex items-center', gapClass, className)}>
-        {menuActions.length > 0 && <MoreActionsMenu items={menuActions} />}
+        {hasMenuActions && <ActionsMenuDropdown groups={menuActions} />}
         {desktopActions.map((action, idx) => (
-          <Button
-            key={`desktop-${action.label}-${idx}`}
-            variant={action.variant || 'primary'}
-            onClick={action.onClick}
-            disabled={action.disabled}
-            loading={action.loading}
-            leftIcon={action.icon}
-          >
-            {action.label}
-          </Button>
+          <ActionButton
+            key={`desktop-${actionKey(action, idx)}`}
+            action={{ ...action, variant: action.variant || 'primary' }}
+          />
         ))}
       </div>
 
-      {/* Mobile: Fixed bottom bar — full-width menu button + primary buttons */}
-      <div className={cn(
-        'fixed md:hidden bottom-0 left-0 right-0 z-50',
-        'bg-ods-card border-t border-ods-border',
-        'flex items-start pt-6 pb-6 px-6',
-        gapClass
-      )}>
-        {menuActions.length > 0 && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                className="flex-1"
-                aria-label="More actions"
-                centerIcon={<Ellipsis01Icon size={24} className="text-ods-text-primary" />}
-              />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="start"
-              side="top"
-              sideOffset={6}
-              className="bg-ods-card border border-ods-border p-0 rounded-[4px] min-w-[200px]"
-            >
-              {menuActions.map((item, idx) => (
-                <DropdownMenuItem
-                  key={`mobile-menu-${item.label}-${idx}`}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (!item.disabled) item.onClick()
-                  }}
-                  disabled={item.disabled}
-                  className="flex items-center gap-2 px-4 py-3 bg-ods-bg hover:bg-ods-bg-hover focus:bg-ods-bg-hover border-b border-ods-border last:border-b-0 rounded-none cursor-pointer data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed"
-                >
-                  {item.icon && (
-                    <div className={cn(item.danger ? 'text-ods-error' : 'text-ods-text-secondary', '[&_svg]:size-6 [&_svg]:shrink-0')}>{item.icon}</div>
-                  )}
-                  <span className={`font-medium text-[18px] leading-6 ${item.danger ? 'text-ods-text-primary' : 'text-ods-text-primary'}`}>
-                    {item.label}
-                  </span>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-        {actions.map((action, idx) => (
-          <Button
-            key={`mobile-${action.label}-${idx}`}
-            variant={action.variant || 'primary'}
-            onClick={action.onClick}
-            disabled={action.disabled}
-            loading={action.loading}
-            leftIcon={action.icon}
-            className="flex-1"
-          >
-            {action.label}
-          </Button>
-        ))}
+      {/* Mobile: single "..." menu with actions merged in */}
+      <div className={cn('flex md:hidden', className)}>
+        <ActionsMenuDropdown
+          groups={[
+            { items: actions.flatMap(actionToMenuItems) },
+            ...menuActions
+          ]}
+        />
       </div>
     </>
   )
@@ -274,17 +303,36 @@ function MobileBottomActions({
       gapClass
     )}>
       {actions.map((action, idx) => (
-        <Button
-          key={`mobile-${action.label}-${idx}`}
-          variant={action.variant}
-          onClick={action.onClick}
-          leftIcon={action.icon}
-          disabled={action.disabled}
-          loading={action.loading}
-          className={'flex-1'}
-        >
-          {action.label}
-        </Button>
+        action.label ? (
+          <Button
+            key={`mobile-${actionKey(action, idx)}`}
+            variant={action.variant}
+            onClick={action.onClick}
+            href={action.href}
+            prefetch={action.prefetch}
+            openInNewTab={action.openInNewTab}
+            leftIcon={action.icon}
+            disabled={action.disabled}
+            loading={action.loading}
+            className={'flex-1'}
+          >
+            {action.label}
+          </Button>
+        ) : (
+          <Button
+            key={`mobile-${actionKey(action, idx)}`}
+            variant={action.variant}
+            size="icon"
+            onClick={action.onClick}
+            href={action.href}
+            prefetch={action.prefetch}
+            openInNewTab={action.openInNewTab}
+            centerIcon={action.icon}
+            disabled={action.disabled}
+            loading={action.loading}
+            aria-label={action.ariaLabel}
+          />
+        )
       ))}
     </div>
   )

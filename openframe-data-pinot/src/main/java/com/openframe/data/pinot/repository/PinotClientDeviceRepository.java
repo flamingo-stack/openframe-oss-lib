@@ -1,287 +1,173 @@
 package com.openframe.data.pinot.repository;
 
-import com.openframe.data.pinot.repository.exception.PinotQueryException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pinot.client.Connection;
-import org.apache.pinot.client.ResultSet;
-import org.apache.pinot.client.ResultSetGroup;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import static com.openframe.data.document.device.DeviceStatus.DELETED;
 
 @Slf4j
 @Repository
-public class PinotClientDeviceRepository implements PinotDeviceRepository {
+public class PinotClientDeviceRepository extends AbstractPinotRepository implements PinotDeviceRepository {
 
-    private final Connection pinotConnection;
+    private static final String STATUS = "status";
+    private static final String DEVICE_TYPE = "deviceType";
+    private static final String OS_TYPE = "osType";
+    private static final String ORGANIZATION_ID = "organizationId";
+    private static final String TAGS = "tags";
+    private static final String TAG_KEY_VALUES = "tagKeyValues";
 
     @Value("${pinot.tables.devices.name:devices}")
     private String devicesTable;
 
     public PinotClientDeviceRepository(@Qualifier("pinotBrokerConnection") Connection pinotConnection) {
-        this.pinotConnection = pinotConnection;
+        super(pinotConnection);
     }
 
     @Override
     public Map<String, Integer> getStatusFilterOptions(
+            String tenantId,
             List<String> statuses,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
             List<String> tagKeyValues) {
-        String whereClause = buildWhereClauseExcluding(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, "status");
-        return queryPinotForFilterOptions("SELECT status, COUNT(*) as count FROM \"" + devicesTable + "\"" +
-                (whereClause.isEmpty() ? "" : " WHERE " + whereClause) +
-                " GROUP BY status ORDER BY count DESC");
+        return executeFacetQuery(STATUS, tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, STATUS);
     }
 
     @Override
     public Map<String, Integer> getDeviceTypeFilterOptions(
+            String tenantId,
             List<String> statuses,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
             List<String> tagKeyValues) {
-        String whereClause = buildWhereClauseExcluding(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, "deviceType");
-        return queryPinotForFilterOptions("SELECT deviceType, COUNT(*) as count FROM \"" + devicesTable + "\"" +
-                (whereClause.isEmpty() ? "" : " WHERE " + whereClause) +
-                " GROUP BY deviceType ORDER BY count DESC");
+        return executeFacetQuery(DEVICE_TYPE, tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, DEVICE_TYPE);
     }
 
     @Override
     public Map<String, Integer> getOsTypeFilterOptions(
+            String tenantId,
             List<String> statuses,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
             List<String> tagKeyValues) {
-        String whereClause = buildWhereClauseExcluding(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, "osType");
-        return queryPinotForFilterOptions("SELECT osType, COUNT(*) as count FROM \"" + devicesTable + "\"" +
-                (whereClause.isEmpty() ? "" : " WHERE " + whereClause) +
-                " GROUP BY osType ORDER BY count DESC");
+        return executeFacetQuery(OS_TYPE, tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, OS_TYPE);
     }
 
     @Override
     public Map<String, Integer> getOrganizationFilterOptions(
+            String tenantId,
             List<String> statuses,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
             List<String> tagKeyValues) {
-        String whereClause = buildWhereClauseExcluding(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, "organizationId");
-        return queryPinotForFilterOptions("SELECT organizationId, COUNT(*) as count FROM \"" + devicesTable + "\"" +
-                (whereClause.isEmpty() ? "" : " WHERE " + whereClause) +
-                " GROUP BY organizationId ORDER BY count DESC");
+        return executeFacetQuery(ORGANIZATION_ID, tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, ORGANIZATION_ID);
     }
 
     @Override
     public Map<String, Integer> getTagKeyFilterOptions(
+            String tenantId,
             List<String> statuses,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
             List<String> tagKeyValues) {
-        String whereClause = buildWhereClauseExcluding(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, "tagKeyValues");
-        return queryPinotForFilterOptions("SELECT tagKeyValues, COUNT(*) as count FROM \"" + devicesTable + "\"" +
-                (whereClause.isEmpty() ? "" : " WHERE " + whereClause) +
-                " GROUP BY tagKeyValues ORDER BY count DESC");
+        return executeFacetQuery(TAG_KEY_VALUES, tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, TAG_KEY_VALUES);
     }
 
     @Override
     public int getFilteredDeviceCount(
+            String tenantId,
             List<String> statuses,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
             List<String> tagKeyValues) {
-        String whereClause = buildWhereClause(statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues);
-        return queryPinotForCount("SELECT COUNT(*) FROM \"" + devicesTable + "\"" +
-                (whereClause.isEmpty() ? "" : " WHERE " + whereClause));
-    }
-
-    private Map<String, Integer> queryPinotForFilterOptions(String query) {
-        try {
-            log.debug("Executing Pinot query: {}", query);
-            ResultSetGroup resultSetGroup = pinotConnection.execute(query);
-            ResultSet resultSet = resultSetGroup.getResultSet(0);
-
-            Map<String, Integer> options = new LinkedHashMap<>();
-
-            for (int i = 0; i < resultSet.getRowCount(); i++) {
-                String value = resultSet.getString(i, 0);
-                if (value != null && !value.isEmpty()) {
-                    long count = resultSet.getLong(i, 1);
-                    options.put(value, (int) count);
-                }
-            }
-
-            log.debug("Found {} options for query: {}", options.size(), query);
-            return options;
-        } catch (Exception e) {
-            log.error("Unexpected error executing Pinot query: {}", query, e);
-            throw new PinotQueryException("Failed to execute Pinot query: " + e.getMessage(), e);
-        }
-    }
-
-    private int queryPinotForCount(String query) {
-        try {
-            log.debug("Executing Pinot count query: {}", query);
-            ResultSetGroup resultSetGroup = pinotConnection.execute(query);
-            ResultSet resultSet = resultSetGroup.getResultSet(0);
-
-            if (resultSet.getRowCount() > 0) {
-                long count = resultSet.getLong(0, 0);
-                log.debug("Count result: {}", count);
-                return (int) count;
-            }
-
-            return 0;
-        } catch (Exception e) {
-            log.error("Unexpected error executing Pinot count query: {}", query, e);
-            throw new PinotQueryException("Failed to execute Pinot count query: " + e.getMessage(), e);
-        }
+        PinotQueryBuilder queryBuilder = new PinotQueryBuilder(devicesTable, tenantId)
+                .selectCountAll();
+        applyDeviceFilters(queryBuilder, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, null);
+        return executeCountQuery(queryBuilder.build());
     }
 
     /**
-     * Sanitizes a string value for safe inclusion in Pinot SQL queries.
-     * Escapes single quotes to prevent SQL injection.
+     * Executes a faceted filter-option query:
+     * SELECT {facetField}, COUNT(*) as count FROM devices WHERE <filters excluding facetField> GROUP BY {facetField} ORDER BY count DESC
      */
-    private String sanitize(String value) {
-        if (value == null) {
-            return "";
-        }
-        return value.replace("'", "''");
+    private Map<String, Integer> executeFacetQuery(String facetField,
+                                                    String tenantId,
+                                                    List<String> statuses,
+                                                    List<String> deviceTypes,
+                                                    List<String> osTypes,
+                                                    List<String> organizationIds,
+                                                    List<String> tagKeys,
+                                                    List<String> tagKeyValues,
+                                                    String excludeField) {
+        PinotQueryBuilder queryBuilder = new PinotQueryBuilder(devicesTable, tenantId)
+                .select(facetField)
+                .selectCount()
+                .groupBy(facetField)
+                .orderByCountDesc();
+        applyDeviceFilters(queryBuilder, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, excludeField);
+        return executeKeyCountQuery(queryBuilder.build());
     }
 
-    private String buildWhereClause(List<String> statuses, List<String> deviceTypes,
-                                    List<String> osTypes, List<String> organizationIds,
-                                    List<String> tagKeys, List<String> tagKeyValues) {
-        List<String> conditions = new ArrayList<>();
-        conditions.add("status != '" + DELETED.name() + "'");
+    /**
+     * Applies the shared device filter set to a builder. Always excludes DELETED devices.
+     * If {@code excludeField} matches a filter's field, that filter is skipped (used for faceted filter-option queries).
+     */
+    private void applyDeviceFilters(PinotQueryBuilder queryBuilder,
+                                    List<String> statuses,
+                                    List<String> deviceTypes,
+                                    List<String> osTypes,
+                                    List<String> organizationIds,
+                                    List<String> tagKeys,
+                                    List<String> tagKeyValues,
+                                    String excludeField) {
+        queryBuilder.whereNotEquals(STATUS, DELETED.name());
 
-        if (statuses != null && !statuses.isEmpty()) {
+        if (!STATUS.equals(excludeField) && statuses != null) {
             List<String> filteredStatuses = statuses.stream()
                     .filter(status -> status != null && !status.isBlank())
                     .filter(status -> !DELETED.name().equals(status))
                     .toList();
-
             if (!filteredStatuses.isEmpty()) {
-                String statusCondition = filteredStatuses.stream()
-                        .map(status -> "status = '" + sanitize(status) + "'")
-                        .collect(Collectors.joining(" OR "));
-                conditions.add("(" + statusCondition + ")");
+                queryBuilder.whereOr(STATUS, filteredStatuses);
             }
         }
 
-        if (deviceTypes != null && !deviceTypes.isEmpty()) {
-            String deviceTypeCondition = deviceTypes.stream()
-                    .map(type -> "deviceType = '" + sanitize(type) + "'")
-                    .collect(Collectors.joining(" OR "));
-            conditions.add("(" + deviceTypeCondition + ")");
+        if (!DEVICE_TYPE.equals(excludeField) && deviceTypes != null && !deviceTypes.isEmpty()) {
+            queryBuilder.whereOr(DEVICE_TYPE, deviceTypes);
         }
 
-        if (osTypes != null && !osTypes.isEmpty()) {
-            String osTypeCondition = osTypes.stream()
-                    .map(os -> "osType = '" + sanitize(os) + "'")
-                    .collect(Collectors.joining(" OR "));
-            conditions.add("(" + osTypeCondition + ")");
+        if (!OS_TYPE.equals(excludeField) && osTypes != null && !osTypes.isEmpty()) {
+            queryBuilder.whereOr(OS_TYPE, osTypes);
         }
 
-        if (organizationIds != null && !organizationIds.isEmpty()) {
-            String orgCondition = organizationIds.stream()
-                    .map(orgId -> "organizationId = '" + sanitize(orgId) + "'")
-                    .collect(Collectors.joining(" OR "));
-            conditions.add("(" + orgCondition + ")");
+        if (!ORGANIZATION_ID.equals(excludeField) && organizationIds != null && !organizationIds.isEmpty()) {
+            queryBuilder.whereOr(ORGANIZATION_ID, organizationIds);
         }
 
-        if (tagKeys != null && !tagKeys.isEmpty()) {
-            String tagCondition = tagKeys.stream()
-                    .map(tagKey -> "tags = '" + sanitize(tagKey) + "'")
-                    .collect(Collectors.joining(" OR "));
-            conditions.add("(" + tagCondition + ")");
+        if (!TAGS.equals(excludeField) && tagKeys != null && !tagKeys.isEmpty()) {
+            queryBuilder.whereOr(TAGS, tagKeys);
         }
 
-        if (tagKeyValues != null && !tagKeyValues.isEmpty()) {
-            String tagKvCondition = tagKeyValues.stream()
-                    .map(kv -> "tagKeyValues = '" + sanitize(kv) + "'")
-                    .collect(Collectors.joining(" OR "));
-            conditions.add("(" + tagKvCondition + ")");
+        if (!TAG_KEY_VALUES.equals(excludeField) && tagKeyValues != null && !tagKeyValues.isEmpty()) {
+            queryBuilder.whereOr(TAG_KEY_VALUES, tagKeyValues);
         }
-
-        return String.join(" AND ", conditions);
     }
-
-    private String buildWhereClauseExcluding(List<String> statuses, List<String> deviceTypes,
-                                             List<String> osTypes, List<String> organizationIds,
-                                             List<String> tagKeys, List<String> tagKeyValues,
-                                             String excludeField) {
-        List<String> conditions = new ArrayList<>();
-        conditions.add("status != '" + DELETED.name() + "'");
-
-        if (statuses != null && !statuses.isEmpty() && !"status".equals(excludeField)) {
-            List<String> filteredStatuses = statuses.stream()
-                    .filter(status -> status != null && !status.isBlank())
-                    .filter(status -> !DELETED.name().equals(status))
-                    .toList();
-
-            if (!filteredStatuses.isEmpty()) {
-                String statusCondition = filteredStatuses.stream()
-                        .map(status -> "status = '" + sanitize(status) + "'")
-                        .collect(Collectors.joining(" OR "));
-                conditions.add("(" + statusCondition + ")");
-            }
-        }
-
-        if (deviceTypes != null && !deviceTypes.isEmpty() && !"deviceType".equals(excludeField)) {
-            String deviceTypeCondition = deviceTypes.stream()
-                    .map(type -> "deviceType = '" + sanitize(type) + "'")
-                    .collect(Collectors.joining(" OR "));
-            conditions.add("(" + deviceTypeCondition + ")");
-        }
-
-        if (osTypes != null && !osTypes.isEmpty() && !"osType".equals(excludeField)) {
-            String osTypeCondition = osTypes.stream()
-                    .map(os -> "osType = '" + sanitize(os) + "'")
-                    .collect(Collectors.joining(" OR "));
-            conditions.add("(" + osTypeCondition + ")");
-        }
-
-        if (organizationIds != null && !organizationIds.isEmpty() && !"organizationId".equals(excludeField)) {
-            String orgCondition = organizationIds.stream()
-                    .map(orgId -> "organizationId = '" + sanitize(orgId) + "'")
-                    .collect(Collectors.joining(" OR "));
-            conditions.add("(" + orgCondition + ")");
-        }
-
-        if (tagKeys != null && !tagKeys.isEmpty() && !"tags".equals(excludeField)) {
-            String tagCondition = tagKeys.stream()
-                    .map(tagKey -> "tags = '" + sanitize(tagKey) + "'")
-                    .collect(Collectors.joining(" OR "));
-            conditions.add("(" + tagCondition + ")");
-        }
-
-        if (tagKeyValues != null && !tagKeyValues.isEmpty() && !"tagKeyValues".equals(excludeField)) {
-            String tagKvCondition = tagKeyValues.stream()
-                    .map(kv -> "tagKeyValues = '" + sanitize(kv) + "'")
-                    .collect(Collectors.joining(" OR "));
-            conditions.add("(" + tagKvCondition + ")");
-        }
-
-        return String.join(" AND ", conditions);
-    }
-
 }

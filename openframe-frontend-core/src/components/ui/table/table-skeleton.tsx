@@ -14,6 +14,7 @@ export function TableCardSkeleton({
   columns,
   rows = 10,
   hasActions = false,
+  hasChevron = false,
   className,
   rowClassName
 }: TableCardSkeletonProps) {
@@ -51,9 +52,16 @@ export function TableCardSkeleton({
 
             {/* Actions skeleton */}
             {hasActions && (
-              <div className="flex gap-2 items-center shrink-0 ml-auto">
+              <div className={cn('flex gap-2 items-center shrink-0', !hasChevron && 'ml-auto')}>
                 <div className="h-12 w-12 bg-ods-bg-surface rounded" />
                 <div className="h-12 w-24 bg-ods-bg-surface rounded" />
+              </div>
+            )}
+
+            {/* Chevron skeleton */}
+            {hasChevron && (
+              <div className={cn('flex items-center justify-end shrink-0 w-12', !hasActions && 'ml-auto')}>
+                <div className="h-8 w-8 bg-ods-bg-surface rounded" />
               </div>
             )}
           </div>
@@ -70,6 +78,9 @@ export function TableCardSkeleton({
             </div>
             {hasActions && (
               <div className="h-12 w-12 bg-ods-bg-surface rounded shrink-0" />
+            )}
+            {hasChevron && (
+              <div className="h-8 w-8 bg-ods-bg-surface rounded shrink-0" />
             )}
           </div>
         </div>

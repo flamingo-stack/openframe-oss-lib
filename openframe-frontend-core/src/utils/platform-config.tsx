@@ -40,11 +40,11 @@ export const platformDisplayNames = {
   openframe: 'OpenFrame',
   flamingo: 'Flamingo',
   'flamingo-teaser': 'Flamingo Teaser',
-  'marketing-hub': 'Marketing Hub',
-  'product-hub': 'Product Hub',
-  'revenue-hub': 'Revenue Hub',
-  'people-hub': 'People Hub',
-  'company-hub': 'Company Hub',
+  'marketing-hub': 'Flamingo Marketing Hub',
+  'product-hub': 'Flamingo Product Hub',
+  'revenue-hub': 'Flamingo Revenue Hub',
+  'people-hub': 'Flamingo People Hub',
+  'company-hub': 'Flamingo Company Hub',
   tmcg: 'TMCG',
   universal: 'Universal'
 };
