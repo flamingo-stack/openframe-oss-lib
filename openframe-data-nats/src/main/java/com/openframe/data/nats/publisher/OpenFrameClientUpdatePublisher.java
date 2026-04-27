@@ -32,14 +32,17 @@ public class OpenFrameClientUpdatePublisher {
             return;
         }
 
-        openFrameClientConfigurationService.markAsNonPublished();
-
         try {
             OpenFrameClientUpdateMessage message = buildMessage(configuration);
             natsMessagePublisher.publishPersistent(TOPIC_NAME, message);
         } catch (Exception e) {
             log.error("NATS publish failed for client configuration version {}, will be retried by scheduler",
                     configuration.getVersion(), e);
+            try {
+                openFrameClientConfigurationService.markAsNonPublished();
+            } catch (OptimisticLockingFailureException ole) {
+                log.warn("Concurrent writer for client configuration during failure-mark; skipping");
+            }
             return;
         }
 

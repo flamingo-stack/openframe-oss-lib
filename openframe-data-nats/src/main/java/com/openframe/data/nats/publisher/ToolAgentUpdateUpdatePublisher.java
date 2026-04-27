@@ -41,14 +41,17 @@ public class ToolAgentUpdateUpdatePublisher {
 
         String toolAgentId = toolAgent.getId();
 
-        integratedToolAgentService.markAsNonPublished(toolAgentId);
-
         try {
             String topicName = buildTopicName(toolAgent);
             ToolAgentUpdateMessage message = buildMessage(toolAgent);
             natsMessagePublisher.publishPersistent(topicName, message);
         } catch (Exception e) {
             log.error("NATS publish failed for tool agent {}, will be retried by scheduler", toolAgentId, e);
+            try {
+                integratedToolAgentService.markAsNonPublished(toolAgentId);
+            } catch (OptimisticLockingFailureException ole) {
+                log.warn("Concurrent writer for tool agent {} during failure-mark; skipping", toolAgentId);
+            }
             return;
         }
 

@@ -106,7 +106,7 @@ public class IntegratedToolAgentService {
         existing.setStatus(fromConfig.getStatus());
 
         if (versionChanged || assetChanged) {
-            existing.setPublishState(PublishState.nonPublished(existing.getPublishState()));
+            existing.setPublishState(new PublishState(false, null, 0));
             log.info("Marked tool agent {} for publish: versionChanged={}, assetChanged={}",
                     existing.getId(), versionChanged, assetChanged);
         }
@@ -130,7 +130,7 @@ public class IntegratedToolAgentService {
         }
         String oldVersion = agent.getVersion();
         agent.setVersion(newVersion);
-        agent.setPublishState(PublishState.nonPublished(agent.getPublishState()));
+        agent.setPublishState(new PublishState(false, null, 0));
         save(agent);
         log.info("Updated release agent {} version {} -> {} and marked for publish",
                 id, oldVersion, newVersion);
