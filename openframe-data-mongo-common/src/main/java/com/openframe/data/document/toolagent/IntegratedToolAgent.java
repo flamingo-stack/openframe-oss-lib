@@ -3,10 +3,8 @@ package com.openframe.data.document.toolagent;
 import com.openframe.data.document.clientconfiguration.DownloadConfiguration;
 import com.openframe.data.document.clientconfiguration.PublishState;
 import lombok.Data;
-import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.annotation.LastModifiedDate;
-import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.List;
@@ -17,6 +15,10 @@ public class IntegratedToolAgent {
 
     @Id
     private String id;
+
+    @Version
+    private Long documentVersion;
+
     private String toolId;
 
     private boolean releaseVersion;

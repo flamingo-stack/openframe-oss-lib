@@ -1,7 +1,6 @@
 package com.openframe.data.nats.publisher;
 
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
-import com.openframe.data.document.clientconfiguration.PublishState;
 import com.openframe.data.nats.mapper.DownloadConfigurationMapper;
 import com.openframe.data.nats.model.OpenFrameClientUpdateMessage;
 import com.openframe.data.service.OpenFrameClientConfigurationService;
@@ -9,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -32,24 +32,23 @@ public class OpenFrameClientUpdatePublisher {
             return;
         }
 
-        markAsNonPublished();
+        openFrameClientConfigurationService.markAsNonPublished();
 
-        OpenFrameClientUpdateMessage message = buildMessage(configuration);
-        natsMessagePublisher.publishPersistent(TOPIC_NAME, message);
+        try {
+            OpenFrameClientUpdateMessage message = buildMessage(configuration);
+            natsMessagePublisher.publishPersistent(TOPIC_NAME, message);
+        } catch (Exception e) {
+            log.error("NATS publish failed for client configuration version {}, will be retried by scheduler",
+                    configuration.getVersion(), e);
+            return;
+        }
 
-        markAsPublished();
-
-        log.info("Published client update message for all machines with version: {}", configuration.getVersion());
-    }
-
-    private void markAsNonPublished() {
-        OpenFrameClientConfiguration configuration = openFrameClientConfigurationService.get();
-
-        PublishState publishState = configuration.getPublishState();
-        PublishState stateBefore = PublishState.nonPublished(publishState);
-        configuration.setPublishState(stateBefore);
-
-        openFrameClientConfigurationService.save(configuration);
+        try {
+            openFrameClientConfigurationService.markAsPublished();
+            log.info("Published client update message for all machines with version: {}", configuration.getVersion());
+        } catch (OptimisticLockingFailureException e) {
+            log.warn("Concurrent writer for client configuration during publish; skipping mark-published");
+        }
     }
 
     private OpenFrameClientUpdateMessage buildMessage(OpenFrameClientConfiguration configuration) {
@@ -60,14 +59,4 @@ public class OpenFrameClientUpdatePublisher {
         );
         return message;
     }
-
-    private void markAsPublished() {
-        OpenFrameClientConfiguration configuration = openFrameClientConfigurationService.get();
-
-        PublishState stateBefore = configuration.getPublishState();
-        configuration.setPublishState(PublishState.published(stateBefore));
-
-        openFrameClientConfigurationService.save(configuration);
-    }
 }
-

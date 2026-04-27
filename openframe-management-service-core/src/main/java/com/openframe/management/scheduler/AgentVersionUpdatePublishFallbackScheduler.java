@@ -9,6 +9,7 @@ import com.openframe.data.service.IntegratedToolAgentService;
 import com.openframe.data.service.OpenFrameClientConfigurationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -31,38 +32,34 @@ public class AgentVersionUpdatePublishFallbackScheduler {
     private int maxPublishAttempts;
 
     @Scheduled(fixedDelayString = "${openframe.agent-version-update-publish-fallback.interval:30000}")
+    @SchedulerLock(
+            name = "agentVersionUpdatePublishFallback",
+            lockAtMostFor = "${openframe.agent-version-update-publish-fallback.lock-at-most-for:5m}",
+            lockAtLeastFor = "${openframe.agent-version-update-publish-fallback.lock-at-least-for:10s}"
+    )
     public void publishUnpublishedEntities() {
         try {
-            OpenFrameClientConfiguration openFrameClientConfiguration = openFrameClientConfigurationService.get();
-            processOpenframeClient(openFrameClientConfiguration);
-
-            List<IntegratedToolAgent> toolAgents = integratedToolAgentService.getAllEnabled();
-            toolAgents.forEach(this::processToolAgent);
+            processOpenframeClient();
+            processToolAgents();
         } catch (Exception e) {
             log.error("Agent version update publishing failed", e);
         }
     }
 
-    private void processOpenframeClient(OpenFrameClientConfiguration openFrameClientConfiguration) {
-        if (shouldRetryPublish(openFrameClientConfiguration)) {
-            openFrameClientUpdatePublisher.publish(openFrameClientConfiguration);
+    private void processOpenframeClient() {
+        OpenFrameClientConfiguration config = openFrameClientConfigurationService.get();
+        if (shouldRetryPublish(config.getPublishState())) {
+            openFrameClientUpdatePublisher.publish(config);
         }
     }
 
-    private void processToolAgent(IntegratedToolAgent toolAgent) {
-        if (shouldRetryPublish(toolAgent)) {
-            toolAgentUpdateUpdatePublisher.publish(toolAgent);
+    private void processToolAgents() {
+        List<IntegratedToolAgent> enabled = integratedToolAgentService.getAllEnabled();
+        for (IntegratedToolAgent agent : enabled) {
+            if (shouldRetryPublish(agent.getPublishState())) {
+                toolAgentUpdateUpdatePublisher.publish(agent);
+            }
         }
-    }
-
-    private boolean shouldRetryPublish(OpenFrameClientConfiguration config) {
-        PublishState publishState = config.getPublishState();
-        return shouldRetryPublish(publishState);
-    }
-
-    private boolean shouldRetryPublish(IntegratedToolAgent agent) {
-        PublishState publishState = agent.getPublishState();
-        return shouldRetryPublish(publishState);
     }
 
     private boolean shouldRetryPublish(PublishState publishState) {
