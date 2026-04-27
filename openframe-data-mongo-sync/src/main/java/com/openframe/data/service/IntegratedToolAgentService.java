@@ -28,10 +28,6 @@ public class IntegratedToolAgentService {
 
     private final IntegratedToolAgentRepository agentRepository;
 
-    public IntegratedToolAgent save(IntegratedToolAgent agent) {
-        return agentRepository.save(agent);
-    }
-
     public List<IntegratedToolAgent> getAll() {
         return agentRepository.findAll();
     }
@@ -61,13 +57,13 @@ public class IntegratedToolAgentService {
     public void markAsNonPublished(String id) {
         IntegratedToolAgent agent = getById(id);
         agent.setPublishState(PublishState.nonPublished(agent.getPublishState()));
-        save(agent);
+        agentRepository.save(agent);
     }
 
     public void markAsPublished(String id) {
         IntegratedToolAgent agent = getById(id);
         agent.setPublishState(PublishState.published(agent.getPublishState()));
-        save(agent);
+        agentRepository.save(agent);
     }
 
     @Retryable(
@@ -78,7 +74,7 @@ public class IntegratedToolAgentService {
     public void updateConfigurationFields(IntegratedToolAgent fromConfig) {
         Optional<IntegratedToolAgent> existingOpt = findById(fromConfig.getId());
         if (existingOpt.isEmpty()) {
-            save(fromConfig);
+            agentRepository.save(fromConfig);
             return;
         }
 
@@ -111,7 +107,7 @@ public class IntegratedToolAgentService {
                     existing.getId(), versionChanged, assetChanged);
         }
 
-        save(existing);
+        agentRepository.save(fromConfig);
     }
 
     @Retryable(
@@ -131,7 +127,7 @@ public class IntegratedToolAgentService {
         String oldVersion = agent.getVersion();
         agent.setVersion(newVersion);
         agent.setPublishState(new PublishState(false, null, 0));
-        save(agent);
+        agentRepository.save(agent);
         log.info("Updated release agent {} version {} -> {} and marked for publish",
                 id, oldVersion, newVersion);
     }
