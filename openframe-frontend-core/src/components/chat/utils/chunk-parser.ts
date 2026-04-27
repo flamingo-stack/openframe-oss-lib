@@ -39,7 +39,13 @@ export function parseChunkToAction(chunk: unknown): ParsedChunkAction | null {
         return { action: 'text', text: data.text }
       }
       return null
-      
+
+    case MESSAGE_TYPE.THINKING:
+      if (typeof data.text === 'string') {
+        return { action: 'thinking', text: data.text }
+      }
+      return null
+
     case MESSAGE_TYPE.EXECUTING_TOOL:
       return {
         action: 'tool_execution',

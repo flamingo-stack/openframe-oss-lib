@@ -154,6 +154,12 @@ export interface UseRealtimeChunkProcessorOptions {
     /** Escalated approvals */
     escalatedApprovals?: Map<string, { command: string; explanation?: string; approvalType: string }>
   }
+  /**
+   * When true, THINKING chunks are processed into thinking segments. When false
+   * (default), they are dropped before parsing — they never enter the
+   * accumulator or store.
+   */
+  enableThinking?: boolean
 }
 
 export interface UseRealtimeChunkProcessorReturn {
