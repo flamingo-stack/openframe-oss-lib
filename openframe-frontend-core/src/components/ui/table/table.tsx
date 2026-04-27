@@ -87,6 +87,7 @@ function injectSyntheticColumns<T>(
   return result
 }
 
+/** @deprecated Use `DataTable` from `data-table` instead. */
 export function Table<T = any>({
   data,
   columns,

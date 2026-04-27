@@ -287,12 +287,6 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
           )}
         </div>
 
-        {/* Footer */}
-        {config.footer && (
-          <div className="border-t border-ods-border p-4 shrink-0">
-            {config.footer}
-          </div>
-        )}
       </div>
     </>
   )

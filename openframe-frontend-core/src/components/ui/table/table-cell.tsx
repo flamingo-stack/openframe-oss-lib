@@ -4,6 +4,7 @@ import React from 'react'
 import { cn } from '../../../utils/cn'
 import type { TableCellProps } from './types'
 
+/** @deprecated Use `DataTable` from `data-table` instead. */
 export function TableCell({
   children,
   align = 'left',

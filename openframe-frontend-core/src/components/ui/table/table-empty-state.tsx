@@ -6,6 +6,7 @@ import { cn } from '../../../utils/cn'
 import { Button } from '../button'
 import type { TableEmptyStateProps } from './types'
 
+/** @deprecated Use `DataTableEmpty` from `data-table` instead. */
 export function TableEmptyState({
   message = 'No data available',
   icon,

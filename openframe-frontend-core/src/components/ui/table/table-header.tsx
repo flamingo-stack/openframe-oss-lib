@@ -10,6 +10,7 @@ import { TableColumnFilterDropdown } from './table-column-filter-dropdown'
 import type { TableColumn, TableHeaderProps } from './types'
 import { getHideClasses } from './utils'
 
+/** @deprecated Use `DataTableHeader` from `data-table` instead. */
 export function TableHeader<T = any>({
   columns,
   className,
@@ -111,7 +112,7 @@ export function TableHeader<T = any>({
               {isActionsColumn ? (
                 // Render total items count in actions column
                 totalItemsCount > 0 && (
-                  <span className="font-medium text-[12px] leading-[16px] text-ods-text-secondary whitespace-nowrap">
+                  <span className="text-h6 text-ods-text-secondary whitespace-nowrap">
                     Showing {totalItemsCount} {totalItemsCount === 1 ? 'result' : 'results'}
                   </span>
                 )
@@ -140,7 +141,7 @@ export function TableHeader<T = any>({
                     </>
                   ) : (
                     <>
-                      <span className="font-medium text-[12px] leading-[16px] text-ods-text-secondary uppercase">
+                      <span className="text-h5 text-ods-text-secondary uppercase whitespace-nowrap">
                         {column.label}
                       </span>
                       {getSortIcon(column)}

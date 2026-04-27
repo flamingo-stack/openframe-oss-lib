@@ -20,10 +20,41 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import { FlattenedParam, shouldIncludeInUrl } from './flatten-schema'
 import { JSType } from './graphql-parser'
 import { coerceValue } from './url-converter'
+
+/**
+ * Returns the previous reference if the JSON-serialized content of `value`
+ * hasn't changed across renders. Internal helper used to shield consumers from
+ * ref churn caused by:
+ *   - `useSearchParams()` returning a new `ReadonlyURLSearchParams` instance
+ *     on every render even when the URL is unchanged (Next.js behavior).
+ *   - Consumers passing the schema as a fresh object literal on every render.
+ */
+function useContentStable<T>(value: T, key: string): T {
+  const ref = useRef<{ value: T; key: string } | undefined>(undefined)
+  if (ref.current && ref.current.key === key) return ref.current.value
+  ref.current = { value, key }
+  return value
+}
+
+/**
+ * Reuses a previous array reference if its content (shallow string equality)
+ * matches the freshly parsed array. Lets `params.tier` etc. stay
+ * reference-stable across renders that don't actually change those values.
+ */
+function reuseIfShallowEqual<T extends string | number | boolean>(
+  prev: unknown,
+  next: T[],
+): T[] {
+  if (!Array.isArray(prev) || prev.length !== next.length) return next
+  for (let i = 0; i < next.length; i++) {
+    if (prev[i] !== next[i]) return next
+  }
+  return prev as T[]
+}
 
 /**
  * Type mapping from JSType to TypeScript types for OUTPUT (reading params)
@@ -193,14 +224,36 @@ export function useApiParams<TSchema extends ParamSchema>(
   options: UseApiParamsOptions = {}
 ): UseApiParamsReturn<TSchema> {
   const router = useRouter()
-  const searchParams = useSearchParams()
+  const searchParamsLive = useSearchParams()
   const debug = options.debug || false
 
+  // ───── Reference-stability layer ──────────────────────────────────────
+  //
+  // Goal: `params`, `params.<arrayField>`, and the setter callbacks must keep
+  // the SAME reference across renders unless the URL or schema content
+  // actually changes. Otherwise consumer `useMemo`/`useEffect` deps that
+  // include `params.foo` invalidate on every parent re-render.
+  //
+  // Without this, every call site has to defensively `JSON.stringify` filter
+  // arrays into a content-key — a known footgun. The stability is provided
+  // here, once, instead of in 17 consumers.
+
+  // 1. URL string is the canonical, value-stable representation of search params.
+  const searchString = searchParamsLive.toString()
+
+  // 2. Schema reference stabilized by content. Consumers commonly pass an
+  //    object literal each render, which would otherwise invalidate every memo.
+  const schemaKey = useMemo(() => JSON.stringify(schema), [schema])
+  const stableSchema = useContentStable(schema, schemaKey)
+
+  // ──────────────────────────────────────────────────────────────────────
+
   // Convert schema to flattened format for reuse
+  // biome-ignore lint/correctness/useExhaustiveDependencies: schemaKey is the content-stable key for `stableSchema`.
   const flattenedSchema = useMemo((): Record<string, FlattenedParam> => {
     const flattened: Record<string, FlattenedParam> = {}
 
-    for (const [key, config] of Object.entries(schema)) {
+    for (const [key, config] of Object.entries(stableSchema)) {
       flattened[key] = {
         urlParamName: key,
         graphqlPath: key,
@@ -212,32 +265,48 @@ export function useApiParams<TSchema extends ParamSchema>(
     }
 
     return flattened
-  }, [schema])
+  }, [schemaKey])
 
-  // Parse URL parameters with type coercion
+  // Parse URL parameters with type coercion. Reuse previous array refs when
+  // their content is unchanged so `params.<arrayField>` stays stable across
+  // renders that don't touch that specific field.
+  const prevParamsRef = useRef<Record<string, unknown> | undefined>(undefined)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `searchString` and `schemaKey` are content-stable representations of `searchParamsLive` and `stableSchema`.
   const params = useMemo((): InferParamsFromSchema<TSchema> => {
+    const sp = new URLSearchParams(searchString)
     const result: Record<string, unknown> = {}
+    const prev = prevParamsRef.current
 
-    for (const [key, config] of Object.entries(schema)) {
+    for (const [key, config] of Object.entries(stableSchema)) {
       // Read from URL
       const rawValue = config.type === 'array'
-        ? searchParams.getAll(key)
-        : searchParams.get(key)
+        ? sp.getAll(key)
+        : sp.get(key)
 
       // Use value from URL or default
+      let value: unknown
       if (rawValue && (Array.isArray(rawValue) ? rawValue.length > 0 : true)) {
-        result[key] = coerceValue(rawValue, config.type)
+        value = coerceValue(rawValue, config.type)
       } else {
-        result[key] = config.default
+        value = config.default
       }
+
+      // Reuse previous reference when content matches — keeps array fields
+      // reference-stable when an unrelated param changed.
+      if (Array.isArray(value) && prev) {
+        value = reuseIfShallowEqual(prev[key], value as (string | number | boolean)[])
+      }
+
+      result[key] = value
     }
 
     if (debug) {
       console.log('[useApiParams] Parsed params:', result)
     }
 
+    prevParamsRef.current = result
     return result as InferParamsFromSchema<TSchema>
-  }, [searchParams, schema, debug])
+  }, [searchString, schemaKey, debug])
 
   // Helper: Add parameter value to URLSearchParams
   const addParamToSearchParams = useCallback((
@@ -282,14 +351,19 @@ export function useApiParams<TSchema extends ParamSchema>(
     return newParams
   }, [params, schema, flattenedSchema, addParamToSearchParams])
 
-  // Update URL with new parameters (preserve other params not managed by this hook)
+  // Update URL with new parameters (preserve other params not managed by this
+  // hook). Depends only on value-stable inputs (`searchString`, `schemaKey`),
+  // so the callback ref itself is stable across renders that don't change URL
+  // or schema — important for consumers that put `setParam`/`setParams` in
+  // `useEffect` deps.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `searchString` and `schemaKey` are content-stable representations of `searchParamsLive` and `stableSchema`.
   const updateUrl = useCallback((newParams: URLSearchParams, keysToRemove: string[] = []) => {
     // Preserve all existing params, then override with new ones
-    const finalParams = new URLSearchParams(searchParams)
+    const finalParams = new URLSearchParams(searchString)
 
     // Remove keys that are explicitly marked for removal
     keysToRemove.forEach(key => {
-      if (key in schema) {
+      if (key in stableSchema) {
         finalParams.delete(key)
       }
     })
@@ -298,7 +372,7 @@ export function useApiParams<TSchema extends ParamSchema>(
     // This preserves other schema parameters that aren't being changed
     newParams.forEach((_, key) => {
       // Only remove keys that are in our schema
-      if (key in schema) {
+      if (key in stableSchema) {
         finalParams.delete(key)
       }
     })
@@ -307,7 +381,7 @@ export function useApiParams<TSchema extends ParamSchema>(
     // Only add parameters that are in our schema to avoid duplicating external params
     newParams.forEach((value, key) => {
       // Only process keys that are in our schema
-      if (key in schema) {
+      if (key in stableSchema) {
         if (finalParams.has(key)) {
           // Key already exists (from array params), append
           finalParams.append(key, value)
@@ -318,8 +392,8 @@ export function useApiParams<TSchema extends ParamSchema>(
       }
     })
 
-    const url = finalParams.toString() 
-      ? `?${finalParams.toString()}` 
+    const url = finalParams.toString()
+      ? `?${finalParams.toString()}`
       : window.location.pathname
 
     if (debug) {
@@ -328,7 +402,7 @@ export function useApiParams<TSchema extends ParamSchema>(
 
     // Use replace for shallow routing (no page reload, no history spam)
     router.replace(url, { scroll: false })
-  }, [router, debug, searchParams, schema])
+  }, [router, debug, searchString, schemaKey])
 
   // Helper to check if value is empty
   const isEmptyValue = (value: unknown): boolean => {
@@ -343,11 +417,12 @@ export function useApiParams<TSchema extends ParamSchema>(
   }
 
   // Set a single parameter
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `schemaKey` is the content-stable key for `stableSchema`.
   const setParam = useCallback(<K extends keyof TSchema & string>(
     key: K,
     value: InferInputParamsFromSchema<Pick<TSchema, K>>[K]
   ) => {
-    const config = schema[key]
+    const config = stableSchema[key]
 
     if (!config) {
       console.warn(`[useApiParams] Unknown parameter: ${key}`)
@@ -362,9 +437,10 @@ export function useApiParams<TSchema extends ParamSchema>(
       addParamToSearchParams(newParams, key, value as ParamValue)
       updateUrl(newParams)
     }
-  }, [schema, updateUrl, addParamToSearchParams])
+  }, [schemaKey, updateUrl, addParamToSearchParams])
 
   // Set multiple parameters
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `schemaKey` is the content-stable key for `stableSchema`.
   const setParams = useCallback((
     updates: Partial<InferInputParamsFromSchema<TSchema>>
   ) => {
@@ -372,7 +448,7 @@ export function useApiParams<TSchema extends ParamSchema>(
     const keysToRemove: string[] = []
 
     for (const [key, value] of Object.entries(updates)) {
-      const config = schema[key]
+      const config = stableSchema[key]
 
       if (!config) {
         console.warn(`[useApiParams] Unknown parameter: ${key}`)
@@ -387,7 +463,7 @@ export function useApiParams<TSchema extends ParamSchema>(
     }
 
     updateUrl(newParams, keysToRemove)
-  }, [schema, updateUrl, addParamToSearchParams])
+  }, [schemaKey, updateUrl, addParamToSearchParams])
 
   // Clear specific parameters
   const clearParams = useCallback((keys: (keyof TSchema & string)[]) => {

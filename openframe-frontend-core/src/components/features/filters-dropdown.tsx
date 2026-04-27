@@ -98,6 +98,10 @@ const FilterCheckbox: React.FC<{
   )
 }
 
+// Animation timings (ms). Must stay in sync with the `duration-200` Tailwind
+// class on the dropdown panel below.
+const ANIMATION_MS = 200
+
 export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
   triggerElement,
   triggerLabel = "Filters",
@@ -111,11 +115,45 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
   responsive = true
 }) => {
   const [isOpen, setIsOpen] = useState(false)
+  // `shouldRender` controls mount/unmount.
+  // `isVisible` controls the open/closed *visual* state and drives the CSS transition.
+  // Splitting them lets us mount in the closed visual state, then flip to open on
+  // the next frame so the browser actually transitions (instead of teleporting).
+  const [shouldRender, setShouldRender] = useState(false)
+  const [isVisible, setIsVisible] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [actualPlacement, setActualPlacement] = useState(placement)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement | HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  // Drive mount/unmount and visual state from `isOpen`.
+  //
+  // Open  : mount with closed styles → wait two frames, flip to visible → CSS transition runs.
+  // Close : flip to invisible → CSS transition runs → unmount after duration.
+  //
+  // Because we use CSS transitions (not @keyframes), interrupting mid-animation
+  // smoothly continues from the current computed value — no flicker.
+  useEffect(() => {
+    if (isOpen) {
+      setShouldRender(true)
+      // Double rAF: the first frame guarantees the element is mounted and the
+      // closed styles have been painted; the second flips to the open state so
+      // the browser sees a transitionable property change. A single rAF can
+      // sometimes fire in the same frame as mount, suppressing the transition.
+      let id2 = 0
+      const id1 = requestAnimationFrame(() => {
+        id2 = requestAnimationFrame(() => setIsVisible(true))
+      })
+      return () => {
+        cancelAnimationFrame(id1)
+        cancelAnimationFrame(id2)
+      }
+    }
+    setIsVisible(false)
+    const t = setTimeout(() => setShouldRender(false), ANIMATION_MS)
+    return () => clearTimeout(t)
+  }, [isOpen])
 
   // Check if mobile on mount and resize
   useEffect(() => {
@@ -325,12 +363,19 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
         </button>
       )}
 
-      {/* Dropdown Panel */}
-      {isOpen && (
+      {/* Dropdown Panel — kept mounted briefly on close to play exit transition. */}
+      {shouldRender && (
         <div
           ref={dropdownRef}
           className={cn(
-            "z-50",
+            "z-50 origin-top",
+            // CSS transitions (not @keyframes) so mid-animation interruption
+            // interpolates smoothly from the current computed value.
+            "transition-[opacity,transform] duration-200 ease-out",
+            "will-change-[opacity,transform]",
+            isVisible
+              ? "opacity-100 scale-100 translate-y-0"
+              : "opacity-0 scale-95 -translate-y-2 pointer-events-none",
             isMobile
               ? "fixed left-4 right-4 max-w-[320px] mx-auto"
               : "absolute w-[320px]",
@@ -354,8 +399,8 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
                   "space-y-2",
                   sectionIndex > 0 && "mt-4"
                 )}>
-                  {/* Section Header */}
-                  <div className="flex items-center justify-between">
+                  {/* Section Header — sticky so title + Select All stay visible while options scroll. */}
+                  <div className="sticky top-0 z-10 bg-ods-bg flex items-center justify-between pb-2">
                     <h3 className="text-h5 text-ods-text-secondary">
                       {section.title}
                     </h3>

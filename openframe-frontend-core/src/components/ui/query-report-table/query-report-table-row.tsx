@@ -1,13 +1,13 @@
 'use client'
 
 import { useRef, useState, useCallback } from 'react'
-import { cn } from '../../../../utils/cn'
+import { cn } from '../../../utils/cn'
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '../../tooltip'
+} from '../tooltip'
 import type { QueryReportTableRowProps } from './types'
 
 export function QueryReportTableRow({
