@@ -107,7 +107,7 @@ public class IntegratedToolAgentService {
                     existing.getId(), versionChanged, assetChanged);
         }
 
-        agentRepository.save(fromConfig);
+        agentRepository.save(existing);
     }
 
     @Retryable(
