@@ -15,8 +15,8 @@ import {
   useDataTable,
   type ColumnDef,
   type ColumnFiltersState,
+  type DataTableSortState,
   type RowSelectionState,
-  type SortingState,
 } from '../components/ui/data-table'
 import { Button } from '../components/ui/button'
 import { Checkbox } from '../components/ui/checkbox'
@@ -307,57 +307,70 @@ export const Basic: Story = {
 }
 
 /**
- * **Client-side sorting** — set `clientSideSorting: true`, mark columns with
- * `enableSorting: true` (default) and TanStack handles the rest. Click a header
- * to sort; shift-click to multi-sort.
+ * **Sorting** — the header is purely presentational: it renders the direction
+ * indicator from the `sort` prop and emits `onSortChange(columnId)` on click.
+ * The consumer owns the toggle cycle and the actual sort (server query,
+ * in-memory sort over the `data` array, or any other strategy).
  */
 export const WithSorting: Story = {
   render: () => {
-    const [sorting, setSorting] = useState<SortingState>([
-      { id: 'hostname', desc: false },
-    ])
+    const [sort, setSort] = useState<DataTableSortState | null>({ id: 'hostname', desc: false })
+
+    const handleSortChange = useCallback((columnId: string) => {
+      setSort(prev => {
+        if (prev?.id !== columnId) return { id: columnId, desc: false }
+        if (!prev.desc) return { id: columnId, desc: true }
+        return null
+      })
+    }, [])
+
+    const sortedData = useMemo(() => {
+      if (!sort) return DEVICES_10
+      const dir = sort.desc ? -1 : 1
+      return [...DEVICES_10].sort((a, b) => {
+        const av = a[sort.id as keyof Device] as string | number
+        const bv = b[sort.id as keyof Device] as string | number
+        if (av < bv) return -1 * dir
+        if (av > bv) return 1 * dir
+        return 0
+      })
+    }, [sort])
 
     const columns = useMemo<ColumnDef<Device>[]>(
       () => [
-        { accessorKey: 'hostname', header: 'Hostname', meta: { width: 'w-[200px]' } },
-        { accessorKey: 'ipAddress', header: 'IP', meta: { width: 'w-[140px]' } },
+        { accessorKey: 'hostname', header: 'Hostname', meta: { width: 'w-[200px]', sortable: true } },
+        { accessorKey: 'ipAddress', header: 'IP', meta: { width: 'w-[140px]', sortable: true } },
         {
           accessorKey: 'status',
           header: 'Status',
           cell: ({ row }) => <StatusTag status={row.original.status} />,
-          meta: { width: 'w-[140px]' },
+          meta: { width: 'w-[140px]', sortable: true },
         },
         {
           accessorKey: 'cpuLoad',
           header: 'CPU',
           cell: ({ row }) => <LoadCell value={row.original.cpuLoad} />,
-          meta: { width: 'w-[120px]', align: 'right' },
+          meta: { width: 'w-[120px]', align: 'right', sortable: true },
         },
         {
           accessorKey: 'memoryGB',
           header: 'Memory',
           cell: ({ row }) => <LoadCell value={row.original.memoryGB} unit="GB" />,
-          meta: { width: 'w-[120px]', align: 'right' },
+          meta: { width: 'w-[120px]', align: 'right', sortable: true },
         },
       ],
       [],
     )
 
-    const table = useDataTable<Device>({
-      data: DEVICES_10,
-      columns,
-      clientSideSorting: true,
-      state: { sorting },
-      onSortingChange: setSorting,
-    })
+    const table = useDataTable<Device>({ data: sortedData, columns })
 
     return (
       <div className="space-y-4">
         <div className="text-h5 text-ods-text-secondary">
-          Current sort: <code>{JSON.stringify(sorting)}</code>
+          Current sort: <code>{JSON.stringify(sort)}</code>
         </div>
         <DataTable table={table}>
-          <DataTable.Header />
+          <DataTable.Header sort={sort} onSortChange={handleSortChange} />
           <DataTable.Body />
         </DataTable>
       </div>
@@ -1243,9 +1256,29 @@ export const URLBackedFilters: Story = {
 export const KitchenSink: Story = {
   parameters: { layout: 'fullscreen' },
   render: () => {
-    const [sorting, setSorting] = useState<SortingState>([])
+    const [sort, setSort] = useState<DataTableSortState | null>(null)
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+
+    const handleSortChange = useCallback((columnId: string) => {
+      setSort(prev => {
+        if (prev?.id !== columnId) return { id: columnId, desc: false }
+        if (!prev.desc) return { id: columnId, desc: true }
+        return null
+      })
+    }, [])
+
+    const sortedDevices = useMemo(() => {
+      if (!sort) return DEVICES
+      const dir = sort.desc ? -1 : 1
+      return [...DEVICES].sort((a, b) => {
+        const av = a[sort.id as keyof Device] as unknown as string | number
+        const bv = b[sort.id as keyof Device] as unknown as string | number
+        if (av < bv) return -1 * dir
+        if (av > bv) return 1 * dir
+        return 0
+      })
+    }, [sort])
 
     const columns = useMemo<ColumnDef<Device>[]>(
       () => [
@@ -1280,7 +1313,11 @@ export const KitchenSink: Story = {
           enableHiding: false,
           meta: { width: 'w-10 shrink-0 flex-none', align: 'center' },
         },
-        ...baseColumns(),
+        // Opt every base column into the sort UI for the kitchen-sink demo.
+        ...baseColumns().map(col => ({
+          ...col,
+          meta: { ...col.meta, sortable: true },
+        })),
         // Per-row actions column.
         {
           id: 'actions',
@@ -1331,14 +1368,12 @@ export const KitchenSink: Story = {
     )
 
     const table = useDataTable<Device>({
-      data: DEVICES,
+      data: sortedDevices,
       columns,
-      clientSideSorting: true,
       clientSideFiltering: true,
       enableRowSelection: true,
       getRowId: row => row.id,
-      state: { sorting, columnFilters, rowSelection },
-      onSortingChange: setSorting,
+      state: { columnFilters, rowSelection },
       onColumnFiltersChange: setColumnFilters,
       onRowSelectionChange: setRowSelection,
     })
@@ -1371,6 +1406,8 @@ export const KitchenSink: Story = {
             stickyHeader
             stickyHeaderOffset={selected.length > 0 ? 'top-[60px]' : 'top-0'}
             rightSlot={<DataTable.RowCount itemName="result" />}
+            sort={sort}
+            onSortChange={handleSortChange}
           />
           <DataTable.Body />
         </DataTable>

@@ -13,6 +13,12 @@ import { DataTableColumnFilter } from './data-table-column-filter'
 import { useDataTableContext } from './data-table'
 import { alignJustify, getHideClasses } from './utils'
 
+/** Single-column sort descriptor consumed by the header. */
+export interface DataTableSortState {
+  id: string
+  desc: boolean
+}
+
 export interface DataTableHeaderProps {
   className?: string
   /** Keep the header visible while scrolling. */
@@ -27,6 +33,18 @@ export interface DataTableHeaderProps {
    * <DataTable.Header rightSlot={<DataTable.RowCount itemName="device" />} />
    */
   rightSlot?: ReactNode
+  /**
+   * Current sort descriptor. The header only renders the direction indicator
+   * based on this value — it doesn't own the state. Pair with `onSortChange`
+   * and let the consumer decide what a click means (server query, in-memory
+   * sort, TanStack's row-model sort, …).
+   */
+  sort?: DataTableSortState | null
+  /**
+   * Fires when a sortable column header is clicked. The consumer owns the
+   * toggle cycle (e.g. none → asc → desc → none) and the actual data sort.
+   */
+  onSortChange?: (columnId: string) => void
 }
 
 export function DataTableHeader({
@@ -34,6 +52,8 @@ export function DataTableHeader({
   stickyHeader,
   stickyHeaderOffset,
   rightSlot,
+  sort = null,
+  onSortChange,
 }: DataTableHeaderProps) {
   const table = useDataTableContext()
   const isLgUp = useLgUp() ?? false
@@ -50,12 +70,18 @@ export function DataTableHeader({
         className,
       )}
     >
-      <div className="flex items-center gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)] py-[var(--spacing-system-sf)] relative h-11">
+      <div className="flex items-stretch gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)] relative">
         {headerGroup.headers.map(header => (
-          <HeaderCell key={header.id} header={header} isLgUp={isLgUp} />
+          <HeaderCell
+            key={header.id}
+            header={header}
+            isLgUp={isLgUp}
+            sort={sort}
+            onSortChange={onSortChange}
+          />
         ))}
         {rightSlot && (
-          <div className="absolute right-[var(--spacing-system-mf)] flex items-center">
+          <div className="absolute right-[var(--spacing-system-mf)] inset-y-0 flex items-center">
             {rightSlot}
           </div>
         )}
@@ -68,13 +94,25 @@ export function DataTableHeader({
 
 type AnyHeader = Header<unknown, unknown>
 
-function HeaderCell({ header, isLgUp }: { header: AnyHeader; isLgUp: boolean }) {
+interface HeaderCellProps {
+  header: AnyHeader
+  isLgUp: boolean
+  sort: DataTableSortState | null
+  onSortChange?: (columnId: string) => void
+}
+
+function HeaderCell({ header, isLgUp, sort, onSortChange }: HeaderCellProps) {
   if (header.isPlaceholder) return null
 
   const column = header.column
   const meta = column.columnDef.meta
   const hasFilter = Boolean(meta?.filter)
   const align = meta?.align ?? 'left'
+  // Sort is opt-in via `meta.sortable`. Direction is fully consumer-driven via
+  // the `sort` prop; we do not consult TanStack's sort APIs here.
+  const canSort = meta?.sortable === true
+  const sortDir: false | 'asc' | 'desc' =
+    sort?.id === column.id ? (sort.desc ? 'desc' : 'asc') : false
 
   // Mobile (md, below lg): hide non-filter columns so only filters are accessible.
   if (!isLgUp && !hasFilter) return null
@@ -82,8 +120,7 @@ function HeaderCell({ header, isLgUp }: { header: AnyHeader; isLgUp: boolean }) 
   return (
     <div
       className={cn(
-        'flex gap-[var(--spacing-system-xsf)] items-center',
-        isLgUp && alignJustify(align),
+        'flex items-stretch',
         isLgUp && (meta?.width || 'flex-1 min-w-0'),
         meta?.headerClassName,
         // Don't apply hide classes if column is filterable on tablet (keep filter accessible)
@@ -96,17 +133,19 @@ function HeaderCell({ header, isLgUp }: { header: AnyHeader; isLgUp: boolean }) 
           options={meta!.filter!.options}
           placement={meta!.filter!.placement}
           label={resolveHeaderLabel(header)}
+          align={align}
         />
       ) : (
         <div
           className={cn(
-            'flex gap-[var(--spacing-system-xsf)] items-center rounded-sm select-none transition-colors duration-200',
-            column.getCanSort() && 'group cursor-pointer',
+            'flex w-full items-center gap-[var(--spacing-system-xsf)] py-[var(--spacing-system-sf)] rounded-sm select-none transition-colors duration-200',
+            isLgUp && alignJustify(align),
+            canSort && 'group cursor-pointer',
           )}
-          onClick={column.getToggleSortingHandler()}
+          onClick={canSort ? () => onSortChange?.(column.id) : undefined}
         >
           <HeaderLabel header={header} />
-          {column.getCanSort() && <SortIcon sorted={column.getIsSorted()} />}
+          {canSort && <SortIcon sorted={sortDir} />}
         </div>
       )}
     </div>
