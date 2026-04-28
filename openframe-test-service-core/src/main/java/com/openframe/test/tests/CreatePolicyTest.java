@@ -6,6 +6,7 @@ import com.openframe.test.data.dto.device.DeviceStatus;
 import com.openframe.test.data.dto.device.Machine;
 import com.openframe.test.data.dto.policy.CreatePolicyRequest;
 import com.openframe.test.data.dto.policy.Policy;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -16,10 +17,12 @@ import static com.openframe.test.data.generator.DeviceGenerator.osAndStatusDevic
 import static com.openframe.test.data.generator.MonitoringGenerator.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
+@DisplayName("Create Policy")
 public class CreatePolicyTest extends BaseTest {
 
     @Tag("device")
     @Test
+    @DisplayName("Add policy")
     public void testAddPolicy() {
         CreatePolicyRequest createPolicyRequest = emptyPolicy();
         Policy policy = MonitoringApi.createPolicy(createPolicyRequest);
@@ -32,6 +35,7 @@ public class CreatePolicyTest extends BaseTest {
 
     @Tag("device")
     @Test
+    @DisplayName("Select policy device")
     public void testSelectPolicyDevice() {
         CreatePolicyRequest createPolicyRequest = windowsVersionPolicy();
         Policy policy = MonitoringApi.createPolicy(createPolicyRequest);
