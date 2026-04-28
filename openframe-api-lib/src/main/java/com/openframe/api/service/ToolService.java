@@ -23,8 +23,8 @@ public class ToolService {
     private final IntegratedToolRepository integratedToolRepository;
 
     public Optional<IntegratedTool> findById(String id) {
-        log.debug("Finding integrated tool by ID: {}", id);
-        return integratedToolRepository.findById(id);
+        log.debug("Finding integrated tool by key: {}", id);
+        return integratedToolRepository.findByKey(id);
     }
 
     public ToolList queryTools(ToolFilterCriteria filterOptions, String search, SortInput sort) {
