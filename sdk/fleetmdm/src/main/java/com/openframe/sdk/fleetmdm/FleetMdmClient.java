@@ -8,6 +8,8 @@ import com.openframe.sdk.fleetmdm.model.Host;
 import com.openframe.sdk.fleetmdm.model.HostSearchRequest;
 import com.openframe.sdk.fleetmdm.model.HostSearchResponse;
 import com.openframe.sdk.fleetmdm.model.QueryResult;
+import com.openframe.sdk.fleetmdm.model.LiveQueryCampaign;
+import com.openframe.sdk.fleetmdm.model.RunLiveQueryRequest;
 import com.openframe.sdk.fleetmdm.model.Policy;
 import com.openframe.sdk.fleetmdm.model.Query;
 import com.openframe.sdk.fleetmdm.model.CreatePolicyRequest;
@@ -36,6 +38,8 @@ public class FleetMdmClient {
     private static final String QUERIES_URL = "/api/v1/fleet/queries";
     private static final String POLICIES_URL = "/api/v1/fleet/global/policies";
     private static final String GET_ENROLL_SECRET_URL = "/api/latest/fleet/spec/enroll_secret";
+    private static final String LIVE_QUERY_RUN_URL = "/api/v1/fleet/queries/run";
+    private static final String POLICIES_DELETE_URL = "/api/v1/fleet/policies/delete";
 
     private final String baseUrl;
     private final String apiToken;
@@ -627,6 +631,142 @@ public class FleetMdmClient {
         }
     }
 
+    /**
+     * Create a distributed live-query campaign that runs a query (ad-hoc or saved) on the targeted hosts.
+     * Returns a campaign descriptor; results are streamed asynchronously over Fleet's live-query websocket.
+     */
+    public CompletableFuture<LiveQueryCampaign> runLiveQueryAsync(RunLiveQueryRequest request) {
+        if (request == null) {
+            CompletableFuture<LiveQueryCampaign> failed = new CompletableFuture<>();
+            failed.completeExceptionally(new IllegalArgumentException("Live query request cannot be null"));
+            return failed;
+        }
+        if ((request.getQuery() == null || request.getQuery().trim().isEmpty()) && request.getQueryId() == null) {
+            CompletableFuture<LiveQueryCampaign> failed = new CompletableFuture<>();
+            failed.completeExceptionally(new IllegalArgumentException("Live query request must specify either query or queryId"));
+            return failed;
+        }
+        try {
+            HttpRequest httpRequest = buildRequest(LIVE_QUERY_RUN_URL, "POST", MAPPER.writeValueAsString(request));
+            return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                    .thenApply(response -> {
+                        checkResponse(response, "create Fleet live-query campaign");
+                        try {
+                            return MAPPER.treeToValue(requireNode(response.body(), "campaign"), LiveQueryCampaign.class);
+                        } catch (Exception e) {
+                            throw new FleetMdmException("Failed to parse live-query campaign response", e);
+                        }
+                    });
+        } catch (Exception e) {
+            CompletableFuture<LiveQueryCampaign> failed = new CompletableFuture<>();
+            failed.completeExceptionally(new FleetMdmException("Failed to create Fleet live-query campaign", e));
+            return failed;
+        }
+    }
+
+    /**
+     * Assign hosts to a saved query so the query targets them on its scheduled interval.
+     * @return number of hosts added
+     */
+    public CompletableFuture<Long> addQueryHostsAsync(long queryId, List<Long> hostIds) {
+        return modifyQueryHostsAsync(queryId, hostIds, "POST", "added");
+    }
+
+    /**
+     * Unassign hosts from a saved query.
+     * @return number of hosts removed
+     */
+    public CompletableFuture<Long> removeQueryHostsAsync(long queryId, List<Long> hostIds) {
+        return modifyQueryHostsAsync(queryId, hostIds, "DELETE", "removed");
+    }
+
+    /**
+     * Assign hosts to a global policy.
+     * @return number of hosts added
+     */
+    public CompletableFuture<Long> addPolicyHostsAsync(long policyId, List<Long> hostIds) {
+        return modifyPolicyHostsAsync(policyId, hostIds, "POST", "added");
+    }
+
+    /**
+     * Unassign hosts from a global policy.
+     * @return number of hosts removed
+     */
+    public CompletableFuture<Long> removePolicyHostsAsync(long policyId, List<Long> hostIds) {
+        return modifyPolicyHostsAsync(policyId, hostIds, "DELETE", "removed");
+    }
+
+    /**
+     * Delete a saved (scheduled) query by ID. Equivalent to DELETE /api/v1/fleet/queries/id/{id}.
+     */
+    public CompletableFuture<Void> deleteScheduledQueryAsync(long queryId) {
+        HttpRequest httpRequest = buildRequest(QUERIES_URL + "/id/" + queryId, "DELETE", null);
+        return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    checkResponse(response, "delete Fleet scheduled query: " + queryId);
+                    return null;
+                });
+    }
+
+    /**
+     * Delete a global policy by ID. Uses Fleet's batch delete endpoint with a single-element list.
+     */
+    public CompletableFuture<Void> deletePolicyAsync(long policyId) {
+        try {
+            String body = MAPPER.writeValueAsString(MAPPER.createObjectNode()
+                    .set("ids", MAPPER.createArrayNode().add(policyId)));
+            HttpRequest httpRequest = buildRequest(POLICIES_DELETE_URL, "POST", body);
+            return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                    .thenApply(response -> {
+                        checkResponse(response, "delete Fleet policy: " + policyId);
+                        return null;
+                    });
+        } catch (Exception e) {
+            CompletableFuture<Void> failed = new CompletableFuture<>();
+            failed.completeExceptionally(new FleetMdmException("Failed to delete Fleet policy: " + policyId, e));
+            return failed;
+        }
+    }
+
+    private CompletableFuture<Long> modifyQueryHostsAsync(long queryId, List<Long> hostIds, String method, String responseField) {
+        return modifyAssociationAsync(QUERIES_URL + "/" + queryId + "/hosts", hostIds, method, responseField,
+                "Fleet query hosts (queryId=" + queryId + ")");
+    }
+
+    private CompletableFuture<Long> modifyPolicyHostsAsync(long policyId, List<Long> hostIds, String method, String responseField) {
+        return modifyAssociationAsync("/api/v1/fleet/policies/" + policyId + "/hosts", hostIds, method, responseField,
+                "Fleet policy hosts (policyId=" + policyId + ")");
+    }
+
+    private CompletableFuture<Long> modifyAssociationAsync(String path, List<Long> hostIds, String method, String responseField, String contextLabel) {
+        if (hostIds == null || hostIds.isEmpty()) {
+            CompletableFuture<Long> failed = new CompletableFuture<>();
+            failed.completeExceptionally(new IllegalArgumentException("hostIds must not be empty"));
+            return failed;
+        }
+        try {
+            String body = MAPPER.writeValueAsString(MAPPER.createObjectNode()
+                    .set("host_ids", MAPPER.valueToTree(hostIds)));
+            HttpRequest httpRequest = buildRequest(path, method, body);
+            String action = ("POST".equals(method) ? "assign hosts to " : "remove hosts from ") + contextLabel;
+            return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                    .thenApply(response -> {
+                        checkResponse(response, action);
+                        try {
+                            JsonNode root = MAPPER.readTree(response.body());
+                            JsonNode count = root.get(responseField);
+                            return count != null && count.canConvertToLong() ? count.asLong() : 0L;
+                        } catch (Exception e) {
+                            throw new FleetMdmException("Failed to parse response for " + action, e);
+                        }
+                    });
+        } catch (Exception e) {
+            CompletableFuture<Long> failed = new CompletableFuture<>();
+            failed.completeExceptionally(new FleetMdmException("Failed to " + ("POST".equals(method) ? "assign" : "remove") + " hosts on " + contextLabel, e));
+            return failed;
+        }
+    }
+
     private HttpRequest buildRequest(String path, String method, String body) {
         HttpRequest.Builder builder = addHeaders(HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl + path))
@@ -635,6 +775,13 @@ public class FleetMdmClient {
         switch (method) {
             case "POST"  -> builder.POST(HttpRequest.BodyPublishers.ofString(body == null ? "" : body));
             case "PATCH" -> builder.method("PATCH", HttpRequest.BodyPublishers.ofString(body == null ? "" : body));
+            case "DELETE" -> {
+                if (body == null) {
+                    builder.DELETE();
+                } else {
+                    builder.method("DELETE", HttpRequest.BodyPublishers.ofString(body));
+                }
+            }
             default      -> builder.GET();
         }
         return builder.build();
