@@ -29,7 +29,7 @@ public class ToolsDataFetcher {
     @DgsData(parentType = "IntegratedTool", field = "id")
     public String toolNodeId(DgsDataFetchingEnvironment dfe) {
         IntegratedTool tool = dfe.getSource();
-        return RELAY.toGlobalId("IntegratedTool", tool.getId());
+        return RELAY.toGlobalId("IntegratedTool", tool.getKey());
     }
 
     @DgsQuery

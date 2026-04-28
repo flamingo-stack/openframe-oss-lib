@@ -10,4 +10,6 @@ import reactor.core.publisher.Mono;
 public interface ReactiveIntegratedToolRepository extends ReactiveMongoRepository<IntegratedTool, String>, BaseIntegratedToolRepository<Mono<IntegratedTool>, Mono<Boolean>, String> {
     @Override
     Mono<IntegratedTool> findByType(String type);
-} 
+
+    Mono<IntegratedTool> findByKey(String key);
+}

@@ -37,7 +37,7 @@ public class FleetMdmSetupService {
 
         tool.getCredentials().setApiKey(apiKey);
         toolRepository.save(tool);
-        log.info("Fleet API token saved to IntegratedTool '{}'", tool.getId());
+        log.info("Fleet API token saved to IntegratedTool '{}'", tool.getKey());
     }
 
     private boolean hasApiToken(IntegratedTool tool) {

@@ -30,11 +30,11 @@ public class IntegratedToolAgentService {
     }
 
     public Optional<IntegratedToolAgent> findById(String id) {
-        return agentRepository.findById(id);
+        return agentRepository.findByKey(id);
     }
 
     public IntegratedToolAgent getById(String id) {
-        return agentRepository.findById(id)
+        return agentRepository.findByKey(id)
                 .orElseThrow(() -> new IllegalStateException("No tool agent configuration found by id " + id));
     }
 
