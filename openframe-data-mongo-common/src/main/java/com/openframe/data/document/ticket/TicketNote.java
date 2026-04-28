@@ -1,5 +1,6 @@
 package com.openframe.data.document.ticket;
 
+import com.openframe.data.document.TenantScoped;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -26,9 +27,12 @@ import java.time.Instant;
 @AllArgsConstructor
 @Document(collection = "ticket_notes")
 @CompoundIndex(name = "ticket_created", def = "{'ticketId': 1, 'createdAt': -1}")
-public class TicketNote {
+public class TicketNote implements TenantScoped {
     @Id
     private String id;
+
+    @Indexed
+    private String tenantId;
 
     @Indexed
     private String ticketId;

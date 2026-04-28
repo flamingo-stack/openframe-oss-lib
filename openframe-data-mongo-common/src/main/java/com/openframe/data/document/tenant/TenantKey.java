@@ -1,5 +1,6 @@
 package com.openframe.data.document.tenant;
 
+import com.openframe.data.document.TenantScoped;
 import lombok.Data;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
@@ -10,7 +11,7 @@ import java.time.Instant;
 
 @Data
 @Document(collection = "tenant_keys")
-public class TenantKey {
+public class TenantKey implements TenantScoped {
     @Id
     private String id;
     private String tenantId;

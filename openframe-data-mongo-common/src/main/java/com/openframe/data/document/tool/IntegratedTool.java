@@ -1,10 +1,12 @@
 package com.openframe.data.document.tool;
 
+import com.openframe.data.document.TenantScoped;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.List;
@@ -14,9 +16,13 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "integrated_tools")
-public class IntegratedTool {
+public class IntegratedTool implements TenantScoped {
     @Id
     private String id;
+
+    @Indexed
+    private String tenantId;
+
     private String name;
     private String description;
     private String icon;

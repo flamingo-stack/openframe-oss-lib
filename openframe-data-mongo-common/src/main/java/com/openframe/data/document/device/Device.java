@@ -1,16 +1,22 @@
 package com.openframe.data.document.device;
 
+import com.openframe.data.document.TenantScoped;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 
 @Data
 @Document(collection = "devices")
-public class Device {
+public class Device implements TenantScoped {
     @Id
     private String id;
+
+    @Indexed
+    private String tenantId;
+
     private String machineId;      // Link to Machine entity
     private String serialNumber;
     private String model;

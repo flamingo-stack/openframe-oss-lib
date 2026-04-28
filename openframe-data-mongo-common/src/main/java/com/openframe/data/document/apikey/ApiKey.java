@@ -1,5 +1,6 @@
 package com.openframe.data.document.apikey;
 
+import com.openframe.data.document.TenantScoped;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -16,9 +17,12 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "api_keys")
-public class ApiKey {
+public class ApiKey implements TenantScoped {
     @Id
     private String keyId;
+
+    @Indexed
+    private String tenantId;
 
     private String hashedKey;
     private String name;

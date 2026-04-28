@@ -1,5 +1,6 @@
 package com.openframe.data.document.toolagent;
 
+import com.openframe.data.document.TenantScoped;
 import com.openframe.data.document.clientconfiguration.DownloadConfiguration;
 import com.openframe.data.document.clientconfiguration.PublishState;
 import lombok.Data;
@@ -13,10 +14,14 @@ import java.util.List;
 
 @Data
 @Document(collection = "integrated_tool_agents")
-public class IntegratedToolAgent {
+public class IntegratedToolAgent implements TenantScoped {
 
     @Id
     private String id;
+
+    @Indexed
+    private String tenantId;
+
     private String toolId;
 
     private boolean releaseVersion;
