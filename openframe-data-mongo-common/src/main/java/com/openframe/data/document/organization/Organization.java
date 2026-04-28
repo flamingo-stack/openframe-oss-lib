@@ -1,5 +1,6 @@
 package com.openframe.data.document.organization;
 
+import com.openframe.data.document.TenantScoped;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -26,10 +27,13 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "organizations")
-public class Organization {
+public class Organization implements TenantScoped {
 
     @Id
     private String id;
+
+    @Indexed
+    private String tenantId;
 
     /**
      * Organization name (company name)

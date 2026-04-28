@@ -43,7 +43,9 @@ public class TenantRegistrationService {
             throw new IllegalArgumentException("Registration is closed for this user");
         }
 
-        Tenant tenant = tenantService.createTenant(request.getTenantName(), tenantDomain);
+        String tenantId = registrationProcessor.reserveTenantIdForRegistration(request);
+
+        Tenant tenant = tenantService.createTenant(request.getTenantName(), tenantDomain, tenantId);
 
         AuthUser user = userService.registerUser(
                 tenant.getId(),

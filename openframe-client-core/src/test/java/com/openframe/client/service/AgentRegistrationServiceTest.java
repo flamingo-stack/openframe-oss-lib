@@ -103,7 +103,7 @@ class AgentRegistrationServiceTest {
         when(oauthClientRepository.existsByMachineId(MACHINE_ID)).thenReturn(false);
         when(agentSecretGenerator.generate()).thenReturn(CLIENT_SECRET);
         when(organizationService.getDefaultOrganization())
-                .thenReturn(Optional.of(new Organization("id", OrganizationService.DEFAULT_ORGANIZATION_NAME, "custom-uuid", true, null, null, null, null, null, null, null, null, null,null, null, null)));
+                .thenReturn(Optional.of(new Organization("id", null, OrganizationService.DEFAULT_ORGANIZATION_NAME, "custom-uuid", true, null, null, null, null, null, null, null, null, null,null, null, null)));
         when(passwordEncoder.encode(CLIENT_SECRET)).thenReturn("encoded-secret");
         when(oauthClientRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
         when(machineRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
@@ -147,7 +147,7 @@ class AgentRegistrationServiceTest {
         when(machineIdGenerator.generate()).thenReturn(MACHINE_ID);
         when(oauthClientRepository.existsByMachineId(MACHINE_ID)).thenReturn(true);
         when(organizationService.getDefaultOrganization())
-                .thenReturn(Optional.of(new Organization("id", OrganizationService.DEFAULT_ORGANIZATION_NAME, "custom-uuid", true, null, null, null, null, null, null, null, null, null,null, null, null)));
+                .thenReturn(Optional.of(new Organization("id", null, OrganizationService.DEFAULT_ORGANIZATION_NAME, "custom-uuid", true, null, null, null, null, null, null, null, null, null,null, null, null)));
 
 
         IllegalStateException exception = assertThrows(
@@ -169,7 +169,7 @@ class AgentRegistrationServiceTest {
         when(oauthClientRepository.existsByMachineId(MACHINE_ID)).thenReturn(false);
         when(agentSecretGenerator.generate()).thenReturn(CLIENT_SECRET);
         when(organizationService.getDefaultOrganization())
-                .thenReturn(Optional.of(new Organization("id", OrganizationService.DEFAULT_ORGANIZATION_NAME, "custom-uuid", true, null, null, null, null, null, null, null, null, null, null, null, null)));
+                .thenReturn(Optional.of(new Organization("id", null, OrganizationService.DEFAULT_ORGANIZATION_NAME, "custom-uuid", true, null, null, null, null, null, null, null, null, null, null, null, null)));
         when(passwordEncoder.encode(CLIENT_SECRET)).thenReturn("encoded-secret");
         when(oauthClientRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
         when(machineRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
@@ -194,7 +194,7 @@ class AgentRegistrationServiceTest {
         when(oauthClientRepository.existsByMachineId(MACHINE_ID)).thenReturn(false);
         when(agentSecretGenerator.generate()).thenReturn(CLIENT_SECRET);
         when(organizationService.getDefaultOrganization())
-                .thenReturn(Optional.of(new Organization("id", OrganizationService.DEFAULT_ORGANIZATION_NAME, "custom-uuid", true, null, null, null, null, null, null, null, null, null, null, null, null)));
+                .thenReturn(Optional.of(new Organization("id", null, OrganizationService.DEFAULT_ORGANIZATION_NAME, "custom-uuid", true, null, null, null, null, null, null, null, null, null, null, null, null)));
         when(passwordEncoder.encode(CLIENT_SECRET)).thenReturn("encoded-secret");
         when(oauthClientRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
         when(machineRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
