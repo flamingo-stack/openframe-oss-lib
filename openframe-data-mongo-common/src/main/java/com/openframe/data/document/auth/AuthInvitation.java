@@ -1,7 +1,6 @@
 package com.openframe.data.document.auth;
 
 import com.openframe.data.document.user.Invitation;
-import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
@@ -12,7 +11,6 @@ import org.springframework.data.mongodb.core.index.CompoundIndex;
 @EqualsAndHashCode(callSuper = true)
 @SuperBuilder
 @NoArgsConstructor
-@AllArgsConstructor
 @CompoundIndex(
         def = "{'tenantId': 1, 'email': 1}",
         unique = true
