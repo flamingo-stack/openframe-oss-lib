@@ -5,6 +5,7 @@ import com.openframe.test.api.ScriptApi;
 import com.openframe.test.data.dto.device.DeviceStatus;
 import com.openframe.test.data.dto.device.Machine;
 import com.openframe.test.data.dto.script.*;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -17,10 +18,12 @@ import static com.openframe.test.data.generator.ScriptGenerator.createOnlineChec
 import static com.openframe.test.data.generator.ScriptGenerator.runSpeedTestScriptRequest;
 import static org.assertj.core.api.Assertions.assertThat;
 
+@DisplayName("Run Script")
 public class RunScriptTest extends BaseTest {
 
     @Tag("device")
     @Test
+    @DisplayName("Bulk run script")
     public void testBulkRun() {
         List<Machine> devices = DeviceApi.getDevices(osAndStatusDevicesFilter("WINDOWS", DeviceStatus.ONLINE));
         assertThat(devices).as("Expect Windows device online").isNotEmpty();
@@ -35,6 +38,7 @@ public class RunScriptTest extends BaseTest {
 
     @Tag("device")
     @Test
+    @DisplayName("Schedule script")
     public void testScheduleScript() {
         List<Machine> devices = DeviceApi.getDevices(osAndStatusDevicesFilter("WINDOWS", DeviceStatus.ONLINE));
         assertThat(devices).as("Expect Windows device online").isNotEmpty();
@@ -52,6 +56,7 @@ public class RunScriptTest extends BaseTest {
 
     @Tag("scheduled")
     @Test
+    @DisplayName("Schedule execution history")
     public void testScheduleExecution() {
         List<ScriptSchedule> schedules = ScriptApi.getScriptSchedules();
         assertThat(schedules).as("Expected script schedule").isNotEmpty();
