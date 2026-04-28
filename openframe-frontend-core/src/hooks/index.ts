@@ -4,6 +4,7 @@ export * from './platform'
 export * from './use-toast'
 export * from './use-contact-submission'
 export * from './use-quick-action-hint'
+export * from './use-copy-to-clipboard'
 
 // Image authentication hooks
 export * from './use-batch-images'

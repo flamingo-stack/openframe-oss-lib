@@ -6,6 +6,7 @@ import { cn } from '../../../utils/cn'
 import { Filter02Icon } from '../../icons-v2-generated'
 import { FiltersDropdown, type FilterSection } from '../../features'
 import type { DataTableFilterOption } from './types'
+import { alignJustify } from './utils'
 
 // Stable reference for "no filter selected" — avoids creating a new `[]` per
 // render when `column.getFilterValue()` is `undefined`, which would otherwise
@@ -17,6 +18,7 @@ export interface DataTableColumnFilterProps {
   options: DataTableFilterOption[]
   placement?: 'bottom-start' | 'bottom-end' | 'bottom'
   label: string
+  align?: 'left' | 'center' | 'right'
 }
 
 /** Filter dropdown wrapper that reads/writes TanStack column filter state. */
@@ -25,6 +27,7 @@ export function DataTableColumnFilter({
   options,
   placement = 'bottom-start',
   label,
+  align = 'left',
 }: DataTableColumnFilterProps) {
   const currentValue = column.getFilterValue() as string[] | undefined
   const activeCount = currentValue?.length ?? 0
@@ -61,9 +64,13 @@ export function DataTableColumnFilter({
 
   return (
     <FiltersDropdown
+      className="!block w-full"
       triggerElement={
         <div
-          className="group flex items-center gap-[var(--spacing-system-xsf)] rounded-sm cursor-pointer transition-colors duration-200 select-none"
+          className={cn(
+            'group flex w-full items-center gap-[var(--spacing-system-xsf)] py-[var(--spacing-system-sf)] rounded-sm cursor-pointer transition-colors duration-200 select-none',
+            alignJustify(align),
+          )}
           aria-label={`Filter by ${label}`}
         >
           <span className="text-h5 text-ods-text-secondary whitespace-nowrap transition-colors duration-200 group-hover:text-ods-text-primary">
