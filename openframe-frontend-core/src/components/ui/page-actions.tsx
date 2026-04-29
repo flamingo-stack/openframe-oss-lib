@@ -123,44 +123,45 @@ export interface PageActionsProps {
   variant?: 'icon-buttons' | 'primary-buttons' | 'menu-primary'
   actions: PageActionButton[]
   menuActions?: ActionsMenuGroup[]
+  /**
+   * Desktop-only slot rendered before the action buttons (e.g. a `TabSelector`
+   * for view-mode toggles). Hidden on mobile and never merged into the "…" menu.
+   * Currently honored by the `icon-buttons` variant.
+   */
+  selector?: React.ReactNode
   className?: string
-  gap?: 'sm' | 'md' | 'lg'
 }
+
+const ACTIONS_GAP = 'gap-[var(--spacing-system-xs)]'
 
 export function PageActions({
   variant = 'icon-buttons',
   actions,
   menuActions,
+  selector,
   className,
-  gap = 'sm'
 }: PageActionsProps) {
-  const gapClasses = {
-    sm: 'gap-2',
-    md: 'gap-4',
-    lg: 'gap-6'
-  }
-
   if (variant === 'icon-buttons') {
-    return <IconButtonsVariant actions={actions} menuActions={menuActions} className={className} gapClass={gapClasses[gap]} />
+    return <IconButtonsVariant actions={actions} menuActions={menuActions} selector={selector} className={className} />
   }
 
   if (variant === 'menu-primary') {
-    return <MenuPrimaryVariant actions={actions} menuActions={menuActions || []} className={className} gapClass={gapClasses[gap]} />
+    return <MenuPrimaryVariant actions={actions} menuActions={menuActions || []} className={className} />
   }
 
-  return <PrimaryButtonsVariant actions={actions} className={className} gapClass={gapClasses[gap]} />
+  return <PrimaryButtonsVariant actions={actions} className={className} />
 }
 
 function IconButtonsVariant({
   actions,
   menuActions,
+  selector,
   className,
-  gapClass
 }: {
   actions: PageActionButton[]
   menuActions?: ActionsMenuGroup[]
+  selector?: React.ReactNode
   className?: string
-  gapClass: string
 }) {
   const desktopActions = actions.filter(a => !a.showOnlyMobile)
   const hasMenuActions = !!menuActions && menuActions.some(g => g.items.length > 0)
@@ -172,7 +173,8 @@ function IconButtonsVariant({
   return (
     <>
       {/* Desktop: Show all buttons with icons, plus an overflow menu at the end */}
-      <div className={cn('hidden md:flex items-center', gapClass, className)}>
+      <div className={cn('hidden md:flex items-center', ACTIONS_GAP, className)}>
+        {selector}
         {desktopActions.map((action, idx) => (
           <ActionButton key={actionKey(action, idx)} action={action} />
         ))}
@@ -214,11 +216,9 @@ function IconButtonsVariant({
 function PrimaryButtonsVariant({
   actions,
   className,
-  gapClass
 }: {
   actions: PageActionButton[]
   className?: string
-  gapClass: string
 }) {
   // Sort actions: primary first, then outline
   const sortedActions = [...actions].sort((a, b) => {
@@ -232,14 +232,14 @@ function PrimaryButtonsVariant({
   return (
     <>
       {/* Desktop: Normal layout (outline left, primary right) */}
-      <div className={cn('hidden md:flex items-center', gapClass, className)}>
+      <div className={cn('hidden md:flex items-center', ACTIONS_GAP, className)}>
         {desktopActions.map((action, idx) => (
           <ActionButton key={`desktop-${actionKey(action, idx)}`} action={action} />
         ))}
       </div>
 
       {/* Mobile: Fixed bottom bar */}
-      <MobileBottomActions actions={sortedActions} gapClass={gapClass} />
+      <MobileBottomActions actions={sortedActions} />
     </>
   )
 }
@@ -252,12 +252,10 @@ function MenuPrimaryVariant({
   actions,
   menuActions,
   className,
-  gapClass
 }: {
   actions: PageActionButton[]
   menuActions: ActionsMenuGroup[]
   className?: string
-  gapClass: string
 }) {
   const desktopActions = actions.filter(a => !a.showOnlyMobile)
   const hasMenuActions = menuActions.some(g => g.items.length > 0)
@@ -265,7 +263,7 @@ function MenuPrimaryVariant({
   return (
     <>
       {/* Desktop: menu dropdown + action buttons */}
-      <div className={cn('hidden md:flex items-center', gapClass, className)}>
+      <div className={cn('hidden md:flex items-center', ACTIONS_GAP, className)}>
         {hasMenuActions && <ActionsMenuDropdown groups={menuActions} />}
         {desktopActions.map((action, idx) => (
           <ActionButton
@@ -290,17 +288,15 @@ function MenuPrimaryVariant({
 
 function MobileBottomActions({
   actions,
-  gapClass
 }: {
   actions: PageActionButton[]
-  gapClass: string
 }) {
   return (
     <div className={cn(
       'fixed md:hidden bottom-0 left-0 right-0 z-50',
       'bg-ods-card border-t border-ods-border',
       'flex items-start pt-6 pb-6 px-6',
-      gapClass
+      ACTIONS_GAP
     )}>
       {actions.map((action, idx) => (
         action.label ? (

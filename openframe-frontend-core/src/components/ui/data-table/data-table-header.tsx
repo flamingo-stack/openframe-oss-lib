@@ -62,6 +62,16 @@ export function DataTableHeader({
   const headerGroup = table.getHeaderGroups()[0]
   if (!headerGroup) return null
 
+  // On tablet (md, below lg), only filterable columns render. If none exist,
+  // every HeaderCell returns null and the flex row collapses — which would
+  // break the absolutely-positioned rightSlot. Detect that case and render
+  // rightSlot in-flow instead.
+  const hasVisibleHeaderCell = headerGroup.headers.some(header => {
+    if (header.isPlaceholder) return false
+    if (isLgUp) return true
+    return Boolean(header.column.columnDef.meta?.filter)
+  })
+
   return (
     <div
       className={cn(
@@ -80,11 +90,16 @@ export function DataTableHeader({
             onSortChange={onSortChange}
           />
         ))}
-        {rightSlot && (
-          <div className="absolute right-[var(--spacing-system-mf)] inset-y-0 flex items-center">
-            {rightSlot}
-          </div>
-        )}
+        {rightSlot &&
+          (hasVisibleHeaderCell ? (
+            <div className="absolute right-[var(--spacing-system-mf)] inset-y-0 flex items-center">
+              {rightSlot}
+            </div>
+          ) : (
+            <div className="ml-auto flex items-center py-[var(--spacing-system-sf)]">
+              {rightSlot}
+            </div>
+          ))}
       </div>
     </div>
   )

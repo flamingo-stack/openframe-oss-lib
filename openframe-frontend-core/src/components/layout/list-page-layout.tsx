@@ -142,50 +142,52 @@ export function ListPageLayout({
       background={background}
       className={className}
     >
-      {/* Search Bar with Mobile Filter Button */}
-      <div className={cn(
-        'flex gap-4 items-center',
-        !stickyHeader && 'w-full',
-        stickyHeader && 'sticky -top-4 md:-top-6 z-20 bg-ods-bg -mx-4 md:-mx-6 px-4 md:px-6 -mt-4 md:-mt-6 pt-4 md:pt-6 pb-2'
-      )}>
-        <Input
-          placeholder={searchPlaceholder}
-          onChange={(e) => setLocalSearchValue(e.target.value)}
-          value={localSearchValue}
-          className="flex-1"
-          startAdornment={<SearchIcon className="w-4 h-4 md:w-6 md:h-6" />}
-        />
+      <div>
+        {/* Search Bar with Mobile Filter Button */}
+        <div className={cn(
+          'flex gap-4 items-center',
+          !stickyHeader && 'w-full',
+          stickyHeader && 'sticky top-0 z-20 flex gap-[var(--spacing-system-m)] items-center bg-ods-bg -mx-[var(--spacing-system-l)] p-[var(--spacing-system-l)] -mt-[var(--spacing-system-l)]'
+        )}>
+          <Input
+            placeholder={searchPlaceholder}
+            onChange={(e) => setLocalSearchValue(e.target.value)}
+            value={localSearchValue}
+            className="flex-1"
+            startAdornment={<SearchIcon className="w-4 h-4 md:w-6 md:h-6" />}
+          />
 
-        {/* Mobile Filter Button - only visible on mobile when filter is enabled */}
+          {/* Mobile Filter Button - only visible on mobile when filter is enabled */}
+          {hasMobileFilter && (
+            <Button
+              variant="search"
+              size="icon"
+              className="md:hidden"
+              onClick={() => setMobileFilterOpen(true)}
+              aria-label="Open filters"
+            >
+              <Filter02Icon />
+            </Button>
+          )}
+        </div>
+
+        {/* Mobile Filter Modal */}
         {hasMobileFilter && (
-          <Button
-            variant="search"
-            size="icon"
-            className="md:hidden"
-            onClick={() => setMobileFilterOpen(true)}
-            aria-label="Open filters"
-          >
-            <Filter02Icon />
-          </Button>
+          <FilterModal
+            isOpen={mobileFilterOpen}
+            onClose={() => setMobileFilterOpen(false)}
+            title={mobileFilterTitle}
+            filterGroups={mobileFilterGroups || []}
+            onFilterChange={onMobileFilterChange || (() => {})}
+            currentFilters={currentMobileFilters || {}}
+            sortConfig={mobileSortConfig}
+            onSort={onMobileSort}
+          />
         )}
+
+        {/* Main Content - Table/Grid with filters */}
+        {children}
       </div>
-
-      {/* Mobile Filter Modal */}
-      {hasMobileFilter && (
-        <FilterModal
-          isOpen={mobileFilterOpen}
-          onClose={() => setMobileFilterOpen(false)}
-          title={mobileFilterTitle}
-          filterGroups={mobileFilterGroups || []}
-          onFilterChange={onMobileFilterChange || (() => {})}
-          currentFilters={currentMobileFilters || {}}
-          sortConfig={mobileSortConfig}
-          onSort={onMobileSort}
-        />
-      )}
-
-      {/* Main Content - Table/Grid with filters */}
-      {children}
     </ListPageContainer>
   )
 }
