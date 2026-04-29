@@ -5,6 +5,7 @@ import com.openframe.gateway.service.RestProxyService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -73,11 +74,20 @@ public class IntegrationController {
     public Mono<ResponseEntity<String>> proxyAgentRequest(
             @PathVariable String toolId,
             ServerHttpRequest request,
-            @RequestBody(required = false) String body
+            @RequestBody(required = false) String body,
+            Authentication authentication
     ) {
         String path = request.getPath().toString();
         log.debug("Proxying agent request for tool: {}, path: {}", toolId, path);
-        return restProxyService.proxyAgentRequest(toolId, request, body);
+        String jwtMachineId = extractMachineId(authentication);
+        return restProxyService.proxyAgentRequest(toolId, request, body, jwtMachineId);
+    }
+
+    private String extractMachineId(Authentication authentication) {
+        if (authentication instanceof JwtAuthenticationToken jwtAuth) {
+            return jwtAuth.getToken().getClaimAsString("machine_id");
+        }
+        return null;
     }
 
 }
