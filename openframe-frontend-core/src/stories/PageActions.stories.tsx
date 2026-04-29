@@ -33,11 +33,6 @@ Use with \`PageContainer\` headerActions prop for consistent page layouts.
     actions: {
       description: 'Array of action buttons to display',
     },
-    gap: {
-      control: 'select',
-      options: ['sm', 'md', 'lg'],
-      description: 'Gap between buttons',
-    },
     className: {
       control: 'text',
       description: 'Additional CSS classes for the container',
@@ -206,50 +201,6 @@ export const WithStates: Story = {
         onClick: fn(),
         variant: 'outline',
         disabled: true,
-      },
-    ],
-  },
-}
-
-/**
- * Small gap between buttons
- */
-export const SmallGap: Story = {
-  args: {
-    variant: 'icon-buttons',
-    gap: 'sm',
-    actions: [
-      {
-        label: 'Edit',
-        onClick: fn(),
-        icon: <ColorsIcon size={24} />,
-      },
-      {
-        label: 'Add',
-        onClick: fn(),
-        icon: <PlusCircleIcon size={24} />,
-      },
-    ],
-  },
-}
-
-/**
- * Large gap between buttons
- */
-export const LargeGap: Story = {
-  args: {
-    variant: 'primary-buttons',
-    gap: 'lg',
-    actions: [
-      {
-        label: 'Save',
-        onClick: fn(),
-        variant: 'primary',
-      },
-      {
-        label: 'Cancel',
-        onClick: fn(),
-        variant: 'outline',
       },
     ],
   },
