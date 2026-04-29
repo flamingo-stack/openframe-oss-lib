@@ -332,11 +332,14 @@ export function useApiParams<TSchema extends ParamSchema>(
     }
   }, [])
 
-  // Get URLSearchParams for fetch/axios
+  // Get URLSearchParams for fetch/axios. Iterates `stableSchema` (not raw
+  // `schema`) so consumers passing an inline schema literal don't invalidate
+  // this memo on every render.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `schemaKey` is the content-stable key for `stableSchema`.
   const urlSearchParams = useMemo((): URLSearchParams => {
     const newParams = new URLSearchParams()
 
-    for (const [key, config] of Object.entries(schema)) {
+    for (const key of Object.keys(stableSchema)) {
       const value = (params as Record<string, unknown>)[key]
       const paramConfig = flattenedSchema[key]
 
@@ -349,7 +352,7 @@ export function useApiParams<TSchema extends ParamSchema>(
     }
 
     return newParams
-  }, [params, schema, flattenedSchema, addParamToSearchParams])
+  }, [params, schemaKey, flattenedSchema, addParamToSearchParams])
 
   // Update URL with new parameters (preserve other params not managed by this
   // hook). Depends only on value-stable inputs (`searchString`, `schemaKey`),
