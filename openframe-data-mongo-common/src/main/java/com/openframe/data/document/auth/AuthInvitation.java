@@ -11,9 +11,9 @@ import org.springframework.data.mongodb.core.index.CompoundIndex;
 @EqualsAndHashCode(callSuper = true)
 @SuperBuilder
 @NoArgsConstructor
-// Compound index (tenantId, email) speeds up "lookup invitations for X in tenant Y" queries.
-// Not unique: a tenant can legitimately have multiple invitations for the same email
-// (e.g., re-invite after expiry, separate role-specific invites).
-@CompoundIndex(def = "{'tenantId': 1, 'email': 1}")
+@CompoundIndex(
+        def = "{'tenantId': 1, 'email': 1}",
+        unique = true
+)
 public class AuthInvitation extends Invitation {
 }
