@@ -34,11 +34,11 @@ public class ToolAgentUpdateUpdatePublisher {
 
     public void publish(IntegratedToolAgent toolAgent) {
         if (!toolAgentUpdateFeatureEnabled) {
-            log.info("Tool agent update publishing is disabled, skipping publish for tool: {} version: {}", toolAgent.getKey(), toolAgent.getVersion());
+            log.info("Tool agent update publishing is disabled, skipping publish for tool: {} version: {}", toolAgent.getId(), toolAgent.getVersion());
             return;
         }
 
-        String toolAgentId = toolAgent.getKey();
+        String toolAgentId = toolAgent.getId();
         markAsNonPublished(toolAgentId);
 
         String topicName = buildTopicName(toolAgent);
@@ -47,7 +47,7 @@ public class ToolAgentUpdateUpdatePublisher {
 
         markAsPublished(toolAgentId);
 
-        log.info("Published tool update message for tool: {} version: {}", toolAgent.getKey(), toolAgent.getVersion());
+        log.info("Published tool update message for tool: {} version: {}", toolAgent.getId(), toolAgent.getVersion());
     }
 
     private void markAsNonPublished(String toolAgentId) {
@@ -61,13 +61,13 @@ public class ToolAgentUpdateUpdatePublisher {
     }
 
     private String buildTopicName(IntegratedToolAgent toolAgent) {
-        String toolAgentId = toolAgent.getKey();
+        String toolAgentId = toolAgent.getId();
         return format(TOPIC_NAME_TEMPLATE, toolAgentId);
     }
 
     private ToolAgentUpdateMessage buildMessage(IntegratedToolAgent toolAgent) {
         ToolAgentUpdateMessage message = new ToolAgentUpdateMessage();
-        message.setToolAgentId(toolAgent.getKey());
+        message.setToolAgentId(toolAgent.getId());
         message.setVersion(toolAgent.getVersion());
         message.setSessionType(toolAgent.getSessionType());
         message.setDownloadConfigurations(
