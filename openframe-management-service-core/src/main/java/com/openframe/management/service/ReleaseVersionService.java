@@ -71,18 +71,18 @@ public class ReleaseVersionService {
 
     private void updateClientConfiguration(String version) {
         log.info("Updating OpenFrameClientConfiguration to version: {}", version);
-
-        openFrameClientConfigurationService.findCurrent()
+        
+        openFrameClientConfigurationService.findById(DEFAULT_CLIENT_CONFIG_ID)
                 .ifPresentOrElse(
                         config -> {
                             String oldVersion = config.getVersion();
                             config.setVersion(version);
                             OpenFrameClientConfiguration updatedConfig = openFrameClientConfigurationService.save(config);
                             log.info("Updated OpenFrameClientConfiguration from version {} to {}", oldVersion, version);
-
+                            
                             openFrameClientUpdatePublisher.publish(updatedConfig);
                         },
-                        () -> log.warn("OpenFrameClientConfiguration not found for current tenant, skipping update")
+                        () -> log.warn("OpenFrameClientConfiguration with id '{}' not found, skipping update", DEFAULT_CLIENT_CONFIG_ID)
                 );
     }
 

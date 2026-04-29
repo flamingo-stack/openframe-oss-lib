@@ -67,11 +67,7 @@ public class IntegratedToolAgentInitializer {
 
     private void processExistingAgent(IntegratedToolAgent existingAgent, IntegratedToolAgent newAgent, String filePath) {
         log.info("Agent configuration {} already exists, updating", newAgent.getKey());
-
-        // Reuse existing _id so save() takes the replace path. JSON config has @JsonIgnore
-        // on id, so newAgent._id is null otherwise and save() would attempt insert.
-        newAgent.setId(existingAgent.getId());
-
+        
         // Preserve version for release agents to prevent overriding
         if (existingAgent.isReleaseVersion()) {
             String existingVersion = existingAgent.getVersion();
@@ -83,7 +79,7 @@ public class IntegratedToolAgentInitializer {
 
         integratedToolAgentService.save(newAgent);
         log.info("Updated agent configuration: {} from {}", newAgent.getKey(), filePath);
-
+        
         processConfigurationUpdate(existingAgent, newAgent);
     }
 

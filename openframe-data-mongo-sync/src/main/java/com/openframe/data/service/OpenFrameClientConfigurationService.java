@@ -16,22 +16,12 @@ public class OpenFrameClientConfigurationService {
     private final OpenFrameClientConfigurationRepository repository;
 
     public OpenFrameClientConfiguration get() {
-        return findCurrent()
+        return repository.findById(DEFAULT_ID)
                 .orElseThrow(() -> new IllegalStateException("No openframe client configuration found"));
     }
 
     public Optional<OpenFrameClientConfiguration> findById(String id) {
         return repository.findById(id);
-    }
-
-    /**
-     * Returns the current pod's client configuration. On SaaS pods, the tenant-scoped
-     * MongoTemplate filters findAll() by the bound tenant, so this returns that tenant's
-     * row (whose _id is a tenant-scoped composite like "{tenantId}:default" after the
-     * migration). On OSS there is only one row, so findFirst() returns it directly.
-     */
-    public Optional<OpenFrameClientConfiguration> findCurrent() {
-        return repository.findAll().stream().findFirst();
     }
 
     public OpenFrameClientConfiguration save(OpenFrameClientConfiguration config) {
