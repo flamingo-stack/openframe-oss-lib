@@ -1,6 +1,5 @@
 package com.openframe.data.document.ticket;
 
-import com.openframe.data.document.TenantScoped;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,12 +20,9 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "ticket_attachments")
-public class TicketAttachment implements TenantScoped {
+public class TicketAttachment {
     @Id
     private String id;
-
-    @Indexed
-    private String tenantId;
 
     @Indexed
     private String ticketId;

@@ -1,6 +1,5 @@
 package com.openframe.data.document.version;
 
-import com.openframe.data.document.TenantScoped;
 import lombok.Data;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
@@ -15,13 +14,10 @@ import java.time.Instant;
  */
 @Data
 @Document(collection = "release_versions")
-public class ReleaseVersion implements TenantScoped {
+public class ReleaseVersion {
 
     @Id
     private String id;
-
-    @Indexed(unique = true)
-    private String tenantId;
 
     /**
      * Version string (e.g., "4.2.0", "1.0.0-beta")

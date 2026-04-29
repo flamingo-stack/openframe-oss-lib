@@ -7,6 +7,7 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.Indexed;
 
 import java.time.Instant;
 
@@ -20,9 +21,13 @@ import java.time.Instant;
 @SuperBuilder
 @CompoundIndex(
         def = "{'tenantId': 1, 'email': 1}",
-        unique = true
+        unique = true,
+        partialFilter = "{ 'tenantId': { $exists: true } }"
 )
 public class AuthUser extends User {
+
+    @Indexed
+    private String tenantId;
 
     private String passwordHash;
 

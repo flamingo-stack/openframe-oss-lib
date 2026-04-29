@@ -1,15 +1,10 @@
 package com.openframe.data.document.tool;
 
-import com.fasterxml.jackson.annotation.JsonAlias;
-import com.openframe.data.document.TenantScoped;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.CompoundIndex;
-import org.springframework.data.mongodb.core.index.CompoundIndexes;
-import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.List;
@@ -19,19 +14,9 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "integrated_tools")
-@CompoundIndexes({
-        @CompoundIndex(name = "tenantId_key_uniq", def = "{'tenantId': 1, 'key': 1}", unique = true)
-})
-public class IntegratedTool implements TenantScoped {
+public class IntegratedTool {
     @Id
     private String id;
-
-    @JsonAlias("id")
-    private String key;
-
-    @Indexed
-    private String tenantId;
-
     private String name;
     private String description;
     private String icon;

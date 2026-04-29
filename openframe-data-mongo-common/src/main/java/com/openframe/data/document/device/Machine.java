@@ -1,6 +1,5 @@
 package com.openframe.data.document.device;
 
-import com.openframe.data.document.TenantScoped;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import org.springframework.data.annotation.CreatedDate;
@@ -14,12 +13,9 @@ import java.util.List;
 
 @Data
 @Document(collection = "machines")
-public class Machine implements TenantScoped {
+public class Machine {
     @Id
     private String id;
-
-    @Indexed
-    private String tenantId;
 
     @NotBlank
     private String machineId;   // Same as in OAuthClient, used for authentication and as primary ID

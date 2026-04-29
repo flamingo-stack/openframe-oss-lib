@@ -55,7 +55,7 @@ public class IntegratedToolAgentInitializer {
             
             IntegratedToolAgent agent = objectMapper.readValue(resource.getInputStream(), IntegratedToolAgent.class);
             
-            integratedToolAgentService.findById(agent.getKey())
+            integratedToolAgentService.findById(agent.getId())
                 .ifPresentOrElse(
                     existingAgent -> processExistingAgent(existingAgent, agent, agentConfigurationFilePath),
                     () -> processNewAgent(agent, agentConfigurationFilePath)
@@ -66,35 +66,31 @@ public class IntegratedToolAgentInitializer {
     }
 
     private void processExistingAgent(IntegratedToolAgent existingAgent, IntegratedToolAgent newAgent, String filePath) {
-        log.info("Agent configuration {} already exists, updating", newAgent.getKey());
-
-        // Reuse existing _id so save() takes the replace path. JSON config has @JsonIgnore
-        // on id, so newAgent._id is null otherwise and save() would attempt insert.
-        newAgent.setId(existingAgent.getId());
-
+        log.info("Agent configuration {} already exists, updating", newAgent.getId());
+        
         // Preserve version for release agents to prevent overriding
         if (existingAgent.isReleaseVersion()) {
             String existingVersion = existingAgent.getVersion();
             newAgent.setVersion(existingVersion);
-            log.info("Preserving version {} for release agent {}", existingVersion, newAgent.getKey());
+            log.info("Preserving version {} for release agent {}", existingVersion, newAgent.getId());
         }
 
         newAgent.setPublishState(existingAgent.getPublishState());
 
         integratedToolAgentService.save(newAgent);
-        log.info("Updated agent configuration: {} from {}", newAgent.getKey(), filePath);
-
+        log.info("Updated agent configuration: {} from {}", newAgent.getId(), filePath);
+        
         processConfigurationUpdate(existingAgent, newAgent);
     }
 
     private void processNewAgent(IntegratedToolAgent agent, String filePath) {
-        log.info("Found no existing agent configuration for {}", agent.getKey());
+        log.info("Found no existing agent configuration for {}", agent.getId());
         integratedToolAgentService.save(agent);
-        log.info("Created new agent configuration: {} from {}", agent.getKey(), filePath);
+        log.info("Created new agent configuration: {} from {}", agent.getId(), filePath);
     }
 
     private void processConfigurationUpdate(IntegratedToolAgent existingAgent, IntegratedToolAgent newAgent) {
-        String toolAgentId = newAgent.getKey();
+        String toolAgentId = newAgent.getId();
         String existingVersion = existingAgent.getVersion();
         String newVersion = newAgent.getVersion();
 
@@ -117,7 +113,7 @@ public class IntegratedToolAgentInitializer {
     }
 
     private boolean hasAssetChanges(IntegratedToolAgent existingAgent, IntegratedToolAgent newAgent) {
-        String toolAgentId = newAgent.getKey();
+        String toolAgentId = newAgent.getId();
         List<ToolAgentAsset> existingAssets = existingAgent.getAssets();
         List<ToolAgentAsset> newAssets = newAgent.getAssets();
 

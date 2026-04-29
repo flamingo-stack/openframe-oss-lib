@@ -1,6 +1,5 @@
 package com.openframe.data.document.ticket;
 
-import com.openframe.data.document.TenantScoped;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -29,23 +28,20 @@ import java.util.List;
 @AllArgsConstructor
 @Document(collection = "tickets")
 @CompoundIndexes({
-    @CompoundIndex(name = "tenant_ticketNumber_idx", def = "{'tenantId': 1, 'ticketNumber': 1}", unique = true),
     @CompoundIndex(name = "status_created", def = "{'status': 1, 'createdAt': -1}"),
     @CompoundIndex(name = "assignee_status", def = "{'assignedTo': 1, 'status': 1}"),
     @CompoundIndex(name = "organization_status", def = "{'organizationId': 1, 'status': 1}"),
     @CompoundIndex(name = "device_status", def = "{'deviceId': 1, 'status': 1}")
 })
-public class Ticket implements TenantScoped {
+public class Ticket {
     @Id
     private String id;
-
-    @Indexed
-    private String tenantId;
 
     /**
      * Human-readable ticket number (e.g., 1001, 1002).
      * Auto-incremented per tenant.
      */
+    @Indexed(unique = true)
     private Integer ticketNumber;
 
     private String title;

@@ -58,7 +58,7 @@ public class IntegrationService {
     }
 
     public Mono<String> testIntegrationConnection(String toolId) {
-        return integratedToolRepository.findByKey(toolId)
+        return integratedToolRepository.findById(toolId)
             .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Tool not found: " + toolId)))
             .flatMap(tool -> {
                 if (!tool.isEnabled()) {

@@ -1,6 +1,5 @@
 package com.openframe.data.document.tag;
 
-import com.openframe.data.document.TenantScoped;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -8,7 +7,6 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.CompoundIndexes;
-import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
@@ -20,14 +18,11 @@ import java.util.List;
 @AllArgsConstructor
 @Document(collection = "tags")
 @CompoundIndexes({
-        @CompoundIndex(name = "tenant_key_entity_idx", def = "{'tenantId': 1, 'key': 1, 'entityType': 1}", unique = true)
+        @CompoundIndex(name = "key_entity_idx", def = "{'key': 1, 'entityType': 1}", unique = true)
 })
-public class Tag implements TenantScoped {
+public class Tag {
     @Id
     private String id;
-
-    @Indexed
-    private String tenantId;
 
     /**
      * Tag key identifier (e.g., "site", "org_type", "primary_msp").

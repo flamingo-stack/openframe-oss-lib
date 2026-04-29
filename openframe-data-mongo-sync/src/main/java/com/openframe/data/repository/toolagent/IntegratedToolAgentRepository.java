@@ -6,7 +6,6 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
-import java.util.Optional;
 
 @Repository
 public interface IntegratedToolAgentRepository extends MongoRepository<IntegratedToolAgent, String> {
@@ -15,5 +14,4 @@ public interface IntegratedToolAgentRepository extends MongoRepository<Integrate
 
     List<IntegratedToolAgent> findByReleaseVersionTrue();
 
-    Optional<IntegratedToolAgent> findByKey(String key);
-}
+} 
