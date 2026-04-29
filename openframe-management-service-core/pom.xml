@@ -88,6 +88,13 @@
             <artifactId>shedlock-provider-redis-spring</artifactId>
             <version>5.10.2</version>
         </dependency>
+
+        <!-- Test dependencies -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>
 
