@@ -11,8 +11,6 @@ import org.springframework.stereotype.Component;
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 
-import static com.openframe.data.service.OpenFrameClientConfigurationService.DEFAULT_ID;
-
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -28,15 +26,15 @@ public class OpenFrameClientConfigurationInitializer {
         log.info("Initializing OpenFrame client configuration");
         ClassPathResource resource = new ClassPathResource(CONFIG_FILE);
         OpenFrameClientConfiguration newConfiguration = objectMapper.readValue(resource.getInputStream(), OpenFrameClientConfiguration.class);
-        
-        // Set the default ID
-        newConfiguration.setId(DEFAULT_ID);
-        
-        clientConfigurationService.findById(DEFAULT_ID)
+
+        clientConfigurationService.findCurrent()
             .ifPresentOrElse(
-                existingConfiguration ->
-                        processExistingConfiguration(existingConfiguration, newConfiguration),
-                    () -> processNewConfiguration(newConfiguration)
+                existingConfiguration -> {
+                    // Preserve existing _id (may be tenant-scoped composite from migration, or ObjectId)
+                    newConfiguration.setId(existingConfiguration.getId());
+                    processExistingConfiguration(existingConfiguration, newConfiguration);
+                },
+                () -> processNewConfiguration(newConfiguration)
             );
 
         log.info("Initialized OpenFrame client configuration");
