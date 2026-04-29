@@ -7,18 +7,24 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.mongodb.core.index.Indexed;
 
 import java.time.LocalDateTime;
 
 /**
- * SSO per-tenant configuration that inherits base SSOConfig (including tenantId from TenantScoped)
- * and adds SaaS-specific timestamps.
+ * SSO per-tenant configuration that inherits base SSOConfig (provider/client credentials, enabled)
+ * and adds tenant-specific linkage and timestamps.
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
 @NoArgsConstructor
 @AllArgsConstructor
 public class SSOPerTenantConfig extends SSOConfig {
+    /**
+     * Tenant ID this SSO configuration belongs to
+     */
+    @Indexed(unique = true, sparse = true)
+    private String tenantId;
 
     @CreatedDate
     private LocalDateTime createdAt;
@@ -26,4 +32,3 @@ public class SSOPerTenantConfig extends SSOConfig {
     @LastModifiedDate
     private LocalDateTime updatedAt;
 }
-

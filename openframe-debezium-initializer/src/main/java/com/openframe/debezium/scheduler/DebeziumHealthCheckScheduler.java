@@ -2,6 +2,7 @@ package com.openframe.debezium.scheduler;
 
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.service.IntegratedToolService;
+import com.openframe.data.service.TenantIdProvider;
 import com.openframe.debezium.service.ConnectorRecoveryManager;
 import com.openframe.debezium.service.DebeziumService;
 import lombok.extern.slf4j.Slf4j;
@@ -24,14 +25,17 @@ public class DebeziumHealthCheckScheduler {
     private final DebeziumService debeziumService;
     private final ConnectorRecoveryManager recoveryManager;
     private final IntegratedToolService integratedToolService;
+    private final TenantIdProvider tenantIdProvider;
 
     @Autowired
     public DebeziumHealthCheckScheduler(DebeziumService debeziumService,
                                         ConnectorRecoveryManager recoveryManager,
-                                        @Autowired(required = false) IntegratedToolService integratedToolService) {
+                                        @Autowired(required = false) IntegratedToolService integratedToolService,
+                                        TenantIdProvider tenantIdProvider) {
         this.debeziumService = debeziumService;
         this.recoveryManager = recoveryManager;
         this.integratedToolService = integratedToolService;
+        this.tenantIdProvider = tenantIdProvider;
     }
 
     @PostConstruct
@@ -48,7 +52,9 @@ public class DebeziumHealthCheckScheduler {
     public void checkAndRestartFailedTasks() {
         log.debug("Running Debezium health check with auto-recovery...");
 
-        if (integratedToolService != null) {
+        // Only reconcile/create connectors if a tenant is registered — prevents creating
+        // connectors on empty clusters (e.g. before the first customer signs up).
+        if (integratedToolService != null && tenantIdProvider.isTenantRegistered()) {
             reconcileMissingConnectors();
         }
 

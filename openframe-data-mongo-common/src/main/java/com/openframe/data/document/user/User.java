@@ -1,6 +1,5 @@
 package com.openframe.data.document.user;
 
-import com.openframe.data.document.TenantScoped;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.experimental.SuperBuilder;
@@ -22,13 +21,9 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "users")
-public class User implements TenantScoped {
+public class User {
     @Id
     private String id;
-
-    @Indexed
-    private String tenantId;
-
     @Indexed
     private String email;
     private String firstName;

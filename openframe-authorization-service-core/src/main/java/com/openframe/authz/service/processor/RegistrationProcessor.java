@@ -20,17 +20,6 @@ public interface RegistrationProcessor {
     }
 
     /**
-     * Returns the tenantId that the new Tenant document must adopt.
-     * SaaS implementations atomically claim a pre-provisioned cluster and return its
-     * pre-generated tenantId so the Tenant._id matches tenant_cluster_registrations.tenantId,
-     * and throw if no READY cluster is available.
-     * The OSS default generates a fresh id.
-     */
-    default String reserveTenantIdForRegistration(TenantRegistrationRequest request) {
-        return Tenant.generateTenantId();
-    }
-
-    /**
      * Post-process hook for tenant registration.
      * Called after the tenant has been successfully registered.
      *
