@@ -1,7 +1,6 @@
 package com.openframe.data.document.user;
 
 
-import com.openframe.data.document.TenantScoped;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -23,12 +22,9 @@ import java.util.Locale;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "invitations")
-public class Invitation implements TenantScoped {
+public class Invitation {
     @Id
     private String id;
-
-    @Indexed
-    private String tenantId;
 
     @Indexed
     private String email;

@@ -1,9 +1,7 @@
 package com.openframe.data.document.event;
 
-import com.openframe.data.document.TenantScoped;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
@@ -11,13 +9,9 @@ import java.util.Map;
 
 @Data
 @Document(collection = "external_application_events")
-public class ExternalApplicationEvent implements TenantScoped {
+public class ExternalApplicationEvent {
     @Id
     private String id;
-
-    @Indexed
-    private String tenantId;
-
     private String type;
     private String payload;
     private Instant timestamp;

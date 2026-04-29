@@ -24,16 +24,15 @@ public class TenantService {
     private final RegistrationValidationService registrationValidationService;
 
     /**
-     * Create a new tenant with the given id. The caller is responsible for sourcing
-     * the id (in SaaS: from tenant_cluster_registrations; in OSS: Tenant.generateTenantId()).
+     * Create a new tenant
      */
-    public Tenant createTenant(String tenantName, String domain, String tenantId) {
+    public Tenant createTenant(String tenantName, String domain) {
         log.debug("Creating tenant: {} with domain: {}", tenantName, domain);
 
         registrationValidationService.ensureTenantDomainAvailable(domain);
 
         Tenant tenant = Tenant.builder()
-                .id(tenantId)
+                .id(Tenant.generateTenantId())
                 .name(tenantName)
                 .domain(domain)
                 .status(TenantStatus.ACTIVE)
