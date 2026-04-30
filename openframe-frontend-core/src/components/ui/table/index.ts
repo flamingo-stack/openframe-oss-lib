@@ -1,3 +1,6 @@
+/**
+ * @deprecated The `table` module is deprecated. Use `data-table` instead.
+ */
 export { Table } from './table'
 export { TableCell } from './table-cell'
 export { TableColumnFilterDropdown, type TableColumnFilterDropdownProps } from './table-column-filter-dropdown'
@@ -17,5 +20,3 @@ export type {
   TableHeaderProps, TableProps, TableRowProps, TailwindBreakpoint
 } from './types'
 
-// Query Report Table (dynamic columns)
-export * from './query-report-table'

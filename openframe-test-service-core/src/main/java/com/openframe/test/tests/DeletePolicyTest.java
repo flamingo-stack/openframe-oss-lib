@@ -2,6 +2,7 @@ package com.openframe.test.tests;
 
 import com.openframe.test.api.MonitoringApi;
 import com.openframe.test.data.dto.policy.Policy;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -12,9 +13,11 @@ import static com.openframe.test.data.generator.MonitoringGenerator.findPolicyBy
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Tag("archive")
+@DisplayName("Delete Policy")
 public class DeletePolicyTest extends BaseTest {
 
     @Test
+    @DisplayName("Delete empty policy")
     public void testDeleteEmptyPolicy() {
         List<Policy> policies = MonitoringApi.getPolicies();
         assertThat(policies).as("No policie").isNotEmpty();
@@ -26,6 +29,7 @@ public class DeletePolicyTest extends BaseTest {
     }
 
     @Test
+    @DisplayName("Delete policy with devices")
     public void testDeletePolicyWithDevices() {
         List<Policy> policies = MonitoringApi.getPolicies();
         assertThat(policies).as("No policie").isNotEmpty();

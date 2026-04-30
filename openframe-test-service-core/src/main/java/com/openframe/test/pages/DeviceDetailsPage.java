@@ -16,11 +16,6 @@ public class DeviceDetailsPage {
 
     private static final String DEVICE_NAME_HEADING = "main h1";
 
-    // Status badge: scoped to main, filtered to the span that carries the
-    // status text (ONLINE / OFFLINE / ARCHIVED). The badge spans sit inside
-    // the header area alongside the "Updated X ago" span; target the one whose
-    // text is all-uppercase and short (≤10 chars) to avoid matching the
-    // "Updated …" span that also has shrink-0.
     private static final String STATUS_BADGE =
             "main span:text-matches('^(ONLINE|OFFLINE|ARCHIVED)$')";
 
@@ -67,8 +62,6 @@ public class DeviceDetailsPage {
      * @return the value text (e.g. "Windows Windows Server 2025 …")
      */
     public String getInfoField(String label) {
-        // Each cell is: <p class="text-ods-text-primary …">VALUE</p>
-        //                <p class="text-ods-text-secondary …">LABEL</p>
         return page.locator("main p.text-ods-text-secondary")
                 .filter(new Locator.FilterOptions().setHasText(label))
                 .locator("xpath=preceding-sibling::p[1]")
@@ -87,15 +80,13 @@ public class DeviceDetailsPage {
     }
 
     /**
-     * Clicks "Remote Control" and waits for the URL to transition to the
-     * remote-desktop sub-route.
+     * Clicks the Remote Control icon and waits for the URL to transition to
+     * the remote-desktop sub-route.
      *
      * @return a new {@link RemoteDesktopPage} scoped to the same page
      */
     public RemoteDesktopPage openRemoteDesktop() {
-        page.locator("main button[role='link']")
-                .filter(new Locator.FilterOptions().setHasText("Remote Control"))
-                .click();
+        page.locator("main a[href*='/remote-desktop/']").click();
         page.waitForURL(
                 url -> url.contains("/remote-desktop/"),
                 new Page.WaitForURLOptions().setTimeout(15_000));
@@ -123,12 +114,10 @@ public class DeviceDetailsPage {
     }
 
     /**
-     * Clicks "Manage Files" (navigates to the file manager sub-route).
+     * Clicks the File Manager icon (navigates to the file manager sub-route).
      */
     public FileManagerPage openFileManager() {
-        page.locator("main button[role='link']")
-                .filter(new Locator.FilterOptions().setHasText("Manage Files"))
-                .click();
+        page.locator("main a[href*='/file-manager/']").click();
         FileManagerPage fileManagerPage = new FileManagerPage(this.page);
         page.waitForCondition(fileManagerPage::isLoaded);
         return fileManagerPage;
@@ -205,7 +194,6 @@ public class DeviceDetailsPage {
      * Clicks the Remote Shell split-button to open its dropdown.
      */
     private void openRemoteShellMenu() {
-        // The split button has aria-haspopup=menu and visible text "Remote Shell"
         page.locator("main button[aria-haspopup='menu']")
                 .filter(new Locator.FilterOptions().setHasText("Remote Shell"))
                 .click();
@@ -216,7 +204,6 @@ public class DeviceDetailsPage {
      * Clicks the ⋯ icon button to open the more-actions dropdown.
      */
     private void openMoreActionsMenu() {
-        // The ⋯ button has aria-haspopup=menu and no visible text
         page.locator("main button[type='button'][aria-haspopup='menu']")
                 .filter(new Locator.FilterOptions().setHasNotText("Remote Shell"))
                 .click();
@@ -225,14 +212,12 @@ public class DeviceDetailsPage {
 
     /**
      * Clicks an item inside the currently open {@code [role="menu"]} by its
-     * visible text. Menu items are plain {@code <div onclick>} elements with
-     * no semantic role, so we match by text content.
+     * visible text. Menu items are {@code <a>} elements, so we match by text
+     * content.
      */
     private void clickMenuItemByText(String text) {
-        page.locator("[role='menu'] div")
+        page.locator("[role='menu'] a")
                 .filter(new Locator.FilterOptions().setHasText(text))
-                // Use last() to pick the innermost div that contains only that text,
-                // not a wrapper that contains all items
                 .last()
                 .click();
     }

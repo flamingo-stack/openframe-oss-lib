@@ -202,6 +202,12 @@ function processMessageData(
       }
       break
 
+    case MESSAGE_TYPE.THINKING:
+      if ('text' in data && data.text) {
+        accumulator.appendThinking(data.text)
+      }
+      break
+
     case MESSAGE_TYPE.EXECUTING_TOOL:
       if ('integratedToolType' in data) {
         accumulator.addToolExecution({

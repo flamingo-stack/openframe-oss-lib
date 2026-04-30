@@ -25,18 +25,20 @@ export interface ToolBadgeProps {
   toolType: ToolType
   /** Additional CSS classes */
   className?: string
+  iconClassName?: string
 }
 
 export const ToolBadge: React.FC<ToolBadgeProps> = ({
   toolType,
-  className
+  className,
+  iconClassName,
 }) => {
   const label = getToolLabel(toolType)
 
   return (
-    <div className={cn("flex items-center gap-1", className)}>
-      <ToolIcon toolType={toolType} className="[&_svg]:w-4 [&_svg]:h-4" />
-      <span className="text-ods-text-primary text-[14px] leading-[20px] md:text-[18px] md:leading-[24px]">{label}</span>
+    <div className={cn("flex items-center gap-1 text-ods-text-secondary", className)}>
+      <ToolIcon toolType={toolType} className={iconClassName} size={16} />
+      <span className="text-ods-text-primary text-h4">{label}</span>
     </div>
   )
 }

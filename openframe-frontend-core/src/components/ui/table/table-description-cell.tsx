@@ -3,6 +3,7 @@
 import React from 'react'
 import { cn } from '../../../utils/cn'
 
+/** @deprecated Use `data-table` instead. */
 export interface TableDescriptionCellProps {
   /**
    * The description text to display
@@ -20,18 +21,7 @@ export interface TableDescriptionCellProps {
 }
 
 /**
- * TableDescriptionCell
- *
- * A reusable component for displaying multi-line description text in table cells.
- * Uses ODS design tokens and supports line clamping for consistent presentation.
- *
- * @example
- * ```tsx
- * <TableDescriptionCell
- *   text="This is a long description that will wrap to multiple lines..."
- *   maxLines={3}
- * />
- * ```
+ * @deprecated Use `data-table` instead.
  */
 export function TableDescriptionCell({
   text,

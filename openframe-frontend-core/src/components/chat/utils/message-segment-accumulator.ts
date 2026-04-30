@@ -30,7 +30,6 @@ export interface AccumulatorCallbacks {
  */
 export class MessageSegmentAccumulator {
   private segments: MessageSegment[] = []
-  private currentTextBuffer: string = ''
   private pendingApprovals: Map<string, PendingApproval> = new Map()
   private executingTools: Map<string, { integratedToolType: string; toolFunction: string; parameters?: Record<string, any> }> = new Map()
   private callbacks: AccumulatorCallbacks = {}
@@ -59,13 +58,6 @@ export class MessageSegmentAccumulator {
   }): void {
     if (state.existingSegments) {
       this.segments = [...state.existingSegments]
-      
-      const lastSegment = this.segments[this.segments.length - 1]
-      if (lastSegment && lastSegment.type === 'text') {
-        this.currentTextBuffer = lastSegment.text
-      } else {
-        this.currentTextBuffer = ''
-      }
     }
 
     if (state.pendingApprovals) {
@@ -90,7 +82,6 @@ export class MessageSegmentAccumulator {
   getState(): AccumulatorState {
     return {
       segments: [...this.segments],
-      currentTextBuffer: this.currentTextBuffer,
       pendingApprovals: new Map(this.pendingApprovals),
       executingTools: new Map(this.executingTools),
     }
@@ -101,7 +92,6 @@ export class MessageSegmentAccumulator {
    */
   reset(): void {
     this.segments = []
-    this.currentTextBuffer = ''
     this.pendingApprovals.clear()
     this.executingTools.clear()
   }
@@ -111,7 +101,6 @@ export class MessageSegmentAccumulator {
    */
   resetSegments(): void {
     this.segments = []
-    this.currentTextBuffer = ''
   }
 
   /**
@@ -120,15 +109,29 @@ export class MessageSegmentAccumulator {
    */
   appendText(text: string): MessageSegment[] {
     const lastSegment = this.segments[this.segments.length - 1]
-    
+
     if (lastSegment && lastSegment.type === 'text') {
-      this.currentTextBuffer += text
-      this.segments[this.segments.length - 1] = { type: 'text', text: this.currentTextBuffer }
+      this.segments[this.segments.length - 1] = { type: 'text', text: lastSegment.text + text }
     } else {
-      this.currentTextBuffer = text
-      this.segments.push({ type: 'text', text: this.currentTextBuffer })
+      this.segments.push({ type: 'text', text })
     }
-    
+
+    return this.getSegments()
+  }
+
+  /**
+   * Append thinking text to the current message.
+   * If the last segment is thinking, append to it; otherwise start a new thinking segment.
+   */
+  appendThinking(text: string): MessageSegment[] {
+    const lastSegment = this.segments[this.segments.length - 1]
+
+    if (lastSegment && lastSegment.type === 'thinking') {
+      this.segments[this.segments.length - 1] = { type: 'thinking', text: lastSegment.text + text }
+    } else {
+      this.segments.push({ type: 'thinking', text })
+    }
+
     return this.getSegments()
   }
 
@@ -345,6 +348,9 @@ export class MessageSegmentAccumulator {
       switch (segment.type) {
         case 'text':
           if (segment.text) this.appendText(segment.text)
+          break
+        case 'thinking':
+          if (segment.text) this.appendThinking(segment.text)
           break
         case 'tool_execution':
           this.addToolExecution(segment)

@@ -81,7 +81,6 @@ export interface SlidingSidebarConfig {
 export interface NavigationSidebarConfig {
   items: NavigationSidebarItem[]
   minimized?: boolean
-  footer?: React.ReactNode
   onNavigate?: (path: string) => void
   onToggleMinimized?: () => void
   className?: string

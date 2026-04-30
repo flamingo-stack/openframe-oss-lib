@@ -9,6 +9,7 @@ import { ROW_HEIGHT_DESKTOP } from './table-skeleton'
 import type { TableRowProps } from './types'
 import { getHideClasses } from './utils'
 
+/** @deprecated Use `DataTableRow` from `data-table` instead. */
 export function TableRow<T = any>({
   item,
   columns,

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, forwardRef, memo } from "react"
+import { forwardRef, memo } from "react"
 import { cn } from "../../utils/cn"
 import { SquareAvatar } from "../ui/square-avatar"
 import { ChatTypingIndicator } from "./chat-typing-indicator"
@@ -8,6 +8,7 @@ import { ToolExecutionDisplay } from "./tool-execution-display"
 import { ApprovalRequestMessage } from "./approval-request-message"
 import { ErrorMessageDisplay } from "./error-message-display"
 import { ContextCompactionDisplay } from "./context-compaction-display"
+import { ThinkingDisplay } from "./thinking-display"
 import { SimpleMarkdownRenderer } from "../ui/simple-markdown-renderer"
 import type { MessageSegment, MessageContent, ChatMessageEnhancedProps } from "./types"
 
@@ -24,8 +25,6 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     const isError = role === 'error'
     const authorType = authorTypeProp ?? (isUser ? 'user' : assistantType === 'mingo' ? 'mingo' : 'fae')
 
-    const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set())
-    
     const getAvatarProps = () => {
       const displayName = name || (isUser ? "User" : assistantType === 'mingo' ? "Mingo" : "Fae")
       const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase()
@@ -50,22 +49,6 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     
     const avatarProps = getAvatarProps()
     const segments = normalizeContent(content)
-    
-    const getToolKey = (segment: MessageSegment & { type: 'tool_execution' }, index: number) => {
-      return `${segment.data.integratedToolType}-${segment.data.toolFunction}-${index}`
-    }
-    
-    const toggleToolExpanded = (key: string) => {
-      setExpandedTools(prev => {
-        const newSet = new Set(prev)
-        if (newSet.has(key)) {
-          newSet.delete(key)
-        } else {
-          newSet.add(key)
-        }
-        return newSet
-      })
-    }
 
     const isSystem = authorType === 'system'
 
@@ -132,13 +115,10 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                     </div>
                   )
                 } else if (segment.type === 'tool_execution') {
-                  const toolKey = getToolKey(segment, index)
                   return (
                     <ToolExecutionDisplay
-                      key={toolKey}
+                      key={index}
                       message={segment.data}
-                      isExpanded={expandedTools.has(toolKey)}
-                      onToggleExpand={() => toggleToolExpanded(toolKey)}
                     />
                   )
                 } else if (segment.type === 'approval_request') {
@@ -164,7 +144,15 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                     <ContextCompactionDisplay
                       key={index}
                       status={segment.status}
-                      summary={segment.summary}
+                    />
+                  )
+                } else if (segment.type === 'thinking') {
+                  const isStreaming = index === segments.length - 1 && isTyping
+                  return (
+                    <ThinkingDisplay
+                      key={index}
+                      text={segment.text}
+                      isStreaming={isStreaming}
                     />
                   )
                 }

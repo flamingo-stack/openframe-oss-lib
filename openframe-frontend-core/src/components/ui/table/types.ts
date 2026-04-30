@@ -1,7 +1,9 @@
 import { ReactNode } from 'react'
 
+/** @deprecated Use types from `data-table` instead. */
 export type TailwindBreakpoint = 'md' | 'lg' | 'xl' | '2xl'
 
+/** @deprecated Use types from `data-table` instead. */
 export interface TableColumn<T = any> {
   key: string
   label: string
@@ -22,12 +24,14 @@ export interface TableColumn<T = any> {
   filterFunction?: (item: T, filterValue: any) => boolean
 }
 
+/** @deprecated Use types from `data-table` instead. */
 export interface FilterOption {
   id: string
   label: string
   value: any
 }
 
+/** @deprecated Use types from `data-table` instead. */
 export interface FilterSection {
   id: string
   title: string
@@ -36,10 +40,12 @@ export interface FilterSection {
   allowSelectAll?: boolean
 }
 
+/** @deprecated Use types from `data-table` instead. */
 export interface TableFilters {
   [columnKey: string]: any[]
 }
 
+/** @deprecated Use types from `data-table` instead. */
 export interface CursorPagination {
   hasNextPage: boolean
   hasPreviousPage?: boolean
@@ -58,6 +64,7 @@ export interface CursorPagination {
   resetButtonIcon?: 'home' | 'rotate'
 }
 
+/** @deprecated Use types from `data-table` instead. */
 export interface PagePagination {
   currentPage: number
   totalPages: number
@@ -66,6 +73,7 @@ export interface PagePagination {
   onPageChange: (page: number) => void
 }
 
+/** @deprecated Use types from `data-table` instead. */
 export interface InfiniteScrollConfig {
   hasNextPage: boolean
   isFetchingNextPage: boolean
@@ -73,6 +81,7 @@ export interface InfiniteScrollConfig {
   skeletonRows?: number
 }
 
+/** @deprecated Use types from `data-table` instead. */
 export interface TableProps<T = any> {
   // Data
   data: T[]
@@ -144,6 +153,7 @@ export interface TableProps<T = any> {
   stickyHeaderOffset?: string
 }
 
+/** @deprecated Use types from `data-table` instead. */
 export interface BulkAction<T = any> {
   label: string
   icon?: ReactNode
@@ -153,6 +163,7 @@ export interface BulkAction<T = any> {
   className?: string
 }
 
+/** @deprecated Use types from `data-table` instead. */
 export interface RowAction<T = any> {
   label: string
   icon?: ReactNode
@@ -162,6 +173,7 @@ export interface RowAction<T = any> {
   hideOnMobile?: boolean
 }
 
+/** @deprecated Use types from `data-table` instead. */
 export interface TableHeaderProps<T = any> {
   columns: TableColumn<T>[]
   className?: string
@@ -183,6 +195,7 @@ export interface TableHeaderProps<T = any> {
   stickyHeaderOffset?: string
 }
 
+/** @deprecated Use types from `data-table` instead. */
 export interface TableRowProps<T = any> {
   item: T
   columns: TableColumn<T>[]
@@ -198,6 +211,7 @@ export interface TableRowProps<T = any> {
   onSelect?: (item: T) => void
 }
 
+/** @deprecated Use types from `data-table` instead. */
 export interface TableCellProps {
   children: ReactNode
   align?: 'left' | 'center' | 'right'
@@ -205,6 +219,7 @@ export interface TableCellProps {
   width?: string
 }
 
+/** @deprecated Use types from `data-table` instead. */
 export interface TableCardSkeletonProps {
   columns: TableColumn[]
   rows?: number // Number of skeleton rows to display (default: 10)
@@ -214,6 +229,7 @@ export interface TableCardSkeletonProps {
   rowClassName?: string // Additional classes for each skeleton row
 }
 
+/** @deprecated Use types from `data-table` instead. */
 export interface TableEmptyStateProps {
   message?: string
   icon?: ReactNode

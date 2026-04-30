@@ -2,9 +2,9 @@
  * Component prop types
  */
 
-import type { HTMLAttributes, TextareaHTMLAttributes } from 'react'
-import type { Message, MessageSegment, ApprovalRequestData, ToolExecutionData } from './message.types'
-import type { AssistantType, AuthorType, ConnectionStatus, ChatApprovalStatus } from './chat.types'
+import type { ButtonHTMLAttributes, HTMLAttributes, TextareaHTMLAttributes } from 'react'
+import type { AssistantType, AuthorType, ChatApprovalStatus, ConnectionStatus } from './chat.types'
+import type { ApprovalRequestData, Message, MessageSegment, ToolExecutionData } from './message.types'
 
 // ========== Chat Container Props ==========
 
@@ -122,10 +122,8 @@ export interface ChatTypingIndicatorProps extends HTMLAttributes<HTMLDivElement>
 
 // ========== Tool Execution Display Props ==========
 
-export interface ToolExecutionDisplayProps extends HTMLAttributes<HTMLDivElement> {
+export interface ToolExecutionDisplayProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   message: ToolExecutionData
-  isExpanded?: boolean
-  onToggleExpand?: () => void
 }
 
 // ========== Approval Request Message Props ==========
@@ -149,7 +147,13 @@ export interface ErrorMessageDisplayProps extends HTMLAttributes<HTMLDivElement>
 
 export interface ContextCompactionDisplayProps extends HTMLAttributes<HTMLDivElement> {
   status: 'started' | 'completed'
-  summary?: string
+}
+
+// ========== Thinking Display Props ==========
+
+export interface ThinkingDisplayProps extends HTMLAttributes<HTMLDivElement> {
+  text: string
+  isStreaming?: boolean
 }
 
 // ========== Model Display Props ==========
