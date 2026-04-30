@@ -25,22 +25,6 @@
         "numInstancesPerPartition": 0
       },
       "minimizeDataMovement": true
-    },
-    "COMPLETED": {
-      "tagPoolConfig": {
-        "tag": "DefaultTenant_REALTIME",
-        "poolBased": false,
-        "numPools": 0
-      },
-      "replicaGroupPartitionConfig": {
-        "replicaGroupBased": true,
-        "numInstances": 0,
-        "numReplicaGroups": "${pinot.tables.logs.replication}",
-        "numInstancesPerReplicaGroup": 0,
-        "numPartitions": 0,
-        "numInstancesPerPartition": 0
-      },
-      "minimizeDataMovement": true
     }
   },
   "tableIndexConfig": {
