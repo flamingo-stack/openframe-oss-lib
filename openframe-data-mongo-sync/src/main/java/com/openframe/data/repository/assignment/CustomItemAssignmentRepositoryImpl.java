@@ -42,21 +42,10 @@ public class CustomItemAssignmentRepositoryImpl implements CustomItemAssignmentR
     }
 
     @Override
-    public Query buildAssignmentQuery(String itemId, AssignmentTargetType targetType, String search) {
-        Query query = new Query();
-        query.addCriteria(Criteria.where(FIELD_ITEM_ID).is(itemId));
-        query.addCriteria(Criteria.where(FIELD_TARGET_TYPE).is(targetType));
-
-        if (StringUtils.hasText(search)) {
-            query.addCriteria(Criteria.where(FIELD_DISPLAY_NAME).regex(search.trim(), "i"));
-        }
-
-        return query;
-    }
-
-    @Override
-    public List<ItemAssignment> findAssignmentsWithCursor(Query query, String cursor, int limit,
-                                                          String sortField, String sortDirection) {
+    public List<ItemAssignment> findAssignmentsWithCursor(String itemId, AssignmentTargetType targetType,
+                                                          String search, String sortField, String sortDirection,
+                                                          String cursor, int limit) {
+        Query query = buildAssignmentQuery(itemId, targetType, search);
         boolean isDesc = SORT_DESC.equalsIgnoreCase(sortDirection);
         Sort.Direction direction = isDesc ? Sort.Direction.DESC : Sort.Direction.ASC;
 
@@ -130,8 +119,21 @@ public class CustomItemAssignmentRepositoryImpl implements CustomItemAssignmentR
     }
 
     @Override
-    public long countAssignments(Query query) {
+    public long countAssignments(String itemId, AssignmentTargetType targetType, String search) {
+        Query query = buildAssignmentQuery(itemId, targetType, search);
         return mongoTemplate.count(query, ItemAssignment.class);
+    }
+
+    private Query buildAssignmentQuery(String itemId, AssignmentTargetType targetType, String search) {
+        Query query = new Query();
+        query.addCriteria(Criteria.where(FIELD_ITEM_ID).is(itemId));
+        query.addCriteria(Criteria.where(FIELD_TARGET_TYPE).is(targetType));
+
+        if (StringUtils.hasText(search)) {
+            query.addCriteria(Criteria.where(FIELD_DISPLAY_NAME).regex(search.trim(), "i"));
+        }
+
+        return query;
     }
 
     @Override

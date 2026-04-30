@@ -28,6 +28,8 @@ public class ItemAssignment {
 
     private String itemId;
 
+    private AssignmentItemType itemType;
+
     private AssignmentTargetType targetType;
 
     @Indexed

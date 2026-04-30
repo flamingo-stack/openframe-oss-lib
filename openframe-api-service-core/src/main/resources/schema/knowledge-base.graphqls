@@ -1,0 +1,127 @@
+extend type Query {
+    knowledgeBaseItems(
+        filter: KnowledgeBaseFilterInput
+        search: String
+        first: Int
+        after: String
+    ): KnowledgeBaseItemConnection!
+    knowledgeBaseItem(id: ID!): KnowledgeBaseItem
+    knowledgeBaseTags: [Tag!]!
+    archivedArticles(
+        search: String
+        tagIds: [ID]
+        first: Int
+        after: String
+    ): KnowledgeBaseItemConnection!
+}
+
+input KnowledgeBaseFilterInput {
+    parentId: ID
+    type: KnowledgeBaseItemType
+    tagIds: [ID]
+}
+
+extend type Mutation {
+    createFolder(name: String!, parentId: ID): KnowledgeBaseItem!
+    renameFolder(id: ID!, name: String!): KnowledgeBaseItem!
+    createArticle(input: CreateArticleInput!): KnowledgeBaseItem!
+    updateArticle(input: UpdateArticleInput!): KnowledgeBaseItem!
+    publishArticle(id: ID!): KnowledgeBaseItem!
+    unpublishArticle(id: ID!): KnowledgeBaseItem!
+    moveToFolder(id: ID!, parentId: ID): KnowledgeBaseItem!
+    archiveArticle(id: ID!): KnowledgeBaseItem!
+    unarchiveArticle(id: ID!, parentId: ID): KnowledgeBaseItem!
+    deleteFolder(input: DeleteFolderInput!): Boolean!
+    addTagToKnowledgeBaseItem(itemId: ID!, tagId: ID!): KnowledgeBaseItem!
+    removeTagFromKnowledgeBaseItem(itemId: ID!, tagId: ID!): KnowledgeBaseItem!
+}
+
+type KnowledgeBaseItem implements AssignableTarget & Node {
+    id: ID!
+    type: KnowledgeBaseItemType!
+    name: String!
+    parentId: ID
+    slug: String
+    sortOrder: Int
+    content: String
+    summary: String
+    status: KnowledgeBaseArticleStatus
+    publishedAt: Instant
+    createdBy: ID
+    createdAt: Instant
+    lastModifiedBy: ID
+    updatedAt: Instant
+    tags: [Tag!]!
+    attachments: [KnowledgeBaseItemAttachment!]!
+    author: User
+}
+
+type KnowledgeBaseItemConnection {
+    edges: [KnowledgeBaseItemEdge!]!
+    pageInfo: PageInfo!
+    filteredCount: Int!
+}
+
+type KnowledgeBaseItemEdge {
+    node: KnowledgeBaseItem!
+    cursor: String!
+}
+
+type KnowledgeBaseItemAttachment {
+    id: ID!
+    fileName: String!
+    fileSize: Long
+    contentType: String
+    createdAt: Instant
+}
+
+input CreateArticleInput {
+    name: String!
+    parentId: ID
+    content: String
+    summary: String
+    status: KnowledgeBaseArticleStatus
+    assignedOrganizationIds: [ID!]
+    assignedDeviceIds: [ID!]
+    assignedTicketIds: [ID!]
+    assignedKnowledgeArticleIds: [ID!]
+}
+
+input UpdateArticleInput {
+    id: ID!
+    name: String
+    parentId: ID
+    content: String
+    summary: String
+}
+
+enum KnowledgeBaseItemType {
+    FOLDER
+    ARTICLE
+}
+
+enum KnowledgeBaseArticleStatus {
+    DRAFT
+    PUBLISHED
+    ARCHIVED
+}
+
+enum FolderChildrenAction {
+    MOVE
+    ARCHIVE
+}
+
+input DeleteFolderInput {
+    id: ID!
+    childrenAction: FolderChildrenAction
+    moveTargetFolderId: ID
+}
+
+# Minimal User type for KB author resolution.
+# TODO: Extract to shared schema or replace after user management module.
+type User implements Node {
+    id: ID!
+    firstName: String
+    lastName: String
+    email: String
+}

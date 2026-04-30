@@ -6,14 +6,15 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
+import com.openframe.data.document.assignment.AssignmentItemType;
 import com.openframe.data.document.assignment.AssignmentTargetType;
 import com.openframe.data.document.assignment.ItemAssignment;
+import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.repository.assignment.ItemAssignmentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +31,7 @@ public class AssignmentService {
     private final OrganizationQueryService organizationQueryService;
     private final DeviceService deviceService;
     private final TicketQueryService ticketQueryService;
+    private final KnowledgeBaseService knowledgeBaseService;
 
     public Map<AssignmentTargetType, Long> countAssignmentsByTargetType(String itemId) {
         return repository.countByItemIdGroupedByTargetType(itemId);
@@ -42,15 +44,14 @@ public class AssignmentService {
                 itemId, targetType, search, sort, paginationCriteria);
 
         CursorPaginationCriteria normalizedPagination = paginationCriteria.normalize();
-        Query query = repository.buildAssignmentQuery(itemId, targetType, search);
 
         String sortField = validateSortField(sort != null ? sort.getField() : null);
         SortDirection sortDirection = (sort != null && sort.getDirection() != null)
                 ? sort.getDirection() : SortDirection.DESC;
 
-        long totalFilteredCount = repository.countAssignments(query);
+        long totalFilteredCount = repository.countAssignments(itemId, targetType, search);
 
-        List<ItemAssignment> pageItems = fetchPageItems(query, normalizedPagination, sortField, sortDirection);
+        List<ItemAssignment> pageItems = fetchPageItems(itemId, targetType, search, normalizedPagination, sortField, sortDirection);
         boolean hasNextPage = pageItems.size() == normalizedPagination.getLimit();
 
         PageInfo pageInfo = buildPageInfo(pageItems, hasNextPage, normalizedPagination.hasCursor());
@@ -62,10 +63,12 @@ public class AssignmentService {
                 .build();
     }
 
-    private List<ItemAssignment> fetchPageItems(Query query, CursorPaginationCriteria criteria,
+    private List<ItemAssignment> fetchPageItems(String itemId, AssignmentTargetType targetType,
+                                                 String search, CursorPaginationCriteria criteria,
                                                  String sortField, SortDirection sortDirection) {
         List<ItemAssignment> items = repository.findAssignmentsWithCursor(
-                query, criteria.getCursor(), criteria.getLimit() + 1, sortField, sortDirection.name());
+                itemId, targetType, search, sortField, sortDirection.name(),
+                criteria.getCursor(), criteria.getLimit() + 1);
         return items.size() > criteria.getLimit()
                 ? items.subList(0, criteria.getLimit())
                 : items;
@@ -96,11 +99,13 @@ public class AssignmentService {
     }
 
     @Transactional
-    public ItemAssignment assignItem(String itemId, AssignmentTargetType targetType, String targetId) {
+    public ItemAssignment assignItem(String itemId, AssignmentItemType itemType,
+                                      AssignmentTargetType targetType, String targetId) {
         String displayName = resolveDisplayName(targetType, targetId);
-        log.info("Assigning {}:{} ({}) to item {}", targetType, targetId, displayName, itemId);
+        log.info("Assigning {}:{} ({}) to {} {}", targetType, targetId, displayName, itemType, itemId);
         ItemAssignment assignment = ItemAssignment.builder()
                 .itemId(itemId)
+                .itemType(itemType)
                 .targetType(targetType)
                 .targetId(targetId)
                 .displayName(displayName)
@@ -129,7 +134,8 @@ public class AssignmentService {
                     .orElse(targetId);
             case TICKET -> ticketQueryService.findById(targetId)
                     .map(t -> t.getTicketNumber() + " - " + t.getTitle()).orElse(targetId);
-            case KNOWLEDGE_ARTICLE -> targetId;
+            case KNOWLEDGE_ARTICLE -> knowledgeBaseService.getItem(targetId)
+                    .map(KnowledgeBaseItem::getName).orElse(targetId);
         };
     }
 }

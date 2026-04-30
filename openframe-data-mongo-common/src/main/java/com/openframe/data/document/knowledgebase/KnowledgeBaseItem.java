@@ -39,8 +39,6 @@ public class KnowledgeBaseItem {
 
     private Integer sortOrder;
 
-    // Article-only fields
-
     private String content;
 
     private String summary;
@@ -48,14 +46,14 @@ public class KnowledgeBaseItem {
     @Indexed
     private KnowledgeBaseArticleStatus status;
 
-    private String authorId;
-
     private Instant publishedAt;
 
     private String createdBy;
 
     @CreatedDate
     private Instant createdAt;
+
+    private String lastModifiedBy;
 
     @LastModifiedDate
     private Instant updatedAt;

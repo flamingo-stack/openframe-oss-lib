@@ -10,10 +10,12 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLAssignmentMapper;
 import com.openframe.api.service.AssignmentService;
+import com.openframe.data.document.assignment.AssignmentItemType;
 import com.openframe.data.document.assignment.AssignmentTargetType;
 import com.openframe.data.document.assignment.ItemAssignment;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.organization.Organization;
+import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.ticket.Ticket;
 import graphql.relay.Relay;
 import jakarta.validation.constraints.NotBlank;
@@ -67,12 +69,13 @@ public class AssignmentDataFetcher {
     @DgsMutation
     public ItemAssignment assignItem(
             @InputArgument @NotBlank String itemId,
+            @InputArgument AssignmentItemType itemType,
             @InputArgument AssignmentTargetType targetType,
             @InputArgument @NotBlank String targetId) {
-        log.info("Assigning {} {} to item {}", targetType, targetId, itemId);
+        log.info("Assigning {} {} to {} {}", targetType, targetId, itemType, itemId);
         String rawItemId = RELAY.fromGlobalId(itemId).getId();
         String rawTargetId = RELAY.fromGlobalId(targetId).getId();
-        return assignmentService.assignItem(rawItemId, targetType, rawTargetId);
+        return assignmentService.assignItem(rawItemId, itemType, targetType, rawTargetId);
     }
 
     @DgsMutation
@@ -111,7 +114,7 @@ public class AssignmentDataFetcher {
             case ORGANIZATION -> dfe.<String, Organization>getDataLoader("organizationDataLoader").load(targetId);
             case DEVICE -> dfe.<String, Machine>getDataLoader("machineDataLoader").load(targetId);
             case TICKET -> dfe.<String, Ticket>getDataLoader("ticketDataLoader").load(targetId);
-            case KNOWLEDGE_ARTICLE -> CompletableFuture.completedFuture(null);
+            case KNOWLEDGE_ARTICLE -> dfe.<String, KnowledgeBaseItem>getDataLoader("knowledgeBaseItemDataLoader").load(targetId);
         };
     }
 }

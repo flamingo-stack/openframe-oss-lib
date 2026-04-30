@@ -11,13 +11,14 @@ extend type Query {
 }
 
 extend type Mutation {
-    assignItem(itemId: ID!, targetType: AssignmentTargetType!, targetId: ID!): ItemAssignment!
+    assignItem(itemId: ID!, itemType: AssignmentItemType!, targetType: AssignmentTargetType!, targetId: ID!): ItemAssignment!
     unassignItem(itemId: ID!, targetType: AssignmentTargetType!, targetId: ID!): Boolean!
     unassignAllByType(itemId: ID!, targetType: AssignmentTargetType!): Boolean!
 }
 
 type ItemAssignment implements Node {
     id: ID!
+    itemType: AssignmentItemType!
     targetType: AssignmentTargetType!
     displayName: String!
     createdAt: Instant
@@ -42,6 +43,11 @@ type AssignedItemCount {
 
 interface AssignableTarget {
     id: ID!
+}
+
+enum AssignmentItemType {
+    TICKET
+    KNOWLEDGE_ARTICLE
 }
 
 enum AssignmentTargetType {
