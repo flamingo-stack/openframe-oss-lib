@@ -73,7 +73,8 @@
   },
   "upsertConfig": {
     "mode": "FULL",
-    "comparisonColumn": "ingestionTime"
+    "comparisonColumn": "ingestionTime",
+    "snapshot": "ENABLE"
   },
   "tenants": {
     "broker": "DefaultTenant",
