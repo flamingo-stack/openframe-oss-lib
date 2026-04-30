@@ -9,6 +9,40 @@
     "retentionTimeUnit": "DAYS",
     "retentionTimeValue": "3650"
   },
+  "instanceAssignmentConfigMap": {
+    "CONSUMING": {
+      "tagPoolConfig": {
+        "tag": "DefaultTenant_REALTIME",
+        "poolBased": false,
+        "numPools": 0
+      },
+      "replicaGroupPartitionConfig": {
+        "replicaGroupBased": true,
+        "numInstances": 0,
+        "numReplicaGroups": 2,
+        "numInstancesPerReplicaGroup": 0,
+        "numPartitions": 0,
+        "numInstancesPerPartition": 0
+      },
+      "minimizeDataMovement": false
+    },
+    "COMPLETED": {
+      "tagPoolConfig": {
+        "tag": "DefaultTenant_REALTIME",
+        "poolBased": false,
+        "numPools": 0
+      },
+      "replicaGroupPartitionConfig": {
+        "replicaGroupBased": true,
+        "numInstances": 0,
+        "numReplicaGroups": 2,
+        "numInstancesPerReplicaGroup": 0,
+        "numPartitions": 0,
+        "numInstancesPerPartition": 0
+      },
+      "minimizeDataMovement": false
+    }
+  },
   "tableIndexConfig": {
     "loadMode": "MMAP",
     "nullHandlingEnabled": true,
