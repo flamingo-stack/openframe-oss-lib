@@ -19,12 +19,12 @@
       "replicaGroupPartitionConfig": {
         "replicaGroupBased": true,
         "numInstances": 0,
-        "numReplicaGroups": 2,
+        "numReplicaGroups": "${pinot.tables.logs.replication}",
         "numInstancesPerReplicaGroup": 0,
         "numPartitions": 0,
         "numInstancesPerPartition": 0
       },
-      "minimizeDataMovement": false
+      "minimizeDataMovement": true
     },
     "COMPLETED": {
       "tagPoolConfig": {
@@ -35,12 +35,12 @@
       "replicaGroupPartitionConfig": {
         "replicaGroupBased": true,
         "numInstances": 0,
-        "numReplicaGroups": 2,
+        "numReplicaGroups": "${pinot.tables.logs.replication}",
         "numInstancesPerReplicaGroup": 0,
         "numPartitions": 0,
         "numInstancesPerPartition": 0
       },
-      "minimizeDataMovement": false
+      "minimizeDataMovement": true
     }
   },
   "tableIndexConfig": {
