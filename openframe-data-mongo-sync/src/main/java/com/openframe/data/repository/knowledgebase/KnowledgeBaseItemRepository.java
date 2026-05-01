@@ -13,4 +13,6 @@ public interface KnowledgeBaseItemRepository extends MongoRepository<KnowledgeBa
     List<KnowledgeBaseItem> findByParentId(String parentId);
 
     List<KnowledgeBaseItem> findByIdIn(List<String> ids);
+
+    List<KnowledgeBaseItem> findByTypeOrderByNameAsc(KnowledgeBaseItemType type);
 }

@@ -80,6 +80,12 @@ public class KnowledgeBaseDataFetcher {
     }
 
     @DgsQuery
+    public List<KnowledgeBaseItem> knowledgeBaseFolderTree() {
+        log.debug("Fetching all KB folders for tree picker");
+        return knowledgeBaseService.getAllFolders();
+    }
+
+    @DgsQuery
     public CountedGenericConnection<GenericEdge<KnowledgeBaseItem>> archivedArticles(
             @InputArgument String search,
             @InputArgument List<String> tagIds,
@@ -207,6 +213,14 @@ public class KnowledgeBaseDataFetcher {
     public String knowledgeBaseItemNodeId(DgsDataFetchingEnvironment dfe) {
         KnowledgeBaseItem item = dfe.getSource();
         return RELAY.toGlobalId("KnowledgeBaseItem", item.getId());
+    }
+
+    @DgsData(parentType = "KnowledgeBaseItem", field = "parentId")
+    public String knowledgeBaseItemParentId(DgsDataFetchingEnvironment dfe) {
+        KnowledgeBaseItem item = dfe.getSource();
+        return item.getParentId() != null
+                ? RELAY.toGlobalId("KnowledgeBaseItem", item.getParentId())
+                : null;
     }
 
     @DgsData(parentType = "KnowledgeBaseItem", field = "tags")
