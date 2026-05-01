@@ -18,7 +18,8 @@ type Mutation {
 
 # Common scalar types
 scalar Instant
-scalar Date  # Date in yyyy-MM-dd format 
+scalar Date  # Date in yyyy-MM-dd format
+scalar Long  # 64-bit integer for large numbers like file sizes
 
 # Relay Connection Spec page info
 type PageInfo {
