@@ -11,8 +11,11 @@ import com.openframe.data.document.assignment.AssignmentTargetType;
 import com.openframe.data.document.assignment.ItemAssignment;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.organization.Organization;
-import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.repository.assignment.ItemAssignmentRepository;
+import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.repository.knowledgebase.KnowledgeBaseItemRepository;
+import com.openframe.data.repository.organization.OrganizationRepository;
+import com.openframe.data.repository.ticket.TicketRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,10 +31,10 @@ import java.util.Map;
 public class AssignmentService {
 
     private final ItemAssignmentRepository repository;
-    private final OrganizationQueryService organizationQueryService;
-    private final DeviceService deviceService;
-    private final TicketQueryService ticketQueryService;
-    private final KnowledgeBaseService knowledgeBaseService;
+    private final OrganizationRepository organizationRepository;
+    private final MachineRepository machineRepository;
+    private final TicketRepository ticketRepository;
+    private final KnowledgeBaseItemRepository knowledgeBaseItemRepository;
 
     public Map<AssignmentTargetType, Long> countAssignmentsByTargetType(String itemId) {
         return repository.countByItemIdGroupedByTargetType(itemId);
@@ -49,10 +52,14 @@ public class AssignmentService {
         SortDirection sortDirection = (sort != null && sort.getDirection() != null)
                 ? sort.getDirection() : SortDirection.DESC;
 
+        int limit = normalizedPagination.getLimit();
         long totalFilteredCount = repository.countAssignments(itemId, targetType, search);
 
-        List<ItemAssignment> pageItems = fetchPageItems(itemId, targetType, search, normalizedPagination, sortField, sortDirection);
-        boolean hasNextPage = pageItems.size() == normalizedPagination.getLimit();
+        List<ItemAssignment> raw = repository.findAssignmentsWithCursor(
+                itemId, targetType, search, sortField, sortDirection.name(),
+                normalizedPagination.getCursor(), limit + 1);
+        boolean hasNextPage = raw.size() > limit;
+        List<ItemAssignment> pageItems = hasNextPage ? raw.subList(0, limit) : raw;
 
         PageInfo pageInfo = buildPageInfo(pageItems, hasNextPage, normalizedPagination.hasCursor());
 
@@ -61,17 +68,6 @@ public class AssignmentService {
                 .pageInfo(pageInfo)
                 .filteredCount((int) totalFilteredCount)
                 .build();
-    }
-
-    private List<ItemAssignment> fetchPageItems(String itemId, AssignmentTargetType targetType,
-                                                 String search, CursorPaginationCriteria criteria,
-                                                 String sortField, SortDirection sortDirection) {
-        List<ItemAssignment> items = repository.findAssignmentsWithCursor(
-                itemId, targetType, search, sortField, sortDirection.name(),
-                criteria.getCursor(), criteria.getLimit() + 1);
-        return items.size() > criteria.getLimit()
-                ? items.subList(0, criteria.getLimit())
-                : items;
     }
 
     private PageInfo buildPageInfo(List<ItemAssignment> pageItems, boolean hasNextPage, boolean hasPreviousPage) {
@@ -127,14 +123,14 @@ public class AssignmentService {
 
     private String resolveDisplayName(AssignmentTargetType type, String targetId) {
         return switch (type) {
-            case ORGANIZATION -> organizationQueryService.findByOrganizationId(targetId)
+            case ORGANIZATION -> organizationRepository.findByOrganizationId(targetId)
                     .map(Organization::getName).orElse(targetId);
-            case DEVICE -> deviceService.findByMachineId(targetId)
+            case DEVICE -> machineRepository.findByMachineId(targetId)
                     .map(m -> m.getHostname() != null ? m.getHostname() : m.getDisplayName())
                     .orElse(targetId);
-            case TICKET -> ticketQueryService.findById(targetId)
+            case TICKET -> ticketRepository.findById(targetId)
                     .map(t -> t.getTicketNumber() + " - " + t.getTitle()).orElse(targetId);
-            case KNOWLEDGE_ARTICLE -> knowledgeBaseService.getItem(targetId)
+            case KNOWLEDGE_ARTICLE -> knowledgeBaseItemRepository.findById(targetId)
                     .map(KnowledgeBaseItem::getName).orElse(targetId);
         };
     }

@@ -61,11 +61,32 @@ enum AssignmentTargetType {
 extend type Organization implements AssignableTarget
 extend type Machine implements AssignableTarget
 
-# Minimal Ticket for AssignableTarget resolution. Full type in ai-agent (ticket.graphqls).
+# Ticket fields exposed for AssignableTarget resolution. Full type in ai-agent (ticket.graphqls).
+# All fields below come from the Ticket @Document entity (denormalized at write time).
+# Fields requiring DataLoaders (assignee User, attachments, notes, dialog, labels) are
+# only on the ai-agent side; query ticket(id) there for full detail.
 # TODO: Remove after Apollo Federation migration — single shared Ticket type.
 type Ticket implements AssignableTarget & Node {
     id: ID!
     ticketNumber: Int
     title: String
+    description: String
     status: String
+    creationSource: String
+
+    deviceId: String
+    deviceHostname: String
+
+    organizationId: String
+    organizationName: String
+
+    reporterId: String
+    reporterName: String
+
+    assignedTo: String
+    assignedName: String
+
+    createdAt: Instant
+    updatedAt: Instant
+    resolvedAt: Instant
 }

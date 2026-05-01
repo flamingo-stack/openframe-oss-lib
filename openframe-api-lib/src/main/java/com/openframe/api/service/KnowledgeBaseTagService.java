@@ -31,6 +31,18 @@ public class KnowledgeBaseTagService {
         return tagRepository.findByEntityType(ENTITY_TYPE);
     }
 
+    public List<Tag> getTagsForItemIds(List<String> itemIds) {
+        if (itemIds == null || itemIds.isEmpty()) {
+            return List.of();
+        }
+        Set<String> tagIds = tagAssignmentRepository
+                .findByEntityIdInAndEntityType(itemIds, ENTITY_TYPE)
+                .stream()
+                .map(TagAssignment::getTagId)
+                .collect(Collectors.toSet());
+        return tagIds.isEmpty() ? List.of() : tagRepository.findAllById(tagIds);
+    }
+
     public List<String> findItemIdsByTags(List<String> tagIds) {
         if (tagIds == null || tagIds.isEmpty()) {
             return null;

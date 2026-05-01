@@ -4,11 +4,13 @@ import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.knowledgebase.CreateArticleCommand;
 import com.openframe.api.dto.knowledgebase.FolderChildrenAction;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseFilterCriteria;
+import com.openframe.api.dto.knowledgebase.PagedArticles;
 import com.openframe.api.dto.knowledgebase.UpdateArticleCommand;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.data.document.assignment.AssignmentItemType;
+import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.assignment.AssignmentTargetType;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseArticleStatus;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
@@ -67,6 +69,13 @@ public class KnowledgeBaseService {
         return repository.findById(id);
     }
 
+    public List<Tag> getTagsInSubtree(String folderId) {
+        List<String> articleIds = collectArticleIdsInSubtree(folderId);
+        return articleIds.isEmpty()
+                ? List.of()
+                : knowledgeBaseTagService.getTagsForItemIds(articleIds);
+    }
+
     public CountedGenericQueryResult<KnowledgeBaseItem> queryArchivedArticles(
             String currentUserId, String search, List<String> tagIds,
             CursorPaginationCriteria paginationCriteria) {
@@ -77,13 +86,12 @@ public class KnowledgeBaseService {
         List<String> restrictToItemIds = resolveTagFilter(tagIds);
 
         long filteredCount = repository.countArchivedArticles(currentUserId, search, restrictToItemIds);
-        List<KnowledgeBaseItem> articles = fetchArchivedArticlesPage(currentUserId, search, restrictToItemIds, normalized);
-        boolean hasNextPage = articles.size() == normalized.getLimit() && filteredCount > normalized.getLimit();
+        PagedArticles paged = fetchArchivedArticlesPage(currentUserId, search, restrictToItemIds, normalized);
 
-        PageInfo pageInfo = buildPageInfo(articles, hasNextPage, normalized.hasCursor());
+        PageInfo pageInfo = buildPageInfo(paged.items(), paged.hasNextPage(), normalized.hasCursor());
 
         return CountedGenericQueryResult.<KnowledgeBaseItem>builder()
-                .items(articles)
+                .items(paged.items())
                 .pageInfo(pageInfo)
                 .filteredCount((int) filteredCount)
                 .build();
@@ -155,6 +163,7 @@ public class KnowledgeBaseService {
                 .build();
         KnowledgeBaseItem saved = repository.save(article);
 
+        addTags(saved.getId(), cmd.getTagIds());
         createAssignments(saved.getId(), AssignmentTargetType.ORGANIZATION, cmd.getAssignedOrganizationIds());
         createAssignments(saved.getId(), AssignmentTargetType.DEVICE, cmd.getAssignedDeviceIds());
         createAssignments(saved.getId(), AssignmentTargetType.TICKET, cmd.getAssignedTicketIds());
@@ -266,16 +275,13 @@ public class KnowledgeBaseService {
 
         List<KnowledgeBaseItem> displayedFolders = isFirstPage ? allFolders : List.of();
         int articleLimit = Math.max(0, normalized.getLimit() - displayedFolders.size());
-        List<KnowledgeBaseItem> articles = articleLimit > 0
+        PagedArticles paged = articleLimit > 0
                 ? fetchArticlesPage(currentUserId, filter.getParentId(), search,
                         restrictToItemIds, normalized.getCursor(), articleLimit)
-                : List.of();
-        boolean hasNextPage = articleLimit > 0
-                && articles.size() == articleLimit
-                && articleCount > articleLimit;
+                : new PagedArticles(List.of(), false);
 
-        List<KnowledgeBaseItem> combined = Stream.concat(displayedFolders.stream(), articles.stream()).toList();
-        PageInfo pageInfo = buildPageInfo(combined, hasNextPage, normalized.hasCursor());
+        List<KnowledgeBaseItem> combined = Stream.concat(displayedFolders.stream(), paged.items().stream()).toList();
+        PageInfo pageInfo = buildPageInfo(combined, paged.hasNextPage(), normalized.hasCursor());
 
         return CountedGenericQueryResult.<KnowledgeBaseItem>builder()
                 .items(combined)
@@ -304,14 +310,13 @@ public class KnowledgeBaseService {
         long count = repository.countArticles(
                 currentUserId, filter.getParentId(), search,
                 KnowledgeBaseItemType.ARTICLE, restrictToItemIds);
-        List<KnowledgeBaseItem> articles = fetchArticlesPage(currentUserId, filter.getParentId(),
+        PagedArticles paged = fetchArticlesPage(currentUserId, filter.getParentId(),
                 search, restrictToItemIds, normalized.getCursor(), normalized.getLimit());
-        boolean hasNextPage = articles.size() == normalized.getLimit() && count > normalized.getLimit();
 
-        PageInfo pageInfo = buildPageInfo(articles, hasNextPage, normalized.hasCursor());
+        PageInfo pageInfo = buildPageInfo(paged.items(), paged.hasNextPage(), normalized.hasCursor());
 
         return CountedGenericQueryResult.<KnowledgeBaseItem>builder()
-                .items(articles)
+                .items(paged.items())
                 .pageInfo(pageInfo)
                 .filteredCount((int) count)
                 .build();
@@ -334,34 +339,36 @@ public class KnowledgeBaseService {
         }
         long count = repository.countArticles(
                 currentUserId, null, search, KnowledgeBaseItemType.ARTICLE, intersection);
-        List<KnowledgeBaseItem> articles = fetchArticlesPage(currentUserId, null, search,
+        PagedArticles paged = fetchArticlesPage(currentUserId, null, search,
                 intersection, normalized.getCursor(), normalized.getLimit());
-        boolean hasNextPage = articles.size() == normalized.getLimit() && count > normalized.getLimit();
 
-        PageInfo pageInfo = buildPageInfo(articles, hasNextPage, normalized.hasCursor());
+        PageInfo pageInfo = buildPageInfo(paged.items(), paged.hasNextPage(), normalized.hasCursor());
 
         return CountedGenericQueryResult.<KnowledgeBaseItem>builder()
-                .items(articles)
+                .items(paged.items())
                 .pageInfo(pageInfo)
                 .filteredCount((int) count)
                 .build();
     }
 
-    private List<KnowledgeBaseItem> fetchArticlesPage(String currentUserId, String parentId, String search,
-                                                       List<String> itemIds, String cursor, int limit) {
-        List<KnowledgeBaseItem> articles = repository.findArticles(
+    private PagedArticles fetchArticlesPage(String currentUserId, String parentId, String search,
+                                             List<String> itemIds, String cursor, int limit) {
+        List<KnowledgeBaseItem> raw = repository.findArticles(
                 currentUserId, parentId, search, KnowledgeBaseItemType.ARTICLE, itemIds, cursor, limit + 1);
-        return articles.size() > limit ? articles.subList(0, limit) : articles;
+        boolean hasNextPage = raw.size() > limit;
+        List<KnowledgeBaseItem> page = hasNextPage ? raw.subList(0, limit) : raw;
+        return new PagedArticles(page, hasNextPage);
     }
 
-    private List<KnowledgeBaseItem> fetchArchivedArticlesPage(String currentUserId, String search,
-                                                                List<String> itemIds,
-                                                                CursorPaginationCriteria normalized) {
-        List<KnowledgeBaseItem> articles = repository.findArchivedArticles(
-                currentUserId, search, itemIds, normalized.getCursor(), normalized.getLimit() + 1);
-        return articles.size() > normalized.getLimit()
-                ? articles.subList(0, normalized.getLimit())
-                : articles;
+    private PagedArticles fetchArchivedArticlesPage(String currentUserId, String search,
+                                                      List<String> itemIds,
+                                                      CursorPaginationCriteria normalized) {
+        int limit = normalized.getLimit();
+        List<KnowledgeBaseItem> raw = repository.findArchivedArticles(
+                currentUserId, search, itemIds, normalized.getCursor(), limit + 1);
+        boolean hasNextPage = raw.size() > limit;
+        List<KnowledgeBaseItem> page = hasNextPage ? raw.subList(0, limit) : raw;
+        return new PagedArticles(page, hasNextPage);
     }
 
     private CountedGenericQueryResult<KnowledgeBaseItem> buildEmptyResult(CursorPaginationCriteria normalized) {
@@ -482,5 +489,12 @@ public class KnowledgeBaseService {
     private KnowledgeBaseItem getById(String id) {
         return repository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Knowledge base item not found: " + id));
+    }
+
+    private void addTags(String articleId, List<String> tagIds) {
+        if (tagIds == null || tagIds.isEmpty()) {
+            return;
+        }
+        tagIds.forEach(tagId -> knowledgeBaseTagService.addTagToItem(articleId, tagId));
     }
 }

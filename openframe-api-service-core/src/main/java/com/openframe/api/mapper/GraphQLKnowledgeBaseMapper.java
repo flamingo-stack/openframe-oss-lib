@@ -61,6 +61,7 @@ public class GraphQLKnowledgeBaseMapper {
                 .content(input.getContent())
                 .summary(input.getSummary())
                 .status(input.getStatus())
+                .tagIds(decodeIds(input.getTagIds()))
                 .assignedOrganizationIds(decodeIds(input.getAssignedOrganizationIds()))
                 .assignedDeviceIds(decodeIds(input.getAssignedDeviceIds()))
                 .assignedTicketIds(decodeIds(input.getAssignedTicketIds()))

@@ -71,7 +71,10 @@ public class KnowledgeBaseDataFetcher {
     }
 
     @DgsQuery
-    public List<Tag> knowledgeBaseTags() {
+    public List<Tag> knowledgeBaseTags(@InputArgument String folderId) {
+        if (folderId != null) {
+            return knowledgeBaseService.getTagsInSubtree(RELAY.fromGlobalId(folderId).getId());
+        }
         log.debug("Fetching all KB tags");
         return knowledgeBaseTagService.getAllTags();
     }

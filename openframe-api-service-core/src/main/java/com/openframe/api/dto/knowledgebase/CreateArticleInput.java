@@ -23,6 +23,9 @@ public class CreateArticleInput {
     private KnowledgeBaseArticleStatus status;
 
     @Size(max = 50)
+    private List<String> tagIds;
+
+    @Size(max = 50)
     private List<String> assignedOrganizationIds;
     @Size(max = 50)
     private List<String> assignedDeviceIds;

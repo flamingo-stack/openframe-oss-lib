@@ -18,6 +18,7 @@ public class CreateArticleCommand {
     private String content;
     private String summary;
     private KnowledgeBaseArticleStatus status;
+    private List<String> tagIds;
     private List<String> assignedOrganizationIds;
     private List<String> assignedDeviceIds;
     private List<String> assignedTicketIds;

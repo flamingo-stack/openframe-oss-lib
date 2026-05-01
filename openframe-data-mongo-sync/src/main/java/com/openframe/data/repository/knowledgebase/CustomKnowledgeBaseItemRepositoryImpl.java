@@ -91,7 +91,9 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
                                   KnowledgeBaseItemType type, List<String> itemIds) {
         Query query = new Query();
 
-        if (StringUtils.hasText(parentId)) {
+        if (itemIds != null && !itemIds.isEmpty()) {
+            query.addCriteria(Criteria.where(ID_FIELD).in(itemIds));
+        } else if (StringUtils.hasText(parentId)) {
             query.addCriteria(Criteria.where(FIELD_PARENT_ID).is(parentId));
         } else {
             query.addCriteria(Criteria.where(FIELD_PARENT_ID).isNull());
@@ -101,20 +103,9 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
             query.addCriteria(Criteria.where(FIELD_TYPE).is(type));
         }
 
-        if (StringUtils.hasText(search)) {
-            query.addCriteria(new Criteria().orOperator(
-                    Criteria.where(FIELD_NAME).regex(search, "i"),
-                    Criteria.where(FIELD_SUMMARY).regex(search, "i")
-            ));
-        }
-
-        if (itemIds != null) {
-            query.addCriteria(Criteria.where(ID_FIELD).in(itemIds));
-        }
-
         query.addCriteria(Criteria.where(FIELD_STATUS).ne(KnowledgeBaseArticleStatus.ARCHIVED));
-        query.addCriteria(buildDraftVisibilityCriteria(currentUserId));
 
+        addSearchAndVisibility(query, search, currentUserId);
         return query;
     }
 
@@ -123,20 +114,29 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
         query.addCriteria(Criteria.where(FIELD_TYPE).is(KnowledgeBaseItemType.ARTICLE));
         query.addCriteria(Criteria.where(FIELD_STATUS).is(KnowledgeBaseArticleStatus.ARCHIVED));
 
-        if (StringUtils.hasText(search)) {
-            query.addCriteria(new Criteria().orOperator(
-                    Criteria.where(FIELD_NAME).regex(search, "i"),
-                    Criteria.where(FIELD_SUMMARY).regex(search, "i")
-            ));
-        }
-
         if (itemIds != null) {
             query.addCriteria(Criteria.where(ID_FIELD).in(itemIds));
         }
 
-        query.addCriteria(buildDraftVisibilityCriteria(currentUserId));
-
+        addSearchAndVisibility(query, search, currentUserId);
         return query;
+    }
+
+    /**
+     * Combines search ($or on name/summary) and DRAFT visibility ($or on status/createdBy)
+     * into a single $and Criteria. Two separate $or criteria on a Query trigger Spring Data Mongo's
+     * "duplicate key" error since both have null field name.
+     */
+    private void addSearchAndVisibility(Query query, String search, String currentUserId) {
+        Criteria visibility = buildDraftVisibilityCriteria(currentUserId);
+        if (!StringUtils.hasText(search)) {
+            query.addCriteria(visibility);
+            return;
+        }
+        Criteria searchCriteria = new Criteria().orOperator(
+                Criteria.where(FIELD_NAME).regex(search, "i"),
+                Criteria.where(FIELD_SUMMARY).regex(search, "i"));
+        query.addCriteria(new Criteria().andOperator(searchCriteria, visibility));
     }
 
     private Criteria buildDraftVisibilityCriteria(String currentUserId) {
