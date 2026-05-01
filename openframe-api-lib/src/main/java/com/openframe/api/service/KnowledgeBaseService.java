@@ -69,6 +69,10 @@ public class KnowledgeBaseService {
         return repository.findById(id);
     }
 
+    public List<KnowledgeBaseItem> getAllFolders() {
+        return repository.findByTypeOrderByNameAsc(KnowledgeBaseItemType.FOLDER);
+    }
+
     public List<Tag> getTagsInSubtree(String folderId) {
         List<String> articleIds = collectArticleIdsInSubtree(folderId);
         return articleIds.isEmpty()

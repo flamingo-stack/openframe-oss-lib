@@ -7,6 +7,7 @@ extend type Query {
     ): KnowledgeBaseItemConnection!
     knowledgeBaseItem(id: ID!): KnowledgeBaseItem
     knowledgeBaseTags(folderId: ID): [Tag!]!
+    knowledgeBaseFolderTree: [KnowledgeBaseItem!]!
     archivedArticles(
         search: String
         tagIds: [ID]
