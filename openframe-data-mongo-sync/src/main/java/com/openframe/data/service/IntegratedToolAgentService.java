@@ -72,13 +72,14 @@ public class IntegratedToolAgentService {
             backoff = @Backoff(delay = 50, multiplier = 2, random = true)
     )
     public void updateConfigurationFields(IntegratedToolAgent fromConfig) {
-        Optional<IntegratedToolAgent> existingOpt = findById(fromConfig.getId());
-        if (existingOpt.isEmpty()) {
-            agentRepository.save(fromConfig);
-            return;
-        }
+        findById(fromConfig.getId())
+                .ifPresentOrElse(
+                existing -> mergeAndSave(existing, fromConfig),
+                () -> agentRepository.save(fromConfig)
+        );
+    }
 
-        IntegratedToolAgent existing = existingOpt.get();
+    private void mergeAndSave(IntegratedToolAgent existing, IntegratedToolAgent fromConfig) {
         boolean releaseAgent = existing.isReleaseVersion();
 
         boolean versionChanged = !releaseAgent

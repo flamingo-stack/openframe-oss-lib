@@ -14,7 +14,6 @@ import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Optional;
 
 @Slf4j
 @Service
@@ -33,12 +32,11 @@ public class ReleaseVersionService {
     public void process(String releaseVersion) {
         log.info("Processing release version: {}", releaseVersion);
 
-        Optional<ReleaseVersion> existing = releaseVersionRepository.findById(ReleaseVersion.DEFAULT_ID);
-        if (existing.isPresent()) {
-            updateExistingReleaseVersion(existing.get(), releaseVersion);
-        } else {
-            createNewReleaseVersion(releaseVersion);
-        }
+        releaseVersionRepository.findById(ReleaseVersion.DEFAULT_ID)
+                .ifPresentOrElse(
+                        existing -> updateExistingReleaseVersion(existing, releaseVersion),
+                        () -> createNewReleaseVersion(releaseVersion)
+                );
     }
 
     private void updateExistingReleaseVersion(ReleaseVersion existing, String releaseVersion) {

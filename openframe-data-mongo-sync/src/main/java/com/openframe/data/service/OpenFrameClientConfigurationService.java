@@ -76,14 +76,13 @@ public class OpenFrameClientConfigurationService {
             backoff = @Backoff(delay = 50, multiplier = 2, random = true)
     )
     public void updateConfigurationFields(OpenFrameClientConfiguration fromConfig) {
-        Optional<OpenFrameClientConfiguration> existingOpt = findById(fromConfig.getId());
-        if (existingOpt.isEmpty()) {
-            save(fromConfig);
-            return;
-        }
+        findById(fromConfig.getId()).ifPresentOrElse(
+                existing -> mergeAndSave(existing, fromConfig),
+                () -> save(fromConfig)
+        );
+    }
 
-        OpenFrameClientConfiguration existing = existingOpt.get();
-
+    private void mergeAndSave(OpenFrameClientConfiguration existing, OpenFrameClientConfiguration fromConfig) {
         boolean downloadChanged = !Objects.equals(existing.getDownloadConfiguration(), fromConfig.getDownloadConfiguration());
 
         existing.setDownloadConfiguration(fromConfig.getDownloadConfiguration());
