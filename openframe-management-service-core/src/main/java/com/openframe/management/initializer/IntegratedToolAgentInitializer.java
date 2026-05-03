@@ -4,9 +4,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.data.document.toolagent.IntegratedToolAgentConfiguration;
 import com.openframe.data.service.IntegratedToolAgentService;
 import com.openframe.management.config.AgentConfigurationProperties;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
@@ -14,16 +16,17 @@ import java.io.InputStream;
 import java.util.List;
 
 @Component
+@Order(20)
 @RequiredArgsConstructor
 @Slf4j
-public class IntegratedToolAgentInitializer {
+public class IntegratedToolAgentInitializer implements ApplicationRunner {
 
     private final ObjectMapper objectMapper;
     private final IntegratedToolAgentService integratedToolAgentService;
     private final AgentConfigurationProperties agentConfigurationProperties;
 
-    @PostConstruct
-    public void initializeToolAgents() {
+    @Override
+    public void run(ApplicationArguments args) {
         List<String> agentConfigurationPaths = agentConfigurationProperties.getAgentConfigurations();
         int agentConfigurationsCount = agentConfigurationPaths.size();
 
