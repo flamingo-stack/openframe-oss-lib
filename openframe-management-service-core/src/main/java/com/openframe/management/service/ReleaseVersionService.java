@@ -3,6 +3,7 @@ package com.openframe.management.service;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
 import com.openframe.data.document.version.ReleaseVersion;
 import com.openframe.data.repository.version.ReleaseVersionRepository;
+import com.openframe.data.retry.RetryOnOptimisticLockingFailure;
 import com.openframe.data.service.IntegratedToolAgentService;
 import com.openframe.data.service.OpenFrameClientConfigurationService;
 import lombok.RequiredArgsConstructor;
@@ -25,11 +26,7 @@ public class ReleaseVersionService {
     private final OpenFrameClientConfigurationService openFrameClientConfigurationService;
     private final IntegratedToolAgentService integratedToolAgentService;
 
-    @Retryable(
-            retryFor = {OptimisticLockingFailureException.class, DuplicateKeyException.class},
-            maxAttempts = 5,
-            backoff = @Backoff(delay = 50, multiplier = 2, random = true)
-    )
+    @RetryOnOptimisticLockingFailure
     public void process(String releaseVersion) {
         log.info("Processing release version: {}", releaseVersion);
 
