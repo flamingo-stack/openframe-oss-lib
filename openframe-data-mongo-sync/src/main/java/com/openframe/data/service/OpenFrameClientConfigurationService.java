@@ -4,11 +4,9 @@ import com.openframe.data.document.clientconfiguration.DownloadConfiguration;
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
 import com.openframe.data.document.clientconfiguration.PublishState;
 import com.openframe.data.repository.clientconfiguration.OpenFrameClientConfigurationRepository;
+import com.openframe.data.retry.RetryOnOptimisticLockingFailure;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.OptimisticLockingFailureException;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -37,11 +35,7 @@ public class OpenFrameClientConfigurationService {
         return repository.save(config);
     }
 
-    @Retryable(
-            retryFor = OptimisticLockingFailureException.class,
-            maxAttempts = 5,
-            backoff = @Backoff(delay = 50, multiplier = 2, random = true)
-    )
+    @RetryOnOptimisticLockingFailure
     public void markAsNonPublished() {
         OpenFrameClientConfiguration config = get();
         PublishState currentState = config.getPublishState();
@@ -58,11 +52,7 @@ public class OpenFrameClientConfigurationService {
         save(config);
     }
 
-    @Retryable(
-            retryFor = OptimisticLockingFailureException.class,
-            maxAttempts = 5,
-            backoff = @Backoff(delay = 50, multiplier = 2, random = true)
-    )
+    @RetryOnOptimisticLockingFailure
     public OpenFrameClientConfiguration updateVersionAndMarkPending(String newVersion) {
         OpenFrameClientConfiguration config = get();
         String oldVersion = config.getVersion();
@@ -76,11 +66,7 @@ public class OpenFrameClientConfigurationService {
         return saved;
     }
 
-    @Retryable(
-            retryFor = OptimisticLockingFailureException.class,
-            maxAttempts = 5,
-            backoff = @Backoff(delay = 50, multiplier = 2, random = true)
-    )
+    @RetryOnOptimisticLockingFailure
     public void updateConfigurationFields(OpenFrameClientConfiguration fromConfig) {
         String fromConfigId = fromConfig.getId();
         findById(fromConfigId).ifPresentOrElse(

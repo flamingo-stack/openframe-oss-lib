@@ -7,11 +7,9 @@ import com.openframe.data.document.toolagent.SessionType;
 import com.openframe.data.document.toolagent.ToolAgentAsset;
 import com.openframe.data.document.toolagent.ToolAgentStatus;
 import com.openframe.data.repository.toolagent.IntegratedToolAgentRepository;
+import com.openframe.data.retry.RetryOnOptimisticLockingFailure;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.OptimisticLockingFailureException;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -51,11 +49,7 @@ public class IntegratedToolAgentService {
         return agentRepository.findByReleaseVersionTrue();
     }
 
-    @Retryable(
-            retryFor = OptimisticLockingFailureException.class,
-            maxAttempts = 5,
-            backoff = @Backoff(delay = 50, multiplier = 2, random = true)
-    )
+    @RetryOnOptimisticLockingFailure
     public void markAsNonPublished(String id) {
         IntegratedToolAgent agent = getById(id);
         PublishState currentState = agent.getPublishState();
@@ -72,11 +66,7 @@ public class IntegratedToolAgentService {
         agentRepository.save(agent);
     }
 
-    @Retryable(
-            retryFor = OptimisticLockingFailureException.class,
-            maxAttempts = 5,
-            backoff = @Backoff(delay = 50, multiplier = 2, random = true)
-    )
+    @RetryOnOptimisticLockingFailure
     public void updateConfigurationFields(IntegratedToolAgent fromConfig) {
         String fromConfigId = fromConfig.getId();
         agentRepository.findById(fromConfigId)
@@ -133,11 +123,7 @@ public class IntegratedToolAgentService {
         agentRepository.save(existing);
     }
 
-    @Retryable(
-            retryFor = OptimisticLockingFailureException.class,
-            maxAttempts = 5,
-            backoff = @Backoff(delay = 50, multiplier = 2, random = true)
-    )
+    @RetryOnOptimisticLockingFailure
     public void updateReleaseAgentVersion(String id, String newVersion) {
         IntegratedToolAgent agent = getById(id);
         boolean releaseAgent = agent.isReleaseVersion();
