@@ -32,14 +32,8 @@ public class OpenFrameClientUpdatePublisher {
     public void publish(OpenFrameClientConfiguration configuration) {
         String configurationVersion = configuration.getVersion();
 
-        if (!clientUpdateFeatureEnabled) {
-            log.info("Client update publishing is disabled, skipping publish for version: {}", configurationVersion);
-            return;
-        }
-
         try {
-            OpenFrameClientUpdateMessage message = buildMessage(configuration);
-            natsMessagePublisher.publishPersistent(TOPIC_NAME, message);
+            send(configuration);
         } catch (Exception e) {
             log.error("NATS publish failed for client configuration version {}, will be retried by scheduler",
                     configurationVersion, e);
@@ -57,6 +51,18 @@ public class OpenFrameClientUpdatePublisher {
         } catch (OptimisticLockingFailureException e) {
             log.warn("Concurrent writer for client configuration during publish; skipping mark-published");
         }
+    }
+
+    public void send(OpenFrameClientConfiguration configuration) {
+        String configurationVersion = configuration.getVersion();
+
+        if (!clientUpdateFeatureEnabled) {
+            log.info("Client update publishing is disabled, skipping send for version: {}", configurationVersion);
+            return;
+        }
+
+        OpenFrameClientUpdateMessage message = buildMessage(configuration);
+        natsMessagePublisher.publishPersistent(TOPIC_NAME, message);
     }
 
     private OpenFrameClientUpdateMessage buildMessage(OpenFrameClientConfiguration configuration) {

@@ -75,7 +75,7 @@ public class ForceClientUpdateService {
         try {
             OpenFrameClientConfiguration configuration = clientConfigurationRepository.findFirstByOrderByCreatedAtDesc()
                     .orElseThrow(() -> new IllegalStateException("Not found client configuration"));
-            clientUpdateService.publish(configuration);
+            clientUpdateService.send(configuration);
 
             return buildResponseItem(machineId, ForceAgentStatus.PROCESSED);
         } catch (Exception e) {

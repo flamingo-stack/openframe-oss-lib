@@ -38,16 +38,8 @@ public class ToolAgentUpdateUpdatePublisher {
         String toolAgentId = toolAgent.getId();
         String toolAgentVersion = toolAgent.getVersion();
 
-        if (!toolAgentUpdateFeatureEnabled) {
-            log.info("Tool agent update publishing is disabled, skipping publish for tool: {} version: {}",
-                    toolAgentId, toolAgentVersion);
-            return;
-        }
-
         try {
-            String topicName = buildTopicName(toolAgentId);
-            ToolAgentUpdateMessage message = buildMessage(toolAgent);
-            natsMessagePublisher.publishPersistent(topicName, message);
+            send(toolAgent);
         } catch (Exception e) {
             log.error("NATS publish failed for tool agent {}, will be retried by scheduler", toolAgentId, e);
             try {
@@ -64,6 +56,21 @@ public class ToolAgentUpdateUpdatePublisher {
         } catch (OptimisticLockingFailureException e) {
             log.warn("Concurrent writer for tool agent {} during publish; skipping mark-published", toolAgentId);
         }
+    }
+
+    public void send(IntegratedToolAgent toolAgent) {
+        String toolAgentId = toolAgent.getId();
+        String toolAgentVersion = toolAgent.getVersion();
+
+        if (!toolAgentUpdateFeatureEnabled) {
+            log.info("Tool agent update publishing is disabled, skipping send for tool: {} version: {}",
+                    toolAgentId, toolAgentVersion);
+            return;
+        }
+
+        String topicName = buildTopicName(toolAgentId);
+        ToolAgentUpdateMessage message = buildMessage(toolAgent);
+        natsMessagePublisher.publishPersistent(topicName, message);
     }
 
     private String buildTopicName(String toolAgentId) {
