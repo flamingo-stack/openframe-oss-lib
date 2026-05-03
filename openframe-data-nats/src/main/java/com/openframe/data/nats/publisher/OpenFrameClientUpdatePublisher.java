@@ -34,7 +34,7 @@ public class OpenFrameClientUpdatePublisher {
             log.error("NATS publish failed for client configuration version {}, will be retried by scheduler",
                     configurationVersion, e);
             try {
-                openFrameClientConfigurationService.markAsNonPublished();
+                openFrameClientConfigurationService.markAsNonPublished(configuration);
             } catch (OptimisticLockingFailureException ole) {
                 log.warn("Concurrent writer for client configuration during failure-mark; skipping");
             }
@@ -42,7 +42,7 @@ public class OpenFrameClientUpdatePublisher {
         }
 
         try {
-            openFrameClientConfigurationService.markAsPublished();
+            openFrameClientConfigurationService.markAsPublished(configuration);
             log.info("Published client update message for all machines with version: {}", configurationVersion);
         } catch (OptimisticLockingFailureException e) {
             log.warn("Concurrent writer for client configuration during publish; skipping mark-published");

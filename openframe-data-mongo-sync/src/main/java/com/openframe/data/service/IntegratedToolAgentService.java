@@ -49,17 +49,14 @@ public class IntegratedToolAgentService {
         return agentRepository.findByReleaseVersionTrue();
     }
 
-    @RetryOnOptimisticLockingFailure
-    public void markAsNonPublished(String id) {
-        IntegratedToolAgent agent = getById(id);
+    public void markAsNonPublished(IntegratedToolAgent agent) {
         PublishState currentState = agent.getPublishState();
         PublishState nextState = PublishState.nonPublished(currentState);
         agent.setPublishState(nextState);
         agentRepository.save(agent);
     }
 
-    public void markAsPublished(String id) {
-        IntegratedToolAgent agent = getById(id);
+    public void markAsPublished(IntegratedToolAgent agent) {
         PublishState nextState = PublishState.published();
         agent.setPublishState(nextState);
         agentRepository.save(agent);

@@ -39,7 +39,7 @@ public class ToolAgentUpdateUpdatePublisher {
         } catch (Exception e) {
             log.error("NATS publish failed for tool agent {}, will be retried by scheduler", toolAgentId, e);
             try {
-                integratedToolAgentService.markAsNonPublished(toolAgentId);
+                integratedToolAgentService.markAsNonPublished(toolAgent);
             } catch (OptimisticLockingFailureException ole) {
                 log.warn("Concurrent writer for tool agent {} during failure-mark; skipping", toolAgentId);
             }
@@ -47,7 +47,7 @@ public class ToolAgentUpdateUpdatePublisher {
         }
 
         try {
-            integratedToolAgentService.markAsPublished(toolAgentId);
+            integratedToolAgentService.markAsPublished(toolAgent);
             log.info("Published tool update message for tool: {} version: {}", toolAgentId, toolAgentVersion);
         } catch (OptimisticLockingFailureException e) {
             log.warn("Concurrent writer for tool agent {} during publish; skipping mark-published", toolAgentId);

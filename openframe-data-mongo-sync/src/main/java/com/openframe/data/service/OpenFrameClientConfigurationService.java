@@ -35,17 +35,14 @@ public class OpenFrameClientConfigurationService {
         return repository.save(config);
     }
 
-    @RetryOnOptimisticLockingFailure
-    public void markAsNonPublished() {
-        OpenFrameClientConfiguration config = get();
+    public void markAsNonPublished(OpenFrameClientConfiguration config) {
         PublishState currentState = config.getPublishState();
         PublishState nextState = PublishState.nonPublished(currentState);
         config.setPublishState(nextState);
         save(config);
     }
 
-    public void markAsPublished() {
-        OpenFrameClientConfiguration config = get();
+    public void markAsPublished(OpenFrameClientConfiguration config) {
         PublishState nextState = PublishState.published();
         config.setPublishState(nextState);
         save(config);
