@@ -166,7 +166,6 @@ public class IntegratedToolAgentService {
         agent.setVersion(newVersion);
         agent.setPublishState(PublishState.pending());
         agentRepository.save(agent);
-        log.info("Updated release agent {} version {} -> {} and marked for publish",
-                id, oldVersion, newVersion);
+        log.info("Updated release agent {} version {} -> {} and marked for publish", id, oldVersion, newVersion);
     }
 }
