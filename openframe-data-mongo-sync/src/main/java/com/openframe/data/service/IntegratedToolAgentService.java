@@ -3,6 +3,7 @@ package com.openframe.data.service;
 import com.openframe.data.document.clientconfiguration.DownloadConfiguration;
 import com.openframe.data.document.clientconfiguration.PublishState;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
+import com.openframe.data.document.toolagent.IntegratedToolAgentConfiguration;
 import com.openframe.data.document.toolagent.SessionType;
 import com.openframe.data.document.toolagent.ToolAgentAsset;
 import com.openframe.data.document.toolagent.ToolAgentStatus;
@@ -63,52 +64,65 @@ public class IntegratedToolAgentService {
     }
 
     @RetryOnOptimisticLockingFailure
-    public void updateConfigurationFields(IntegratedToolAgent fromConfig) {
-        String fromConfigId = fromConfig.getId();
-        agentRepository.findById(fromConfigId)
+    public void updateConfigurationFields(IntegratedToolAgentConfiguration configuration) {
+        String configurationId = configuration.getId();
+        agentRepository.findById(configurationId)
                 .ifPresentOrElse(
-                        existing -> mergeAndSave(existing, fromConfig),
-                        () -> agentRepository.save(fromConfig)
+                        existing -> mergeAndSave(existing, configuration),
+                        () -> createFromConfiguration(configuration)
         );
     }
 
-    private void mergeAndSave(IntegratedToolAgent existing, IntegratedToolAgent fromConfig) {
+    private void createFromConfiguration(IntegratedToolAgentConfiguration configuration) {
+        IntegratedToolAgent agent = new IntegratedToolAgent();
+        agent.setId(configuration.getId());
+        agent.setToolId(configuration.getToolId());
+        agent.setReleaseVersion(configuration.isReleaseVersion());
+        agent.setVersion(configuration.getVersion());
+        agent.setSessionType(configuration.getSessionType());
+        agent.setDownloadConfigurations(configuration.getDownloadConfigurations());
+        agent.setAssets(configuration.getAssets());
+        agent.setInstallationCommandArgs(configuration.getInstallationCommandArgs());
+        agent.setRunCommandArgs(configuration.getRunCommandArgs());
+        agent.setAgentToolIdCommandArgs(configuration.getAgentToolIdCommandArgs());
+        agent.setUninstallationCommandArgs(configuration.getUninstallationCommandArgs());
+        agent.setStatus(configuration.getStatus());
+        agentRepository.save(agent);
+    }
+
+    private void mergeAndSave(IntegratedToolAgent existing, IntegratedToolAgentConfiguration configuration) {
         String existingId = existing.getId();
         boolean releaseAgent = existing.isReleaseVersion();
         String existingVersion = existing.getVersion();
-        String fromConfigVersion = fromConfig.getVersion();
+        String configurationVersion = configuration.getVersion();
 
-        boolean versionChanged = !releaseAgent && !Objects.equals(existingVersion, fromConfigVersion);
-        boolean assetChanged = !releaseAgent && hasAssetChanges(existing, fromConfig);
+        boolean versionChanged = !releaseAgent && !Objects.equals(existingVersion, configurationVersion);
+        boolean assetChanged = !releaseAgent && hasAssetChanges(existing, configuration);
 
-        String fromConfigToolId = fromConfig.getToolId();
-        boolean fromConfigReleaseVersion = fromConfig.isReleaseVersion();
-        SessionType fromConfigSessionType = fromConfig.getSessionType();
-        List<DownloadConfiguration> fromConfigDownloadConfigurations = fromConfig.getDownloadConfigurations();
-        List<ToolAgentAsset> fromConfigAssets = fromConfig.getAssets();
-        List<String> fromConfigInstallationArgs = fromConfig.getInstallationCommandArgs();
-        List<String> fromConfigRunArgs = fromConfig.getRunCommandArgs();
-        List<String> fromConfigAgentToolIdArgs = fromConfig.getAgentToolIdCommandArgs();
-        List<String> fromConfigUninstallationArgs = fromConfig.getUninstallationCommandArgs();
-        boolean fromConfigAllowVersionUpdate = fromConfig.isAllowVersionUpdate();
-        boolean fromConfigAllowConfigurationUpdate = fromConfig.isAllowConfigurationUpdate();
-        ToolAgentStatus fromConfigStatus = fromConfig.getStatus();
+        String configurationToolId = configuration.getToolId();
+        boolean configurationReleaseVersion = configuration.isReleaseVersion();
+        SessionType configurationSessionType = configuration.getSessionType();
+        List<DownloadConfiguration> configurationDownloadConfigurations = configuration.getDownloadConfigurations();
+        List<ToolAgentAsset> configurationAssets = configuration.getAssets();
+        List<String> configurationInstallationArgs = configuration.getInstallationCommandArgs();
+        List<String> configurationRunArgs = configuration.getRunCommandArgs();
+        List<String> configurationAgentToolIdArgs = configuration.getAgentToolIdCommandArgs();
+        List<String> configurationUninstallationArgs = configuration.getUninstallationCommandArgs();
+        ToolAgentStatus configurationStatus = configuration.getStatus();
 
-        existing.setToolId(fromConfigToolId);
-        existing.setReleaseVersion(fromConfigReleaseVersion);
+        existing.setToolId(configurationToolId);
+        existing.setReleaseVersion(configurationReleaseVersion);
         if (!releaseAgent) {
-            existing.setVersion(fromConfigVersion);
+            existing.setVersion(configurationVersion);
         }
-        existing.setSessionType(fromConfigSessionType);
-        existing.setDownloadConfigurations(fromConfigDownloadConfigurations);
-        existing.setAssets(fromConfigAssets);
-        existing.setInstallationCommandArgs(fromConfigInstallationArgs);
-        existing.setRunCommandArgs(fromConfigRunArgs);
-        existing.setAgentToolIdCommandArgs(fromConfigAgentToolIdArgs);
-        existing.setUninstallationCommandArgs(fromConfigUninstallationArgs);
-        existing.setAllowVersionUpdate(fromConfigAllowVersionUpdate);
-        existing.setAllowConfigurationUpdate(fromConfigAllowConfigurationUpdate);
-        existing.setStatus(fromConfigStatus);
+        existing.setSessionType(configurationSessionType);
+        existing.setDownloadConfigurations(configurationDownloadConfigurations);
+        existing.setAssets(configurationAssets);
+        existing.setInstallationCommandArgs(configurationInstallationArgs);
+        existing.setRunCommandArgs(configurationRunArgs);
+        existing.setAgentToolIdCommandArgs(configurationAgentToolIdArgs);
+        existing.setUninstallationCommandArgs(configurationUninstallationArgs);
+        existing.setStatus(configurationStatus);
 
         if (versionChanged || assetChanged) {
             existing.setPublishState(PublishState.pending());
@@ -138,9 +152,9 @@ public class IntegratedToolAgentService {
                 id, oldVersion, newVersion);
     }
 
-    private boolean hasAssetChanges(IntegratedToolAgent existing, IntegratedToolAgent fromConfig) {
+    private boolean hasAssetChanges(IntegratedToolAgent existing, IntegratedToolAgentConfiguration configuration) {
         List<ToolAgentAsset> existingAssets = existing.getAssets();
-        List<ToolAgentAsset> newAssets = fromConfig.getAssets();
+        List<ToolAgentAsset> newAssets = configuration.getAssets();
 
         if (isEmpty(existingAssets) || isEmpty(newAssets)) {
             return false;

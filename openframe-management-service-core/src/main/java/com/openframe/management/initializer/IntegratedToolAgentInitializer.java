@@ -1,7 +1,7 @@
 package com.openframe.management.initializer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.openframe.data.document.toolagent.IntegratedToolAgent;
+import com.openframe.data.document.toolagent.IntegratedToolAgentConfiguration;
 import com.openframe.data.service.IntegratedToolAgentService;
 import com.openframe.management.config.AgentConfigurationProperties;
 import jakarta.annotation.PostConstruct;
@@ -47,11 +47,11 @@ public class IntegratedToolAgentInitializer {
                 return;
             }
 
-            IntegratedToolAgent fromConfig = objectMapper.readValue(resource.getInputStream(), IntegratedToolAgent.class);
-            String fromConfigId = fromConfig.getId();
+            IntegratedToolAgentConfiguration configuration = objectMapper.readValue(resource.getInputStream(), IntegratedToolAgentConfiguration.class);
+            String configurationId = configuration.getId();
 
-            integratedToolAgentService.updateConfigurationFields(fromConfig);
-            log.info("Applied agent configuration: {} from {}", fromConfigId, agentConfigurationFilePath);
+            integratedToolAgentService.updateConfigurationFields(configuration);
+            log.info("Applied agent configuration: {} from {}", configurationId, agentConfigurationFilePath);
         } catch (Exception e) {
             String errorMessage = e.getMessage();
             log.error("Failed to load agent configuration from {}: {}", agentConfigurationFilePath, errorMessage, e);
