@@ -1,15 +1,6 @@
 import type { TableColumn, TailwindBreakpoint } from './types'
 
-/**
- * Generates Tailwind hide classes based on breakpoint configuration
- * @param hideAt - Breakpoint(s) at which to hide the column
- * @returns Tailwind classes to hide the column at specified breakpoints
- *
- * @example
- * getHideClasses('md') // Returns: 'hidden md:flex'
- * getHideClasses(['md', 'lg']) // Returns: 'md:hidden lg:hidden xl:flex'
- * getHideClasses(undefined, true) // Returns: 'hidden md:flex' (backward compatibility)
- */
+/** @deprecated Use `data-table` instead. */
 export function getHideClasses(
   hideAt?: TailwindBreakpoint | TailwindBreakpoint[],
 ): string {
@@ -52,10 +43,7 @@ export function getHideClasses(
   return hideClasses
 }
 
-/**
- * Checks if a column should be hidden at mobile breakpoints
- * Used for filtering columns in mobile view
- */
+/** @deprecated Use `data-table` instead. */
 export function isHiddenOnMobile<T>(column: TableColumn<T>): boolean {
   if (!column.hideAt) {
     return false

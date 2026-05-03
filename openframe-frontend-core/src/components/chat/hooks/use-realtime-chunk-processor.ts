@@ -11,6 +11,7 @@ import {
   MessageSegmentAccumulator,
   createMessageSegmentAccumulator,
 } from '../utils/message-segment-accumulator'
+import { MESSAGE_TYPE } from '../types'
 import type { UseRealtimeChunkProcessorReturn, UseRealtimeChunkProcessorOptions, ChatApprovalStatus } from '../types'
 
 /**
@@ -19,7 +20,7 @@ import type { UseRealtimeChunkProcessorReturn, UseRealtimeChunkProcessorOptions,
 export function useRealtimeChunkProcessor(
   options: UseRealtimeChunkProcessorOptions
 ): UseRealtimeChunkProcessorReturn {
-  const { callbacks, displayApprovalTypes = ['CLIENT'], approvalStatuses = {}, initialState } = options
+  const { callbacks, displayApprovalTypes = ['CLIENT'], approvalStatuses = {}, initialState, enableThinking = false } = options
 
   const accumulatorRef = useRef<MessageSegmentAccumulator>(
     createMessageSegmentAccumulator({
@@ -56,6 +57,15 @@ export function useRealtimeChunkProcessor(
 
   const processChunk = useCallback(
     (chunk: unknown) => {
+      if (
+        !enableThinking &&
+        chunk &&
+        typeof chunk === 'object' &&
+        (chunk as { type?: string }).type === MESSAGE_TYPE.THINKING
+      ) {
+        return
+      }
+
       const action = parseChunkToAction(chunk)
       if (!action) return
 
@@ -80,6 +90,12 @@ export function useRealtimeChunkProcessor(
 
         case 'text': {
           const segments = accumulator.appendText(action.text)
+          callbacks.onSegmentsUpdate?.(segments)
+          break
+        }
+
+        case 'thinking': {
+          const segments = accumulator.appendThinking(action.text)
           callbacks.onSegmentsUpdate?.(segments)
           break
         }
@@ -199,7 +215,7 @@ export function useRealtimeChunkProcessor(
           break
       }
     },
-    [callbacks, displayApprovalTypes, approvalStatuses, initialState]
+    [callbacks, displayApprovalTypes, approvalStatuses, initialState, enableThinking]
   )
 
   const getSegments = useCallback(() => {

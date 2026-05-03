@@ -1,10 +1,5 @@
 import type { QueryResultRow } from './types'
 
-/**
- * Derive column names from data rows.
- * If `columnOrder` is provided, those keys come first; remaining keys are appended
- * in the order they appear in the first row.
- */
 export function deriveColumns(
   data: QueryResultRow[],
   columnOrder?: string[]
@@ -35,9 +30,6 @@ function escapeCSVCell(value: string): string {
   return value
 }
 
-/**
- * Export data as a CSV file.
- */
 export function exportToCSV(
   data: QueryResultRow[],
   columns: string[],

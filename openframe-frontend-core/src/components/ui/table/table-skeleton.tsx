@@ -4,12 +4,10 @@ import React from 'react'
 import { cn } from '../../../utils/cn'
 import type { TableCardSkeletonProps } from './types'
 
-// Consistent row height using clamp for responsive sizing
-// Desktop: min 72px, preferred 5vw, max 88px
-// Mobile: min 72px, preferred 18vw, max 96px
-const ROW_HEIGHT_DESKTOP = 'h-[clamp(72px,5vw,88px)]'
-const ROW_HEIGHT_MOBILE = 'min-h-[clamp(72px,18vw,96px)]'
+const ROW_HEIGHT_DESKTOP = 'h-[68px] md:h-[80px]'
+const ROW_HEIGHT_MOBILE = 'h-[68px]'
 
+/** @deprecated Use `DataTableSkeleton` from `data-table` instead. */
 export function TableCardSkeleton({
   columns,
   rows = 10,
@@ -89,5 +87,5 @@ export function TableCardSkeleton({
   )
 }
 
-// Export the height constants for use in TableRow to ensure consistency
+/** @deprecated */
 export { ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE }

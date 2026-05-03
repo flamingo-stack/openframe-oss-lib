@@ -68,6 +68,7 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
           className={cn(
             "relative z-10 w-full max-w-md flex flex-col",
             "mx-4 mb-4 md:mb-0",
+            "max-h-[90vh]",
             "bg-ods-bg md:bg-ods-card",
             "border border-ods-border rounded-md shadow-xl",
             "p-[var(--spacing-system-xl)] gap-[var(--spacing-system-l)]",
@@ -88,7 +89,7 @@ Modal.displayName = "ModalV2"
 
 const ModalContent = React.forwardRef<HTMLDivElement, ModalContentProps>(
   ({ children, className }, ref) => (
-    <div ref={ref} className={cn("", className)}>
+    <div ref={ref} className={cn("flex-1 min-h-0 overflow-y-auto", className)}>
       {children}
     </div>
   )

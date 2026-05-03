@@ -217,4 +217,14 @@ public class DeviceApi {
                 .then().spec(graphqlSuccess())
                 .extract().jsonPath().getObject("data.deviceFilters", DeviceFilters.class);
     }
+
+    public static DeviceFilters getDeviceFilters(DeviceFilterInput filter) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("query", DEVICE_FILTERS_WITH_FILTER);
+        body.put("variables", Map.of("filter", filter));
+        return given(getAuthorizedSpec())
+                .body(body).post(GRAPHQL)
+                .then().spec(graphqlSuccess())
+                .extract().jsonPath().getObject("data.deviceFilters", DeviceFilters.class);
+    }
 }

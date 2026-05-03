@@ -69,24 +69,25 @@ const defaultIconConfig: ShellIconConfig = {
 }
 
 export interface ShellTypeBadgeProps {
-  /** Shell type */
   shellType: ShellType
-  /** Additional CSS classes */
   className?: string
+  iconClassName?: string
 }
 
 export const ShellTypeBadge: React.FC<ShellTypeBadgeProps> = ({
   shellType,
-  className
+  className,
+  iconClassName
 }) => {
   const normalizedType = shellType?.toUpperCase() as ShellType
   const label = getShellLabel(normalizedType)
   const { icon: IconComponent, props: iconProps } = shellIconMap[normalizedType] ?? defaultIconConfig
+  const defaultIconClassName = 'className' in iconProps ? iconProps.className : undefined
 
   return (
     <div className={cn("flex items-center gap-1", className)}>
-      <IconComponent {...iconProps} />
-      <span className="text-ods-text-primary text-[14px] leading-[20px] md:text-[18px] md:leading-[24px]">{label}</span>
+      <IconComponent size={16} className={cn(defaultIconClassName, iconClassName)} />
+      <span className="text-ods-text-primary text-h4">{label}</span>
     </div>
   )
 }
