@@ -28,7 +28,6 @@ public class PublishState {
     }
 
     public static PublishState published(PublishState current) {
-        int attempts = current == null ? 0 : current.getAttempts();
-        return new PublishState(true, Instant.now(), attempts);
+        return new PublishState(true, Instant.now(), 0);
     }
 }
