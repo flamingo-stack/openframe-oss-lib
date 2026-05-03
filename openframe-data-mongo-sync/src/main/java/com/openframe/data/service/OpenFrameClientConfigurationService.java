@@ -59,7 +59,7 @@ public class OpenFrameClientConfigurationService {
             return config;
         }
         config.setVersion(newVersion);
-        config.setPublishState(new PublishState(false, null, 0));
+        config.setPublishState(PublishState.pending());
         OpenFrameClientConfiguration saved = save(config);
         log.info("Updated client configuration version {} -> {} and marked for publish", oldVersion, newVersion);
         return saved;
@@ -82,7 +82,7 @@ public class OpenFrameClientConfigurationService {
         existing.setDownloadConfiguration(fromConfigDownloadConfiguration);
 
         if (downloadChanged) {
-            existing.setPublishState(new PublishState(false, null, 0));
+            existing.setPublishState(PublishState.pending());
             log.info("Marked client configuration for publish: downloadChanged=true");
         }
 

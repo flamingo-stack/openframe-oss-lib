@@ -5,8 +5,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.Instant;
-
 @Data
 @Builder
 @NoArgsConstructor
@@ -14,20 +12,21 @@ import java.time.Instant;
 public class PublishState {
 
     private boolean published;
-    private Instant publishedAt;
     private int attempts;
+
+    public static PublishState pending() {
+        return new PublishState(false, 0);
+    }
 
     public static PublishState nonPublished(PublishState current) {
         if (current == null || current.isPublished()) {
-            return new PublishState(false, null, 0);
+            return pending();
         }
-
         int nextAttempts = current.getAttempts() + 1;
-        Instant publishedAt = current.getPublishedAt();
-        return new PublishState(false, publishedAt, nextAttempts);
+        return new PublishState(false, nextAttempts);
     }
 
     public static PublishState published() {
-        return new PublishState(true, Instant.now(), 0);
+        return new PublishState(true, 0);
     }
 }
