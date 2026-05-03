@@ -52,17 +52,16 @@ public class OpenFrameClientConfigurationService {
     }
 
     @RetryOnOptimisticLockingFailure
-    public OpenFrameClientConfiguration updateVersionAndMarkPending(String newVersion) {
+    public void updateVersionAndMarkPending(String newVersion) {
         OpenFrameClientConfiguration config = get();
         String oldVersion = config.getVersion();
         if (Objects.equals(oldVersion, newVersion)) {
-            return config;
+            return;
         }
         config.setVersion(newVersion);
         config.setPublishState(PublishState.pending());
-        OpenFrameClientConfiguration saved = save(config);
+        save(config);
         log.info("Updated client configuration version {} -> {} and marked for publish", oldVersion, newVersion);
-        return saved;
     }
 
     @RetryOnOptimisticLockingFailure
