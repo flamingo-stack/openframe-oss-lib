@@ -6,15 +6,16 @@ import io.nats.client.api.StorageType;
 import io.nats.client.api.StreamConfiguration;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
-import jakarta.annotation.PostConstruct;
 import java.util.List;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class NatsStreamConfigurationInitializer {
+public class NatsStreamConfigurationInitializer implements ApplicationRunner {
 
     // TODO: use json file
     // TODO: revise stream configuration
@@ -58,10 +59,9 @@ public class NatsStreamConfigurationInitializer {
 
     private final NatsStreamManagementService natsStreamManagementService;
 
-    @PostConstruct
-    public void run() {
-        CONFIGURATIONS
-                .forEach(natsStreamManagementService::save);
+    @Override
+    public void run(ApplicationArguments args) {
+        CONFIGURATIONS.forEach(natsStreamManagementService::save);
     }
 
 }
