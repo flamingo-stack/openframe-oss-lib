@@ -19,10 +19,8 @@ public class PublishState {
     }
 
     public static PublishState nonPublished(PublishState current) {
-        if (current == null || current.isPublished()) {
-            return pending();
-        }
-        int nextAttempts = current.getAttempts() + 1;
+        int previousAttempts = current == null ? 0 : current.getAttempts();
+        int nextAttempts = previousAttempts + 1;
         return new PublishState(false, nextAttempts);
     }
 
