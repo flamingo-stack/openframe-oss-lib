@@ -67,10 +67,11 @@ public class OpenFrameClientConfigurationService {
     @RetryOnOptimisticLockingFailure
     public void updateConfigurationFields(OpenFrameClientConfiguration fromConfig) {
         String fromConfigId = fromConfig.getId();
-        findById(fromConfigId).ifPresentOrElse(
-                existing -> mergeAndSave(existing, fromConfig),
-                () -> save(fromConfig)
-        );
+        repository.findById(fromConfigId)
+                .ifPresentOrElse(
+                        existing -> mergeAndSave(existing, fromConfig),
+                        () -> save(fromConfig)
+                );
     }
 
     private void mergeAndSave(OpenFrameClientConfiguration existing, OpenFrameClientConfiguration fromConfig) {
