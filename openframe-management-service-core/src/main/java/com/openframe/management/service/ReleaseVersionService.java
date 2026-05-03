@@ -14,6 +14,7 @@ import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Objects;
 
 @Slf4j
 @Service
@@ -42,20 +43,22 @@ public class ReleaseVersionService {
     private void updateExistingReleaseVersion(ReleaseVersion existing, String releaseVersion) {
         String currentVersion = existing.getVersion();
 
-        if (currentVersion != null && currentVersion.equals(releaseVersion)) {
-            log.info("Release version {} is already up to date, skipping update", releaseVersion);
-            return;
+        if (isUpToDate(currentVersion, releaseVersion)) {
+            log.info("Release version {} is already up to date, re-running propagate for idempotency", releaseVersion);
+        } else {
+            log.info("Updating existing release version from {} to {}", currentVersion, releaseVersion);
+            existing.setVersion(releaseVersion);
+            ReleaseVersion saved = releaseVersionRepository.save(existing);
+            String savedId = saved.getId();
+            String savedVersion = saved.getVersion();
+            log.info("Successfully updated release version: {} with id: {}", savedVersion, savedId);
         }
 
-        log.info("Updating existing release version from {} to {}", currentVersion, releaseVersion);
-        existing.setVersion(releaseVersion);
-
-        ReleaseVersion saved = releaseVersionRepository.save(existing);
-        String savedId = saved.getId();
-        String savedVersion = saved.getVersion();
-        log.info("Successfully updated release version: {} with id: {}", savedVersion, savedId);
-
         propagate(releaseVersion);
+    }
+
+    private boolean isUpToDate(String currentVersion, String releaseVersion) {
+        return Objects.equals(currentVersion, releaseVersion);
     }
 
     private void createNewReleaseVersion(String releaseVersion) {
