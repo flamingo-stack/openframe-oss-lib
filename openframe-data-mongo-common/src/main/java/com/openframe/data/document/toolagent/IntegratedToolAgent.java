@@ -34,9 +34,6 @@ public class IntegratedToolAgent {
     private List<String> agentToolIdCommandArgs;
     private List<String> uninstallationCommandArgs;
 
-    private boolean allowVersionUpdate;
-    private boolean allowConfigurationUpdate;
-
     private ToolAgentStatus status;
 
     private PublishState publishState;
