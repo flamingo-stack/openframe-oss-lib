@@ -8,10 +8,6 @@ import com.openframe.data.service.IntegratedToolAgentService;
 import com.openframe.data.service.OpenFrameClientConfigurationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DuplicateKeyException;
-import org.springframework.dao.OptimisticLockingFailureException;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -73,7 +69,7 @@ public class ReleaseVersionService {
     }
 
     private void propagate(String version) {
-        openFrameClientConfigurationService.updateVersionAndMarkPending(version);
+        openFrameClientConfigurationService.updateVersion(version);
         updateReleaseAgents(version);
     }
 

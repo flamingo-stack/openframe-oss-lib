@@ -49,7 +49,7 @@ public class OpenFrameClientConfigurationService {
     }
 
     @RetryOnOptimisticLockingFailure
-    public void updateVersionAndMarkPending(String newVersion) {
+    public void updateVersion(String newVersion) {
         OpenFrameClientConfiguration config = get();
         String oldVersion = config.getVersion();
         if (Objects.equals(oldVersion, newVersion)) {
