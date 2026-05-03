@@ -25,7 +25,12 @@ public class IntegratedToolAgentInitializer {
     public void initializeToolAgents() {
         List<String> agentConfigurationPaths = agentConfigurationProperties.getAgentConfigurations();
         int agentConfigurationsCount = agentConfigurationPaths.size();
-        log.info("Initializing IntegratedToolAgent configurations from resources...");
+
+        if (agentConfigurationsCount == 0) {
+            throw new IllegalStateException("No agent configuration found");
+        }
+
+        log.info("Initializing IntegratedToolAgent configurations from resources");
         log.info("Loading {} agent configuration(s) from configuration: {}",
                 agentConfigurationsCount, agentConfigurationPaths);
 
