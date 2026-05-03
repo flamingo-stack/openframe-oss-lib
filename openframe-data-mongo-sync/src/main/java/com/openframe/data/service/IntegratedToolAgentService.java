@@ -74,7 +74,9 @@ public class IntegratedToolAgentService {
     private void createFromConfiguration(IntegratedToolAgentConfiguration configuration) {
         IntegratedToolAgent agent = new IntegratedToolAgent();
         applyConfiguration(agent, configuration);
-        agent.setVersion(configuration.getVersion());
+        if (!configuration.isReleaseVersion()) {
+            agent.setVersion(configuration.getVersion());
+        }
         agentRepository.save(agent);
     }
 
