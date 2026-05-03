@@ -24,12 +24,12 @@ public class IntegratedToolAgentInitializer {
     @PostConstruct
     public void initializeToolAgents() {
         List<String> agentConfigurationPaths = agentConfigurationProperties.getAgentConfigurations();
+        int agentConfigurationsCount = agentConfigurationPaths.size();
         log.info("Initializing IntegratedToolAgent configurations from resources...");
         log.info("Loading {} agent configuration(s) from configuration: {}",
-                agentConfigurationPaths.size(), agentConfigurationPaths);
+                agentConfigurationsCount, agentConfigurationPaths);
 
-        agentConfigurationPaths
-                .forEach(this::processAgentConfiguration);
+        agentConfigurationPaths.forEach(this::processAgentConfiguration);
 
         log.info("IntegratedToolAgent configurations initialized successfully");
     }
@@ -43,11 +43,13 @@ public class IntegratedToolAgentInitializer {
             }
 
             IntegratedToolAgent fromConfig = objectMapper.readValue(resource.getInputStream(), IntegratedToolAgent.class);
+            String fromConfigId = fromConfig.getId();
 
             integratedToolAgentService.updateConfigurationFields(fromConfig);
-            log.info("Applied agent configuration: {} from {}", fromConfig.getId(), agentConfigurationFilePath);
+            log.info("Applied agent configuration: {} from {}", fromConfigId, agentConfigurationFilePath);
         } catch (Exception e) {
-            log.error("Failed to load agent configuration from {}: {}", agentConfigurationFilePath, e.getMessage(), e);
+            String errorMessage = e.getMessage();
+            log.error("Failed to load agent configuration from {}: {}", agentConfigurationFilePath, errorMessage, e);
         }
     }
 

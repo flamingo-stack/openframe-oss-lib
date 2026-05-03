@@ -1,5 +1,6 @@
 package com.openframe.data.nats.publisher;
 
+import com.openframe.data.document.clientconfiguration.DownloadConfiguration;
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
 import com.openframe.data.nats.mapper.DownloadConfigurationMapper;
 import com.openframe.data.nats.model.OpenFrameClientUpdateMessage;
@@ -10,6 +11,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -27,8 +30,10 @@ public class OpenFrameClientUpdatePublisher {
     private final OpenFrameClientConfigurationService openFrameClientConfigurationService;
 
     public void publish(OpenFrameClientConfiguration configuration) {
+        String configurationVersion = configuration.getVersion();
+
         if (!clientUpdateFeatureEnabled) {
-            log.info("Client update publishing is disabled, skipping publish for version: {}", configuration.getVersion());
+            log.info("Client update publishing is disabled, skipping publish for version: {}", configurationVersion);
             return;
         }
 
@@ -37,7 +42,7 @@ public class OpenFrameClientUpdatePublisher {
             natsMessagePublisher.publishPersistent(TOPIC_NAME, message);
         } catch (Exception e) {
             log.error("NATS publish failed for client configuration version {}, will be retried by scheduler",
-                    configuration.getVersion(), e);
+                    configurationVersion, e);
             try {
                 openFrameClientConfigurationService.markAsNonPublished();
             } catch (OptimisticLockingFailureException ole) {
@@ -48,18 +53,19 @@ public class OpenFrameClientUpdatePublisher {
 
         try {
             openFrameClientConfigurationService.markAsPublished();
-            log.info("Published client update message for all machines with version: {}", configuration.getVersion());
+            log.info("Published client update message for all machines with version: {}", configurationVersion);
         } catch (OptimisticLockingFailureException e) {
             log.warn("Concurrent writer for client configuration during publish; skipping mark-published");
         }
     }
 
     private OpenFrameClientUpdateMessage buildMessage(OpenFrameClientConfiguration configuration) {
+        String configurationVersion = configuration.getVersion();
+        List<DownloadConfiguration> downloadConfiguration = configuration.getDownloadConfiguration();
+
         OpenFrameClientUpdateMessage message = new OpenFrameClientUpdateMessage();
-        message.setVersion(configuration.getVersion());
-        message.setDownloadConfigurations(
-                downloadConfigurationMapper.map(configuration.getDownloadConfiguration(), configuration.getVersion())
-        );
+        message.setVersion(configurationVersion);
+        message.setDownloadConfigurations(downloadConfigurationMapper.map(downloadConfiguration, configurationVersion));
         return message;
     }
 }

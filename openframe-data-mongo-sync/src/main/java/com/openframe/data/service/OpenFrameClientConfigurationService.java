@@ -1,5 +1,6 @@
 package com.openframe.data.service;
 
+import com.openframe.data.document.clientconfiguration.DownloadConfiguration;
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
 import com.openframe.data.document.clientconfiguration.PublishState;
 import com.openframe.data.repository.clientconfiguration.OpenFrameClientConfigurationRepository;
@@ -10,6 +11,7 @@ import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -42,13 +44,17 @@ public class OpenFrameClientConfigurationService {
     )
     public void markAsNonPublished() {
         OpenFrameClientConfiguration config = get();
-        config.setPublishState(PublishState.nonPublished(config.getPublishState()));
+        PublishState currentState = config.getPublishState();
+        PublishState nextState = PublishState.nonPublished(currentState);
+        config.setPublishState(nextState);
         save(config);
     }
 
     public void markAsPublished() {
         OpenFrameClientConfiguration config = get();
-        config.setPublishState(PublishState.published(config.getPublishState()));
+        PublishState currentState = config.getPublishState();
+        PublishState nextState = PublishState.published(currentState);
+        config.setPublishState(nextState);
         save(config);
     }
 
@@ -59,10 +65,10 @@ public class OpenFrameClientConfigurationService {
     )
     public OpenFrameClientConfiguration updateVersionAndMarkPending(String newVersion) {
         OpenFrameClientConfiguration config = get();
-        if (Objects.equals(config.getVersion(), newVersion)) {
+        String oldVersion = config.getVersion();
+        if (Objects.equals(oldVersion, newVersion)) {
             return config;
         }
-        String oldVersion = config.getVersion();
         config.setVersion(newVersion);
         config.setPublishState(new PublishState(false, null, 0));
         OpenFrameClientConfiguration saved = save(config);
@@ -76,16 +82,19 @@ public class OpenFrameClientConfigurationService {
             backoff = @Backoff(delay = 50, multiplier = 2, random = true)
     )
     public void updateConfigurationFields(OpenFrameClientConfiguration fromConfig) {
-        findById(fromConfig.getId()).ifPresentOrElse(
+        String fromConfigId = fromConfig.getId();
+        findById(fromConfigId).ifPresentOrElse(
                 existing -> mergeAndSave(existing, fromConfig),
                 () -> save(fromConfig)
         );
     }
 
     private void mergeAndSave(OpenFrameClientConfiguration existing, OpenFrameClientConfiguration fromConfig) {
-        boolean downloadChanged = !Objects.equals(existing.getDownloadConfiguration(), fromConfig.getDownloadConfiguration());
+        List<DownloadConfiguration> existingDownloadConfiguration = existing.getDownloadConfiguration();
+        List<DownloadConfiguration> fromConfigDownloadConfiguration = fromConfig.getDownloadConfiguration();
+        boolean downloadChanged = !Objects.equals(existingDownloadConfiguration, fromConfigDownloadConfiguration);
 
-        existing.setDownloadConfiguration(fromConfig.getDownloadConfiguration());
+        existing.setDownloadConfiguration(fromConfigDownloadConfiguration);
 
         if (downloadChanged) {
             existing.setPublishState(new PublishState(false, null, 0));

@@ -51,7 +51,9 @@ public class ReleaseVersionService {
         existing.setVersion(releaseVersion);
 
         ReleaseVersion saved = releaseVersionRepository.save(existing);
-        log.info("Successfully updated release version: {} with id: {}", saved.getVersion(), saved.getId());
+        String savedId = saved.getId();
+        String savedVersion = saved.getVersion();
+        log.info("Successfully updated release version: {} with id: {}", savedVersion, savedId);
 
         propagate(releaseVersion);
     }
@@ -63,7 +65,9 @@ public class ReleaseVersionService {
         newReleaseVersion.setVersion(releaseVersion);
 
         ReleaseVersion saved = releaseVersionRepository.save(newReleaseVersion);
-        log.info("Successfully created release version: {} with id: {}", saved.getVersion(), saved.getId());
+        String savedId = saved.getId();
+        String savedVersion = saved.getVersion();
+        log.info("Successfully created release version: {} with id: {}", savedVersion, savedId);
 
         propagate(releaseVersion);
     }
@@ -79,7 +83,10 @@ public class ReleaseVersionService {
         List<IntegratedToolAgent> releaseAgents = integratedToolAgentService.findByReleaseVersionTrue();
         log.info("Found {} release agents to update", releaseAgents.size());
 
-        releaseAgents.forEach(agent -> integratedToolAgentService.updateReleaseAgentVersion(agent.getId(), version));
+        releaseAgents.forEach(agent -> {
+            String agentId = agent.getId();
+            integratedToolAgentService.updateReleaseAgentVersion(agentId, version);
+        });
 
         log.info("Successfully updated {} release agents", releaseAgents.size());
     }

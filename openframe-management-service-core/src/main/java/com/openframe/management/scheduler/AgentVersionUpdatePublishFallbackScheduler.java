@@ -48,7 +48,8 @@ public class AgentVersionUpdatePublishFallbackScheduler {
 
     private void processOpenframeClient() {
         OpenFrameClientConfiguration config = openFrameClientConfigurationService.get();
-        if (shouldRetryPublish(config.getPublishState())) {
+        PublishState publishState = config.getPublishState();
+        if (shouldRetryPublish(publishState)) {
             openFrameClientUpdatePublisher.publish(config);
         }
     }
@@ -56,7 +57,8 @@ public class AgentVersionUpdatePublishFallbackScheduler {
     private void processToolAgents() {
         List<IntegratedToolAgent> enabled = integratedToolAgentService.getAllEnabled();
         for (IntegratedToolAgent agent : enabled) {
-            if (shouldRetryPublish(agent.getPublishState())) {
+            PublishState publishState = agent.getPublishState();
+            if (shouldRetryPublish(publishState)) {
                 toolAgentUpdateUpdatePublisher.publish(agent);
             }
         }
@@ -66,9 +68,11 @@ public class AgentVersionUpdatePublishFallbackScheduler {
         if (publishState == null) {
             return true;
         }
-        if (publishState.isPublished()) {
+        boolean published = publishState.isPublished();
+        if (published) {
             return false;
         }
-        return publishState.getAttempts() < maxPublishAttempts;
+        int attempts = publishState.getAttempts();
+        return attempts < maxPublishAttempts;
     }
 }

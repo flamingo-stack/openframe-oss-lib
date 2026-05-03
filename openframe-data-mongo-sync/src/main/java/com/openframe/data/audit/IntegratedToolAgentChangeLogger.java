@@ -14,12 +14,14 @@ public class IntegratedToolAgentChangeLogger extends AbstractMongoEventListener<
 
     @Override
     public void onBeforeSave(BeforeSaveEvent<IntegratedToolAgent> event) {
-        log("before", event.getSource());
+        IntegratedToolAgent agent = event.getSource();
+        log("before", agent);
     }
 
     @Override
     public void onAfterSave(AfterSaveEvent<IntegratedToolAgent> event) {
-        log("after", event.getSource());
+        IntegratedToolAgent agent = event.getSource();
+        log("after", agent);
     }
 
     private void log(String phase, IntegratedToolAgent agent) {
@@ -27,19 +29,23 @@ public class IntegratedToolAgentChangeLogger extends AbstractMongoEventListener<
         Long documentVersion = agent.getDocumentVersion();
         String version = agent.getVersion();
         boolean releaseVersion = agent.isReleaseVersion();
-        String publishState = formatPublishState(agent.getPublishState());
-        log.info("save-{} id={} v={} agentVersion={} release={} publish={}", phase, id, documentVersion, version, releaseVersion, publishState);
+        PublishState publishState = agent.getPublishState();
+        String publishStateFormatted = formatPublishState(publishState);
+        log.info("save-{} id={} v={} agentVersion={} release={} publish={}",
+                phase, id, documentVersion, version, releaseVersion, publishStateFormatted);
     }
 
     private static String formatPublishState(PublishState ps) {
         if (ps == null) {
             return "none";
         }
-        if (ps.isPublished()) {
+        boolean published = ps.isPublished();
+        if (published) {
             return "published";
         }
-        return ps.getAttempts() == 0
+        int attempts = ps.getAttempts();
+        return attempts == 0
                 ? "pending"
-                : "pending(attempts=" + ps.getAttempts() + ")";
+                : "pending(attempts=" + attempts + ")";
     }
 }
