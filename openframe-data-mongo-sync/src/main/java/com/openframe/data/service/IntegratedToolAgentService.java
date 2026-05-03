@@ -60,8 +60,7 @@ public class IntegratedToolAgentService {
 
     public void markAsPublished(String id) {
         IntegratedToolAgent agent = getById(id);
-        PublishState currentState = agent.getPublishState();
-        PublishState nextState = PublishState.published(currentState);
+        PublishState nextState = PublishState.published();
         agent.setPublishState(nextState);
         agentRepository.save(agent);
     }

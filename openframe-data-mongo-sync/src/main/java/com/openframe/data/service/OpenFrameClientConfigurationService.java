@@ -46,8 +46,7 @@ public class OpenFrameClientConfigurationService {
 
     public void markAsPublished() {
         OpenFrameClientConfiguration config = get();
-        PublishState currentState = config.getPublishState();
-        PublishState nextState = PublishState.published(currentState);
+        PublishState nextState = PublishState.published();
         config.setPublishState(nextState);
         save(config);
     }

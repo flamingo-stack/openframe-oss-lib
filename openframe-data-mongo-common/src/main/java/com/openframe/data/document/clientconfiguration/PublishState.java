@@ -27,7 +27,7 @@ public class PublishState {
         return new PublishState(false, publishedAt, nextAttempts);
     }
 
-    public static PublishState published(PublishState current) {
+    public static PublishState published() {
         return new PublishState(true, Instant.now(), 0);
     }
 }
