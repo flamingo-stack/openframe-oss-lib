@@ -1,10 +1,8 @@
 package com.openframe.data.service;
 
-import com.openframe.data.document.clientconfiguration.DownloadConfiguration;
 import com.openframe.data.document.clientconfiguration.PublishState;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
 import com.openframe.data.document.toolagent.IntegratedToolAgentConfiguration;
-import com.openframe.data.document.toolagent.SessionType;
 import com.openframe.data.document.toolagent.ToolAgentAsset;
 import com.openframe.data.document.toolagent.ToolAgentStatus;
 import com.openframe.data.repository.toolagent.IntegratedToolAgentRepository;
@@ -75,18 +73,8 @@ public class IntegratedToolAgentService {
 
     private void createFromConfiguration(IntegratedToolAgentConfiguration configuration) {
         IntegratedToolAgent agent = new IntegratedToolAgent();
-        agent.setId(configuration.getId());
-        agent.setToolId(configuration.getToolId());
-        agent.setReleaseVersion(configuration.isReleaseVersion());
+        applyConfiguration(agent, configuration);
         agent.setVersion(configuration.getVersion());
-        agent.setSessionType(configuration.getSessionType());
-        agent.setDownloadConfigurations(configuration.getDownloadConfigurations());
-        agent.setAssets(configuration.getAssets());
-        agent.setInstallationCommandArgs(configuration.getInstallationCommandArgs());
-        agent.setRunCommandArgs(configuration.getRunCommandArgs());
-        agent.setAgentToolIdCommandArgs(configuration.getAgentToolIdCommandArgs());
-        agent.setUninstallationCommandArgs(configuration.getUninstallationCommandArgs());
-        agent.setStatus(configuration.getStatus());
         agentRepository.save(agent);
     }
 
@@ -99,30 +87,10 @@ public class IntegratedToolAgentService {
         boolean versionChanged = !releaseAgent && !Objects.equals(existingVersion, configurationVersion);
         boolean assetChanged = !releaseAgent && hasAssetChanges(existing, configuration);
 
-        String configurationToolId = configuration.getToolId();
-        boolean configurationReleaseVersion = configuration.isReleaseVersion();
-        SessionType configurationSessionType = configuration.getSessionType();
-        List<DownloadConfiguration> configurationDownloadConfigurations = configuration.getDownloadConfigurations();
-        List<ToolAgentAsset> configurationAssets = configuration.getAssets();
-        List<String> configurationInstallationArgs = configuration.getInstallationCommandArgs();
-        List<String> configurationRunArgs = configuration.getRunCommandArgs();
-        List<String> configurationAgentToolIdArgs = configuration.getAgentToolIdCommandArgs();
-        List<String> configurationUninstallationArgs = configuration.getUninstallationCommandArgs();
-        ToolAgentStatus configurationStatus = configuration.getStatus();
-
-        existing.setToolId(configurationToolId);
-        existing.setReleaseVersion(configurationReleaseVersion);
+        applyConfiguration(existing, configuration);
         if (!releaseAgent) {
             existing.setVersion(configurationVersion);
         }
-        existing.setSessionType(configurationSessionType);
-        existing.setDownloadConfigurations(configurationDownloadConfigurations);
-        existing.setAssets(configurationAssets);
-        existing.setInstallationCommandArgs(configurationInstallationArgs);
-        existing.setRunCommandArgs(configurationRunArgs);
-        existing.setAgentToolIdCommandArgs(configurationAgentToolIdArgs);
-        existing.setUninstallationCommandArgs(configurationUninstallationArgs);
-        existing.setStatus(configurationStatus);
 
         if (versionChanged || assetChanged) {
             existing.setPublishState(PublishState.pending());
@@ -133,23 +101,18 @@ public class IntegratedToolAgentService {
         agentRepository.save(existing);
     }
 
-    @RetryOnOptimisticLockingFailure
-    public void updateReleaseAgentVersion(String id, String newVersion) {
-        IntegratedToolAgent agent = getById(id);
-        boolean releaseAgent = agent.isReleaseVersion();
-        if (!releaseAgent) {
-            log.warn("updateReleaseAgentVersion called for non-release agent {}, skipping", id);
-            return;
-        }
-        String oldVersion = agent.getVersion();
-        if (Objects.equals(oldVersion, newVersion)) {
-            return;
-        }
-        agent.setVersion(newVersion);
-        agent.setPublishState(PublishState.pending());
-        agentRepository.save(agent);
-        log.info("Updated release agent {} version {} -> {} and marked for publish",
-                id, oldVersion, newVersion);
+    private void applyConfiguration(IntegratedToolAgent agent, IntegratedToolAgentConfiguration configuration) {
+        agent.setId(configuration.getId());
+        agent.setToolId(configuration.getToolId());
+        agent.setReleaseVersion(configuration.isReleaseVersion());
+        agent.setSessionType(configuration.getSessionType());
+        agent.setDownloadConfigurations(configuration.getDownloadConfigurations());
+        agent.setAssets(configuration.getAssets());
+        agent.setInstallationCommandArgs(configuration.getInstallationCommandArgs());
+        agent.setRunCommandArgs(configuration.getRunCommandArgs());
+        agent.setAgentToolIdCommandArgs(configuration.getAgentToolIdCommandArgs());
+        agent.setUninstallationCommandArgs(configuration.getUninstallationCommandArgs());
+        agent.setStatus(configuration.getStatus());
     }
 
     private boolean hasAssetChanges(IntegratedToolAgent existing, IntegratedToolAgentConfiguration configuration) {
@@ -184,5 +147,24 @@ public class IntegratedToolAgentService {
             }
         }
         return false;
+    }
+
+    @RetryOnOptimisticLockingFailure
+    public void updateReleaseAgentVersion(String id, String newVersion) {
+        IntegratedToolAgent agent = getById(id);
+        boolean releaseAgent = agent.isReleaseVersion();
+        if (!releaseAgent) {
+            log.warn("updateReleaseAgentVersion called for non-release agent {}, skipping", id);
+            return;
+        }
+        String oldVersion = agent.getVersion();
+        if (Objects.equals(oldVersion, newVersion)) {
+            return;
+        }
+        agent.setVersion(newVersion);
+        agent.setPublishState(PublishState.pending());
+        agentRepository.save(agent);
+        log.info("Updated release agent {} version {} -> {} and marked for publish",
+                id, oldVersion, newVersion);
     }
 }

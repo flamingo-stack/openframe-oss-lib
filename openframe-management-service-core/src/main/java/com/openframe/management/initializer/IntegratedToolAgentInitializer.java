@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
+import java.io.InputStream;
 import java.util.List;
 
 @Component
@@ -47,7 +48,8 @@ public class IntegratedToolAgentInitializer {
                 return;
             }
 
-            IntegratedToolAgentConfiguration configuration = objectMapper.readValue(resource.getInputStream(), IntegratedToolAgentConfiguration.class);
+            InputStream resourceInputStream = resource.getInputStream();
+            IntegratedToolAgentConfiguration configuration = objectMapper.readValue(resourceInputStream, IntegratedToolAgentConfiguration.class);
             String configurationId = configuration.getId();
 
             integratedToolAgentService.updateConfigurationFields(configuration);
