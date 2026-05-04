@@ -177,7 +177,7 @@ export function AnnouncementBar() {
               <Button
                 onClick={handleCtaClick}
                 variant="outline"
-                size="sm"
+                size="small-legacy"
                 leftIcon={
                   announcement.cta_show_icon && announcement.cta_icon
                     ? getSvgIcon(

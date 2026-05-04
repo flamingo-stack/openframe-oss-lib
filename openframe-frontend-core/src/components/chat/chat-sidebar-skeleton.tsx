@@ -63,7 +63,7 @@ const ChatSidebarSkeleton = React.forwardRef<HTMLDivElement, ChatSidebarSkeleton
         {showNewChatButton && (
           <div className="bg-ods-card border-b border-ods-border flex items-center justify-center px-4 py-1 shrink-0">
             <Button
-              variant="ghost"
+              variant="transparent"
               disabled={true}
               leftIcon={<ChatPlusIcon className="size-6 text-ods-text-secondary" />}
               className="flex-1 justify-center text-lg font-bold text-ods-text-secondary cursor-not-allowed hover:bg-transparent"

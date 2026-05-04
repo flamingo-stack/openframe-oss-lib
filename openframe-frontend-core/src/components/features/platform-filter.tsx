@@ -13,7 +13,7 @@ export interface PlatformFilterComponentProps {
   platforms: PlatformConfig[];
   className?: string;
   showIcons?: boolean;
-  size?: 'sm' | 'default' | 'lg';
+  size?: 'small-legacy' | 'default';
 }
 
 export function PlatformFilterComponent({
@@ -22,13 +22,13 @@ export function PlatformFilterComponent({
   platforms = [],
   className = '',
   showIcons = true,
-  size = 'sm'
+  size = 'small-legacy'
 }: PlatformFilterComponentProps) {
   return (
     <div className={`flex items-center gap-2 flex-wrap ${className}`}>
       <Button
         type="button"
-        variant={selectedPlatform === 'all' ? "primary" : "outline"}
+        variant={selectedPlatform === 'all' ? "accent" : "outline"}
         size={size}
         onClick={() => onPlatformChange('all')}
         className="text-h3"
@@ -39,7 +39,7 @@ export function PlatformFilterComponent({
         <Button
           key={platform.value}
           type="button"
-          variant={selectedPlatform === platform.value ? "primary" : "outline"}
+          variant={selectedPlatform === platform.value ? "accent" : "outline"}
           size={size}
           onClick={() => onPlatformChange(platform.value)}
           leftIcon={showIcons ? getSmallPlatformIcon(platform.value) : undefined}

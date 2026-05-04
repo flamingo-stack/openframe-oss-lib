@@ -136,7 +136,7 @@ export function SocialLinksManager({
 
             <Button
               type="button"
-              variant="ghost"
+              variant="transparent"
               size="icon"
               onClick={() => removeLink(index)}
               className="text-red-400 hover:text-red-300 hover:bg-red-400/10"

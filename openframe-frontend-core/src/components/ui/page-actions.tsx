@@ -8,7 +8,7 @@ import type { ButtonProps } from './button'
 import { Button } from './button'
 
 export type PageActionButton = {
-  /** Button label. Omit to render an icon-only button (icon becomes `centerIcon`). */
+  /** Button label. Omit to render an icon-only button. */
   label?: string
   /** Accessible name. Required for icon-only buttons (when `label` is omitted). */
   ariaLabel?: string
@@ -70,11 +70,12 @@ function ActionButton({ action }: { action: PageActionButton }) {
         groups={[{ items: action.submenu }]}
         customTrigger={
           <Button
-            variant="split-action"
+            variant="outline"
             disabled={action.disabled}
             loading={action.loading}
             leftIcon={action.icon}
             rightIcon={<Chevron02DownIcon className="h-4 w-4" />}
+            className="!pr-0 !gap-3 [&>span:last-child]:self-stretch [&>span:last-child]:border-l [&>span:last-child]:border-ods-border [&>span:last-child]:px-3"
           >
             {action.label}
           </Button>
@@ -84,7 +85,7 @@ function ActionButton({ action }: { action: PageActionButton }) {
   }
 
   if (!action.label || action.iconOnlyOnDesktop) {
-    const centerIcon = action.iconOnlyOnDesktop
+    const iconNode = action.iconOnlyOnDesktop
       ? <span className="inline-flex [&_svg]:!text-ods-text-primary">{action.icon}</span>
       : action.icon
     return (
@@ -97,7 +98,7 @@ function ActionButton({ action }: { action: PageActionButton }) {
         onClick={action.onClick}
         disabled={action.disabled}
         loading={action.loading}
-        centerIcon={centerIcon}
+        leftIcon={iconNode}
         aria-label={action.label ?? action.ariaLabel}
       />
     )
@@ -193,7 +194,7 @@ function IconButtonsVariant({
             openInNewTab={singleAction.openInNewTab}
             disabled={singleAction.disabled}
             loading={singleAction.loading}
-            centerIcon={singleAction.icon}
+            leftIcon={singleAction.icon}
             aria-label={singleAction.label ?? singleAction.ariaLabel}
           />
         ) : (
@@ -220,10 +221,10 @@ function PrimaryButtonsVariant({
   actions: PageActionButton[]
   className?: string
 }) {
-  // Sort actions: primary first, then outline
+  // Sort actions: accent first, then outline
   const sortedActions = [...actions].sort((a, b) => {
-    if (a.variant === 'primary' && b.variant !== 'primary') return 1
-    if (a.variant !== 'primary' && b.variant === 'primary') return -1
+    if (a.variant === 'accent' && b.variant !== 'accent') return 1
+    if (a.variant !== 'accent' && b.variant === 'accent') return -1
     return 0
   })
 
@@ -268,7 +269,7 @@ function MenuPrimaryVariant({
         {desktopActions.map((action, idx) => (
           <ActionButton
             key={`desktop-${actionKey(action, idx)}`}
-            action={{ ...action, variant: action.variant || 'primary' }}
+            action={{ ...action, variant: action.variant || 'accent' }}
           />
         ))}
       </div>
@@ -323,7 +324,7 @@ function MobileBottomActions({
             href={action.href}
             prefetch={action.prefetch}
             openInNewTab={action.openInNewTab}
-            centerIcon={action.icon}
+            leftIcon={action.icon}
             disabled={action.disabled}
             loading={action.loading}
             aria-label={action.ariaLabel}

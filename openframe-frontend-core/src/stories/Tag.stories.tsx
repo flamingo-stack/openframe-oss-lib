@@ -72,7 +72,7 @@ export const WithIconAndClose: Story = {
 export const AllVariants: Story = {
   render: () => (
     <div className="flex flex-wrap gap-3">
-      <Tag variant="primary" label="Primary" />
+      <Tag variant="accent" label="Primary" />
       <Tag variant="outline" label="Outline" />
       <Tag variant="success" label="Success" />
       <Tag variant="warning" label="Warning" />
@@ -86,7 +86,7 @@ export const AllVariants: Story = {
 export const AllWithIcons: Story = {
   render: () => (
     <div className="flex flex-wrap gap-3">
-      <Tag variant="primary" icon={<Smile className="size-5" />} label="Primary" />
+      <Tag variant="accent" icon={<Smile className="size-5" />} label="Primary" />
       <Tag variant="outline" icon={<Smile className="size-5" />} label="Outline" />
       <Tag variant="success" icon={<Smile className="size-5" />} label="Success" />
       <Tag variant="warning" icon={<Smile className="size-5" />} label="Warning" />
@@ -100,7 +100,7 @@ export const AllWithIcons: Story = {
 export const AllWithClose: Story = {
   render: () => (
     <div className="flex flex-wrap gap-3">
-      <Tag variant="primary" onClose={() => {}} label="Primary" />
+      <Tag variant="accent" onClose={() => {}} label="Primary" />
       <Tag variant="outline" onClose={() => {}} label="Outline" />
       <Tag variant="success" onClose={() => {}} label="Success" />
       <Tag variant="warning" onClose={() => {}} label="Warning" />
@@ -128,7 +128,7 @@ export const DisabledWithIconAndClose: Story = {
 export const AllDisabled: Story = {
   render: () => (
     <div className="flex flex-wrap gap-3">
-      <Tag variant="primary" label="Primary" disabled />
+      <Tag variant="accent" label="Primary" disabled />
       <Tag variant="outline" label="Outline" disabled />
       <Tag variant="success" label="Success" disabled />
       <Tag variant="warning" label="Warning" disabled />
@@ -142,7 +142,7 @@ export const AllDisabled: Story = {
 export const AllWithIconAndClose: Story = {
   render: () => (
     <div className="flex flex-wrap gap-3">
-      <Tag variant="primary" icon={<Smile className="size-5" />} onClose={() => {}} label="Primary" />
+      <Tag variant="accent" icon={<Smile className="size-5" />} onClose={() => {}} label="Primary" />
       <Tag variant="outline" icon={<Smile className="size-5" />} onClose={() => {}} label="Outline" />
       <Tag variant="success" icon={<Smile className="size-5" />} onClose={() => {}} label="Success" />
       <Tag variant="warning" icon={<Smile className="size-5" />} onClose={() => {}} label="Warning" />

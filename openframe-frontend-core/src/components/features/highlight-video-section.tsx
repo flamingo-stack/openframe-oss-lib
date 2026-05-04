@@ -209,7 +209,7 @@ export function HighlightVideoSection({
           <Button
             type="button"
             variant="outline"
-            size="sm"
+            size="small-legacy"
             leftIcon={<Upload className="h-4 w-4" />}
             onClick={handleUploadClick}
             disabled={isUploading || disabled}

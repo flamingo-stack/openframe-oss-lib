@@ -71,7 +71,7 @@ export function QueryReportTable({
               <Button
                 className='bg-ods-card'
                 variant="outline"
-                size="sm"
+                size="small-legacy"
                 leftIcon={<Download02Icon size={18} />}
                 onClick={handleExport}
               >

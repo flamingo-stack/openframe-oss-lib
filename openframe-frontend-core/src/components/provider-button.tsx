@@ -4,8 +4,8 @@ import { cn } from "../utils/cn"
 
 interface ProviderButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   provider: 'google' | 'microsoft' | 'slack' | 'github';
-  variant?: 'primary' | 'outline';
-  size?: 'default' | 'sm' | 'lg';
+  variant?: 'accent' | 'outline';
+  size?: 'default' | 'small-legacy';
   loading?: boolean;
 }
 

@@ -255,7 +255,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({
           </Button>
         )}
         <Button
-          variant="primary"
+          variant="accent"
           onClick={async () => {
             const result = await exportCrop()
             if (result) onComplete(result)

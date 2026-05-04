@@ -96,7 +96,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange, className }: Pagina
           return (
             <li key={page}>
               <Button
-                variant={currentPage === page ? "primary" : "outline"}
+                variant={currentPage === page ? "accent" : "outline"}
                 size="icon"
                 onClick={() => onPageChange(page)}
                 className="!h-9 !w-9 md:!h-9 md:!w-9"

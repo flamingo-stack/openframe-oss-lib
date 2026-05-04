@@ -34,8 +34,8 @@ export function ChevronButton({
 
   return (
     <Button
-      variant="ghost"
-      size={size}
+      variant="transparent"
+      size="icon"
       onClick={onClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}

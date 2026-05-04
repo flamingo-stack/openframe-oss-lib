@@ -190,7 +190,7 @@ export const CustomHeaderContent: Story = {
     headerContent: (
       <div className="flex items-center justify-between w-full">
         <h1 className="text-2xl font-bold text-ods-text-primary">Custom Header</h1>
-        <Button variant="primary" size="sm">Action</Button>
+        <Button variant="accent" size="small-legacy">Action</Button>
       </div>
     ),
     children: <PlaceholderContent />,
@@ -205,7 +205,7 @@ export const WithHeaderActions: Story = {
     variant: 'list',
     title: 'Devices',
     headerActions: (
-      <Button variant="outline" size="sm">Export</Button>
+      <Button variant="outline" size="small-legacy">Export</Button>
     ),
     actions: [
       { label: 'Add Device', onClick: () => {}, icon: <Plus className="w-5 h-5" />, variant: 'primary' },

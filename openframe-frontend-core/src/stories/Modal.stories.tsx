@@ -58,7 +58,7 @@ export const Default: Story = {
             <Button variant="outline" onClick={() => setIsOpen(false)}>
               Cancel
             </Button>
-            <Button variant="primary" onClick={() => setIsOpen(false)}>
+            <Button variant="accent" onClick={() => setIsOpen(false)}>
               Confirm
             </Button>
           </ModalFooter>
@@ -127,7 +127,7 @@ export const WithAutocomplete: Story = {
             <Button variant="outline" onClick={() => setIsOpen(false)}>
               Cancel
             </Button>
-            <Button variant="primary" onClick={() => setIsOpen(false)}>
+            <Button variant="accent" onClick={() => setIsOpen(false)}>
               Save
             </Button>
           </ModalFooter>

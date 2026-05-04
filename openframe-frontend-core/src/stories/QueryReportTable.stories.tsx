@@ -241,7 +241,7 @@ export const WithHeaderActions: Story = {
     title: 'Server Health Report',
     data: sampleData,
     headerActions: (
-      <Button variant="outline" size="sm">
+      <Button variant="outline" size="small-legacy">
         Refresh
       </Button>
     ),

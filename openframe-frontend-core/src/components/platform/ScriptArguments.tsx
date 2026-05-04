@@ -141,12 +141,12 @@ export const ScriptArguments: React.FC<ScriptArgumentsProps> = ({
             </div>
             <Button
               type="button"
-              variant="card"
+              variant="outline"
               size="icon"
               onClick={() => handleDelete(arg.id)}
               disabled={disabled}
               aria-label="Delete argument"
-              centerIcon={<Trash2 className="size-4 md:size-6 " color="var(--ods-attention-red-error)" />}
+              leftIcon={<Trash2 className="size-4 md:size-6 " color="var(--ods-attention-red-error)" />}
             />
           </div>
         </div>
@@ -156,12 +156,12 @@ export const ScriptArguments: React.FC<ScriptArgumentsProps> = ({
       <div className="flex justify-start">
         <Button
           type="button"
-          variant="ghost-subtle"
+          variant="transparent"
           className="text-ods-text-primary"
           onClick={handleAdd}
           disabled={disabled}
           leftIcon={<PlusCircle className="size-6" />}
-          noPadding
+          noPaddingX
         >
           {addButtonLabel}
         </Button>
