@@ -146,7 +146,7 @@ export function VideoSourceSelector({
       <div className="flex gap-2">
         <Button
           type="button"
-          variant={videoSourceType === 'youtube' ? 'primary' : 'outline'}
+          variant={videoSourceType === 'youtube' ? 'accent' : 'outline'}
           onClick={() => onVideoSourceTypeChange('youtube')}
           leftIcon={<YouTubeIcon className="h-4 w-4" color="currentColor" />}
           disabled={disabled}
@@ -155,7 +155,7 @@ export function VideoSourceSelector({
         </Button>
         <Button
           type="button"
-          variant={videoSourceType === 'uploaded' ? 'primary' : 'outline'}
+          variant={videoSourceType === 'uploaded' ? 'accent' : 'outline'}
           onClick={() => onVideoSourceTypeChange('uploaded')}
           leftIcon={<Upload className="h-4 w-4" />}
           disabled={disabled}
@@ -199,7 +199,7 @@ export function VideoSourceSelector({
             <Button
               type="button"
               variant="outline"
-              size="sm"
+              size="small-legacy"
               leftIcon={<Upload className="h-4 w-4" />}
               onClick={handleUploadClick}
               disabled={disabled || isUploading}

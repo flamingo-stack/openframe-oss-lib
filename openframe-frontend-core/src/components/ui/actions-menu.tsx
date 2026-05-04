@@ -371,7 +371,7 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
 							triggerClassName ||
 							"bg-ods-card border-ods-border hover:bg-ods-bg-hover flex items-center justify-center focus-visible:ring-0"
 						}
-						centerIcon={
+						leftIcon={
 							trigger ?? (
 								<Ellipsis01Icon size={24} className="text-ods-text-primary" />
 							)

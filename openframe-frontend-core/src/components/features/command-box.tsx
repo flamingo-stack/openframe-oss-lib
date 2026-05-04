@@ -10,7 +10,7 @@ export interface CommandBoxAction {
   /** Click handler */
   onClick: () => void
   /** Button variant */
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost'
+  variant?: 'accent' | 'outline' | 'transparent' | 'destructive'
   /** Icon to display before the label */
   icon?: React.ReactNode
   /** Whether the button is disabled */
@@ -124,7 +124,7 @@ export function CommandBox({
             )}
             {primaryAction && (
               <Button
-                variant={primaryAction.variant || 'primary'}
+                variant={primaryAction.variant || 'accent'}
                 leftIcon={primaryAction.icon}
                 onClick={primaryAction.onClick}
                 disabled={primaryAction.disabled}

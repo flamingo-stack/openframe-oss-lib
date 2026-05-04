@@ -284,7 +284,7 @@ export function TagsManager({
 													/>
 													<Button
 														type="button"
-														variant="ghost-subtle"
+														variant="transparent"
 														size="icon"
 														onClick={confirmEdit}
 														disabled={isUpdating}
@@ -293,7 +293,7 @@ export function TagsManager({
 													</Button>
 													<Button
 														type="button"
-														variant="ghost-subtle"
+														variant="transparent"
 														size="icon"
 														onClick={cancelEdit}
 													>
@@ -342,7 +342,7 @@ export function TagsManager({
 																{onUpdateTag && (
 																	<Button
 																		type="button"
-																		variant="ghost-subtle"
+																		variant="transparent"
 																		size="icon"
 																		onClick={(e) => {
 																			e.stopPropagation();
@@ -358,7 +358,7 @@ export function TagsManager({
 																{onDeleteTag && (
 																	<Button
 																		type="button"
-																		variant="ghost-subtle"
+																		variant="transparent"
 																		size="icon"
 																		onClick={(e) => {
 																			e.stopPropagation();

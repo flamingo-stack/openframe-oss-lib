@@ -72,10 +72,10 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
         {onBack && (
           <Button
             onClick={onBack}
-            variant="ghost"
+            variant="transparent"
             size="icon"
             aria-label="Back"
-            centerIcon={<Chevron02LeftIcon size={24} className="text-ods-text-primary" />}
+            leftIcon={<Chevron02LeftIcon size={24} className="text-ods-text-primary" />}
             className={cn(
               cardClasses,
               "absolute -translate-y-1/2 right-full mr-3 my-6 hover:bg-ods-bg-hover"
@@ -115,8 +115,8 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
               {showNewChat && onNewChat && (
                 <Button
                   onClick={onNewChat}
-                  variant="ghost"
-                  size="sm"
+                  variant="transparent"
+                  size="small-legacy"
                   leftIcon={<PlusCircleIcon className="w-5 h-5" whiteOverlay/>}
                   className="text-ods-text-primary hover:bg-ods-bg-hover"
                 >
@@ -126,8 +126,8 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
               {onClose && (
                 <Button
                   onClick={onClose}
-                  variant="ghost"
-                  size="sm"
+                  variant="transparent"
+                  size="small-legacy"
                   aria-label="Close"
                   className="text-ods-text-muted hover:text-ods-text-primary hover:bg-ods-bg-hover !p-1.5"
                 >

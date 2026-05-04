@@ -92,9 +92,9 @@ const AllowedDomainsInput = React.forwardRef<HTMLDivElement, AllowedDomainsInput
             />
             <Button
               type="button"
-              variant="ghost"
-              size="sm"
-              centerIcon={<X className="h-4 w-4" />}
+              variant="transparent"
+              size="small-legacy"
+              leftIcon={<X className="h-4 w-4" />}
               onClick={() => removeDomain(index)}
               disabled={disabled}
               className="text-ods-text-secondary hover:text-ods-text-primary shrink-0"

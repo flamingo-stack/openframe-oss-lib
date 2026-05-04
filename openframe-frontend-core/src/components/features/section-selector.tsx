@@ -73,9 +73,10 @@ const SectionButton: React.FC<{
     <Button
       onClick={onClick}
       disabled={isDisabled}
-      variant={isActive ? "section-active" : "section"}
-      size={layout === 'vertical' ? "touch" : "sectionWrap"}
+      variant="outline"
       className={cn(
+        'bg-ods-card shadow-ods-card !text-left !justify-start !items-start hover:bg-ods-card-hover',
+        isActive && 'border-ods-accent',
         widthClasses,
         buttonClassName,
         isActive && activeButtonClassName,

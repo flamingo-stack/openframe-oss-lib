@@ -242,10 +242,10 @@ function renderAdvancedPageContainer({
             {backButton && (
               <Button
                 onClick={backButton.onClick}
-                variant="ghost-subtle"
+                variant="transparent"
                 className="self-start justify-start hidden md:flex"
                 leftIcon={<ChevronLeft className="size-6" />}
-                noPadding
+                noPaddingX
               >
                 {backButton.label || 'Back'}
               </Button>
@@ -285,10 +285,10 @@ function renderAdvancedPageContainer({
             {backButton && (
               <Button
                 onClick={backButton.onClick}
-                variant="ghost-subtle"
+                variant="transparent"
                 className="self-start justify-start hidden md:flex"
                 leftIcon={<ChevronLeft className="size-6" />}
-                noPadding
+                noPaddingX
               >
                 {backButton.label || 'Back'}
               </Button>
@@ -325,10 +325,10 @@ function renderAdvancedPageContainer({
             {backButton && (
               <Button
                 onClick={backButton.onClick}
-                variant="ghost-subtle"
+                variant="transparent"
                 className="self-start justify-start hidden md:flex"
                 leftIcon={<ChevronLeft className="size-6" />}
-                noPadding
+                noPaddingX
               >
                 {backButton.label || 'Back'}
               </Button>

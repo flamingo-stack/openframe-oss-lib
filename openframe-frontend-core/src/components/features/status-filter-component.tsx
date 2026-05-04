@@ -46,8 +46,8 @@ export function StatusFilterComponent({
       {/* All button */}
       <Button
         type="button"
-        variant={selectedStatus === 'all' ? "primary" : "outline"}
-        size="sm"
+        variant={selectedStatus === 'all' ? "accent" : "outline"}
+        size="small-legacy"
         onClick={() => onStatusChange('all')}
         className="text-h3"
       >
@@ -59,8 +59,8 @@ export function StatusFilterComponent({
         <Button
           key={option.value}
           type="button"
-          variant={selectedStatus === option.value ? "primary" : "outline"}
-          size="sm"
+          variant={selectedStatus === option.value ? "accent" : "outline"}
+          size="small-legacy"
           onClick={() => onStatusChange(option.value)}
           className="text-h3"
         >

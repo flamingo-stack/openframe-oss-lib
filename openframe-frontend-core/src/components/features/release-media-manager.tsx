@@ -192,7 +192,7 @@ export function ReleaseMediaManager({
                   <Button
                     type="button"
                     variant="outline"
-                    size="sm"
+                    size="small-legacy"
                     onClick={() => removeMedia(index)}
                     disabled={item._uploading}
                     className="h-8 w-8 p-0 bg-red-500 hover:bg-red-600 border-red-500"

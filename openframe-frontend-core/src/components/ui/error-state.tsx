@@ -83,7 +83,7 @@ export function ErrorState({
                   <Button
                     onClick={onRetry}
                     variant="outline"
-                    size="sm"
+                    size="small-legacy"
                     className="h-8"
                     leftIcon={<RefreshCw className="h-4 w-4" />}
                   >
@@ -94,7 +94,7 @@ export function ErrorState({
                   <Button
                     onClick={onHome}
                     variant="outline"
-                    size="sm"
+                    size="small-legacy"
                     className="h-8"
                     leftIcon={<Home className="h-4 w-4" />}
                   >

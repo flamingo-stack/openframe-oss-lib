@@ -868,7 +868,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 {/* Left: Play, Volume, Time */}
                 <div className="flex items-center">
                   {/* Play/Pause — 36×36 button, 20px icon */}
-                  <Button variant="ghost" size="icon"
+                  <Button variant="transparent" size="icon"
                     onClick={(e) => { e.stopPropagation(); setIsPlaying(prev => !prev); }}
                     className="h-9 w-9 text-white hover:text-white/80 hover:bg-white/10"
                     aria-label={isPlaying ? 'Pause (Space)' : 'Play (Space)'}>
@@ -877,7 +877,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
                   {/* Volume: icon + hover-reveal slider */}
                   <div className="group/vol flex items-center">
-                    <Button variant="ghost" size="icon"
+                    <Button variant="transparent" size="icon"
                       onClick={(e) => { e.stopPropagation(); toggleMute(); }}
                       className="h-9 w-9 text-white hover:text-white/80 hover:bg-white/10"
                       aria-label={isMuted ? 'Unmute (M)' : 'Mute (M)'}>
@@ -910,7 +910,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 {/* Right: Speed, CC, Fullscreen */}
                 <div className="flex items-center">
                   {/* Playback speed — compact text button */}
-                  <Button variant="ghost" size="sm"
+                  <Button variant="transparent" size="small-legacy"
                     onClick={(e) => { e.stopPropagation(); cycleSpeed(); }}
                     className={`h-9 px-1.5 text-[11px] font-bold rounded hover:bg-white/10 ${
                       playbackRate !== 1 ? 'text-white' : 'text-white/70 hover:text-white'
@@ -921,7 +921,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   </Button>
 
                   {hasCues && (
-                    <Button variant="ghost" size="sm"
+                    <Button variant="transparent" size="small-legacy"
                       onClick={(e) => { e.stopPropagation(); setCaptionsEnabled(prev => !prev); }}
                       className={`h-9 px-1.5 text-[11px] font-bold rounded ${
                         captionsEnabled ? 'bg-white text-black hover:bg-white/90' : 'text-white/50 hover:text-white hover:bg-white/10'
@@ -933,7 +933,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                     </Button>
                   )}
 
-                  <Button variant="ghost" size="icon"
+                  <Button variant="transparent" size="icon"
                     onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
                     className="h-9 w-9 text-white/80 hover:text-white hover:bg-white/10"
                     title={isFullscreen ? 'Exit fullscreen (F)' : 'Fullscreen (F)'}

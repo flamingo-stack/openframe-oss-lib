@@ -99,11 +99,11 @@ function CalendarNavButton({ direction, onClick, "aria-label": ariaLabel }: Cale
   return (
     <Button
       type="button"
-      variant="card"
+      variant="outline"
       size="icon"
       onClick={onClick}
       aria-label={ariaLabel}
-      centerIcon={direction === "left" ? <ChevronLeft className="size-6" /> : <ChevronRight className="size-6" />}
+      leftIcon={direction === "left" ? <ChevronLeft className="size-6" /> : <ChevronRight className="size-6" />}
     />
   );
 }

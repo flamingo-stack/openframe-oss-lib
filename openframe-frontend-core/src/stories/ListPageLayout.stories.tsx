@@ -117,10 +117,10 @@ export const WithHeaderActions: Story = {
     title: 'Devices',
     headerActions: (
       <div className="flex gap-2">
-        <Button variant="outline" size="sm" leftIcon={<RefreshCw className="w-4 h-4" />}>
+        <Button variant="outline" size="small-legacy" leftIcon={<RefreshCw className="w-4 h-4" />}>
           Refresh
         </Button>
-        <Button variant="primary" size="sm" leftIcon={<Plus className="w-4 h-4" />}>
+        <Button variant="accent" size="small-legacy" leftIcon={<Plus className="w-4 h-4" />}>
           Add Device
         </Button>
       </div>
@@ -146,13 +146,13 @@ export const WithViewToggle: Story = {
     title: 'Devices',
     headerActions: (
       <div className="flex gap-2">
-        <Button variant="outline" size="sm" leftIcon={<LayoutList className="w-4 h-4" />}>
+        <Button variant="outline" size="small-legacy" leftIcon={<LayoutList className="w-4 h-4" />}>
           List
         </Button>
-        <Button variant="ghost" size="sm" leftIcon={<LayoutGrid className="w-4 h-4" />}>
+        <Button variant="transparent" size="small-legacy" leftIcon={<LayoutGrid className="w-4 h-4" />}>
           Grid
         </Button>
-        <Button variant="primary" size="sm" leftIcon={<Plus className="w-4 h-4" />}>
+        <Button variant="accent" size="small-legacy" leftIcon={<Plus className="w-4 h-4" />}>
           New
         </Button>
       </div>
@@ -191,7 +191,7 @@ export const WithSearchValue: Story = {
   args: {
     title: 'Devices',
     headerActions: (
-      <Button variant="outline" size="sm" leftIcon={<RefreshCw className="w-4 h-4" />}>
+      <Button variant="outline" size="small-legacy" leftIcon={<RefreshCw className="w-4 h-4" />}>
         Refresh
       </Button>
     ),
@@ -215,7 +215,7 @@ export const EmptyState: Story = {
   args: {
     title: 'Devices',
     headerActions: (
-      <Button variant="primary" size="sm" leftIcon={<Plus className="w-4 h-4" />}>
+      <Button variant="accent" size="small-legacy" leftIcon={<Plus className="w-4 h-4" />}>
         Add Device
       </Button>
     ),
@@ -317,10 +317,10 @@ export const Interactive: Story = {
         title="Devices"
         headerActions={
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" leftIcon={<RefreshCw className="w-4 h-4" />}>
+            <Button variant="outline" size="small-legacy" leftIcon={<RefreshCw className="w-4 h-4" />}>
               Refresh
             </Button>
-            <Button variant="primary" size="sm" leftIcon={<Plus className="w-4 h-4" />}>
+            <Button variant="accent" size="small-legacy" leftIcon={<Plus className="w-4 h-4" />}>
               Add Device
             </Button>
           </div>
@@ -348,10 +348,10 @@ export const ScriptsPageExample: Story = {
     title: 'Scripts',
     headerActions: (
       <div className="flex gap-2">
-        <Button variant="outline" size="sm" leftIcon={<RefreshCw className="w-4 h-4" />}>
+        <Button variant="outline" size="small-legacy" leftIcon={<RefreshCw className="w-4 h-4" />}>
           Refresh
         </Button>
-        <Button variant="primary" size="sm" leftIcon={<Plus className="w-4 h-4" />}>
+        <Button variant="accent" size="small-legacy" leftIcon={<Plus className="w-4 h-4" />}>
           New Script
         </Button>
       </div>
@@ -385,7 +385,7 @@ export const LogsPageExample: Story = {
   args: {
     title: 'Logs',
     headerActions: (
-      <Button variant="outline" size="sm" leftIcon={<RefreshCw className="w-4 h-4" />}>
+      <Button variant="outline" size="small-legacy" leftIcon={<RefreshCw className="w-4 h-4" />}>
         Refresh
       </Button>
     ),
@@ -507,10 +507,10 @@ export const WithMobileFilter: Story = {
         title="Devices"
         headerActions={
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" leftIcon={<RefreshCw className="w-4 h-4" />}>
+            <Button variant="outline" size="small-legacy" leftIcon={<RefreshCw className="w-4 h-4" />}>
               Refresh
             </Button>
-            <Button variant="primary" size="sm" leftIcon={<Plus className="w-4 h-4" />}>
+            <Button variant="accent" size="small-legacy" leftIcon={<Plus className="w-4 h-4" />}>
               Add Device
             </Button>
           </div>

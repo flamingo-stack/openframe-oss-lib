@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { HeaderConfig, NavigationItem } from '../../types/navigation'
 import { cn } from '../../utils'
 import { Button } from '../ui/button'
+import { Menu01Icon } from '../icons-v2-generated'
 
 export interface HeaderProps {
   config: HeaderConfig
@@ -119,7 +120,7 @@ export function Header({ config, platform }: HeaderProps) {
         <div key={item.id} className="relative">
           <Button
             ref={(el) => { triggerRefs.current[item.id] = el }}
-            variant="ghost"
+            variant="transparent"
             leftIcon={item.icon}
             rightIcon={item.badge}
             onClick={() => {
@@ -128,12 +129,9 @@ export function Header({ config, platform }: HeaderProps) {
                 [item.id]: !prev[item.id] 
               }))
             }}
+            size="small-legacy"
             className={cn(
-              "h-10 px-3 py-2",
-              "font-['DM_Sans'] font-bold text-[16px] leading-none tracking-[-0.32px]",
-              "hover:bg-ods-bg-hover focus:bg-ods-bg-hover",
-              "whitespace-nowrap",
-              "text-ods-text-primary", // All items use primary text color
+              "font-bold text-[16px] leading-none tracking-[-0.32px]",
               item.isActive && 'bg-ods-bg-hover', // Active items get subtle gray background
               isOpen && 'bg-ods-bg-hover', // Open dropdowns get gray background
               item.className
@@ -164,8 +162,8 @@ export function Header({ config, platform }: HeaderProps) {
               {item.children.map((child, index) => (
                 <Button
                   key={child.id}
-                  variant="ghost"
-                  size="sm"
+                  variant="transparent"
+                  size="small-legacy"
                   href={child.href} // Use href for navigation
                   leftIcon={child.icon}
                   rightIcon={child.badge}
@@ -179,6 +177,7 @@ export function Header({ config, platform }: HeaderProps) {
                   }}
                   className={cn(
                     "flex justify-start w-full",
+                    "font-bold text-[16px] leading-none tracking-[-0.32px]",
                     index < (item.children?.length ?? 0) - 1 && "mb-1",
                     "text-ods-text-primary", // All dropdown items use primary text color
                     child.isActive && 'bg-ods-bg-hover' // Active dropdown items get gray background
@@ -207,14 +206,14 @@ export function Header({ config, platform }: HeaderProps) {
       return (
         <Button
           key={item.id}
-          variant="ghost"
+          variant="transparent"
           href={item.href} // Use href for navigation
           onClick={item.onClick} // Only for non-navigation actions
           leftIcon={item.icon}
           rightIcon={item.badge}
+          size="small-legacy"
           className={cn(
-            "h-10 px-3 py-2",
-            "font-['DM_Sans'] font-bold text-[16px] leading-none tracking-[-0.32px]",
+            "font-bold text-[16px] leading-none tracking-[-0.32px]",
             "hover:bg-ods-bg-hover focus:bg-ods-bg-hover",
             "whitespace-nowrap",
             "text-ods-text-primary", // All items use primary text color
@@ -232,13 +231,13 @@ export function Header({ config, platform }: HeaderProps) {
     return (
       <Button
         key={item.id}
-        variant="ghost"
+        variant="transparent"
         onClick={item.onClick}
         leftIcon={item.icon}
         rightIcon={item.badge}
+        size="small-legacy"
         className={cn(
-          "h-10 px-3 py-2",
-          "font-['DM_Sans'] font-bold text-[16px] leading-none tracking-[-0.32px]",
+          "font-bold text-[16px] leading-none tracking-[-0.32px]",
           "hover:bg-ods-bg-hover focus:bg-ods-bg-hover",
           "whitespace-nowrap",
           "text-ods-text-primary", // All items use primary text color
@@ -312,16 +311,15 @@ export function Header({ config, platform }: HeaderProps) {
         {/* Mobile Menu Toggle */}
         {config.mobile && config.mobile.enabled && (
           <Button
-              variant="ghost"
-              size="sm"
-              className="flex md:hidden p-2 h-10 w-10 items-center justify-center"
-              onClick={() => {
-                config.mobile?.onToggle?.()
-              }}
-              aria-label={config.mobile?.isOpen ? "Close menu" : "Open menu"}
-              centerIcon={config.mobile?.menuIcon || <span>☰</span>}
-            >
-            </Button>
+            variant="transparent"
+            size="icon"
+            className="flex md:hidden"
+            onClick={() => {
+              config.mobile?.onToggle?.()
+            }}
+            aria-label={config.mobile?.isOpen ? "Close menu" : "Open menu"}
+            leftIcon={config.mobile?.menuIcon || <Menu01Icon />}
+          />
         )}
       </div>
     </header>
