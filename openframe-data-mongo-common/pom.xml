@@ -40,6 +40,13 @@
             <artifactId>spring-boot-starter-validation</artifactId>
             <optional>true</optional>
         </dependency>
+
+        <!-- Jackson polymorphism annotations on NotificationContext base. Concrete
+             ObjectMapper wiring is configured by downstream Spring modules. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+        </dependency>
     </dependencies>
 
 </project>

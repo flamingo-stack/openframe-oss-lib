@@ -1,0 +1,69 @@
+extend type Query {
+    notifications(first: Int, after: String, last: Int, before: String): NotificationConnection!
+    hasUnreadNotifications: Boolean!
+
+    """
+    Machine-scoped catch-up. Caller must be an AGENT principal — `machineId`
+    comes from the JWT, never an argument. Returns the machine's direct rows
+    plus tenant-wide broadcasts. No read flags.
+    """
+    machineNotifications(first: Int, after: String, last: Int, before: String): NotificationConnection!
+}
+
+extend type Mutation {
+    """
+    Per-user mark-as-read. Idempotent: returns true only on the unread→read
+    transition. Marking read for one recipient does not affect others.
+    """
+    markNotificationAsRead(notificationId: ID!): Boolean!
+}
+
+"""UI severity, independent of `context.type`."""
+enum NotificationSeverity {
+    INFO
+    WARNING
+    DANGER
+}
+
+"""
+Shared/presentation fields are flat here; type-specific data lives inside
+`context`, which is polymorphic.
+"""
+type Notification implements Node {
+    id: ID!
+    severity: NotificationSeverity!
+    title: String!
+    createdAt: Instant!
+    """Per-user read flag for the calling user."""
+    read: Boolean!
+    context: NotificationContext!
+}
+
+"""
+Polymorphic payload. Concrete implementations contributed by downstream
+modules; clients project type-specific fields via inline fragments, e.g.
+`context { type ... on SomeSpecificContext { someField } }`.
+"""
+interface NotificationContext {
+    """Discriminator token — drives client-side strategy dispatch."""
+    type: String!
+}
+
+"""
+Fallback for events without a dedicated typed shape. Prefer a dedicated
+subtype when there are structured fields.
+"""
+type GenericContext implements NotificationContext {
+    type: String!
+    payload: String
+}
+
+type NotificationConnection {
+    edges: [NotificationEdge!]!
+    pageInfo: PageInfo!
+}
+
+type NotificationEdge {
+    node: Notification!
+    cursor: String!
+}
