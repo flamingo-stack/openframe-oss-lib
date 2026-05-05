@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
-import ReactDOM from "react-dom";
-import Link from "next/link";
+import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { Check } from "lucide-react";
+import Link from "next/link";
+import React, { useCallback, useState } from "react";
 import { Chevron02RightIcon, Ellipsis01Icon } from "../icons-v2-generated";
+import { cn } from "../../utils/cn";
 import { Button } from "./button";
 import {
 	DropdownMenu,
@@ -40,74 +41,25 @@ export interface ActionsMenuProps {
 interface MenuItemProps {
 	item: ActionsMenuItem;
 	onItemClick?: (item: ActionsMenuItem) => void;
-	isNested?: boolean;
-	parentCloseHandler?: () => void;
 }
 
-const MenuItem: React.FC<MenuItemProps> = ({
-	item,
-	onItemClick,
-	isNested = false,
-	parentCloseHandler,
-}) => {
-	const [showSubmenu, setShowSubmenu] = useState(false);
-	const [submenuPosition, setSubmenuPosition] = useState({ top: 0, left: 0 });
-	const itemRef = useRef<HTMLDivElement>(null);
-	const submenuRef = useRef<HTMLDivElement>(null);
+const ROW_CLASSES =
+	"flex items-center gap-2 px-3 py-3 cursor-pointer transition-colors bg-ods-bg outline-none";
+const WRAPPER_CLASSES =
+	"relative border-b border-ods-border last:border-b-0";
 
-	useEffect(() => {
-		if (showSubmenu && itemRef.current) {
-			const rect = itemRef.current.getBoundingClientRect();
-			const submenuWidth = 256; // min-w-[256px]
-			const viewportWidth = window.innerWidth;
-
-			// Check available space on both sides
-			const spaceRight = viewportWidth - rect.right;
-			const spaceLeft = rect.left;
-
-			let left: number;
-			if (spaceRight >= submenuWidth + 4) {
-				// Position to the right (default)
-				left = rect.right + 4;
-			} else if (spaceLeft >= submenuWidth + 4) {
-				// Position to the left
-				left = rect.left - submenuWidth - 4;
-			} else {
-				// Fallback: position to whichever side has more space
-				left =
-					spaceRight >= spaceLeft
-						? rect.right + 4
-						: rect.left - submenuWidth - 4;
-			}
-
-			setSubmenuPosition({
-				top: rect.top,
-				left,
-			});
-		}
-	}, [showSubmenu]);
-
-	const closeSubmenu = useCallback(() => {
-		setShowSubmenu(false);
-	}, []);
-
+const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
 	const activate = useCallback(() => {
 		if (item.disabled) return;
-
-		if (item.type === "submenu") {
-			setShowSubmenu((prev) => !prev);
-		} else if (item.type === "checkbox") {
+		if (item.type === "checkbox") {
 			item.onClick?.();
 			onItemClick?.(item);
-		} else if (item.onClick) {
-			item.onClick();
-			onItemClick?.(item);
-
-			if (isNested && parentCloseHandler) {
-				parentCloseHandler();
-			}
+			return;
 		}
-	}, [item, onItemClick, isNested, parentCloseHandler]);
+		if (item.type === "submenu") return;
+		item.onClick?.();
+		onItemClick?.(item);
+	}, [item, onItemClick]);
 
 	const handleClick = useCallback(
 		(e: React.MouseEvent) => {
@@ -137,47 +89,25 @@ const MenuItem: React.FC<MenuItemProps> = ({
 			}
 			item.onClick?.();
 			onItemClick?.(item);
-			if (isNested && parentCloseHandler) {
-				parentCloseHandler();
-			}
 		},
-		[item, onItemClick, isNested, parentCloseHandler],
+		[item, onItemClick],
 	);
-
-	useEffect(() => {
-		if (showSubmenu) {
-			const handleClickOutside = (e: MouseEvent) => {
-				if (
-					itemRef.current &&
-					!itemRef.current.contains(e.target as Node) &&
-					submenuRef.current &&
-					!submenuRef.current.contains(e.target as Node)
-				) {
-					setShowSubmenu(false);
-				}
-			};
-
-			document.addEventListener("mousedown", handleClickOutside);
-			return () => {
-				document.removeEventListener("mousedown", handleClickOutside);
-			};
-		}
-	}, [showSubmenu]);
 
 	if (item.type === "separator") {
 		return <div className="bg-ods-system-greys-soft-grey h-1 w-full" />;
 	}
 
-	const itemClasses = `
-    flex items-center gap-2 px-3 py-3 cursor-pointer transition-colors
-    bg-ods-bg
-    ${
-			item.disabled
-				? "text-ods-text-secondary cursor-not-allowed pointer-events-none opacity-60"
-				: "text-ods-text-primary hover:bg-ods-bg-hover"
-		}
-    ${showSubmenu && item.type === "submenu" ? "bg-[#2b2b2b]" : ""}
-  `;
+	const itemClasses = cn(
+		ROW_CLASSES,
+		item.disabled
+			? "text-ods-text-secondary cursor-not-allowed pointer-events-none opacity-60"
+			: "text-ods-text-primary hover:bg-ods-bg-hover",
+	);
+
+	const subTriggerClasses = cn(
+		itemClasses,
+		"data-[state=open]:bg-[#2b2b2b] focus:bg-ods-bg-hover",
+	);
 
 	const renderAsLink =
 		!!item.href && item.type !== "submenu" && item.type !== "checkbox";
@@ -186,28 +116,32 @@ const MenuItem: React.FC<MenuItemProps> = ({
 		<>
 			{item.icon && (
 				<div
-					className={`w-6 h-6 flex-shrink-0 flex items-center justify-center ${item.disabled ? "opacity-50" : ""}`}
+					className={cn(
+						"w-6 h-6 flex-shrink-0 flex items-center justify-center",
+						item.disabled && "opacity-50",
+					)}
 				>
 					{item.icon}
 				</div>
 			)}
 
 			<span
-				className={`flex-1 text-[18px] font-medium leading-6 ${item.disabled ? "text-ods-text-secondary" : "text-ods-text-primary"}`}
+				className={cn(
+					"flex-1 text-[18px] font-medium leading-6",
+					item.disabled ? "text-ods-text-secondary" : "text-ods-text-primary",
+				)}
 			>
 				{item.label}
 			</span>
 
 			{item.type === "checkbox" && (
 				<div
-					className={`
-          w-6 h-6 flex items-center justify-center rounded-md transition-colors
-          ${
+					className={cn(
+						"w-6 h-6 flex items-center justify-center rounded-md transition-colors",
 						item.checked
 							? "bg-[#ffc008]"
-							: "border-2 border-ods-border bg-transparent"
-					}
-        `}
+							: "border-2 border-ods-border bg-transparent",
+					)}
 				>
 					{item.checked && (
 						<Check className="w-4 h-4 text-black" strokeWidth={3} />
@@ -221,11 +155,9 @@ const MenuItem: React.FC<MenuItemProps> = ({
 		</>
 	);
 
-	const wrapperClasses = `relative border-b border-ods-border last:border-b-0`;
-
 	if (renderAsLink && item.href) {
 		return (
-			<div className={wrapperClasses}>
+			<div className={WRAPPER_CLASSES}>
 				<Link
 					href={item.href}
 					prefetch={false}
@@ -240,52 +172,47 @@ const MenuItem: React.FC<MenuItemProps> = ({
 		);
 	}
 
+	if (item.type === "submenu" && item.submenu) {
+		return (
+			<div className={WRAPPER_CLASSES}>
+				<DropdownMenuPrimitive.Sub>
+					<DropdownMenuPrimitive.SubTrigger
+						disabled={item.disabled}
+						className={subTriggerClasses}
+					>
+						{rowContent}
+					</DropdownMenuPrimitive.SubTrigger>
+					<DropdownMenuPrimitive.Portal>
+						<DropdownMenuPrimitive.SubContent
+							sideOffset={4}
+							className="z-[1500] min-w-[256px] max-h-[var(--radix-popper-available-height)] bg-ods-bg border border-ods-border rounded-md shadow-xl overflow-y-auto p-0"
+						>
+							{item.submenu.map((subItem, index) => (
+								<MenuItem
+									key={subItem.id || index}
+									item={subItem}
+									onItemClick={onItemClick}
+								/>
+							))}
+						</DropdownMenuPrimitive.SubContent>
+					</DropdownMenuPrimitive.Portal>
+				</DropdownMenuPrimitive.Sub>
+			</div>
+		);
+	}
+
 	return (
-		<div className={wrapperClasses}>
+		<div className={WRAPPER_CLASSES}>
 			<div
-				ref={itemRef}
 				role="menuitem"
 				tabIndex={item.disabled ? -1 : 0}
 				aria-disabled={item.disabled}
-				aria-haspopup={item.type === "submenu" ? "menu" : undefined}
-				aria-expanded={item.type === "submenu" ? showSubmenu : undefined}
 				className={itemClasses}
 				onClick={handleClick}
 				onKeyDown={handleKeyDown}
 			>
 				{rowContent}
 			</div>
-
-			{/* Submenu */}
-			{item.type === "submenu" &&
-				showSubmenu &&
-				item.submenu &&
-				typeof window !== "undefined" &&
-				ReactDOM.createPortal(
-					<div
-						ref={submenuRef}
-						role="menu"
-						data-actions-submenu
-						className="fixed z-[9999] min-w-[256px] bg-ods-bg border border-ods-border rounded-md shadow-xl overflow-hidden"
-						style={{
-							top: `${submenuPosition.top}px`,
-							left: `${submenuPosition.left}px`,
-						}}
-						onClick={(e) => e.stopPropagation()}
-						onKeyDown={(e) => e.stopPropagation()}
-					>
-						{item.submenu.map((subItem, index) => (
-							<MenuItem
-								key={subItem.id || index}
-								item={subItem}
-								onItemClick={onItemClick}
-								isNested={true}
-								parentCloseHandler={closeSubmenu}
-							/>
-						))}
-					</div>,
-					document.body,
-				)}
 		</div>
 	);
 };
@@ -301,7 +228,7 @@ export const ActionsMenu: React.FC<ActionsMenuProps> = ({
 }) => {
 	return (
 		<div
-			className={`relative min-w-[256px] bg-ods-bg border border-ods-border rounded-md shadow-lg overflow-hidden ${className}`}
+			className={`relative min-w-[256px] max-h-[var(--radix-popper-available-height)] bg-ods-bg border border-ods-border rounded-md shadow-lg overflow-y-auto ${className}`}
 		>
 			{groups.map((group, groupIndex) => {
 				const groupKey = group.id || group.items.map((i) => i.id).join("|");
@@ -330,6 +257,7 @@ export interface ActionsMenuDropdownProps extends ActionsMenuProps {
 	customTrigger?: React.ReactNode;
 	triggerAriaLabel?: string;
 	triggerClassName?: string;
+	contentClassName?: string;
 	align?: "start" | "center" | "end";
 	side?: "top" | "right" | "bottom" | "left";
 	sideOffset?: number;
@@ -343,6 +271,7 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
 	customTrigger,
 	triggerAriaLabel = "More actions",
 	triggerClassName,
+	contentClassName,
 	align = "end",
 	side = "bottom",
 	sideOffset = 6,
@@ -383,16 +312,10 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
 				align={align}
 				side={side}
 				sideOffset={sideOffset}
-				className="p-0 border-0 bg-transparent shadow-none overflow-visible"
-				onInteractOutside={(e) => {
-					const original = (
-						e as unknown as CustomEvent<{ originalEvent: Event }>
-					).detail?.originalEvent;
-					const target = original?.target as HTMLElement | null;
-					if (target && target.closest("[data-actions-submenu]")) {
-						e.preventDefault();
-					}
-				}}
+				className={cn(
+					"p-0 border-0 bg-transparent shadow-none overflow-visible",
+					contentClassName,
+				)}
 			>
 				<ActionsMenu
 					groups={groups}
