@@ -101,21 +101,6 @@ public class ApiKeyService {
         log.info("Deleted API key and its statistics: {}", keyId);
     }
 
-    /**
-     * Disable expired API keys TODO (scheduled task)
-     */
-    public void disableExpiredKeys() {
-        List<ApiKey> expiredKeys = apiKeyRepository.findExpiredKeys(Instant.now());
-
-        for (ApiKey key : expiredKeys) {
-            key.setEnabled(false);
-            key.setUpdatedAt(Instant.now());
-            apiKeyRepository.save(key);
-            log.info("Disabled expired API key: {}", key.getKeyId());
-        }
-    }
-
-
     private String generateKeyId() {
         byte[] bytes = new byte[KEY_ID_LENGTH / 2];
         secureRandom.nextBytes(bytes);
