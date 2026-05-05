@@ -1,16 +1,16 @@
 import type { SVGProps } from "react";
-export interface AppleIconProps
+export interface AppleFoodIconProps
   extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
   className?: string;
   size?: number;
   color?: string;
 }
-export function AppleIcon({
+export function AppleFoodIcon({
   className = "",
   size = 24,
   color = "currentColor",
   ...props
-}: AppleIconProps) {
+}: AppleFoodIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

@@ -13,6 +13,15 @@ import {
 	DropdownMenuTrigger,
 } from "./dropdown-menu";
 
+export interface ActionsMenuItemIconAction {
+	icon: React.ReactNode;
+	"aria-label": string;
+	onClick?: () => void;
+	href?: string;
+	openInNewTab?: boolean;
+	disabled?: boolean;
+}
+
 export interface ActionsMenuItem {
 	id: string;
 	label: string;
@@ -24,6 +33,12 @@ export interface ActionsMenuItem {
 	submenu?: ActionsMenuItem[];
 	/** Optional URL for navigation items */
 	href?: string;
+	/**
+	 * Optional secondary action — a 40px-wide button on the right of the row
+	 * with a vertical divider. The main row keeps its primary click target;
+	 * the secondary is independently clickable (e.g. "open in new tab").
+	 */
+	iconAction?: ActionsMenuItemIconAction;
 }
 
 export interface ActionsMenuGroup {
@@ -44,9 +59,61 @@ interface MenuItemProps {
 }
 
 const ROW_CLASSES =
-	"flex items-center gap-2 px-3 py-3 cursor-pointer transition-colors bg-ods-bg outline-none";
+	"flex flex-1 min-w-0 items-center gap-2 px-3 py-3 cursor-pointer transition-colors bg-ods-bg outline-none";
 const WRAPPER_CLASSES =
-	"relative border-b border-ods-border last:border-b-0";
+	"relative flex items-stretch border-b border-ods-border last:border-b-0";
+
+const SECONDARY_ACTION_CLASSES =
+	"flex w-10 shrink-0 items-center justify-center self-stretch border-l border-ods-border transition-colors hover:bg-ods-bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus";
+
+const SecondaryAction: React.FC<{ action: ActionsMenuItemIconAction }> = ({ action }) => {
+	const handleClick = useCallback(
+		(e: React.MouseEvent) => {
+			e.stopPropagation();
+			if (action.disabled) {
+				e.preventDefault();
+				return;
+			}
+			action.onClick?.();
+		},
+		[action],
+	);
+
+	const classes = cn(
+		SECONDARY_ACTION_CLASSES,
+		action.disabled && "cursor-not-allowed opacity-60 pointer-events-none",
+	);
+
+	if (action.href) {
+		return (
+			<Link
+				href={action.href}
+				prefetch={false}
+				target={action.openInNewTab ? "_blank" : undefined}
+				rel={action.openInNewTab ? "noopener noreferrer" : undefined}
+				aria-label={action["aria-label"]}
+				aria-disabled={action.disabled || undefined}
+				tabIndex={action.disabled ? -1 : undefined}
+				className={classes}
+				onClick={handleClick}
+			>
+				{action.icon}
+			</Link>
+		);
+	}
+
+	return (
+		<button
+			type="button"
+			aria-label={action["aria-label"]}
+			disabled={action.disabled}
+			className={classes}
+			onClick={handleClick}
+		>
+			{action.icon}
+		</button>
+	);
+};
 
 const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
 	const activate = useCallback(() => {
@@ -168,6 +235,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
 				>
 					{rowContent}
 				</Link>
+				{item.iconAction && <SecondaryAction action={item.iconAction} />}
 			</div>
 		);
 	}
@@ -197,6 +265,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
 						</DropdownMenuPrimitive.SubContent>
 					</DropdownMenuPrimitive.Portal>
 				</DropdownMenuPrimitive.Sub>
+				{item.iconAction && <SecondaryAction action={item.iconAction} />}
 			</div>
 		);
 	}
@@ -213,6 +282,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
 			>
 				{rowContent}
 			</div>
+			{item.iconAction && <SecondaryAction action={item.iconAction} />}
 		</div>
 	);
 };

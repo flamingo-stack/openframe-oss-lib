@@ -22,6 +22,7 @@ export { ArrowCornerBlIcon } from './arrow-corner-bl-icon';
 export { ArrowCornerBrIcon } from './arrow-corner-br-icon';
 export { ArrowCornerTlIcon } from './arrow-corner-tl-icon';
 export { ArrowCornerTrIcon } from './arrow-corner-tr-icon';
+export { ArrowRightUpIcon } from './arrow-right-up-icon';
 export { ArrowSquareDownIcon } from './arrow-square-down-icon';
 export { ArrowSquareLeftIcon } from './arrow-square-left-icon';
 export { ArrowSquareRightIcon } from './arrow-square-right-icon';
