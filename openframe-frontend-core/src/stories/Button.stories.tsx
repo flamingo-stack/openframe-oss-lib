@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { Bell, ChevronRight, Download, Heart, Menu, MessageSquare, Plus, Search, Settings, ShoppingCart, Trash2, X } from 'lucide-react';
+import { Bell, ChevronDown, ChevronRight, Download, ExternalLink as ExternalLinkIcon, Heart, Menu, MessageSquare, Plus, Search, Settings, ShoppingCart, Trash2, X } from 'lucide-react';
 import React from 'react';
 import { Button } from '../components/ui/button';
 
@@ -85,6 +85,24 @@ export const Loading: Story = {
 export const FullWidth: Story = {
   args: { children: 'Full Width', fullWidth: true },
 };
+
+// === SplitIcon (single click target with visual divider) ===
+
+export const SplitIcon: Story = {
+  args: { children: 'Save', splitIcon: <ChevronDown /> },
+}
+
+export const SplitIconOutline: Story = {
+  args: { children: 'Open', variant: 'outline', splitIcon: <ExternalLinkIcon /> },
+}
+
+export const SplitIconAsLink: Story = {
+  args: { children: 'Documentation', href: '/docs', splitIcon: <ExternalLinkIcon /> },
+}
+
+export const SplitIconSmall: Story = {
+  args: { children: 'Save', size: 'small', splitIcon: <ChevronDown /> },
+}
 
 // === As link ===
 

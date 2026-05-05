@@ -1,11 +1,10 @@
 'use client'
 
-import { ChevronLeft } from 'lucide-react'
 import React from 'react'
 import { cn } from '../../utils/cn'
-import { Button } from '../ui/button'
 import type { ActionsMenuGroup } from '../ui/actions-menu'
 import { PageActions, type PageActionButton } from '../ui/page-actions'
+import { BackButton } from './back-button'
 
 // Legacy interface for backward compatibility (layout version)
 interface LegacyPageContainerProps {
@@ -240,15 +239,11 @@ function renderAdvancedPageContainer({
           <div className="flex flex-col gap-2 flex-1 min-w-0">
             {/* Back Button */}
             {backButton && (
-              <Button
+              <BackButton
                 onClick={backButton.onClick}
-                variant="transparent"
-                className="self-start justify-start hidden md:flex"
-                leftIcon={<ChevronLeft className="size-6" />}
-                noPaddingX
-              >
-                {backButton.label || 'Back'}
-              </Button>
+                label={backButton.label}
+                className="hidden md:inline-flex"
+              />
             )}
 
             {/* Title */}
@@ -283,15 +278,11 @@ function renderAdvancedPageContainer({
           <div className="flex flex-col gap-1 flex-1 min-w-0">
             {/* Back Button */}
             {backButton && (
-              <Button
+              <BackButton
                 onClick={backButton.onClick}
-                variant="transparent"
-                className="self-start justify-start hidden md:flex"
-                leftIcon={<ChevronLeft className="size-6" />}
-                noPaddingX
-              >
-                {backButton.label || 'Back'}
-              </Button>
+                label={backButton.label}
+                className="hidden md:inline-flex"
+              />
             )}
 
             {title && (
@@ -323,15 +314,11 @@ function renderAdvancedPageContainer({
           <div className="flex flex-col gap-2 flex-1 min-w-0">
             {/* Back Button */}
             {backButton && (
-              <Button
+              <BackButton
                 onClick={backButton.onClick}
-                variant="transparent"
-                className="self-start justify-start hidden md:flex"
-                leftIcon={<ChevronLeft className="size-6" />}
-                noPaddingX
-              >
-                {backButton.label || 'Back'}
-              </Button>
+                label={backButton.label}
+                className="hidden md:inline-flex"
+              />
             )}
 
             {title && (

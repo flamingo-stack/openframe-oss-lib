@@ -1,11 +1,10 @@
 'use client'
 
-import { ChevronLeft } from 'lucide-react'
 import React from 'react'
 import { cn } from '../../utils/cn'
 import type { ActionsMenuGroup } from '../ui/actions-menu'
-import { Button } from '../ui/button'
 import { PageActions, type PageActionButton } from '../ui/page-actions'
+import { BackButton } from './back-button'
 
 function getInitials(name?: string): string {
   if (!name) return ''
@@ -75,15 +74,11 @@ export function TitleBlock({
     >
       <div className="flex flex-col gap-[var(--spacing-system-xs)] flex-1 min-w-0">
         {backButton && (
-          <Button
+          <BackButton
             onClick={backButton.onClick}
-            variant="transparent"
-            className="self-start justify-start hidden md:flex"
-            leftIcon={<ChevronLeft className="size-6" />}
-            noPaddingX
-          >
-            {backButton.label || 'Back'}
-          </Button>
+            label={backButton.label}
+            className="hidden md:inline-flex"
+          />
         )}
         {(image || subtitle) ? (
           <div className="flex items-center gap-[var(--spacing-system-m)] min-w-0 w-full">
