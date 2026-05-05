@@ -27,8 +27,8 @@ public class AuthEntryPage {
     // ── Selectors ─────────────────────────────────────────────────────────
     // Scoped to the login card to avoid collision with "Create Organization" card
     private static final String LOGIN_CARD = "div.bg-ods-bg.border.border-ods-border:has(h1:has-text('Already Have an Account'))";
-    private static final String EMAIL_INPUT = LOGIN_CARD + " input[type='email']";
-    private static final String CONTINUE_BTN = LOGIN_CARD + " button:has-text('Continue')";
+    //    private static final String EMAIL_INPUT = LOGIN_CARD + " input[type='email']";
+//    private static final String CONTINUE_BTN = LOGIN_CARD + " button:has-text('Continue')";
     private static final String FORGOT_PWD = LOGIN_CARD + " button:has-text('Forgot password')";
     private static final String PAGE_HEADING = LOGIN_CARD + " h1";
 
@@ -53,11 +53,11 @@ public class AuthEntryPage {
     }
 
     public Locator emailInput() {
-        return page.locator(EMAIL_INPUT);
+        return page.locator("input[type='email']").nth(1);
     }
 
     public Locator continueButton() {
-        return page.locator(CONTINUE_BTN);
+        return page.locator("button:has-text('Continue')").nth(1);
     }
 
     public Locator forgotPasswordLink() {
