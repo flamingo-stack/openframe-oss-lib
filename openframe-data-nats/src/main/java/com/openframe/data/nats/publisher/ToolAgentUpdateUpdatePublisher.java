@@ -1,15 +1,16 @@
 package com.openframe.data.nats.publisher;
 
-import com.openframe.data.document.clientconfiguration.PublishState;
+import com.openframe.data.document.clientconfiguration.DownloadConfiguration;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
+import com.openframe.data.document.toolagent.SessionType;
 import com.openframe.data.document.toolagent.ToolAgentAsset;
 import com.openframe.data.nats.mapper.DownloadConfigurationMapper;
 import com.openframe.data.nats.model.ToolAgentUpdateMessage;
 import com.openframe.data.service.IntegratedToolAgentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -25,55 +26,58 @@ public class ToolAgentUpdateUpdatePublisher {
 
     private final static String TOPIC_NAME_TEMPLATE = "machine.all.tool.%s.update";
 
-    @Value("${openframe.tool-agent.update.feature.enabled:false}")
-    private boolean toolAgentUpdateFeatureEnabled;
-
     private final NatsMessagePublisher natsMessagePublisher;
     private final DownloadConfigurationMapper downloadConfigurationMapper;
     private final IntegratedToolAgentService integratedToolAgentService;
 
     public void publish(IntegratedToolAgent toolAgent) {
-        if (!toolAgentUpdateFeatureEnabled) {
-            log.info("Tool agent update publishing is disabled, skipping publish for tool: {} version: {}", toolAgent.getId(), toolAgent.getVersion());
+        String toolAgentId = toolAgent.getId();
+        String toolAgentVersion = toolAgent.getVersion();
+
+        try {
+            send(toolAgent);
+        } catch (Exception e) {
+            log.error("NATS publish failed for tool agent {}, will be retried by scheduler", toolAgentId, e);
+            try {
+                integratedToolAgentService.markAsNonPublished(toolAgent);
+            } catch (OptimisticLockingFailureException ole) {
+                log.warn("Concurrent writer for tool agent {} during failure-mark; skipping", toolAgentId);
+            }
             return;
         }
 
-        String toolAgentId = toolAgent.getId();
-        markAsNonPublished(toolAgentId);
+        try {
+            integratedToolAgentService.markAsPublished(toolAgent);
+            log.info("Published tool update message for tool: {} version: {}", toolAgentId, toolAgentVersion);
+        } catch (OptimisticLockingFailureException e) {
+            log.warn("Concurrent writer for tool agent {} during publish; skipping mark-published", toolAgentId);
+        }
+    }
 
-        String topicName = buildTopicName(toolAgent);
+    public void send(IntegratedToolAgent toolAgent) {
+        String toolAgentId = toolAgent.getId();
+        String topicName = buildTopicName(toolAgentId);
         ToolAgentUpdateMessage message = buildMessage(toolAgent);
         natsMessagePublisher.publishPersistent(topicName, message);
-
-        markAsPublished(toolAgentId);
-
-        log.info("Published tool update message for tool: {} version: {}", toolAgent.getId(), toolAgent.getVersion());
     }
 
-    private void markAsNonPublished(String toolAgentId) {
-        IntegratedToolAgent toolAgent = integratedToolAgentService.getById(toolAgentId);
-
-        PublishState publishState = toolAgent.getPublishState();
-        PublishState stateBefore = PublishState.nonPublished(publishState);
-        toolAgent.setPublishState(stateBefore);
-
-        integratedToolAgentService.save(toolAgent);
-    }
-
-    private String buildTopicName(IntegratedToolAgent toolAgent) {
-        String toolAgentId = toolAgent.getId();
+    private String buildTopicName(String toolAgentId) {
         return format(TOPIC_NAME_TEMPLATE, toolAgentId);
     }
 
     private ToolAgentUpdateMessage buildMessage(IntegratedToolAgent toolAgent) {
+        String toolAgentId = toolAgent.getId();
+        String toolAgentVersion = toolAgent.getVersion();
+        SessionType sessionType = toolAgent.getSessionType();
+        List<DownloadConfiguration> downloadConfigurations = toolAgent.getDownloadConfigurations();
+        List<ToolAgentAsset> assets = toolAgent.getAssets();
+
         ToolAgentUpdateMessage message = new ToolAgentUpdateMessage();
-        message.setToolAgentId(toolAgent.getId());
-        message.setVersion(toolAgent.getVersion());
-        message.setSessionType(toolAgent.getSessionType());
-        message.setDownloadConfigurations(
-                downloadConfigurationMapper.map(toolAgent.getDownloadConfigurations(), toolAgent.getVersion())
-        );
-        message.setAssets(mapAssets(toolAgent.getAssets()));
+        message.setToolAgentId(toolAgentId);
+        message.setVersion(toolAgentVersion);
+        message.setSessionType(sessionType);
+        message.setDownloadConfigurations(downloadConfigurationMapper.map(downloadConfigurations, toolAgentVersion));
+        message.setAssets(mapAssets(assets));
         return message;
     }
 
@@ -87,22 +91,16 @@ public class ToolAgentUpdateUpdatePublisher {
     }
 
     private ToolAgentUpdateMessage.AssetUpdate mapAsset(ToolAgentAsset asset) {
+        String assetId = asset.getId();
+        String assetVersion = asset.getVersion();
+        boolean executable = asset.isExecutable();
+        List<DownloadConfiguration> assetDownloadConfigurations = asset.getDownloadConfigurations();
+
         ToolAgentUpdateMessage.AssetUpdate assetUpdate = new ToolAgentUpdateMessage.AssetUpdate();
-        assetUpdate.setAssetId(asset.getId());
-        assetUpdate.setVersion(asset.getVersion());
-        assetUpdate.setExecutable(asset.isExecutable());
-        assetUpdate.setDownloadConfigurations(
-                downloadConfigurationMapper.map(asset.getDownloadConfigurations(), asset.getVersion())
-        );
+        assetUpdate.setAssetId(assetId);
+        assetUpdate.setVersion(assetVersion);
+        assetUpdate.setExecutable(executable);
+        assetUpdate.setDownloadConfigurations(downloadConfigurationMapper.map(assetDownloadConfigurations, assetVersion));
         return assetUpdate;
     }
-
-    private void markAsPublished(String toolAgentId) {
-        IntegratedToolAgent toolAgent = integratedToolAgentService.getById(toolAgentId);
-
-        PublishState publishState = toolAgent.getPublishState();
-        toolAgent.setPublishState(PublishState.published(publishState));
-        integratedToolAgentService.save(toolAgent);
-    }
 }
-

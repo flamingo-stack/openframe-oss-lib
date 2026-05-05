@@ -86,7 +86,7 @@ public class ForceToolAgentUpdateService {
         try {
             IntegratedToolAgent toolAgent = toolAgentRepository.findById(toolAgentId)
                     .orElseThrow(() -> new IllegalStateException("Not found tool agent configuration for " + toolAgentId));
-            toolAgentUpdateUpdatePublisher.publish(toolAgent);
+            toolAgentUpdateUpdatePublisher.send(toolAgent);
 
             return buildResponseItem(machineId, toolAgentId, ForceAgentStatus.PROCESSED);
         } catch (Exception e) {
