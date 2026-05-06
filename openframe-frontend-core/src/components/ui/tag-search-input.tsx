@@ -139,6 +139,7 @@ export function TagSearchInput<T = string>({
           "bg-ods-card border-ods-border",
           "has-[:focus]:border-ods-accent",
           !disabled && "hover:bg-ods-bg-hover hover:border-ods-border-hover",
+          disabled && "bg-ods-bg",
           disabled && "cursor-not-allowed opacity-50",
           className,
         )}
@@ -196,7 +197,7 @@ export function TagSearchInput<T = string>({
             disabled={disabled}
             className={cn(
               "flex-1 min-w-[60px] bg-transparent border-none outline-none",
-              "text-[18px] font-medium leading-6",
+              "text-h4",
               "text-ods-text-primary placeholder:text-ods-text-secondary",
               "disabled:cursor-not-allowed",
             )}
@@ -239,7 +240,7 @@ export function TagSearchInput<T = string>({
       <span
         ref={textMeasureRef}
         aria-hidden="true"
-        className="absolute left-0 top-0 pointer-events-none invisible -z-10 whitespace-nowrap text-[18px] font-medium leading-6"
+        className="absolute left-0 top-0 pointer-events-none invisible -z-10 whitespace-nowrap text-h4"
       >
         {currentPlaceholder}
       </span>

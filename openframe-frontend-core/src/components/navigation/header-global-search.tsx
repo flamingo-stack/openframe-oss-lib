@@ -66,7 +66,7 @@ export function HeaderGlobalSearch({
         placeholder={placeholder}
         className={cn(
           "flex-1 min-w-0 bg-transparent",
-          "text-lg font-medium leading-6",
+          "text-h4",
           "text-ods-text-primary placeholder:text-ods-text-secondary",
           "outline-none border-none"
         )}

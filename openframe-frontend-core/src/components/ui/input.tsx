@@ -98,7 +98,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             // Layout
             "flex-1 min-w-0 bg-transparent border-none outline-none",
             // Typography
-            // "text-h4",
+            "text-h4",
             // Colors
             "text-ods-text-primary placeholder:text-ods-text-secondary",
             // File input adjustments

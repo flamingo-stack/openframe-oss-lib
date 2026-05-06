@@ -24,7 +24,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           // Layout & spacing - match Input
           "flex min-h-[96px] w-full rounded-[6px] border p-3",
           // Typography - match Input exactly
-          "text-[18px] font-medium leading-6",
+          "text-h4",
           // Focus states
           "focus-visible:outline-none focus:border-ods-accent",
           // Animations & touch UX

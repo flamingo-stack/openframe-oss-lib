@@ -94,6 +94,7 @@ const containerStyles = cn(
 
 const innerInputStyles = cn(
   "flex-1 min-w-[60px] bg-transparent border-none outline-none",
+  "text-h4",
   "text-ods-text-primary placeholder:text-ods-text-secondary",
   "disabled:cursor-not-allowed",
   "touch-manipulation"
