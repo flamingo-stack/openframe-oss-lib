@@ -80,17 +80,32 @@ public class DeviceDetailsPage {
     }
 
     /**
-     * Clicks the Remote Control icon and waits for the URL to transition to
-     * the remote-desktop sub-route.
+     * Opens the ⋯ more-actions menu, clicks "Remote Control", and waits for
+     * the URL to transition to the remote-desktop sub-route.
      *
      * @return a new {@link RemoteDesktopPage} scoped to the same page
      */
     public RemoteDesktopPage openRemoteDesktop() {
-        page.locator("main a[href*='/remote-desktop/']").click();
+        openMoreActionsMenu();
+        page.locator("[role='menu'] a[href*='/remote-desktop/']").first().click();
         page.waitForURL(
                 url -> url.contains("/remote-desktop/"),
                 new Page.WaitForURLOptions().setTimeout(15_000));
         return new RemoteDesktopPage(page);
+    }
+
+    /**
+     * Opens the ⋯ more-actions menu, clicks "File Manager", and waits for
+     * the File Manager page to finish loading.
+     *
+     * @return a new {@link FileManagerPage} scoped to the same page
+     */
+    public FileManagerPage openFileManager() {
+        openMoreActionsMenu();
+        page.locator("[role='menu'] a[href*='/file-manager/']").first().click();
+        FileManagerPage fileManagerPage = new FileManagerPage(this.page);
+        page.waitForCondition(fileManagerPage::isLoaded);
+        return fileManagerPage;
     }
 
     /**
@@ -113,16 +128,6 @@ public class DeviceDetailsPage {
         return remoteShellPage;
     }
 
-    /**
-     * Clicks the File Manager icon (navigates to the file manager sub-route).
-     */
-    public FileManagerPage openFileManager() {
-        page.locator("main a[href*='/file-manager/']").click();
-        FileManagerPage fileManagerPage = new FileManagerPage(this.page);
-        page.waitForCondition(fileManagerPage::isLoaded);
-        return fileManagerPage;
-    }
-
     // ── ⋯ More-actions menu ───────────────────────────────────────────────────
 
     /**
@@ -131,14 +136,6 @@ public class DeviceDetailsPage {
     public void clickRunScript() {
         openMoreActionsMenu();
         clickMenuItemByText("Run Script");
-    }
-
-    /**
-     * Opens the ⋯ more-actions menu and clicks "Uninstall Device".
-     */
-    public void clickUninstallDevice() {
-        openMoreActionsMenu();
-        clickMenuItemByText("Uninstall Device");
     }
 
     /**
@@ -201,22 +198,22 @@ public class DeviceDetailsPage {
     }
 
     /**
-     * Clicks the ⋯ icon button to open the more-actions dropdown.
+     * Clicks the ⋯ icon button (aria-label="More actions") to open the
+     * more-actions dropdown.
      */
     private void openMoreActionsMenu() {
-        page.locator("main button[type='button'][aria-haspopup='menu']")
-                .filter(new Locator.FilterOptions().setHasNotText("Remote Shell"))
-                .click();
+        page.getByRole(AriaRole.BUTTON,
+                new Page.GetByRoleOptions().setName("More actions")).click();
         page.locator("[role='menu']").waitFor();
     }
 
     /**
      * Clicks an item inside the currently open {@code [role="menu"]} by its
-     * visible text. Menu items are {@code <a>} elements, so we match by text
-     * content.
+     * visible text. Matches both {@code <a>} links and {@code <menuitem>}
+     * elements.
      */
     private void clickMenuItemByText(String text) {
-        page.locator("[role='menu'] a")
+        page.locator("[role='menu'] a, [role='menu'] [role='menuitem']")
                 .filter(new Locator.FilterOptions().setHasText(text))
                 .last()
                 .click();
