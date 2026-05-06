@@ -31,8 +31,8 @@ export function FileManagerEmpty({
       
       {action && (
         <Button
-          variant="primary"
-          size="sm"
+          variant="accent"
+          size="small-legacy"
           onClick={action.onClick}
         >
           {action.label}

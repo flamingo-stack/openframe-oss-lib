@@ -117,7 +117,7 @@ const backgroundClasses = {
  * <OrganizationIcon
  *   imageUrl={org.imageUrl}
  *   organizationName={org.name}
- *   size="sm"
+ *   size="small-legacy"
  *   showBackground={false}
  * />
  * ```

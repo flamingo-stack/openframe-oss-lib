@@ -234,7 +234,7 @@ export const VariantComparison: Story = {
           value={primaryValue}
           onValueChange={setPrimaryValue}
           items={fiveItems}
-          variant="primary"
+          variant="accent"
           label="Primary"
         />
         <TabSelector
@@ -275,6 +275,6 @@ export const WithBadges: Story = {
         ),
       },
     ];
-    return <TabSelector value={value} onValueChange={setValue} items={items} variant="primary" label="Plan" />;
+    return <TabSelector value={value} onValueChange={setValue} items={items} variant="accent" label="Plan" />;
   },
 };

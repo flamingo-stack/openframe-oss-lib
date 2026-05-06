@@ -463,7 +463,7 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
             {/* Action Buttons */}
             <div className="flex gap-3 mt-4 shrink-0">
               <Button
-                variant="card"
+                variant="outline"
                 onClick={handleReset}
                 size="default"
                 className="md:w-full!"
@@ -471,7 +471,7 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
                 Reset
               </Button>
               <Button
-                variant="primary"
+                variant="accent"
                 onClick={handleApply}
                 size="default"
                 className="md:w-full!"

@@ -239,7 +239,7 @@ export function FilterModal({
         <Button variant="outline" className="flex-1 h-11" onClick={handleReset}>
           {resetButtonText}
         </Button>
-        <Button variant="primary" className="flex-1 h-11" onClick={handleApply}>
+        <Button variant="accent" className="flex-1 h-11" onClick={handleApply}>
           {applyButtonText}
         </Button>
       </ModalV2Footer>

@@ -12,7 +12,7 @@ interface SocialLink {
 interface SocialIconRowProps {
   className?: string;
   links?: SocialLink[];
-  variant?: "destructive" | "outline" | "secondary" | "ghost" | "link" | "search" | "primary" | "white" | "transparent" | "ghost-nav" | "submit" | "success" | "warning" | "info" | "flamingo-primary" | "flamingo-secondary" | "footer-link" | "filter" | "filter-active" | "section" | "section-active" | null | undefined;
+  variant?: "accent" | "outline" | "transparent" | "destructive" | null | undefined;
 }
 
 const defaultLinks: SocialLink[] = [

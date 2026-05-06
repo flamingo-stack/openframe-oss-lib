@@ -9,13 +9,28 @@ interface ContactSubmissionOptions {
   onSuccess?: () => void;
 }
 
+/**
+ * Mirrors the API contract at POST /api/contact (see `ContactBaseSchema` in
+ * the consuming app). Keep optional fields aligned with the Zod schema —
+ * anything missing here OR there will be silently dropped on submission.
+ *
+ * Tracking fields (rdt_cid, utm_*, referrer_url) are forwarded as-is and
+ * persisted by the API; they don't need to be declared on the form, but
+ * the index signature below preserves any extra keys callers spread in.
+ */
 interface ContactFormData {
   name: string;
   email: string;
-  companySize: string;
-  referralSource: string;
   helpCategory: string;
   message: string;
+  linkedin_url?: string;
+  companySize?: string;
+  referralSource?: string;
+  rdt_cid?: string;
+  // Permissive index signature — tracking metadata, A/B variants, and
+  // future per-form fields flow through unchanged. The API decides what
+  // to keep via its Zod schema.
+  [key: string]: unknown;
 }
 
 /**

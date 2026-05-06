@@ -160,7 +160,7 @@ export function ListPageLayout({
           {/* Mobile Filter Button - only visible on mobile when filter is enabled */}
           {hasMobileFilter && (
             <Button
-              variant="search"
+              variant="outline"
               size="icon"
               className="md:hidden"
               onClick={() => setMobileFilterOpen(true)}

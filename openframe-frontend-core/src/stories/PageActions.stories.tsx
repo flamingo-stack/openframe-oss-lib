@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { fn } from 'storybook/test'
-import { ColorsIcon, PlusCircleIcon, PlayCircleIcon, CheckCircleIcon, PenEditIcon, CalendarDaysIcon, VialIcon, TerminalIcon, TrashIcon } from '../components/icons-v2-generated'
+import { Arrow01RightIcon, ColorsIcon, PlusCircleIcon, PlayCircleIcon, CheckCircleIcon, PenEditIcon, CalendarDaysIcon, VialIcon, TerminalIcon, TrashIcon, ComputerMouseIcon, FolderIcon } from '../components/icons-v2-generated'
 import { PageActions } from '../components/ui/page-actions'
 
 const meta = {
@@ -83,7 +83,7 @@ export const PrimaryButtons: Story = {
       {
         label: 'Save Script',
         onClick: fn(),
-        variant: 'primary',
+        variant: 'accent',
       },
       {
         label: 'Test Script',
@@ -104,7 +104,7 @@ export const PrimaryButtonsWithIcons: Story = {
       {
         label: 'Save Changes',
         onClick: fn(),
-        variant: 'primary',
+        variant: 'accent',
         icon: <CheckCircleIcon size={24} />,
       },
       {
@@ -127,7 +127,7 @@ export const SinglePrimaryButton: Story = {
       {
         label: 'Create New',
         onClick: fn(),
-        variant: 'primary',
+        variant: 'accent',
         icon: <PlusCircleIcon size={24} />,
       },
     ],
@@ -193,7 +193,7 @@ export const WithStates: Story = {
       {
         label: 'Saving...',
         onClick: fn(),
-        variant: 'primary',
+        variant: 'accent',
         loading: true,
       },
       {
@@ -217,7 +217,7 @@ export const MenuPrimary: Story = {
       {
         label: 'Run Script',
         onClick: fn(),
-        variant: 'primary',
+        variant: 'accent',
         icon: <PlayCircleIcon size={24} />,
       },
     ],
@@ -258,7 +258,7 @@ export const MenuPrimarySingleAction: Story = {
       {
         label: 'Save Changes',
         onClick: fn(),
-        variant: 'primary',
+        variant: 'accent',
         icon: <CheckCircleIcon size={24} />,
       },
     ],
@@ -286,7 +286,7 @@ export const MenuPrimaryLoading: Story = {
       {
         label: 'Running...',
         onClick: fn(),
-        variant: 'primary',
+        variant: 'accent',
         loading: true,
       },
     ],
@@ -360,7 +360,7 @@ export const LinkActions: Story = {
       {
         label: 'Open Docs',
         href: '/docs',
-        variant: 'primary',
+        variant: 'accent',
         icon: <PlayCircleIcon size={24} />,
       },
     ],
@@ -412,7 +412,7 @@ export const SplitButtonWithMenu: Story = {
     actions: [
       {
         label: 'Remote Shell',
-        variant: 'card',
+        variant: 'outline',
         submenu: [
           {
             id: 'cmd',
@@ -459,6 +459,214 @@ export const SplitButtonWithMenu: Story = {
 }
 
 /**
+ * Two-target SplitButton — primary action on the left half, secondary action
+ * (e.g. open in new tab) on the right half. Each half is independently clickable.
+ */
+export const SplitButtonTwoActions: Story = {
+  args: {
+    variant: 'menu-primary',
+    actions: [
+      {
+        label: 'Open Docs',
+        onClick: fn(),
+        variant: 'accent',
+        icon: <PlayCircleIcon size={24} />,
+        iconAction: {
+          icon: <Arrow01RightIcon size={24} />,
+          'aria-label': 'Open docs in new tab',
+          href: 'https://example.com/docs',
+          openInNewTab: true,
+        },
+      },
+    ],
+    menuActions: [
+      {
+        items: [
+          {
+            id: 'edit',
+            label: 'Edit',
+            onClick: fn(),
+            icon: <PenEditIcon size={24} />,
+          },
+        ],
+      },
+    ],
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Provide `iconAction` on an action to render it as a `SplitButton` (two independent click targets). Main half runs the primary `onClick`/`href`; the icon half runs its own action — typical use case is "open in new tab".',
+      },
+    },
+  },
+}
+
+/**
+ * Menu items with a secondary action — each row in the dropdown can have its
+ * own 40px icon button on the right (with vertical divider). Matches the Figma
+ * device-page menu where rows like "Remote Control" have an arrow that opens
+ * the app in a new tab while the main row navigates inside the current page.
+ */
+export const MenuItemsWithIconAction: Story = {
+  args: {
+    variant: 'menu-primary',
+    actions: [
+      {
+        label: 'Save Changes',
+        onClick: fn(),
+        variant: 'accent',
+        icon: <CheckCircleIcon size={24} />,
+      },
+    ],
+    menuActions: [
+      {
+        items: [
+          {
+            id: 'remote-control',
+            label: 'Remote Control',
+            href: '/devices/remote-control',
+            icon: <ComputerMouseIcon size={24} />,
+            iconAction: {
+              icon: <Arrow01RightIcon size={24} />,
+              'aria-label': 'Open Remote Control in new tab',
+              href: '/devices/remote-control',
+              openInNewTab: true,
+            },
+          },
+          {
+            id: 'file-manager',
+            label: 'File Manager',
+            href: '/devices/file-manager',
+            icon: <FolderIcon size={24} />,
+            iconAction: {
+              icon: <Arrow01RightIcon size={24} />,
+              'aria-label': 'Open File Manager in new tab',
+              href: '/devices/file-manager',
+              openInNewTab: true,
+            },
+          },
+          {
+            id: 'archive-device',
+            label: 'Archive Device',
+            onClick: fn(),
+          },
+          {
+            id: 'delete-device',
+            label: 'Delete Device',
+            onClick: fn(),
+            icon: <TrashIcon size={24} />,
+          },
+        ],
+      },
+    ],
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Add `iconAction` to any `ActionsMenuItem` to render an independent secondary button on the right of the row, separated by a vertical divider. Clicking the secondary action does not trigger the main row.',
+      },
+    },
+  },
+}
+
+/**
+ * Two SplitButton actions + a menu where some items have a secondary action.
+ * Shows the full Figma device-page pattern in a single layout.
+ */
+export const DoubleActionsAndMixedMenu: Story = {
+  args: {
+    variant: 'menu-primary',
+    actions: [
+      {
+        label: 'Open Docs',
+        onClick: fn(),
+        variant: 'accent',
+        icon: <PlayCircleIcon size={24} />,
+        iconAction: {
+          icon: <Arrow01RightIcon size={24} />,
+          'aria-label': 'Open docs in new tab',
+          href: 'https://example.com/docs',
+          openInNewTab: true,
+        },
+      },
+      {
+        label: 'Run Script',
+        onClick: fn(),
+        variant: 'outline',
+        icon: <TerminalIcon size={24} />,
+        // Whole button disabled — both halves locked.
+        disabled: true,
+        iconAction: {
+          icon: <Arrow01RightIcon size={24} />,
+          'aria-label': 'Run script in new window',
+          onClick: fn(),
+        },
+      },
+      {
+        label: 'Test Script',
+        onClick: fn(),
+        variant: 'outline',
+        icon: <VialIcon size={24} />,
+        // Only the main half disabled — icon-half stays clickable.
+        mainDisabled: true,
+        iconAction: {
+          icon: <Arrow01RightIcon size={24} />,
+          'aria-label': 'Test script in new window',
+          onClick: fn(),
+        },
+      },
+      {
+        label: 'Schedule',
+        onClick: fn(),
+        variant: 'outline',
+        icon: <CalendarDaysIcon size={24} />,
+        // Only the icon half disabled — main stays clickable.
+        iconAction: {
+          icon: <Arrow01RightIcon size={24} />,
+          'aria-label': 'Open scheduler in new window',
+          onClick: fn(),
+          disabled: true,
+        },
+      },
+    ],
+    menuActions: [
+      {
+        items: [
+          {
+            id: 'remote-control',
+            label: 'Remote Control',
+            href: '/devices/remote-control',
+            icon: <ComputerMouseIcon size={24} />,
+            iconAction: {
+              icon: <Arrow01RightIcon size={24} />,
+              'aria-label': 'Open Remote Control in new tab',
+              href: '/devices/remote-control',
+              openInNewTab: true,
+            },
+          },
+          {
+            id: 'delete-device',
+            label: 'Delete Device',
+            onClick: fn(),
+            icon: <TrashIcon size={24} />,
+          },
+        ],
+      },
+    ],
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Combined story: two SplitButton page-actions on desktop (each with its own secondary action), plus a "..." menu where "Remote Control" has a secondary "open in new tab" button on the right and "Delete Device" is a single-target row.',
+      },
+    },
+  },
+}
+
+/**
  * Primary buttons with a mobile-only action.
  */
 export const PrimaryButtonsMobileOnly: Story = {
@@ -468,7 +676,7 @@ export const PrimaryButtonsMobileOnly: Story = {
       {
         label: 'Save Changes',
         onClick: fn(),
-        variant: 'primary',
+        variant: 'accent',
         icon: <CheckCircleIcon size={24} />,
       },
       {

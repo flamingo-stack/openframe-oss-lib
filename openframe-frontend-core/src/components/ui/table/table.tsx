@@ -38,13 +38,12 @@ function injectSyntheticColumns<T>(
             rowActions!.map((action, actionIndex) => (
               <Button
                 key={actionIndex}
-                variant='card'
+                variant="outline"
                 onClick={(e) => {
                   e.stopPropagation()
                   action.onClick(item)
                 }}
-                leftIcon={action.icon && action.label ? action.icon : undefined}
-                centerIcon={action.icon && !action.label ? action.icon : undefined}
+                leftIcon={action.icon}
                 className={action.className}
               >
                 {action.label}
@@ -72,10 +71,9 @@ function injectSyntheticColumns<T>(
               href={href}
               prefetch={false}
               variant="outline"
-					    size="icon"
-              centerIcon={<Chevron02RightIcon className="w-6 h-6" />}
+              size="icon"
+              leftIcon={<Chevron02RightIcon className="w-6 h-6" />}
               aria-label="View details"
-              className="bg-ods-card"
             />
           </div>
         )

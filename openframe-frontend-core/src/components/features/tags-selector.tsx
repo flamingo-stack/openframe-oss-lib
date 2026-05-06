@@ -122,18 +122,16 @@ export function TagsSelector({
               {tag.name}
               {!disabled && (
                 <Button
-                  variant="ghost"
-                  size="none"
+                  variant="transparent"
                   type="button"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     handleTagRemove(tag.id);
                   }}
-                  centerIcon={<X className="w-2.5 h-2.5" />}
+                  leftIcon={<X className="w-2.5 h-2.5" />}
                   className="w-3 h-3 p-0 min-h-0 min-w-0 ml-0.5 hover:opacity-70 text-ods-bg hover:bg-transparent"
                   aria-label={`Remove ${tag.name}`}
-                  fullWidthOnMobile={false}
                 />
               )}
             </span>
@@ -172,17 +170,15 @@ export function TagsSelector({
           {/* Clear Search Button */}
           {searchQuery && (
             <Button
-              variant="ghost"
-              size="none"
+              variant="transparent"
               type="button"
               onClick={() => {
                 setSearchQuery("");
                 setShowDropdown(false);
               }}
-              centerIcon={<X className="w-3 h-3" />}
+              leftIcon={<X className="w-3 h-3" />}
               className="w-5 h-5 p-0 min-h-0 min-w-0 shrink-0 text-ods-text-secondary hover:text-ods-text-primary hover:bg-transparent"
               aria-label="Clear search"
-              fullWidthOnMobile={false}
             />
           )}
         </div>
@@ -195,13 +191,11 @@ export function TagsSelector({
               {canCreateNewTag && (
                 <Button
                   variant="outline"
-                  size="none"
                   type="button"
                   onClick={handleCreateTag}
                   disabled={isCreating}
                   leftIcon={isCreating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
                   className="w-full flex flex-row items-center gap-1.5 px-2 py-1 mb-2 h-auto rounded border-dashed border-ods-accent bg-ods-bg hover:bg-ods-card text-ods-accent font-['DM_Sans'] !text-xs !font-medium"
-                  fullWidthOnMobile={true}
                 >
                   Create tag: <strong>"{searchQuery.trim()}"</strong>
                 </Button>
@@ -214,11 +208,9 @@ export function TagsSelector({
                     <Button
                       key={tag.id}
                       variant="outline"
-                      size="none"
                       type="button"
                       onClick={() => handleTagAdd(tag.id)}
                       className="h-auto px-2 py-0.5 rounded border-ods-border hover:border-ods-accent bg-ods-bg hover:bg-ods-card text-ods-text-primary font-['DM_Sans'] !text-xs !font-medium"
-                      fullWidthOnMobile={false}
                     >
                       {tag.name}
                     </Button>

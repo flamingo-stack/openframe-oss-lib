@@ -142,7 +142,7 @@ export const WithSeparator: Story = {
 export const CustomTrigger: Story = {
   args: {
     triggerElement: (
-      <Button variant="outline" size="sm">
+      <Button variant="outline" size="small-legacy">
         Open Filters
       </Button>
     ),

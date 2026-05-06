@@ -643,7 +643,7 @@ export const WithChevronLink: Story = {
                 prefetch={false}
                 variant="outline"
                 size="icon"
-                centerIcon={<Chevron02RightIcon className="w-5 h-5" />}
+                leftIcon={<Chevron02RightIcon className="w-5 h-5" />}
                 aria-label="View details"
                 className="bg-ods-card"
               />
@@ -1354,7 +1354,7 @@ export const KitchenSink: Story = {
                 prefetch={false}
                 variant="outline"
                 size="icon"
-                centerIcon={<Chevron02RightIcon className="w-5 h-5" />}
+                leftIcon={<Chevron02RightIcon className="w-5 h-5" />}
                 aria-label="View details"
                 className="bg-ods-card"
               />

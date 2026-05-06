@@ -49,7 +49,7 @@ const baseNavigation: HeaderConfig['navigation'] = {
 };
 
 const rightActions = [
-  <Button key="cta" variant="primary" href="/signup">
+  <Button key="cta" variant="accent" href="/signup">
     Start Free Trial
   </Button>,
 ];

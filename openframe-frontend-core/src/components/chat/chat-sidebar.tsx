@@ -128,7 +128,7 @@ const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(
         <div className="bg-ods-card border-b border-ods-border flex items-center justify-center px-4 py-1 shrink-0">
           <Button
             onClick={onNewChat}
-            variant="ghost"
+            variant="transparent"
             disabled={isLoading || isCreatingDialog}
             leftIcon={<ChatPlusIcon className="size-6 text-ods-text-secondary" />}
             className="flex-1 justify-center text-lg font-bold text-ods-text-primary hover:bg-ods-bg-hover focus-visible:ring-0"

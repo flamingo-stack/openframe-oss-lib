@@ -95,7 +95,7 @@ export function ChangelogManager({
         <Button
           type="button"
           variant="outline"
-          size="sm"
+          size="small-legacy"
           onClick={addEntry}
           leftIcon={<Plus className="h-4 w-4" />}
           className="font-['DM_Sans'] text-[14px]"
@@ -114,7 +114,7 @@ export function ChangelogManager({
             <div className="flex items-center gap-3 p-3">
               <Button
                 type="button"
-                variant="ghost"
+                variant="transparent"
                 size="icon"
                 onClick={() => toggleExpanded(index)}
                 className="shrink-0"
@@ -137,7 +137,7 @@ export function ChangelogManager({
               {showVisibilityToggle && (
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="transparent"
                   size="icon"
                   onClick={() => toggleVisibility(index)}
                   className="shrink-0"
@@ -157,7 +157,7 @@ export function ChangelogManager({
 
               <Button
                 type="button"
-                variant="ghost"
+                variant="transparent"
                 size="icon"
                 onClick={() => removeEntry(index)}
                 className="text-red-400 hover:text-red-300 hover:bg-red-400/10 shrink-0"

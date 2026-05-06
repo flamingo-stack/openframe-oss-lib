@@ -33,7 +33,6 @@
  */
 
 import React from 'react'
-import { Button } from '../ui/button'
 import {
   PackageIcon,
   WindowsIcon,
@@ -100,15 +99,10 @@ export const SoftwareSourceBadge: React.FC<SoftwareSourceBadgeProps> = ({
   const config = sourceConfig[source] || { label: source, icon: <PackageIcon className="w-4 h-4" /> }
 
   return (
-    <Button
-      variant="table-display"
-      size="none"
-      leftIcon={config.icon}
-      className={cn(className)}
-      alignment='left'
-    >
+    <span className={cn('inline-flex items-center gap-2 text-ods-text-primary', className)}>
+      {config.icon}
       {config.label}
-    </Button>
+    </span>
   )
 }
 

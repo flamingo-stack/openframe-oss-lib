@@ -60,7 +60,7 @@ export function MobileNavPanel({ isOpen, config }: MobileNavPanelProps) {
         <Button
           key={item.id}
           variant="outline"
-          size="sm"
+          size="small-legacy"
           href={item.href}
           onClick={handleClick}
           leftIcon={item.icon}
@@ -79,7 +79,7 @@ export function MobileNavPanel({ isOpen, config }: MobileNavPanelProps) {
       <Button
         key={item.id}
         variant="outline"
-        size="sm"
+        size="small-legacy"
         onClick={handleClick}
         leftIcon={item.icon}
         className={cn(
@@ -124,8 +124,8 @@ export function MobileNavPanel({ isOpen, config }: MobileNavPanelProps) {
           <Button
             aria-label="Close menu"
             size="icon"
-            variant="ghost"
-            centerIcon={<X className="w-4 h-4 text-ods-text-primary" />}
+            variant="transparent"
+            leftIcon={<X className="w-4 h-4 text-ods-text-primary" />}
             onClick={config.onClose}
             className="hover:bg-ods-bg-hover"
           />
