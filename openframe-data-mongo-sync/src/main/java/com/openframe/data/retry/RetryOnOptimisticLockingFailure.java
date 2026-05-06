@@ -14,7 +14,8 @@ import java.lang.annotation.Target;
 @Retryable(
         retryFor = OptimisticLockingFailureException.class,
         maxAttempts = 5,
-        backoff = @Backoff(delay = 50, multiplier = 2, random = true)
+        backoff = @Backoff(delay = 50, multiplier = 2, random = true),
+        listeners = "optimisticLockingRetryListener"
 )
 public @interface RetryOnOptimisticLockingFailure {
 }
