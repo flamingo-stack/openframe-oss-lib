@@ -1,8 +1,8 @@
 "use client"
 
 import * as CheckboxPrimitive from "@radix-ui/react-checkbox"
-import { Check } from "lucide-react"
 import { cn } from "../../utils/cn"
+import { CheckboxCheckmarkIcon } from "../icons-v2-generated/signs-and-symbols/checkbox-checkmark-icon"
 
 export interface FilterCheckboxItemProps {
   label: string
@@ -41,8 +41,8 @@ export function FilterCheckboxItem({
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        <CheckboxPrimitive.Indicator className="flex items-center justify-center">
-          <Check className="h-3.5 w-3.5 text-ods-bg" strokeWidth={3} />
+        <CheckboxPrimitive.Indicator className="flex items-center justify-center text-ods-text-on-accent">
+          <CheckboxCheckmarkIcon size={10} />
         </CheckboxPrimitive.Indicator>
       </CheckboxPrimitive.Root>
       <span className="flex-1 text-h4 text-ods-text-primary">

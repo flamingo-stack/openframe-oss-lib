@@ -25,7 +25,7 @@ export function BackButton({ label = 'Back', className, type = 'button', ...prop
       {...props}
     >
       <Chevron02LeftIcon className="size-6 shrink-0" />
-      <span className="text-h3">{label}</span>
+      <span className="text-h4">{label}</span>
     </button>
   )
 }

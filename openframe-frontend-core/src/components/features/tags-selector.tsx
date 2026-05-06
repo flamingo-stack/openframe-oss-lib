@@ -162,7 +162,7 @@ export function TagsSelector({
             placeholder={selectedTagIds.length >= maxTags ? "Maximum tags reached" : selectedTagIds.length === 0 ? placeholder : "Add more..."}
             disabled={disabled || selectedTagIds.length >= maxTags}
             className={cn(
-              "flex-1 min-w-[100px] bg-transparent border-none outline-none text-ods-text-primary placeholder:text-ods-text-secondary text-[14px] font-['DM_Sans'] leading-[1.4em] py-1 focus:outline-none focus:ring-0 focus:border-0",
+              "flex-1 min-w-[100px] bg-transparent border-none outline-none text-ods-text-primary placeholder:text-ods-text-secondary text-h4 py-1 focus:outline-none focus:ring-0 focus:border-0",
               selectedTagIds.length >= maxTags && "cursor-not-allowed opacity-50"
             )}
           />

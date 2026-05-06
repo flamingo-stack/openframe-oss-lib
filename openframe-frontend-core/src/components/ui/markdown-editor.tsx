@@ -337,7 +337,7 @@ export function MarkdownEditor({
               fontWeight: 500,
               lineHeight: "24px",
               color: "var(--color-text-primary)",
-              backgroundColor: "var(--color-bg-card)",
+              backgroundColor: disabled ? "var(--color-bg)" : "var(--color-bg-card)",
             },
           }}
           data-color-mode="dark"
