@@ -52,7 +52,15 @@ public class Notification {
 
     private NotificationContext context;
 
-    private PublishState publishState;
+    /**
+     * Always populated so the retry-candidates index hits without an {@code $exists:false}
+     * branch — the planner falls back to a full {@code _id} walk when the field is optional.
+     */
+    @Builder.Default
+    private PublishState publishState = PublishState.builder()
+            .published(false)
+            .attempts(0)
+            .build();
 
     /** Per-user view-state, populated at query time. Not persisted, not on the wire. */
     @Transient

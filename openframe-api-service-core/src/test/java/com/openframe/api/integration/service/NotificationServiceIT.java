@@ -74,12 +74,14 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         }
 
         @Test
-        @DisplayName("Given the NATS publisher bean is absent, when creating a notification, then publishState stays null so the fallback scheduler picks it up")
-        void given_publisher_absent_when_creating_then_publish_state_is_null() {
+        @DisplayName("Given the NATS publisher bean is absent, when creating a notification, then publishState defaults to unpublished/0 so the fallback scheduler picks it up")
+        void given_publisher_absent_when_creating_then_publish_state_defaults_to_unpublished() {
             Notification created = service.create(NotificationFixtures.basic(ALICE));
 
             Notification reread = repository.findById(created.getId()).orElseThrow();
-            assertThat(reread.getPublishState()).isNull();
+            assertThat(reread.getPublishState()).isNotNull();
+            assertThat(reread.getPublishState().isPublished()).isFalse();
+            assertThat(reread.getPublishState().getAttempts()).isZero();
         }
 
         @Test
