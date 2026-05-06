@@ -97,16 +97,8 @@ public class CustomNotificationRepositoryImpl implements CustomNotificationRepos
 
     @Override
     public List<Notification> findRetryablePublishCandidates(int maxAttempts, int limit) {
-        Criteria notPublished = new Criteria().orOperator(
-                Criteria.where("publishState").exists(false),
-                Criteria.where(FIELD_PUBLISHED).is(false)
-        );
-        Criteria attemptsBelowCap = new Criteria().orOperator(
-                Criteria.where(FIELD_ATTEMPTS).exists(false),
-                Criteria.where(FIELD_ATTEMPTS).lt(maxAttempts)
-        );
-
-        Query query = new Query(new Criteria().andOperator(notPublished, attemptsBelowCap));
+        Query query = new Query(Criteria.where(FIELD_PUBLISHED).is(false)
+                .and(FIELD_ATTEMPTS).lt(maxAttempts));
         query.with(Sort.by(Sort.Direction.ASC, FIELD_ID));
         query.limit(limit);
 

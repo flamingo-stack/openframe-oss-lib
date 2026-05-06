@@ -112,15 +112,17 @@ class NotificationNatsPublishFallbackSchedulerIT extends BaseIntegrationTest {
 
         scheduler.republishUnpublishedNotifications();
         Notification afterFirst = repository.findById(saved.getId()).orElseThrow();
-        assertThat(afterFirst.getPublishState().getAttempts()).isZero();
+        assertThat(afterFirst.getPublishState().getAttempts()).isEqualTo(1);
 
         scheduler.republishUnpublishedNotifications();
         Notification afterSecond = repository.findById(saved.getId()).orElseThrow();
-        assertThat(afterSecond.getPublishState().getAttempts()).isEqualTo(1);
+        assertThat(afterSecond.getPublishState().getAttempts()).isEqualTo(2);
 
+        // attempts has hit the cap; subsequent sweeps must skip the row.
         scheduler.republishUnpublishedNotifications();
         Notification afterThird = repository.findById(saved.getId()).orElseThrow();
         assertThat(afterThird.getPublishState().getAttempts()).isEqualTo(2);
+        assertThat(afterThird.getPublishState().isPublished()).isFalse();
 
         scheduler.republishUnpublishedNotifications();
         Notification afterFourth = repository.findById(saved.getId()).orElseThrow();

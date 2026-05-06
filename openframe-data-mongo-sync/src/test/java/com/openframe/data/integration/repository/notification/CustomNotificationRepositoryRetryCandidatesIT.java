@@ -37,8 +37,8 @@ class CustomNotificationRepositoryRetryCandidatesIT extends BaseMongoIntegration
     }
 
     @Test
-    @DisplayName("Given a notification persisted without a publishState field, when finding retry candidates, then it is included")
-    void given_row_without_publish_state_when_finding_retry_candidates_then_it_is_included() {
+    @DisplayName("Given a freshly built notification (default publishState), when finding retry candidates, then it is included")
+    void given_freshly_built_row_when_finding_retry_candidates_then_it_is_included() {
         Notification fresh = repository.save(NotificationFixtures.basic("u1"));
 
         List<Notification> candidates = repository.findRetryablePublishCandidates(MAX_ATTEMPTS, 100);

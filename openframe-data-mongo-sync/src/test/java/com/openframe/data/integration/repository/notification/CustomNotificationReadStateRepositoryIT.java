@@ -17,6 +17,11 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -78,6 +83,40 @@ class CustomNotificationReadStateRepositoryIT extends BaseMongoIntegrationTest {
             assertThat(rows).hasSize(2);
             assertThat(rows).extracting(NotificationReadState::getUserId)
                     .containsExactlyInAnyOrder(ALICE, BOB);
+        }
+
+        @Test
+        @DisplayName("Given many threads racing markRead on the same (user, notification) pair, when all calls land at once, then exactly one returns true and exactly one row is written — the unique index plus DuplicateKeyException catch hold under contention")
+        void given_concurrent_callers_when_marking_same_pair_then_exactly_one_winner_and_one_row() throws InterruptedException {
+            int threads = 32;
+            ExecutorService pool = Executors.newFixedThreadPool(threads);
+            CountDownLatch start = new CountDownLatch(1);
+            CountDownLatch done = new CountDownLatch(threads);
+            AtomicInteger winners = new AtomicInteger();
+
+            try {
+                for (int i = 0; i < threads; i++) {
+                    pool.submit(() -> {
+                        try {
+                            start.await();
+                            if (repository.markRead(ALICE, "notif-1")) {
+                                winners.incrementAndGet();
+                            }
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        } finally {
+                            done.countDown();
+                        }
+                    });
+                }
+                start.countDown();
+                assertThat(done.await(10, TimeUnit.SECONDS)).isTrue();
+            } finally {
+                pool.shutdownNow();
+            }
+
+            assertThat(winners.get()).isEqualTo(1);
+            assertThat(mongoTemplate.findAll(NotificationReadState.class)).hasSize(1);
         }
     }
 

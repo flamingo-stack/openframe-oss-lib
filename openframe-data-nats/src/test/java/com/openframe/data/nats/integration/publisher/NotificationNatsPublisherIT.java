@@ -116,8 +116,8 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Given a NATS broker that always fails, when publishing for the first time, then the row stays unpublished with attempts=0 ready for the fallback scheduler")
-    void given_failing_broker_when_publishing_first_time_then_row_unpublished_with_zero_attempts() {
+    @DisplayName("Given a NATS broker that always fails, when publishing for the first time, then the row stays unpublished and the attempts counter advances to 1")
+    void given_failing_broker_when_publishing_first_time_then_attempts_counter_advances() {
         NotificationNatsPublisher publisher = new NotificationNatsPublisher(
                 alwaysFails(), repository);
         Notification saved = repository.save(NotificationFixtures.basic("alice"));
@@ -128,7 +128,7 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
         Notification reread = repository.findById(saved.getId()).orElseThrow();
         assertThat(reread.getPublishState()).isNotNull();
         assertThat(reread.getPublishState().isPublished()).isFalse();
-        assertThat(reread.getPublishState().getAttempts()).isZero();
+        assertThat(reread.getPublishState().getAttempts()).isEqualTo(1);
     }
 
     @Test
@@ -140,15 +140,15 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
 
         publisher.publish(saved);
         assertThat(repository.findById(saved.getId()).orElseThrow()
-                .getPublishState().getAttempts()).isZero();
-
-        publisher.publish(repository.findById(saved.getId()).orElseThrow());
-        assertThat(repository.findById(saved.getId()).orElseThrow()
                 .getPublishState().getAttempts()).isEqualTo(1);
 
         publisher.publish(repository.findById(saved.getId()).orElseThrow());
         assertThat(repository.findById(saved.getId()).orElseThrow()
                 .getPublishState().getAttempts()).isEqualTo(2);
+
+        publisher.publish(repository.findById(saved.getId()).orElseThrow());
+        assertThat(repository.findById(saved.getId()).orElseThrow()
+                .getPublishState().getAttempts()).isEqualTo(3);
         assertThat(repository.findById(saved.getId()).orElseThrow()
                 .getPublishState().isPublished()).isFalse();
     }
