@@ -2,7 +2,7 @@
 
 import * as CheckboxPrimitive from "@radix-ui/react-checkbox"
 import * as React from "react"
-import { CheckIcon } from "../icons-v2-generated/signs-and-symbols/check-icon"
+import { CheckboxCheckmarkIcon } from "../icons-v2-generated/signs-and-symbols/checkbox-checkmark-icon"
 
 import { cn } from "../../utils/cn"
 
@@ -55,9 +55,9 @@ const CheckboxBlock = React.forwardRef<
         )}
       >
         <CheckboxPrimitive.Indicator
-          className="flex items-center justify-center text-ods-card"
+          className="flex items-center justify-center text-ods-text-on-accent"
         >
-          <CheckIcon className="h-4 w-4" strokeWidth={3} />
+          <CheckboxCheckmarkIcon size={10} />
         </CheckboxPrimitive.Indicator>
       </CheckboxPrimitive.Root>
       <div className="flex flex-1 flex-col justify-center min-w-0">

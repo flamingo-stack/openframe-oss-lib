@@ -45,7 +45,7 @@ export const InputTrigger = React.forwardRef<HTMLButtonElement, InputTriggerProp
 				{...props}
 				className={cn(
 					"flex w-full items-center gap-2 rounded-[6px] border px-3 h-11 md:h-12 outline-none",
-					"text-[18px] font-medium leading-6",
+					"text-h4",
 					"bg-ods-card border-ods-border text-ods-text-primary",
 					"enabled:hover:bg-ods-bg-hover enabled:hover:border-ods-border-hover enabled:active:bg-ods-bg-active enabled:active:border-ods-border-active",
 					!invalid &&

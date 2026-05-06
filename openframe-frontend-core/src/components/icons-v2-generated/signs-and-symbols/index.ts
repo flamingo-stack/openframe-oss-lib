@@ -2,6 +2,7 @@ export { AsteriskIcon } from './asterisk-icon';
 export { BitcoinCircleIcon } from './bitcoin-circle-icon';
 export { BitcoinIcon } from './bitcoin-icon';
 export { CheckAltIcon } from './check-alt-icon';
+export { CheckboxCheckmarkIcon } from './checkbox-checkmark-icon';
 export { CheckCircleIcon } from './check-circle-icon';
 export { CheckFillIcon } from './check-fill-icon';
 export { CheckIcon } from './check-icon';

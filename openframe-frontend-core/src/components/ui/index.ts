@@ -142,6 +142,7 @@ export * from './markdown-editor'
 
 // File Upload
 export * from './file-upload'
+export * from './image-uploader'
 
 // Ticket components
 export * from './ticket-status-tag'

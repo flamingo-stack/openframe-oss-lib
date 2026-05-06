@@ -4,6 +4,7 @@ import * as React from "react"
 import { Button } from "../ui"
 import { useEffect, useRef, useState } from "react"
 import { cn } from "../../utils/cn"
+import { CheckboxCheckmarkIcon } from "../icons-v2-generated/signs-and-symbols/checkbox-checkmark-icon"
 
 // Types for filter configuration
 export interface FilterOption {
@@ -75,23 +76,8 @@ const FilterCheckbox: React.FC<{
       )}
     >
       {checked && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <svg
-            width="14"
-            height="10"
-            viewBox="0 0 14 10"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            className="text-ods-text-on-accent"
-          >
-            <path
-              d="M1 5L5 9L13 1"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+        <div className="absolute inset-0 flex items-center justify-center text-ods-text-on-accent">
+          <CheckboxCheckmarkIcon size={10} />
         </div>
       )}
     </div>

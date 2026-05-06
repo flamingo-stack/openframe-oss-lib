@@ -116,7 +116,7 @@ export type AutocompleteProps<T = string> = AutocompleteSingleProps<T> | Autocom
 // Inner input styles matching Input component
 const innerInputStyles = cn(
   "flex-1 min-w-[60px] bg-transparent border-none outline-none",
-  "text-[18px] font-medium leading-6",
+  "text-h4",
   "text-ods-text-primary placeholder:text-ods-text-secondary",
   "disabled:cursor-not-allowed"
 )
@@ -569,7 +569,7 @@ function AutocompleteInner<T = string>(
                     aria-selected={false}
                     className={cn(
                       "flex items-center h-11 md:h-12 px-4 cursor-pointer transition-colors min-w-0",
-                      "text-[18px] font-medium leading-6 text-ods-accent",
+                      "text-h4 text-ods-accent",
                       "hover:bg-ods-bg-hover"
                     )}
                     onClick={handleCreate}
@@ -597,7 +597,7 @@ function AutocompleteInner<T = string>(
                       aria-selected={isSelected}
                       className={cn(
                         "flex items-center h-11 md:h-12 px-4 cursor-pointer transition-colors border-b border-ods-border last:border-b-0",
-                        "text-[18px] font-medium leading-6",
+                        "text-h4",
                         isHighlighted && "bg-ods-bg-surface",
                         isSelected ? "text-ods-accent" : "text-ods-text-primary",
                         !isHighlighted && "hover:bg-ods-bg-hover"
@@ -661,7 +661,7 @@ function AutocompleteInner<T = string>(
             <span
               ref={autoLimitTags.textMeasureRef}
               aria-hidden="true"
-              className="absolute left-0 top-0 pointer-events-none invisible -z-10 whitespace-nowrap text-[18px] font-medium leading-6"
+              className="absolute left-0 top-0 pointer-events-none invisible -z-10 whitespace-nowrap text-h4"
             >
               {inputPlaceholder}
             </span>
