@@ -33,7 +33,7 @@ export interface ImageUploaderProps {
   loading?: boolean
   /** External error message. Internal validation errors take precedence when present. */
   error?: string
-  /** CSS aspect-ratio for the dropzone, e.g. "16 / 9", "1 / 1". Default: "16 / 11" (matches Figma 320:220). */
+  /** CSS aspect-ratio for the dropzone, e.g. "16 / 9", "1 / 1". When set, overrides the default fixed height. */
   aspectRatio?: string
   /** object-fit for the preview image. Default: "cover" */
   objectFit?: "cover" | "contain" | "fill" | "none" | "scale-down"
@@ -81,7 +81,7 @@ export function ImageUploader({
   disabled = false,
   loading = false,
   error,
-  aspectRatio = "16 / 11",
+  aspectRatio,
   objectFit = "cover",
   alt = "Uploaded image",
   className,
@@ -170,9 +170,10 @@ export function ImageUploader({
         role={!hasImage ? "button" : undefined}
         tabIndex={!hasImage && interactive ? 0 : undefined}
         aria-disabled={!interactive || undefined}
-        style={{ aspectRatio }}
+        style={aspectRatio ? { aspectRatio } : undefined}
         className={cn(
           "relative flex w-full flex-col items-center justify-center gap-[var(--spacing-system-l)] p-[var(--spacing-system-l)] rounded-md",
+          !aspectRatio && "h-44",
           "border border-dashed transition-colors duration-150",
           hasImage
             ? "bg-ods-bg border-ods-border"
@@ -184,6 +185,7 @@ export function ImageUploader({
           !hasImage && !interactive && "cursor-not-allowed",
         )}
       >
+
         {hasImage ? (
           <>
             <div className="relative min-h-0 w-full flex-1 overflow-hidden rounded-md">
@@ -278,3 +280,4 @@ function ActionIconButton({ onClick, disabled, ariaLabel, children }: ActionIcon
     </button>
   )
 }
+
