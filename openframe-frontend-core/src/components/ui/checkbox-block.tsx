@@ -28,8 +28,9 @@ const CheckboxBlock = React.forwardRef<
     <label
       htmlFor={id}
       className={cn(
-        "flex items-center gap-3 rounded-[6px] border w-full",
+        "flex items-center gap-[var(--spacing-system-s)] rounded-[6px] border w-full",
         "p-[var(--spacing-system-sf)]",
+        !description && "h-11 md:h-12",
         "bg-ods-card border-ods-border",
         "cursor-pointer transition-colors duration-200",
         "hover:border-ods-accent/30",
@@ -62,14 +63,15 @@ const CheckboxBlock = React.forwardRef<
       </CheckboxPrimitive.Root>
       <div className="flex flex-1 flex-col justify-center min-w-0">
         <span className={cn(
-          "font-[family-name:var(--font-h4-family)] font-[number:var(--font-h4-weight)] text-[length:var(--font-size-h4-body)] leading-[21.5px]",
-          "text-ods-text-primary select-none"
+          "text-h4",
+          "text-ods-text-primary select-none",
+          !description && "truncate"
         )}>
           {label}
         </span>
         {description && (
           <span className={cn(
-            "font-[family-name:var(--font-h6-family)] font-[number:var(--font-h6-weight)] text-[length:var(--font-size-h6-caption)] leading-[16.5px]",
+            "text-h6",
             "text-ods-text-secondary select-none"
           )}>
             {description}
