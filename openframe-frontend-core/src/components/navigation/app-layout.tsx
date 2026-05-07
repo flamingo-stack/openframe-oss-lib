@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useState } from 'react'
 import { NavigationSidebarConfig } from '../../types/navigation'
 import { cn } from '../../utils'
+import { NotificationDrawer } from '../features/notifications/notification-drawer'
 import { AppHeader, AppHeaderProps } from './app-header'
 import { MobileBurgerMenu, MobileBurgerMenuProps } from './mobile-burger-menu'
 import { NavigationSidebar } from './navigation-sidebar'
@@ -63,6 +64,7 @@ export function AppLayout({
           onToggleMobileMenu={handleToggleMobileMenu}
           disabled={disabled}
         />
+        <NotificationDrawer />
 
         {/* Main Content */}
         <main className={cn("flex-1 overflow-y-auto", mainClassName)}>
