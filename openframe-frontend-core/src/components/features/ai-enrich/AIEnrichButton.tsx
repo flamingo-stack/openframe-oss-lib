@@ -40,6 +40,7 @@ export const AIEnrichButton: React.FC<AIEnrichButtonProps> = ({
 }) => {
   return (
     <Button
+      type="button"
       onClick={onClick}
       disabled={disabled || loading}
       loading={loading}
