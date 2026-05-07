@@ -7,11 +7,6 @@ import lombok.RequiredArgsConstructor;
 
 import java.util.List;
 
-/**
- * DGS allows one type-resolver per interface, so this dispatches to the chain
- * of contributed {@link NotificationContextTypeResolver} SPI beans
- * (in {@code @Order}). First non-null wins; otherwise {@code GenericContext}.
- */
 @DgsComponent
 @RequiredArgsConstructor
 public class NotificationContextGraphQlTypeResolver {

@@ -1,6 +1,7 @@
 package com.openframe.api.service;
 
 import com.openframe.api.dto.GenericQueryResult;
+import com.openframe.api.dto.notification.NotificationView;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
@@ -24,8 +25,8 @@ public class NotificationService {
     private final NotificationPublishingService notificationPublishingService;
     private final NotificationReadStateService readStateService;
 
-    public GenericQueryResult<Notification> listForRecipient(String recipientUserId,
-                                                             CursorPaginationCriteria pagination) {
+    public GenericQueryResult<NotificationView> listForRecipient(String recipientUserId,
+                                                                 CursorPaginationCriteria pagination) {
         CursorPaginationCriteria normalized = pagination.normalize();
         int limit = normalized.getLimit();
 
@@ -42,17 +43,17 @@ public class NotificationService {
             items = items.reversed();
         }
 
-        applyReadFlags(recipientUserId, items);
+        List<NotificationView> views = withReadFlags(recipientUserId, items);
 
-        return GenericQueryResult.<Notification>builder()
-                .items(items)
-                .pageInfo(buildPageInfo(items, hasMore, normalized))
+        return GenericQueryResult.<NotificationView>builder()
+                .items(views)
+                .pageInfo(buildPageInfo(views, hasMore, normalized))
                 .build();
     }
 
-    /** No read flags — machines don't track per-row read state. */
-    public GenericQueryResult<Notification> listForMachine(String machineId,
-                                                           CursorPaginationCriteria pagination) {
+    /** Machines don't track per-row read state — every view comes back with {@code read=false}. */
+    public GenericQueryResult<NotificationView> listForMachine(String machineId,
+                                                               CursorPaginationCriteria pagination) {
         CursorPaginationCriteria normalized = pagination.normalize();
         int limit = normalized.getLimit();
 
@@ -69,9 +70,13 @@ public class NotificationService {
             items = items.reversed();
         }
 
-        return GenericQueryResult.<Notification>builder()
-                .items(items)
-                .pageInfo(buildPageInfo(items, hasMore, normalized))
+        List<NotificationView> views = items.stream()
+                .map(n -> new NotificationView(n, false))
+                .toList();
+
+        return GenericQueryResult.<NotificationView>builder()
+                .items(views)
+                .pageInfo(buildPageInfo(views, hasMore, normalized))
                 .build();
     }
 
@@ -83,27 +88,22 @@ public class NotificationService {
         return readStateService.markRead(userId, notificationId);
     }
 
-    private void applyReadFlags(String userId, List<Notification> items) {
-        if (items.isEmpty()) {
-            return;
-        }
-        List<String> ids = items.stream().map(Notification::getId).toList();
-        Set<String> readIds = readStateService.findReadIds(userId, ids);
-        if (readIds.isEmpty()) {
-            return;
-        }
-        for (Notification notification : items) {
-            if (readIds.contains(notification.getId())) {
-                notification.setRead(true);
-            }
-        }
-    }
-
     public Notification create(Notification notification) {
         return notificationPublishingService.create(notification);
     }
 
-    private PageInfo buildPageInfo(List<Notification> items, boolean hasMore, CursorPaginationCriteria criteria) {
+    private List<NotificationView> withReadFlags(String userId, List<Notification> items) {
+        if (items.isEmpty()) {
+            return List.of();
+        }
+        List<String> ids = items.stream().map(Notification::getId).toList();
+        Set<String> readIds = readStateService.findReadIds(userId, ids);
+        return items.stream()
+                .map(n -> new NotificationView(n, readIds.contains(n.getId())))
+                .toList();
+    }
+
+    private PageInfo buildPageInfo(List<NotificationView> items, boolean hasMore, CursorPaginationCriteria criteria) {
         String startCursor = items.isEmpty() ? null : CursorCodec.encode(items.getFirst().getId());
         String endCursor = items.isEmpty() ? null : CursorCodec.encode(items.getLast().getId());
 

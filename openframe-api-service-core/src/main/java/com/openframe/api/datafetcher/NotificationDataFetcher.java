@@ -1,20 +1,15 @@
 package com.openframe.api.datafetcher;
 
-import com.netflix.graphql.dgs.DgsComponent;
-import com.netflix.graphql.dgs.DgsData;
-import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
-import com.netflix.graphql.dgs.DgsMutation;
-import com.netflix.graphql.dgs.DgsQuery;
-import com.netflix.graphql.dgs.InputArgument;
+import com.netflix.graphql.dgs.*;
 import com.openframe.api.dto.GenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.GenericQueryResult;
+import com.openframe.api.dto.notification.NotificationView;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.mapper.GraphQLNotificationMapper;
 import com.openframe.api.service.NotificationService;
 import com.openframe.core.exception.UnauthorizedException;
-import com.openframe.data.document.notification.Notification;
 import com.openframe.security.authentication.ActorType;
 import com.openframe.security.authentication.AuthPrincipal;
 import graphql.relay.Relay;
@@ -22,7 +17,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.validation.annotation.Validated;
 
@@ -39,12 +33,12 @@ public class NotificationDataFetcher {
 
     @DgsData(parentType = "Notification", field = "id")
     public String notificationNodeId(DgsDataFetchingEnvironment dfe) {
-        Notification notification = dfe.getSource();
-        return RELAY.toGlobalId("Notification", notification.getId());
+        NotificationView view = dfe.getSource();
+        return RELAY.toGlobalId("Notification", view.getId());
     }
 
     @DgsQuery
-    public GenericConnection<GenericEdge<Notification>> notifications(
+    public GenericConnection<GenericEdge<NotificationView>> notifications(
             @InputArgument Integer first,
             @InputArgument String after,
             @InputArgument Integer last,
@@ -59,7 +53,7 @@ public class NotificationDataFetcher {
                 .build();
         CursorPaginationCriteria pagination = notificationMapper.toCursorPaginationCriteria(args);
 
-        GenericQueryResult<Notification> result = notificationService.listForRecipient(userId, pagination);
+        GenericQueryResult<NotificationView> result = notificationService.listForRecipient(userId, pagination);
         return notificationMapper.toConnection(result);
     }
 
@@ -70,7 +64,7 @@ public class NotificationDataFetcher {
     }
 
     @DgsQuery
-    public GenericConnection<GenericEdge<Notification>> machineNotifications(
+    public GenericConnection<GenericEdge<NotificationView>> machineNotifications(
             @InputArgument Integer first,
             @InputArgument String after,
             @InputArgument Integer last,
@@ -85,7 +79,7 @@ public class NotificationDataFetcher {
                 .build();
         CursorPaginationCriteria pagination = notificationMapper.toCursorPaginationCriteria(args);
 
-        GenericQueryResult<Notification> result = notificationService.listForMachine(machineId, pagination);
+        GenericQueryResult<NotificationView> result = notificationService.listForMachine(machineId, pagination);
         return notificationMapper.toConnection(result);
     }
 

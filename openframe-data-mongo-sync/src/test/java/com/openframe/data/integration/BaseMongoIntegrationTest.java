@@ -5,26 +5,26 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.MongoDBContainer;
 import org.testcontainers.utility.DockerImageName;
 
-/**
- * Run with: {@code mvn test -Dintegration.tests=true -pl openframe-data-mongo-sync}.
- *
- * <p>Tests are inert by default: the JUnit {@link EnabledIfSystemProperty} condition
- * runs before any container lifecycle, so CI (which never sets the flag) skips them
- * without touching Docker. {@link Testcontainers#disabledWithoutDocker()} adds a
- * second safety net for developers who set the flag on a Docker-less machine.
- */
 public abstract class BaseMongoIntegrationTest {
+
+    private static final String EXTERNAL_URI = System.getProperty("mongo.external.uri");
 
     protected static final MongoDBContainer MONGO =
             new MongoDBContainer(DockerImageName.parse("mongo:7"));
 
     @DynamicPropertySource
     static void mongoProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.data.mongodb.uri", BaseMongoIntegrationTest::resolveUri);
+        registry.add("spring.data.mongodb.auto-index-creation", () -> "true");
+    }
+
+    private static String resolveUri() {
+        if (EXTERNAL_URI != null) {
+            return EXTERNAL_URI;
+        }
         if (!MONGO.isRunning()) {
             MONGO.start();
         }
-        registry.add("spring.data.mongodb.uri",
-                () -> MONGO.getConnectionString() + "/test?directConnection=true");
-        registry.add("spring.data.mongodb.auto-index-creation", () -> "true");
+        return MONGO.getConnectionString() + "/test?directConnection=true";
     }
 }

@@ -1,24 +1,17 @@
 package com.openframe.api.integration.service;
 
 import com.openframe.api.dto.GenericQueryResult;
+import com.openframe.api.dto.notification.NotificationView;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.integration.BaseMongoIntegrationTest;
 import com.openframe.api.integration.support.NotificationFixtures;
 import com.openframe.api.integration.support.ServiceIntegrationTestApplication;
 import com.openframe.api.service.NotificationService;
-import com.openframe.data.document.notification.GenericContext;
-import com.openframe.data.document.notification.Notification;
-import com.openframe.data.document.notification.NotificationReadState;
-import com.openframe.data.document.notification.NotificationSeverity;
-import com.openframe.data.document.notification.RecipientScope;
+import com.openframe.data.document.notification.*;
 import com.openframe.data.repository.notification.NotificationRepository;
 import com.openframe.data.service.notification.NotificationReadStateService;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -27,9 +20,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.tuple;
+import static org.assertj.core.api.Assertions.*;
 
 @SpringBootTest(
         classes = ServiceIntegrationTestApplication.class,
@@ -197,7 +188,7 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         void given_fewer_rows_than_limit_when_listing_then_all_rows_returned_and_no_further_pages() {
             seedSequential(ALICE, 3);
 
-            GenericQueryResult<Notification> result = service.listForRecipient(
+            GenericQueryResult<NotificationView> result = service.listForRecipient(
                     ALICE, CursorPaginationCriteria.builder().limit(10).build());
 
             assertThat(result.getItems()).hasSize(3);
@@ -210,7 +201,7 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         void given_more_rows_than_limit_when_listing_forward_then_has_next_page_is_true() {
             seedSequential(ALICE, 25);
 
-            GenericQueryResult<Notification> result = service.listForRecipient(
+            GenericQueryResult<NotificationView> result = service.listForRecipient(
                     ALICE, CursorPaginationCriteria.builder().limit(10).build());
 
             assertThat(result.getItems()).hasSize(10);
@@ -222,11 +213,11 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         void given_end_cursor_of_first_page_when_fetching_next_page_then_returns_next_slice() {
             List<Notification> seeded = seedSequential(ALICE, 25);
 
-            GenericQueryResult<Notification> first = service.listForRecipient(
+            GenericQueryResult<NotificationView> first = service.listForRecipient(
                     ALICE, CursorPaginationCriteria.builder().limit(10).build());
             String rawCursor = CursorCodec.decode(first.getPageInfo().getEndCursor());
 
-            GenericQueryResult<Notification> second = service.listForRecipient(
+            GenericQueryResult<NotificationView> second = service.listForRecipient(
                     ALICE, CursorPaginationCriteria.builder().limit(10).cursor(rawCursor).backward(false).build());
 
             assertThat(second.getItems()).hasSize(10);
@@ -238,7 +229,7 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         void given_limit_above_max_when_listing_then_limit_is_normalised() {
             seedSequential(ALICE, 5);
 
-            GenericQueryResult<Notification> result = service.listForRecipient(
+            GenericQueryResult<NotificationView> result = service.listForRecipient(
                     ALICE, CursorPaginationCriteria.builder().limit(999).build());
 
             assertThat(result.getItems()).hasSize(5);
@@ -249,7 +240,7 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         void given_null_limit_when_listing_then_default_page_size_applied() {
             seedSequential(ALICE, 25);
 
-            GenericQueryResult<Notification> result = service.listForRecipient(
+            GenericQueryResult<NotificationView> result = service.listForRecipient(
                     ALICE, CursorPaginationCriteria.builder().limit(null).build());
 
             assertThat(result.getItems()).hasSize(CursorPaginationCriteria.DEFAULT_PAGE_SIZE);
@@ -261,10 +252,10 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
             List<Notification> seeded = seedSequential(ALICE, 5);
             String beforeCursor = seeded.get(0).getId();
 
-            GenericQueryResult<Notification> result = service.listForRecipient(
+            GenericQueryResult<NotificationView> result = service.listForRecipient(
                     ALICE, CursorPaginationCriteria.builder().limit(10).cursor(beforeCursor).backward(true).build());
 
-            assertThat(result.getItems()).extracting(Notification::getId)
+            assertThat(result.getItems()).extracting(NotificationView::getId)
                     .containsExactly(
                             seeded.get(4).getId(),
                             seeded.get(3).getId(),
@@ -278,7 +269,7 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
             seedSequential(ALICE, 3);
             seedSequential(BOB, 3);
 
-            GenericQueryResult<Notification> result = service.listForRecipient(
+            GenericQueryResult<NotificationView> result = service.listForRecipient(
                     ALICE, CursorPaginationCriteria.builder().limit(10).build());
 
             assertThat(result.getItems())
@@ -289,7 +280,7 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         @Test
         @DisplayName("Given a recipient with no notifications, when listing, then items are empty and pageInfo cursors are null")
         void given_no_notifications_for_recipient_when_listing_then_items_empty_and_cursors_null() {
-            GenericQueryResult<Notification> result = service.listForRecipient(
+            GenericQueryResult<NotificationView> result = service.listForRecipient(
                     "ghost", CursorPaginationCriteria.builder().limit(10).build());
 
             assertThat(result.getItems()).isEmpty();
@@ -304,11 +295,11 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
             readStateService.markRead(ALICE, seeded.get(0).getId());
             readStateService.markRead(ALICE, seeded.get(2).getId());
 
-            GenericQueryResult<Notification> result = service.listForRecipient(
+            GenericQueryResult<NotificationView> result = service.listForRecipient(
                     ALICE, CursorPaginationCriteria.builder().limit(10).build());
 
             assertThat(result.getItems())
-                    .extracting(Notification::getId, Notification::isRead)
+                    .extracting(NotificationView::getId, NotificationView::isRead)
                     .containsExactlyInAnyOrder(
                             tuple(seeded.get(0).getId(), true),
                             tuple(seeded.get(1).getId(), false),
@@ -322,7 +313,7 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
             // Bob marks one of Alice's notifications as read for HIM — must not bleed.
             readStateService.markRead(BOB, seeded.get(0).getId());
 
-            GenericQueryResult<Notification> result = service.listForRecipient(
+            GenericQueryResult<NotificationView> result = service.listForRecipient(
                     ALICE, CursorPaginationCriteria.builder().limit(10).build());
 
             assertThat(result.getItems())
@@ -346,10 +337,10 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
                     .context(GenericContext.builder().type("ann").payload("{}").build())
                     .build());
 
-            GenericQueryResult<Notification> result = service.listForMachine(
+            GenericQueryResult<NotificationView> result = service.listForMachine(
                     MACHINE_ID, CursorPaginationCriteria.builder().limit(10).build());
 
-            assertThat(result.getItems()).extracting(Notification::getId)
+            assertThat(result.getItems()).extracting(NotificationView::getId)
                     .contains(broadcast.getId())
                     .hasSize(4);
         }
@@ -360,7 +351,7 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
             seedMachineSequential(MACHINE_ID, 2);
             seedMachineSequential("other-machine", 3);
 
-            GenericQueryResult<Notification> result = service.listForMachine(
+            GenericQueryResult<NotificationView> result = service.listForMachine(
                     MACHINE_ID, CursorPaginationCriteria.builder().limit(10).build());
 
             assertThat(result.getItems()).hasSize(2);
@@ -373,7 +364,7 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         void given_more_rows_than_limit_when_listing_for_machine_then_has_next_page() {
             seedMachineSequential(MACHINE_ID, 15);
 
-            GenericQueryResult<Notification> result = service.listForMachine(
+            GenericQueryResult<NotificationView> result = service.listForMachine(
                     MACHINE_ID, CursorPaginationCriteria.builder().limit(10).build());
 
             assertThat(result.getItems()).hasSize(10);

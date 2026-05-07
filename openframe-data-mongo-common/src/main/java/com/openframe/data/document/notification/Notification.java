@@ -4,12 +4,9 @@ import com.openframe.data.document.clientconfiguration.PublishState;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
-import lombok.ToString;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.annotation.Transient;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -61,10 +58,4 @@ public class Notification {
             .published(false)
             .attempts(0)
             .build();
-
-    /** Per-user view-state, populated at query time. Not persisted, not on the wire. */
-    @Transient
-    @EqualsAndHashCode.Exclude
-    @ToString.Exclude
-    private boolean read;
 }
