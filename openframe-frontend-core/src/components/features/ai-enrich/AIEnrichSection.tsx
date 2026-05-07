@@ -201,6 +201,7 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
         />
         {showCancel && onCancel && loading && (
           <Button
+            type="button"
             variant="outline"
             size="small-legacy"
             onClick={onCancel}
