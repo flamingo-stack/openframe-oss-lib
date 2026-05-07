@@ -124,7 +124,9 @@ public class DeviceDetailsPage {
         openRemoteShellMenu();
         clickMenuItemByText("PowerShell");
         RemoteShellPage remoteShellPage = new RemoteShellPage(this.page);
-        page.waitForCondition(remoteShellPage::isConnected);
+        // Wait for the PS prompt to appear in terminal output, not just the
+        // Connected badge — the badge turns green before the shell is ready.
+        remoteShellPage.waitForOutputContaining("PS ", 30_000);
         return remoteShellPage;
     }
 
