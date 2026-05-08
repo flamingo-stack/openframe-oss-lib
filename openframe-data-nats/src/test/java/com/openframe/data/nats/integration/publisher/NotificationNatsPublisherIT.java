@@ -3,9 +3,11 @@ package com.openframe.data.nats.integration.publisher;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.core.exception.NatsException;
 import com.openframe.data.document.notification.GenericContext;
+import com.openframe.data.document.notification.BroadcastRecipient;
+import com.openframe.data.document.notification.MachineRecipient;
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationSeverity;
-import com.openframe.data.document.notification.RecipientScope;
+import com.openframe.data.document.notification.UserRecipient;
 import com.openframe.data.nats.integration.BaseIntegrationTest;
 import com.openframe.data.nats.integration.support.NotificationFixtures;
 import com.openframe.data.nats.integration.support.PublisherIntegrationTestApplication;
@@ -85,7 +87,6 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
 
         NotificationMessage decoded = objectMapper.readValue(received.getData(), NotificationMessage.class);
         assertThat(decoded.getId()).isEqualTo(saved.getId());
-        assertThat(decoded.getRecipientUserId()).isEqualTo("alice");
         assertThat(decoded.getSeverity()).isEqualTo(saved.getSeverity());
         assertThat(decoded.getTitle()).isEqualTo(saved.getTitle());
         assertThat(decoded.getContext()).isInstanceOf(GenericContext.class);
@@ -162,7 +163,7 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
         NotificationNatsPublisher publisher = new NotificationNatsPublisher(
                 realNats(publisherConnection), repository);
         Notification withDanger = Notification.builder()
-                .recipientUserId("alice")
+                .recipient(new UserRecipient("alice"))
                 .severity(NotificationSeverity.DANGER)
                 .title("Datastore unreachable")
                 .context(GenericContext.builder().type("incident").payload("{\"k\":\"v\"}").build())
@@ -201,8 +202,7 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
         NotificationNatsPublisher publisher = new NotificationNatsPublisher(
                 realNats(publisherConnection), repository);
         Notification saved = repository.save(Notification.builder()
-                .recipientScope(RecipientScope.MACHINE)
-                .recipientMachineId("m1")
+                .recipient(new MachineRecipient("m1"))
                 .title("Machine event")
                 .context(GenericContext.builder().type("event").payload("{}").build())
                 .build());
@@ -223,7 +223,7 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
         NotificationNatsPublisher publisher = new NotificationNatsPublisher(
                 realNats(publisherConnection), repository);
         Notification saved = repository.save(Notification.builder()
-                .recipientScope(RecipientScope.ALL)
+                .recipient(new BroadcastRecipient())
                 .title("Tenant ann")
                 .context(GenericContext.builder().type("ann").payload("{}").build())
                 .build());
@@ -231,42 +231,41 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
         publisher.publish(saved);
 
         assertThat(broadcastSub.nextMessage(Duration.ofSeconds(2))).isNotNull();
-        // Per-user subject must NOT receive a broadcast — clients pick it up on the broadcast subject.
+
         assertThat(userSub.nextMessage(Duration.ofMillis(300))).isNull();
     }
 
     @Test
-    @DisplayName("Given a USER-scope notification with a blank recipientUserId, when publishing, then IllegalStateException is raised — invariants enforced before any send")
-    void given_user_scope_without_recipient_user_id_when_publishing_then_throws() {
+    @DisplayName("Given a UserRecipient with a blank userId, when publishing, then IllegalStateException is raised — invariants enforced before any send")
+    void given_user_recipient_without_user_id_when_publishing_then_throws() {
         NotificationNatsPublisher publisher = new NotificationNatsPublisher(
                 realNats(publisherConnection), repository);
-        // Bypass NotificationPublishingService.validate() by going straight to the repository — we want
-        // to exercise the publisher's own scope/id consistency check.
+
         Notification badUser = repository.save(Notification.builder()
-                .recipientScope(RecipientScope.USER)
+                .recipient(new UserRecipient(null))
                 .title("missing user id")
                 .context(GenericContext.builder().type("event").payload("{}").build())
                 .build());
 
         assertThatThrownBy(() -> publisher.publish(badUser))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("recipientUserId");
+                .hasMessageContaining("userId");
     }
 
     @Test
-    @DisplayName("Given a MACHINE-scope notification with a blank recipientMachineId, when publishing, then IllegalStateException is raised")
-    void given_machine_scope_without_recipient_machine_id_when_publishing_then_throws() {
+    @DisplayName("Given a MachineRecipient with a blank machineId, when publishing, then IllegalStateException is raised")
+    void given_machine_recipient_without_machine_id_when_publishing_then_throws() {
         NotificationNatsPublisher publisher = new NotificationNatsPublisher(
                 realNats(publisherConnection), repository);
         Notification badMachine = repository.save(Notification.builder()
-                .recipientScope(RecipientScope.MACHINE)
+                .recipient(new MachineRecipient(null))
                 .title("missing machine id")
                 .context(GenericContext.builder().type("event").payload("{}").build())
                 .build());
 
         assertThatThrownBy(() -> publisher.publish(badMachine))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("recipientMachineId");
+                .hasMessageContaining("machineId");
     }
 
     @Test
@@ -277,10 +276,9 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
 
         NotificationNatsPublisher publisher = new NotificationNatsPublisher(
                 realNats(publisherConnection), repository);
-        // type=NEW_TYPE_FROM_FUTURE_PRODUCER is not registered via any
-        // NotificationContextBinding — Jackson should fall through to defaultImpl.
+
         Notification withUnregistered = Notification.builder()
-                .recipientUserId("alice")
+                .recipient(new UserRecipient("alice"))
                 .title("From the future")
                 .context(GenericContext.builder()
                         .type("NEW_TYPE_FROM_FUTURE_PRODUCER")
@@ -308,7 +306,7 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
         NotificationNatsPublisher publisher = new NotificationNatsPublisher(
                 realNats(publisherConnection), repository);
         Notification withTyped = Notification.builder()
-                .recipientUserId("alice")
+                .recipient(new UserRecipient("alice"))
                 .title("Approval requested")
                 .context(TestPublisherContext.builder()
                         .type(TestPublisherContext.TYPE)

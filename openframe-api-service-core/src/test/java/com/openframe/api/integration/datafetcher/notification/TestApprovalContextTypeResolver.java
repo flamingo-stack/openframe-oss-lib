@@ -6,7 +6,6 @@ import com.openframe.data.document.notification.NotificationContextBinding;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-/** Test-only resolver + binding so {@link TestApprovalContext} round-trips through the full stack. */
 @Component
 @Order(0)
 public class TestApprovalContextTypeResolver

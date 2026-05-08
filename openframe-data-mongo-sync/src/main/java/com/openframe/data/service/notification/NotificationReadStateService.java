@@ -11,6 +11,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
+import static org.apache.commons.lang3.StringUtils.isBlank;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -19,15 +21,11 @@ public class NotificationReadStateService {
     private final NotificationRepository notificationRepository;
     private final NotificationReadStateRepository repository;
 
-    /**
-     * Bell-badge scan window. Fully-read backlogs older than this stay dark —
-     * matches "anything new" rather than "anything ever unread".
-     */
     @Value("${openframe.notifications.unread-scan-window:1000}")
     private int unreadScanWindow;
 
     public boolean hasUnread(String recipientUserId) {
-        if (recipientUserId == null || recipientUserId.isBlank()) {
+        if (isBlank(recipientUserId)) {
             return false;
         }
         List<String> recentIds = notificationRepository.findRecentIdsForUser(recipientUserId, unreadScanWindow);

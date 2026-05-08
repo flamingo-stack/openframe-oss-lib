@@ -14,10 +14,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-/**
- * Replays notifications that failed their initial NATS publish. Capped retries +
- * ShedLock for distributed safety.
- */
 @Component
 @RequiredArgsConstructor
 @Slf4j

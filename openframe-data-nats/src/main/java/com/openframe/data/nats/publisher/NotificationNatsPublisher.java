@@ -2,8 +2,11 @@ package com.openframe.data.nats.publisher;
 
 import com.openframe.core.exception.NatsException;
 import com.openframe.data.document.clientconfiguration.PublishState;
+import com.openframe.data.document.notification.BroadcastRecipient;
+import com.openframe.data.document.notification.MachineRecipient;
 import com.openframe.data.document.notification.Notification;
-import com.openframe.data.document.notification.RecipientScope;
+import com.openframe.data.document.notification.Recipient;
+import com.openframe.data.document.notification.UserRecipient;
 import com.openframe.data.nats.model.NotificationMessage;
 import com.openframe.data.repository.notification.NotificationRepository;
 import lombok.RequiredArgsConstructor;
@@ -12,13 +15,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import static java.lang.String.format;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
-/**
- * Best-effort NATS publish — failures are swallowed because the notification is
- * already persisted and will be retried by {@code NotificationNatsPublishFallbackScheduler}.
- * The returned notification carries the resulting {@link PublishState}; inspect
- * {@code getPublishState().isPublished()} to check synchronously.
- */
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty("spring.cloud.stream.enabled")
@@ -48,10 +46,6 @@ public class NotificationNatsPublisher {
         return updatePublishState(notification, PublishState.published(notification.getPublishState()));
     }
 
-    /**
-     * Targeted {@code $set} so a concurrent writer doesn't clobber unrelated
-     * fields under last-write-wins.
-     */
     private Notification updatePublishState(Notification notification, PublishState next) {
         notificationRepository.updatePublishState(notification.getId(), next);
         notification.setPublishState(next);
@@ -61,9 +55,6 @@ public class NotificationNatsPublisher {
     private NotificationMessage buildMessage(Notification notification) {
         return NotificationMessage.builder()
                 .id(notification.getId())
-                .recipientScope(notification.getRecipientScope())
-                .recipientUserId(notification.getRecipientUserId())
-                .recipientMachineId(notification.getRecipientMachineId())
                 .severity(notification.getSeverity())
                 .title(notification.getTitle())
                 .createdAt(notification.getCreatedAt())
@@ -72,21 +63,20 @@ public class NotificationNatsPublisher {
     }
 
     private String buildTopic(Notification notification) {
-        RecipientScope scope = notification.getRecipientScope();
-        if (scope == null) {
-            scope = RecipientScope.USER;
+        Recipient recipient = notification.getRecipient();
+        if (recipient == null) {
+            throw new IllegalStateException("Notification recipient must not be null");
         }
-        return switch (scope) {
-            case USER -> format(USER_TOPIC_TEMPLATE, requireId(notification.getRecipientUserId(), "USER", "recipientUserId"));
-            case MACHINE -> format(MACHINE_TOPIC_TEMPLATE, requireId(notification.getRecipientMachineId(), "MACHINE", "recipientMachineId"));
-            case ALL -> BROADCAST_TOPIC;
+        return switch (recipient) {
+            case UserRecipient(String userId) -> format(USER_TOPIC_TEMPLATE, requireId(userId, "UserRecipient", "userId"));
+            case MachineRecipient(String machineId) -> format(MACHINE_TOPIC_TEMPLATE, requireId(machineId, "MachineRecipient", "machineId"));
+            case BroadcastRecipient ignored -> BROADCAST_TOPIC;
         };
     }
 
-    private static String requireId(String value, String scopeName, String fieldName) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalStateException(
-                    "Notification with scope=" + scopeName + " requires non-blank " + fieldName);
+    private static String requireId(String value, String typeName, String fieldName) {
+        if (isBlank(value)) {
+            throw new IllegalStateException(typeName + " requires non-blank " + fieldName);
         }
         return value;
     }

@@ -11,11 +11,6 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 
-/**
- * Per-user read state. Lives in its own collection so a write by one user
- * cannot affect another, and so the same notification document can be addressed
- * to multiple users without contention on a shared list field.
- */
 @Document(collection = "notification_read_states")
 @CompoundIndexes({
         @CompoundIndex(

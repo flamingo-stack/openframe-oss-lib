@@ -8,12 +8,6 @@ import org.springframework.data.mongodb.core.mapping.MongoPersistentEntity;
 import org.springframework.data.mongodb.core.mapping.MongoPersistentProperty;
 import org.springframework.data.util.TypeInformation;
 
-/**
- * Suppresses {@code _class} for the {@link NotificationContext} hierarchy
- * (it uses its own {@code type} field as the discriminator). Other classes
- * fall through to default behaviour, so this mapper is safe to install
- * globally.
- */
 public class NotificationContextSelectiveTypeMapper extends DefaultMongoTypeMapper {
 
     public NotificationContextSelectiveTypeMapper(

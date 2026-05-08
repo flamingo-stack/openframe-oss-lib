@@ -41,7 +41,7 @@ public class CustomNotificationReadStateRepositoryImpl implements CustomNotifica
             var result = mongoTemplate.upsert(query, update, NotificationReadState.class);
             return result.getUpsertedId() != null;
         } catch (DuplicateKeyException ex) {
-            // Concurrent inserts hitting the unique index — treat as already-read.
+
             return false;
         }
     }

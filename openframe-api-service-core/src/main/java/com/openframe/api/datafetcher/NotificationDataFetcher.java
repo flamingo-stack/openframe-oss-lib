@@ -4,7 +4,12 @@ import com.netflix.graphql.dgs.*;
 import com.openframe.api.dto.GenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.GenericQueryResult;
+import com.openframe.api.dto.notification.NotificationFilter;
+import com.openframe.api.dto.notification.NotificationFilterInput;
 import com.openframe.api.dto.notification.NotificationView;
+import com.openframe.data.document.notification.MachineRecipient;
+import com.openframe.data.document.notification.Recipient;
+import com.openframe.data.document.notification.UserRecipient;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.mapper.GraphQLNotificationMapper;
@@ -13,12 +18,17 @@ import com.openframe.core.exception.UnauthorizedException;
 import com.openframe.security.authentication.ActorType;
 import com.openframe.security.authentication.AuthPrincipal;
 import graphql.relay.Relay;
+import jakarta.annotation.Nullable;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.validation.annotation.Validated;
+
+import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @DgsComponent
 @RequiredArgsConstructor
@@ -37,52 +47,41 @@ public class NotificationDataFetcher {
         return RELAY.toGlobalId("Notification", view.getId());
     }
 
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")
     @DgsQuery
     public GenericConnection<GenericEdge<NotificationView>> notifications(
+            @InputArgument @Nullable String machineId,
+            @InputArgument NotificationFilterInput filter,
             @InputArgument Integer first,
             @InputArgument String after,
             @InputArgument Integer last,
             @InputArgument String before) {
 
-        String userId = currentUserId();
-        log.debug("Listing notifications for user {} (first={}, after={}, last={}, before={})",
-                userId, first, after, last, before);
+        Recipient recipient = resolveRecipient(machineId);
+        log.debug("Listing notifications for {} (filter={}, first={}, after={}, last={}, before={})",
+                recipient, filter, first, after, last, before);
 
         ConnectionArgs args = ConnectionArgs.builder()
                 .first(first).after(after).last(last).before(before)
                 .build();
         CursorPaginationCriteria pagination = notificationMapper.toCursorPaginationCriteria(args);
+        NotificationFilter serviceFilter = filter == null
+                ? null
+                : new NotificationFilter(filter.getRead());
 
-        GenericQueryResult<NotificationView> result = notificationService.listForRecipient(userId, pagination);
+        GenericQueryResult<NotificationView> result = notificationService.list(
+                recipient, serviceFilter, pagination);
         return notificationMapper.toConnection(result);
     }
 
+    @PreAuthorize("hasAuthority('ADMIN')")
     @DgsQuery
     public boolean hasUnreadNotifications() {
         String userId = currentUserId();
         return notificationService.hasUnread(userId);
     }
 
-    @DgsQuery
-    public GenericConnection<GenericEdge<NotificationView>> machineNotifications(
-            @InputArgument Integer first,
-            @InputArgument String after,
-            @InputArgument Integer last,
-            @InputArgument String before) {
-
-        String machineId = currentMachineId();
-        log.debug("Listing notifications for machine {} (first={}, after={}, last={}, before={})",
-                machineId, first, after, last, before);
-
-        ConnectionArgs args = ConnectionArgs.builder()
-                .first(first).after(after).last(last).before(before)
-                .build();
-        CursorPaginationCriteria pagination = notificationMapper.toCursorPaginationCriteria(args);
-
-        GenericQueryResult<NotificationView> result = notificationService.listForMachine(machineId, pagination);
-        return notificationMapper.toConnection(result);
-    }
-
+    @PreAuthorize("hasAuthority('ADMIN')")
     @DgsMutation
     public boolean markNotificationAsRead(@InputArgument String notificationId) {
         String userId = currentUserId();
@@ -91,9 +90,26 @@ public class NotificationDataFetcher {
         return notificationService.markRead(userId, rawId);
     }
 
-    /** Strict — silently resolving a malformed id to {@code false} hides client bugs. */
+    private Recipient resolveRecipient(@Nullable String machineIdArg) {
+        AuthPrincipal principal = currentPrincipal();
+        if (principal.getActorType() == ActorType.AGENT) {
+            String agentMachineId = principal.getMachineId();
+            if (isBlank(agentMachineId)) {
+                throw new UnauthorizedException("AGENT principal missing machine_id claim");
+            }
+            if (isNotBlank(machineIdArg) && !machineIdArg.equals(agentMachineId)) {
+                throw new UnauthorizedException("AGENT cannot read another machine's notifications");
+            }
+            return new MachineRecipient(agentMachineId);
+        }
+        if (isNotBlank(machineIdArg)) {
+            return new MachineRecipient(machineIdArg);
+        }
+        return new UserRecipient(requireUserId(principal));
+    }
+
     private String decodeNotificationId(String input) {
-        if (input == null || input.isBlank()) {
+        if (isBlank(input)) {
             throw new IllegalArgumentException("notificationId must not be blank");
         }
         Relay.ResolvedGlobalId resolved;
@@ -110,25 +126,15 @@ public class NotificationDataFetcher {
     }
 
     private String currentUserId() {
-        AuthPrincipal principal = currentPrincipal();
+        return requireUserId(currentPrincipal());
+    }
+
+    private static String requireUserId(AuthPrincipal principal) {
         String id = principal.getId();
-        if (id == null || id.isBlank()) {
+        if (isBlank(id)) {
             throw new UnauthorizedException("Authenticated user is required to access notifications");
         }
         return id;
-    }
-
-    /** AGENT principals only — admin tokens can't reach a machine's backlog. */
-    private String currentMachineId() {
-        AuthPrincipal principal = currentPrincipal();
-        if (principal.getActorType() != ActorType.AGENT) {
-            throw new UnauthorizedException("AGENT principal is required to access machine notifications");
-        }
-        String machineId = principal.getMachineId();
-        if (machineId == null || machineId.isBlank()) {
-            throw new UnauthorizedException("AGENT principal missing machine_id claim");
-        }
-        return machineId;
     }
 
     private AuthPrincipal currentPrincipal() {

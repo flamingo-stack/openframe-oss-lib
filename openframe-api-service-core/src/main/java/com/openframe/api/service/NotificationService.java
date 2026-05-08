@@ -1,11 +1,16 @@
 package com.openframe.api.service;
 
 import com.openframe.api.dto.GenericQueryResult;
+import com.openframe.api.dto.notification.NotificationFilter;
 import com.openframe.api.dto.notification.NotificationView;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
+import com.openframe.data.document.notification.BroadcastRecipient;
+import com.openframe.data.document.notification.MachineRecipient;
 import com.openframe.data.document.notification.Notification;
+import com.openframe.data.document.notification.Recipient;
+import com.openframe.data.document.notification.UserRecipient;
 import com.openframe.data.nats.service.NotificationPublishingService;
 import com.openframe.data.repository.notification.NotificationRepository;
 import com.openframe.data.service.notification.NotificationReadStateService;
@@ -25,43 +30,19 @@ public class NotificationService {
     private final NotificationPublishingService notificationPublishingService;
     private final NotificationReadStateService readStateService;
 
-    public GenericQueryResult<NotificationView> listForRecipient(String recipientUserId,
-                                                                 CursorPaginationCriteria pagination) {
-        CursorPaginationCriteria normalized = pagination.normalize();
-        int limit = normalized.getLimit();
-
-        List<Notification> page = notificationRepository.findPageForUser(
-                recipientUserId,
-                normalized.getCursor(),
-                normalized.isBackward(),
-                limit + 1);
-
-        boolean hasMore = page.size() > limit;
-        List<Notification> items = hasMore ? page.subList(0, limit) : page;
-
-        if (normalized.isBackward()) {
-            items = items.reversed();
-        }
-
-        List<NotificationView> views = withReadFlags(recipientUserId, items);
-
-        return GenericQueryResult.<NotificationView>builder()
-                .items(views)
-                .pageInfo(buildPageInfo(views, hasMore, normalized))
-                .build();
+    public GenericQueryResult<NotificationView> list(Recipient recipient,
+                                                     CursorPaginationCriteria pagination) {
+        return list(recipient, null, pagination);
     }
 
-    /** Machines don't track per-row read state — every view comes back with {@code read=false}. */
-    public GenericQueryResult<NotificationView> listForMachine(String machineId,
-                                                               CursorPaginationCriteria pagination) {
+    public GenericQueryResult<NotificationView> list(Recipient recipient,
+                                                     NotificationFilter filter,
+                                                     CursorPaginationCriteria pagination) {
+        rejectFilterForNonUser(recipient, filter);
         CursorPaginationCriteria normalized = pagination.normalize();
         int limit = normalized.getLimit();
 
-        List<Notification> page = notificationRepository.findPageForMachine(
-                machineId,
-                normalized.getCursor(),
-                normalized.isBackward(),
-                limit + 1);
+        List<Notification> page = fetchPage(recipient, filter, normalized, limit + 1);
 
         boolean hasMore = page.size() > limit;
         List<Notification> items = hasMore ? page.subList(0, limit) : page;
@@ -70,9 +51,7 @@ public class NotificationService {
             items = items.reversed();
         }
 
-        List<NotificationView> views = items.stream()
-                .map(n -> new NotificationView(n, false))
-                .toList();
+        List<NotificationView> views = withReadFlags(recipient, filter, items);
 
         return GenericQueryResult.<NotificationView>builder()
                 .items(views)
@@ -92,9 +71,47 @@ public class NotificationService {
         return notificationPublishingService.create(notification);
     }
 
-    private List<NotificationView> withReadFlags(String userId, List<Notification> items) {
+    private static void rejectFilterForNonUser(Recipient recipient, NotificationFilter filter) {
+        if (filter == null || !filter.hasReadFilter()) {
+            return;
+        }
+        if (!(recipient instanceof UserRecipient)) {
+            throw new IllegalArgumentException("read filter is only supported for UserRecipient");
+        }
+    }
+
+    private List<Notification> fetchPage(Recipient recipient, NotificationFilter filter, CursorPaginationCriteria criteria, int limit) {
+        return switch (recipient) {
+            case UserRecipient(String userId) -> notificationRepository.findPageForUser(
+                    userId, filter == null ? null : filter.read(),
+                    criteria.getCursor(), criteria.isBackward(), limit);
+            case MachineRecipient(String machineId) -> notificationRepository.findPageForMachine(
+                    machineId, criteria.getCursor(), criteria.isBackward(), limit);
+            case BroadcastRecipient ignored ->
+                    throw new IllegalArgumentException("BroadcastRecipient is not a queryable inbox owner");
+        };
+    }
+
+    private List<NotificationView> withReadFlags(Recipient recipient, NotificationFilter filter, List<Notification> items) {
+        return switch (recipient) {
+            case UserRecipient(String userId) -> applyUserReadFlags(userId, filter, items);
+            case MachineRecipient ignored -> items.stream()
+                    .map(n -> new NotificationView(n, false))
+                    .toList();
+            case BroadcastRecipient ignored ->
+                    throw new IllegalArgumentException("BroadcastRecipient is not a queryable inbox owner");
+        };
+    }
+
+    private List<NotificationView> applyUserReadFlags(String userId, NotificationFilter filter, List<Notification> items) {
         if (items.isEmpty()) {
             return List.of();
+        }
+        if (filter != null && filter.hasReadFilter()) {
+            boolean read = filter.read();
+            return items.stream()
+                    .map(n -> new NotificationView(n, read))
+                    .toList();
         }
         List<String> ids = items.stream().map(Notification::getId).toList();
         Set<String> readIds = readStateService.findReadIds(userId, ids);

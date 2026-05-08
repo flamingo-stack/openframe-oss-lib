@@ -1,9 +1,11 @@
 package com.openframe.data.integration.performance;
 
 import com.mongodb.client.MongoCollection;
+import com.openframe.data.document.notification.BroadcastRecipient;
+import com.openframe.data.document.notification.MachineRecipient;
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationReadState;
-import com.openframe.data.document.notification.RecipientScope;
+import com.openframe.data.document.notification.UserRecipient;
 import com.openframe.data.integration.BaseMongoIntegrationTest;
 import com.openframe.data.integration.support.IntegrationTestApplication;
 import com.openframe.data.integration.support.MongoExplain;
@@ -36,17 +38,6 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Verifies the notification queries each hit the indexes we built for them and
- * don't degrade to a full collection scan on realistic-sized data.
- *
- * <p>Run manually:
- * {@code mvn test -Dperformance.tests=true -pl openframe-data-mongo-sync \
- *        -Dtest=NotificationIndexUsageIT}.
- *
- * <p>Volumes are tunable through {@code -Dperf.notifications.count}, etc., so a
- * fast smoke pass and a heavy stress run share the same code.
- */
 @SpringBootTest(classes = IntegrationTestApplication.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Tag("performance")
@@ -71,7 +62,10 @@ class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
     private static final String IDX_RECIPIENT_MACHINE = "recipient_machine_id";
     private static final String IDX_USER_NOTIF        = "user_notification_unique";
 
-    /** Generous budgets — guard against catastrophic regressions, not micro-perf changes. CI nodes vary. */
+    private static final String BROADCAST_CLASS = BroadcastRecipient.class.getName();
+    private static final String USER_CLASS = UserRecipient.class.getName();
+    private static final String MACHINE_CLASS = MachineRecipient.class.getName();
+
     private static final long FIND_BUDGET_MS  = 200;
     private static final long WRITE_BUDGET_MS = 100;
 
@@ -79,15 +73,13 @@ class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
     @Autowired private NotificationReadStateRepository readStateRepository;
     @Autowired private MongoTemplate mongoTemplate;
 
-    /** Notification ids belonging to the hot user — handed to findReadIds in the IN-list test. */
     private final List<String> hotUserNotifIds = new ArrayList<>();
 
     @BeforeAll
     void seedDataset() {
         mongoTemplate.dropCollection(Notification.class);
         mongoTemplate.dropCollection(NotificationReadState.class);
-        // Bulk inserts go through the raw driver, so Spring's auto-indexer never runs —
-        // resolve and ensure the @CompoundIndexes manually before measuring.
+
         ensureIndexes(Notification.class);
         ensureIndexes(NotificationReadState.class);
 
@@ -103,35 +95,31 @@ class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    @DisplayName("findPageForUser hits recipient_user_id (or recipient_scope_id) and only examines about page-size keys")
+    @DisplayName("findPageForUser hits recipient_user_id and only examines about page-size keys")
     void list_for_user_uses_recipient_user_index() {
         int limit = 25;
 
-        // Sanity: the real call returns rows for the hot user (or broadcasts, which carry no recipientUserId).
         List<Notification> page = notificationRepository.findPageForUser(HOT_USER, null, false, limit);
         assertThat(page).hasSize(limit);
-        assertThat(page).allSatisfy(n ->
-                assertThat(n.getRecipientUserId()).isIn(null, HOT_USER));
+        assertThat(page).allSatisfy(n -> assertThat(matchesUserOrBroadcast(n, HOT_USER)).isTrue());
 
         Stats stats = MongoExplain.explainFind(mongoTemplate, NOTIFS_COLL, listForUserQuery(HOT_USER, limit));
 
         stats.assertNoCollectionScan()
                 .assertUsesIndex(IDX_RECIPIENT_USER)
                 .assertExecutionTimeBelow(FIND_BUDGET_MS);
-        // $or fans out into two index branches; cap the total keys touched well below
-        // the dataset to catch a regression that turns this into a near-collection scan.
+
         stats.assertExaminedAtMost(limit * 4L);
     }
 
     @Test
-    @DisplayName("findPageForMachine hits recipient_machine_id (or recipient_scope_id) and only examines about page-size keys")
+    @DisplayName("findPageForMachine hits recipient_machine_id and only examines about page-size keys")
     void list_for_machine_uses_recipient_machine_index() {
         int limit = 25;
 
         List<Notification> page = notificationRepository.findPageForMachine(HOT_MACHINE, null, false, limit);
         assertThat(page).hasSize(limit);
-        assertThat(page).allSatisfy(n ->
-                assertThat(n.getRecipientMachineId()).isIn(null, HOT_MACHINE));
+        assertThat(page).allSatisfy(n -> assertThat(matchesMachineOrBroadcast(n, HOT_MACHINE)).isTrue());
 
         Stats stats = MongoExplain.explainFind(mongoTemplate, NOTIFS_COLL, listForMachineQuery(HOT_MACHINE, limit));
 
@@ -165,9 +153,6 @@ class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
         boolean inserted = readStateRepository.markRead(HOT_USER, freshNotifId);
         assertThat(inserted).isTrue();
 
-        // Explain the same upsert shape against an arbitrary not-yet-inserted pair so
-        // the planner picks the read-side path (rather than reporting an IDHACK after
-        // the row already exists).
         String explainNotifId = "perf-explain-" + UUID.randomUUID();
         Query query = Query.query(
                 Criteria.where("userId").is(HOT_USER)
@@ -193,7 +178,6 @@ class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
             probe.add("missing-" + UUID.randomUUID());
         }
 
-        // Sanity: real call returns at most the matching subset.
         var hits = readStateRepository.findReadIds(HOT_USER, probe);
         assertThat(hits).isSubsetOf(probe);
 
@@ -207,7 +191,7 @@ class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
         stats.assertNoCollectionScan()
                 .assertUsesIndex(IDX_USER_NOTIF)
                 .assertExecutionTimeBelow(FIND_BUDGET_MS);
-        // Each IN-list element costs at most one index seek; small slack for the planner.
+
         stats.assertExaminedAtMost(probe.size() * 2L);
     }
 
@@ -223,18 +207,25 @@ class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
 
         stats.assertNoCollectionScan()
                 .assertExecutionTimeBelow(FIND_BUDGET_MS);
-        // The published majority should be index-skipped — keys touched should be on the
-        // order of the unpublished slice, not the whole collection.
+
         long ceiling = Math.max(RETRY_CANDIDATES * 4L, batch * 4L);
         stats.assertExaminedAtMost(ceiling);
     }
 
-    /* ───── Query builders mirroring the production repositories ───── */
+    private static boolean matchesUserOrBroadcast(Notification n, String userId) {
+        return n.getRecipient() instanceof UserRecipient u && userId.equals(u.userId())
+                || n.getRecipient() instanceof BroadcastRecipient;
+    }
+
+    private static boolean matchesMachineOrBroadcast(Notification n, String machineId) {
+        return n.getRecipient() instanceof MachineRecipient m && machineId.equals(m.machineId())
+                || n.getRecipient() instanceof BroadcastRecipient;
+    }
 
     private static Query listForUserQuery(String userId, int limit) {
         Query q = new Query(new Criteria().orOperator(
-                Criteria.where("recipientUserId").is(userId),
-                Criteria.where("recipientScope").is(RecipientScope.ALL)));
+                Criteria.where("recipient.userId").is(userId),
+                Criteria.where("recipient._class").is(BROADCAST_CLASS)));
         q.with(Sort.by(Sort.Direction.DESC, "_id"));
         q.limit(limit);
         return q;
@@ -242,8 +233,8 @@ class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
 
     private static Query listForMachineQuery(String machineId, int limit) {
         Query q = new Query(new Criteria().orOperator(
-                Criteria.where("recipientMachineId").is(machineId),
-                Criteria.where("recipientScope").is(RecipientScope.ALL)));
+                Criteria.where("recipient.machineId").is(machineId),
+                Criteria.where("recipient._class").is(BROADCAST_CLASS)));
         q.with(Sort.by(Sort.Direction.DESC, "_id"));
         q.limit(limit);
         return q;
@@ -263,8 +254,6 @@ class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
         return q;
     }
 
-    /* ───── Dataset seeding (raw documents to bypass the converter) ───── */
-
     private void seedNotifications() {
         long retrySliceStart = NOTIF_TOTAL - RETRY_CANDIDATES;
         BatchInserter inserter = new BatchInserter(mongoTemplate.getCollection(NOTIFS_COLL));
@@ -274,7 +263,7 @@ class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
             boolean unpublished = i >= retrySliceStart;
             Document doc = notificationDocument(target, "perf-evt-" + i, unpublished);
 
-            if (HOT_USER.equals(target.userId())) {
+            if (target.userId() != null && HOT_USER.equals(target.userId())) {
                 hotUserNotifIds.add(doc.getObjectId("_id").toHexString());
             }
             inserter.add(doc);
@@ -296,11 +285,10 @@ class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
         inserter.flush();
     }
 
-    /** Slice of the dataset a row belongs to — drives userId / machineId / scope wiring. */
-    private record Target(String scope, String userId, String machineId) {
-        static Target hotUser()           { return new Target(RecipientScope.USER.name(), HOT_USER, null); }
-        static Target hotMachine()        { return new Target(RecipientScope.MACHINE.name(), null, HOT_MACHINE); }
-        static Target noise(int index)    { return new Target(RecipientScope.USER.name(), "user-noise-" + (index % 100), null); }
+    private record Target(String userId, String machineId) {
+        static Target hotUser()        { return new Target(HOT_USER, null); }
+        static Target hotMachine()     { return new Target(null, HOT_MACHINE); }
+        static Target noise(int index) { return new Target("user-noise-" + (index % 100), null); }
     }
 
     private static Target targetFor(int index) {
@@ -316,17 +304,15 @@ class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
     private static Document notificationDocument(Target target, String title, boolean unpublished) {
         Document doc = new Document()
                 .append("_id", new ObjectId())
-                .append("recipientScope", target.scope())
                 .append("severity", "INFO")
                 .append("title", title)
                 .append("createdAt", new Date())
                 .append("context", new Document("type", "welcome").append("payload", "{}"))
                 .append("publishState", publishStateDocument(unpublished));
         if (target.userId() != null) {
-            doc.append("recipientUserId", target.userId());
-        }
-        if (target.machineId() != null) {
-            doc.append("recipientMachineId", target.machineId());
+            doc.append("recipient", new Document("_class", USER_CLASS).append("userId", target.userId()));
+        } else if (target.machineId() != null) {
+            doc.append("recipient", new Document("_class", MACHINE_CLASS).append("machineId", target.machineId()));
         }
         return doc;
     }
@@ -358,7 +344,6 @@ class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
         return out;
     }
 
-    /** Buffers documents and flushes every {@link #BATCH_FLUSH_SIZE} rows. */
     private static final class BatchInserter {
 
         private final MongoCollection<Document> collection;

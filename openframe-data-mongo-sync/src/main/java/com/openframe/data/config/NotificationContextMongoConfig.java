@@ -11,15 +11,6 @@ import org.springframework.data.mongodb.core.convert.MongoCustomConversions;
 
 import java.util.List;
 
-/**
- * Wires the notification-context polymorphism into Spring Data Mongo: a read
- * converter for the embedded {@code context} field, and a selective type mapper
- * that suppresses {@code _class} for the hierarchy.
- *
- * <p>The type mapper is installed via {@link BeanPostProcessor} on purpose —
- * overriding the {@code MappingMongoConverter} bean would clobber other
- * module-level configuration (e.g. {@code MongoSyncConfig}).
- */
 @Configuration
 @Import(NotificationContextJacksonConfig.class)
 public class NotificationContextMongoConfig {

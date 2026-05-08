@@ -1,6 +1,7 @@
 package com.openframe.api.integration.service;
 
 import com.openframe.api.dto.GenericQueryResult;
+import com.openframe.api.dto.notification.NotificationFilter;
 import com.openframe.api.dto.notification.NotificationView;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
@@ -89,7 +90,7 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         @DisplayName("Given an explicit non-default severity, when creating, then the severity round-trips through persistence")
         void given_explicit_severity_when_creating_then_severity_round_trips() {
             Notification withDanger = Notification.builder()
-                    .recipientUserId(ALICE)
+                    .recipient(new UserRecipient(ALICE))
                     .severity(NotificationSeverity.DANGER)
                     .title("Datastore is down")
                     .context(GenericContext.builder().type("incident").payload("{}").build())
@@ -106,7 +107,7 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         @DisplayName("Given a notification with a blank title, when creating, then validation rejects it before any write")
         void given_blank_title_when_creating_then_validation_rejects() {
             Notification noTitle = Notification.builder()
-                    .recipientUserId(ALICE)
+                    .recipient(new UserRecipient(ALICE))
                     .title("   ")
                     .context(GenericContext.builder().type("welcome").payload("{}").build())
                     .build();
@@ -121,7 +122,7 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         @DisplayName("Given a notification with severity explicitly nulled, when creating, then validation rejects it")
         void given_null_severity_when_creating_then_validation_rejects() {
             Notification withNullSeverity = Notification.builder()
-                    .recipientUserId(ALICE)
+                    .recipient(new UserRecipient(ALICE))
                     .severity(null)
                     .title("Hi")
                     .context(GenericContext.builder().type("welcome").payload("{}").build())
@@ -137,7 +138,7 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         @DisplayName("Given a notification without context, when creating, then validation rejects it")
         void given_null_context_when_creating_then_validation_rejects() {
             Notification noContext = Notification.builder()
-                    .recipientUserId(ALICE)
+                    .recipient(new UserRecipient(ALICE))
                     .title("Hi")
                     .build();
 
@@ -151,7 +152,7 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         @DisplayName("Given a context with a blank type discriminator, when creating, then validation rejects it")
         void given_blank_context_type_when_creating_then_validation_rejects() {
             Notification blankType = Notification.builder()
-                    .recipientUserId(ALICE)
+                    .recipient(new UserRecipient(ALICE))
                     .title("Hi")
                     .context(GenericContext.builder().type("   ").build())
                     .build();
@@ -180,16 +181,16 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
     }
 
     @Nested
-    @DisplayName("listForRecipient")
-    class ListForRecipient {
+    @DisplayName("list(UserRecipient)")
+    class ListForUser {
 
         @Test
         @DisplayName("Given fewer rows than the requested limit, when listing, then all rows come back and pageInfo reports no further pages")
         void given_fewer_rows_than_limit_when_listing_then_all_rows_returned_and_no_further_pages() {
             seedSequential(ALICE, 3);
 
-            GenericQueryResult<NotificationView> result = service.listForRecipient(
-                    ALICE, CursorPaginationCriteria.builder().limit(10).build());
+            GenericQueryResult<NotificationView> result = service.list(
+                    new UserRecipient(ALICE), CursorPaginationCriteria.builder().limit(10).build());
 
             assertThat(result.getItems()).hasSize(3);
             assertThat(result.getPageInfo().isHasNextPage()).isFalse();
@@ -201,8 +202,8 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         void given_more_rows_than_limit_when_listing_forward_then_has_next_page_is_true() {
             seedSequential(ALICE, 25);
 
-            GenericQueryResult<NotificationView> result = service.listForRecipient(
-                    ALICE, CursorPaginationCriteria.builder().limit(10).build());
+            GenericQueryResult<NotificationView> result = service.list(
+                    new UserRecipient(ALICE), CursorPaginationCriteria.builder().limit(10).build());
 
             assertThat(result.getItems()).hasSize(10);
             assertThat(result.getPageInfo().isHasNextPage()).isTrue();
@@ -213,12 +214,12 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         void given_end_cursor_of_first_page_when_fetching_next_page_then_returns_next_slice() {
             List<Notification> seeded = seedSequential(ALICE, 25);
 
-            GenericQueryResult<NotificationView> first = service.listForRecipient(
-                    ALICE, CursorPaginationCriteria.builder().limit(10).build());
+            GenericQueryResult<NotificationView> first = service.list(
+                    new UserRecipient(ALICE), CursorPaginationCriteria.builder().limit(10).build());
             String rawCursor = CursorCodec.decode(first.getPageInfo().getEndCursor());
 
-            GenericQueryResult<NotificationView> second = service.listForRecipient(
-                    ALICE, CursorPaginationCriteria.builder().limit(10).cursor(rawCursor).backward(false).build());
+            GenericQueryResult<NotificationView> second = service.list(
+                    new UserRecipient(ALICE), CursorPaginationCriteria.builder().limit(10).cursor(rawCursor).backward(false).build());
 
             assertThat(second.getItems()).hasSize(10);
             assertThat(second.getItems().get(0).getId()).isEqualTo(seeded.get(14).getId());
@@ -229,8 +230,8 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         void given_limit_above_max_when_listing_then_limit_is_normalised() {
             seedSequential(ALICE, 5);
 
-            GenericQueryResult<NotificationView> result = service.listForRecipient(
-                    ALICE, CursorPaginationCriteria.builder().limit(999).build());
+            GenericQueryResult<NotificationView> result = service.list(
+                    new UserRecipient(ALICE), CursorPaginationCriteria.builder().limit(999).build());
 
             assertThat(result.getItems()).hasSize(5);
         }
@@ -240,8 +241,8 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         void given_null_limit_when_listing_then_default_page_size_applied() {
             seedSequential(ALICE, 25);
 
-            GenericQueryResult<NotificationView> result = service.listForRecipient(
-                    ALICE, CursorPaginationCriteria.builder().limit(null).build());
+            GenericQueryResult<NotificationView> result = service.list(
+                    new UserRecipient(ALICE), CursorPaginationCriteria.builder().limit(null).build());
 
             assertThat(result.getItems()).hasSize(CursorPaginationCriteria.DEFAULT_PAGE_SIZE);
         }
@@ -252,8 +253,8 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
             List<Notification> seeded = seedSequential(ALICE, 5);
             String beforeCursor = seeded.get(0).getId();
 
-            GenericQueryResult<NotificationView> result = service.listForRecipient(
-                    ALICE, CursorPaginationCriteria.builder().limit(10).cursor(beforeCursor).backward(true).build());
+            GenericQueryResult<NotificationView> result = service.list(
+                    new UserRecipient(ALICE), CursorPaginationCriteria.builder().limit(10).cursor(beforeCursor).backward(true).build());
 
             assertThat(result.getItems()).extracting(NotificationView::getId)
                     .containsExactly(
@@ -269,19 +270,19 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
             seedSequential(ALICE, 3);
             seedSequential(BOB, 3);
 
-            GenericQueryResult<NotificationView> result = service.listForRecipient(
-                    ALICE, CursorPaginationCriteria.builder().limit(10).build());
+            GenericQueryResult<NotificationView> result = service.list(
+                    new UserRecipient(ALICE), CursorPaginationCriteria.builder().limit(10).build());
 
             assertThat(result.getItems())
-                    .allSatisfy(n -> assertThat(n.getRecipientUserId()).isEqualTo(ALICE));
+                    .allSatisfy(n -> assertThat(n.getRecipient()).isEqualTo(new UserRecipient(ALICE)));
             assertThat(result.getItems()).hasSize(3);
         }
 
         @Test
         @DisplayName("Given a recipient with no notifications, when listing, then items are empty and pageInfo cursors are null")
         void given_no_notifications_for_recipient_when_listing_then_items_empty_and_cursors_null() {
-            GenericQueryResult<NotificationView> result = service.listForRecipient(
-                    "ghost", CursorPaginationCriteria.builder().limit(10).build());
+            GenericQueryResult<NotificationView> result = service.list(
+                    new UserRecipient("ghost"), CursorPaginationCriteria.builder().limit(10).build());
 
             assertThat(result.getItems()).isEmpty();
             assertThat(result.getPageInfo().getStartCursor()).isNull();
@@ -295,8 +296,8 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
             readStateService.markRead(ALICE, seeded.get(0).getId());
             readStateService.markRead(ALICE, seeded.get(2).getId());
 
-            GenericQueryResult<NotificationView> result = service.listForRecipient(
-                    ALICE, CursorPaginationCriteria.builder().limit(10).build());
+            GenericQueryResult<NotificationView> result = service.list(
+                    new UserRecipient(ALICE), CursorPaginationCriteria.builder().limit(10).build());
 
             assertThat(result.getItems())
                     .extracting(NotificationView::getId, NotificationView::isRead)
@@ -310,11 +311,11 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         @DisplayName("Given Bob marks one of Alice's notifications read for himself, when Alice lists her inbox, then her rows still show read=false")
         void given_other_user_marks_for_themselves_when_listing_for_caller_then_no_read_state_leakage() {
             List<Notification> seeded = seedSequential(ALICE, 2);
-            // Bob marks one of Alice's notifications as read for HIM — must not bleed.
+
             readStateService.markRead(BOB, seeded.get(0).getId());
 
-            GenericQueryResult<NotificationView> result = service.listForRecipient(
-                    ALICE, CursorPaginationCriteria.builder().limit(10).build());
+            GenericQueryResult<NotificationView> result = service.list(
+                    new UserRecipient(ALICE), CursorPaginationCriteria.builder().limit(10).build());
 
             assertThat(result.getItems())
                     .allSatisfy(n -> assertThat(n.isRead()).isFalse());
@@ -322,7 +323,135 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
     }
 
     @Nested
-    @DisplayName("listForMachine")
+    @DisplayName("list(UserRecipient) with read filter")
+    class ListForUserWithReadFilter {
+
+        @Test
+        @DisplayName("Given a mix of read and unread notifications, when filtering by read=true, then only read rows come back and the read flag is true")
+        void given_mixed_read_state_when_filtering_read_true_then_only_read_rows_returned() {
+            List<Notification> seeded = seedSequential(ALICE, 4);
+            readStateService.markRead(ALICE, seeded.get(1).getId());
+            readStateService.markRead(ALICE, seeded.get(3).getId());
+
+            GenericQueryResult<NotificationView> result = service.list(
+                    new UserRecipient(ALICE),
+                    new NotificationFilter(true),
+                    CursorPaginationCriteria.builder().limit(10).build());
+
+            assertThat(result.getItems())
+                    .extracting(NotificationView::getId)
+                    .containsExactlyInAnyOrder(seeded.get(1).getId(), seeded.get(3).getId());
+            assertThat(result.getItems())
+                    .allSatisfy(n -> assertThat(n.isRead()).isTrue());
+        }
+
+        @Test
+        @DisplayName("Given a mix of read and unread notifications, when filtering by read=false, then only unread rows come back and the read flag is false")
+        void given_mixed_read_state_when_filtering_read_false_then_only_unread_rows_returned() {
+            List<Notification> seeded = seedSequential(ALICE, 4);
+            readStateService.markRead(ALICE, seeded.get(1).getId());
+            readStateService.markRead(ALICE, seeded.get(3).getId());
+
+            GenericQueryResult<NotificationView> result = service.list(
+                    new UserRecipient(ALICE),
+                    new NotificationFilter(false),
+                    CursorPaginationCriteria.builder().limit(10).build());
+
+            assertThat(result.getItems())
+                    .extracting(NotificationView::getId)
+                    .containsExactlyInAnyOrder(seeded.get(0).getId(), seeded.get(2).getId());
+            assertThat(result.getItems())
+                    .allSatisfy(n -> assertThat(n.isRead()).isFalse());
+        }
+
+        @Test
+        @DisplayName("Given Bob marks one of Alice's notifications read for himself, when Alice filters by read=false, then Alice still sees that notification — read state is per-user")
+        void given_other_user_marks_for_themselves_when_filtering_unread_for_caller_then_no_leakage() {
+            List<Notification> seeded = seedSequential(ALICE, 2);
+            readStateService.markRead(BOB, seeded.get(0).getId());
+
+            GenericQueryResult<NotificationView> result = service.list(
+                    new UserRecipient(ALICE),
+                    new NotificationFilter(false),
+                    CursorPaginationCriteria.builder().limit(10).build());
+
+            assertThat(result.getItems())
+                    .extracting(NotificationView::getId)
+                    .containsExactlyInAnyOrder(seeded.get(0).getId(), seeded.get(1).getId());
+        }
+
+        @Test
+        @DisplayName("Given a tenant-wide broadcast and direct rows, when filtering by read=false, then the broadcast is included alongside unread direct rows")
+        void given_broadcast_and_direct_rows_when_filtering_unread_then_broadcast_is_included() {
+            List<Notification> seeded = seedSequential(ALICE, 2);
+            Notification broadcast = repository.save(Notification.builder()
+                    .recipient(new BroadcastRecipient())
+                    .title("ann")
+                    .context(GenericContext.builder().type("ann").payload("{}").build())
+                    .build());
+            readStateService.markRead(ALICE, seeded.get(0).getId());
+
+            GenericQueryResult<NotificationView> result = service.list(
+                    new UserRecipient(ALICE),
+                    new NotificationFilter(false),
+                    CursorPaginationCriteria.builder().limit(10).build());
+
+            assertThat(result.getItems())
+                    .extracting(NotificationView::getId)
+                    .containsExactlyInAnyOrder(seeded.get(1).getId(), broadcast.getId());
+        }
+
+        @Test
+        @DisplayName("Given more unread rows than the limit, when filtering by read=false, then pageInfo.hasNextPage is true")
+        void given_more_unread_than_limit_when_filtering_unread_then_has_next_page_is_true() {
+            seedSequential(ALICE, 25);
+
+            GenericQueryResult<NotificationView> result = service.list(
+                    new UserRecipient(ALICE),
+                    new NotificationFilter(false),
+                    CursorPaginationCriteria.builder().limit(10).build());
+
+            assertThat(result.getItems()).hasSize(10);
+            assertThat(result.getPageInfo().isHasNextPage()).isTrue();
+        }
+
+        @Test
+        @DisplayName("Given the endCursor of an unread page, when fetching the next page with the same filter, then disjoint unread rows come back")
+        void given_unread_page_cursor_when_fetching_next_page_then_disjoint_rows_returned() {
+            List<Notification> seeded = seedSequential(ALICE, 25);
+
+            GenericQueryResult<NotificationView> first = service.list(
+                    new UserRecipient(ALICE),
+                    new NotificationFilter(false),
+                    CursorPaginationCriteria.builder().limit(10).build());
+            String rawCursor = CursorCodec.decode(first.getPageInfo().getEndCursor());
+
+            GenericQueryResult<NotificationView> second = service.list(
+                    new UserRecipient(ALICE),
+                    new NotificationFilter(false),
+                    CursorPaginationCriteria.builder().limit(10).cursor(rawCursor).backward(false).build());
+
+            assertThat(second.getItems()).hasSize(10);
+            assertThat(second.getItems().get(0).getId()).isEqualTo(seeded.get(14).getId());
+            assertThat(first.getItems()).extracting(NotificationView::getId)
+                    .doesNotContainAnyElementsOf(
+                            second.getItems().stream().map(NotificationView::getId).toList());
+        }
+
+        @Test
+        @DisplayName("Given a MachineRecipient and a non-null read filter, when listing, then service rejects with IllegalArgumentException — read filter is user-only")
+        void given_machine_recipient_and_read_filter_when_listing_then_rejected() {
+            assertThatThrownBy(() -> service.list(
+                    new MachineRecipient("m-1"),
+                    new NotificationFilter(true),
+                    CursorPaginationCriteria.builder().limit(10).build()))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("UserRecipient");
+        }
+    }
+
+    @Nested
+    @DisplayName("list(MachineRecipient)")
     class ListForMachine {
 
         private static final String MACHINE_ID = "machine-007";
@@ -332,13 +461,13 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         void given_machine_rows_and_broadcast_when_listing_for_machine_then_both_returned() {
             seedMachineSequential(MACHINE_ID, 3);
             Notification broadcast = repository.save(Notification.builder()
-                    .recipientScope(RecipientScope.ALL)
+                    .recipient(new BroadcastRecipient())
                     .title("Tenant ann")
                     .context(GenericContext.builder().type("ann").payload("{}").build())
                     .build());
 
-            GenericQueryResult<NotificationView> result = service.listForMachine(
-                    MACHINE_ID, CursorPaginationCriteria.builder().limit(10).build());
+            GenericQueryResult<NotificationView> result = service.list(
+                    new MachineRecipient(MACHINE_ID), CursorPaginationCriteria.builder().limit(10).build());
 
             assertThat(result.getItems()).extracting(NotificationView::getId)
                     .contains(broadcast.getId())
@@ -351,12 +480,12 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
             seedMachineSequential(MACHINE_ID, 2);
             seedMachineSequential("other-machine", 3);
 
-            GenericQueryResult<NotificationView> result = service.listForMachine(
-                    MACHINE_ID, CursorPaginationCriteria.builder().limit(10).build());
+            GenericQueryResult<NotificationView> result = service.list(
+                    new MachineRecipient(MACHINE_ID), CursorPaginationCriteria.builder().limit(10).build());
 
             assertThat(result.getItems()).hasSize(2);
             assertThat(result.getItems())
-                    .allSatisfy(n -> assertThat(n.getRecipientMachineId()).isEqualTo(MACHINE_ID));
+                    .allSatisfy(n -> assertThat(n.getRecipient()).isEqualTo(new MachineRecipient(MACHINE_ID)));
         }
 
         @Test
@@ -364,8 +493,8 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         void given_more_rows_than_limit_when_listing_for_machine_then_has_next_page() {
             seedMachineSequential(MACHINE_ID, 15);
 
-            GenericQueryResult<NotificationView> result = service.listForMachine(
-                    MACHINE_ID, CursorPaginationCriteria.builder().limit(10).build());
+            GenericQueryResult<NotificationView> result = service.list(
+                    new MachineRecipient(MACHINE_ID), CursorPaginationCriteria.builder().limit(10).build());
 
             assertThat(result.getItems()).hasSize(10);
             assertThat(result.getPageInfo().isHasNextPage()).isTrue();
@@ -382,8 +511,7 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
             Notification saved = repository.save(NotificationFixtures.basic(ALICE));
 
             assertThat(service.markRead(ALICE, saved.getId())).isTrue();
-            // Idempotency proves the row is persisted: a second call returns
-            // false because the unique (userId, notificationId) row already exists.
+
             assertThat(service.markRead(ALICE, saved.getId())).isFalse();
         }
 
@@ -403,8 +531,6 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
 
             service.markRead(ALICE, saved.getId());
 
-            // Bob marking the same notification still transitions for him —
-            // proves Alice's read row didn't bleed.
             assertThat(service.markRead(BOB, saved.getId())).isTrue();
         }
     }
@@ -426,8 +552,7 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         List<Notification> saved = new ArrayList<>();
         for (int i = 0; i < count; i++) {
             saved.add(repository.save(Notification.builder()
-                    .recipientScope(RecipientScope.MACHINE)
-                    .recipientMachineId(machineId)
+                    .recipient(new MachineRecipient(machineId))
                     .title("Event " + i)
                     .context(GenericContext.builder().type("type-" + i).payload("{}").build())
                     .build()));

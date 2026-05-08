@@ -4,7 +4,6 @@ import com.openframe.data.document.notification.NotificationContext;
 import com.openframe.data.document.notification.NotificationContextBinding;
 import org.springframework.stereotype.Component;
 
-/** Test binding for {@link TestExtendedContext}. */
 @Component
 public class TestExtendedContextBinding implements NotificationContextBinding {
 

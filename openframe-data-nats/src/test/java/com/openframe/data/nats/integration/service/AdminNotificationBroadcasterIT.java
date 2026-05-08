@@ -2,6 +2,7 @@ package com.openframe.data.nats.integration.service;
 
 import com.openframe.data.document.notification.GenericContext;
 import com.openframe.data.document.notification.Notification;
+import com.openframe.data.document.notification.UserRecipient;
 import com.openframe.data.document.user.User;
 import com.openframe.data.document.user.UserRole;
 import com.openframe.data.document.user.UserStatus;
@@ -66,7 +67,7 @@ class AdminNotificationBroadcasterIT extends BaseIntegrationTest {
         assertThat(sent).isEqualTo(2);
         List<Notification> stored = notificationRepository.findAll();
         assertThat(stored)
-                .extracting(Notification::getRecipientUserId)
+                .extracting(n -> ((UserRecipient) n.getRecipient()).userId())
                 .containsExactlyInAnyOrder(admin.getId(), owner.getId());
     }
 
@@ -82,7 +83,7 @@ class AdminNotificationBroadcasterIT extends BaseIntegrationTest {
 
         assertThat(sent).isEqualTo(1);
         assertThat(notificationRepository.findAll())
-                .extracting(Notification::getRecipientUserId)
+                .extracting(n -> ((UserRecipient) n.getRecipient()).userId())
                 .containsExactly("active-admin");
     }
 
@@ -99,7 +100,7 @@ class AdminNotificationBroadcasterIT extends BaseIntegrationTest {
 
         assertThat(sent).isEqualTo(2);
         assertThat(notificationRepository.findAll())
-                .extracting(Notification::getRecipientUserId)
+                .extracting(n -> ((UserRecipient) n.getRecipient()).userId())
                 .containsExactlyInAnyOrder("admin-1", "admin-3");
     }
 
@@ -128,7 +129,7 @@ class AdminNotificationBroadcasterIT extends BaseIntegrationTest {
 
         assertThat(sent).isEqualTo(2);
         assertThat(notificationRepository.findAll())
-                .extracting(Notification::getRecipientUserId)
+                .extracting(n -> ((UserRecipient) n.getRecipient()).userId())
                 .containsExactlyInAnyOrder("admin-1", "admin-2");
     }
 
@@ -150,7 +151,7 @@ class AdminNotificationBroadcasterIT extends BaseIntegrationTest {
 
         assertThat(sent).isEqualTo(2);
         assertThat(notificationRepository.findAll())
-                .extracting(Notification::getRecipientUserId)
+                .extracting(n -> ((UserRecipient) n.getRecipient()).userId())
                 .containsExactlyInAnyOrder("good-admin-1", "good-admin-2");
     }
 
@@ -168,7 +169,7 @@ class AdminNotificationBroadcasterIT extends BaseIntegrationTest {
 
     private static Notification notification(String userId, String type) {
         return Notification.builder()
-                .recipientUserId(userId)
+                .recipient(new UserRecipient(userId))
                 .title(type)
                 .createdAt(Instant.now())
                 .context(GenericContext.builder().type(type).payload("{}").build())

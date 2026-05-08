@@ -8,7 +8,6 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
-/** Test-only context used by {@code NotificationContextDispatchIT}. */
 @Data
 @SuperBuilder
 @NoArgsConstructor

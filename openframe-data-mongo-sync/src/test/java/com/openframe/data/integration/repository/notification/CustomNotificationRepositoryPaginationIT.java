@@ -1,6 +1,8 @@
 package com.openframe.data.integration.repository.notification;
 
+import com.openframe.data.document.notification.BroadcastRecipient;
 import com.openframe.data.document.notification.Notification;
+import com.openframe.data.document.notification.UserRecipient;
 import com.openframe.data.integration.BaseMongoIntegrationTest;
 import com.openframe.data.integration.support.IntegrationTestApplication;
 import com.openframe.data.integration.support.NotificationFixtures;
@@ -80,9 +82,6 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
     void given_invalid_cursor_when_listing_for_user_then_throws_illegal_argument() {
         seedSequential(ALICE, 3);
 
-        // Surfacing as IllegalArgumentException lets DGS turn this into a
-        // GraphQL error rather than silently dropping back to the first page —
-        // a malformed cursor is a client bug, not a "give them anything".
         assertThatThrownBy(() ->
                 repository.findPageForUser(ALICE, "not-an-objectid", false, 10))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -96,7 +95,8 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
         seedSequential(BOB, 3);
 
         List<Notification> alicePage = repository.findPageForUser(ALICE, null, false, 10);
-        assertThat(alicePage).allSatisfy(n -> assertThat(n.getRecipientUserId()).isEqualTo(ALICE));
+        assertThat(alicePage).allSatisfy(n ->
+                assertThat(n.getRecipient()).isEqualTo(new UserRecipient(ALICE)));
         assertThat(alicePage).hasSize(3);
     }
 
@@ -141,9 +141,11 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
 
         List<Notification> alicePage = repository.findPageForUser(ALICE, null, false, 10);
 
-        // Alice sees her own + broadcast, never Bob's direct notification.
-        assertThat(alicePage).extracting(Notification::getRecipientUserId)
-                .containsOnly(ALICE, null);
+        assertThat(alicePage).allSatisfy(n -> {
+            var r = n.getRecipient();
+            assertThat(r instanceof UserRecipient(String userId) && ALICE.equals(userId)
+                    || r instanceof BroadcastRecipient).isTrue();
+        });
         assertThat(alicePage).extracting(Notification::getId)
                 .contains(broadcast.getId());
     }

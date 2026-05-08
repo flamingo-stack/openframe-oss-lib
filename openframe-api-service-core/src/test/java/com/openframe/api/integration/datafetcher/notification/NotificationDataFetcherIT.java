@@ -6,11 +6,13 @@ import com.openframe.api.integration.BaseMongoIntegrationTest;
 import com.openframe.api.integration.support.GraphQlIntegrationTestApplication;
 import com.openframe.api.integration.support.NotificationFixtures;
 import com.openframe.core.exception.UnauthorizedException;
+import com.openframe.data.document.notification.BroadcastRecipient;
 import com.openframe.data.document.notification.GenericContext;
+import com.openframe.data.document.notification.MachineRecipient;
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.NotificationSeverity;
-import com.openframe.data.document.notification.RecipientScope;
+import com.openframe.data.document.notification.UserRecipient;
 import com.openframe.data.repository.notification.NotificationRepository;
 import com.openframe.data.service.notification.NotificationReadStateService;
 import graphql.ExecutionResult;
@@ -25,6 +27,7 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -119,7 +122,7 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
         @DisplayName("Given only an unread tenant-wide broadcast and no direct rows for the caller, when querying hasUnreadNotifications via GraphQL, then it returns true — broadcasts feed into the bell badge through the data fetcher path")
         void given_only_unread_broadcast_when_querying_then_returns_true() {
             repository.save(Notification.builder()
-                    .recipientScope(RecipientScope.ALL)
+                    .recipient(new BroadcastRecipient())
                     .title("Tenant-wide announcement")
                     .createdAt(Instant.now())
                     .context(GenericContext.builder().type("ann").payload("{}").build())
@@ -236,7 +239,7 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
         @DisplayName("Given a Notification with a contributed context subtype, when querying with an inline fragment on context, then the contributed GraphQL type is selected and subtype fields come back")
         void given_contributed_context_subtype_when_querying_then_routes_to_contributed_type() {
             Notification approval = Notification.builder()
-                    .recipientUserId(ALICE)
+                    .recipient(new UserRecipient(ALICE))
                     .title("Approval requested")
                     .createdAt(Instant.now())
                     .context(TestApprovalContext.builder()
@@ -267,7 +270,7 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
         @DisplayName("Given a contributed resolver in the chain and a Notification with a plain GenericContext, when querying, then the plain row still falls back to GenericContext — registering a resolver does not regress the fallback")
         void given_contributed_resolver_and_unclaimed_row_when_querying_then_unclaimed_row_falls_back_to_generic() {
             Notification approval = Notification.builder()
-                    .recipientUserId(ALICE)
+                    .recipient(new UserRecipient(ALICE))
                     .title("Approval requested")
                     .createdAt(Instant.now())
                     .context(TestApprovalContext.builder()
@@ -282,7 +285,6 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
             List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
                     query, "data.notifications.edges");
 
-            // _id desc ordering: the plain notification was saved second, so it's first.
             assertThat(edges).hasSize(2);
             Map<String, Object> plainCtx = (Map<String, Object>) ((Map<String, Object>) edges.get(0).get("node")).get("context");
             Map<String, Object> approvalCtx = (Map<String, Object>) ((Map<String, Object>) edges.get(1).get("node")).get("context");
@@ -295,7 +297,7 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
         @DisplayName("Given a base64-decodable but otherwise malformed cursor, when querying, then a GraphQL error is returned instead of silently falling back to the first page")
         void given_malformed_cursor_when_querying_then_graphql_error_is_raised() {
             repository.save(NotificationFixtures.basic(ALICE));
-            // Base64-encoded garbage: decodes cleanly but isn't a valid ObjectId.
+
             String badCursor = CursorCodec.encode("not-an-object-id");
 
             ExecutionResult result = queryExecutor.execute(String.format(
@@ -308,7 +310,7 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
         @DisplayName("Given a saved notification with explicit severity and title, when querying both fields, then they come back on the node")
         void given_severity_and_title_when_querying_then_fields_returned() {
             Notification withWarning = Notification.builder()
-                    .recipientUserId(ALICE)
+                    .recipient(new UserRecipient(ALICE))
                     .severity(NotificationSeverity.WARNING)
                     .title("Heads up")
                     .createdAt(Instant.now())
@@ -350,13 +352,61 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
                     query, "data.notifications.edges");
 
             assertThat(edges).hasSize(2);
-            // _id desc ordering: most recent first
+
             Map<String, Object> firstNode = (Map<String, Object>) edges.get(0).get("node");
             Map<String, Object> secondNode = (Map<String, Object>) edges.get(1).get("node");
             assertThat(((Map<String, Object>) firstNode.get("context")).get("type")).isEqualTo("type-2");
             assertThat(firstNode.get("read")).isEqualTo(true);
             assertThat(((Map<String, Object>) secondNode.get("context")).get("type")).isEqualTo("type-1");
             assertThat(secondNode.get("read")).isEqualTo(false);
+        }
+
+        @Test
+        @DisplayName("Given a mix of read and unread, when querying with filter.read=true, then only read rows come back")
+        void given_mixed_read_state_when_filtering_read_true_then_only_read_rows_returned() {
+            Notification readRow = repository.save(NotificationFixtures.basic(ALICE, "type-read"));
+            repository.save(NotificationFixtures.basic(ALICE, "type-unread"));
+            readStateService.markRead(ALICE, readRow.getId());
+
+            String query = "{ notifications(filter: { read: true }, first: 10) { edges { node { read context { type } } } } }";
+            List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
+                    query, "data.notifications.edges");
+
+            assertThat(edges).hasSize(1);
+            Map<String, Object> node = (Map<String, Object>) edges.get(0).get("node");
+            assertThat(((Map<String, Object>) node.get("context")).get("type")).isEqualTo("type-read");
+            assertThat(node.get("read")).isEqualTo(true);
+        }
+
+        @Test
+        @DisplayName("Given a mix of read and unread, when querying with filter.read=false, then only unread rows come back")
+        void given_mixed_read_state_when_filtering_read_false_then_only_unread_rows_returned() {
+            Notification readRow = repository.save(NotificationFixtures.basic(ALICE, "type-read"));
+            repository.save(NotificationFixtures.basic(ALICE, "type-unread"));
+            readStateService.markRead(ALICE, readRow.getId());
+
+            String query = "{ notifications(filter: { read: false }, first: 10) { edges { node { read context { type } } } } }";
+            List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
+                    query, "data.notifications.edges");
+
+            assertThat(edges).hasSize(1);
+            Map<String, Object> node = (Map<String, Object>) edges.get(0).get("node");
+            assertThat(((Map<String, Object>) node.get("context")).get("type")).isEqualTo("type-unread");
+            assertThat(node.get("read")).isEqualTo(false);
+        }
+
+        @Test
+        @DisplayName("Given filter omitted (null), when querying, then both read and unread rows come back — filter is opt-in")
+        void given_filter_null_when_querying_then_both_read_and_unread_returned() {
+            Notification readRow = repository.save(NotificationFixtures.basic(ALICE, "type-read"));
+            repository.save(NotificationFixtures.basic(ALICE, "type-unread"));
+            readStateService.markRead(ALICE, readRow.getId());
+
+            String query = "{ notifications(first: 10) { edges { node { read } } } }";
+            List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
+                    query, "data.notifications.edges");
+
+            assertThat(edges).hasSize(2);
         }
     }
 
@@ -376,7 +426,7 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
                     mutation, "data.markNotificationAsRead");
 
             assertThat(result).isTrue();
-            // Idempotency on the SPI proves persistence — a second call returns false.
+
             assertThat(readStateService.markRead(ALICE, saved.getId())).isFalse();
         }
 
@@ -417,9 +467,8 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
                     String.format("mutation { markNotificationAsRead(notificationId: \"%s\") }", relayId),
                     "data.markNotificationAsRead");
 
-            // Alice marked it — second call from her returns false (already read).
             assertThat(readStateService.markRead(ALICE, saved.getId())).isFalse();
-            // Bob never read it — first call from him returns true.
+
             assertThat(readStateService.markRead(BOB, saved.getId())).isTrue();
         }
 
@@ -436,33 +485,32 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
     }
 
     @Nested
-    @DisplayName("machineNotifications query")
-    class MachineNotificationsQuery {
+    @DisplayName("notifications query — machine inbox")
+    class NotificationsForMachine {
 
         private static final String MACHINE_ID = "machine-007";
 
         @Test
-        @DisplayName("Given an AGENT principal, when querying machineNotifications, then it returns rows targeted at that machine plus broadcasts")
-        void given_agent_principal_when_querying_then_returns_machine_rows_and_broadcasts() {
+        @DisplayName("Given an AGENT principal with no machineId argument, when querying notifications, then it returns rows targeted at that machine plus broadcasts")
+        void given_agent_principal_no_arg_when_querying_then_returns_machine_rows_and_broadcasts() {
             authAsAgent(MACHINE_ID);
 
             Notification machineRow = repository.save(Notification.builder()
-                    .recipientScope(RecipientScope.MACHINE)
-                    .recipientMachineId(MACHINE_ID)
+                    .recipient(new MachineRecipient(MACHINE_ID))
                     .title("Direct event")
                     .createdAt(Instant.now())
                     .context(GenericContext.builder().type("event").payload("{}").build())
                     .build());
             Notification broadcast = repository.save(Notification.builder()
-                    .recipientScope(RecipientScope.ALL)
+                    .recipient(new BroadcastRecipient())
                     .title("Tenant-wide event")
                     .createdAt(Instant.now())
                     .context(GenericContext.builder().type("ann").payload("{}").build())
                     .build());
 
-            String query = "{ machineNotifications(first: 10) { edges { node { id } } } }";
+            String query = "{ notifications(first: 10) { edges { node { id } } } }";
             List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
-                    query, "data.machineNotifications.edges");
+                    query, "data.notifications.edges");
 
             assertThat(extractIds(edges)).containsExactlyInAnyOrder(
                     RELAY.toGlobalId("Notification", machineRow.getId()),
@@ -470,7 +518,55 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
         }
 
         @Test
-        @DisplayName("Given the caller's own machine rows alongside another machine's rows, when querying machineNotifications, then only the caller's rows come back — no cross-machine leakage")
+        @DisplayName("Given an ADMIN principal with an explicit machineId argument, when querying notifications, then it returns rows targeted at that machine plus broadcasts")
+        void given_admin_with_machine_id_arg_when_querying_then_returns_machine_rows_and_broadcasts() {
+            Notification machineRow = saveMachineRow(MACHINE_ID, "for-machine");
+            Notification broadcast = repository.save(Notification.builder()
+                    .recipient(new BroadcastRecipient())
+                    .title("Tenant ann")
+                    .createdAt(Instant.now())
+                    .context(GenericContext.builder().type("ann").payload("{}").build())
+                    .build());
+
+            String query = String.format(
+                    "{ notifications(machineId: \"%s\", first: 10) { edges { node { id } } } }", MACHINE_ID);
+            List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
+                    query, "data.notifications.edges");
+
+            assertThat(extractIds(edges)).containsExactlyInAnyOrder(
+                    RELAY.toGlobalId("Notification", machineRow.getId()),
+                    RELAY.toGlobalId("Notification", broadcast.getId()));
+        }
+
+        @Test
+        @DisplayName("Given an AGENT principal and a foreign machineId argument, when querying notifications, then a GraphQL error is raised — agents may not read another machine's inbox")
+        void given_agent_with_foreign_machine_id_arg_when_querying_then_unauthorized() {
+            authAsAgent(MACHINE_ID);
+
+            ExecutionResult result = queryExecutor.execute(
+                    "{ notifications(machineId: \"other-machine\", first: 10) { edges { node { id } } } }");
+
+            assertThat(result.getErrors()).isNotEmpty();
+            assertThat(result.getErrors().getFirst().getMessage())
+                    .containsAnyOf("another machine", "Unauthorized");
+        }
+
+        @Test
+        @DisplayName("Given an AGENT principal passes its own machineId argument, when querying notifications, then it succeeds and returns the same rows as the no-arg path")
+        void given_agent_with_own_machine_id_arg_when_querying_then_succeeds() {
+            authAsAgent(MACHINE_ID);
+            Notification own = saveMachineRow(MACHINE_ID, "own");
+
+            String query = String.format(
+                    "{ notifications(machineId: \"%s\", first: 10) { edges { node { id } } } }", MACHINE_ID);
+            List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
+                    query, "data.notifications.edges");
+
+            assertThat(extractIds(edges)).contains(RELAY.toGlobalId("Notification", own.getId()));
+        }
+
+        @Test
+        @DisplayName("Given the caller's own machine rows alongside another machine's rows, when AGENT queries with no machineId, then only the caller's rows come back — no cross-machine leakage")
         void given_own_and_other_machines_rows_when_querying_then_only_own_visible() {
             authAsAgent(MACHINE_ID);
 
@@ -478,9 +574,9 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
             Notification own2 = saveMachineRow(MACHINE_ID, "own-2");
             Notification foreign = saveMachineRow("other-machine", "foreign");
 
-            String query = "{ machineNotifications(first: 10) { edges { node { id } } } }";
+            String query = "{ notifications(first: 10) { edges { node { id } } } }";
             List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
-                    query, "data.machineNotifications.edges");
+                    query, "data.notifications.edges");
 
             List<String> ids = extractIds(edges);
             assertThat(ids).containsExactlyInAnyOrder(
@@ -495,9 +591,9 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
             authAsAgent(MACHINE_ID);
             Notification saved = saveMachineRow(MACHINE_ID, "event");
 
-            String query = "{ machineNotifications(first: 10) { edges { node { id } } } }";
+            String query = "{ notifications(first: 10) { edges { node { id } } } }";
             List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
-                    query, "data.machineNotifications.edges");
+                    query, "data.notifications.edges");
 
             String relayId = (String) ((Map<String, Object>) edges.get(0).get("node")).get("id");
             Relay.ResolvedGlobalId resolved = RELAY.fromGlobalId(relayId);
@@ -510,19 +606,18 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
         void given_machine_notification_with_generic_context_when_querying_then_context_typename_and_shared_fields_returned() {
             authAsAgent(MACHINE_ID);
             repository.save(Notification.builder()
-                    .recipientScope(RecipientScope.MACHINE)
-                    .recipientMachineId(MACHINE_ID)
+                    .recipient(new MachineRecipient(MACHINE_ID))
                     .severity(NotificationSeverity.WARNING)
                     .title("Heads up")
                     .createdAt(Instant.now())
                     .context(GenericContext.builder().type("event").payload("{\"k\":\"v\"}").build())
                     .build());
 
-            String query = "{ machineNotifications(first: 10) { edges { node { "
+            String query = "{ notifications(first: 10) { edges { node { "
                     + "severity title context { __typename type ... on GenericContext { payload } } "
                     + "} } } }";
             List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
-                    query, "data.machineNotifications.edges");
+                    query, "data.notifications.edges");
 
             Map<String, Object> node = (Map<String, Object>) edges.get(0).get("node");
             Map<String, Object> context = (Map<String, Object>) node.get("context");
@@ -534,22 +629,21 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
         }
 
         @Test
-        @DisplayName("Given a base64-decodable but malformed cursor, when querying machineNotifications, then a GraphQL error is raised — same strict cursor handling as the user-side query")
-        void given_malformed_cursor_when_querying_machine_notifications_then_graphql_error() {
+        @DisplayName("Given a base64-decodable but malformed cursor on a machine inbox query, when querying, then a GraphQL error is raised — same strict cursor handling as the user-side query")
+        void given_malformed_cursor_when_querying_machine_inbox_then_graphql_error() {
             authAsAgent(MACHINE_ID);
             saveMachineRow(MACHINE_ID, "event");
             String badCursor = CursorCodec.encode("not-an-object-id");
 
             ExecutionResult result = queryExecutor.execute(String.format(
-                    "{ machineNotifications(first: 5, after: \"%s\") { edges { cursor } } }", badCursor));
+                    "{ notifications(first: 5, after: \"%s\") { edges { cursor } } }", badCursor));
 
             assertThat(result.getErrors()).isNotEmpty();
         }
 
         private Notification saveMachineRow(String machineId, String typeToken) {
             return repository.save(Notification.builder()
-                    .recipientScope(RecipientScope.MACHINE)
-                    .recipientMachineId(machineId)
+                    .recipient(new MachineRecipient(machineId))
                     .title(typeToken)
                     .createdAt(Instant.now())
                     .context(GenericContext.builder().type(typeToken).payload("{}").build())
@@ -557,13 +651,12 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
         }
 
         @Test
-        @DisplayName("Given multiple machine notifications, when paginating forward, then consecutive pages are disjoint")
+        @DisplayName("Given multiple machine notifications, when AGENT paginates forward, then consecutive pages are disjoint")
         void given_multiple_machine_notifications_when_paginating_then_pages_disjoint() {
             authAsAgent(MACHINE_ID);
             for (int i = 0; i < 5; i++) {
                 repository.save(Notification.builder()
-                        .recipientScope(RecipientScope.MACHINE)
-                        .recipientMachineId(MACHINE_ID)
+                        .recipient(new MachineRecipient(MACHINE_ID))
                         .title("Event " + i)
                         .createdAt(Instant.now())
                         .context(GenericContext.builder().type("type-" + i).payload("{}").build())
@@ -572,13 +665,13 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
             }
 
             Map<String, Object> first = queryExecutor.executeAndExtractJsonPath(
-                    "{ machineNotifications(first: 2) { edges { node { id } } pageInfo { hasNextPage endCursor } } }",
-                    "data.machineNotifications");
+                    "{ notifications(first: 2) { edges { node { id } } pageInfo { hasNextPage endCursor } } }",
+                    "data.notifications");
             String afterCursor = (String) ((Map<String, Object>) first.get("pageInfo")).get("endCursor");
 
             Map<String, Object> second = queryExecutor.executeAndExtractJsonPath(
-                    String.format("{ machineNotifications(first: 2, after: \"%s\") { edges { node { id } } } }", afterCursor),
-                    "data.machineNotifications");
+                    String.format("{ notifications(first: 2, after: \"%s\") { edges { node { id } } } }", afterCursor),
+                    "data.notifications");
 
             List<Map<String, Object>> firstEdges = (List<Map<String, Object>>) first.get("edges");
             List<Map<String, Object>> secondEdges = (List<Map<String, Object>>) second.get("edges");
@@ -591,7 +684,7 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
     class AuthBoundary {
 
         @Test
-        @DisplayName("Given no authenticated user in the security context, when querying notifications-related endpoints, then a GraphQL error mentioning Unauthorized is surfaced")
+        @DisplayName("Given no authenticated user in the security context, when querying notifications-related endpoints, then @PreAuthorize raises an authentication error before any business logic runs")
         void given_no_authentication_when_querying_then_unauthorized_graphql_error() {
             SecurityContextHolder.clearContext();
 
@@ -599,28 +692,42 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
 
             assertThat(result.getErrors()).isNotEmpty();
             assertThat(result.getErrors().getFirst().getMessage())
-                    .containsAnyOf("Unauthorized", UnauthorizedException.class.getSimpleName());
+                    .containsAnyOf("Authentication", "Unauthorized", UnauthorizedException.class.getSimpleName());
         }
 
         @Test
-        @DisplayName("Given an ADMIN principal, when querying machineNotifications, then a GraphQL error is raised — only AGENT principals can read a machine's backlog")
-        void given_admin_principal_when_querying_machine_notifications_then_unauthorized() {
-            // BeforeEach authenticated us as Alice (ADMIN by default).
-            ExecutionResult result = queryExecutor.execute(
-                    "{ machineNotifications(first: 10) { edges { node { id } } } }");
+        @DisplayName("Given an AGENT principal, when querying hasUnreadNotifications, then a GraphQL error is raised — bell badge is ADMIN-only")
+        void given_agent_principal_when_querying_has_unread_then_unauthorized() {
+            authAsAgent("machine-007");
+
+            ExecutionResult result = queryExecutor.execute("{ hasUnreadNotifications }");
 
             assertThat(result.getErrors()).isNotEmpty();
             assertThat(result.getErrors().getFirst().getMessage())
-                    .containsAnyOf("AGENT", "Unauthorized", UnauthorizedException.class.getSimpleName());
+                    .containsAnyOf("Access Denied", "AccessDenied", "denied");
         }
 
         @Test
-        @DisplayName("Given an AGENT principal whose JWT is missing the machine_id claim, when querying machineNotifications, then a GraphQL error is raised")
-        void given_agent_without_machine_id_claim_when_querying_machine_notifications_then_unauthorized() {
+        @DisplayName("Given an AGENT principal, when calling markNotificationAsRead, then a GraphQL error is raised — mark-read mutation is ADMIN-only")
+        void given_agent_principal_when_calling_mark_read_mutation_then_unauthorized() {
+            authAsAgent("machine-007");
+            String relayId = RELAY.toGlobalId("Notification", "67faaaaaaaaaaaaaaaaaaaaa");
+
+            ExecutionResult result = queryExecutor.execute(String.format(
+                    "mutation { markNotificationAsRead(notificationId: \"%s\") }", relayId));
+
+            assertThat(result.getErrors()).isNotEmpty();
+            assertThat(result.getErrors().getFirst().getMessage())
+                    .containsAnyOf("Access Denied", "AccessDenied", "denied");
+        }
+
+        @Test
+        @DisplayName("Given an AGENT principal whose JWT is missing the machine_id claim, when querying notifications, then a GraphQL error is raised")
+        void given_agent_without_machine_id_claim_when_querying_then_unauthorized() {
             authAsAgentWithoutMachineId();
 
             ExecutionResult result = queryExecutor.execute(
-                    "{ machineNotifications(first: 10) { edges { node { id } } } }");
+                    "{ notifications(first: 10) { edges { node { id } } } }");
 
             assertThat(result.getErrors()).isNotEmpty();
             assertThat(result.getErrors().getFirst().getMessage())
@@ -649,12 +756,18 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
     }
 
     private static void authAs(String userId) {
+        authAs(userId, "ADMIN");
+    }
+
+    private static void authAs(String userId, String role) {
         Jwt jwt = Jwt.withTokenValue("test-token")
                 .header("alg", "RS256")
                 .subject(userId)
                 .claim("userId", userId)
+                .claim("roles", List.of(role))
                 .build();
-        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
+        SecurityContextHolder.getContext().setAuthentication(
+                new JwtAuthenticationToken(jwt, List.of(new SimpleGrantedAuthority(role))));
     }
 
     private static void authAsAgent(String machineId) {
@@ -665,7 +778,8 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
                 .claim("machine_id", machineId)
                 .claim("roles", List.of("AGENT"))
                 .build();
-        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
+        SecurityContextHolder.getContext().setAuthentication(
+                new JwtAuthenticationToken(jwt, List.of(new SimpleGrantedAuthority("AGENT"))));
     }
 
     private static void authAsAgentWithoutMachineId() {
@@ -675,6 +789,7 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
                 .claim("userId", "agent-broken")
                 .claim("roles", List.of("AGENT"))
                 .build();
-        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
+        SecurityContextHolder.getContext().setAuthentication(
+                new JwtAuthenticationToken(jwt, List.of(new SimpleGrantedAuthority("AGENT"))));
     }
 }

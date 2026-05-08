@@ -10,15 +10,6 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Wraps {@code explain("executionStats")} for find / upsert commands and exposes
- * the assertion DSL the perf IT actually uses. Walks the whole plan tree so multi-branch
- * {@code $or} plans (one IXSCAN per branch) can't slip through with a single-stage check.
- *
- * <p>The helper duplicates the {@link Query} that production code builds; tests must
- * keep the two in sync. The alternative — capturing the wire query via the profiler —
- * introduces shared state that makes parallel tests fragile.
- */
 public final class MongoExplain {
 
     private MongoExplain() {
@@ -81,7 +72,7 @@ public final class MongoExplain {
 
             Document queryPlanner = (Document) explainResult.get("queryPlanner");
             Document winningPlan = queryPlanner == null ? null : (Document) queryPlanner.get("winningPlan");
-            // Mongo 7 SBE wraps the plan tree under queryPlan.
+
             if (winningPlan != null && winningPlan.get("queryPlan") instanceof Document qp) {
                 winningPlan = qp;
             }
