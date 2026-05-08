@@ -16,9 +16,9 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   progress,
   warningThreshold = 75,
   criticalThreshold = 90,
-  segmentWidth = 6,
+  segmentWidth = 3.47,
   segmentGap = 2,
-  height = 16,
+  height = 24,
   inverted = false,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
