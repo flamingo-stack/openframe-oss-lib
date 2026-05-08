@@ -264,7 +264,7 @@ export function WaitlistForm({
           disabled={isSubmitting}
           leftIcon={<OpenFrameLogo />}
           onClick={handleSubmit}
-          className="w-full @2xl:w-auto"
+          className="w-full md:w-auto"
         >
           {isSuccess ? successLabel : submitLabel}
         </Button>

@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { Button } from '../components/ui/button'
-import { QueryReportTable } from '../components/ui/table/query-report-table'
-import type { QueryResultRow } from '../components/ui/table/query-report-table'
+import { QueryReportTable } from '../components/ui/query-report-table'
+import type { QueryResultRow } from '../components/ui/query-report-table'
 
 const sampleData: QueryResultRow[] = [
   {
@@ -241,7 +241,7 @@ export const WithHeaderActions: Story = {
     title: 'Server Health Report',
     data: sampleData,
     headerActions: (
-      <Button variant="outline" size="sm">
+      <Button variant="outline" size="small-legacy">
         Refresh
       </Button>
     ),

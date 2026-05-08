@@ -2,9 +2,12 @@
 
 import React, { useMemo, useState } from 'react'
 import { cn } from '../../utils/cn'
-import { CopyIcon, EyeIcon } from '../icons'
+import { EyeIcon } from '../icons'
+import { Copy01Icon } from '../icons-v2-generated/documents'
+import { CheckIcon } from '../icons-v2-generated/signs-and-symbols'
 import { ExternalLink } from 'lucide-react'
 import { OpenFrameLogo } from '../..'
+import { useCopyToClipboard } from '../../hooks/use-copy-to-clipboard'
 
 export type ServiceCardRowAction = {
   copy?: boolean
@@ -83,14 +86,12 @@ export function ServiceCard({ title, subtitle, icon, tag, rows, className }: Ser
 
 function ServiceCardRowItem({ row }: { row: ServiceCardRow }) {
   const [revealed, setRevealed] = useState(false)
+  const { copy, copied } = useCopyToClipboard()
   const actions = useMemo<ServiceCardRowAction>(() => ({ copy: true, open: !!row.href, reveal: !!row.isSecret, ...row.actions }), [row])
 
   const displayValue = row.isSecret ? <MaskedValue value={row.value} isRevealed={revealed} /> : <span>{row.value}</span>
 
-  const copyToClipboard = async () => {
-    const text = row.copyValue ?? row.value
-    try { await navigator.clipboard.writeText(text) } catch { /* no-op */ }
-  }
+  const handleCopy = () => copy(row.copyValue ?? row.value)
 
   const openInNewTab = () => {
     if (!row.href) return
@@ -117,11 +118,14 @@ function ServiceCardRowItem({ row }: { row: ServiceCardRow }) {
 
           {actions.copy && (
             <button
-              onClick={copyToClipboard}
-              className="p-2 rounded hover:bg-ods-card text-ods-text-secondary"
+              onClick={handleCopy}
+              className={cn(
+                'p-2 rounded hover:bg-ods-card transition-colors',
+                copied ? 'text-ods-success' : 'text-ods-text-secondary',
+              )}
               aria-label={`Copy ${row.label ?? 'value'}`}
             >
-              <CopyIcon className="w-5 h-5" />
+              {copied ? <CheckIcon size={20} /> : <Copy01Icon size={20} />}
             </button>
           )}
 

@@ -105,7 +105,7 @@ export function getPlatformProductionUrl(platform: string): string {
     case 'tmcg':
       return process.env.NEXT_PUBLIC_TMCG_URL || 'https://www.tmcg.miami';
     case 'flamingo-teaser':
-      return process.env.NEXT_PUBLIC_FLAMINGO_TEASER_URL || 'https://www.flamingo.cx';
+      return process.env.NEXT_PUBLIC_FLAMINGO_URL || 'https://www.flamingo.run';
     case 'openframe':
       return process.env.NEXT_PUBLIC_OPENFRAME_URL || 'https://openframe.ai';
     case 'universal':

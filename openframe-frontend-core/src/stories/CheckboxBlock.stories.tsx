@@ -42,9 +42,7 @@ const meta = {
   },
   decorators: [
     (Story) => (
-      <div style={{ width: '320px' }}>
-        <Story />
-      </div>
+       <Story />
     ),
   ],
 } satisfies Meta<typeof CheckboxBlock>;

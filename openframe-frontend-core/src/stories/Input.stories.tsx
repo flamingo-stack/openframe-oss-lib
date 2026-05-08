@@ -191,7 +191,7 @@ export const WithButton: Story = {
           placeholder="Enter your email..."
           error='sdfsd'
         />
-        <Button variant="primary" size="default">
+        <Button variant="accent" size="default">
           Submit
         </Button>
       </div>

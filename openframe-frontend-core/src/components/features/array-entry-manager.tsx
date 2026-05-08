@@ -129,7 +129,7 @@ export function ArrayEntryManager<T extends { [key: string]: any }>({
           {requireSave && isDirty && (
             <Button
               type="button"
-              size="sm"
+              size="small-legacy"
               onClick={handleSave}
               disabled={isSaving}
               leftIcon={isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
@@ -141,7 +141,7 @@ export function ArrayEntryManager<T extends { [key: string]: any }>({
           <Button
             type="button"
             variant="outline"
-            size="sm"
+            size="small-legacy"
             onClick={addItem}
             leftIcon={<Plus className="h-4 w-4" />}
             className="font-['DM_Sans'] text-[14px]"
@@ -173,7 +173,7 @@ export function ArrayEntryManager<T extends { [key: string]: any }>({
 
           <Button
             type="button"
-            variant="ghost"
+            variant="transparent"
             size="icon"
             onClick={() => removeItem(index)}
             className="text-ods-attention-red-error hover:bg-ods-attention-red-error/10"

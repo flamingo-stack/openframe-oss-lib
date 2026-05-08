@@ -141,7 +141,7 @@ export const DisabledButton: Story = {
     <Tooltip>
       <TooltipTrigger asChild>
         <span tabIndex={0} className="inline-block">
-          <Button variant="primary" size="sm" disabled>
+          <Button variant="accent" size="small-legacy" disabled>
             Deploy
           </Button>
         </span>

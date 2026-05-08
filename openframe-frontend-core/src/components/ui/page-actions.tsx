@@ -4,11 +4,11 @@ import React from 'react'
 import { cn } from '../../utils/cn'
 import { Chevron02DownIcon } from '../icons-v2-generated'
 import { ActionsMenuDropdown, type ActionsMenuGroup, type ActionsMenuItem } from './actions-menu'
-import type { ButtonProps } from './button'
-import { Button } from './button'
+import type { ButtonProps, SplitButtonIconAction } from './button'
+import { Button, SplitButton } from './button'
 
 export type PageActionButton = {
-  /** Button label. Omit to render an icon-only button (icon becomes `centerIcon`). */
+  /** Button label. Omit to render an icon-only button. */
   label?: string
   /** Accessible name. Required for icon-only buttons (when `label` is omitted). */
   ariaLabel?: string
@@ -17,6 +17,12 @@ export type PageActionButton = {
   icon?: React.ReactNode
   variant?: ButtonProps['variant']
   disabled?: boolean
+  /**
+   * For SplitButton actions (when `iconAction` is set): disables only the main
+   * half. Combine with `iconAction.disabled` for icon-only disable. Ignored
+   * for non-SplitButton actions.
+   */
+  mainDisabled?: boolean
   loading?: boolean
   /** Show action only on mobile (below md). Default: visible on all screens. */
   showOnlyMobile?: boolean
@@ -32,7 +38,17 @@ export type PageActionButton = {
   prefetch?: boolean
   /** Open link in a new tab. Only applies when `href` is set. */
   openInNewTab?: boolean
-  /** Render a split button with a chevron opening a dropdown. Mutually exclusive with `href`/`onClick`. */
+  /**
+   * Render the action as a `SplitButton` (two independent click targets).
+   * The main half runs `onClick`/`href`; the icon half runs its own action.
+   * Mutually exclusive with `submenu`.
+   */
+  iconAction?: SplitButtonIconAction
+  /**
+   * Render a button with a chevron that opens a dropdown. The whole button is
+   * a single click target — clicking anywhere opens the menu.
+   * Mutually exclusive with `iconAction` and `href`/`onClick`.
+   */
   submenu?: ActionsMenuItem[]
 }
 
@@ -60,21 +76,60 @@ function actionToMenuItems(action: PageActionButton, idx: number): ActionsMenuIt
     onClick: action.onClick,
     disabled: action.disabled,
     href: action.href,
+    iconAction: action.iconAction
+      ? {
+          icon: action.iconAction.icon,
+          'aria-label': action.iconAction['aria-label'],
+          onClick: action.iconAction.onClick as (() => void) | undefined,
+          href: action.iconAction.href,
+          openInNewTab: action.iconAction.openInNewTab,
+          disabled: action.iconAction.disabled,
+        }
+      : undefined,
   }]
 }
 
-function ActionButton({ action }: { action: PageActionButton }) {
+interface RenderOptions {
+  /** Force the rendered button to be icon-only (label hidden). */
+  iconOnly?: boolean
+  /** Stretch the button to fill flex parent (used in mobile bottom bar). */
+  fullWidth?: boolean
+}
+
+function renderActionButton(action: PageActionButton, opts: RenderOptions = {}): React.ReactNode {
+  // Two-target SplitButton — primary action + secondary icon action.
+  if (action.iconAction) {
+    return (
+      <SplitButton
+        variant={action.variant ?? undefined}
+        href={action.href}
+        prefetch={action.prefetch}
+        openInNewTab={action.openInNewTab}
+        onClick={action.onClick}
+        disabled={action.disabled}
+        mainDisabled={action.mainDisabled}
+        leftIcon={action.icon}
+        fullWidth={opts.fullWidth}
+        iconAction={action.iconAction}
+      >
+        {action.label}
+      </SplitButton>
+    )
+  }
+
+  // Submenu — single click target with a trailing chevron divider.
   if (action.submenu && action.submenu.length > 0) {
     return (
       <ActionsMenuDropdown
         groups={[{ items: action.submenu }]}
         customTrigger={
           <Button
-            variant="split-action"
+            variant="outline"
             disabled={action.disabled}
             loading={action.loading}
             leftIcon={action.icon}
-            rightIcon={<Chevron02DownIcon className="h-4 w-4" />}
+            splitIcon={<Chevron02DownIcon className="h-4 w-4" />}
+            className={opts.fullWidth ? 'flex-1' : undefined}
           >
             {action.label}
           </Button>
@@ -83,8 +138,10 @@ function ActionButton({ action }: { action: PageActionButton }) {
     )
   }
 
-  if (!action.label || action.iconOnlyOnDesktop) {
-    const centerIcon = action.iconOnlyOnDesktop
+  // Icon-only button (no label, or explicitly icon-only on desktop).
+  const isIconOnly = opts.iconOnly || !action.label || action.iconOnlyOnDesktop
+  if (isIconOnly) {
+    const iconNode = action.iconOnlyOnDesktop
       ? <span className="inline-flex [&_svg]:!text-ods-text-primary">{action.icon}</span>
       : action.icon
     return (
@@ -97,12 +154,13 @@ function ActionButton({ action }: { action: PageActionButton }) {
         onClick={action.onClick}
         disabled={action.disabled}
         loading={action.loading}
-        centerIcon={centerIcon}
+        leftIcon={iconNode}
         aria-label={action.label ?? action.ariaLabel}
       />
     )
   }
 
+  // Default labeled button.
   return (
     <Button
       variant={action.variant}
@@ -113,6 +171,7 @@ function ActionButton({ action }: { action: PageActionButton }) {
       disabled={action.disabled}
       loading={action.loading}
       leftIcon={action.icon}
+      className={opts.fullWidth ? 'flex-1' : undefined}
     >
       {action.label}
     </Button>
@@ -123,44 +182,45 @@ export interface PageActionsProps {
   variant?: 'icon-buttons' | 'primary-buttons' | 'menu-primary'
   actions: PageActionButton[]
   menuActions?: ActionsMenuGroup[]
+  /**
+   * Desktop-only slot rendered before the action buttons (e.g. a `TabSelector`
+   * for view-mode toggles). Hidden on mobile and never merged into the "…" menu.
+   * Currently honored by the `icon-buttons` variant.
+   */
+  selector?: React.ReactNode
   className?: string
-  gap?: 'sm' | 'md' | 'lg'
 }
+
+const ACTIONS_GAP = 'gap-[var(--spacing-system-xs)]'
 
 export function PageActions({
   variant = 'icon-buttons',
   actions,
   menuActions,
+  selector,
   className,
-  gap = 'sm'
 }: PageActionsProps) {
-  const gapClasses = {
-    sm: 'gap-2',
-    md: 'gap-4',
-    lg: 'gap-6'
-  }
-
   if (variant === 'icon-buttons') {
-    return <IconButtonsVariant actions={actions} menuActions={menuActions} className={className} gapClass={gapClasses[gap]} />
+    return <IconButtonsVariant actions={actions} menuActions={menuActions} selector={selector} className={className} />
   }
 
   if (variant === 'menu-primary') {
-    return <MenuPrimaryVariant actions={actions} menuActions={menuActions || []} className={className} gapClass={gapClasses[gap]} />
+    return <MenuPrimaryVariant actions={actions} menuActions={menuActions || []} className={className} />
   }
 
-  return <PrimaryButtonsVariant actions={actions} className={className} gapClass={gapClasses[gap]} />
+  return <PrimaryButtonsVariant actions={actions} className={className} />
 }
 
 function IconButtonsVariant({
   actions,
   menuActions,
+  selector,
   className,
-  gapClass
 }: {
   actions: PageActionButton[]
   menuActions?: ActionsMenuGroup[]
+  selector?: React.ReactNode
   className?: string
-  gapClass: string
 }) {
   const desktopActions = actions.filter(a => !a.showOnlyMobile)
   const hasMenuActions = !!menuActions && menuActions.some(g => g.items.length > 0)
@@ -171,34 +231,26 @@ function IconButtonsVariant({
 
   return (
     <>
-      {/* Desktop: Show all buttons with icons, plus an overflow menu at the end */}
-      <div className={cn('hidden md:flex items-center', gapClass, className)}>
+      {/* Desktop: every action as an icon button + optional overflow menu */}
+      <div className={cn('hidden md:flex items-center', ACTIONS_GAP, className)}>
+        {selector}
         {desktopActions.map((action, idx) => (
-          <ActionButton key={actionKey(action, idx)} action={action} />
+          <React.Fragment key={actionKey(action, idx)}>
+            {renderActionButton(action)}
+          </React.Fragment>
         ))}
         {hasMenuActions && <ActionsMenuDropdown groups={menuActions} />}
       </div>
 
-      {/* Mobile: Show single icon button, or one merged ActionsMenu with every item */}
+      {/* Mobile: single icon button OR all actions merged into one "..." menu */}
       <div className={cn('flex md:hidden', className)}>
         {useSingleActionMobile && singleAction ? (
-          <Button
-            variant={singleAction.variant}
-            size="icon"
-            onClick={singleAction.onClick}
-            href={singleAction.href}
-            prefetch={singleAction.prefetch}
-            openInNewTab={singleAction.openInNewTab}
-            disabled={singleAction.disabled}
-            loading={singleAction.loading}
-            centerIcon={singleAction.icon}
-            aria-label={singleAction.label ?? singleAction.ariaLabel}
-          />
+          renderActionButton(singleAction, { iconOnly: true })
         ) : (
           <ActionsMenuDropdown
             groups={[
               { items: actions.flatMap(actionToMenuItems) },
-              ...(menuActions ?? [])
+              ...(menuActions ?? []),
             ]}
           />
         )}
@@ -208,22 +260,20 @@ function IconButtonsVariant({
 }
 
 /**
- * Primary buttons variant - shows primary + outline buttons,
- * becomes fixed bottom bar on mobile
+ * Primary buttons variant — primary + outline buttons on desktop,
+ * fixed bottom bar on mobile.
  */
 function PrimaryButtonsVariant({
   actions,
   className,
-  gapClass
 }: {
   actions: PageActionButton[]
   className?: string
-  gapClass: string
 }) {
-  // Sort actions: primary first, then outline
+  // Sort: outline first, accent last (rightmost on desktop).
   const sortedActions = [...actions].sort((a, b) => {
-    if (a.variant === 'primary' && b.variant !== 'primary') return 1
-    if (a.variant !== 'primary' && b.variant === 'primary') return -1
+    if (a.variant === 'accent' && b.variant !== 'accent') return 1
+    if (a.variant !== 'accent' && b.variant === 'accent') return -1
     return 0
   })
 
@@ -231,56 +281,51 @@ function PrimaryButtonsVariant({
 
   return (
     <>
-      {/* Desktop: Normal layout (outline left, primary right) */}
-      <div className={cn('hidden md:flex items-center', gapClass, className)}>
+      <div className={cn('hidden md:flex items-center', ACTIONS_GAP, className)}>
         {desktopActions.map((action, idx) => (
-          <ActionButton key={`desktop-${actionKey(action, idx)}`} action={action} />
+          <React.Fragment key={`desktop-${actionKey(action, idx)}`}>
+            {renderActionButton(action)}
+          </React.Fragment>
         ))}
       </div>
 
-      {/* Mobile: Fixed bottom bar */}
-      <MobileBottomActions actions={sortedActions} gapClass={gapClass} />
+      <MobileBottomActions actions={sortedActions} />
     </>
   )
 }
 
 /**
- * Menu + primary variant - shows menu ("...") + primary button on desktop,
- * all actions move to a single "..." menu on mobile
+ * Menu + primary variant — "..." menu + primary buttons on desktop,
+ * all actions merged into a single "..." menu on mobile.
  */
 function MenuPrimaryVariant({
   actions,
   menuActions,
   className,
-  gapClass
 }: {
   actions: PageActionButton[]
   menuActions: ActionsMenuGroup[]
   className?: string
-  gapClass: string
 }) {
   const desktopActions = actions.filter(a => !a.showOnlyMobile)
   const hasMenuActions = menuActions.some(g => g.items.length > 0)
 
   return (
     <>
-      {/* Desktop: menu dropdown + action buttons */}
-      <div className={cn('hidden md:flex items-center', gapClass, className)}>
+      <div className={cn('hidden md:flex items-center', ACTIONS_GAP, className)}>
         {hasMenuActions && <ActionsMenuDropdown groups={menuActions} />}
         {desktopActions.map((action, idx) => (
-          <ActionButton
-            key={`desktop-${actionKey(action, idx)}`}
-            action={{ ...action, variant: action.variant || 'primary' }}
-          />
+          <React.Fragment key={`desktop-${actionKey(action, idx)}`}>
+            {renderActionButton({ ...action, variant: action.variant || 'accent' })}
+          </React.Fragment>
         ))}
       </div>
 
-      {/* Mobile: single "..." menu with actions merged in */}
       <div className={cn('flex md:hidden', className)}>
         <ActionsMenuDropdown
           groups={[
             { items: actions.flatMap(actionToMenuItems) },
-            ...menuActions
+            ...menuActions,
           ]}
         />
       </div>
@@ -288,51 +333,18 @@ function MenuPrimaryVariant({
   )
 }
 
-function MobileBottomActions({
-  actions,
-  gapClass
-}: {
-  actions: PageActionButton[]
-  gapClass: string
-}) {
+function MobileBottomActions({ actions }: { actions: PageActionButton[] }) {
   return (
     <div className={cn(
       'fixed md:hidden bottom-0 left-0 right-0 z-50',
       'bg-ods-card border-t border-ods-border',
       'flex items-start pt-6 pb-6 px-6',
-      gapClass
+      ACTIONS_GAP,
     )}>
       {actions.map((action, idx) => (
-        action.label ? (
-          <Button
-            key={`mobile-${actionKey(action, idx)}`}
-            variant={action.variant}
-            onClick={action.onClick}
-            href={action.href}
-            prefetch={action.prefetch}
-            openInNewTab={action.openInNewTab}
-            leftIcon={action.icon}
-            disabled={action.disabled}
-            loading={action.loading}
-            className={'flex-1'}
-          >
-            {action.label}
-          </Button>
-        ) : (
-          <Button
-            key={`mobile-${actionKey(action, idx)}`}
-            variant={action.variant}
-            size="icon"
-            onClick={action.onClick}
-            href={action.href}
-            prefetch={action.prefetch}
-            openInNewTab={action.openInNewTab}
-            centerIcon={action.icon}
-            disabled={action.disabled}
-            loading={action.loading}
-            aria-label={action.ariaLabel}
-          />
-        )
+        <React.Fragment key={`mobile-${actionKey(action, idx)}`}>
+          {renderActionButton(action, { fullWidth: !!action.label })}
+        </React.Fragment>
       ))}
     </div>
   )

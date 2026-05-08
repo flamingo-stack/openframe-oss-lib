@@ -1,7 +1,10 @@
 'use client'
 
 import React from 'react'
-import { CopyIcon } from '../icons'
+import { cn } from '../../utils/cn'
+import { Copy01Icon } from '../icons-v2-generated/documents'
+import { CheckIcon } from '../icons-v2-generated/signs-and-symbols'
+import { useCopyToClipboard } from '../../hooks/use-copy-to-clipboard'
 import { ProgressBar } from './progress-bar'
 
 interface InfoCardData {
@@ -56,30 +59,14 @@ export function InfoCard({ data, className = '' }: InfoCardProps) {
           return (
             <React.Fragment key={index}>
               {values.map((val, valIndex) => (
-                <div key={`${index}-${valIndex}`} className="flex gap-2 items-center w-full">
-                  <span className="text-h4 text-[#fafafa] whitespace-nowrap">
-                    {valIndex === 0 ? item.label : ''}
-                  </span>
-                  <div className="flex-1 h-px bg-[#3a3a3a]" />
-                  <div className="flex items-center gap-2 max-w-[60%]">
-                    <span
-                      className="text-h4 text-[#fafafa] truncate select-text"
-                      title={val}
-                    >
-                      {val}
-                    </span>
-                    {item.copyable && (
-                      <button
-                        type="button"
-                        onClick={() => navigator.clipboard?.writeText(val)}
-                        className="text-[#888888] hover:text-[#fafafa] transition-colors"
-                        aria-label={`Copy ${item.label} ${valIndex + 1}`}
-                      >
-                        <CopyIcon className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                </div>
+                <InfoCardValueRow
+                  key={`${index}-${valIndex}`}
+                  label={item.label}
+                  value={val}
+                  showLabel={valIndex === 0}
+                  copyable={item.copyable}
+                  copyAriaLabel={`Copy ${item.label} ${valIndex + 1}`}
+                />
               ))}
             </React.Fragment>
           )
@@ -95,6 +82,48 @@ export function InfoCard({ data, className = '' }: InfoCardProps) {
           inverted={data.progress.inverted}
         />
       )}
+    </div>
+  )
+}
+
+interface InfoCardValueRowProps {
+  label?: string
+  value: string
+  showLabel: boolean
+  copyable?: boolean
+  copyAriaLabel: string
+}
+
+function InfoCardValueRow({ label, value, showLabel, copyable, copyAriaLabel }: InfoCardValueRowProps) {
+  const { copy, copied } = useCopyToClipboard()
+
+  return (
+    <div className="flex gap-2 items-center w-full">
+      <span className="text-h4 text-[#fafafa] whitespace-nowrap">
+        {showLabel ? label : ''}
+      </span>
+      <div className="flex-1 h-px bg-[#3a3a3a]" />
+      <div className="flex items-center gap-2 max-w-[60%]">
+        <span
+          className="text-h4 text-[#fafafa] truncate select-text"
+          title={value}
+        >
+          {value}
+        </span>
+        {copyable && (
+          <button
+            type="button"
+            onClick={() => copy(value)}
+            className={cn(
+              'transition-colors',
+              copied ? 'text-ods-success' : 'text-[#888888] hover:text-[#fafafa]',
+            )}
+            aria-label={copyAriaLabel}
+          >
+            {copied ? <CheckIcon size={16} /> : <Copy01Icon size={16} />}
+          </button>
+        )}
+      </div>
     </div>
   )
 }

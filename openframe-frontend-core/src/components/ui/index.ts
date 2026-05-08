@@ -13,6 +13,7 @@ export * from './field-wrapper'
 export * from './info-card'
 export * from './info-row'
 export * from './input'
+export * from './input-trigger'
 export * from './interactive-card'
 export * from './label'
 export * from './media-type-selector'
@@ -141,6 +142,7 @@ export * from './markdown-editor'
 
 // File Upload
 export * from './file-upload'
+export * from './image-uploader'
 
 // Ticket components
 export * from './ticket-status-tag'

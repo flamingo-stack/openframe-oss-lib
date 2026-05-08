@@ -18,6 +18,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Service for querying organizations with filtering and search.
@@ -29,6 +30,10 @@ import java.util.List;
 public class OrganizationQueryService {
 
     private final OrganizationRepository organizationRepository;
+
+    public Optional<Organization> findByOrganizationId(String organizationId) {
+        return organizationRepository.findByOrganizationId(organizationId);
+    }
 
     /**
      * Query organizations with optional filtering, pagination, and search.

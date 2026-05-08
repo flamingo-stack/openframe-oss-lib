@@ -169,7 +169,7 @@ export const WithFooter: Story = {
             <Button variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button variant="primary" onClick={() => setOpen(false)}>
+            <Button variant="accent" onClick={() => setOpen(false)}>
               Confirm
             </Button>
           </DrawerFooter>

@@ -26,7 +26,7 @@ export interface DataTableProps<T> {
 export function DataTableRoot<T>({ table, children, className }: DataTableProps<T>) {
   return (
     <DataTableContext.Provider value={table}>
-      <div className={cn('flex flex-col gap-[var(--spacing-system-xxs)] w-full', className)}>{children}</div>
+      <div className={cn('flex flex-col w-full', className)}>{children}</div>
     </DataTableContext.Provider>
   )
 }

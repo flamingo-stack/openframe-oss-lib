@@ -131,7 +131,7 @@ export function SlidingSidebar({ config }: SlidingSidebarProps) {
       return (
         <div key={item.id} className="space-y-1">
           <Button
-            variant="ghost-nav"
+            variant="transparent"
             size="default"
             onClick={() => toggleExpanded(item.id)}
             leftIcon={item.icon}
@@ -178,7 +178,7 @@ export function SlidingSidebar({ config }: SlidingSidebarProps) {
       return (
         <Button
           key={item.id}
-          variant="ghost-nav"
+          variant="transparent"
           size="default"
           onClick={() => {
             // Let the parent handle navigation
@@ -205,7 +205,7 @@ export function SlidingSidebar({ config }: SlidingSidebarProps) {
     return (
       <Button
         key={item.id}
-        variant="ghost-nav"
+        variant="transparent"
         size="default"
         onClick={() => {
           item.onClick?.()

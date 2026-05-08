@@ -21,6 +21,12 @@ declare module '@tanstack/react-table' {
       options: DataTableFilterOption[]
       placement?: 'bottom-start' | 'bottom-end' | 'bottom'
     }
+    /**
+     * Opt-in: header renders the sort indicator and clicks toggle column sort.
+     * Default `false` — columns are not sortable from the UI even though
+     * TanStack's `enableSorting` defaults to true.
+     */
+    sortable?: boolean
     /** Extra class names applied to the body cell wrapper. */
     cellClassName?: string
     /** Extra class names applied to the header cell wrapper. */

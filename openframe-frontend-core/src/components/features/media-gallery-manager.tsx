@@ -137,7 +137,7 @@ export function MediaGalleryManager({
           <Button
             type="button"
             variant="outline"
-            size="sm"
+            size="small-legacy"
             onClick={() => handleDeleteMedia(index)}
             disabled={isDeleting}
             className="h-8 w-8 p-0 bg-red-500 hover:bg-red-600 border-red-500"

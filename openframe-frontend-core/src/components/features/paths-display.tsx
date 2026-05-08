@@ -107,8 +107,8 @@ export function PathsDisplay({
             </span>
             {showCopyButtons && onCopyPath && (
               <Button
-                variant="ghost"
-                size="sm"
+                variant="transparent"
+                size="small-legacy"
                 onClick={() => onCopyPath(path)}
                 className="ml-4 shrink-0"
               >

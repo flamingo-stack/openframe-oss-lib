@@ -170,4 +170,13 @@ public class DeviceQueries {
                 }
             }
             """;
+
+    public static final String DEVICE_FILTERS_WITH_FILTER = """
+            query DeviceFilters($filter: DeviceFilterInput) {
+                deviceFilters(filter: $filter) {
+                    statuses { value count }
+                    filteredCount
+                }
+            }
+            """;
 }

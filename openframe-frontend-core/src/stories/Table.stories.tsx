@@ -125,7 +125,7 @@ export const ResponsiveColumns: Story = {
     rowKey: 'id',
     renderRowActions: (item) => (
       <div>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="small-legacy">
           Edit
         </Button>
       </div>

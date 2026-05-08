@@ -103,8 +103,8 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
         {/* Approve/Reject buttons */}
         <div className="flex gap-4 items-center">
           <Button
-            size="sm"
-            variant="primary"
+            size="small-legacy"
+            variant="accent"
             onClick={handleApprove}
             disabled={isProcessing}
             className={cn(
@@ -116,7 +116,7 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
             Approve
           </Button>
           <Button
-            size="sm"
+            size="small-legacy"
             variant="outline"
             onClick={handleReject}
             disabled={isProcessing}

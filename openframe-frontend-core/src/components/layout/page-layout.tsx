@@ -1,27 +1,24 @@
 'use client'
 
-import { ChevronLeft } from 'lucide-react'
 import React from 'react'
 import { cn } from '../../utils/cn'
 import type { ActionsMenuGroup } from '../ui/actions-menu'
-import { Button } from '../ui/button'
-import { PageActions, type PageActionButton } from '../ui/page-actions'
-
-const PADDING = { none: '', sm: 'p-4', md: 'p-6', lg: 'p-8' } as const
-const BACKGROUND = { default: 'bg-ods-bg', card: 'bg-ods-card', transparent: '' } as const
+import { type PageActionButton } from '../ui/page-actions'
+import { TitleBlock } from './title-block'
 
 export interface PageLayoutProps {
   children: React.ReactNode
   title?: string
+  subtitle?: string
+  image?: { src: string; alt?: string }
   backButton?: { label?: string; onClick: () => void }
-  /** @deprecated Use `actions` instead for consistent action handling */
-  headerActions?: React.ReactNode
   actions?: PageActionButton[]
   actionsVariant?: 'icon-buttons' | 'primary-buttons' | 'menu-primary'
-  actionsGap?: 'sm' | 'md' | 'lg'
   menuActions?: ActionsMenuGroup[]
-  padding?: keyof typeof PADDING
-  background?: keyof typeof BACKGROUND
+  /** Desktop-only slot (e.g. a `TabSelector`) rendered with the actions. Hidden on mobile. */
+  selector?: React.ReactNode
+  /** Header visual variant. `card` adds a card background, border, and padding on mobile. */
+  headerVariant?: 'plain' | 'card'
   className?: string
   contentClassName?: string
   showHeader?: boolean
@@ -35,54 +32,36 @@ export interface PageLayoutProps {
 export function PageLayout({
   children,
   title,
+  subtitle,
+  image,
   backButton,
-  headerActions,
   actions,
   actionsVariant = 'icon-buttons',
-  actionsGap,
   menuActions,
-  padding = 'none',
-  background = 'transparent',
+  selector,
+  headerVariant,
   className,
   contentClassName,
   showHeader = true,
 }: PageLayoutProps) {
   const hasActions = actions && actions.length > 0
   const needsBottomPadding = hasActions && actionsVariant === 'primary-buttons'
-  const hasHeader = showHeader && (title || backButton || headerActions || hasActions)
+  const hasHeader = showHeader && (title || subtitle || image || backButton || hasActions || selector)
 
   return (
-    <div
-      className={cn('flex flex-col w-full', BACKGROUND[background], PADDING[padding], className)}
-    >
+    <div className={cn('flex flex-col w-full', className)}>
       {hasHeader && (
-        <div className="flex items-end justify-between md:flex-col md:items-start md:justify-start lg:flex-row lg:items-end lg:justify-between gap-[var(--spacing-system-m)] mb-[var(--spacing-system-l)]">
-          <div className="flex flex-col gap-2 flex-1 min-w-0">
-            {backButton && (
-              <Button
-                onClick={backButton.onClick}
-                variant="ghost-subtle"
-                className="self-start justify-start hidden md:flex"
-                leftIcon={<ChevronLeft className="size-6" />}
-                noPadding
-              >
-                {backButton.label || 'Back'}
-              </Button>
-            )}
-            {title && (
-              <h1 className="text-h2 text-ods-text-primary">{title}</h1>
-            )}
-          </div>
-
-          {(headerActions || hasActions) && (
-            <div className="flex gap-2 items-center shrink-0">
-              {headerActions}
-              {hasActions && (
-                <PageActions variant={actionsVariant} actions={actions} menuActions={menuActions} gap={actionsGap} />
-              )}
-            </div>
-          )}
-        </div>
+        <TitleBlock
+          title={title}
+          subtitle={subtitle}
+          image={image}
+          backButton={backButton}
+          actions={actions}
+          actionsVariant={actionsVariant}
+          menuActions={menuActions}
+          selector={selector}
+          variant={headerVariant}
+        />
       )}
 
       <div className={cn('flex flex-col flex-1 gap-[var(--spacing-system-l)]', needsBottomPadding && 'pb-28 md:pb-0', contentClassName)}>
@@ -93,4 +72,6 @@ export function PageLayout({
 }
 
 export type { PageActionButton } from '../ui/page-actions'
+export { TitleBlock } from './title-block'
+export type { TitleBlockProps } from './title-block'
 export default PageLayout

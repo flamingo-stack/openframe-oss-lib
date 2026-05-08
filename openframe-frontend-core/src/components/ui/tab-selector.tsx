@@ -6,8 +6,10 @@ import { cn } from '../../utils/cn'
 export interface TabSelectorItem {
   /** Unique identifier for the tab */
   id: string
-  /** Display label */
-  label: string
+  /** Display label. Optional — omit for icon-only tabs (provide `ariaLabel` for accessibility). */
+  label?: string
+  /** Accessible name. Required when `label` is omitted. */
+  ariaLabel?: string
   /** Optional icon (ReactNode) displayed before the label */
   icon?: React.ReactNode
   /** Whether this tab is disabled */
@@ -63,6 +65,7 @@ export function TabSelector({
               type="button"
               disabled={isDisabled}
               onClick={() => onValueChange(item.id)}
+              aria-label={!item.label ? item.ariaLabel : undefined}
               className={cn(
                 'flex flex-1 items-center justify-center gap-2 rounded-xs p-2 text-h4 transition-colors duration-200 whitespace-nowrap',
                 isDisabled

@@ -39,7 +39,7 @@ public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
             error = buildError(ce.getMessage(), ce.getErrorCode());
         } else if (exception instanceof BaseException be) {
             error = buildError(be.getMessage(), be.getErrorCode());
-        } else if (exception instanceof IllegalArgumentException) {
+        } else if (exception instanceof IllegalArgumentException || exception instanceof IllegalStateException) {
             error = buildError(exception.getMessage(), ErrorCode.VALIDATION_ERROR);
         } else if (exception instanceof RuntimeException) {
             error = buildError("An unexpected error occurred. Please try again later.", ErrorCode.INTERNAL_ERROR);

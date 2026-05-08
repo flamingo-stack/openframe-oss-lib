@@ -179,7 +179,7 @@ export function OnboardingWalkthrough({
           <div className="h-[48px] w-full md:w-[160px] bg-ods-border rounded-[6px] animate-pulse" />
         ) : isAllComplete ? (
           <Button
-            variant="primary"
+            variant="accent"
             onClick={handleDismiss}
             className="w-full md:w-auto"
           >
@@ -187,7 +187,7 @@ export function OnboardingWalkthrough({
           </Button>
         ) : (
           <Button
-            variant="device-action"
+            variant="outline"
             onClick={handleDismiss}
             className="w-full md:w-auto"
           >

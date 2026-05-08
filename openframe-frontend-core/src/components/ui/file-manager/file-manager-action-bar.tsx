@@ -21,63 +21,57 @@ export function FileManagerActionBar({
     <div className={cn('flex items-center gap-4 flex-wrap md:justify-end', className)}>
       <Button
         variant="outline"
-        size="sm"
+        size="small-legacy"
         onClick={onNewFolder}
         leftIcon={<FolderPlus className="h-4 w-4" />}
-        fullWidthOnMobile={false}
       >
         New Folder
       </Button>
 
       <Button
         variant="outline"
-        size="sm"
+        size="small-legacy"
         onClick={onCopy}
         disabled={!hasSelection}
         leftIcon={<Copy className="h-4 w-4" />}
-        fullWidthOnMobile={false}
       >
         Copy
       </Button>
 
       <Button
         variant="outline"
-        size="sm"
+        size="small-legacy"
         onClick={onCut}
         disabled={!hasSelection}
         leftIcon={<Scissors className="h-4 w-4" />}
-        fullWidthOnMobile={false}
       >
         Cut
       </Button>
 
       <Button
         variant="outline"
-        size="sm"
+        size="small-legacy"
         onClick={onPaste}
         disabled={!canPaste}
         leftIcon={<Clipboard className="h-4 w-4" />}
-        fullWidthOnMobile={false}
       >
         Paste
       </Button>
 
       <Button
         variant="outline"
-        size="sm"
+        size="small-legacy"
         onClick={onUpload}
         leftIcon={<Upload className="h-4 w-4" />}
-        fullWidthOnMobile={false}
       >
         Upload
       </Button>
 
       <Button
         variant="outline"
-        size="sm"
+        size="small-legacy"
         onClick={onSelectAll}
         leftIcon={<CheckSquare className="h-4 w-4" />}
-        fullWidthOnMobile={false}
       >
         Select All
       </Button>

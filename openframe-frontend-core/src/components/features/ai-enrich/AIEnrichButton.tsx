@@ -17,14 +17,14 @@ export interface AIEnrichButtonProps {
 }
 
 const sizeMap = {
-  sm: 'sm' as const,
+  sm: 'small-legacy' as const,
   md: 'default' as const,
-  lg: 'lg' as const,
+  lg: 'default' as const,
 }
 
 const variantMap = {
-  primary: 'flamingo-primary' as const,
-  secondary: 'flamingo-secondary' as const,
+  primary: 'accent' as const,
+  secondary: 'outline' as const,
   outline: 'outline' as const,
 }
 
@@ -40,6 +40,7 @@ export const AIEnrichButton: React.FC<AIEnrichButtonProps> = ({
 }) => {
   return (
     <Button
+      type="button"
       onClick={onClick}
       disabled={disabled || loading}
       loading={loading}

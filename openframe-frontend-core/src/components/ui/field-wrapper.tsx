@@ -27,7 +27,7 @@ const FieldWrapper = React.forwardRef<HTMLDivElement, FieldWrapperProps>(
     return (
       <div ref={ref} className={cn(hasChrome ? "relative flex w-full flex-col" : "contents", className)}>
         {label && (
-          <label className="text-[14px] md:text-[18px] font-medium leading-5 md:leading-6 text-ods-text-primary mb-1">
+          <label className="text-h4 text-ods-text-primary mb-1">
             {label}
           </label>
         )}

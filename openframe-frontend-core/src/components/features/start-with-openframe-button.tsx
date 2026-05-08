@@ -31,28 +31,28 @@ export const StartWithOpenFrameButton = React.forwardRef<
   const isCyan = mode === 'cyan';
   
   // Map buttonSize to Button component's size prop
-  const mappedSize = buttonSize === 'md' ? 'default' : buttonSize;
-  
+  const mappedSize = buttonSize === 'md' ? 'default' : buttonSize === 'sm' ? 'small-legacy' : buttonSize === 'lg' ? 'default' : undefined;
+
   // Determine button variant and class names based on mode
-  let buttonVariant: 'primary' | 'outline' = 'outline';
+  let buttonVariant: 'accent' | 'outline' = 'outline';
   let modeClassName = '';
   let iconLowerPath = "var(--ods-open-yellow-base)";
   let iconUpperPath = "var(--ods-system-greys-white)";
   let customStyle: React.CSSProperties = {};
   
   if (isYellow) {
-    buttonVariant = 'primary';
+    buttonVariant = "accent";
     modeClassName = 'bg-[var(--ods-open-yellow-base)] hover:bg-[var(--ods-open-yellow-hover)] text-ods-text-on-accent border-[var(--ods-open-yellow-base)]';
     iconLowerPath = "var(--ods-system-greys-white)";
     iconUpperPath = "var(--ods-system-greys-black)";
   } else if (isPink) {
-    buttonVariant = 'primary';
+    buttonVariant = "accent";
     modeClassName = 'bg-[var(--ods-flamingo-pink-base)] hover:bg-[var(--ods-flamingo-pink-hover)] text-[var(--ods-system-greys-black)] border-[var(--ods-flamingo-pink-base)]';
     iconLowerPath = "var(--ods-system-greys-white)";
     iconUpperPath = "var(--ods-system-greys-black)";
   } else if (isCyan) {
     // Cyan mode: similar to JoinWaitlistButton with custom colors
-    buttonVariant = 'primary';
+    buttonVariant = "accent";
     modeClassName = 'bg-[var(--ods-flamingo-cyan-base)] hover:bg-[var(--ods-flamingo-cyan-hover)] text-[var(--ods-system-greys-black)] border-[var(--ods-flamingo-cyan-base)]';
     // Allow override with custom colors if provided
     if (buttonBackgroundColor || buttonTextColor) {

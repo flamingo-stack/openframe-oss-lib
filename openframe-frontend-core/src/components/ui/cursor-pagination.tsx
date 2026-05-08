@@ -102,7 +102,7 @@ export function CursorPagination({
         {onReset ? (
           <Button
             variant="outline"
-            size={compact ? 'sm' : 'default'}
+            size={compact ? 'small-legacy' : 'default'}
             onClick={handleReset}
             disabled={isFirstPage || loading}
             className={cn(
@@ -117,7 +117,7 @@ export function CursorPagination({
           hasPreviousPage !== undefined && onPrevious && (
             <Button
               variant="outline"
-              size={compact ? 'sm' : 'default'}
+              size={compact ? 'small-legacy' : 'default'}
               onClick={handlePrevious}
               disabled={!hasPreviousPage || loading}
               className={cn(
@@ -133,7 +133,7 @@ export function CursorPagination({
 
         <Button
           variant="outline"
-          size={compact ? 'sm' : 'default'}
+          size={compact ? 'small-legacy' : 'default'}
           onClick={handleNext}
           disabled={!hasNextPage || loading}
           className={cn(
@@ -163,7 +163,7 @@ export function CursorPaginationSimple({
     <div className={cn('flex items-center gap-1', className)}>
       {onReset ? (
         <Button
-          variant="ghost"
+          variant="transparent"
           size="icon"
           onClick={onReset}
           disabled={isFirstPage || loading}
@@ -174,7 +174,7 @@ export function CursorPaginationSimple({
       ) : (
         hasPreviousPage !== undefined && onPrevious && (
           <Button
-            variant="ghost"
+            variant="transparent"
             size="icon"
             onClick={() => onPrevious?.('')}
             disabled={!hasPreviousPage || loading}
@@ -186,7 +186,7 @@ export function CursorPaginationSimple({
       )}
       
       <Button
-        variant="ghost"
+        variant="transparent"
         size="icon"
         onClick={() => onNext?.('')}
         disabled={!hasNextPage || loading}

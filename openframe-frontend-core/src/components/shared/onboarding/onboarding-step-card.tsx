@@ -114,7 +114,7 @@ export function OnboardingStepCard({
               Skip Step
             </Button>
             <Button
-              variant="primary"
+              variant="accent"
               onClick={handleAction}
               disabled={isProcessing}
               leftIcon={step.actionIcon('black')}

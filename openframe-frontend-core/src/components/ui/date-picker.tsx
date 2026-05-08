@@ -99,11 +99,11 @@ function CalendarNavButton({ direction, onClick, "aria-label": ariaLabel }: Cale
   return (
     <Button
       type="button"
-      variant="card"
+      variant="outline"
       size="icon"
       onClick={onClick}
       aria-label={ariaLabel}
-      centerIcon={direction === "left" ? <ChevronLeft className="size-6" /> : <ChevronRight className="size-6" />}
+      leftIcon={direction === "left" ? <ChevronLeft className="size-6" /> : <ChevronRight className="size-6" />}
     />
   );
 }
@@ -156,7 +156,7 @@ function DatePickerCalendar({
     week: "flex",
     day: cn(
       "size-10 flex items-center justify-center",
-      "text-[18px] font-medium leading-6 text-ods-text-primary",
+      "text-h4 text-ods-text-primary",
       "cursor-pointer",
       "transition-colors duration-150",
       "hover:bg-ods-bg-surface hover:rounded-[6px]"
@@ -265,7 +265,7 @@ function DatePickerCalendar({
             onClick={handlePreviousMonth}
             aria-label="Previous month"
           />
-          <span className="text-[18px] font-medium leading-6 text-ods-text-primary">
+          <span className="text-h4 text-ods-text-primary">
             {formatMonthYear(month)}
           </span>
           <CalendarNavButton
@@ -305,7 +305,7 @@ function DatePickerCalendar({
               onClick={handlePreviousMonth}
               aria-label="Previous month"
             />
-            <span className="text-[18px] font-medium leading-6 text-ods-text-primary">
+            <span className="text-h4 text-ods-text-primary">
               {formatMonthYear(month)}
             </span>
             {numberOfMonths === 1 && (
@@ -338,7 +338,7 @@ function DatePickerCalendar({
           <div className="flex-1 border-l border-ods-border">
             <div className="flex items-center justify-between px-4 pt-4">
               <div className="size-10 md:size-12" />
-              <span className="text-[18px] font-medium leading-6 text-ods-text-primary">
+              <span className="text-h4 text-ods-text-primary">
                 {formatMonthYear(getSecondMonth(month))}
               </span>
               <CalendarNavButton
@@ -378,7 +378,7 @@ const triggerButtonStyles = cn(
   // Colors
   "bg-ods-card border-ods-border",
   // Typography
-  "text-[18px] font-medium leading-6",
+  "text-h4",
   // Hover & active (not disabled)
   "enabled:hover:bg-ods-bg-hover enabled:hover:border-ods-border-hover enabled:active:bg-ods-bg-active enabled:active:border-ods-border-active",
   "focus:outline-none",
@@ -392,7 +392,7 @@ const timeSelectTriggerStyles = cn(
   "flex items-center justify-between gap-1",
   "h-11 md:h-12 min-h-0 px-3 rounded-[6px] border",
   "bg-ods-card border-ods-border",
-  "text-[18px] font-medium leading-6",
+  "text-h4",
   "enabled:hover:bg-ods-bg-hover enabled:hover:border-ods-border-hover enabled:active:bg-ods-bg-active enabled:active:border-ods-border-active",
   "focus:outline-none",
   "disabled:!cursor-not-allowed disabled:bg-ods-bg",
@@ -685,7 +685,7 @@ export function DatePickerInput({
             </SelectContent>
           </Select>
 
-          <span className="text-ods-text-secondary text-[18px] font-medium">:</span>
+          <span className="text-ods-text-secondary text-h4">:</span>
 
           {/* Minute Select */}
           <Select

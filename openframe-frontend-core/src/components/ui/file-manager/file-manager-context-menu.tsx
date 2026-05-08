@@ -63,8 +63,8 @@ export function FileManagerContextMenu({
       <DropdownMenuTrigger asChild>
         {trigger || (
           <Button
-            variant="ghost"
-            size="sm"
+            variant="transparent"
+            size="small-legacy"
             className="h-8 w-8 p-0"
           >
             <MoreHorizontal className="h-4 w-4" />

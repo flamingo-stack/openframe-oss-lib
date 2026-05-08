@@ -204,12 +204,12 @@ const CategorySection: React.FC<{
 
         {/* Expand/Collapse Button */}
         <Button
-          variant="ghost"
+          variant="transparent"
           onClick={(e) => {
             e.stopPropagation();
             onCategoryToggle(category.id);
           }}
-          centerIcon={<ChevronDown 
+          leftIcon={<ChevronDown 
             className={cn(
               "h-6 w-6 text-ods-text-primary transition-transform duration-300",
               category.isExpanded && "rotate-180"

@@ -33,7 +33,7 @@ const SelectTrigger = React.forwardRef<
         // Layout & spacing - match Input
         "flex w-full items-center justify-between gap-2 rounded-[6px] border px-3 h-11 md:h-12 outline-none",
         // Typography - match Input exactly
-        "text-[18px] font-medium leading-6",
+        "text-h4",
         // Theme palette - match Input exactly
         "bg-ods-card border-ods-border text-ods-text-primary data-[placeholder]:text-ods-text-secondary",
         "enabled:hover:bg-ods-bg-hover enabled:hover:border-ods-border-hover enabled:active:bg-ods-bg-active enabled:active:border-ods-border-active",
@@ -152,7 +152,7 @@ const SelectItem = React.forwardRef<
     className={cn(
       "flex w-full cursor-pointer select-none items-center justify-between h-11 md:h-12 px-4 border-b border-ods-border last:border-b-0",
       // Typography - match trigger
-      "text-[18px] font-medium leading-6 whitespace-nowrap",
+      "text-h4 whitespace-nowrap",
       // Hover state with visible background change
       "outline-none hover:bg-ods-bg-hover data-[highlighted]:bg-ods-bg-surface",
       "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",

@@ -2,6 +2,7 @@ package com.openframe.management.config.pinot;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -70,14 +71,24 @@ public class PinotConfigInitializer {
 
         log.info("Starting Pinot configuration deployment to {}", pinotControllerUrl);
 
+        List<String> failed = new ArrayList<>();
         for (PinotConfig config : PINOT_CONFIGS) {
             try {
                 deployPinotConfig(config);
             } catch (Exception e) {
                 log.error("Failed to deploy Pinot configuration for {}", config.getName(), e);
+                failed.add(config.getName());
             }
         }
-        log.info("Pinot configuration deployment completed");
+
+        if (failed.isEmpty()) {
+            log.info("Pinot configuration deployment completed successfully");
+        } else {
+            log.error("Pinot configuration deployment FAILED for {} of {} table(s): {}. "
+                    + "Affected tables may be missing, stale, or rejected by the controller. "
+                    + "See preceding stack traces for the underlying cause.",
+                    failed.size(), PINOT_CONFIGS.size(), failed);
+        }
     }
 
     private void deployPinotConfig(PinotConfig config) {

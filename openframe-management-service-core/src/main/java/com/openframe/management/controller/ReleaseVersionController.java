@@ -16,7 +16,8 @@ public class ReleaseVersionController {
 
     @PostMapping
     public void updateReleaseVersion(@RequestBody ReleaseVersionRequest request) {
-        releaseVersionService.process(request.getImageTagVersion());
+        String imageTagVersion = request.getImageTagVersion();
+        releaseVersionService.process(imageTagVersion);
     }
 }
 

@@ -201,8 +201,9 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
         />
         {showCancel && onCancel && loading && (
           <Button
+            type="button"
             variant="outline"
-            size="sm"
+            size="small-legacy"
             onClick={onCancel}
             disabled={isCancelling}
             leftIcon={isCancelling ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
@@ -283,7 +284,7 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
           {showClearButton && onClear && (
             <Button
               variant="outline"
-              size="sm"
+              size="small-legacy"
               onClick={onClear}
             >
               Clear Results

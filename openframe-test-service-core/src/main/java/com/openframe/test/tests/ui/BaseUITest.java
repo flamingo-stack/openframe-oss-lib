@@ -11,6 +11,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.extension.AfterTestExecutionCallback;
+import org.junit.jupiter.api.extension.ExtensionContext;
+import org.junit.jupiter.api.extension.LifecycleMethodExecutionExceptionHandler;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.nio.file.Files;
@@ -34,6 +36,15 @@ abstract class BaseUITest {
     @RegisterExtension
     final AfterTestExecutionCallback afterTest = ctx ->
             captureArtifacts(ctx.getDisplayName(), ctx.getExecutionException().isPresent());
+
+    @RegisterExtension
+    final LifecycleMethodExecutionExceptionHandler beforeEachFail = new LifecycleMethodExecutionExceptionHandler() {
+        @Override
+        public void handleBeforeEachMethodExecutionException(ExtensionContext ctx, Throwable t) throws Throwable {
+            captureArtifacts(ctx.getDisplayName(), true);
+            throw t;
+        }
+    };
 
     @BeforeAll
     static void launchBrowser() {

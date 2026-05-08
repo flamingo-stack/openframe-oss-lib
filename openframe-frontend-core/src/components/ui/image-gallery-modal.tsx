@@ -88,8 +88,8 @@ export function ImageGalleryModal({
             {selectedImageIndex > 0 && (
               <div className="absolute left-4 top-1/2 -translate-y-1/2 z-[10000]">
                 <Button
-                  variant="ghost"
-                  size="sm"
+                  variant="transparent"
+                  size="small-legacy"
                   onClick={goToPreviousImage}
                   className="rounded-full bg-black/50 text-white hover:bg-black/70 p-2"
                   leftIcon={<ChevronLeft className="w-6 h-6" />}
@@ -99,8 +99,8 @@ export function ImageGalleryModal({
             {selectedImageIndex < images.length - 1 && (
               <div className="absolute right-4 top-1/2 -translate-y-1/2 z-[10000]">
                 <Button
-                  variant="ghost"
-                  size="sm"
+                  variant="transparent"
+                  size="small-legacy"
                   onClick={goToNextImage}
                   className="rounded-full bg-black/50 text-white hover:bg-black/70 p-2"
                   leftIcon={<ChevronRight className="w-6 h-6" />}
