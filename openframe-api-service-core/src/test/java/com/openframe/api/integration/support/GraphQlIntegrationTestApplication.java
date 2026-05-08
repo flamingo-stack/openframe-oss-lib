@@ -5,7 +5,7 @@ import com.openframe.api.config.InstantScalarConfig;
 import com.openframe.api.config.LongScalarConfig;
 import com.openframe.api.datafetcher.NotificationDataFetcher;
 import com.openframe.api.datafetcher.notification.NotificationContextGraphQlTypeResolver;
-import com.openframe.api.integration.datafetcher.notification.TestApprovalContextTypeResolver;
+import com.openframe.api.integration.datafetcher.notification.TestApprovalContextDescriptor;
 import com.openframe.api.mapper.GraphQLNotificationMapper;
 import com.openframe.api.service.NotificationService;
 import com.openframe.data.config.NotificationContextMongoConfig;
@@ -59,7 +59,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
         GraphQLNotificationMapper.class,
         NotificationDataFetcher.class,
         NotificationContextGraphQlTypeResolver.class,
-        TestApprovalContextTypeResolver.class,
+        TestApprovalContextDescriptor.class,
         NotificationContextMongoConfig.class,
         NotificationContextJacksonConfig.class,
         InstantScalarConfig.class,

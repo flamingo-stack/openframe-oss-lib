@@ -1,11 +1,11 @@
 package com.openframe.data.integration.document.notification;
 
 import com.openframe.data.document.notification.NotificationContext;
-import com.openframe.data.document.notification.NotificationContextBinding;
+import com.openframe.data.document.notification.NotificationContextDescriptor;
 import org.springframework.stereotype.Component;
 
 @Component
-public class TestExtendedContextBinding implements NotificationContextBinding {
+public class TestExtendedContextDescriptor implements NotificationContextDescriptor {
 
     @Override
     public String type() {

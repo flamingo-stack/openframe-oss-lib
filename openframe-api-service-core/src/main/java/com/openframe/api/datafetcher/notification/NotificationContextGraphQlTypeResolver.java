@@ -3,26 +3,29 @@ package com.openframe.api.datafetcher.notification;
 import com.netflix.graphql.dgs.DgsComponent;
 import com.netflix.graphql.dgs.DgsTypeResolver;
 import com.openframe.data.document.notification.NotificationContext;
-import lombok.RequiredArgsConstructor;
+import com.openframe.data.document.notification.NotificationContextDescriptor;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @DgsComponent
-@RequiredArgsConstructor
 public class NotificationContextGraphQlTypeResolver {
 
     static final String DEFAULT_TYPE = "GenericContext";
 
-    private final List<NotificationContextTypeResolver> resolvers;
+    private final Map<String, String> typeNamesByDiscriminator;
+
+    public NotificationContextGraphQlTypeResolver(List<NotificationContextDescriptor> descriptors) {
+        this.typeNamesByDiscriminator = descriptors.stream()
+                .collect(Collectors.toUnmodifiableMap(
+                        NotificationContextDescriptor::type,
+                        NotificationContextDescriptor::graphqlTypeName,
+                        (left, right) -> left));
+    }
 
     @DgsTypeResolver(name = "NotificationContext")
     public String resolveType(NotificationContext source) {
-        for (NotificationContextTypeResolver resolver : resolvers) {
-            String typeName = resolver.resolveTypeName(source);
-            if (typeName != null) {
-                return typeName;
-            }
-        }
-        return DEFAULT_TYPE;
+        return typeNamesByDiscriminator.getOrDefault(source.getType(), DEFAULT_TYPE);
     }
 }

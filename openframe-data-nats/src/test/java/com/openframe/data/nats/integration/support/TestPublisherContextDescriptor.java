@@ -1,11 +1,11 @@
 package com.openframe.data.nats.integration.support;
 
 import com.openframe.data.document.notification.NotificationContext;
-import com.openframe.data.document.notification.NotificationContextBinding;
+import com.openframe.data.document.notification.NotificationContextDescriptor;
 import org.springframework.stereotype.Component;
 
 @Component
-public class TestPublisherContextBinding implements NotificationContextBinding {
+public class TestPublisherContextDescriptor implements NotificationContextDescriptor {
 
     @Override
     public String type() {

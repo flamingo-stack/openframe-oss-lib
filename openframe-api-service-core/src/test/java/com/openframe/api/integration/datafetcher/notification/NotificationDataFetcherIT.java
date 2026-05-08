@@ -243,7 +243,7 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
                     .title("Approval requested")
                     .createdAt(Instant.now())
                     .context(TestApprovalContext.builder()
-                            .type(TestApprovalContextTypeResolver.TYPE)
+                            .type(TestApprovalContextDescriptor.TYPE)
                             .ticketId("ticket-42")
                             .approvalRequestId("apr-7")
                             .build())
@@ -261,7 +261,7 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
             Map<String, Object> node = (Map<String, Object>) edges.get(0).get("node");
             Map<String, Object> context = (Map<String, Object>) node.get("context");
             assertThat(context.get("__typename")).isEqualTo("TestApprovalContext");
-            assertThat(context.get("type")).isEqualTo(TestApprovalContextTypeResolver.TYPE);
+            assertThat(context.get("type")).isEqualTo(TestApprovalContextDescriptor.TYPE);
             assertThat(context.get("ticketId")).isEqualTo("ticket-42");
             assertThat(context.get("approvalRequestId")).isEqualTo("apr-7");
         }
@@ -274,7 +274,7 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
                     .title("Approval requested")
                     .createdAt(Instant.now())
                     .context(TestApprovalContext.builder()
-                            .type(TestApprovalContextTypeResolver.TYPE)
+                            .type(TestApprovalContextDescriptor.TYPE)
                             .ticketId("ticket-1")
                             .build())
                     .build();

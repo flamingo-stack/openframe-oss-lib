@@ -27,7 +27,7 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
         CustomNotificationRepositoryImpl.class,
         NotificationContextMongoConfig.class,
         NotificationContextJacksonConfig.class,
-        TestPublisherContextBinding.class
+        TestPublisherContextDescriptor.class
 })
 public class PublisherIntegrationTestApplication {
 }
