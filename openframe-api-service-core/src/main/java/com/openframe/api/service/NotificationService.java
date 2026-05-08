@@ -14,9 +14,11 @@ import com.openframe.data.document.notification.UserRecipient;
 import com.openframe.data.nats.service.NotificationPublishingService;
 import com.openframe.data.repository.notification.NotificationRepository;
 import com.openframe.data.service.notification.NotificationReadStateService;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
 import java.util.Set;
@@ -24,6 +26,7 @@ import java.util.Set;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Validated
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
@@ -32,11 +35,11 @@ public class NotificationService {
 
     public GenericQueryResult<NotificationView> list(Recipient recipient,
                                                      CursorPaginationCriteria pagination) {
-        return list(recipient, null, pagination);
+        return list(recipient, NotificationFilter.EMPTY, pagination);
     }
 
     public GenericQueryResult<NotificationView> list(Recipient recipient,
-                                                     NotificationFilter filter,
+                                                     @NotNull NotificationFilter filter,
                                                      CursorPaginationCriteria pagination) {
         rejectFilterForNonUser(recipient, filter);
         CursorPaginationCriteria normalized = pagination.normalize();
@@ -72,10 +75,7 @@ public class NotificationService {
     }
 
     private static void rejectFilterForNonUser(Recipient recipient, NotificationFilter filter) {
-        if (filter == null || !filter.hasReadFilter()) {
-            return;
-        }
-        if (!(recipient instanceof UserRecipient)) {
+        if (filter.hasReadFilter() && !(recipient instanceof UserRecipient)) {
             throw new IllegalArgumentException("read filter is only supported for UserRecipient");
         }
     }
@@ -83,10 +83,10 @@ public class NotificationService {
     private List<Notification> fetchPage(Recipient recipient, NotificationFilter filter, CursorPaginationCriteria criteria, int limit) {
         return switch (recipient) {
             case UserRecipient(String userId) -> notificationRepository.findPageForUser(
-                    userId, filter == null ? null : filter.read(),
+                    userId, filter.read(), filter.search(),
                     criteria.getCursor(), criteria.isBackward(), limit);
             case MachineRecipient(String machineId) -> notificationRepository.findPageForMachine(
-                    machineId, criteria.getCursor(), criteria.isBackward(), limit);
+                    machineId, filter.search(), criteria.getCursor(), criteria.isBackward(), limit);
             case BroadcastRecipient ignored ->
                     throw new IllegalArgumentException("BroadcastRecipient is not a queryable inbox owner");
         };
@@ -107,7 +107,7 @@ public class NotificationService {
         if (items.isEmpty()) {
             return List.of();
         }
-        if (filter != null && filter.hasReadFilter()) {
+        if (filter.hasReadFilter()) {
             boolean read = filter.read();
             return items.stream()
                     .map(n -> new NotificationView(n, read))

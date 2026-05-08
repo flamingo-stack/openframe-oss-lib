@@ -36,6 +36,13 @@ public final class MongoExplain {
         return Stats.parse(template.getDb().runCommand(command));
     }
 
+    public static Stats explainCount(MongoTemplate template, String collection, Query query) {
+        Document command = new Document("explain",
+                new Document("count", collection).append("query", query.getQueryObject()))
+                .append("verbosity", "executionStats");
+        return Stats.parse(template.getDb().runCommand(command));
+    }
+
     public static Stats explainUpsert(MongoTemplate template, String collection, Query query, Update update) {
         Document updateOp = new Document("q", query.getQueryObject())
                 .append("u", update.getUpdateObject())
@@ -147,6 +154,18 @@ public final class MongoExplain {
                             maxMillis, executionTimeMillis, raw.toJson())
                     .isLessThan(maxMillis);
             return this;
+        }
+
+        public long keysExamined() {
+            return keysExamined;
+        }
+
+        public long executionTimeMillis() {
+            return executionTimeMillis;
+        }
+
+        public List<String> indexesUsed() {
+            return indexNames();
         }
 
         private List<String> scanStages() {

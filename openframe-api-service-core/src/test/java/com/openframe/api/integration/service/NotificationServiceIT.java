@@ -451,6 +451,130 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
     }
 
     @Nested
+    @DisplayName("list with search")
+    class ListWithSearch {
+
+        @Test
+        @DisplayName("Given notifications whose titles match the search token, when listing with that search, then only matching rows come back")
+        void given_titles_match_search_when_listing_then_only_matching_rows_returned() {
+            Notification welcomeRow = repository.save(NotificationFixtures.basic(ALICE, "welcome"));
+            Notification reminderRow = repository.save(NotificationFixtures.basic(ALICE, "reminder"));
+            Notification welcomeBack = repository.save(Notification.builder()
+                    .recipient(new UserRecipient(ALICE))
+                    .title("Welcome back, friend")
+                    .context(GenericContext.builder().type("custom").payload("{}").build())
+                    .build());
+
+            GenericQueryResult<NotificationView> result = service.list(
+                    new UserRecipient(ALICE),
+                    new NotificationFilter(null, "welcome"),
+                    CursorPaginationCriteria.builder().limit(10).build());
+
+            assertThat(result.getItems()).extracting(NotificationView::getId)
+                    .containsExactlyInAnyOrder(welcomeRow.getId(), welcomeBack.getId())
+                    .doesNotContain(reminderRow.getId());
+        }
+
+        @Test
+        @DisplayName("Given a search that matches no titles, when listing, then an empty page comes back")
+        void given_search_matches_nothing_when_listing_then_empty_page() {
+            seedSequential(ALICE, 5);
+
+            GenericQueryResult<NotificationView> result = service.list(
+                    new UserRecipient(ALICE),
+                    new NotificationFilter(null, "no-such-token"),
+                    CursorPaginationCriteria.builder().limit(10).build());
+
+            assertThat(result.getItems()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Given a mixed-case title and a lowercase search, when listing, then the row matches — search is case-insensitive")
+        void given_mixed_case_title_and_lowercase_search_when_listing_then_matches() {
+            Notification mixed = repository.save(Notification.builder()
+                    .recipient(new UserRecipient(ALICE))
+                    .title("HEADS UP")
+                    .context(GenericContext.builder().type("custom").payload("{}").build())
+                    .build());
+
+            GenericQueryResult<NotificationView> result = service.list(
+                    new UserRecipient(ALICE),
+                    new NotificationFilter(null, "heads"),
+                    CursorPaginationCriteria.builder().limit(10).build());
+
+            assertThat(result.getItems()).extracting(NotificationView::getId)
+                    .containsExactly(mixed.getId());
+        }
+
+        @Test
+        @DisplayName("Given a search containing regex metacharacters, when listing, then it is treated as a literal string — no regex injection")
+        void given_search_with_regex_metacharacters_when_listing_then_treated_as_literal() {
+            Notification literal = repository.save(Notification.builder()
+                    .recipient(new UserRecipient(ALICE))
+                    .title("price: $5.00")
+                    .context(GenericContext.builder().type("custom").payload("{}").build())
+                    .build());
+            Notification dotAny = repository.save(Notification.builder()
+                    .recipient(new UserRecipient(ALICE))
+                    .title("price: x5x00")
+                    .context(GenericContext.builder().type("custom").payload("{}").build())
+                    .build());
+
+            GenericQueryResult<NotificationView> result = service.list(
+                    new UserRecipient(ALICE),
+                    new NotificationFilter(null, "$5.00"),
+                    CursorPaginationCriteria.builder().limit(10).build());
+
+            assertThat(result.getItems()).extracting(NotificationView::getId)
+                    .containsExactly(literal.getId())
+                    .doesNotContain(dotAny.getId());
+        }
+
+        @Test
+        @DisplayName("Given a search combined with a read filter, when listing, then both filters apply (intersection)")
+        void given_search_combined_with_read_filter_when_listing_then_both_filters_apply() {
+            Notification readMatch = repository.save(NotificationFixtures.basic(ALICE, "alpha"));
+            Notification unreadMatch = repository.save(NotificationFixtures.basic(ALICE, "alpha"));
+            Notification readNoMatch = repository.save(NotificationFixtures.basic(ALICE, "beta"));
+            readStateService.markRead(ALICE, readMatch.getId());
+            readStateService.markRead(ALICE, readNoMatch.getId());
+
+            GenericQueryResult<NotificationView> result = service.list(
+                    new UserRecipient(ALICE),
+                    new NotificationFilter(true, "alpha"),
+                    CursorPaginationCriteria.builder().limit(10).build());
+
+            assertThat(result.getItems()).extracting(NotificationView::getId)
+                    .containsExactly(readMatch.getId())
+                    .doesNotContain(unreadMatch.getId(), readNoMatch.getId());
+        }
+
+        @Test
+        @DisplayName("Given machine notifications and a search token, when AGENT lists with that search, then only matching machine rows come back")
+        void given_machine_search_when_listing_then_only_matching_machine_rows_returned() {
+            String machineId = "machine-search";
+            Notification matching = repository.save(Notification.builder()
+                    .recipient(new MachineRecipient(machineId))
+                    .title("disk-warning")
+                    .context(GenericContext.builder().type("disk").payload("{}").build())
+                    .build());
+            repository.save(Notification.builder()
+                    .recipient(new MachineRecipient(machineId))
+                    .title("cpu-stable")
+                    .context(GenericContext.builder().type("cpu").payload("{}").build())
+                    .build());
+
+            GenericQueryResult<NotificationView> result = service.list(
+                    new MachineRecipient(machineId),
+                    new NotificationFilter(null, "disk"),
+                    CursorPaginationCriteria.builder().limit(10).build());
+
+            assertThat(result.getItems()).extracting(NotificationView::getId)
+                    .containsExactly(matching.getId());
+        }
+    }
+
+    @Nested
     @DisplayName("list(MachineRecipient)")
     class ListForMachine {
 

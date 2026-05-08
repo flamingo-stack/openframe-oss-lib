@@ -52,22 +52,22 @@ public class NotificationDataFetcher {
     public GenericConnection<GenericEdge<NotificationView>> notifications(
             @InputArgument @Nullable String machineId,
             @InputArgument NotificationFilterInput filter,
+            @InputArgument String search,
             @InputArgument Integer first,
             @InputArgument String after,
             @InputArgument Integer last,
             @InputArgument String before) {
 
         Recipient recipient = resolveRecipient(machineId);
-        log.debug("Listing notifications for {} (filter={}, first={}, after={}, last={}, before={})",
-                recipient, filter, first, after, last, before);
+        log.debug("Listing notifications for {} (filter={}, search={}, first={}, after={}, last={}, before={})",
+                recipient, filter, search, first, after, last, before);
 
         ConnectionArgs args = ConnectionArgs.builder()
                 .first(first).after(after).last(last).before(before)
                 .build();
         CursorPaginationCriteria pagination = notificationMapper.toCursorPaginationCriteria(args);
-        NotificationFilter serviceFilter = filter == null
-                ? null
-                : new NotificationFilter(filter.getRead());
+        NotificationFilter serviceFilter = new NotificationFilter(
+                filter == null ? null : filter.getRead(), search);
 
         GenericQueryResult<NotificationView> result = notificationService.list(
                 recipient, serviceFilter, pagination);

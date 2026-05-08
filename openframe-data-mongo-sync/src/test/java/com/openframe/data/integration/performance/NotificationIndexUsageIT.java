@@ -10,10 +10,13 @@ import com.openframe.data.integration.BaseMongoIntegrationTest;
 import com.openframe.data.integration.support.IntegrationTestApplication;
 import com.openframe.data.integration.support.MongoExplain;
 import com.openframe.data.integration.support.MongoExplain.Stats;
+import com.openframe.data.integration.support.PerfResultRecorder;
 import com.openframe.data.repository.notification.NotificationReadStateRepository;
 import com.openframe.data.repository.notification.NotificationRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.bson.types.ObjectId;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -29,6 +32,8 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 
+import java.io.IOException;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
@@ -38,6 +43,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Slf4j
 @SpringBootTest(classes = IntegrationTestApplication.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Tag("performance")
@@ -69,11 +75,19 @@ class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
     private static final long FIND_BUDGET_MS  = 200;
     private static final long WRITE_BUDGET_MS = 100;
 
+    private static final Path REPORT_DIR = Path.of("target", "perf-results");
+
     @Autowired private NotificationRepository notificationRepository;
     @Autowired private NotificationReadStateRepository readStateRepository;
     @Autowired private MongoTemplate mongoTemplate;
 
     private final List<String> hotUserNotifIds = new ArrayList<>();
+
+    private final PerfResultRecorder recorder =
+            new PerfResultRecorder("NotificationIndexUsageIT")
+                    .withMeta("notifTotal", NOTIF_TOTAL)
+                    .withMeta("hotUserNotifs", HOT_USER_NOTIFS)
+                    .withMeta("hotMachineNotifs", HOT_MACHINE_NOTIFS);
 
     @BeforeAll
     void seedDataset() {
@@ -85,6 +99,11 @@ class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
 
         seedNotifications();
         seedReadStates();
+    }
+
+    @AfterAll
+    void writeReports() throws IOException {
+        recorder.writeMarkdown(REPORT_DIR);
     }
 
     private void ensureIndexes(Class<?> entityClass) {
@@ -196,6 +215,85 @@ class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
     }
 
     @Test
+    @DisplayName("findPageForUser with a search token — uses recipient_user_id for the audience and filters with regex against the slice; no collection scan, examines at most about hot-user-slice rows")
+    void search_within_user_audience_uses_recipient_user_index_and_filters_within_slice() {
+        int limit = 25;
+        String search = "perf-evt-29";
+
+        List<Notification> page = notificationRepository.findPageForUser(
+                HOT_USER, null, search, null, false, limit);
+        assertThat(page).isNotEmpty();
+        assertThat(page).allSatisfy(n -> {
+            assertThat(matchesUserOrBroadcast(n, HOT_USER)).isTrue();
+            assertThat(n.getTitle()).containsIgnoringCase(search);
+        });
+
+        Stats stats = MongoExplain.explainFind(mongoTemplate, NOTIFS_COLL, listForUserSearchQuery(HOT_USER, search, limit));
+
+        stats.assertNoCollectionScan()
+                .assertUsesIndex(IDX_RECIPIENT_USER)
+                .assertExecutionTimeBelow(FIND_BUDGET_MS);
+
+        stats.assertExaminedAtMost(HOT_USER_NOTIFS * 2L);
+
+        Query q = listForUserSearchQuery(HOT_USER, search, limit);
+        recorder.record("Search find — user audience + title regex, limit 25",
+                "returned", page.size(),
+                "executionTimeMs", stats.executionTimeMillis(),
+                "keysExamined", stats.keysExamined(),
+                "indexes", stats.indexesUsed(),
+                "filter", q.getQueryObject().toJson());
+    }
+
+    @Test
+    @DisplayName("count over the hot-user audience — uses recipient_user_id and stays within hot-user-slice key budget")
+    void count_within_user_audience_uses_recipient_user_index_and_does_not_collscan() {
+        Query q = countForUserQuery(HOT_USER);
+        long count = mongoTemplate.count(q, Notification.class);
+        assertThat(count).isGreaterThan(0L);
+
+        Stats stats = MongoExplain.explainCount(mongoTemplate, NOTIFS_COLL, q);
+
+        stats.assertNoCollectionScan()
+                .assertUsesIndex(IDX_RECIPIENT_USER)
+                .assertExecutionTimeBelow(FIND_BUDGET_MS);
+
+        stats.assertExaminedAtMost(HOT_USER_NOTIFS * 2L);
+
+        recorder.record("Count — user audience only",
+                "count", count,
+                "executionTimeMs", stats.executionTimeMillis(),
+                "keysExamined", stats.keysExamined(),
+                "indexes", stats.indexesUsed(),
+                "filter", q.getQueryObject().toJson());
+    }
+
+    @Test
+    @DisplayName("count over the hot-user audience with a regex search — still uses recipient_user_id for audience and stays within slice")
+    void count_with_search_within_user_audience_uses_index_for_audience_scoping() {
+        String search = "perf-evt-29";
+
+        Query q = countForUserSearchQuery(HOT_USER, search);
+        long count = mongoTemplate.count(q, Notification.class);
+        assertThat(count).isGreaterThan(0L);
+
+        Stats stats = MongoExplain.explainCount(mongoTemplate, NOTIFS_COLL, q);
+
+        stats.assertNoCollectionScan()
+                .assertUsesIndex(IDX_RECIPIENT_USER)
+                .assertExecutionTimeBelow(FIND_BUDGET_MS);
+
+        stats.assertExaminedAtMost(HOT_USER_NOTIFS * 2L);
+
+        recorder.record("Count — user audience + title regex",
+                "matched", count,
+                "executionTimeMs", stats.executionTimeMillis(),
+                "keysExamined", stats.keysExamined(),
+                "indexes", stats.indexesUsed(),
+                "filter", q.getQueryObject().toJson());
+    }
+
+    @Test
     @DisplayName("findRetryablePublishCandidates does not collection-scan — only the unpublished slice should be touched")
     void retryable_candidates_does_not_collscan() {
         int batch = 100;
@@ -228,6 +326,28 @@ class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
                 Criteria.where("recipient._class").is(BROADCAST_CLASS)));
         q.with(Sort.by(Sort.Direction.DESC, "_id"));
         q.limit(limit);
+        return q;
+    }
+
+    private static Query listForUserSearchQuery(String userId, String search, int limit) {
+        Query q = new Query(new Criteria().orOperator(
+                Criteria.where("recipient.userId").is(userId),
+                Criteria.where("recipient._class").is(BROADCAST_CLASS)));
+        q.addCriteria(Criteria.where("title").regex(java.util.regex.Pattern.quote(search), "i"));
+        q.with(Sort.by(Sort.Direction.DESC, "_id"));
+        q.limit(limit);
+        return q;
+    }
+
+    private static Query countForUserQuery(String userId) {
+        return new Query(new Criteria().orOperator(
+                Criteria.where("recipient.userId").is(userId),
+                Criteria.where("recipient._class").is(BROADCAST_CLASS)));
+    }
+
+    private static Query countForUserSearchQuery(String userId, String search) {
+        Query q = countForUserQuery(userId);
+        q.addCriteria(Criteria.where("title").regex(java.util.regex.Pattern.quote(search), "i"));
         return q;
     }
 

@@ -97,7 +97,6 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
         Notification reread = repository.findById(saved.getId()).orElseThrow();
         assertThat(reread.getPublishState()).isNotNull();
         assertThat(reread.getPublishState().isPublished()).isTrue();
-        assertThat(reread.getPublishState().getPublishedAt()).isNotNull();
     }
 
     @Test

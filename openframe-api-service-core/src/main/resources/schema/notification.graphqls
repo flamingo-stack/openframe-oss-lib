@@ -1,5 +1,5 @@
 extend type Query {
-    notifications(machineId: ID, filter: NotificationFilterInput, first: Int, after: String, last: Int, before: String): NotificationConnection!
+    notifications(machineId: ID, filter: NotificationFilterInput, search: String, first: Int, after: String, last: Int, before: String): NotificationConnection!
     hasUnreadNotifications: Boolean!
 }
 

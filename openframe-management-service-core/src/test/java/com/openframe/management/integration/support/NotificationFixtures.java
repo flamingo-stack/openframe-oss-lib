@@ -28,7 +28,7 @@ public final class NotificationFixtures {
     }
 
     public static PublishState published() {
-        return PublishState.builder().published(true).publishedAt(Instant.now()).attempts(0).build();
+        return PublishState.published();
     }
 
     public static PublishState nonPublishedAttempts(int attempts) {

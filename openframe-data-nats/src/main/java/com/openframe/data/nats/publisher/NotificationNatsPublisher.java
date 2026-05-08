@@ -43,7 +43,7 @@ public class NotificationNatsPublisher {
             return updatePublishState(notification, PublishState.nonPublished(notification.getPublishState()));
         }
 
-        return updatePublishState(notification, PublishState.published(notification.getPublishState()));
+        return updatePublishState(notification, PublishState.published());
     }
 
     private Notification updatePublishState(Notification notification, PublishState next) {

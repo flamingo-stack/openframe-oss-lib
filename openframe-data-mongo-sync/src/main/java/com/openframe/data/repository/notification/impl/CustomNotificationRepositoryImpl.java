@@ -19,6 +19,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
@@ -27,6 +28,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 public class CustomNotificationRepositoryImpl implements CustomNotificationRepository {
 
     private static final String FIELD_ID = "_id";
+    private static final String FIELD_TITLE = "title";
     private static final String FIELD_RECIPIENT_USER_ID = "recipient.userId";
     private static final String FIELD_RECIPIENT_MACHINE_ID = "recipient.machineId";
     private static final String FIELD_RECIPIENT_CLASS = "recipient._class";
@@ -42,23 +44,30 @@ public class CustomNotificationRepositoryImpl implements CustomNotificationRepos
 
     @Override
     public List<Notification> findPageForUser(String userId, String cursor, boolean backward, int limit) {
-        return findPageForUser(userId, null, cursor, backward, limit);
+        return findPageForUser(userId, null, null, cursor, backward, limit);
     }
 
     @Override
-    public List<Notification> findPageForUser(String userId, Boolean readFilter, String cursor, boolean backward, int limit) {
+    public List<Notification> findPageForUser(String userId, Boolean readFilter, String search,
+                                              String cursor, boolean backward, int limit) {
         if (readFilter == null) {
-            return findPage(userAudience(userId), cursor, backward, limit);
+            return findPage(userAudience(userId), search, cursor, backward, limit);
         }
-        return findUserPageWithReadFilter(userId, readFilter, cursor, backward, limit);
+        return findUserPageWithReadFilter(userId, readFilter, search, cursor, backward, limit);
     }
 
     @Override
     public List<Notification> findPageForMachine(String machineId, String cursor, boolean backward, int limit) {
+        return findPageForMachine(machineId, null, cursor, backward, limit);
+    }
+
+    @Override
+    public List<Notification> findPageForMachine(String machineId, String search,
+                                                 String cursor, boolean backward, int limit) {
         Criteria audience = new Criteria().orOperator(
                 Criteria.where(FIELD_RECIPIENT_MACHINE_ID).is(machineId),
                 Criteria.where(FIELD_RECIPIENT_CLASS).is(BROADCAST_CLASS));
-        return findPage(audience, cursor, backward, limit);
+        return findPage(audience, search, cursor, backward, limit);
     }
 
     private static Criteria userAudience(String userId) {
@@ -67,14 +76,26 @@ public class CustomNotificationRepositoryImpl implements CustomNotificationRepos
                 Criteria.where(FIELD_RECIPIENT_CLASS).is(BROADCAST_CLASS));
     }
 
-    private List<Notification> findPage(Criteria audience, String cursor, boolean backward, int limit) {
+    private List<Notification> findPage(Criteria audience, String search,
+                                        String cursor, boolean backward, int limit) {
         Query query = new Query(audience);
 
+        Criteria searchCriteria = searchCriteria(search);
+        if (searchCriteria != null) {
+            query.addCriteria(searchCriteria);
+        }
         applyCursor(query, cursor, backward);
         query.with(Sort.by(backward ? Sort.Direction.ASC : Sort.Direction.DESC, FIELD_ID));
         query.limit(limit);
 
         return mongoTemplate.find(query, Notification.class);
+    }
+
+    private static Criteria searchCriteria(String search) {
+        if (isBlank(search)) {
+            return null;
+        }
+        return Criteria.where(FIELD_TITLE).regex(Pattern.quote(search), "i");
     }
 
     private static void applyCursor(Query query, String cursor, boolean backward) {
@@ -91,16 +112,26 @@ public class CustomNotificationRepositoryImpl implements CustomNotificationRepos
                 : Criteria.where(FIELD_ID).lt(cursorId);
     }
 
-    private List<Notification> findUserPageWithReadFilter(String userId, boolean read, String cursor, boolean backward, int limit) {
+    private List<Notification> findUserPageWithReadFilter(String userId, boolean read, String search,
+                                                          String cursor, boolean backward, int limit) {
         Criteria audience = userAudience(userId);
 
+        List<Criteria> firstStageGuards = new ArrayList<>();
+        firstStageGuards.add(audience);
         ObjectId cursorId = parseCursor(cursor);
         if (cursorId != null) {
-            audience = new Criteria().andOperator(audience, cursorCriteria(cursorId, backward));
+            firstStageGuards.add(cursorCriteria(cursorId, backward));
         }
+        Criteria searchCriteria = searchCriteria(search);
+        if (searchCriteria != null) {
+            firstStageGuards.add(searchCriteria);
+        }
+        Criteria firstStage = firstStageGuards.size() == 1
+                ? firstStageGuards.get(0)
+                : new Criteria().andOperator(firstStageGuards.toArray(new Criteria[0]));
 
         List<AggregationOperation> ops = new ArrayList<>();
-        ops.add(Aggregation.match(audience));
+        ops.add(Aggregation.match(firstStage));
         ops.add(Aggregation.sort(backward ? Sort.Direction.ASC : Sort.Direction.DESC, FIELD_ID));
         ops.add(context -> new Document("$lookup", new Document()
                 .append("from", READ_STATE_COLLECTION)

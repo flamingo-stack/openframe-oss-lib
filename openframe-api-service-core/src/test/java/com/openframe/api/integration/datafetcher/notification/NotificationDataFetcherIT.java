@@ -408,6 +408,47 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
 
             assertThat(edges).hasSize(2);
         }
+
+        @Test
+        @DisplayName("Given titles match the search token, when querying with search arg, then only matching rows come back")
+        void given_titles_match_search_arg_when_querying_then_only_matching_rows_returned() {
+            Notification welcome = repository.save(NotificationFixtures.basic(ALICE, "welcome"));
+            repository.save(NotificationFixtures.basic(ALICE, "reminder"));
+
+            String query = "{ notifications(search: \"welcome\", first: 10) { edges { node { context { type } } } } }";
+            List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
+                    query, "data.notifications.edges");
+
+            assertThat(edges).hasSize(1);
+            Map<String, Object> node = (Map<String, Object>) edges.get(0).get("node");
+            assertThat(((Map<String, Object>) node.get("context")).get("type")).isEqualTo("welcome");
+            assertThat(welcome.getId()).isNotNull();
+        }
+
+        @Test
+        @DisplayName("Given a search containing regex metacharacters, when querying, then it is treated as a literal string — no regex injection")
+        void given_search_with_regex_metacharacters_when_querying_then_treated_as_literal() {
+            repository.save(Notification.builder()
+                    .recipient(new UserRecipient(ALICE))
+                    .title("price: $5.00")
+                    .createdAt(Instant.now())
+                    .context(GenericContext.builder().type("custom").payload("{}").build())
+                    .build());
+            repository.save(Notification.builder()
+                    .recipient(new UserRecipient(ALICE))
+                    .title("price: x5x00")
+                    .createdAt(Instant.now())
+                    .context(GenericContext.builder().type("custom").payload("{}").build())
+                    .build());
+
+            String query = "{ notifications(search: \"$5.00\", first: 10) { edges { node { title } } } }";
+            List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
+                    query, "data.notifications.edges");
+
+            assertThat(edges).hasSize(1);
+            Map<String, Object> node = (Map<String, Object>) edges.get(0).get("node");
+            assertThat(node.get("title")).isEqualTo("price: $5.00");
+        }
     }
 
     @Nested
