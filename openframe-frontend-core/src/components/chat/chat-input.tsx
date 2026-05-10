@@ -90,12 +90,46 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
             focusTextarea()
           })
         },
+        setValueAndCursor: (next: string, cursorOffset: number) => {
+          setValue(next)
+          // The caret position must be set on the underlying textarea AFTER
+          // React commits the new value (otherwise React resets selection
+          // to end-of-input on the next render). We clamp the offset to
+          // [0, value.length] so a misconfigured caller can't crash.
+          const clamped = Math.max(0, Math.min(cursorOffset, next.length))
+          requestAnimationFrame(() => {
+            const el = textareaRef.current
+            if (el) {
+              el.style.height = 'auto'
+              el.style.height = `${el.scrollHeight}px`
+              el.focus()
+              el.setSelectionRange(clamped, clamped)
+            }
+          })
+        },
+        submit: (next: string) => {
+          // Mirror the user-typed Send-button path: skip when sending or
+          // disabled, fire onSend with the trimmed value, clear local state.
+          // The caller is responsible for any pre-fill UX (none here — this
+          // is the one-click "Recent" path).
+          if (sending || disabled || !onSend) return
+          const trimmed = next.trim()
+          if (!trimmed) return
+          onSend(trimmed)
+          setValue('')
+          if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto'
+          }
+          shouldRefocusRef.current = true
+          focusTextarea()
+        },
         getValue: () => valueRef.current,
       }),
-      // `valueRef` is a stable ref; only re-derive the handle when
-      // `focusTextarea` changes (its identity flips on `disabled` toggles
-      // — a few times per session, not per keystroke).
-      [focusTextarea],
+      // `valueRef` and `shouldRefocusRef` are stable refs. `sending` /
+      // `disabled` / `onSend` change session-rarely; including them here
+      // is correct for closure freshness and rebuilds < 5 times per chat
+      // session — an order of magnitude fewer than per-keystroke.
+      [focusTextarea, sending, disabled, onSend],
     )
 
     const handleSubmit = useCallback(() => {

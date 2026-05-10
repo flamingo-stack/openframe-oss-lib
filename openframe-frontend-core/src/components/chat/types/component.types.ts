@@ -135,6 +135,17 @@ export interface ChatInputRef {
   clear: () => void
   setValue: (value: string) => void
   getValue: () => string
+  /** Set the input value AND position the textarea caret at the given
+   *  zero-based offset. Used by the empty-state quick-action "Find"
+   *  button that pre-fills `/<cmd> ""` and lands the cursor between
+   *  the quotes so the user can immediately start typing the title. */
+  setValueAndCursor: (value: string, cursorOffset: number) => void
+  /** Set the input value and immediately fire `onSend` with the new
+   *  value (subject to the same `sending`/`disabled` guards as a
+   *  manual click). Used by the empty-state quick-action "Recent"
+   *  button to dispatch `/<cmd>` in one click without forcing the
+   *  user to press Enter. */
+  submit: (value: string) => void
 }
 
 // ========== Chat Typing Indicator Props ==========
