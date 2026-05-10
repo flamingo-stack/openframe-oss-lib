@@ -90,6 +90,28 @@ export interface ChatMessageListRef {
 
 // ========== Chat Input Props ==========
 
+/** Action ids — the dispatch BEHAVIORS exposed by a slash command's UI
+ *  affordances. The host (e.g. multi-platform-hub) owns the mapping
+ *  from id → input-buffer mutation:
+ *
+ *   - `browse` : submit `/<id>` bare → top-N items / canonical doc.
+ *   - `search` : prefill `/<id> ` → user types FTS query.
+ *   - `find`   : prefill `/<id> ""` (cursor between quotes) → singular
+ *                lookup (ILIKE).
+ *
+ *  Mirrors the server-side `SlashCommandActionId` union; kept as a
+ *  string-literal union (not enum) so JSON wire shape is stable. */
+export type SlashCommandActionId = 'browse' | 'search' | 'find'
+
+/** Resolved action affordance — `label` is ALWAYS populated by the
+ *  server (override OR default). The OSS-lib renders directly without
+ *  label-resolution branching — single source of truth lives in the
+ *  hub's `slash-commands-config.ts`. */
+export interface SlashCommandSummaryAction {
+  id: SlashCommandActionId
+  label: string
+}
+
 export interface SlashCommandSummary {
   id: string
   description: string
@@ -103,9 +125,12 @@ export interface SlashCommandSummary {
    *  the empty-state chip. When the resolver returns undefined OR this
    *  field is missing, the row renders without an icon (fallback). */
   primarySourceId?: string
-  /** When true, the row's "Find" action button is shown. False/undefined
-   *  hides it (singular ILIKE-by-name doesn't apply to the command). */
-  supportsSingular?: boolean
+  /** Action affordances declared by the server-side registry. The
+   *  dropdown row renders one button per entry, in array order. Empty
+   *  array = no buttons (degenerate; servers should always declare
+   *  ≥1 action). Single source of truth — same array drives the
+   *  empty-state chip on the host side via the synchronous registry. */
+  actions: SlashCommandSummaryAction[]
 }
 
 /** Icon + label pair returned by the consumer's `resolveSourceIcon`. The
@@ -133,21 +158,16 @@ export interface SlashCommandsProp {
    *  `RAG_SOURCE_DISPLAY[sourceId]`. Returns undefined for unknown ids;
    *  the row falls back to no-icon rendering. */
   resolveSourceIcon?: (sourceId: string) => SlashCommandSourceMeta | undefined
-  /** Optional Recent action — fires when the user clicks the "Recent"
-   *  button on an autocomplete row. The hub maps this to
-   *  `chatInputRef.current.submit(`/${cmd.id}`)` (auto-send the bare
-   *  command). When undefined, the Recent button is not rendered. */
-  onActionRecent?: (cmd: SlashCommandSummary) => void
-  /** Optional Search action — fires when the user clicks "Search". The hub
-   *  maps this to `chatInputRef.current.setValue(`/${cmd.id} `)`. When
-   *  undefined, the Search button is not rendered. */
-  onActionSearch?: (cmd: SlashCommandSummary) => void
-  /** Optional Find action — fires when the user clicks "Find". The hub
-   *  maps this to `chatInputRef.current.setValueAndCursor` to pre-fill
-   *  `/<cmd> ""` and land the cursor between quotes. The button only
-   *  renders when BOTH `onActionFind` is provided AND the command's
-   *  `supportsSingular` flag is true. */
-  onActionFind?: (cmd: SlashCommandSummary) => void
+  /** Generic action handler — fires when the user clicks any of the
+   *  command's declared action buttons (Recent / Search / Find / …).
+   *  The host owns the mapping from `actionId` to the chat-input-ref
+   *  mutation:
+   *    - 'browse' → `chatInputRef.current.submit(`/${cmd.id}`)`
+   *    - 'search' → `chatInputRef.current.setValue(`/${cmd.id} `)`
+   *    - 'find'   → `chatInputRef.current.setValueAndCursor(...)`
+   *  When undefined, no action buttons are rendered (the row is still
+   *  clickable for the default select behavior). */
+  onAction?: (cmd: SlashCommandSummary, actionId: SlashCommandActionId) => void
 }
 
 export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'onSubmit'> {

@@ -4,6 +4,7 @@ import type { MouseEvent } from "react"
 import { cn } from "../../utils/cn"
 import { Card } from "../ui/card"
 import type {
+  SlashCommandActionId,
   SlashCommandSourceMeta,
   SlashCommandSummary,
 } from "./types"
@@ -24,18 +25,11 @@ interface SlashCommandSuggestionsProps {
    *  command summary and returns an icon + label so the row carries the
    *  same visual identity as the empty-state chip for that source. */
   resolveSourceIcon?: (sourceId: string) => SlashCommandSourceMeta | undefined
-  /** Optional Recent action handler — rendered as a button when provided. */
-  onActionRecent?: (cmd: SlashCommandSummary) => void
-  /** Optional Search action handler — rendered as a button when provided.
-   *  Functionally identical to `onSelect` (both pre-fill the command for
-   *  refinement), but exposing it as an explicit button makes the three
-   *  modes (Recent / Search / Find) discoverable without users having to
-   *  know that clicking the row equals Search. */
-  onActionSearch?: (cmd: SlashCommandSummary) => void
-  /** Optional Find action handler — rendered as a button ONLY when the
-   *  command's `supportsSingular` flag is true (ILIKE-by-name only makes
-   *  sense for commands with `singularLookup`). */
-  onActionFind?: (cmd: SlashCommandSummary) => void
+  /** Generic action handler — fires when the user clicks any of the
+   *  command's action buttons. The action's id discriminates the
+   *  dispatch behavior (browse / search / find / …); the host owns
+   *  the mapping. When undefined, NO action buttons render. */
+  onAction?: (cmd: SlashCommandSummary, actionId: SlashCommandActionId) => void
   /** Optional className override for positioning (e.g. `absolute bottom-full`). */
   className?: string
 }
@@ -46,14 +40,13 @@ interface SlashCommandSuggestionsProps {
  * Each row is a card-shaped option with three regions:
  *   - LEFT: source icon (from `resolveSourceIcon`, when available)
  *   - MIDDLE: source label + slash id + argument hint + description (2-line clamp)
- *   - RIGHT: up to three action buttons (Recent / Search / Find), per
- *     2026 chat UX best practice (3-5 quick-action buttons per row).
- *     The Find button is gated on `supportsSingular`.
+ *   - RIGHT: one button per `cmd.actions[i]`, in declaration order. Buttons
+ *     render labels server-resolved; no client-side label fallback.
  *
  * Clicking the row body fires `onSelect` (the host typically maps this to
  * Search-mode pre-fill so the user can refine). Clicking an action button
- * fires the corresponding `onAction*` handler and stops propagation so the
- * row click doesn't double-fire.
+ * fires `onAction(cmd, actionId)` and stops propagation so the row click
+ * doesn't double-fire.
  *
  * Accessibility: the outer container is `role="menu"`; each row is
  * `role="menuitem"` with `aria-current` for the highlighted row. We use
@@ -70,9 +63,7 @@ export function SlashCommandSuggestions({
   onHover,
   onSelect,
   resolveSourceIcon,
-  onActionRecent,
-  onActionSearch,
-  onActionFind,
+  onAction,
   className,
 }: SlashCommandSuggestionsProps) {
   if (commands.length === 0) return null
@@ -132,41 +123,22 @@ export function SlashCommandSuggestions({
                 {cmd.description}
               </p>
             </div>
-            <div className="flex gap-1 shrink-0 ml-2">
-              {onActionRecent && (
-                <SuggestionActionButton
-                  label="Recent"
-                  ariaLabel={`Show recent ${cmd.id}`}
-                  title="Show recent items"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onActionRecent(cmd)
-                  }}
-                />
-              )}
-              {onActionSearch && (
-                <SuggestionActionButton
-                  label="Search"
-                  ariaLabel={`Search ${cmd.id}`}
-                  title="Search by keywords"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onActionSearch(cmd)
-                  }}
-                />
-              )}
-              {onActionFind && cmd.supportsSingular && (
-                <SuggestionActionButton
-                  label="Find"
-                  ariaLabel={`Find specific ${cmd.id} by id or exact name`}
-                  title="Find a specific item by id or exact name"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onActionFind(cmd)
-                  }}
-                />
-              )}
-            </div>
+            {onAction && cmd.actions.length > 0 && (
+              <div className="flex gap-1 shrink-0 ml-2">
+                {cmd.actions.map((action) => (
+                  <SuggestionActionButton
+                    key={action.id}
+                    label={action.label}
+                    ariaLabel={`${action.label} ${cmd.id}`}
+                    title={`${action.label} ${cmd.id}`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onAction(cmd, action.id)
+                    }}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )
       })}
@@ -175,9 +147,9 @@ export function SlashCommandSuggestions({
 }
 
 /**
- * Per-row action button. Shared styling hoisted so all three (Recent /
- * Search / Find) stay visually synced. ODS tokens throughout; intentionally
- * smaller than UI-Kit `<Button size="small">` because these are chip-density
+ * Per-row action button. Shared styling hoisted so all action buttons
+ * stay visually synced. ODS tokens throughout; intentionally smaller
+ * than UI-Kit `<Button size="small">` because these are chip-density
  * action buttons inside a compact dropdown row.
  */
 function SuggestionActionButton({
