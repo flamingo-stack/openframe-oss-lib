@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
+import type { PluggableList } from 'unified';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import rehypeHighlight from 'rehype-highlight';
@@ -284,15 +285,16 @@ export interface SimpleMarkdownRendererProps {
   componentOverrides?: Partial<Components>;
   /**
    * Extra remark plugins appended after the built-in `remarkGfm` and
-   * `remarkBreaks`. Used by chat consumers to inject the `remarkCardLinks`
-   * plugin that converts `[card://<type>:<id>]` markers into synthetic
-   * link nodes (subsequently rendered as <ObjectCard /> via componentOverrides).
+   * `remarkBreaks`. Used by chat consumers to inject `remarkCardLinks`,
+   * which converts `[card://<type>:<id>]` markers into synthetic `link`
+   * nodes; the host's `componentOverrides.a` then swaps those for whatever
+   * inline entity-card component it provides.
    *
    * Each entry is either a Plugin reference or a [Plugin, options] tuple
    * — same shape as react-markdown's own `remarkPlugins` prop. Pass an
    * empty array (or omit) to keep the default plugin set.
    */
-  additionalRemarkPlugins?: any[];
+  additionalRemarkPlugins?: PluggableList;
   /**
    * Configure text sizing for all rendered elements.
    * - `"default"` — current behavior (large article-style typography)

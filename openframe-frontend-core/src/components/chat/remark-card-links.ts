@@ -2,8 +2,8 @@
  * Remark plugin that walks markdown text leaves and replaces `[card://<type>:<id>]`
  * patterns with synthetic `link` mdast nodes. The link's `url` is the literal
  * `card://<type>:<id>` (a non-standard scheme) so the downstream `<a>`
- * component override can detect it and render an <ObjectCard /> instead of a
- * normal anchor.
+ * component override can detect it and delegate rendering to the host's
+ * `renderEntityCard` callback (see `chat-message-enhanced.tsx`).
  *
  * Why a remark plugin (NOT a regex on the raw markdown source):
  *   - Preserves bold / italic / list / code wrapping around the marker.

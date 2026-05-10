@@ -34,18 +34,21 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     // resolved ChatRef — typically a hover-card pill that composes the
     // canonical entity card from the host's design system.
     //
-    // When `renderEntityCard` is unset OR returns null, the renderer falls
-    // back to plain text (the ref's title, or the cardId when even that
-    // isn't resolvable). Never renders the literal `[card://...]` marker.
-    const hasRefs = !!chatRefs && Object.keys(chatRefs).length > 0 && !!renderEntityCard
+    // The remark plugin runs whenever the assistant emits a `[card://]`
+    // marker (chatRefs present OR not), so we always strip raw markers
+    // from rendered text (Logic MED-4). When the host's `renderEntityCard`
+    // is unset OR returns null, the override falls back to the ref's
+    // title — or, if even the ref is unknown, the bare cardId. Never
+    // renders the literal `[card://...]` URL.
+    const hasMarkerSupport = !!chatRefs || !!renderEntityCard
     const cardRemarkPlugins = useMemo(
-      () => (hasRefs ? [remarkCardLinks] : []),
-      [hasRefs],
+      () => (hasMarkerSupport ? [remarkCardLinks] : []),
+      [hasMarkerSupport],
     )
     const cardComponentOverrides = useMemo(() => {
-      if (!hasRefs) return undefined
-      const refs = chatRefs!
-      const render = renderEntityCard!
+      if (!hasMarkerSupport) return undefined
+      const refs = chatRefs ?? {}
+      const render = renderEntityCard
       return {
         // Override `<a>` to detect `card://` URLs emitted by `remarkCardLinks`
         // and delegate rendering to the host. Other href schemes pass
@@ -60,12 +63,14 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
               const cardId = stripped.slice(sepIdx + 1)
               const key = `${cardType}:${cardId}`
               const refMatch: ChatRef | undefined = refs[key]
-              if (refMatch) {
+              if (refMatch && render) {
                 const rendered = render(refMatch)
                 if (rendered != null) return rendered
               }
-              // Unknown ref OR host opted out — fall back to plain text
-              // title-only (use any same-type ref's title if available).
+              // No renderer, no ref, OR renderer returned null — fall back
+              // to plain text title-only. Use any same-type ref's title if
+              // available; otherwise the bare cardId. Never render the
+              // literal `card://` URL.
               const fallbackTitle = (refMatch?.title)
                 ?? Object.values(refs).find((r) => r.type === cardType)?.title
                 ?? cardId
@@ -85,7 +90,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           )
         },
       }
-    }, [hasRefs, chatRefs, renderEntityCard])
+    }, [hasMarkerSupport, chatRefs, renderEntityCard])
 
     const getAvatarProps = () => {
       const displayName = name || (isUser ? "User" : assistantType === 'mingo' ? "Mingo" : "Fae")
