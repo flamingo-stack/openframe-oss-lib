@@ -90,6 +90,24 @@ export interface ChatMessageListRef {
 
 // ========== Chat Input Props ==========
 
+export interface SlashCommandSummary {
+  id: string
+  description: string
+}
+
+export interface SlashCommandsProp {
+  /** DocSource identifier for the registry lookup. Kept as a plain string so
+   *  the OSS lib doesn't import hub-internal types. */
+  source: string
+  /** Server-side fetch — typically wraps `GET /api/docs/commands`. The hub
+   *  provides this; the OSS-lib has no knowledge of hub route paths. */
+  fetchCommands: (
+    source: string,
+    prefix: string,
+    signal?: AbortSignal,
+  ) => Promise<SlashCommandSummary[]>
+}
+
 export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'onSubmit'> {
   onSend?: (message: string) => void
   onStop?: () => void | Promise<void>
@@ -100,6 +118,11 @@ export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextArea
   maxRows?: number
   showSendButton?: boolean
   sendButtonLabel?: string
+  /** When provided, shows a slash-command autocomplete dropdown when the
+   *  user's text starts with `/`. The dropdown uses UI-Kit `<Card>` + button
+   *  primitives (no raw HTML elements) and ODS tokens for theming.
+   *  Backward compat: omit to disable autocomplete entirely. */
+  slashCommands?: SlashCommandsProp
 }
 
 export interface ChatInputRef {
