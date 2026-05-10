@@ -5,6 +5,7 @@
 import type { ButtonHTMLAttributes, ComponentType, HTMLAttributes, TextareaHTMLAttributes } from 'react'
 import type { AssistantType, AuthorType, ChatApprovalStatus, ConnectionStatus } from './chat.types'
 import type { ApprovalRequestData, Message, MessageSegment, ToolExecutionData } from './message.types'
+import type { ChatRef } from '../object-card'
 
 // ========== Chat Container Props ==========
 
@@ -57,6 +58,27 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
   isTyping?: boolean
   onApprove?: (requestId?: string) => void | Promise<void>
   onReject?: (requestId?: string) => void | Promise<void>
+  /**
+   * Per-row metadata for inline object-card rendering (v6.1 §B.2.6+§B.2.7).
+   * Keyed by `<documentType>:<primaryKey>`. When present, text segments are
+   * passed through the `remarkCardLinks` plugin and `[card://<type>:<id>]`
+   * markers expand into <ObjectCard /> hover pills. When undefined or empty,
+   * messages render as plain markdown (backward compat).
+   */
+  chatRefs?: Record<string, ChatRef>
+  /**
+   * Whether a given card type supports the "Discuss" action. Defers to the
+   * host's slash-command registry per v6.1 DRY duplications #2 — the OSS-lib
+   * has no knowledge of registered commands.
+   */
+  canDiscussType?: (type: string) => boolean
+  /**
+   * Click handler for the "Discuss" button on an ObjectCard. The host
+   * synthesizes a natural-prompt turn ("Tell me more about <title>") with a
+   * structured `commandOverride.entityIdFilter` field on the request body.
+   * v6.1 §B.2.8.
+   */
+  onCardDiscuss?: (reference: ChatRef) => void
 }
 
 // ========== Chat Message List Props ==========
@@ -80,6 +102,15 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
   hasNextPage?: boolean
   isFetchingNextPage?: boolean
   onLoadMore?: () => void
+  /** Whether a given object-card type supports the "Discuss" action. The
+   *  host queries its slash-command registry (or equivalent) per v6.1
+   *  DRY duplications #2 — the OSS-lib has no knowledge of registered
+   *  commands. Forwarded to every message's ChatMessageEnhanced. */
+  canDiscussType?: (type: string) => boolean
+  /** Click handler for the Discuss button on an ObjectCard. The host
+   *  synthesizes a natural-prompt turn ("Tell me more about <title>")
+   *  with a structured `commandOverride.entityIdFilter`. v6.1 §B.2.8. */
+  onCardDiscuss?: (reference: ChatRef) => void
 }
 
 export interface ChatMessageListRef {

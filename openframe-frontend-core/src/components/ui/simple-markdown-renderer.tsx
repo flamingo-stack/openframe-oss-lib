@@ -283,6 +283,17 @@ export interface SimpleMarkdownRendererProps {
   /** Merge additional or override react-markdown component renderers */
   componentOverrides?: Partial<Components>;
   /**
+   * Extra remark plugins appended after the built-in `remarkGfm` and
+   * `remarkBreaks`. Used by chat consumers to inject the `remarkCardLinks`
+   * plugin that converts `[card://<type>:<id>]` markers into synthetic
+   * link nodes (subsequently rendered as <ObjectCard /> via componentOverrides).
+   *
+   * Each entry is either a Plugin reference or a [Plugin, options] tuple
+   * — same shape as react-markdown's own `remarkPlugins` prop. Pass an
+   * empty array (or omit) to keep the default plugin set.
+   */
+  additionalRemarkPlugins?: any[];
+  /**
    * Configure text sizing for all rendered elements.
    * - `"default"` — current behavior (large article-style typography)
    * - `"compact"` — smaller sizes for sidebars, cards, changelogs
@@ -308,6 +319,7 @@ export const SimpleMarkdownRenderer: React.FC<SimpleMarkdownRendererProps> = ({
   preprocessContent,
   componentOverrides,
   textSize,
+  additionalRemarkPlugins,
 }) => {
   const idCountsRef = useRef<Record<string, number>>({});
 
@@ -577,7 +589,7 @@ export const SimpleMarkdownRenderer: React.FC<SimpleMarkdownRendererProps> = ({
       <div className="content-wrapper max-w-none break-words">
         <article className="prose prose-lg max-w-none">
           <ReactMarkdown
-            remarkPlugins={[remarkGfm, remarkBreaks]}
+            remarkPlugins={[remarkGfm, remarkBreaks, ...(additionalRemarkPlugins ?? [])]}
             rehypePlugins={[
               rehypeRaw,
               [rehypeHighlight, { detect: true, ignoreMissing: true }],
