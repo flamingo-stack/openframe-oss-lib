@@ -80,14 +80,20 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
         setValue: (next: string) => {
           setValue(next)
           // Defer until React commits the new value so scrollHeight reflects
-          // the updated DOM. requestAnimationFrame is the standard escape hatch.
+          // the updated DOM. requestAnimationFrame is the standard escape
+          // hatch. After focus, set selection to the END of the new value —
+          // programmatic `.focus()` on a textarea defaults to caret-at-0
+          // (browser-standard), which would land the cursor at the start of
+          // the prefilled `/cmd ` and force users to arrow-right past every
+          // character before typing.
           requestAnimationFrame(() => {
             const el = textareaRef.current
-            if (el) {
-              el.style.height = 'auto'
-              el.style.height = `${el.scrollHeight}px`
-            }
-            focusTextarea()
+            if (!el) return
+            el.style.height = 'auto'
+            el.style.height = `${el.scrollHeight}px`
+            if (disabled || el.disabled) return
+            el.focus()
+            el.setSelectionRange(next.length, next.length)
           })
         },
         setValueAndCursor: (next: string, cursorOffset: number) => {
@@ -193,11 +199,22 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
       (cmd: SlashCommandSummary) => {
         // Keep trailing space so the user types args without an extra space.
         // Matches macOS / VSCode autocomplete UX.
-        setValue(`/${cmd.id} `)
+        const next = `/${cmd.id} `
+        setValue(next)
         setSlashSuggestions([])
-        focusTextarea()
+        // After focus, position the caret at the end of the prefilled
+        // string. Programmatic `.focus()` defaults to caret-at-0 in most
+        // browsers, which would force the user to arrow-right past every
+        // prefilled character before typing args. Defer one frame so the
+        // textarea has the new value committed by React first.
+        requestAnimationFrame(() => {
+          const el = textareaRef.current
+          if (!el || el.disabled) return
+          el.focus()
+          el.setSelectionRange(next.length, next.length)
+        })
       },
-      [focusTextarea],
+      [],
     )
 
     const handleKeyDown = useCallback(
