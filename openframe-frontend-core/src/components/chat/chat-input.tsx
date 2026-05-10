@@ -6,7 +6,7 @@ import { Send01Icon, StopIcon } from "../icons-v2-generated"
 import { Textarea } from "../ui/textarea"
 import { ChatTypingIndicator } from "./chat-typing-indicator"
 import { SlashCommandSuggestions } from "./slash-command-suggestions"
-import type { ChatInputProps, SlashCommandSummary } from "./types"
+import type { ChatInputProps, ChatInputRef, SlashCommandSummary } from "./types"
 
 /** SHARED with `lib/config/slash-commands-config.ts:SLASH_COMMAND_ID_REGEX`
  *  AND the chat-route slash dispatch parser. Keep all three in sync — server
@@ -14,7 +14,7 @@ import type { ChatInputProps, SlashCommandSummary } from "./types"
  *  uppercase / out-of-charset names would offer commands the API rejects. */
 const SLASH_INPUT_TRIGGER = /^\/([a-z][a-z0-9-]*)?$/
 
-const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
+const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
   (allProps, ref) => {
     // Pull `slashCommands` out FIRST, BEFORE any spread, so it can never leak
     // into `<Textarea {...inputProps}>` (and from there onto `<textarea>` as
@@ -40,8 +40,6 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const prevSendingRef = useRef(sending)
     const prevAwaitingResponseRef = useRef(awaitingResponse)
 
-    useImperativeHandle(ref, () => textareaRef.current!)
-
     const focusTextarea = useCallback(() => {
       if (disabled) return
       const el = textareaRef.current
@@ -54,6 +52,51 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         focusTextarea()
       }
     }, [autoFocus, focusTextarea])
+
+    // Mirror `value` into a ref so `getValue()` can read the latest value
+    // without forcing a new imperative handle on every keystroke. Without
+    // this, `useImperativeHandle` deps would have to include `value`,
+    // rebuilding the handle object N times per turn.
+    const valueRef = useRef(value)
+    valueRef.current = value
+
+    // Expose the `ChatInputRef` shape so parents can imperatively pre-fill
+    // the input (used by the empty-state quick-action chips that translate
+    // to `/<id> ` slash invocations) and focus the textarea programmatically.
+    // setValue() mirrors the user-typed path: updates state AND triggers the
+    // textarea's auto-resize on the next frame so multi-line pre-fills don't
+    // clip the rendered content.
+    useImperativeHandle(
+      ref,
+      (): ChatInputRef => ({
+        focus: () => focusTextarea(),
+        blur: () => textareaRef.current?.blur(),
+        clear: () => {
+          setValue('')
+          if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto'
+          }
+        },
+        setValue: (next: string) => {
+          setValue(next)
+          // Defer until React commits the new value so scrollHeight reflects
+          // the updated DOM. requestAnimationFrame is the standard escape hatch.
+          requestAnimationFrame(() => {
+            const el = textareaRef.current
+            if (el) {
+              el.style.height = 'auto'
+              el.style.height = `${el.scrollHeight}px`
+            }
+            focusTextarea()
+          })
+        },
+        getValue: () => valueRef.current,
+      }),
+      // `valueRef` is a stable ref; only re-derive the handle when
+      // `focusTextarea` changes (its identity flips on `disabled` toggles
+      // — a few times per session, not per keystroke).
+      [focusTextarea],
+    )
 
     const handleSubmit = useCallback(() => {
       const message = value.trim()

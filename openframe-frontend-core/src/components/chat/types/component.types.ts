@@ -93,6 +93,10 @@ export interface ChatMessageListRef {
 export interface SlashCommandSummary {
   id: string
   description: string
+  /** Optional `[arg-name]` hint shown after the command id in autocomplete,
+   *  e.g. `/podcasts [title or id]`. Per 2026 best practice (Codex CLI /
+   *  Claude Code SDK argument-hint frontmatter). */
+  argumentHint?: string
 }
 
 export interface SlashCommandsProp {

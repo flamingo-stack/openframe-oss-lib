@@ -72,6 +72,11 @@ export function SlashCommandSuggestions({
           <span className="font-mono text-h5 mr-2 text-ods-text-primary">
             /{cmd.id}
           </span>
+          {cmd.argumentHint && (
+            <span className="font-mono text-h5 mr-2 text-ods-text-muted shrink-0">
+              {cmd.argumentHint}
+            </span>
+          )}
           <span className="text-h5 text-ods-text-secondary truncate">
             — {cmd.description}
           </span>
