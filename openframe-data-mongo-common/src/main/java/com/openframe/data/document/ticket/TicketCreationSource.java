@@ -1,8 +1,8 @@
 package com.openframe.data.document.ticket;
 
 public enum TicketCreationSource {
-    FAE_FORM,
-    FAE_DIALOG,
+    IN_APP_FORM,
+    AI_CONVERSATION,
     ADMIN_DASHBOARD,
     INBOUND_EMAIL
 }

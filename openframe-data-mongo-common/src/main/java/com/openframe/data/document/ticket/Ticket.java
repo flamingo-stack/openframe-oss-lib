@@ -53,7 +53,7 @@ public class Ticket {
     @Indexed
     private TicketStatusKind statusKind;
 
-    private boolean faeDisabled;
+    private boolean aiDisabled;
 
     @Indexed
     private TicketCreationSource creationSource;
