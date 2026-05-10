@@ -2,7 +2,7 @@
  * Component prop types
  */
 
-import type { ButtonHTMLAttributes, HTMLAttributes, TextareaHTMLAttributes } from 'react'
+import type { ButtonHTMLAttributes, ComponentType, HTMLAttributes, TextareaHTMLAttributes } from 'react'
 import type { AssistantType, AuthorType, ChatApprovalStatus, ConnectionStatus } from './chat.types'
 import type { ApprovalRequestData, Message, MessageSegment, ToolExecutionData } from './message.types'
 
@@ -97,6 +97,23 @@ export interface SlashCommandSummary {
    *  e.g. `/podcasts [title or id]`. Per 2026 best practice (Codex CLI /
    *  Claude Code SDK argument-hint frontmatter). */
   argumentHint?: string
+  /** Opaque source id (e.g. `'podcasts'`, `'clickup-roadmap'`) — resolved
+   *  by the consumer-provided `resolveSourceIcon` callback into an icon
+   *  + label so the autocomplete row carries the same visual identity as
+   *  the empty-state chip. When the resolver returns undefined OR this
+   *  field is missing, the row renders without an icon (fallback). */
+  primarySourceId?: string
+  /** When true, the row's "Find" action button is shown. False/undefined
+   *  hides it (singular ILIKE-by-name doesn't apply to the command). */
+  supportsSingular?: boolean
+}
+
+/** Icon + label pair returned by the consumer's `resolveSourceIcon`. The
+ *  Icon is a React component (lucide-react or UI-Kit shape); the label
+ *  is the human-readable source name (e.g. "Podcasts", "ClickUp Roadmap"). */
+export interface SlashCommandSourceMeta {
+  Icon: ComponentType<{ className?: string }>
+  label: string
 }
 
 export interface SlashCommandsProp {
@@ -110,6 +127,27 @@ export interface SlashCommandsProp {
     prefix: string,
     signal?: AbortSignal,
   ) => Promise<SlashCommandSummary[]>
+  /** Optional: resolve a `primarySourceId` to an icon + label pair so the
+   *  autocomplete row carries the same visual identity as the empty-state
+   *  chip for that source. Hub provides this by looking up
+   *  `RAG_SOURCE_DISPLAY[sourceId]`. Returns undefined for unknown ids;
+   *  the row falls back to no-icon rendering. */
+  resolveSourceIcon?: (sourceId: string) => SlashCommandSourceMeta | undefined
+  /** Optional Recent action — fires when the user clicks the "Recent"
+   *  button on an autocomplete row. The hub maps this to
+   *  `chatInputRef.current.submit(`/${cmd.id}`)` (auto-send the bare
+   *  command). When undefined, the Recent button is not rendered. */
+  onActionRecent?: (cmd: SlashCommandSummary) => void
+  /** Optional Search action — fires when the user clicks "Search". The hub
+   *  maps this to `chatInputRef.current.setValue(`/${cmd.id} `)`. When
+   *  undefined, the Search button is not rendered. */
+  onActionSearch?: (cmd: SlashCommandSummary) => void
+  /** Optional Find action — fires when the user clicks "Find". The hub
+   *  maps this to `chatInputRef.current.setValueAndCursor` to pre-fill
+   *  `/<cmd> ""` and land the cursor between quotes. The button only
+   *  renders when BOTH `onActionFind` is provided AND the command's
+   *  `supportsSingular` flag is true. */
+  onActionFind?: (cmd: SlashCommandSummary) => void
 }
 
 export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'onSubmit'> {

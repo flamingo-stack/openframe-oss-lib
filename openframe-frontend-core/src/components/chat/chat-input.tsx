@@ -335,6 +335,10 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
             highlightedIdx={highlightedIdx}
             onHover={setHighlightedIdx}
             onSelect={acceptSuggestion}
+            resolveSourceIcon={slashCommands?.resolveSourceIcon}
+            onActionRecent={slashCommands?.onActionRecent}
+            onActionSearch={slashCommands?.onActionSearch}
+            onActionFind={slashCommands?.onActionFind}
           />
           <div
             className={cn(
