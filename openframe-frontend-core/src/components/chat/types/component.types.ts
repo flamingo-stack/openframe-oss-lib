@@ -2,7 +2,7 @@
  * Component prop types
  */
 
-import type { ButtonHTMLAttributes, HTMLAttributes, TextareaHTMLAttributes } from 'react'
+import type { ButtonHTMLAttributes, ComponentType, HTMLAttributes, TextareaHTMLAttributes } from 'react'
 import type { AssistantType, AuthorType, ChatApprovalStatus, ConnectionStatus } from './chat.types'
 import type { ApprovalRequestData, Message, MessageSegment, ToolExecutionData } from './message.types'
 
@@ -90,6 +90,86 @@ export interface ChatMessageListRef {
 
 // ========== Chat Input Props ==========
 
+/** Action ids — the dispatch BEHAVIORS exposed by a slash command's UI
+ *  affordances. The host (e.g. multi-platform-hub) owns the mapping
+ *  from id → input-buffer mutation:
+ *
+ *   - `browse` : submit `/<id>` bare → top-N items / canonical doc.
+ *   - `search` : prefill `/<id> ` → user types FTS query.
+ *   - `find`   : prefill `/<id> ""` (cursor between quotes) → singular
+ *                lookup (ILIKE).
+ *
+ *  Mirrors the server-side `SlashCommandActionId` union; kept as a
+ *  string-literal union (not enum) so JSON wire shape is stable. */
+export type SlashCommandActionId = 'browse' | 'search' | 'find'
+
+/** Resolved action affordance — `label` is ALWAYS populated by the
+ *  server (override OR default). The OSS-lib renders directly without
+ *  label-resolution branching — single source of truth lives in the
+ *  hub's `slash-commands-config.ts`. */
+export interface SlashCommandSummaryAction {
+  id: SlashCommandActionId
+  label: string
+}
+
+export interface SlashCommandSummary {
+  id: string
+  description: string
+  /** Optional `[arg-name]` hint shown after the command id in autocomplete,
+   *  e.g. `/podcasts [title or id]`. Per 2026 best practice (Codex CLI /
+   *  Claude Code SDK argument-hint frontmatter). */
+  argumentHint?: string
+  /** Opaque source id (e.g. `'podcasts'`, `'clickup-roadmap'`) — resolved
+   *  by the consumer-provided `resolveSourceIcon` callback into an icon
+   *  + label so the autocomplete row carries the same visual identity as
+   *  the empty-state chip. When the resolver returns undefined OR this
+   *  field is missing, the row renders without an icon (fallback). */
+  primarySourceId?: string
+  /** Action affordances declared by the server-side registry. The
+   *  dropdown row renders one button per entry, in array order. Empty
+   *  array = no buttons (degenerate; servers should always declare
+   *  ≥1 action). Single source of truth — same array drives the
+   *  empty-state chip on the host side via the synchronous registry. */
+  actions: SlashCommandSummaryAction[]
+}
+
+/** Icon + label pair returned by the consumer's `resolveSourceIcon`. The
+ *  Icon is a React component (lucide-react or UI-Kit shape); the label
+ *  is the human-readable source name (e.g. "Podcasts", "ClickUp Roadmap"). */
+export interface SlashCommandSourceMeta {
+  Icon: ComponentType<{ className?: string }>
+  label: string
+}
+
+export interface SlashCommandsProp {
+  /** DocSource identifier for the registry lookup. Kept as a plain string so
+   *  the OSS lib doesn't import hub-internal types. */
+  source: string
+  /** Server-side fetch — typically wraps `GET /api/docs/commands`. The hub
+   *  provides this; the OSS-lib has no knowledge of hub route paths. */
+  fetchCommands: (
+    source: string,
+    prefix: string,
+    signal?: AbortSignal,
+  ) => Promise<SlashCommandSummary[]>
+  /** Optional: resolve a `primarySourceId` to an icon + label pair so the
+   *  autocomplete row carries the same visual identity as the empty-state
+   *  chip for that source. Hub provides this by looking up
+   *  `RAG_SOURCE_DISPLAY[sourceId]`. Returns undefined for unknown ids;
+   *  the row falls back to no-icon rendering. */
+  resolveSourceIcon?: (sourceId: string) => SlashCommandSourceMeta | undefined
+  /** Generic action handler — fires when the user clicks any of the
+   *  command's declared action buttons (Recent / Search / Find / …).
+   *  The host owns the mapping from `actionId` to the chat-input-ref
+   *  mutation:
+   *    - 'browse' → `chatInputRef.current.submit(`/${cmd.id}`)`
+   *    - 'search' → `chatInputRef.current.setValue(`/${cmd.id} `)`
+   *    - 'find'   → `chatInputRef.current.setValueAndCursor(...)`
+   *  When undefined, no action buttons are rendered (the row is still
+   *  clickable for the default select behavior). */
+  onAction?: (cmd: SlashCommandSummary, actionId: SlashCommandActionId) => void
+}
+
 export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'onSubmit'> {
   onSend?: (message: string) => void
   onStop?: () => void | Promise<void>
@@ -100,6 +180,11 @@ export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextArea
   maxRows?: number
   showSendButton?: boolean
   sendButtonLabel?: string
+  /** When provided, shows a slash-command autocomplete dropdown when the
+   *  user's text starts with `/`. The dropdown uses UI-Kit `<Card>` + button
+   *  primitives (no raw HTML elements) and ODS tokens for theming.
+   *  Backward compat: omit to disable autocomplete entirely. */
+  slashCommands?: SlashCommandsProp
 }
 
 export interface ChatInputRef {
@@ -108,6 +193,17 @@ export interface ChatInputRef {
   clear: () => void
   setValue: (value: string) => void
   getValue: () => string
+  /** Set the input value AND position the textarea caret at the given
+   *  zero-based offset. Used by the empty-state quick-action "Find"
+   *  button that pre-fills `/<cmd> ""` and lands the cursor between
+   *  the quotes so the user can immediately start typing the title. */
+  setValueAndCursor: (value: string, cursorOffset: number) => void
+  /** Set the input value and immediately fire `onSend` with the new
+   *  value (subject to the same `sending`/`disabled` guards as a
+   *  manual click). Used by the empty-state quick-action "Recent"
+   *  button to dispatch `/<cmd>` in one click without forcing the
+   *  user to press Enter. */
+  submit: (value: string) => void
 }
 
 // ========== Chat Typing Indicator Props ==========
