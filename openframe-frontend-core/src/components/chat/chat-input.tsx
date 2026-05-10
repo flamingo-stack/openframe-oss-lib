@@ -4,9 +4,8 @@ import { useState, useRef, useImperativeHandle, forwardRef, useCallback, useEffe
 import { cn } from "../../utils/cn"
 import { Send01Icon, StopIcon } from "../icons-v2-generated"
 import { Textarea } from "../ui/textarea"
-import { Card } from "../ui/card"
-import { Button } from "../ui/button"
 import { ChatTypingIndicator } from "./chat-typing-indicator"
+import { SlashCommandSuggestions } from "./slash-command-suggestions"
 import type { ChatInputProps, SlashCommandSummary } from "./types"
 
 /** SHARED with `lib/config/slash-commands-config.ts:SLASH_COMMAND_ID_REGEX`
@@ -16,7 +15,25 @@ import type { ChatInputProps, SlashCommandSummary } from "./types"
 const SLASH_INPUT_TRIGGER = /^\/([a-z][a-z0-9-]*)?$/
 
 const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
-  ({ className, onSend, onStop, sending = false, awaitingResponse = false, placeholder = "Enter your Request...", reserveAvatarOffset = true, disabled = false, autoFocus = false, slashCommands, ...props }, ref) => {
+  (allProps, ref) => {
+    // Pull `slashCommands` out FIRST, BEFORE any spread, so it can never leak
+    // into `<Textarea {...inputProps}>` (and from there onto `<textarea>` as
+    // an unrecognized DOM attribute). The structural separation here is the
+    // belt to the destructure's suspenders.
+    const { slashCommands, ...rest } = allProps
+    const {
+      className,
+      onSend,
+      onStop,
+      sending = false,
+      awaitingResponse = false,
+      placeholder = "Enter your Request...",
+      reserveAvatarOffset = true,
+      disabled = false,
+      autoFocus = false,
+      ...inputProps
+    } = rest
+
     const [value, setValue] = useState('')
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const shouldRefocusRef = useRef(false)
@@ -53,10 +70,8 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       }
     }, [value, sending, disabled, onSend, focusTextarea])
 
-    // Slash-command autocomplete state. Detect trigger BEFORE keydown handler
-    // so Enter behavior (submit vs. accept-suggestion) can branch on it.
-    // The optional `?` in the regex captures the empty-prefix case where the
-    // user has typed only `/`.
+    // Slash-command autocomplete state. Detection runs in render so the
+    // keyboard handler can branch on it without re-parsing.
     const slashMatch = useMemo(
       () => (slashCommands ? value.match(SLASH_INPUT_TRIGGER) : null),
       [value, slashCommands],
@@ -86,7 +101,6 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         } catch (err) {
           // AbortError on dep-change / unmount is expected.
           if (!cancelled && (err as Error)?.name !== 'AbortError') {
-            // Silent fail in production — autocomplete is non-critical.
             console.warn('[chat-input] slash-command fetch failed:', err)
           }
         }
@@ -100,8 +114,8 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
     const acceptSuggestion = useCallback(
       (cmd: SlashCommandSummary) => {
-        // Keep the trailing space so the user can type args without having
-        // to press space after Tab. Matches macOS / VSCode autocomplete UX.
+        // Keep trailing space so the user types args without an extra space.
+        // Matches macOS / VSCode autocomplete UX.
         setValue(`/${cmd.id} `)
         setSlashSuggestions([])
         focusTextarea()
@@ -112,7 +126,7 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const handleKeyDown = useCallback(
       (e: KeyboardEvent<HTMLTextAreaElement>) => {
         // Slash-command navigation takes precedence when the dropdown is
-        // visible. Esc closes; ArrowUp/Down cycle; Enter/Tab accept.
+        // visible. Esc closes; ArrowUp/Down cycle; Tab/Enter accept.
         if (slashSuggestions.length > 0 && slashPrefix !== null) {
           if (e.key === 'Escape') {
             e.preventDefault()
@@ -239,45 +253,12 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       >
         {reserveAvatarOffset && <div className="invisible h-8 w-8" aria-hidden />}
         <div className="relative">
-          {slashSuggestions.length > 0 && slashPrefix !== null && (
-            <Card
-              role="listbox"
-              aria-label="Slash command suggestions"
-              className={cn(
-                "absolute bottom-full mb-2 left-0 right-0 max-h-72 overflow-auto",
-                "bg-ods-card text-ods-text-primary border-ods-border",
-                "z-50 p-1",
-              )}
-            >
-              {slashSuggestions.map((cmd, idx) => (
-                <Button
-                  key={cmd.id}
-                  variant="transparent"
-                  size="small"
-                  fullWidth
-                  type="button"
-                  role="option"
-                  aria-selected={idx === highlightedIdx}
-                  onMouseEnter={() => setHighlightedIdx(idx)}
-                  onClick={() => acceptSuggestion(cmd)}
-                  className={cn(
-                    "justify-start text-left h-auto py-2 px-3",
-                    "text-ods-text-primary",
-                    idx === highlightedIdx
-                      ? "bg-ods-card-hover"
-                      : "bg-transparent",
-                  )}
-                >
-                  <span className="font-mono text-h5 mr-2 text-ods-text-primary">
-                    /{cmd.id}
-                  </span>
-                  <span className="text-h5 text-ods-text-secondary truncate">
-                    — {cmd.description}
-                  </span>
-                </Button>
-              ))}
-            </Card>
-          )}
+          <SlashCommandSuggestions
+            commands={slashPrefix !== null ? slashSuggestions : []}
+            highlightedIdx={highlightedIdx}
+            onHover={setHighlightedIdx}
+            onSelect={acceptSuggestion}
+          />
           <div
             className={cn(
               "flex items-center gap-2",
@@ -302,7 +283,7 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 "min-h-[20px] max-h-[160px] focus:outline-none",
                 "disabled:opacity-50 disabled:cursor-not-allowed"
               )}
-              {...props}
+              {...inputProps}
             />
 
             {sending && onStop ? (
