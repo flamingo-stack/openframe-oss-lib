@@ -219,7 +219,7 @@ export interface ProcessedMessage {
 
 // ========== Base Message Interface ==========
 
-import type { ChatRef as MessageChatRef } from '../object-card'
+import type { ChatRef as MessageChatRef } from '../chat-ref.types'
 
 export interface Message {
   id: string

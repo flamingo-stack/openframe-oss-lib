@@ -10,7 +10,7 @@ import { ErrorMessageDisplay } from "./error-message-display"
 import { ContextCompactionDisplay } from "./context-compaction-display"
 import { ThinkingDisplay } from "./thinking-display"
 import { SimpleMarkdownRenderer } from "../ui/simple-markdown-renderer"
-import { ObjectCard, type ChatRef } from "./object-card"
+import type { ChatRef } from "./chat-ref.types"
 import { remarkCardLinks } from "./remark-card-links"
 import type { MessageSegment, MessageContent, ChatMessageEnhancedProps } from "./types"
 
@@ -22,16 +22,22 @@ function normalizeContent(content: MessageContent): MessageSegment[] {
 }
 
 const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>(
-  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, authorType: authorTypeProp, assistantIcon, chatRefs, canDiscussType, onCardDiscuss, ...props }, ref) => {
+  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, authorType: authorTypeProp, assistantIcon, chatRefs, renderEntityCard, ...props }, ref) => {
     const isUser = role === 'user'
     const isError = role === 'error'
     const authorType = authorTypeProp ?? (isUser ? 'user' : assistantType === 'mingo' ? 'mingo' : 'fae')
 
-    // Compose the additional remark plugin set + the `<a>` component override
-    // that swaps `card://type:id` URLs for <ObjectCard /> instances. Empty
-    // chatRefs short-circuits the override so the renderer behaves
-    // identically to the legacy markdown path.
-    const hasRefs = !!chatRefs && Object.keys(chatRefs).length > 0
+    // Inline-card rendering uses a HOST-PROVIDED `renderEntityCard` function
+    // (v6.1 §B.2.7 — DRY duplications #2). The OSS-lib stays data-agnostic:
+    // it doesn't know about entity types, slash commands, or app routing.
+    // The host (multi-platform-hub) returns whatever JSX it wants for each
+    // resolved ChatRef — typically a hover-card pill that composes the
+    // canonical entity card from the host's design system.
+    //
+    // When `renderEntityCard` is unset OR returns null, the renderer falls
+    // back to plain text (the ref's title, or the cardId when even that
+    // isn't resolvable). Never renders the literal `[card://...]` marker.
+    const hasRefs = !!chatRefs && Object.keys(chatRefs).length > 0 && !!renderEntityCard
     const cardRemarkPlugins = useMemo(
       () => (hasRefs ? [remarkCardLinks] : []),
       [hasRefs],
@@ -39,44 +45,33 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     const cardComponentOverrides = useMemo(() => {
       if (!hasRefs) return undefined
       const refs = chatRefs!
+      const render = renderEntityCard!
       return {
-        // Override `<a>` to detect `card://` URLs and render an ObjectCard.
-        // The `node` arg's url is what `remarkCardLinks` produced.
+        // Override `<a>` to detect `card://` URLs emitted by `remarkCardLinks`
+        // and delegate rendering to the host. Other href schemes pass
+        // through unchanged — react-markdown's default `<a>` handler covers
+        // them.
         a: ({ href, children, className: linkClassName, ...rest }: any) => {
           if (typeof href === 'string' && href.startsWith('card://')) {
-            // Parse `card://<type>:<id>`. Tolerate snake_case or kebab-case
-            // (the regex shape matches `[a-zA-Z0-9_-]+` per remark plugin).
             const stripped = href.slice('card://'.length)
             const sepIdx = stripped.lastIndexOf(':')
             if (sepIdx !== -1) {
               const cardType = stripped.slice(0, sepIdx)
               const cardId = stripped.slice(sepIdx + 1)
               const key = `${cardType}:${cardId}`
-              const ref: ChatRef | undefined = refs[key]
-              if (ref) {
-                return (
-                  <ObjectCard
-                    reference={ref}
-                    canDiscuss={canDiscussType ? canDiscussType(ref.type) : undefined}
-                    onDiscuss={onCardDiscuss}
-                  />
-                )
+              const refMatch: ChatRef | undefined = refs[key]
+              if (refMatch) {
+                const rendered = render(refMatch)
+                if (rendered != null) return rendered
               }
-              // Unknown ref — fall back to the chip-metadata title if any
-              // entry of this type exists. Otherwise render the literal
-              // marker text. Per v6.1 defensive note: never render the raw
-              // `[card://...]` URL itself; show plain prose.
-              const fallbackRef = Object.values(refs).find((r) => r.type === cardType)
-              const fallbackTitle = fallbackRef?.title ?? cardId
+              // Unknown ref OR host opted out — fall back to plain text
+              // title-only (use any same-type ref's title if available).
+              const fallbackTitle = (refMatch?.title)
+                ?? Object.values(refs).find((r) => r.type === cardType)?.title
+                ?? cardId
               return <span className="text-ods-text-primary">{fallbackTitle}</span>
             }
           }
-          // Default link rendering — passes through to the regular `<a>` path.
-          // The OSS-lib renderer's default `<a>` handler covers internal-link
-          // resolution + broken-link decoration; we don't replicate it here.
-          // Returning a basic anchor is sufficient because card-marker links
-          // are NEVER in-app routes and the chat UX doesn't need broken-link
-          // detection on assistant-emitted text.
           return (
             <a
               href={href}
@@ -90,7 +85,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           )
         },
       }
-    }, [hasRefs, chatRefs, canDiscussType, onCardDiscuss])
+    }, [hasRefs, chatRefs, renderEntityCard])
 
     const getAvatarProps = () => {
       const displayName = name || (isUser ? "User" : assistantType === 'mingo' ? "Mingo" : "Fae")
@@ -258,8 +253,7 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     // Without this check, a parent re-render with a new (but equivalent)
     // refs object would force a full markdown re-render every keystroke.
     prevProps.chatRefs === nextProps.chatRefs &&
-    prevProps.canDiscussType === nextProps.canDiscussType &&
-    prevProps.onCardDiscuss === nextProps.onCardDiscuss
+    prevProps.renderEntityCard === nextProps.renderEntityCard
   )
 })
 

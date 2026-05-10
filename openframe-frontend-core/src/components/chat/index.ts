@@ -18,7 +18,7 @@ export * from './chat-typing-indicator'
 export * from './tool-execution-display'
 export * from './model-display'
 export * from './chat-sidebar'
-export * from './object-card'
+export type { ChatRef } from './chat-ref.types'
 export { remarkCardLinks } from './remark-card-links'
 
 // Chat types and constants

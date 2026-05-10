@@ -10,6 +10,7 @@ export * from './ui'
 
 // Individual component exports
 export * from './announcement-bar'
+export * from './hover-card'
 export * from './categories-cart'
 export * from './category-card'
 export * from './comment-card'
