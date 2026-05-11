@@ -1,14 +1,17 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import { useMdUp } from '@/hooks';
 
 type ProgressBarProps = {
   progress: number; // 0–100
   warningThreshold?: number; // default 70
   criticalThreshold?: number; // default 90
-  segmentWidth?: number; // px, default 6
+  segmentWidth?: number; // desktop segment width (px)
+  mobileSegmentWidth?: number; // mobile segment width (px)
   segmentGap?: number; // px, default 2
-  height?: number; // px, default 16
+  height?: number; // desktop height (px)
+  mobileHeight?: number; // mobile height (px)
   inverted?: boolean; // if true, high values are good (green), low values are bad (red)
 };
 
@@ -16,11 +19,17 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   progress,
   warningThreshold = 75,
   criticalThreshold = 90,
-  segmentWidth = 3.47,
+  segmentWidth = 3.43,
+  mobileSegmentWidth = 5.09,
   segmentGap = 2,
   height = 24,
+  mobileHeight = 8,
   inverted = false,
 }) => {
+  const isMdUp = useMdUp() ?? true;
+  const effectiveSegmentWidth = isMdUp ? segmentWidth : mobileSegmentWidth;
+  const effectiveHeight = isMdUp ? height : mobileHeight;
+
   const containerRef = useRef<HTMLDivElement>(null);
   const [segmentCount, setSegmentCount] = useState(0);
 
@@ -30,7 +39,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
     const resizeObserver = new ResizeObserver(() => {
       if (containerRef.current) {
         const width = containerRef.current.offsetWidth;
-        const count = Math.floor(width / (segmentWidth + segmentGap));
+        const count = Math.floor(width / (effectiveSegmentWidth + segmentGap));
         setSegmentCount(count);
       }
     });
@@ -38,7 +47,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
     resizeObserver.observe(containerRef.current);
 
     return () => resizeObserver.disconnect();
-  }, [segmentWidth, segmentGap]);
+  }, [effectiveSegmentWidth, segmentGap]);
 
   // Pick color based on thresholds using ODS design tokens
   const getColor = () => {
@@ -58,14 +67,18 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   };
 
   return (
-    <div ref={containerRef} className="w-full flex gap-[2px]">
+    <div
+      ref={containerRef}
+      className="w-full flex"
+      style={{ gap: `${segmentGap}px` }}
+    >
       {Array.from({ length: segmentCount }).map((_, i) => (
         <div
           key={i}
-          className="rounded-sm"
+          className="rounded"
           style={{
-            width: `${segmentWidth}px`,
-            height: `${height}px`,
+            width: `${effectiveSegmentWidth}px`,
+            height: `${effectiveHeight}px`,
             backgroundColor:
               i < Math.round((progress / 100) * segmentCount)
                 ? getColor()

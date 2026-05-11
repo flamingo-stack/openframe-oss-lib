@@ -33,12 +33,12 @@ export function InfoCard({ data, className = '' }: InfoCardProps) {
   return (
     <div
       className={cn(
-        'bg-ods-card border border-ods-border rounded-md p-4 flex flex-col gap-3 items-start w-full',
+        'bg-ods-card border border-ods-border rounded-md p-[var(--spacing-system-m)] flex flex-col gap-[var(--spacing-system-s)] items-start w-full',
         className,
       )}
     >
       {data.title && (
-        <div className="flex items-center gap-2 self-stretch h-6">
+        <div className="flex items-center gap-[var(--spacing-system-xsf)] self-stretch h-6">
           <span className="text-h4 text-ods-text-primary truncate">
             {data.title}
           </span>
@@ -103,7 +103,7 @@ function InfoCardValueRow({ label, value, showLabel, copyable, copyAriaLabel }: 
         {showLabel ? label : ''}
       </span>
       <div className="flex-1 h-px bg-ods-divider" />
-      <div className="flex items-center gap-2 max-w-[60%]">
+      <div className="flex items-center gap-[var(--spacing-system-xsf)] max-w-[60%]">
         <span
           className="text-h4 text-ods-text-primary truncate select-text"
           title={value}
