@@ -64,11 +64,11 @@ public class MonitoringPage {
      */
     private final Locator complianceRateCard;
     /**
-     * Compliance ratio text, e.g. "2/2"
+     * Compliance ratio text, e.g. "1/1"
      */
     private final Locator complianceRateRatio;
     /**
-     * Compliance percentage text, e.g. "100%"
+     * Compliance percentage text, e.g. "(100%)"
      */
     private final Locator complianceRatePercent;
     /**
@@ -90,32 +90,12 @@ public class MonitoringPage {
 
     // ── Policies list table ───────────────────────────────────────────────────
     /**
-     * Sticky column-header row (Name / Severity / Platform / Status)
-     */
-    private final Locator tableHeaderRow;
-    /**
-     * "Name" column header
-     */
-    private final Locator colHeaderName;
-    /**
-     * "Severity" column header
-     */
-    private final Locator colHeaderSeverity;
-    /**
-     * "Platform" column header
-     */
-    private final Locator colHeaderPlatform;
-    /**
-     * "Status" column header
-     */
-    private final Locator colHeaderStatus;
-    /**
-     * Result count label, e.g. "Showing 2 results"
+     * Result count label, e.g. "1 result" or "2 results"
      */
     private final Locator resultsCountLabel;
     /**
-     * All policy row containers.
-     * Each row contains: name/description | severity | platform | status badge | more-actions button.
+     * All policy row containers (the inner flex row inside each card).
+     * Each row has direct-child divs: [0] Name | [1] Severity | [2] Platform | [3] Status | [4] Actions | [5] Link
      */
     private final Locator policyRows;
 
@@ -161,7 +141,8 @@ public class MonitoringPage {
         // ── Policies tab – header ─────────────────────────────────────────────
         policiesHeading = page.locator("main h1").filter(
                 new Locator.FilterOptions().setHasText("Policies"));
-        addPolicyButtonText = page.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName("Add Policy")).first();
+        addPolicyButtonText = page.getByRole(AriaRole.BUTTON,
+                new Page.GetByRoleOptions().setName("Add Policy")).first();
         addPolicyButtonIcon = page.locator("main button[aria-label='Add Policy']");
         searchPoliciesInput = page.locator("main input[placeholder='Search for Policies']");
 
@@ -185,23 +166,20 @@ public class MonitoringPage {
         updatedTimestamp = updatedCard.locator("p").last();
 
         // ── Policies tab – table ──────────────────────────────────────────────
-        tableHeaderRow = page.locator("main div.hidden.md\\:flex.items-center.gap-4.px-4.py-3");
-        colHeaderName = tableHeaderRow.locator("div").filter(
-                new Locator.FilterOptions().setHasText("Name")).first();
-        colHeaderSeverity = tableHeaderRow.locator("div").filter(
-                new Locator.FilterOptions().setHasText("Severity")).first();
-        colHeaderPlatform = tableHeaderRow.locator("div").filter(
-                new Locator.FilterOptions().setHasText("Platform")).first();
-        colHeaderStatus = tableHeaderRow.locator("div").filter(
-                new Locator.FilterOptions().setHasText("Status")).first();
-        resultsCountLabel = page.locator("main div").filter(
-                new Locator.FilterOptions().setHasText("Showing")).last();
-        policyRows = page.locator("main div[class*='h-[clamp']");
+        // Result count lives in a <span> inside the sticky header above the list.
+        resultsCountLabel = page.locator(
+                "main span.text-ods-text-secondary.whitespace-nowrap");
+
+        // FIX: was "div[class*='h-[clamp']" — actual class is h-[68px] md:h-[80px].
+        // This is the inner flex row inside each policy card and is the correct
+        // context element for column-index lookups via :scope > div.
+        policyRows = page.locator("main div[class*='h-[68px]']");
 
         // ── Queries tab ───────────────────────────────────────────────────────
         queriesHeading = page.locator("main h1").filter(
                 new Locator.FilterOptions().setHasText("Queries"));
-        addQueryButtonText = page.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName("Add Query")).first();
+        addQueryButtonText = page.getByRole(AriaRole.BUTTON,
+                new Page.GetByRoleOptions().setName("Add Query")).first();
         addQueryButtonIcon = page.locator("main button[aria-label='Add Query']");
         searchQueriesInput = page.locator("main input[placeholder='Search for Queries']");
         queriesEmptyState = page.locator("main").filter(
@@ -285,7 +263,7 @@ public class MonitoringPage {
      * Returns the status badge text ("Compliant", "Non-Compliant", …)
      * for the policy row matching the given name.
      *
-     * @param policyName exact visible name of the policy, e.g. "Windows version"
+     * @param policyName exact visible name of the policy, e.g. "test policy"
      * @return status text of the matched row
      * @throws RuntimeException if no row with that name is found
      */
@@ -297,9 +275,12 @@ public class MonitoringPage {
             throw new RuntimeException("No policy row found with name: " + policyName);
         }
 
-        // Status is the 4th child div of the row (index 3): Name | Severity | Platform | Status | Actions
+        // FIX: was locator("div").nth(4) — using all nested divs caused the extra
+        // name-column wrapper div to shift every index by +1.
+        // :scope > div selects direct children only, giving a stable column mapping:
+        // [0] Name  [1] Severity  [2] Platform  [3] Status  [4] Actions  [5] Link
         return matchedRow.first()
-                .locator("div").nth(4)
+                .locator(":scope > div").nth(3)
                 .textContent()
                 .trim();
     }
@@ -321,7 +302,7 @@ public class MonitoringPage {
 
 
     // ══════════════════════════════════════════════════════════════════════════
-    // POLICIES TAB – GETTERS / ASSERTIONS HELPERS
+    // POLICIES TAB – GETTERS / ASSERTION HELPERS
     // ══════════════════════════════════════════════════════════════════════════
 
     public String getPoliciesHeadingText() {
@@ -333,11 +314,11 @@ public class MonitoringPage {
     }
 
     public String getComplianceRateRatio() {
-        return complianceRateRatio.textContent().trim();       // e.g. "2/2"
+        return complianceRateRatio.textContent().trim();       // e.g. "1/1"
     }
 
     public String getComplianceRatePercent() {
-        return complianceRatePercent.textContent().trim();     // e.g. "100%"
+        return complianceRatePercent.textContent().trim();     // e.g. "(100%)"
     }
 
     public int getFailedPoliciesCount() {
@@ -345,11 +326,15 @@ public class MonitoringPage {
     }
 
     public String getUpdatedTimestamp() {
-        return updatedTimestamp.textContent().trim();          // e.g. "3 minutes ago"
+        return updatedTimestamp.textContent().trim();          // e.g. "10 minutes ago"
     }
 
+    /**
+     * Returns the result count label text, e.g. "1 result" or "3 results".
+     * FIX: was filtering on "Showing" — the actual label never contains that word.
+     */
     public String getResultsCountText() {
-        return resultsCountLabel.textContent().trim();         // e.g. "Showing 2 results"
+        return resultsCountLabel.textContent().trim();
     }
 
     public int getPolicyRowCount() {
@@ -360,37 +345,49 @@ public class MonitoringPage {
      * Returns the policy name from the row at the given 0-based index.
      */
     public String getPolicyName(int rowIndex) {
+        // Direct child [0] is the name column; descend into its nested <p> or <div>.
         return policyRows.nth(rowIndex)
-                .locator("div").first()
-                .locator("div").first()
+                .locator(":scope > div").first()
                 .locator("p, div").first()
                 .textContent().trim();
     }
 
     /**
      * Returns the severity text ("Low", "Medium", "High") for a given row.
+     * FIX: was locator("div").nth(1) — off by one due to extra nested name wrapper.
+     * Direct child [1] = Severity column.
      */
     public String getPolicySeverity(int rowIndex) {
-        // Severity is the 2nd child div of the row
-        return policyRows.nth(rowIndex).locator("div").nth(1).textContent().trim();
+        return policyRows.nth(rowIndex)
+                .locator(":scope > div").nth(1)
+                .textContent().trim();
     }
 
     /**
      * Returns the platform text ("All", "Windows", …) for a given row.
+     * FIX: was locator("div").nth(2) — off by one due to extra nested name wrapper.
+     * Direct child [2] = Platform column.
      */
     public String getPolicyPlatform(int rowIndex) {
-        return policyRows.nth(rowIndex).locator("div").nth(2).textContent().trim();
+        return policyRows.nth(rowIndex)
+                .locator(":scope > div").nth(2)
+                .textContent().trim();
     }
 
     /**
      * Returns the status badge text ("Compliant", "Non-Compliant", …) for a given row.
+     * FIX: was locator("div").nth(3) — off by one due to extra nested name wrapper.
+     * Direct child [3] = Status column.
      */
     public String getPolicyStatus(int rowIndex) {
-        return policyRows.nth(rowIndex).locator("div").nth(3).textContent().trim();
+        return policyRows.nth(rowIndex)
+                .locator(":scope > div").nth(3)
+                .textContent().trim();
     }
 
     /**
      * Returns the Locator for the status badge div (for color / CSS class assertions).
+     * Scoped to the correct row to avoid matching the Failed Policies metric card badge.
      */
     public Locator getPolicyStatusBadge(int rowIndex) {
         return policyRows.nth(rowIndex)

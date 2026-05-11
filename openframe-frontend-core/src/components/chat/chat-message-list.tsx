@@ -9,7 +9,7 @@ import type { ChatMessageListProps } from "./types"
 const BOTTOM_THRESHOLD = 30 // px from bottom to be considered "at bottom"
 
 const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
-  ({ className, messages, dialogId, isLoading = false, isTyping = false, autoScroll = true, showAvatars = true, contentClassName, assistantType, assistantIcon, pendingApprovals, hasNextPage, isFetchingNextPage, onLoadMore, ...props }, ref) => {
+  ({ className, messages, dialogId, isLoading = false, isTyping = false, autoScroll = true, showAvatars = true, contentClassName, assistantType, assistantIcon, pendingApprovals, hasNextPage, isFetchingNextPage, onLoadMore, renderEntityCard, ...props }, ref) => {
     const scrollRef = useRef<HTMLDivElement>(null)
     const sentinelRef = useRef<HTMLDivElement>(null)
     const onLoadMoreRef = useRef(onLoadMore)
@@ -308,6 +308,8 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                 assistantType={message.assistantType || assistantType}
                 authorType={message.authorType}
                 assistantIcon={message.role !== 'user' ? assistantIcon : undefined}
+                chatRefs={message.chatRefs}
+                renderEntityCard={renderEntityCard}
               />
             ))}
           </div>

@@ -211,6 +211,7 @@
     "remark": "^15.0.1",
     "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.1",
+    "unist-util-visit": "^5.0.0",
     "sonner": "^1.2.4",
     "tailwind-merge": "^3.4.0",
     "tailwindcss-animate": "^1.0.7",
