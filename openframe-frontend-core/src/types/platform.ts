@@ -11,6 +11,15 @@ export interface PlatformRecord {
   description?: string;
   is_active: boolean;
   is_internal: boolean; // Whether this is an internal admin platform vs public-facing
+  // Chat (Ask AI) wiring — populated only for platforms that host a chat surface.
+  // `chat_source_id` is the doc-source binding (`chat_admin_personas.chat_source_id`).
+  // `chat_source_rag_tables_version` is the per-platform RAG-table override version
+  //   bumped by the `replace_chat_source_rag_tables` RPC; used for cross-Lambda
+  //   cache invalidation in `lib/data/doc-source-config-utils.ts`.
+  // `chat_enabled` is the platform-wide chat kill switch (NOT NULL DEFAULT true).
+  chat_source_id?: string | null;
+  chat_source_rag_tables_version?: number | null;
+  chat_enabled?: boolean | null;
   created_at: string;
   updated_at: string;
 }
