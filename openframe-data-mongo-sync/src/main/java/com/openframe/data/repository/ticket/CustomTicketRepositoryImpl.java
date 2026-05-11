@@ -283,4 +283,31 @@ public class CustomTicketRepositoryImpl implements CustomTicketRepository {
     public String getDefaultSortField() {
         return DEFAULT_SORT_FIELD;
     }
+
+    @Override
+    public Optional<Ticket> findLastInColumn(TicketStatus status) {
+        Query query = new Query(Criteria.where(FIELD_STATUS).is(status)
+                .and(FIELD_ORDER).exists(true).ne(null));
+        query.with(Sort.by(Sort.Direction.DESC, FIELD_ORDER));
+        query.limit(1);
+        return Optional.ofNullable(mongoTemplate.findOne(query, Ticket.class));
+    }
+
+    @Override
+    public Optional<Ticket> findFirstAfter(TicketStatus status, String order) {
+        Query query = new Query(Criteria.where(FIELD_STATUS).is(status)
+                .and(FIELD_ORDER).gt(order));
+        query.with(Sort.by(Sort.Direction.ASC, FIELD_ORDER));
+        query.limit(1);
+        return Optional.ofNullable(mongoTemplate.findOne(query, Ticket.class));
+    }
+
+    @Override
+    public Optional<Ticket> findFirstBefore(TicketStatus status, String order) {
+        Query query = new Query(Criteria.where(FIELD_STATUS).is(status)
+                .and(FIELD_ORDER).lt(order));
+        query.with(Sort.by(Sort.Direction.DESC, FIELD_ORDER));
+        query.limit(1);
+        return Optional.ofNullable(mongoTemplate.findOne(query, Ticket.class));
+    }
 }
