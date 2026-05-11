@@ -20,7 +20,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   warningThreshold = 75,
   criticalThreshold = 90,
   segmentWidth = 3.43,
-  mobileSegmentWidth = 5.09,
+  mobileSegmentWidth = 5,
   segmentGap = 2,
   height = 24,
   mobileHeight = 8,
@@ -39,7 +39,9 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
     const resizeObserver = new ResizeObserver(() => {
       if (containerRef.current) {
         const width = containerRef.current.offsetWidth;
-        const count = Math.floor(width / (effectiveSegmentWidth + segmentGap));
+        // N segments have only (N-1) gaps, so add one gap back before dividing —
+        // otherwise the last segment is dropped due to a phantom trailing gap.
+        const count = Math.floor((width + segmentGap) / (effectiveSegmentWidth + segmentGap));
         setSegmentCount(count);
       }
     });
