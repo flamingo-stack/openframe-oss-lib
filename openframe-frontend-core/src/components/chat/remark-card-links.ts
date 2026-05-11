@@ -25,7 +25,14 @@ import type { Plugin } from "unified"
 import type { Root, Text, Link } from "mdast"
 import { visit, SKIP } from "unist-util-visit"
 
-const CARD_REGEX = /\[card:\/\/([a-zA-Z0-9_-]+):([a-zA-Z0-9_-]+)\]/g
+// Closing bracket is `]` per spec, but tolerate `)` as well — the LLM
+// occasionally drifts to `)` after long dashed UUID ids (bracket-balancing
+// noise on opaque tokens; reproduced in production with podcast UUIDs).
+// The `[card://` open is the load-bearing signature; if the open matches,
+// treat trailing `)` as `]`. `[card://type:id)` is not valid markdown
+// syntax anywhere else (regular links use `[text](url)`, not `[text)`),
+// so widening the closer has zero false-positive risk.
+const CARD_REGEX = /\[card:\/\/([a-zA-Z0-9_-]+):([a-zA-Z0-9_-]+)[\])]/g
 
 export const remarkCardLinks: Plugin<[], Root> = () => {
   return (tree: Root) => {

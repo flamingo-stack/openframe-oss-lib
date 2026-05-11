@@ -25,6 +25,10 @@ export interface ChatRef {
   date?: string
   /** PII-sanitized hover preview text. Optional. */
   preview?: string
-  /** Type-specific extras (speakers for webinars, status for tickets, …). */
+  /** Type-specific extras carried opaquely through the wire — keyed map
+   *  the host's renderer can pull from. Used today by `slack_message`
+   *  refs to ship `{ channelName, userName }` resolved server-side from
+   *  the slack-channels / slack-users tables, so the compact card
+   *  surfaces human-readable names instead of opaque Slack IDs. */
   metadata?: Record<string, unknown>
 }

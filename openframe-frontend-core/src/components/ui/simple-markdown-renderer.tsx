@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import ReactMarkdown, { type Components } from 'react-markdown';
+import ReactMarkdown, { type Components, defaultUrlTransform } from 'react-markdown';
 import type { PluggableList } from 'unified';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -10,6 +10,30 @@ import rehypeRaw from 'rehype-raw';
 import Image from 'next/image';
 import { AlertCircleIcon } from '../icons-v2-generated';
 import { cn } from '../../utils/cn';
+
+/**
+ * URL transformer that extends react-markdown's default safe-protocol
+ * allowlist with `card://` — the non-standard scheme `remarkCardLinks`
+ * emits for inline chat-card markers.
+ *
+ * Without this, react-markdown 10's `defaultUrlTransform` strips the URL
+ * to `""` before the `<a>` component override runs (the override's
+ * `href.startsWith('card://')` check then fails and the marker leaks
+ * through as literal text). All other URL schemes still go through the
+ * default sanitizer — `javascript:`, `vbscript:`, `data:` (non-image), etc.
+ * remain blocked.
+ *
+ * Scope: `card://` is allowed ONLY for `href` attributes. If the LLM
+ * accidentally emits `![alt](card://type:id)` the URL still goes through
+ * `defaultUrlTransform` (which strips it to `""`) so an `<img src="card://...">`
+ * never reaches the DOM — broken request avoided. Per v6.1 §B.2.4: "the
+ * `card://` scheme is internal — never network-fetched, never written to
+ * attributes other than `href` for renderer dispatch."
+ */
+function cardAwareUrlTransform(url: string, key: string): string {
+  if (key === 'href' && typeof url === 'string' && url.startsWith('card://')) return url;
+  return defaultUrlTransform(url);
+}
 
 // ---------------------------------------------------------------------------
 // Mermaid styles (responsive)
@@ -596,6 +620,7 @@ export const SimpleMarkdownRenderer: React.FC<SimpleMarkdownRendererProps> = ({
               rehypeRaw,
               [rehypeHighlight, { detect: true, ignoreMissing: true }],
             ]}
+            urlTransform={cardAwareUrlTransform}
             components={components}
           >
             {processedContent}
