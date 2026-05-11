@@ -285,6 +285,44 @@ export interface ModelDisplayProps extends HTMLAttributes<HTMLDivElement> {
   contextWindow?: number
   usedTokens?: number
   showIcon?: boolean
+  /**
+   * Per-call token breakdown for the hover-tooltip (v6.1 §A.3). When
+   * provided alongside non-empty fields, the entire ModelDisplay is
+   * wrapped in a HoverCard trigger that surfaces "Answer model + each
+   * helper" rows on hover. Use this for chat surfaces that aggregate a
+   * Sonnet answer with Haiku helpers (query rewriter / classifier /
+   * summarizer). Absent → renders the bare display unchanged
+   * (backward-compatible — every existing caller keeps working).
+   */
+  breakdown?: ModelUsageBreakdown
+  /**
+   * Cache-hit % across the answer call's input + cached + creation
+   * tokens. Surfaced in the breakdown tooltip's footer. Drives a
+   * "cache savings" summary line.
+   */
+  hitRatePct?: number
+  /**
+   * Answer call's input tokens — surfaced in the breakdown tooltip's
+   * "Answer model" row alongside outputTokens. `usedTokens` (sum) is
+   * still the right prop for the inline "X / Y" display; this pair
+   * powers the per-row split inside the tooltip.
+   */
+  inputTokens?: number
+  /** Answer call's output tokens — pairs with `inputTokens`. */
+  outputTokens?: number
+}
+
+/**
+ * Cross-call token breakdown captured by the chat route across all
+ * Claude calls in a turn (Sonnet answer + Haiku rewriter + Haiku
+ * classifier + Haiku summarizer). Every field is optional — chats that
+ * skip a helper (e.g., short-conversation summarizer-skipped path) omit
+ * the field, and the tooltip just doesn't render that row.
+ */
+export interface ModelUsageBreakdown {
+  haikuRewriter?: { input: number; output: number }
+  haikuClassifier?: { input: number; output: number }
+  haikuSummarizer?: { input: number; output: number }
 }
 
 // ========== Chat Quick Action Props ==========
