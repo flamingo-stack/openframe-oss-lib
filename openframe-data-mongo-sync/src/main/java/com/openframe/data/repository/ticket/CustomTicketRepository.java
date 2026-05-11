@@ -36,10 +36,4 @@ public interface CustomTicketRepository {
     boolean isSortableField(String field);
 
     String getDefaultSortField();
-
-    Optional<Ticket> findLastInColumn(TicketStatus status);
-
-    Optional<Ticket> findFirstAfter(TicketStatus status, String order);
-
-    Optional<Ticket> findFirstBefore(TicketStatus status, String order);
 }
