@@ -2,21 +2,24 @@ package com.openframe.test.pages;
 
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
+import com.microsoft.playwright.options.LoadState;
 import com.microsoft.playwright.options.WaitForSelectorState;
 
 /**
  * Page Object for the Devices list page.
  * URL: /devices/
- * <p>
- * Layout (table view – default):
- * ┌─ Heading "Devices"
- * ├─ View toggle  [Grid] [Table]
+ *
+ * <p>Layout (table view – default):
+ * <pre>
+ * ┌─ Heading "Devices"  (H1)
+ * ├─ View toggle  [Table active] [Grid inactive]
  * ├─ Add Device button
  * ├─ Search bar  "Search for Devices"
- * ├─ Open Filters button  →  "Sort and Filter" slide-up panel
- * ├─ Column header row  STATUS | OS | ORGANIZATION | "Showing N results"
+ * ├─ Filter Tags button  →  "Sort and Filter" modal dialog
+ * ├─ Column header row  DEVICE | STATUS | OS | ORGANIZATION | "N results"
  * └─ Device rows  (cursor-pointer cards)
- * └─ per row:  device icon | name | status+date | OS | org | ⋮ context menu
+ *    └─ per row:  device icon | name | status+date | OS | org | ⋮ context menu | ↗ open-in-new-tab link
+ * </pre>
  */
 public class DevicesPage {
 
@@ -24,60 +27,143 @@ public class DevicesPage {
 
     private final Page page;
 
-    // ── Selectors ────────────────────────────────────────────────────────────
+    // ── Page heading ─────────────────────────────────────────────────────────
+    // The heading is an <h1> (not h2) with class text-h2 text-ods-text-primary.
+    private static final String PAGE_HEADING = "main h1";
 
-    // Page heading
-    private static final String PAGE_HEADING = "main h1, main h2";
+    // ── View-toggle buttons ──────────────────────────────────────────────────
+    // The two toggle buttons are plain <button type="button"> elements with no
+    // role="radio", no aria-label, and no aria-checked attributes.
+    // Active state:   bg-ods-accent + cursor-default  (table view is default active)
+    // Inactive state: bg-transparent + cursor-pointer
+    // They live inside: div.flex.w-full.bg-ods-bg.border.border-ods-border.rounded-md.p-1
+    // and are the only two buttons in that container, so we use :nth-child().
+    private static final String VIEW_TOGGLE_CONTAINER =
+            "main div.flex.w-full.bg-ods-bg.border.border-ods-border.rounded-md";
+    private static final String TABLE_VIEW_BTN = VIEW_TOGGLE_CONTAINER + " button:nth-child(1)";
+    private static final String GRID_VIEW_BTN = VIEW_TOGGLE_CONTAINER + " button:nth-child(2)";
 
-    // View-toggle radio buttons (Radix ToggleGroup)
-    private static final String GRID_VIEW_BTN = "button[role='radio'][aria-label='Grid view']";
-    private static final String TABLE_VIEW_BTN = "button[role='radio'][aria-label='Table view']";
+    // ── Add Device button ────────────────────────────────────────────────────
+    // Two submit buttons exist: one with visible text (desktop), one icon-only
+    // (aria-label="Add Device", hidden on desktop). Target the text variant.
+    private static final String ADD_DEVICE_BTN = "main button:has-text('Add Device'):visible";
 
-    // Add Device button
-    private static final String ADD_DEVICE_BTN = "main button:has-text('Add Device')";
-
-    // Search input
+    // ── Search input ─────────────────────────────────────────────────────────
     private static final String SEARCH_INPUT = "input[placeholder='Search for Devices']";
 
-    // Open Filters button (the funnel/filter icon button)
-    private static final String OPEN_FILTERS_BTN = "button[aria-label='Open filters']";
+    // ── Filter Tags button ───────────────────────────────────────────────────
+    // Label is "Filter Tags"; there is no aria-label attribute on this button.
+    private static final String OPEN_FILTERS_BTN = "main button:has-text('Filter Tags')";
 
-    // "Showing N results" counter
-    private static final String RESULTS_COUNT = "main *:text-matches('^Showing \\\\d+ results$')";
+    // ── Results counter ──────────────────────────────────────────────────────
+    // Text format is "N results" (no "Showing" prefix).
+    // Element: <span class="text-h6 text-ods-text-secondary whitespace-nowrap">
+    private static final String RESULTS_COUNT =
+            "main span.text-h6.text-ods-text-secondary:text-matches('^\\d+ results$')";
 
-    // ── Device row ────────────────────────────────────────────────────────────
-    // Each row is a card: div.relative.rounded-[6px].bg-ods-card.cursor-pointer
-    private static final String DEVICE_ROW = "main div.relative.cursor-pointer";
+    // ── Device row cards ─────────────────────────────────────────────────────
+    // Each row: div.relative.rounded-md.bg-ods-card.cursor-pointer (+ more classes)
+    // Contains two children:
+    //   [0] <a class="absolute inset-0" aria-label="View details" href="/devices/details/{id}/">
+    //   [1] <div class="relative flex items-center ... pointer-events-none"> (content)
+    private static final String DEVICE_ROW =
+            "main div.relative.rounded-md.bg-ods-card.cursor-pointer";
 
-    // Within a row: device name <p>, status <span>, last-seen <span>, OS column
+    // Device name: <p class="leading-[24px] overflow-ellipsis overflow-hidden whitespace-pre">
     private static final String ROW_NAME = "p.leading-\\[24px\\]";
-    private static final String ROW_STATUS = "span.shrink-0";
 
-    // Three-dot context menu trigger inside a row
-    private static final String ROW_MENU_BTN = "button[aria-haspopup='menu'][data-state='closed']," +
-            "button[aria-haspopup='menu'][data-state='open']";
+    // Status badge: <span class="truncate"> (values: "ONLINE", "OFFLINE", "ARCHIVED")
+    private static final String ROW_STATUS = "span.truncate";
 
-    // ── Filter panel (slide-up) ───────────────────────────────────────────────
-    private static final String FILTER_PANEL = "[class*='slide-in-from-bo']";
-    private static final String FILTER_RESET_BTN = FILTER_PANEL + " button:has-text('Reset Filters')";
-    private static final String FILTER_APPLY_BTN = FILTER_PANEL + " button:has-text('Apply Filters')";
+    // Last-seen timestamp: <span class="text-h6 text-ods-text-secondary hidden md:flex">
+    private static final String ROW_LAST_SEEN =
+            "span.text-h6.text-ods-text-secondary.hidden";
 
-    // Checkboxes inside the filter panel (Radix Checkbox → role="checkbox")
-    private static final String FILTER_CHECKBOX_OFFLINE = FILTER_PANEL + " button[role='checkbox']:near(:text('OFFLINE'))";
-    private static final String FILTER_CHECKBOX_ONLINE = FILTER_PANEL + " button[role='checkbox']:near(:text('ONLINE'))";
-    private static final String FILTER_CHECKBOX_ARCHIVED = FILTER_PANEL + " button[role='checkbox']:near(:text('ARCHIVED'))";
-    private static final String FILTER_CHECKBOX_WINDOWS = FILTER_PANEL + " button[role='checkbox']:near(:text('WINDOWS'))";
-    private static final String FILTER_CHECKBOX_MACOS = FILTER_PANEL + " button[role='checkbox']:near(:text('MAC_OS'))";
+    // Three-dot context menu trigger: button[aria-haspopup="menu"][aria-label="More actions"]
+    // aria-expanded="false"|"true" and data-state="closed"|"open" are set while menu is open.
+    private static final String ROW_MENU_BTN =
+            "button[aria-haspopup='menu'][aria-label='More actions']";
 
-    // ── Context-menu items (rendered in a Radix [role="menu"]) ───────────────
+    // ── Sort and Filter modal ────────────────────────────────────────────────
+    // The modal is: div[role="dialog"][aria-modal="true"]
+    // It is appended to <main> when open and removed (or hidden) when closed.
+    private static final String FILTER_PANEL =
+            "div[role='dialog'][aria-modal='true']:not([aria-label])";
+
+    private static final String FILTER_RESET_BTN =
+            FILTER_PANEL + " button:has-text('Reset Filters')";
+    private static final String FILTER_APPLY_BTN =
+            FILTER_PANEL + " button:has-text('Apply Filters')";
+
+    // ── Filter panel: tag key checkboxes ─────────────────────────────────────
+    // Structure inside the panel:
+    //
+    //   div.flex.flex-col.gap-4               ← all groups
+    //     div.flex.flex-col.gap-2             ← "Tag Keys" group
+    //       span.text-h5.uppercase            "Tag Keys"
+    //       div.rounded-[6px].border          ← bordered list of key rows
+    //         div.flex.items-center           ← one key row
+    //           button[role="checkbox"]       key checkbox
+    //           span.flex-1                   key name text (e.g. "new_tag")
+    //
+    //     div.flex.flex-col.gap-2             ← value group (only when key is checked)
+    //       span.text-h5.uppercase            key name (e.g. "new_tag") — exact lowercase
+    //       div.rounded-[6px].border          ← bordered list of value rows
+    //         div.flex.items-center           ← one value row
+    //           button[role="checkbox"]       value checkbox
+    //           span.flex-1                   value name text
+    //           span.shrink-0                 device count badge
+    //
+    // Key-checkbox selector: scoped to the "Tag Keys" group header so it never
+    // accidentally matches a same-named value section header.
+    private static final String FILTER_TAG_KEY_CHECKBOX_BY_NAME =
+            FILTER_PANEL
+                    + " div.flex.flex-col.gap-2:has(> span:text-is('Tag Keys'))"
+                    + " div.flex.items-center:has(> span.flex-1:text-is('%s'))"
+                    + " button[role='checkbox']";
+
+    // Value-section container: scoped to the group whose header text equals the key name.
+    // The "Tag Keys" header text is "Tag Keys" (title-cased), while value-group headers
+    // use the raw lowercase key name (e.g. "new_tag"), so :text-is() is unambiguous.
+    private static final String FILTER_TAG_VALUE_SECTION_BY_KEY =
+            FILTER_PANEL
+                    + " div.flex.flex-col.gap-2:has(> span.text-h5:text-is('%s'))";
+
+    // Value-checkbox selector: inside the correct key's value section.
+    private static final String FILTER_TAG_VALUE_CHECKBOX_BY_NAME =
+            FILTER_TAG_VALUE_SECTION_BY_KEY
+                    + " div.flex.items-center:has(> span.flex-1:text-is('%s'))"
+                    + " button[role='checkbox']";
+
+    // ── Context menu ─────────────────────────────────────────────────────────
+    // The Radix [role="menu"] floats in a portal. Items are wrapped in
+    //   div.relative.flex.items-stretch  (one per visible row + one empty separator)
+    // "Remote Shell" and "Run Script" expose role="menuitem" on a DIV (sub-menu trigger
+    // and click-action respectively). "Remote Control" and "Manage Files" are <a> links
+    // with no role="menuitem". "Archive Device" and "Delete Device" are DIV[role="menuitem"].
+    // There is NO "Uninstall Device" item in the current UI.
+    // All items share span.flex-1 as their visible label node.
     private static final String CTX_MENU = "[role='menu']";
-    private static final String CTX_REMOTE_CONTROL = CTX_MENU + " div:has-text('Remote Control')";
-    private static final String CTX_REMOTE_SHELL = CTX_MENU + " div:has-text('Remote Shell')";
-    private static final String CTX_MANAGE_FILES = CTX_MENU + " div:has-text('Manage Files')";
-    private static final String CTX_RUN_SCRIPT = CTX_MENU + " div:has-text('Run Script')";
-    private static final String CTX_UNINSTALL = CTX_MENU + " div:has-text('Uninstall Device')";
-    private static final String CTX_ARCHIVE = CTX_MENU + " div:has-text('Archive Device')";
-    private static final String CTX_DELETE = CTX_MENU + " div:has-text('Delete Device')";
+
+    // Generic item selector that works for both DIV[role=menuitem] and <a> link items:
+    // match any direct child of the menu container that contains a span.flex-1 with the text.
+    private static final String CTX_ITEM_BY_TEXT =
+            CTX_MENU + " :is(div[role='menuitem'], a):has(span.flex-1:text-is('%s'))";
+
+    // ── Additional selectors needed by the filter-chip tests ─────────────────────
+
+    // The active filter chip rendered in the search bar after a filter is applied.
+// Text format: "key:value"  e.g. "purpose:auto_test"
+// Element: span.truncate.max-w-[120px]  inside the chip container.
+// There can be two copies of the same span (one is an invisible measurement
+// clone); .first() is safe because both are equivalent and the visible one
+// comes first.
+    private static final String ACTIVE_FILTER_CHIP_BY_TEXT =
+            "main span.truncate:text-is('%s')";
+
+    // "Clear all" button — removes every active filter chip at once.
+    private static final String CLEAR_ALL_FILTERS_BTN =
+            "main button[aria-label='Clear all']";
 
     // ── Constructor ──────────────────────────────────────────────────────────
     public DevicesPage(Page page) {
@@ -87,15 +173,21 @@ public class DevicesPage {
     // ── Page-level locators ──────────────────────────────────────────────────
 
     public Locator pageHeading() {
-        return page.locator(PAGE_HEADING).first();
+        return page.locator(PAGE_HEADING);
     }
 
-    public Locator gridViewButton() {
-        return page.locator(GRID_VIEW_BTN);
-    }
-
+    /**
+     * The Table-view toggle button (first in the container; active by default).
+     */
     public Locator tableViewButton() {
         return page.locator(TABLE_VIEW_BTN);
+    }
+
+    /**
+     * The Grid-view toggle button (second in the container).
+     */
+    public Locator gridViewButton() {
+        return page.locator(GRID_VIEW_BTN);
     }
 
     public Locator addDeviceButton() {
@@ -110,21 +202,30 @@ public class DevicesPage {
         return page.locator(OPEN_FILTERS_BTN);
     }
 
+    /**
+     * Span showing "N results" in the column header row.
+     */
     public Locator resultsCount() {
         return page.locator(RESULTS_COUNT);
     }
 
-    // All device row cards
+    /**
+     * All device-row cards currently rendered.
+     */
     public Locator deviceRows() {
         return page.locator(DEVICE_ROW);
     }
 
-    // A specific device row by its visible name text
+    /**
+     * First device-row card whose visible text contains {@code name}.
+     */
     public Locator deviceRowByName(String name) {
         return page.locator(DEVICE_ROW + ":has-text('" + name + "')").first();
     }
 
-    // The three-dot menu button within a named row
+    /**
+     * The three-dot "More actions" button inside the named device row.
+     */
     public Locator rowMenuButtonByName(String deviceName) {
         return deviceRowByName(deviceName).locator(ROW_MENU_BTN).first();
     }
@@ -143,24 +244,62 @@ public class DevicesPage {
         return page.locator(FILTER_APPLY_BTN);
     }
 
-    public Locator filterOfflineCheckbox() {
-        return page.locator(FILTER_CHECKBOX_OFFLINE);
+    /**
+     * The checkbox for a tag key in the "Tag Keys" section.
+     *
+     * @param tagKey exact key name as shown in the UI, e.g. {@code "new_tag"}
+     */
+    public Locator filterTagKeyCheckbox(String tagKey) {
+        return page.locator(String.format(FILTER_TAG_KEY_CHECKBOX_BY_NAME, tagKey));
     }
 
-    public Locator filterOnlineCheckbox() {
-        return page.locator(FILTER_CHECKBOX_ONLINE);
+    // ── Additional locators ───────────────────────────────────────────────────────
+
+    /**
+     * The active filter chip in the search bar whose text equals {@code chipText}.
+     * Text format: {@code "key:value"}, e.g. {@code "purpose:auto_test"}.
+     *
+     * @param chipText the exact chip label (key + ":" + value, lowercase)
+     */
+    public Locator activeFilterChip(String chipText) {
+        return page.locator(String.format(ACTIVE_FILTER_CHIP_BY_TEXT, chipText)).first();
     }
 
-    public Locator filterArchivedCheckbox() {
-        return page.locator(FILTER_CHECKBOX_ARCHIVED);
+// ── Additional actions ────────────────────────────────────────────────────────
+
+    /**
+     * Clicks the "Clear all" button in the search bar to remove all active filter
+     * chips and waits for the result list to settle.
+     *
+     * <p>Only available when at least one filter chip is active (i.e. the button
+     * is visible). Safe to call after {@link #filterByTag}.
+     *
+     * @return this page object for fluent chaining
+     */
+    public DevicesPage clearAllFilters() {
+        page.locator(CLEAR_ALL_FILTERS_BTN).click();
+        page.waitForLoadState(LoadState.NETWORKIDLE);
+        return this;
     }
 
-    public Locator filterWindowsCheckbox() {
-        return page.locator(FILTER_CHECKBOX_WINDOWS);
+    /**
+     * The container for a tag key's value list.
+     * Only present in the DOM once the corresponding key checkbox is checked.
+     *
+     * @param tagKey exact key name, e.g. {@code "new_tag"}
+     */
+    public Locator filterTagValueSection(String tagKey) {
+        return page.locator(String.format(FILTER_TAG_VALUE_SECTION_BY_KEY, tagKey));
     }
 
-    public Locator filterMacOsCheckbox() {
-        return page.locator(FILTER_CHECKBOX_MACOS);
+    /**
+     * The checkbox for a specific value inside a tag key's value section.
+     *
+     * @param tagKey   exact key name, e.g. {@code "new_tag"}
+     * @param tagValue exact value name, e.g. {@code "windows"}
+     */
+    public Locator filterTagValueCheckbox(String tagKey, String tagValue) {
+        return page.locator(String.format(FILTER_TAG_VALUE_CHECKBOX_BY_NAME, tagKey, tagValue));
     }
 
     // ── Context-menu locators ────────────────────────────────────────────────
@@ -169,32 +308,46 @@ public class DevicesPage {
         return page.locator(CTX_MENU);
     }
 
-    public Locator ctxRemoteControlItem() {
-        return page.locator(CTX_REMOTE_CONTROL).first();
-    }
-
+    /**
+     * "Remote Shell" — DIV[role=menuitem] with a submenu arrow.
+     */
     public Locator ctxRemoteShellItem() {
-        return page.locator(CTX_REMOTE_SHELL).first();
+        return page.locator(String.format(CTX_ITEM_BY_TEXT, "Remote Shell"));
     }
 
+    /**
+     * "Remote Control" — rendered as an {@code <a>} link to {@code /remote-desktop/}.
+     */
+    public Locator ctxRemoteControlItem() {
+        return page.locator(String.format(CTX_ITEM_BY_TEXT, "Remote Control"));
+    }
+
+    /**
+     * "Manage Files" — rendered as an {@code <a>} link to {@code /file-manager/}.
+     */
     public Locator ctxManageFilesItem() {
-        return page.locator(CTX_MANAGE_FILES).first();
+        return page.locator(String.format(CTX_ITEM_BY_TEXT, "Manage Files"));
     }
 
+    /**
+     * "Run Script" — DIV[role=menuitem].
+     */
     public Locator ctxRunScriptItem() {
-        return page.locator(CTX_RUN_SCRIPT).first();
+        return page.locator(String.format(CTX_ITEM_BY_TEXT, "Run Script"));
     }
 
-    public Locator ctxUninstallItem() {
-        return page.locator(CTX_UNINSTALL).first();
-    }
-
+    /**
+     * "Archive Device" — DIV[role=menuitem].
+     */
     public Locator ctxArchiveItem() {
-        return page.locator(CTX_ARCHIVE).first();
+        return page.locator(String.format(CTX_ITEM_BY_TEXT, "Archive Device"));
     }
 
+    /**
+     * "Delete Device" — DIV[role=menuitem].
+     */
     public Locator ctxDeleteItem() {
-        return page.locator(CTX_DELETE).first();
+        return page.locator(String.format(CTX_ITEM_BY_TEXT, "Delete Device"));
     }
 
     // ── Derived helpers ───────────────────────────────────────────────────────
@@ -203,36 +356,48 @@ public class DevicesPage {
         return pageHeading().innerText().trim();
     }
 
+    /**
+     * Parses "N results" → N.
+     */
     public int getResultsCount() {
-        String text = resultsCount().innerText().trim(); // "Showing 12 results"
+        String text = resultsCount().innerText().trim();
         return Integer.parseInt(text.replaceAll("\\D+", ""));
     }
 
+    /**
+     * Returns true when the Table-view button is the active toggle.
+     * Active state is indicated by the {@code bg-ods-accent} Tailwind class.
+     */
     public boolean isTableViewActive() {
-        return "true".equals(tableViewButton().getAttribute("aria-checked"));
+        String cls = tableViewButton().getAttribute("class");
+        return cls != null && cls.contains("bg-ods-accent");
     }
 
+    /**
+     * Returns true when the Grid-view button is the active toggle.
+     */
     public boolean isGridViewActive() {
-        return "true".equals(gridViewButton().getAttribute("aria-checked"));
+        String cls = gridViewButton().getAttribute("class");
+        return cls != null && cls.contains("bg-ods-accent");
     }
 
     // ── Actions ───────────────────────────────────────────────────────────────
 
     /**
-     * Types into the search bar and waits for the results to settle.
+     * Types into the search bar and waits for network activity to settle.
      */
     public DevicesPage searchFor(String query) {
         searchInput().fill(query);
-        page.waitForLoadState(com.microsoft.playwright.options.LoadState.NETWORKIDLE);
+        page.waitForLoadState(LoadState.NETWORKIDLE);
         return this;
     }
 
     /**
-     * Clears the search bar.
+     * Clears the search bar and waits for network activity to settle.
      */
     public DevicesPage clearSearch() {
         searchInput().clear();
-        page.waitForLoadState(com.microsoft.playwright.options.LoadState.NETWORKIDLE);
+        page.waitForLoadState(LoadState.NETWORKIDLE);
         return this;
     }
 
@@ -253,7 +418,7 @@ public class DevicesPage {
     }
 
     /**
-     * Opens the Sort and Filter panel.
+     * Clicks "Filter Tags" and waits for the modal to become visible.
      */
     public DevicesPage openFilterPanel() {
         openFiltersButton().click();
@@ -264,19 +429,19 @@ public class DevicesPage {
     }
 
     /**
-     * Applies the currently selected filter checkboxes.
+     * Clicks "Apply Filters", waits for the modal to close, then for NETWORKIDLE.
      */
     public DevicesPage applyFilters() {
         filterApplyButton().click();
         filterPanel().waitFor(new Locator.WaitForOptions()
                 .setState(WaitForSelectorState.HIDDEN)
                 .setTimeout(5_000));
-        page.waitForLoadState(com.microsoft.playwright.options.LoadState.NETWORKIDLE);
+        page.waitForLoadState(LoadState.NETWORKIDLE);
         return this;
     }
 
     /**
-     * Resets all filter checkboxes.
+     * Clicks "Reset Filters" inside the open panel (panel remains open).
      */
     public DevicesPage resetFilters() {
         filterResetButton().click();
@@ -284,7 +449,38 @@ public class DevicesPage {
     }
 
     /**
-     * Opens the three-dot context menu on the named device row.
+     * Opens the filter panel, checks the given tag key (if not already checked)
+     * so that its value list expands, then checks the given tag value, and applies
+     * the filter.
+     *
+     * <p>Multiple calls can be chained to build a multi-value selection before
+     * {@link #applyFilters()} — in that case call {@link #openFilterPanel()} once,
+     * use {@link #filterTagKeyCheckbox} / {@link #filterTagValueCheckbox} directly,
+     * and call {@link #applyFilters()} at the end.
+     *
+     * @param tagKey   exact key name as shown in the UI (e.g. {@code "new_tag"})
+     * @param tagValue exact value name as shown in the UI (e.g. {@code "windows"})
+     * @return this page object for fluent chaining
+     */
+    public DevicesPage filterByTag(String tagKey, String tagValue) {
+        openFilterPanel();
+
+        // Expand the value list for this key if it is not yet checked.
+        Locator keyCheckbox = filterTagKeyCheckbox(tagKey);
+        if (!"true".equals(keyCheckbox.getAttribute("aria-checked"))) {
+            keyCheckbox.click();
+            filterTagValueSection(tagKey).waitFor(new Locator.WaitForOptions()
+                    .setState(WaitForSelectorState.VISIBLE)
+                    .setTimeout(5_000));
+        }
+
+        filterTagValueCheckbox(tagKey, tagValue).click();
+        return applyFilters();
+    }
+
+    /**
+     * Opens the three-dot context menu on the named device row and waits for
+     * it to become visible.
      */
     public DevicesPage openContextMenuFor(String deviceName) {
         rowMenuButtonByName(deviceName).click();
@@ -295,32 +491,40 @@ public class DevicesPage {
     }
 
     /**
-     * Clicks "Remote Control" in the currently open context menu and returns
-     * the resulting RemoteDesktopPage.
+     * Clicks "Remote Control" in the currently open context menu.
+     * "Remote Control" is an {@code <a>} link; clicking it navigates to
+     * {@code /devices/details/{id}/remote-desktop/}.
+     *
+     * @return the resulting {@link RemoteDesktopPage}
      */
     public RemoteDesktopPage clickRemoteControlInMenu() {
         ctxRemoteControlItem().click();
         page.waitForURL(
                 url -> url.contains("/remote-desktop/"),
-                new Page.WaitForURLOptions().setTimeout(15_000)
-        );
+                new Page.WaitForURLOptions().setTimeout(15_000));
         return new RemoteDesktopPage(page);
     }
 
     /**
-     * Clicks a device row by name and returns the DeviceDetailsPage.
+     * Clicks a device row by name and waits for the detail page to load.
+     *
+     * @return the resulting {@link DeviceDetailsPage}
      */
     public DeviceDetailsPage openDevice(String deviceName) {
         deviceRowByName(deviceName).click();
         page.waitForURL(
                 url -> url.contains("/devices/details/"),
-                new Page.WaitForURLOptions().setTimeout(10_000)
-        );
+                new Page.WaitForURLOptions().setTimeout(10_000));
         DeviceDetailsPage deviceDetailsPage = new DeviceDetailsPage(page);
         page.waitForCondition(deviceDetailsPage::isLoaded);
         return deviceDetailsPage;
     }
 
+    /**
+     * Returns true when the page is fully loaded:
+     * the URL contains {@value #URL_FRAGMENT} and the visible "Add Device"
+     * button is present.
+     */
     public boolean isLoaded() {
         return page.url().contains(URL_FRAGMENT) && addDeviceButton().isVisible();
     }
