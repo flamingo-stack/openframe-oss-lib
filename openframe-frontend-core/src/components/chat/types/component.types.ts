@@ -5,6 +5,7 @@
 import type { ButtonHTMLAttributes, ComponentType, HTMLAttributes, TextareaHTMLAttributes } from 'react'
 import type { AssistantType, AuthorType, ChatApprovalStatus, ConnectionStatus } from './chat.types'
 import type { ApprovalRequestData, Message, MessageSegment, ToolExecutionData } from './message.types'
+import type { ChatRef } from '../chat-ref.types'
 
 // ========== Chat Container Props ==========
 
@@ -57,6 +58,26 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
   isTyping?: boolean
   onApprove?: (requestId?: string) => void | Promise<void>
   onReject?: (requestId?: string) => void | Promise<void>
+  /**
+   * Per-row metadata for inline entity-card rendering (v6.1 §B.2.6+§B.2.7).
+   * Keyed by `<documentType>:<primaryKey>`. When present AND
+   * `renderEntityCard` is also provided, text segments are passed through
+   * the `remarkCardLinks` plugin and `[card://<type>:<id>]` markers
+   * expand into the host's chosen inline component. When unset (or
+   * `renderEntityCard` unset), messages render as plain markdown.
+   */
+  chatRefs?: Record<string, ChatRef>
+  /**
+   * Host-provided renderer for inline entity cards (v6.1 §B.2.7 — DRY
+   * duplications #2). The OSS-lib delegates all entity-specific rendering
+   * (type→icon mapping, hover-card chrome, action buttons, slash-command
+   * gating) to the host so the library stays free of app-specific
+   * knowledge.
+   *
+   * Return `null` for any ref the host can't render — the renderer falls
+   * back to plain text title-only.
+   */
+  renderEntityCard?: (reference: ChatRef) => React.ReactNode
 }
 
 // ========== Chat Message List Props ==========
@@ -80,6 +101,9 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
   hasNextPage?: boolean
   isFetchingNextPage?: boolean
   onLoadMore?: () => void
+  /** Host-provided renderer for inline entity cards. Forwarded verbatim
+   *  to every message's ChatMessageEnhanced. v6.1 §B.2.7. */
+  renderEntityCard?: (reference: ChatRef) => React.ReactNode
 }
 
 export interface ChatMessageListRef {
