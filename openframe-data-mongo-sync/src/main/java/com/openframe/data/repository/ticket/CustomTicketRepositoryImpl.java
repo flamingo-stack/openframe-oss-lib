@@ -40,6 +40,7 @@ public class CustomTicketRepositoryImpl implements CustomTicketRepository {
     private static final String FIELD_CREATED_AT = "createdAt";
     private static final String FIELD_UPDATED_AT = "updatedAt";
     private static final String FIELD_RESOLVED_AT = "resolvedAt";
+    private static final String FIELD_ORDER = "order";
 
     private static final String AGG_COUNT = "count";
     private static final String AGG_RESOLUTION_TIME = "resolutionTime";
@@ -54,7 +55,8 @@ public class CustomTicketRepositoryImpl implements CustomTicketRepository {
             FIELD_DEVICE_HOSTNAME,
             FIELD_CREATED_AT,
             FIELD_UPDATED_AT,
-            FIELD_RESOLVED_AT
+            FIELD_RESOLVED_AT,
+            FIELD_ORDER
     );
 
     private final MongoTemplate mongoTemplate;
@@ -186,6 +188,7 @@ public class CustomTicketRepositoryImpl implements CustomTicketRepository {
             case FIELD_CREATED_AT -> ticket.getCreatedAt();
             case FIELD_UPDATED_AT -> ticket.getUpdatedAt();
             case FIELD_RESOLVED_AT -> ticket.getResolvedAt();
+            case FIELD_ORDER -> ticket.getOrder();
             default -> null;
         };
     }
