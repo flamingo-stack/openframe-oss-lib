@@ -29,3 +29,6 @@ export * from './os-utils'
 export * from './country-phone-utils'
 // Generic domain detection
 export * from './generic-domain-utils'
+// Chat stream demuxer (v5.1 §7 / v6.1 §A.3) — length-prefixed ctrl frame
+// protocol for chat surfaces consuming the hub's /api/docs/chat stream.
+export * from './chat-stream-demux'
