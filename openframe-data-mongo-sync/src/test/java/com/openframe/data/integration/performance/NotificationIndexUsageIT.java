@@ -53,7 +53,6 @@ class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
     private static final int NOTIF_TOTAL        = Integer.getInteger("perf.notifications.count", 30_000);
     private static final int HOT_USER_NOTIFS    = Integer.getInteger("perf.notifications.hotUser", 3_000);
     private static final int HOT_MACHINE_NOTIFS = Integer.getInteger("perf.notifications.hotMachine", 1_000);
-    private static final int RETRY_CANDIDATES   = Integer.getInteger("perf.notifications.retryable", 100);
     private static final int READ_STATE_TOTAL   = Integer.getInteger("perf.readStates.count", 20_000);
     private static final int HOT_USER_READS     = Integer.getInteger("perf.readStates.hotUser", 10_000);
 
@@ -293,23 +292,6 @@ class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
                 "filter", q.getQueryObject().toJson());
     }
 
-    @Test
-    @DisplayName("findRetryablePublishCandidates does not collection-scan — only the unpublished slice should be touched")
-    void retryable_candidates_does_not_collscan() {
-        int batch = 100;
-
-        List<Notification> candidates = notificationRepository.findRetryablePublishCandidates(5, batch);
-        assertThat(candidates).isNotEmpty();
-
-        Stats stats = MongoExplain.explainFind(mongoTemplate, NOTIFS_COLL, retryableCandidatesQuery(5, batch));
-
-        stats.assertNoCollectionScan()
-                .assertExecutionTimeBelow(FIND_BUDGET_MS);
-
-        long ceiling = Math.max(RETRY_CANDIDATES * 4L, batch * 4L);
-        stats.assertExaminedAtMost(ceiling);
-    }
-
     private static boolean matchesUserOrBroadcast(Notification n, String userId) {
         return n.getRecipient() instanceof UserRecipient u && userId.equals(u.userId())
                 || n.getRecipient() instanceof BroadcastRecipient;
@@ -366,22 +348,12 @@ class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
         return q;
     }
 
-    private static Query retryableCandidatesQuery(int maxAttempts, int limit) {
-        Query q = new Query(Criteria.where("publishState.published").is(false)
-                .and("publishState.attempts").lt(maxAttempts));
-        q.with(Sort.by(Sort.Direction.ASC, "_id"));
-        q.limit(limit);
-        return q;
-    }
-
     private void seedNotifications() {
-        long retrySliceStart = NOTIF_TOTAL - RETRY_CANDIDATES;
         BatchInserter inserter = new BatchInserter(mongoTemplate.getCollection(NOTIFS_COLL));
 
         for (int i = 0; i < NOTIF_TOTAL; i++) {
             Target target = targetFor(i);
-            boolean unpublished = i >= retrySliceStart;
-            Document doc = notificationDocument(target, "perf-evt-" + i, unpublished);
+            Document doc = notificationDocument(target, "perf-evt-" + i);
 
             if (target.userId() != null && HOT_USER.equals(target.userId())) {
                 hotUserNotifIds.add(doc.getObjectId("_id").toHexString());
@@ -421,30 +393,19 @@ class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
         return Target.noise(index);
     }
 
-    private static Document notificationDocument(Target target, String title, boolean unpublished) {
+    private static Document notificationDocument(Target target, String title) {
         Document doc = new Document()
                 .append("_id", new ObjectId())
                 .append("severity", "INFO")
                 .append("title", title)
                 .append("createdAt", new Date())
-                .append("context", new Document("type", "welcome").append("payload", "{}"))
-                .append("publishState", publishStateDocument(unpublished));
+                .append("context", new Document("type", "welcome").append("payload", "{}"));
         if (target.userId() != null) {
             doc.append("recipient", new Document("_class", USER_CLASS).append("userId", target.userId()));
         } else if (target.machineId() != null) {
             doc.append("recipient", new Document("_class", MACHINE_CLASS).append("machineId", target.machineId()));
         }
         return doc;
-    }
-
-    private static Document publishStateDocument(boolean unpublished) {
-        Document state = new Document()
-                .append("published", !unpublished)
-                .append("attempts", unpublished ? ThreadLocalRandom.current().nextInt(0, 4) : 0);
-        if (!unpublished) {
-            state.append("publishedAt", new Date());
-        }
-        return state;
     }
 
     private static Document readStateDocument(String userId, String notificationId) {

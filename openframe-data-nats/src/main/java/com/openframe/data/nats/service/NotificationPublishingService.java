@@ -33,7 +33,7 @@ public class NotificationPublishingService {
         return notificationPublisher
                 .map(publisher -> publisher.publish(saved))
                 .orElseGet(() -> {
-                    log.debug("NATS publisher disabled — notification {} stays unpublished for fallback delivery", saved.getId());
+                    log.debug("NATS publisher disabled — notification {} persisted only; clients reconcile via GraphQL catch-up", saved.getId());
                     return saved;
                 });
     }

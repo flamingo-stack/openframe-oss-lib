@@ -1,14 +1,12 @@
 package com.openframe.data.nats.publisher;
 
 import com.openframe.core.exception.NatsException;
-import com.openframe.data.document.clientconfiguration.PublishState;
 import com.openframe.data.document.notification.BroadcastRecipient;
 import com.openframe.data.document.notification.MachineRecipient;
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.Recipient;
 import com.openframe.data.document.notification.UserRecipient;
 import com.openframe.data.nats.model.NotificationMessage;
-import com.openframe.data.repository.notification.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -28,7 +26,6 @@ public class NotificationNatsPublisher {
     private static final String BROADCAST_TOPIC = "notification.broadcast";
 
     private final NatsMessagePublisher natsMessagePublisher;
-    private final NotificationRepository notificationRepository;
 
     public Notification publish(Notification notification) {
         if (notification == null || notification.getId() == null) {
@@ -36,19 +33,12 @@ public class NotificationNatsPublisher {
         }
 
         try {
-            natsMessagePublisher.publish(buildTopic(notification), buildMessage(notification));
+            natsMessagePublisher.publishPersistent(buildTopic(notification), buildMessage(notification));
         } catch (NatsException ex) {
-            log.warn("Failed to publish notification {} to NATS, will rely on fallback scheduler: {}",
-                    notification.getId(), ex.getMessage());
-            return updatePublishState(notification, PublishState.nonPublished(notification.getPublishState()));
+            // Mongo is source of truth; clients reconcile missed live deliveries via GraphQL catch-up.
+            log.warn("JetStream publish failed for notification {}: {}", notification.getId(), ex.getMessage());
         }
 
-        return updatePublishState(notification, PublishState.published());
-    }
-
-    private Notification updatePublishState(Notification notification, PublishState next) {
-        notificationRepository.updatePublishState(notification.getId(), next);
-        notification.setPublishState(next);
         return notification;
     }
 

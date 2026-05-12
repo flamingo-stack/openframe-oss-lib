@@ -1,6 +1,5 @@
 package com.openframe.data.document.notification;
 
-import com.openframe.data.document.clientconfiguration.PublishState;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -17,8 +16,7 @@ import java.time.Instant;
 @CompoundIndexes({
         @CompoundIndex(name = "recipient_user_id", def = "{'recipient.userId': 1, '_id': -1}"),
         @CompoundIndex(name = "recipient_machine_id", def = "{'recipient.machineId': 1, '_id': -1}"),
-        @CompoundIndex(name = "recipient_class_id", def = "{'recipient._class': 1, '_id': -1}"),
-        @CompoundIndex(name = "publish_state", def = "{'publishState.published': 1, 'publishState.attempts': 1}")
+        @CompoundIndex(name = "recipient_class_id", def = "{'recipient._class': 1, '_id': -1}")
 })
 @Data
 @Builder
@@ -40,10 +38,4 @@ public class Notification {
     private Instant createdAt;
 
     private NotificationContext context;
-
-    @Builder.Default
-    private PublishState publishState = PublishState.builder()
-            .published(false)
-            .attempts(0)
-            .build();
 }

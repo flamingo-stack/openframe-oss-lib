@@ -1,6 +1,5 @@
 package com.openframe.data.integration.support;
 
-import com.openframe.data.document.clientconfiguration.PublishState;
 import com.openframe.data.document.notification.BroadcastRecipient;
 import com.openframe.data.document.notification.GenericContext;
 import com.openframe.data.document.notification.MachineRecipient;
@@ -48,19 +47,5 @@ public final class NotificationFixtures {
                 .createdAt(Instant.now())
                 .context(GenericContext.builder().type(type).payload(payload).build())
                 .build();
-    }
-
-    public static Notification withPublishState(String recipientUserId, PublishState state) {
-        Notification n = basic(recipientUserId);
-        n.setPublishState(state);
-        return n;
-    }
-
-    public static PublishState published() {
-        return PublishState.published();
-    }
-
-    public static PublishState nonPublishedAttempts(int attempts) {
-        return PublishState.builder().published(false).attempts(attempts).build();
     }
 }

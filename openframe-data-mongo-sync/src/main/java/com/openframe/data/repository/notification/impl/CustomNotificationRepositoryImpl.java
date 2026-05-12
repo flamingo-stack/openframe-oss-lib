@@ -1,6 +1,5 @@
 package com.openframe.data.repository.notification.impl;
 
-import com.openframe.data.document.clientconfiguration.PublishState;
 import com.openframe.data.document.notification.BroadcastRecipient;
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.repository.notification.CustomNotificationRepository;
@@ -14,7 +13,6 @@ import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
@@ -33,9 +31,6 @@ public class CustomNotificationRepositoryImpl implements CustomNotificationRepos
     private static final String FIELD_RECIPIENT_MACHINE_ID = "recipient.machineId";
     private static final String FIELD_RECIPIENT_CLASS = "recipient._class";
     private static final String BROADCAST_CLASS = BroadcastRecipient.class.getName();
-    private static final String FIELD_PUBLISH_STATE = "publishState";
-    private static final String FIELD_PUBLISHED = "publishState.published";
-    private static final String FIELD_ATTEMPTS = "publishState.attempts";
     private static final String READ_STATE_COLLECTION = "notification_read_states";
     private static final String NOTIFICATIONS_COLLECTION = "notifications";
     private static final String LOOKUP_FIELD = "rs";
@@ -166,14 +161,6 @@ public class CustomNotificationRepositoryImpl implements CustomNotificationRepos
     }
 
     @Override
-    public void updatePublishState(String id, PublishState publishState) {
-        mongoTemplate.updateFirst(
-                Query.query(Criteria.where(FIELD_ID).is(new ObjectId(id))),
-                new Update().set(FIELD_PUBLISH_STATE, publishState),
-                Notification.class);
-    }
-
-    @Override
     public List<String> findRecentIdsForUser(String userId, int limit) {
         Query query = new Query(userAudience(userId));
         query.fields().include(FIELD_ID);
@@ -184,15 +171,5 @@ public class CustomNotificationRepositoryImpl implements CustomNotificationRepos
         return rows.stream()
                 .map(row -> row.getObjectId(FIELD_ID).toHexString())
                 .toList();
-    }
-
-    @Override
-    public List<Notification> findRetryablePublishCandidates(int maxAttempts, int limit) {
-        Query query = new Query(Criteria.where(FIELD_PUBLISHED).is(false)
-                .and(FIELD_ATTEMPTS).lt(maxAttempts));
-        query.with(Sort.by(Sort.Direction.ASC, FIELD_ID));
-        query.limit(limit);
-
-        return mongoTemplate.find(query, Notification.class);
     }
 }

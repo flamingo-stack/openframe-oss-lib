@@ -15,15 +15,13 @@ public abstract class BaseIntegrationTest {
     protected static final GenericContainer<?> NATS =
             new GenericContainer<>(DockerImageName.parse("nats:2.10-alpine"))
                     .withExposedPorts(4222)
+                    .withCommand("-js")
                     .waitingFor(Wait.forLogMessage(".*Server is ready.*", 1));
 
     @DynamicPropertySource
     static void infrastructureProperties(DynamicPropertyRegistry registry) {
         if (!MONGO.isRunning()) {
             MONGO.start();
-        }
-        if (!NATS.isRunning()) {
-            NATS.start();
         }
         registry.add("spring.data.mongodb.uri",
                 () -> MONGO.getConnectionString() + "/test?directConnection=true");

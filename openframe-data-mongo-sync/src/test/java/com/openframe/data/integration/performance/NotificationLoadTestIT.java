@@ -223,8 +223,7 @@ class NotificationLoadTestIT extends BaseMongoIntegrationTest {
                 .append("severity", "INFO")
                 .append("title", title)
                 .append("createdAt", new Date())
-                .append("context", new Document("type", "evt").append("payload", "{}"))
-                .append("publishState", new Document().append("published", true).append("attempts", 0));
+                .append("context", new Document("type", "evt").append("payload", "{}"));
     }
 
     private static final class BatchInserter {

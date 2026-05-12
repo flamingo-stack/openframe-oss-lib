@@ -44,8 +44,7 @@ class NotificationIndexesIT extends BaseMongoIntegrationTest {
         assertThat(byName).containsKeys(
                 "recipient_user_id",
                 "recipient_machine_id",
-                "recipient_class_id",
-                "publish_state");
+                "recipient_class_id");
 
         assertThat(byName.get("recipient_user_id").getIndexFields())
                 .extracting("key")
@@ -56,9 +55,5 @@ class NotificationIndexesIT extends BaseMongoIntegrationTest {
         assertThat(byName.get("recipient_class_id").getIndexFields())
                 .extracting("key")
                 .containsExactly("recipient._class", "_id");
-
-        assertThat(byName.get("publish_state").getIndexFields())
-                .extracting("key")
-                .containsExactly("publishState.published", "publishState.attempts");
     }
 }
