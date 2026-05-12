@@ -12,6 +12,7 @@ import java.util.Optional;
 
 public interface CustomTicketRepository {
 
+    // TODO(lifecycle-rollout): drop all methods in this Legacy block after rollout
     // ===== Legacy (used when lifecycle feature flag is OFF) =====
 
     default Query buildTicketQuery(TicketQueryFilter filter) {
