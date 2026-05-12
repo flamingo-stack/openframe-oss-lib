@@ -20,6 +20,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class TicketQueryFilter {
+    // TODO(lifecycle-rollout): drop legacy `statuses` field after rollout
     // ===== Legacy (lifecycle feature flag OFF) =====
     private List<TicketStatus> statuses;
 

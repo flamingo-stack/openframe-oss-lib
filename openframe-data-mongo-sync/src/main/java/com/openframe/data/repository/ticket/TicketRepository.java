@@ -14,6 +14,7 @@ import java.util.Optional;
 @Repository
 public interface TicketRepository extends MongoRepository<Ticket, String>, CustomTicketRepository {
 
+    // TODO(lifecycle-rollout): drop all methods in this Legacy block after rollout
     // ===== Legacy (used when lifecycle feature flag is OFF) =====
 
     Optional<Ticket> findByTicketNumber(Integer ticketNumber);

@@ -371,6 +371,7 @@ public class CustomTicketRepositoryImpl implements CustomTicketRepository {
         return DEFAULT_SORT_FIELD;
     }
 
+    // TODO(lifecycle-rollout): drop all methods in this Legacy block after rollout
     // ===== Legacy methods (used when lifecycle feature flag is OFF) =====
 
     @Override

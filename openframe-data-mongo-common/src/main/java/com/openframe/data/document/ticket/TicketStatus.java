@@ -6,6 +6,7 @@ import java.util.Set;
  * Status of a ticket (matches Figma flow).
  * Separate from DialogStatus for feature flag isolation.
  */
+// TODO(lifecycle-rollout): remove entire enum after legacy status field is dropped from Ticket
 public enum TicketStatus {
     ACTIVE,
     TECH_REQUIRED,
