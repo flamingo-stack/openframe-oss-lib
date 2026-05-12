@@ -1,6 +1,7 @@
 package com.openframe.data.repository.ticket;
 
 import com.openframe.data.document.ticket.Ticket;
+import com.openframe.data.document.ticket.TicketStatus;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +33,7 @@ public class CustomTicketRepositoryImpl implements CustomTicketRepository {
     private static final String DEFAULT_SORT_FIELD = "_id";
 
     private static final String FIELD_TENANT_ID = "tenantId";
+    private static final String FIELD_STATUS = "status";
     private static final String FIELD_STATUS_ID = "statusId";
     private static final String FIELD_STATUS_KIND = "statusKind";
     private static final String FIELD_TICKET_NUMBER = "ticketNumber";
@@ -55,6 +57,7 @@ public class CustomTicketRepositoryImpl implements CustomTicketRepository {
     private static final List<String> SORTABLE_FIELDS = List.of(
             ID_FIELD,
             FIELD_TICKET_NUMBER,
+            FIELD_STATUS,
             FIELD_STATUS_KIND,
             FIELD_ORGANIZATION_NAME,
             FIELD_ASSIGNED_NAME,
@@ -217,6 +220,7 @@ public class CustomTicketRepositoryImpl implements CustomTicketRepository {
     private Object getSortFieldValue(Ticket ticket, String sortField) {
         return switch (sortField) {
             case FIELD_TICKET_NUMBER -> ticket.getTicketNumber();
+            case FIELD_STATUS -> ticket.getStatus() != null ? ticket.getStatus().name() : null;
             case FIELD_STATUS_KIND -> ticket.getStatusKind() != null ? ticket.getStatusKind().name() : null;
             case FIELD_ORGANIZATION_NAME -> ticket.getOrganizationName();
             case FIELD_ASSIGNED_NAME -> ticket.getAssignedName();
@@ -348,5 +352,99 @@ public class CustomTicketRepositoryImpl implements CustomTicketRepository {
     @Override
     public String getDefaultSortField() {
         return DEFAULT_SORT_FIELD;
+    }
+
+    // ===== Legacy methods (used when lifecycle feature flag is OFF) =====
+
+    @Override
+    public Query buildTicketQuery(TicketQueryFilter filter, String search,
+                                  List<String> restrictToTicketIds, String ownerMachineId) {
+        Query query = new Query();
+
+        if (filter != null) {
+            addCriteriaIfNotEmpty(query, FIELD_STATUS, filter.getStatuses());
+            addCriteriaIfNotEmpty(query, FIELD_ORGANIZATION_ID, filter.getOrganizationIds());
+            addCriteriaIfNotEmpty(query, FIELD_ASSIGNED_TO, filter.getAssigneeIds());
+            addCriteriaIfNotEmpty(query, FIELD_DEVICE_ID, filter.getDeviceIds());
+        }
+
+        applyRestrictionCriteria(query, restrictToTicketIds);
+        applyOwnerMachineCriteria(query, ownerMachineId);
+        applySearchCriteria(query, search);
+        return query;
+    }
+
+    @Override
+    public Map<TicketStatus, Long> countTicketsByStatus() {
+        Aggregation aggregation = Aggregation.newAggregation(
+                Aggregation.group(FIELD_STATUS).count().as(AGG_COUNT),
+                Aggregation.project(AGG_COUNT).and(ID_FIELD).as(FIELD_STATUS)
+        );
+
+        AggregationResults<Document> results = mongoTemplate.aggregate(
+                aggregation, Ticket.class, Document.class);
+
+        Map<TicketStatus, Long> statusCounts = new EnumMap<>(TicketStatus.class);
+        for (Document doc : results.getMappedResults()) {
+            String statusStr = doc.getString(FIELD_STATUS);
+            if (!hasText(statusStr)) {
+                continue;
+            }
+            try {
+                TicketStatus status = TicketStatus.valueOf(statusStr);
+                statusCounts.put(status, doc.getInteger(AGG_COUNT).longValue());
+            } catch (IllegalArgumentException e) {
+                log.warn("Unknown ticket status: {}", statusStr);
+            }
+        }
+        return statusCounts;
+    }
+
+    @Override
+    public long getTotalCount() {
+        return mongoTemplate.count(new Query(), Ticket.class);
+    }
+
+    @Override
+    public Optional<Long> getAverageResolutionTimeMs() {
+        Aggregation aggregation = Aggregation.newAggregation(
+                Aggregation.match(Criteria.where(FIELD_RESOLVED_AT).ne(null)
+                        .and(FIELD_CREATED_AT).ne(null)),
+                Aggregation.project()
+                        .andExpression(FIELD_RESOLVED_AT + " - " + FIELD_CREATED_AT).as(AGG_RESOLUTION_TIME),
+                Aggregation.group().avg(AGG_RESOLUTION_TIME).as(AGG_AVG_RESOLUTION_TIME)
+        );
+
+        AggregationResults<Document> results = mongoTemplate.aggregate(
+                aggregation, Ticket.class, Document.class);
+
+        Document result = results.getUniqueMappedResult();
+        if (result == null || result.get(AGG_AVG_RESOLUTION_TIME) == null) {
+            return Optional.empty();
+        }
+        Number avg = (Number) result.get(AGG_AVG_RESOLUTION_TIME);
+        return Optional.of(avg.longValue());
+    }
+
+    @Override
+    public int updateStatusBulk(TicketStatus fromStatus, TicketStatus toStatus) {
+        Query query = new Query(Criteria.where(FIELD_STATUS).is(fromStatus));
+        Update update = new Update()
+                .set(FIELD_STATUS, toStatus)
+                .set(FIELD_UPDATED_AT, Instant.now());
+
+        long modifiedCount = mongoTemplate.updateMulti(query, update, Ticket.class).getModifiedCount();
+        log.debug("Bulk status update (legacy): {} -> {}, modified: {}", fromStatus, toStatus, modifiedCount);
+        return (int) modifiedCount;
+    }
+
+    @Override
+    public void updateTitle(String ticketId, String title) {
+        Query query = new Query(Criteria.where(ID_FIELD).is(ticketId));
+        Update update = new Update()
+                .set(FIELD_TITLE, title)
+                .set(FIELD_UPDATED_AT, Instant.now());
+
+        mongoTemplate.updateFirst(query, update, Ticket.class);
     }
 }
