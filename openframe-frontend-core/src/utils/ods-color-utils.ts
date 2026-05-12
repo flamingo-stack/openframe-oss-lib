@@ -290,6 +290,19 @@ export function usePlatformColors(platform?: Platform) {
   };
 }
 
+/**
+ * Picks a near-black or near-white text color with adequate contrast on `hex`.
+ * Uses Rec. 601 luminance.
+ */
+export function getReadableTextColor(hex: string): string {
+  const n = parseInt(hex.replace('#', ''), 16)
+  const r = (n >> 16) & 0xff
+  const g = (n >> 8) & 0xff
+  const b = n & 0xff
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  return luminance > 0.5 ? '#212121' : '#fafafa'
+}
+
 export default {
   getODSToken,
   getPlatformAccentColor,

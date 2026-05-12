@@ -87,6 +87,9 @@ public class Ticket {
     private String assignedTo;
     private String assignedName;
 
+    @Indexed
+    private String order;
+
     @CreatedDate
     private Instant createdAt;
 

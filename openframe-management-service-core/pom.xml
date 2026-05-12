@@ -27,6 +27,11 @@
             <artifactId>openframe-data-mongo-sync</artifactId>
         </dependency>
         <dependency>
+            <groupId>com.github.pravin-raha</groupId>
+            <artifactId>lexorank4j</artifactId>
+            <version>0.1.0</version>
+        </dependency>
+        <dependency>
             <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-debezium-initializer</artifactId>
         </dependency>

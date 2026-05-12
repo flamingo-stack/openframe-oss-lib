@@ -219,6 +219,8 @@ export interface ProcessedMessage {
 
 // ========== Base Message Interface ==========
 
+import type { ChatRef as MessageChatRef } from '../chat-ref.types'
+
 export interface Message {
   id: string
   role: 'user' | 'assistant' | 'error'  // Limited to display roles
@@ -228,4 +230,9 @@ export interface Message {
   authorType?: AuthorType
   timestamp?: Date
   avatar?: string | null
+  /** Per-row metadata for inline entity-card rendering on this message
+   *  (v6.1 §B.2.6). Keyed by `<documentType>:<primaryKey>`. Optional —
+   *  user messages and legacy turns omit this field. The host's
+   *  `renderEntityCard` callback resolves keys to inline components. */
+  chatRefs?: Record<string, MessageChatRef>
 }

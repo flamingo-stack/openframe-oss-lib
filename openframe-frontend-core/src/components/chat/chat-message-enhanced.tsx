@@ -1,6 +1,6 @@
 "use client"
 
-import { forwardRef, memo } from "react"
+import { forwardRef, memo, useMemo } from "react"
 import { cn } from "../../utils/cn"
 import { SquareAvatar } from "../ui/square-avatar"
 import { ChatTypingIndicator } from "./chat-typing-indicator"
@@ -10,6 +10,8 @@ import { ErrorMessageDisplay } from "./error-message-display"
 import { ContextCompactionDisplay } from "./context-compaction-display"
 import { ThinkingDisplay } from "./thinking-display"
 import { SimpleMarkdownRenderer } from "../ui/simple-markdown-renderer"
+import type { ChatRef } from "./chat-ref.types"
+import { remarkCardLinks } from "./remark-card-links"
 import type { MessageSegment, MessageContent, ChatMessageEnhancedProps } from "./types"
 
 function normalizeContent(content: MessageContent): MessageSegment[] {
@@ -20,10 +22,75 @@ function normalizeContent(content: MessageContent): MessageSegment[] {
 }
 
 const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>(
-  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, authorType: authorTypeProp, assistantIcon, ...props }, ref) => {
+  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, authorType: authorTypeProp, assistantIcon, chatRefs, renderEntityCard, ...props }, ref) => {
     const isUser = role === 'user'
     const isError = role === 'error'
     const authorType = authorTypeProp ?? (isUser ? 'user' : assistantType === 'mingo' ? 'mingo' : 'fae')
+
+    // Inline-card rendering uses a HOST-PROVIDED `renderEntityCard` function
+    // (v6.1 §B.2.7 — DRY duplications #2). The OSS-lib stays data-agnostic:
+    // it doesn't know about entity types, slash commands, or app routing.
+    // The host (multi-platform-hub) returns whatever JSX it wants for each
+    // resolved ChatRef — typically a hover-card pill that composes the
+    // canonical entity card from the host's design system.
+    //
+    // The remark plugin runs whenever the assistant emits a `[card://]`
+    // marker (chatRefs present OR not), so we always strip raw markers
+    // from rendered text (Logic MED-4). When the host's `renderEntityCard`
+    // is unset OR returns null, the override falls back to the ref's
+    // title — or, if even the ref is unknown, the bare cardId. Never
+    // renders the literal `[card://...]` URL.
+    const hasMarkerSupport = !!chatRefs || !!renderEntityCard
+    const cardRemarkPlugins = useMemo(
+      () => (hasMarkerSupport ? [remarkCardLinks] : []),
+      [hasMarkerSupport],
+    )
+    const cardComponentOverrides = useMemo(() => {
+      if (!hasMarkerSupport) return undefined
+      const refs = chatRefs ?? {}
+      const render = renderEntityCard
+      return {
+        // Override `<a>` to detect `card://` URLs emitted by `remarkCardLinks`
+        // and delegate rendering to the host. Other href schemes pass
+        // through unchanged — react-markdown's default `<a>` handler covers
+        // them.
+        a: ({ href, children, className: linkClassName, ...rest }: any) => {
+          if (typeof href === 'string' && href.startsWith('card://')) {
+            const stripped = href.slice('card://'.length)
+            const sepIdx = stripped.lastIndexOf(':')
+            if (sepIdx !== -1) {
+              const cardType = stripped.slice(0, sepIdx)
+              const cardId = stripped.slice(sepIdx + 1)
+              const key = `${cardType}:${cardId}`
+              const refMatch: ChatRef | undefined = refs[key]
+              if (refMatch && render) {
+                const rendered = render(refMatch)
+                if (rendered != null) return rendered
+              }
+              // No renderer, no ref, OR renderer returned null — fall back
+              // to plain text title-only. Use any same-type ref's title if
+              // available; otherwise the bare cardId. Never render the
+              // literal `card://` URL.
+              const fallbackTitle = (refMatch?.title)
+                ?? Object.values(refs).find((r) => r.type === cardType)?.title
+                ?? cardId
+              return <span className="text-ods-text-primary">{fallbackTitle}</span>
+            }
+          }
+          return (
+            <a
+              href={href}
+              className={linkClassName}
+              target={typeof href === 'string' && href.startsWith('http') ? '_blank' : undefined}
+              rel={typeof href === 'string' && href.startsWith('http') ? 'noopener noreferrer' : undefined}
+              {...rest}
+            >
+              {children}
+            </a>
+          )
+        },
+      }
+    }, [hasMarkerSupport, chatRefs, renderEntityCard])
 
     const getAvatarProps = () => {
       const displayName = name || (isUser ? "User" : assistantType === 'mingo' ? "Mingo" : "Fae")
@@ -111,7 +178,12 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                         ? "text-ods-error"
                         : "text-ods-text-primary"
                     )}>
-                      <SimpleMarkdownRenderer content={segment.text} textSize="compact" />
+                      <SimpleMarkdownRenderer
+                        content={segment.text}
+                        textSize="compact"
+                        additionalRemarkPlugins={cardRemarkPlugins}
+                        componentOverrides={cardComponentOverrides}
+                      />
                     </div>
                   )
                 } else if (segment.type === 'tool_execution') {
@@ -180,7 +252,13 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     prevProps.assistantType === nextProps.assistantType &&
     prevProps.authorType === nextProps.authorType &&
     prevProps.assistantIcon === nextProps.assistantIcon &&
-    prevProps.className === nextProps.className
+    prevProps.className === nextProps.className &&
+    // Reference equality on chatRefs is sufficient — the host's hooks should
+    // re-use the same Record instance per turn; mutations create a new map.
+    // Without this check, a parent re-render with a new (but equivalent)
+    // refs object would force a full markdown re-render every keystroke.
+    prevProps.chatRefs === nextProps.chatRefs &&
+    prevProps.renderEntityCard === nextProps.renderEntityCard
   )
 })
 

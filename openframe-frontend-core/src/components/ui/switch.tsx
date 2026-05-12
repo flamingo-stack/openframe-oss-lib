@@ -30,8 +30,10 @@ const Switch = React.forwardRef<
   return (
     <SwitchPrimitives.Root
       className={cn(
-        "peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50",
-        isChecked ? "bg-ods-accent" : "bg-gray-600",
+        "peer inline-flex h-4 w-6 shrink-0 cursor-pointer items-center rounded-full border-2 bg-ods-card px-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background hover:bg-ods-bg-hover active:bg-ods-bg-active disabled:cursor-not-allowed disabled:opacity-50",
+        isChecked
+          ? "border-ods-accent hover:border-ods-accent-hover"
+          : "border-ods-text-secondary",
         className,
       )}
       checked={checked}
@@ -40,9 +42,12 @@ const Switch = React.forwardRef<
       ref={ref}
     >
       <SwitchPrimitives.Thumb
-        className="pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform duration-200"
+        className={cn(
+          "pointer-events-none block size-2 rounded-full transition-transform duration-200",
+          isChecked ? "bg-ods-accent" : "bg-ods-text-secondary",
+        )}
         style={{
-          transform: isChecked ? "translateX(20px)" : "translateX(0px)"
+          transform: isChecked ? "translateX(8px)" : "translateX(0px)"
         }}
       />
     </SwitchPrimitives.Root>

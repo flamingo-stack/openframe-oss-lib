@@ -1,10 +1,12 @@
 'use client'
 
 import React from 'react'
-import { Bell } from 'lucide-react'
 import { useMdUp } from '../../hooks/ui/use-media-query'
 import { cn } from '../../utils/cn'
+import { useOptionalNotifications } from '../features/notifications/notifications-context'
 import { LogOutIcon, OpenFrameLogo, OpenFrameText, UserIcon } from '../icons'
+import { BellIcon } from '../icons-v2-generated/interface/bell-icon'
+import { BellRingingIcon } from '../icons-v2-generated/interface/bell-ringing-icon'
 import { Menu01Icon, SearchIcon, XmarkIcon } from '../icons-v2-generated'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, SquareAvatar } from '../ui'
 import { HeaderButton } from './header-button'
@@ -117,6 +119,15 @@ export const AppHeader = React.memo(function AppHeader({
         />
       )}
 
+      {/* Notifications button */}
+      {showNotifications && (
+        <NotificationsHeaderButton
+          fallbackUnreadCount={unreadCount}
+          disabled={disabled}
+          dimmedClass={dimmedClass}
+        />
+      )}
+
       {isMdUp && showUser && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild disabled={disabled}>
@@ -183,27 +194,46 @@ export const AppHeader = React.memo(function AppHeader({
           </DropdownMenuContent>
         </DropdownMenu>
       )}
-
-      {/* Mobile: Notifications button */}
-      {showNotifications && (
-        <HeaderButton
-          icon={
-            <div className="relative w-full h-full flex items-center justify-center">
-              <Bell className="h-4 w-4 md:w-6 md:h-6" />
-              {unreadCount > 0 && (
-                <span className="absolute top-2 right-2 bg-ods-accent text-ods-text-on-accent text-[8px] rounded-full w-3 h-3 md:w-4 md:h-4 flex items-center justify-center">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
-              )}
-            </div>
-          }
-          aria-label="Notifications"
-          disabled={disabled}
-          className={dimmedClass}
-        />
-      )}
     </header>
   )
 })
+
+interface NotificationsHeaderButtonProps {
+  fallbackUnreadCount: number
+  disabled: boolean
+  dimmedClass: string
+}
+
+function NotificationsHeaderButton({
+  fallbackUnreadCount,
+  disabled,
+  dimmedClass,
+}: NotificationsHeaderButtonProps) {
+  const ctx = useOptionalNotifications()
+  const unreadCount = ctx?.unreadCount ?? fallbackUnreadCount
+  const isActive = ctx?.isOpen ?? false
+  const onClick = ctx?.toggle
+  const Icon = unreadCount > 0 ? BellRingingIcon : BellIcon
+
+  return (
+    <HeaderButton
+      icon={
+        <div className="relative w-full h-full flex items-center justify-center">
+          <Icon className="h-4 w-4 md:w-6 md:h-6" />
+          {unreadCount > 0 && (
+            <span className="absolute top-2 right-2 bg-ods-accent text-ods-text-on-accent text-[8px] rounded-full w-3 h-3 md:w-4 md:h-4 flex items-center justify-center">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
+        </div>
+      }
+      aria-label="Notifications"
+      onClick={onClick}
+      isActive={isActive}
+      disabled={disabled || !onClick}
+      className={dimmedClass}
+    />
+  )
+}
 
 export default AppHeader

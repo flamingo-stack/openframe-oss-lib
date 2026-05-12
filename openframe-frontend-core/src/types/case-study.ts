@@ -26,6 +26,7 @@ export interface CaseStudy {
   // Testimonial video (text testimonials come from MSP profile)
   testimonial_video_url: string | null // YouTube URL (preferred when both exist)
   uploaded_video_url: string | null // Uploaded video file URL (fallback when no YouTube)
+  main_video_thumbnail?: string | null // Manual poster image URL for testimonial video. Standardized name matches main_video_thumbnail on customer_interviews/webinars/podcasts/investor_updates/product_releases per lib/data/entity-video-utils.ts ENTITY_FIELD_CONFIG. Optional for backward-compat with existing literal CaseStudy constructions across hub + external lib consumers.
 
   // Video enhancement fields
   video_source_type: 'youtube' | 'uploaded' | null // Deprecated - use URL detection instead
@@ -80,6 +81,7 @@ export interface CreateCaseStudyData {
   results?: string
   testimonial_video_url?: string // YouTube URL
   uploaded_video_url?: string // Uploaded video file URL
+  main_video_thumbnail?: string | null // Manual poster image URL for testimonial video (standardized name across all video-bearing entities). Nullable so admin form can explicitly clear a stale poster from the DB when the testimonial video is removed or the source is switched to YouTube.
   // Video enhancement fields
   video_source_type?: 'youtube' | 'uploaded' // Deprecated
   video_source?: 'manual' | 'ai_generated'
