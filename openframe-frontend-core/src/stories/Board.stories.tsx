@@ -266,6 +266,29 @@ export const Pagination: Story = {
   },
 }
 
+/** All columns start in `isLoading` state and resolve to seeded data after 1s. */
+export const InitialLoading: Story = {
+  render: function Render() {
+    const [columns, setColumns] = React.useState<BoardColumnDef[]>(() =>
+      groupTicketsByStatus([], ['ACTIVE', 'TECH_REQUIRED', 'ON_HOLD', 'RESOLVED']).map(c => ({
+        ...c,
+        isLoading: true,
+      })),
+    )
+
+    React.useEffect(() => {
+      const t = setTimeout(() => setColumns(buildSeedColumns()), 1000)
+      return () => clearTimeout(t)
+    }, [])
+
+    return (
+      <div className="h-[80vh] bg-ods-bg">
+        <Board columns={columns} onChange={c => setColumns(prev => applyChange(prev, c))} />
+      </div>
+    )
+  },
+}
+
 /** Empty columns to verify the drop placeholder. */
 export const Empty: Story = {
   render: function Render() {

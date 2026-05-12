@@ -134,7 +134,9 @@ function ColumnBody({ column, getTicketHref, renderAssignSlot, onLoadMore, loadM
       )}
     >
       <SortableContext items={ticketIds} strategy={verticalListSortingStrategy}>
-        {column.tickets.length === 0 ? (
+        {column.isLoading ? (
+          <SkeletonStack />
+        ) : column.tickets.length === 0 ? (
           <EmptyState />
         ) : (
           column.tickets.map(t => (
@@ -149,9 +151,23 @@ function ColumnBody({ column, getTicketHref, renderAssignSlot, onLoadMore, loadM
           ))
         )}
       </SortableContext>
-      {column.isLoadingMore && <TicketCardSkeleton />}
+      {column.isLoadingMore && !column.isLoading && <TicketCardSkeleton />}
       {column.hasMore && <div ref={sentinelRef} aria-hidden className="h-1 shrink-0" />}
     </div>
+  )
+}
+
+function SkeletonStack({ count = 4 }: { count?: number }) {
+  const keys = React.useMemo(
+    () => Array.from({ length: count }, () => Math.random().toString(36).slice(2)),
+    [count],
+  )
+  return (
+    <>
+      {keys.map(k => (
+        <TicketCardSkeleton key={k} />
+      ))}
+    </>
   )
 }
 

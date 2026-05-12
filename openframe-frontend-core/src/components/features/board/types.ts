@@ -30,6 +30,7 @@ export interface BoardColumnDef {
 
   total?: number
   hasMore?: boolean
+  isLoading?: boolean
   isLoadingMore?: boolean
 
   system?: boolean
@@ -67,6 +68,7 @@ export function columnFromTicketStatus(
     tickets,
     total: overrides.total,
     hasMore: overrides.hasMore,
+    isLoading: overrides.isLoading,
     isLoadingMore: overrides.isLoadingMore,
     system: overrides.system,
     dropDisabled: overrides.dropDisabled,
