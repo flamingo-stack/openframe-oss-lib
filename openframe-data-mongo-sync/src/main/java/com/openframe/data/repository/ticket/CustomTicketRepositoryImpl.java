@@ -1,6 +1,7 @@
 package com.openframe.data.repository.ticket;
 
 import com.openframe.data.document.ticket.Ticket;
+import com.openframe.data.document.ticket.TicketStatus;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +33,7 @@ public class CustomTicketRepositoryImpl implements CustomTicketRepository {
     private static final String DEFAULT_SORT_FIELD = "_id";
 
     private static final String FIELD_TENANT_ID = "tenantId";
+    private static final String FIELD_STATUS = "status";
     private static final String FIELD_STATUS_ID = "statusId";
     private static final String FIELD_STATUS_KIND = "statusKind";
     private static final String FIELD_TICKET_NUMBER = "ticketNumber";
@@ -88,10 +90,24 @@ public class CustomTicketRepositoryImpl implements CustomTicketRepository {
         return query;
     }
 
+    @Override
+    public Query buildLegacyTicketQuery(TicketQueryFilter filter,
+                                        String search,
+                                        List<String> restrictToTicketIds,
+                                        String ownerMachineId) {
+        Query query = new Query();
+        applyFilterCriteria(query, filter);
+        applyRestrictionCriteria(query, restrictToTicketIds);
+        applyOwnerMachineCriteria(query, ownerMachineId);
+        applySearchCriteria(query, search);
+        return query;
+    }
+
     private void applyFilterCriteria(Query query, TicketQueryFilter filter) {
         if (filter == null) {
             return;
         }
+        addCriteriaIfNotEmpty(query, FIELD_STATUS, filter.getStatuses());
         addCriteriaIfNotEmpty(query, FIELD_STATUS_ID, filter.getStatusIds());
         addCriteriaIfNotEmpty(query, FIELD_STATUS_KIND, filter.getStatusKinds());
         addCriteriaIfNotEmpty(query, FIELD_ORGANIZATION_ID, filter.getOrganizationIds());
@@ -235,6 +251,33 @@ public class CustomTicketRepositoryImpl implements CustomTicketRepository {
     }
 
     @Override
+    public Map<TicketStatus, Long> countTicketsByStatus(String tenantId) {
+        Aggregation aggregation = Aggregation.newAggregation(
+                Aggregation.match(Criteria.where(FIELD_TENANT_ID).is(tenantId)),
+                Aggregation.group(FIELD_STATUS).count().as(AGG_COUNT),
+                Aggregation.project(AGG_COUNT).and(ID_FIELD).as(FIELD_STATUS)
+        );
+
+        AggregationResults<Document> results = mongoTemplate.aggregate(
+                aggregation, Ticket.class, Document.class);
+
+        Map<TicketStatus, Long> statusCounts = new EnumMap<>(TicketStatus.class);
+        for (Document doc : results.getMappedResults()) {
+            String statusStr = doc.getString(FIELD_STATUS);
+            if (!hasText(statusStr)) {
+                continue;
+            }
+            try {
+                TicketStatus status = TicketStatus.valueOf(statusStr);
+                statusCounts.put(status, doc.getInteger(AGG_COUNT).longValue());
+            } catch (IllegalArgumentException e) {
+                log.warn("Unknown ticket status: {}", statusStr);
+            }
+        }
+        return statusCounts;
+    }
+
+    @Override
     public Map<TicketStatusKind, Long> countTicketsByStatusKind(String tenantId) {
         Aggregation aggregation = Aggregation.newAggregation(
                 Aggregation.match(Criteria.where(FIELD_TENANT_ID).is(tenantId)),
@@ -290,11 +333,47 @@ public class CustomTicketRepositoryImpl implements CustomTicketRepository {
     }
 
     @Override
-    public Optional<Long> getAverageResolutionTimeMs(String tenantId) {
+    public Map<TicketStatus, Long> countTicketsByStatusLegacy() {
         Aggregation aggregation = Aggregation.newAggregation(
-                Aggregation.match(Criteria.where(FIELD_TENANT_ID).is(tenantId)
-                        .and(FIELD_RESOLVED_AT).ne(null)
-                        .and(FIELD_CREATED_AT).ne(null)),
+                Aggregation.group(FIELD_STATUS).count().as(AGG_COUNT),
+                Aggregation.project(AGG_COUNT).and(ID_FIELD).as(FIELD_STATUS)
+        );
+
+        AggregationResults<Document> results = mongoTemplate.aggregate(
+                aggregation, Ticket.class, Document.class);
+
+        Map<TicketStatus, Long> statusCounts = new EnumMap<>(TicketStatus.class);
+        for (Document doc : results.getMappedResults()) {
+            String statusStr = doc.getString(FIELD_STATUS);
+            if (!hasText(statusStr)) {
+                continue;
+            }
+            try {
+                TicketStatus status = TicketStatus.valueOf(statusStr);
+                statusCounts.put(status, doc.getInteger(AGG_COUNT).longValue());
+            } catch (IllegalArgumentException e) {
+                log.warn("Unknown ticket status: {}", statusStr);
+            }
+        }
+        return statusCounts;
+    }
+
+    @Override
+    public Optional<Long> getAverageResolutionTimeMs(String tenantId) {
+        return computeAverageResolutionTimeMs(Criteria.where(FIELD_TENANT_ID).is(tenantId)
+                .and(FIELD_RESOLVED_AT).ne(null)
+                .and(FIELD_CREATED_AT).ne(null));
+    }
+
+    @Override
+    public Optional<Long> getAverageResolutionTimeMsLegacy() {
+        return computeAverageResolutionTimeMs(Criteria.where(FIELD_RESOLVED_AT).ne(null)
+                .and(FIELD_CREATED_AT).ne(null));
+    }
+
+    private Optional<Long> computeAverageResolutionTimeMs(Criteria matchCriteria) {
+        Aggregation aggregation = Aggregation.newAggregation(
+                Aggregation.match(matchCriteria),
                 Aggregation.project()
                         .andExpression(FIELD_RESOLVED_AT + " - " + FIELD_CREATED_AT).as(AGG_RESOLUTION_TIME),
                 Aggregation.group().avg(AGG_RESOLUTION_TIME).as(AGG_AVG_RESOLUTION_TIME)

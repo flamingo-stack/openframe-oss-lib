@@ -1,6 +1,7 @@
 package com.openframe.data.repository.ticket;
 
 import com.openframe.data.document.ticket.Ticket;
+import com.openframe.data.document.ticket.TicketStatus;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import org.springframework.data.mongodb.repository.Aggregation;
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -17,15 +18,26 @@ public interface TicketRepository extends MongoRepository<Ticket, String>, Custo
 
     Optional<Ticket> findByTenantIdAndId(String tenantId, String id);
 
+    List<Ticket> findByTenantIdAndStatus(String tenantId, TicketStatus status);
+
+    // TODO(lifecycle-rollout): drop non-tenant findByStatus/findByOrganizationId/findByAssignedTo/findByDeviceId/findByIdAndOwnerMachineId after rollout
+    List<Ticket> findByStatus(TicketStatus status);
+
     List<Ticket> findByTenantIdAndStatusKind(String tenantId, TicketStatusKind statusKind);
 
     List<Ticket> findByTenantIdAndStatusId(String tenantId, String statusId);
 
     List<Ticket> findByTenantIdAndOrganizationId(String tenantId, String organizationId);
 
+    List<Ticket> findByOrganizationId(String organizationId);
+
     List<Ticket> findByTenantIdAndAssignedTo(String tenantId, String assignedTo);
 
+    List<Ticket> findByAssignedTo(String assignedTo);
+
     List<Ticket> findByTenantIdAndDeviceId(String tenantId, String deviceId);
+
+    List<Ticket> findByDeviceId(String deviceId);
 
     List<Ticket> findByTenantIdAndIdIn(String tenantId, List<String> ids);
 
@@ -33,6 +45,9 @@ public interface TicketRepository extends MongoRepository<Ticket, String>, Custo
 
     @Query("{ 'tenantId': ?0, '_id': ?1, 'owner.machineId': ?2 }")
     Optional<Ticket> findByTenantIdAndIdAndOwnerMachineId(String tenantId, String id, String machineId);
+
+    @Query("{ '_id': ?0, 'owner.machineId': ?1 }")
+    Optional<Ticket> findByIdAndOwnerMachineId(String id, String machineId);
 
     @Aggregation(pipeline = {
             "{ $match: { 'tenantId': ?0, 'statusId': ?1, 'order': { $ne: null } } }",

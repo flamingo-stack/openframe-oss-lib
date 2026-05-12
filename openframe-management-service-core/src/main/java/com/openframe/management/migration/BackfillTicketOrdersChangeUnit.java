@@ -7,6 +7,7 @@ import io.mongock.api.annotations.ChangeUnit;
 import io.mongock.api.annotations.Execution;
 import io.mongock.api.annotations.RollbackExecution;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.env.Environment;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -26,9 +27,17 @@ public class BackfillTicketOrdersChangeUnit {
     private static final String FIELD_STATUS_ID = "statusId";
     private static final String FIELD_ORDER = "order";
     private static final String FIELD_CREATED_AT = "createdAt";
+    private static final String LIFECYCLE_FLAG = "openframe.features.tickets.lifecycle.enabled";
 
     @Execution
-    public void execution(MongoTemplate mongoTemplate, TenantIdProvider tenantIdProvider) {
+    public void execution(MongoTemplate mongoTemplate,
+                          TenantIdProvider tenantIdProvider,
+                          Environment environment) {
+        // TODO(lifecycle-rollout): remove guard + drop Environment param after rollout
+        if (!environment.getProperty(LIFECYCLE_FLAG, Boolean.class, false)) {
+            log.info("Backfill ticket orders: lifecycle feature disabled; skipping");
+            return;
+        }
         String tenantId = tenantIdProvider.getTenantId();
         if (!hasText(tenantId)) {
             log.warn("Backfill ticket orders: tenantId not available; skipping");

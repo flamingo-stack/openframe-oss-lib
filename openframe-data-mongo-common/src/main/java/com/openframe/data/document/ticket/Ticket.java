@@ -22,6 +22,8 @@ import java.time.Instant;
 @CompoundIndexes({
         @CompoundIndex(name = "tenant_ticket_number_unique",
                 def = "{'tenantId': 1, 'ticketNumber': 1}", unique = true),
+        @CompoundIndex(name = "tenant_status_created",
+                def = "{'tenantId': 1, 'status': 1, 'createdAt': -1}"),
         @CompoundIndex(name = "tenant_status_kind_created",
                 def = "{'tenantId': 1, 'statusKind': 1, 'createdAt': -1}"),
         @CompoundIndex(name = "tenant_assignee_status_kind",
@@ -46,6 +48,10 @@ public class Ticket {
     private String title;
 
     private String description;
+
+    // TODO(lifecycle-rollout): drop legacy status field + tenant_status_created index after rollout
+    @Indexed
+    private TicketStatus status;
 
     @Indexed
     private String statusId;
