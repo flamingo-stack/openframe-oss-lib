@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.core.exception.NatsException;
 import io.nats.client.Connection;
 import io.nats.client.JetStream;
+import io.nats.client.api.PublishAck;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -37,14 +38,15 @@ public class NatsMessagePublisher {
         }
     }
 
-    public <T> void publishPersistent(String subject, T payload) {
+    public <T> PublishAck publishPersistent(String subject, T payload) {
         try {
             JetStream js = natsConnection.jetStream();
             byte[] body = objectMapper.writeValueAsBytes(payload);
-            js.publish(subject, body);
+            PublishAck ack = js.publish(subject, body);
             log.info("Successfully published persistent message to JetStream subject: {}", subject);
+            return ack;
         } catch (Exception e) {
             throw new NatsException("Error publishing persistent message to subject: " + subject, e);
         }
     }
-} 
+}
