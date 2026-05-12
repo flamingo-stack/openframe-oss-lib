@@ -146,6 +146,7 @@ export * from './image-uploader'
 
 // Ticket components
 export * from './ticket-status-tag'
+export * from './assignee-dropdown'
 export * from './ticket-info-section'
 export * from './ticket-detail-section'
 export * from './ticket-attachments-list'

@@ -21,6 +21,7 @@ export { BellXmarkIcon } from './bell-xmark-icon';
 export { DotIcon } from './dot-icon';
 export { Download01Icon } from './download-01-icon';
 export { Download02Icon } from './download-02-icon';
+export { DraggerIcon } from './dragger-icon';
 export { Ellipsis01CircleIcon } from './ellipsis-01-circle-icon';
 export { Ellipsis01Icon } from './ellipsis-01-icon';
 export { Ellipsis01SquareIcon } from './ellipsis-01-square-icon';
