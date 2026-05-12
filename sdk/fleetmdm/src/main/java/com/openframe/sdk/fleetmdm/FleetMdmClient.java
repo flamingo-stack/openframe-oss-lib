@@ -39,7 +39,7 @@ public class FleetMdmClient {
     private static final String POLICIES_URL = "/api/v1/fleet/global/policies";
     private static final String GET_ENROLL_SECRET_URL = "/api/latest/fleet/spec/enroll_secret";
     private static final String LIVE_QUERY_RUN_URL = "/api/v1/fleet/queries/run";
-    private static final String POLICIES_DELETE_URL = "/api/v1/fleet/policies/delete";
+    private static final String POLICIES_DELETE_URL = "/api/latest/fleet/policies/delete";
 
     private final String baseUrl;
     private final String apiToken;
