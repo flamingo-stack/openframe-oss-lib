@@ -58,10 +58,14 @@ public class NatsStreamConfigurationInitializer implements ApplicationRunner {
     );
 
     private final NatsStreamManagementService natsStreamManagementService;
+    private final AdditionalStreamConfigurationProvider additionalStreamConfigurationProvider;
 
     @Override
     public void run(ApplicationArguments args) {
         CONFIGURATIONS.forEach(natsStreamManagementService::save);
+
+        additionalStreamConfigurationProvider.provide()
+                .forEach(natsStreamManagementService::save);
     }
 
 }
