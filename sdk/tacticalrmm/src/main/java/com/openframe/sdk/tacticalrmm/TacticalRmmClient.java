@@ -12,7 +12,6 @@ import com.openframe.sdk.tacticalrmm.model.AutomatedTaskItem;
 import com.openframe.sdk.tacticalrmm.model.CommandResult;
 import com.openframe.sdk.tacticalrmm.model.CreateScriptRequest;
 import com.openframe.sdk.tacticalrmm.model.RunScriptRequest;
-import com.openframe.sdk.tacticalrmm.model.RunScriptResult;
 import com.openframe.sdk.tacticalrmm.model.ScriptListItem;
 import com.openframe.sdk.tacticalrmm.model.ScriptScheduleAgentsResult;
 import com.openframe.sdk.tacticalrmm.model.TacticalScheduledTask;
@@ -921,11 +920,11 @@ public class TacticalRmmClient {
 
     /**
      * Run a saved script on an agent (POST /agents/&lt;agent_id&gt;/runscript/).
-     * For {@code output=wait} the response is the parsed {@link RunScriptResult};
-     * for other output modes the response body is a confirmation string and
-     * fields on the result will be left null (only agentId/scriptId populated).
+     * Returns the raw response body as-is — Tactical returns the script's stdout
+     * (as a JSON-encoded string for {@code output=wait}, or a confirmation string
+     * for {@code output=email|collector}).
      */
-    public CompletableFuture<RunScriptResult> runScriptAsync(
+    public CompletableFuture<String> runScriptAsync(
             String tacticalServerUrl,
             String apiKey,
             String agentId,
@@ -957,10 +956,7 @@ public class TacticalRmmClient {
             return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                     .thenApply(response -> {
                         checkSuccess(response, "run TacticalRMM script", agentId);
-                        RunScriptResult result = parseRunScriptResult(response.body());
-                        result.setAgentId(agentId);
-                        result.setScriptId(request.getScript());
-                        return result;
+                        return response.body();
                     });
         } catch (Exception e) {
             return failedFuture(new TacticalRmmException("Failed to run script on agent: " + agentId, e));
@@ -1089,18 +1085,6 @@ public class TacticalRmmClient {
                     });
         } catch (Exception e) {
             return failedFuture(new TacticalRmmException("Failed to " + actionName + " agents on script schedule: " + scheduleId, e));
-        }
-    }
-
-    private RunScriptResult parseRunScriptResult(String body) {
-        if (body == null || body.isEmpty()) {
-            return new RunScriptResult();
-        }
-        try {
-            return objectMapper.readValue(body, RunScriptResult.class);
-        } catch (Exception ignored) {
-            // Tactical returns a confirmation string for non-wait outputs (e.g. "ok") — return blank result.
-            return new RunScriptResult();
         }
     }
 

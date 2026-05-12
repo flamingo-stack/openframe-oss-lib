@@ -1,7 +1,6 @@
 package com.openframe.sdk.tacticalrmm;
 
 import com.openframe.sdk.tacticalrmm.model.RunScriptRequest;
-import com.openframe.sdk.tacticalrmm.model.RunScriptResult;
 import com.openframe.sdk.tacticalrmm.model.ScriptScheduleAgentsResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,19 +42,16 @@ class TacticalRmmClientNewMethodsTest {
 
     @Test
     void runScriptAsync_postsToRunscriptEndpoint() throws Exception {
-        mockAsyncResponse(200, "{\"stdout\":\"hi\",\"stderr\":\"\",\"execution_time\":\"0.05\",\"retcode\":0}");
+        String responseBody = "\"script stdout text\"";
+        mockAsyncResponse(200, responseBody);
         RunScriptRequest req = new RunScriptRequest();
         req.setScript(7);
         req.setOutput("wait");
         req.setTimeout(60);
 
-        RunScriptResult result = client.runScriptAsync(SERVER, API_KEY, "agent-abc", req).get();
+        String result = client.runScriptAsync(SERVER, API_KEY, "agent-abc", req).get();
 
-        assertNotNull(result);
-        assertEquals(0, result.getRetcode());
-        assertEquals("hi", result.getStdout());
-        assertEquals("agent-abc", result.getAgentId());
-        assertEquals(7, result.getScriptId());
+        assertEquals(responseBody, result);
         ArgumentCaptor<HttpRequest> captor = ArgumentCaptor.forClass(HttpRequest.class);
         verify(mockHttpClient).sendAsync(captor.capture(), any());
         assertTrue(captor.getValue().uri().toString().endsWith("/agents/agent-abc/runscript/"));
@@ -64,7 +60,7 @@ class TacticalRmmClientNewMethodsTest {
 
     @Test
     void runScriptAsync_rejectsMissingScriptId() {
-        CompletableFuture<RunScriptResult> future = client.runScriptAsync(SERVER, API_KEY, "agent-abc", new RunScriptRequest());
+        CompletableFuture<String> future = client.runScriptAsync(SERVER, API_KEY, "agent-abc", new RunScriptRequest());
         assertTrue(future.isCompletedExceptionally());
     }
 

@@ -43,6 +43,9 @@ public class RunScriptRequest {
     @JsonProperty("custom_field")
     private Integer customField;
 
+    @JsonProperty("save_all_output")
+    private Boolean saveAllOutput;
+
     public Integer getScript() { return script; }
     public void setScript(Integer script) { this.script = script; }
 
@@ -72,4 +75,7 @@ public class RunScriptRequest {
 
     public Integer getCustomField() { return customField; }
     public void setCustomField(Integer customField) { this.customField = customField; }
+
+    public Boolean getSaveAllOutput() { return saveAllOutput; }
+    public void setSaveAllOutput(Boolean saveAllOutput) { this.saveAllOutput = saveAllOutput; }
 }
