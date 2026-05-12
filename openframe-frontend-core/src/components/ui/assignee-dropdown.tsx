@@ -116,13 +116,14 @@ function CompactAssigneeDropdown({
             'data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2',
           )}
         >
-          <div className="p-[var(--spacing-system-xs)] border-b border-ods-border">
+          <div className="border-b border-ods-border">
             <Input
               autoFocus
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search users..."
               startAdornment={<SearchIcon className="size-4 text-ods-text-secondary" />}
+              className="rounded-none border-0"
             />
           </div>
           <div className="max-h-80 overflow-y-auto py-[var(--spacing-system-xs)]" role="listbox">
