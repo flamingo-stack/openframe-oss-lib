@@ -4,6 +4,7 @@ import React from 'react'
 import { Tag, type TagProps } from './tag'
 import { CheckCircleIcon } from '../icons-v2-generated'
 import { cn } from '../../utils/cn'
+import { getReadableTextColor } from '../../utils/ods-color-utils'
 
 /**
  * Canonical ticket status values.
@@ -103,6 +104,11 @@ export interface TicketStatusTagProps {
   status: string
   /** Override the default label */
   label?: string
+  /**
+   * Hex color override. Replaces the variant's fill; text
+   * color is computed for contrast. The status's preset icon is preserved.
+   */
+  color?: string
   /** Additional className for the Tag */
   className?: string
   /** Show the status-specific icon (e.g. checkmark for resolved) */
@@ -117,10 +123,14 @@ export interface TicketStatusTagProps {
 export function TicketStatusTag({
   status,
   label,
+  color,
   className,
   showIcon = true,
 }: TicketStatusTagProps) {
   const config = getTicketStatusConfig(status)
+  const customStyle = color
+    ? { backgroundColor: color, color: getReadableTextColor(color) }
+    : undefined
 
   return (
     <Tag
@@ -128,6 +138,7 @@ export function TicketStatusTag({
       variant={config.variant}
       icon={showIcon ? config.icon : undefined}
       className={cn('shrink-0 w-fit', className)}
+      style={customStyle}
     />
   )
 }

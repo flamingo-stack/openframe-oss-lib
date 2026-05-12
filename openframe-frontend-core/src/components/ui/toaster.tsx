@@ -11,7 +11,7 @@ import { cn } from '../../utils/cn'
 
 export type ToastVariant = 'default' | 'success' | 'warning' | 'error' | 'info'
 
-const dotColorByVariant: Record<ToastVariant, string> = {
+export const dotColorByVariant: Record<ToastVariant, string> = {
   default: 'bg-ods-text-secondary',
   success: 'bg-ods-success',
   warning: 'bg-ods-warning',
@@ -19,7 +19,7 @@ const dotColorByVariant: Record<ToastVariant, string> = {
   info: 'bg-ods-info',
 }
 
-const progressColorByVariant: Record<ToastVariant, string> = {
+export const progressColorByVariant: Record<ToastVariant, string> = {
   default: 'bg-ods-text-secondary',
   success: 'bg-ods-success',
   warning: 'bg-ods-accent',

@@ -17,7 +17,7 @@ public enum TicketStatus {
         return getAllowedTransitions().contains(target);
     }
 
-    private Set<TicketStatus> getAllowedTransitions() {
+    public Set<TicketStatus> getAllowedTransitions() {
         return switch (this) {
             case ACTIVE -> Set.of(TECH_REQUIRED, ON_HOLD, RESOLVED);
             case TECH_REQUIRED -> Set.of(ACTIVE, ON_HOLD, RESOLVED);

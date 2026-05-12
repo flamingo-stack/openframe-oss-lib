@@ -39,6 +39,13 @@ export interface StatusBadgeProps
   extends React.HTMLAttributes<HTMLSpanElement>,
     VariantProps<typeof statusBadgeVariants> {
   text: string;
+  /**
+   * When true, renders `text` verbatim on a single line, bypassing the
+   * default multi-word vertical-stack behavior used by `variant="button"`.
+   * Use this for compact inline contexts (e.g. chat-inline roadmap cards)
+   * where the stamp-like stacked layout is undesirable.
+   */
+  singleLine?: boolean;
 }
 
 function StatusBadge({
@@ -46,6 +53,7 @@ function StatusBadge({
   variant,
   colorScheme,
   className,
+  singleLine,
   ...props
 }: StatusBadgeProps) {
   // Outer element is `<span>` so the badge is HTML-valid in any inline
@@ -53,7 +61,13 @@ function StatusBadge({
   // or inside an `<a>`). The `inline-flex` base class in
   // `statusBadgeVariants` keeps the layout identical to the previous
   // `<div>` outer — only the element name changed.
+  //
+  // Escape hatch: callers can pass `singleLine` to opt out of the
+  // multi-word stacking applied for `variant="button"`. This is needed
+  // for compact inline contexts (chat-inline roadmap cards) where the
+  // default stamp-like vertical stack ("TO" / "DO") breaks layout.
   const renderText = () => {
+    if (singleLine) return text;
     if (variant === 'button' && text.includes(' ')) {
       const words = text.split(' ');
       return (
