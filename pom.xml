@@ -33,6 +33,7 @@
         <spring-authorization-server.version>1.3.1</spring-authorization-server.version>
         <netflix.dgs.version>9.0.3</netflix.dgs.version>
         <grpc.version>1.58.0</grpc.version>
+        <testcontainers.version>1.21.4</testcontainers.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     </properties>
