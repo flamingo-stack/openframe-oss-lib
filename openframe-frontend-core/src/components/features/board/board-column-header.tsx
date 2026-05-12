@@ -29,7 +29,7 @@ export function BoardColumnHeader({
         <Button
           variant="transparent"
           size="icon"
-          className="h-8 w-8 p-0"
+          className="h-8 w-8 md:h-8 md:w-8 p-0"
           onClick={onToggleCollapse}
           aria-label="Expand column"
         >
@@ -67,7 +67,7 @@ export function BoardColumnHeader({
         <Button
           variant="transparent"
           size="icon"
-          className="h-8 w-8 p-0"
+          className="h-8 w-8 md:h-8 md:w-8 p-0"
           onClick={onToggleCollapse}
           aria-label="Collapse column"
         >
@@ -77,7 +77,7 @@ export function BoardColumnHeader({
           <Button
             variant="transparent"
             size="icon"
-            className="h-8 w-8 p-0"
+            className="h-8 w-8 md:h-8 md:w-8 p-0"
             onClick={onAddTicket}
             aria-label="Add ticket"
           >

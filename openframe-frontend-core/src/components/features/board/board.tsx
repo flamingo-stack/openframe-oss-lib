@@ -82,12 +82,14 @@ export function Board({
     const toColumnId = overData?.columnId
     if (!fromColumnId || !toColumnId || fromColumnId === toColumnId) return
 
-    const isReturnToOrigin = dragOriginRef.current?.fromColumnId === toColumnId
+    const origin = dragOriginRef.current
+    const isReturnToOrigin = origin?.fromColumnId === toColumnId
     const targetCol = items.find(c => c.id === toColumnId)
     const blockedBySource =
       !isReturnToOrigin &&
       !!targetCol?.allowedFromColumns &&
-      !targetCol.allowedFromColumns.includes(fromColumnId)
+      !!origin &&
+      !targetCol.allowedFromColumns.includes(origin.fromColumnId)
     if ((targetCol?.dropDisabled && !isReturnToOrigin) || blockedBySource) return
 
     setItems(prev => {
