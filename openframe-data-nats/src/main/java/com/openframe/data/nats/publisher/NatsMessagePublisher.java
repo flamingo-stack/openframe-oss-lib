@@ -42,9 +42,7 @@ public class NatsMessagePublisher {
         try {
             JetStream js = natsConnection.jetStream();
             byte[] body = objectMapper.writeValueAsBytes(payload);
-            PublishAck ack = js.publish(subject, body);
-            log.info("Successfully published persistent message to JetStream subject: {}", subject);
-            return ack;
+            return js.publish(subject, body);
         } catch (Exception e) {
             throw new NatsException("Error publishing persistent message to subject: " + subject, e);
         }
