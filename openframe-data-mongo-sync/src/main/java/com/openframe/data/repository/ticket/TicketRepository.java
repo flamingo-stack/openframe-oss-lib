@@ -30,6 +30,13 @@ public interface TicketRepository extends MongoRepository<Ticket, String>, Custo
 
     @Aggregation(pipeline = {
             "{ $match: { 'status': ?0, 'order': { $ne: null } } }",
+            "{ $sort: { 'order': 1 } }",
+            "{ $limit: 1 }"
+    })
+    Optional<Ticket> findFirstInColumn(TicketStatus status);
+
+    @Aggregation(pipeline = {
+            "{ $match: { 'status': ?0, 'order': { $ne: null } } }",
             "{ $sort: { 'order': -1 } }",
             "{ $limit: 1 }"
     })
