@@ -35,13 +35,15 @@ export interface BoardColumnDef {
   system?: boolean
   dropDisabled?: boolean
   dragDisabled?: boolean
+  allowedFromColumns?: string[]
 }
 
 export interface BoardChange {
   ticketId: string
   fromColumnId: string
   toColumnId: string
-  newIndex: number
+  afterTicketId: string | null
+  beforeTicketId: string | null
 }
 
 const STATUS_DEFAULTS: Record<TicketStatus, { label: string; color: string }> = {
@@ -69,6 +71,7 @@ export function columnFromTicketStatus(
     system: overrides.system,
     dropDisabled: overrides.dropDisabled,
     dragDisabled: overrides.dragDisabled,
+    allowedFromColumns: overrides.allowedFromColumns,
   }
 }
 

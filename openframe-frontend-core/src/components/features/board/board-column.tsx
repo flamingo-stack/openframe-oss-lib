@@ -9,14 +9,15 @@ import { BoardColumnHeader } from './board-column-header'
 import { tintOnDark } from './color-utils'
 import { TicketCard } from './ticket-card'
 import { TicketCardSkeleton } from './ticket-card-skeleton'
-import type { BoardColumnDef } from './types'
+import type { BoardColumnDef, BoardTicket } from './types'
 
 export interface BoardColumnProps {
   column: BoardColumnDef
   collapsed?: boolean
   onToggleCollapse: () => void
   onAddTicket?: (columnId: string) => void
-  onTicketClick?: (ticketId: string) => void
+  getTicketHref?: (ticketId: string) => string
+  renderAssignSlot?: (ticket: BoardTicket) => React.ReactNode
   onLoadMore?: (columnId: string) => void
   loadMoreRootMargin?: string
   joinLeft?: boolean
@@ -28,7 +29,8 @@ export function BoardColumn({
   collapsed = false,
   onToggleCollapse,
   onAddTicket,
-  onTicketClick,
+  getTicketHref,
+  renderAssignSlot,
   onLoadMore,
   loadMoreRootMargin = '200px 0px',
   joinLeft = false,
@@ -57,7 +59,8 @@ export function BoardColumn({
           <div aria-hidden className="-mx-[var(--spacing-system-sf)] h-px shrink-0 bg-ods-border" />
           <ColumnBody
             column={column}
-            onTicketClick={onTicketClick}
+            getTicketHref={getTicketHref}
+            renderAssignSlot={renderAssignSlot}
             onLoadMore={onLoadMore}
             loadMoreRootMargin={loadMoreRootMargin}
           />
@@ -69,12 +72,13 @@ export function BoardColumn({
 
 interface ColumnBodyProps {
   column: BoardColumnDef
-  onTicketClick?: (ticketId: string) => void
+  getTicketHref?: (ticketId: string) => string
+  renderAssignSlot?: (ticket: BoardTicket) => React.ReactNode
   onLoadMore?: (columnId: string) => void
   loadMoreRootMargin: string
 }
 
-function ColumnBody({ column, onTicketClick, onLoadMore, loadMoreRootMargin }: ColumnBodyProps) {
+function ColumnBody({ column, getTicketHref, renderAssignSlot, onLoadMore, loadMoreRootMargin }: ColumnBodyProps) {
   const ticketIds = React.useMemo(() => column.tickets.map(t => t.id), [column.tickets])
 
   const droppableData = React.useMemo(
@@ -138,7 +142,8 @@ function ColumnBody({ column, onTicketClick, onLoadMore, loadMoreRootMargin }: C
               key={t.id}
               ticket={t}
               columnId={column.id}
-              onClick={onTicketClick}
+              href={getTicketHref?.(t.id)}
+              renderAssignSlot={renderAssignSlot}
               dragDisabled={column.dragDisabled}
             />
           ))

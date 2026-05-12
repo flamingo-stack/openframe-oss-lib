@@ -25,7 +25,8 @@ export interface BoardProps {
   onChange: (change: BoardChange) => void
   onLoadMore?: (columnId: string) => void
   onAddTicket?: (columnId: string) => void
-  onTicketClick?: (ticketId: string) => void
+  getTicketHref?: (ticketId: string) => string
+  renderAssignSlot?: (ticket: BoardTicket) => React.ReactNode
   collapseStorageKey?: string
   loadMoreRootMargin?: string
   className?: string
@@ -36,7 +37,8 @@ export function Board({
   onChange,
   onLoadMore,
   onAddTicket,
-  onTicketClick,
+  getTicketHref,
+  renderAssignSlot,
   collapseStorageKey,
   loadMoreRootMargin,
   className,
@@ -81,7 +83,12 @@ export function Board({
     if (!fromColumnId || !toColumnId || fromColumnId === toColumnId) return
 
     const isReturnToOrigin = dragOriginRef.current?.fromColumnId === toColumnId
-    if (items.find(c => c.id === toColumnId)?.dropDisabled && !isReturnToOrigin) return
+    const targetCol = items.find(c => c.id === toColumnId)
+    const blockedBySource =
+      !isReturnToOrigin &&
+      !!targetCol?.allowedFromColumns &&
+      !targetCol.allowedFromColumns.includes(fromColumnId)
+    if ((targetCol?.dropDisabled && !isReturnToOrigin) || blockedBySource) return
 
     setItems(prev => {
       const fromIndex = findIndexInColumn(prev, fromColumnId, activeId)
@@ -135,19 +142,28 @@ export function Board({
     }
 
     const toColumnId = located.columnId
-    if (origin.fromColumnId !== toColumnId && items.find(c => c.id === toColumnId)?.dropDisabled) {
+    const isCrossColumn = origin.fromColumnId !== toColumnId
+    const targetCol = items.find(c => c.id === toColumnId)
+    if (
+      isCrossColumn &&
+      (targetCol?.dropDisabled ||
+        (targetCol?.allowedFromColumns && !targetCol.allowedFromColumns.includes(origin.fromColumnId)))
+    ) {
       setItems(columns)
       return
     }
+
     let finalIndex = located.index
+    let finalColumnTickets = items.find(c => c.id === toColumnId)?.tickets ?? []
 
     const overData = over.data.current as { columnId?: string; type?: string } | undefined
     if (overData?.type === 'ticket') {
       const overIndex = findIndexInColumn(items, toColumnId, String(over.id))
       if (overIndex >= 0 && overIndex !== located.index) {
+        finalColumnTickets = arrayMove(finalColumnTickets, located.index, overIndex)
         setItems(
           items.map(c =>
-            c.id !== toColumnId ? c : { ...c, tickets: arrayMove(c.tickets, located.index, overIndex) },
+            c.id !== toColumnId ? c : { ...c, tickets: finalColumnTickets },
           ),
         )
         finalIndex = overIndex
@@ -163,7 +179,8 @@ export function Board({
       ticketId: origin.ticketId,
       fromColumnId: origin.fromColumnId,
       toColumnId,
-      newIndex: finalIndex,
+      afterTicketId: finalColumnTickets[finalIndex - 1]?.id ?? null,
+      beforeTicketId: finalColumnTickets[finalIndex + 1]?.id ?? null,
     })
   }
 
@@ -183,7 +200,7 @@ export function Board({
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <div className={cn('flex h-full overflow-x-auto p-[var(--spacing-system-mf)]', className)}>
+      <div className={cn('flex h-full overflow-x-auto', className)}>
         {items.map((column, i) => {
           const prev = items[i - 1]
           const next = items[i + 1]
@@ -198,7 +215,8 @@ export function Board({
                 collapsed={!!collapsed[column.id]}
                 onToggleCollapse={() => toggle(column.id)}
                 onAddTicket={onAddTicket}
-                onTicketClick={onTicketClick}
+                getTicketHref={getTicketHref}
+                renderAssignSlot={renderAssignSlot}
                 onLoadMore={onLoadMore}
                 loadMoreRootMargin={loadMoreRootMargin}
                 joinLeft={joinLeft}

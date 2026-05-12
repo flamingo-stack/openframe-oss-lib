@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { arrayMove } from '@dnd-kit/sortable'
 import * as React from 'react'
 import {
   Board,
@@ -76,13 +75,17 @@ function applyChange(columns: BoardColumnDef[], change: BoardChange): BoardColum
 
   const fromIndex = fromCol.tickets.findIndex(t => t.id === change.ticketId)
   if (fromIndex < 0) return columns
+  const [moved] = fromCol.tickets.splice(fromIndex, 1)
 
-  if (fromCol === toCol) {
-    fromCol.tickets = arrayMove(fromCol.tickets, fromIndex, change.newIndex)
+  let insertAt: number
+  if (change.afterTicketId) {
+    insertAt = toCol.tickets.findIndex(t => t.id === change.afterTicketId) + 1
+  } else if (change.beforeTicketId) {
+    insertAt = toCol.tickets.findIndex(t => t.id === change.beforeTicketId)
   } else {
-    const [moved] = fromCol.tickets.splice(fromIndex, 1)
-    toCol.tickets.splice(change.newIndex, 0, moved)
+    insertAt = 0
   }
+  toCol.tickets.splice(insertAt, 0, moved)
   return next
 }
 

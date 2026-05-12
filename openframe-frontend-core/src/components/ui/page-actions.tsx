@@ -185,7 +185,7 @@ export interface PageActionsProps {
   /**
    * Desktop-only slot rendered before the action buttons (e.g. a `TabSelector`
    * for view-mode toggles). Hidden on mobile and never merged into the "…" menu.
-   * Currently honored by the `icon-buttons` variant.
+   * Honored by the `icon-buttons` and `menu-primary` variants.
    */
   selector?: React.ReactNode
   className?: string
@@ -205,7 +205,7 @@ export function PageActions({
   }
 
   if (variant === 'menu-primary') {
-    return <MenuPrimaryVariant actions={actions} menuActions={menuActions || []} className={className} />
+    return <MenuPrimaryVariant actions={actions} menuActions={menuActions || []} selector={selector} className={className} />
   }
 
   return <PrimaryButtonsVariant actions={actions} className={className} />
@@ -301,10 +301,12 @@ function PrimaryButtonsVariant({
 function MenuPrimaryVariant({
   actions,
   menuActions,
+  selector,
   className,
 }: {
   actions: PageActionButton[]
   menuActions: ActionsMenuGroup[]
+  selector?: React.ReactNode
   className?: string
 }) {
   const desktopActions = actions.filter(a => !a.showOnlyMobile)
@@ -313,6 +315,7 @@ function MenuPrimaryVariant({
   return (
     <>
       <div className={cn('hidden md:flex items-center', ACTIONS_GAP, className)}>
+        {selector}
         {hasMenuActions && <ActionsMenuDropdown groups={menuActions} />}
         {desktopActions.map((action, idx) => (
           <React.Fragment key={`desktop-${actionKey(action, idx)}`}>

@@ -2,6 +2,7 @@
 
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import Link from 'next/link'
 import * as React from 'react'
 import { LaptopIcon, Flag02Icon } from '../../icons-v2-generated'
 import { SquareAvatar } from '../../ui/square-avatar'
@@ -22,12 +23,20 @@ const MAX_VISIBLE_ASSIGNEES = 3
 export interface TicketCardProps {
   ticket: BoardTicket
   columnId: string
-  onClick?: (ticketId: string) => void
+  href?: string
   isOverlay?: boolean
   dragDisabled?: boolean
+  renderAssignSlot?: (ticket: BoardTicket) => React.ReactNode
 }
 
-export function TicketCard({ ticket, columnId, onClick, isOverlay = false, dragDisabled }: TicketCardProps) {
+export function TicketCard({
+  ticket,
+  columnId,
+  href,
+  isOverlay = false,
+  dragDisabled,
+  renderAssignSlot,
+}: TicketCardProps) {
   const sortableData = React.useMemo(
     () => ({ columnId, type: 'ticket' as const }),
     [columnId],
@@ -49,30 +58,49 @@ export function TicketCard({ ticket, columnId, onClick, isOverlay = false, dragD
     ticket.organizationName,
   ].filter(Boolean).join(', ')
 
-  const handleClick = () => {
-    if (sortable.isDragging) return
-    onClick?.(ticket.id)
+  const handleClick = (e: React.MouseEvent) => {
+    if (sortable.isDragging) e.preventDefault()
   }
 
-  return (
-    <button
-      type="button"
-      ref={isOverlay ? undefined : sortable.setNodeRef}
-      style={isOverlay ? undefined : style}
-      {...(isOverlay ? {} : sortable.attributes)}
-      {...(isOverlay ? {} : sortable.listeners)}
-      onClick={handleClick}
-      className={cn(
-        'flex flex-col gap-[var(--spacing-system-sf)] rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-sf)] select-none text-left',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus',
-        !dragDisabled && 'cursor-pointer',
-        sortable.isDragging && !isOverlay && 'opacity-40',
-        isOverlay && 'rotate-1 shadow-card-hover',
+  const hasRightSection = !!(ticket.priority || ticket.assignees?.length || renderAssignSlot)
+
+  const rightSection = hasRightSection ? (
+    <div className="pointer-events-auto flex shrink-0 items-center gap-[var(--spacing-system-xsf)]">
+      {ticket.priority && (
+        <Flag02Icon
+          className={cn('size-4', PRIORITY_COLOR_CLASS[ticket.priority])}
+          aria-label={`Priority: ${ticket.priority}`}
+        />
       )}
-    >
+      {renderAssignSlot ? (
+        renderAssignSlot(ticket)
+      ) : ticket.assignees?.length ? (
+        <div className="flex -space-x-2">
+          {ticket.assignees.slice(0, MAX_VISIBLE_ASSIGNEES).map(a => (
+            <SquareAvatar
+              key={a.id}
+              src={a.avatarUrl}
+              alt={a.name ?? a.initials ?? a.id}
+              fallback={a.name ?? a.initials}
+              size="sm"
+              variant="round"
+            />
+          ))}
+          {ticket.assignees.length > MAX_VISIBLE_ASSIGNEES && (
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-ods-border bg-ods-bg text-xs font-medium text-ods-text-secondary">
+              +{ticket.assignees.length - MAX_VISIBLE_ASSIGNEES}
+            </div>
+          )}
+        </div>
+      ) : null}
+    </div>
+  ) : null
+
+  const body = (
+    <>
       <div className="flex items-start gap-[var(--spacing-system-sf)]">
         <div className="flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-xxs)]">
-          <p className="text-h3 truncate text-ods-text-primary hover:text-ods-accent">{ticket.title}</p>
+          <p className="text-h3 truncate text-ods-text-primary">{ticket.title}</p>
           {showDeviceRow && (
             <div className="flex min-w-0 items-center gap-[var(--spacing-system-xxs)] text-h6 text-ods-text-secondary">
               <LaptopIcon className="size-4 shrink-0" />
@@ -80,39 +108,61 @@ export function TicketCard({ ticket, columnId, onClick, isOverlay = false, dragD
             </div>
           )}
         </div>
-        {(ticket.priority || ticket.assignees?.length) && (
-          <div className="flex shrink-0 items-center gap-[var(--spacing-system-xsf)]">
-            {ticket.priority && (
-              <Flag02Icon
-                className={cn('size-4', PRIORITY_COLOR_CLASS[ticket.priority])}
-                aria-label={`Priority: ${ticket.priority}`}
-              />
-            )}
-            {ticket.assignees?.length ? (
-              <div className="flex -space-x-2">
-                {ticket.assignees.slice(0, MAX_VISIBLE_ASSIGNEES).map(a => (
-                  <SquareAvatar
-                    key={a.id}
-                    src={a.avatarUrl}
-                    alt={a.name ?? a.initials ?? a.id}
-                    fallback={a.name ?? a.initials}
-                    size="sm"
-                    variant="round"
-                  />
-                ))}
-                {ticket.assignees.length > MAX_VISIBLE_ASSIGNEES && (
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-ods-border bg-ods-bg text-xs font-medium text-ods-text-secondary">
-                    +{ticket.assignees.length - MAX_VISIBLE_ASSIGNEES}
-                  </div>
-                )}
-              </div>
-            ) : null}
-          </div>
-        )}
+        {rightSection}
       </div>
-
       {ticket.tags?.length ? <TicketTagRow tags={ticket.tags} /> : null}
-    </button>
+    </>
+  )
+
+  const cardClasses = cn(
+    'relative flex flex-col gap-[var(--spacing-system-sf)] rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-sf)] select-none text-left',
+    !dragDisabled && 'cursor-pointer',
+    sortable.isDragging && !isOverlay && 'opacity-40',
+    isOverlay && 'rotate-1 shadow-card-hover',
+  )
+
+  const outerProps = {
+    ref: isOverlay ? undefined : sortable.setNodeRef,
+    style: isOverlay ? undefined : style,
+    className: cardClasses,
+    ...(isOverlay ? {} : sortable.attributes),
+    ...(isOverlay ? {} : sortable.listeners),
+  }
+
+  if (isOverlay) {
+    return (
+      <div {...outerProps}>
+        <div className="relative z-10">{body}</div>
+      </div>
+    )
+  }
+
+  if (href) {
+    return (
+      <div {...outerProps}>
+        <Link
+          href={href}
+          draggable={false}
+          prefetch={false}
+          onClick={handleClick}
+          aria-label={ticket.title}
+          className="absolute inset-0 z-0 rounded-md focus-visible:outline-none"
+        />
+        <div className="pointer-events-none relative z-10">{body}</div>
+      </div>
+    )
+  }
+
+  return (
+    <div {...outerProps}>
+      <button
+        type="button"
+        onClick={handleClick}
+        aria-label={ticket.title}
+        className="absolute inset-0 z-0 cursor-pointer rounded-md focus-visible:outline-none"
+      />
+      <div className="pointer-events-none relative z-10">{body}</div>
+    </div>
   )
 }
 
