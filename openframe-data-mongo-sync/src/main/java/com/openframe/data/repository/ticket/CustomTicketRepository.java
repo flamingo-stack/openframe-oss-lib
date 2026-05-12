@@ -1,7 +1,7 @@
 package com.openframe.data.repository.ticket;
 
 import com.openframe.data.document.ticket.Ticket;
-import com.openframe.data.document.ticket.TicketStatus;
+import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
 import org.springframework.data.mongodb.core.query.Query;
 
@@ -11,27 +11,34 @@ import java.util.Optional;
 
 public interface CustomTicketRepository {
 
-    default Query buildTicketQuery(TicketQueryFilter filter) {
-        return buildTicketQuery(filter, null, null, null);
-    }
+    Query buildTicketQuery(String tenantId,
+                           TicketQueryFilter filter,
+                           String search,
+                           List<String> restrictToTicketIds,
+                           String ownerMachineId);
 
-    Query buildTicketQuery(TicketQueryFilter filter, String search,
-                           List<String> restrictToTicketIds, String ownerMachineId);
-
-    List<Ticket> findTicketsWithCursor(Query query, String cursor, int limit,
-                                        String sortField, String sortDirection);
+    List<Ticket> findTicketsWithCursor(Query query,
+                                       String cursor,
+                                       int limit,
+                                       String sortField,
+                                       String sortDirection);
 
     long countTickets(Query query);
 
-    Map<TicketStatus, Long> countTicketsByStatus();
+    Map<TicketStatusKind, Long> countTicketsByStatusKind(String tenantId);
 
-    long getTotalCount();
+    Map<String, Long> countTicketsByStatusId(String tenantId);
 
-    Optional<Long> getAverageResolutionTimeMs();
+    long getTotalCount(String tenantId);
 
-    int updateStatusBulk(TicketStatus fromStatus, TicketStatus toStatus);
+    Optional<Long> getAverageResolutionTimeMs(String tenantId);
 
-    void updateTitle(String ticketId, String title);
+    int reassignTicketsToStatus(String tenantId,
+                                String fromStatusId,
+                                String toStatusId,
+                                TicketStatusKind toKind);
+
+    void updateTitle(String tenantId, String ticketId, String title);
 
     boolean isSortableField(String field);
 
