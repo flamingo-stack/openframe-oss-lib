@@ -108,7 +108,7 @@ class FleetMdmClientAssignmentTest {
 
         ArgumentCaptor<HttpRequest> captor = ArgumentCaptor.forClass(HttpRequest.class);
         verify(mockHttpClient).sendAsync(captor.capture(), any());
-        assertTrue(captor.getValue().uri().toString().endsWith("/api/v1/fleet/policies/delete"));
+        assertTrue(captor.getValue().uri().toString().endsWith("/api/latest/fleet/policies/delete"));
         assertEquals("POST", captor.getValue().method());
     }
 
