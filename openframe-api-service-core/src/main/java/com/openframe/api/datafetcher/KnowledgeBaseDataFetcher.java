@@ -86,6 +86,13 @@ public class KnowledgeBaseDataFetcher {
     }
 
     @DgsQuery
+    public List<KnowledgeBaseItem> knowledgeBaseArticleTree() {
+        String currentUserId = getCurrentUserId();
+        log.debug("Fetching all KB articles for picker, user: {}", currentUserId);
+        return knowledgeBaseService.getAllArticles(currentUserId);
+    }
+
+    @DgsQuery
     public CountedGenericConnection<GenericEdge<KnowledgeBaseItem>> archivedArticles(
             @InputArgument String search,
             @InputArgument List<String> tagIds,

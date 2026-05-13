@@ -73,6 +73,10 @@ public class KnowledgeBaseService {
         return repository.findByTypeOrderByNameAsc(KnowledgeBaseItemType.FOLDER);
     }
 
+    public List<KnowledgeBaseItem> getAllArticles(String currentUserId) {
+        return repository.findAllArticles(currentUserId);
+    }
+
     public List<Tag> getTagsInSubtree(String folderId) {
         List<String> articleIds = collectArticleIdsInSubtree(folderId);
         return articleIds.isEmpty()
@@ -269,6 +273,7 @@ public class KnowledgeBaseService {
             String currentUserId, KnowledgeBaseFilterCriteria filter, String search,
             List<String> restrictToItemIds, CursorPaginationCriteria normalized) {
         boolean isFirstPage = !normalized.hasCursor();
+        int limit = normalized.getLimit();
 
         List<KnowledgeBaseItem> allFolders = repository.findFoldersForParent(
                 filter.getParentId(), search, restrictToItemIds);
@@ -277,15 +282,20 @@ public class KnowledgeBaseService {
                 KnowledgeBaseItemType.ARTICLE, restrictToItemIds);
         long totalCount = allFolders.size() + articleCount;
 
-        List<KnowledgeBaseItem> displayedFolders = isFirstPage ? allFolders : List.of();
-        int articleLimit = Math.max(0, normalized.getLimit() - displayedFolders.size());
+        List<KnowledgeBaseItem> displayedFolders = isFirstPage
+                ? (allFolders.size() > limit ? allFolders.subList(0, limit) : allFolders)
+                : List.of();
+        boolean foldersTruncated = isFirstPage && allFolders.size() > displayedFolders.size();
+
+        int articleLimit = Math.max(0, limit - displayedFolders.size());
         PagedArticles paged = articleLimit > 0
                 ? fetchArticlesPage(currentUserId, filter.getParentId(), search,
                         restrictToItemIds, normalized.getCursor(), articleLimit)
                 : new PagedArticles(List.of(), false);
 
         List<KnowledgeBaseItem> combined = Stream.concat(displayedFolders.stream(), paged.items().stream()).toList();
-        PageInfo pageInfo = buildPageInfo(combined, paged.hasNextPage(), normalized.hasCursor());
+        boolean hasNextPage = paged.hasNextPage() || foldersTruncated;
+        PageInfo pageInfo = buildPageInfo(combined, hasNextPage, normalized.hasCursor());
 
         return CountedGenericQueryResult.<KnowledgeBaseItem>builder()
                 .items(combined)

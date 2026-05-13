@@ -87,6 +87,16 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
         return mongoTemplate.count(query, KnowledgeBaseItem.class);
     }
 
+    @Override
+    public List<KnowledgeBaseItem> findAllArticles(String currentUserId) {
+        Query query = new Query();
+        query.addCriteria(Criteria.where(FIELD_TYPE).is(KnowledgeBaseItemType.ARTICLE));
+        query.addCriteria(Criteria.where(FIELD_STATUS).ne(KnowledgeBaseArticleStatus.ARCHIVED));
+        query.addCriteria(buildDraftVisibilityCriteria(currentUserId));
+        query.with(Sort.by(Sort.Order.asc(FIELD_NAME), Sort.Order.desc(ID_FIELD)));
+        return mongoTemplate.find(query, KnowledgeBaseItem.class);
+    }
+
     private Query buildItemQuery(String currentUserId, String parentId, String search,
                                   KnowledgeBaseItemType type, List<String> itemIds) {
         Query query = new Query();
