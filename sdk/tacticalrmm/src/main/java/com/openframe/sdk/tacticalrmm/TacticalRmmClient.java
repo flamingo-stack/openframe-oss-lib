@@ -11,7 +11,9 @@ import com.openframe.sdk.tacticalrmm.model.AgentRegistrationSecretRequest;
 import com.openframe.sdk.tacticalrmm.model.AutomatedTaskItem;
 import com.openframe.sdk.tacticalrmm.model.CommandResult;
 import com.openframe.sdk.tacticalrmm.model.CreateScriptRequest;
+import com.openframe.sdk.tacticalrmm.model.RunScriptRequest;
 import com.openframe.sdk.tacticalrmm.model.ScriptListItem;
+import com.openframe.sdk.tacticalrmm.model.ScriptScheduleAgentsResult;
 import com.openframe.sdk.tacticalrmm.model.TacticalScheduledTask;
 import com.openframe.sdk.tacticalrmm.model.TacticalScript;
 import com.openframe.sdk.tacticalrmm.model.CreateScriptScheduleRequest;
@@ -914,6 +916,182 @@ public class TacticalRmmClient {
             failed.completeExceptionally(new TacticalRmmException("Failed to update script schedule: " + scheduleId, e));
             return failed;
         }
+    }
+
+    /**
+     * Run a saved script on an agent (POST /agents/&lt;agent_id&gt;/runscript/).
+     * Returns the raw response body as-is — Tactical returns the script's stdout
+     * (as a JSON-encoded string for {@code output=wait}, or a confirmation string
+     * for {@code output=email|collector}).
+     */
+    public CompletableFuture<String> runScriptAsync(
+            String tacticalServerUrl,
+            String apiKey,
+            String agentId,
+            RunScriptRequest request
+    ) {
+        if (tacticalServerUrl == null || tacticalServerUrl.trim().isEmpty()) {
+            return failedFuture(new IllegalArgumentException("Tactical server URL cannot be null or empty"));
+        }
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            return failedFuture(new IllegalArgumentException("API key cannot be null or empty"));
+        }
+        if (agentId == null || agentId.trim().isEmpty()) {
+            return failedFuture(new IllegalArgumentException("Agent ID cannot be null or empty"));
+        }
+        if (request == null || request.getScript() == null) {
+            return failedFuture(new IllegalArgumentException("RunScriptRequest with script id is required"));
+        }
+        try {
+            String body = objectMapper.writeValueAsString(request);
+            int httpTimeout = request.getTimeout() != null ? request.getTimeout() + 15 : 90;
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(tacticalServerUrl + "/agents/" + agentId + "/runscript/"))
+                    .POST(HttpRequest.BodyPublishers.ofString(body))
+                    .header("Content-Type", "application/json")
+                    .header("Accept", "application/json")
+                    .header("X-API-KEY", apiKey)
+                    .timeout(Duration.ofSeconds(httpTimeout))
+                    .build();
+            return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                    .thenApply(response -> {
+                        checkSuccess(response, "run TacticalRMM script", agentId);
+                        return response.body();
+                    });
+        } catch (Exception e) {
+            return failedFuture(new TacticalRmmException("Failed to run script on agent: " + agentId, e));
+        }
+    }
+
+    /**
+     * Add agents to a script schedule (POST /script-schedules/&lt;pk&gt;/agents/).
+     * Already-assigned agents are a no-op. Returns the updated counts.
+     */
+    public CompletableFuture<ScriptScheduleAgentsResult> assignAgentsToScriptScheduleAsync(
+            String tacticalServerUrl,
+            String apiKey,
+            int scheduleId,
+            List<String> agentIds
+    ) {
+        return modifyScriptScheduleAgentsAsync(tacticalServerUrl, apiKey, scheduleId, agentIds, "POST", "assign");
+    }
+
+    /**
+     * Remove agents from a script schedule (DELETE /script-schedules/&lt;pk&gt;/agents/).
+     * Stale TaskResult rows for the removed agents are deleted. Returns the updated counts.
+     */
+    public CompletableFuture<ScriptScheduleAgentsResult> unassignAgentsFromScriptScheduleAsync(
+            String tacticalServerUrl,
+            String apiKey,
+            int scheduleId,
+            List<String> agentIds
+    ) {
+        return modifyScriptScheduleAgentsAsync(tacticalServerUrl, apiKey, scheduleId, agentIds, "DELETE", "unassign");
+    }
+
+    /**
+     * Delete a saved script (DELETE /scripts/&lt;pk&gt;/).
+     */
+    public CompletableFuture<Void> deleteScriptAsync(String tacticalServerUrl, String apiKey, String scriptId) {
+        if (tacticalServerUrl == null || tacticalServerUrl.trim().isEmpty()) {
+            return failedFuture(new IllegalArgumentException("Tactical server URL cannot be null or empty"));
+        }
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            return failedFuture(new IllegalArgumentException("API key cannot be null or empty"));
+        }
+        if (scriptId == null || scriptId.trim().isEmpty()) {
+            return failedFuture(new IllegalArgumentException("Script ID cannot be null or empty"));
+        }
+        HttpRequest httpRequest = HttpRequest.newBuilder()
+                .uri(URI.create(tacticalServerUrl + "/scripts/" + scriptId + "/"))
+                .DELETE()
+                .header("Accept", "application/json")
+                .header("X-API-KEY", apiKey)
+                .timeout(Duration.ofSeconds(30))
+                .build();
+        return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    checkSuccess(response, "delete TacticalRMM script", scriptId);
+                    return null;
+                });
+    }
+
+    /**
+     * Delete a script schedule (DELETE /script-schedules/&lt;pk&gt;/).
+     * Cascades to the underlying AutomatedTask and all TaskResult rows.
+     */
+    public CompletableFuture<Void> deleteScriptScheduleAsync(String tacticalServerUrl, String apiKey, int scheduleId) {
+        if (tacticalServerUrl == null || tacticalServerUrl.trim().isEmpty()) {
+            return failedFuture(new IllegalArgumentException("Tactical server URL cannot be null or empty"));
+        }
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            return failedFuture(new IllegalArgumentException("API key cannot be null or empty"));
+        }
+        HttpRequest httpRequest = HttpRequest.newBuilder()
+                .uri(URI.create(tacticalServerUrl + "/script-schedules/" + scheduleId + "/"))
+                .DELETE()
+                .header("Accept", "application/json")
+                .header("X-API-KEY", apiKey)
+                .timeout(Duration.ofSeconds(30))
+                .build();
+        return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    checkSuccess(response, "delete TacticalRMM script schedule", String.valueOf(scheduleId));
+                    return null;
+                });
+    }
+
+    private CompletableFuture<ScriptScheduleAgentsResult> modifyScriptScheduleAgentsAsync(
+            String tacticalServerUrl,
+            String apiKey,
+            int scheduleId,
+            List<String> agentIds,
+            String httpMethod,
+            String actionName
+    ) {
+        if (tacticalServerUrl == null || tacticalServerUrl.trim().isEmpty()) {
+            return failedFuture(new IllegalArgumentException("Tactical server URL cannot be null or empty"));
+        }
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            return failedFuture(new IllegalArgumentException("API key cannot be null or empty"));
+        }
+        if (agentIds == null || agentIds.isEmpty()) {
+            return failedFuture(new IllegalArgumentException("agentIds must not be empty"));
+        }
+        try {
+            ObjectNode body = objectMapper.createObjectNode();
+            body.set("agents", objectMapper.valueToTree(agentIds));
+            String requestBody = objectMapper.writeValueAsString(body);
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
+                    .uri(URI.create(tacticalServerUrl + "/script-schedules/" + scheduleId + "/agents/"))
+                    .header("Content-Type", "application/json")
+                    .header("Accept", "application/json")
+                    .header("X-API-KEY", apiKey)
+                    .timeout(Duration.ofSeconds(30));
+            if ("POST".equals(httpMethod)) {
+                builder.POST(HttpRequest.BodyPublishers.ofString(requestBody));
+            } else {
+                builder.method("DELETE", HttpRequest.BodyPublishers.ofString(requestBody));
+            }
+            HttpRequest httpRequest = builder.build();
+            return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                    .thenApply(response -> {
+                        checkSuccess(response, actionName + " agents on TacticalRMM script schedule", String.valueOf(scheduleId));
+                        try {
+                            return objectMapper.readValue(response.body(), ScriptScheduleAgentsResult.class);
+                        } catch (Exception e) {
+                            throw new TacticalRmmException("Failed to parse script schedule agents response", e);
+                        }
+                    });
+        } catch (Exception e) {
+            return failedFuture(new TacticalRmmException("Failed to " + actionName + " agents on script schedule: " + scheduleId, e));
+        }
+    }
+
+    private static <T> CompletableFuture<T> failedFuture(Throwable t) {
+        CompletableFuture<T> failed = new CompletableFuture<>();
+        failed.completeExceptionally(t);
+        return failed;
     }
 
     private HttpRequest buildRunCommandRequest(
