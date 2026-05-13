@@ -38,6 +38,7 @@ public class RestProxyService {
     private final ReactiveIntegratedToolRepository toolRepository;
     private final ToolUpstreamResolverRegistry upstreamRegistry;
     private final ToolApiKeyHeadersResolver apiKeyHeadersResolver;
+    private final AgentDeviceAccessValidator agentDeviceAccessValidator;
 
     public Mono<ResponseEntity<String>> proxyApiRequest(String toolId, ServerHttpRequest request, String body) {
         return toolRepository.findById(toolId)
@@ -69,39 +70,52 @@ public class RestProxyService {
         return headers;
     }
 
-    /*
-     * Currently if one device have valid open-frame machine JWT token, it can send
-     * API request for other device.
-     * TODO: implement device access validation after tool connection feature is
-     * implemented.
-     * 
-     * Tactical RMM request format:
-     * - GET /{agentId}/**
-     * - POST /**
-     * {
-     * "agentId": "*",
-     * }
-     * }
-     */
-    public Mono<ResponseEntity<String>> proxyAgentRequest(String toolId, ServerHttpRequest request, String body) {
-        return toolRepository.findById(toolId)
-                .flatMap(tool -> {
-                    if (!tool.isEnabled()) {
-                        ResponseEntity<String> response = ResponseEntity.badRequest()
-                                .body("Tool " + tool.getName() + " is not enabled");
-                        return Mono.just(response);
+    public Mono<ResponseEntity<String>> proxyAgentRequest(
+            String toolId, ServerHttpRequest request, String body, String jwtMachineId) {
+        String agentToolId = extractAgentToolId(toolId, request).orElse(null);
+        return agentDeviceAccessValidator.canAccess(jwtMachineId, agentToolId)
+                .flatMap(allowed -> {
+                    if (!allowed) {
+                        log.warn("Blocked agent request: machineId={} to agentToolId={} via tool={}",
+                                jwtMachineId, agentToolId, toolId);
+                        return Mono.just(ResponseEntity.status(HttpStatus.FORBIDDEN)
+                                .<String>build());
                     }
+                    return toolRepository.findById(toolId)
+                            .flatMap(tool -> {
+                                if (!tool.isEnabled()) {
+                                    ResponseEntity<String> response = ResponseEntity.badRequest()
+                                            .body("Tool " + tool.getName() + " is not enabled");
+                                    return Mono.just(response);
+                                }
 
-                    URI targetUri = upstreamRegistry.resolve(toolId).resolveRest(tool, request, "/tools/agent");
-                    log.debug("Proxying agent request for tool: {}, url: {}", toolId, targetUri);
+                                URI targetUri = upstreamRegistry.resolve(toolId)
+                                        .resolveRest(tool, request, "/tools/agent");
+                                log.debug("Proxying agent request for tool: {}, url: {}", toolId, targetUri);
 
-                    HttpMethod method = request.getMethod();
-                    Map<String, String> headers = buildAgentRequestHeaders(request);
+                                HttpMethod method = request.getMethod();
+                                Map<String, String> headers = buildAgentRequestHeaders(request);
 
-                    return proxy(tool, targetUri, method, headers, body);
-                })
-                .switchIfEmpty(
-                        Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).body("Tool not found: " + toolId)));
+                                return proxy(tool, targetUri, method, headers, body);
+                            })
+                            .switchIfEmpty(Mono.just(
+                                    ResponseEntity.status(HttpStatus.NOT_FOUND).body("Tool not found: " + toolId)));
+                });
+    }
+
+    private java.util.Optional<String> extractAgentToolId(String toolId, ServerHttpRequest request) {
+        String path = request.getPath().value();
+        String prefix = "/tools/agent/" + toolId + "/";
+        if (!path.startsWith(prefix)) {
+            return java.util.Optional.empty();
+        }
+        String remaining = path.substring(prefix.length());
+        if (remaining.isBlank()) {
+            return java.util.Optional.empty();
+        }
+        int slashIdx = remaining.indexOf('/');
+        String agentToolId = slashIdx == -1 ? remaining : remaining.substring(0, slashIdx);
+        return agentToolId.isBlank() ? java.util.Optional.empty() : java.util.Optional.of(agentToolId);
     }
 
     private Map<String, String> buildAgentRequestHeaders(ServerHttpRequest request) {
