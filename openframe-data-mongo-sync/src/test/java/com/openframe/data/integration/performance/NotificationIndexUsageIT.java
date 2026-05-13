@@ -1,6 +1,7 @@
 package com.openframe.data.integration.performance;
 
 import com.mongodb.client.MongoCollection;
+import com.openframe.data.config.notification.NotificationIndexes;
 import com.openframe.data.document.notification.BroadcastRecipient;
 import com.openframe.data.document.notification.MachineRecipient;
 import com.openframe.data.document.notification.Notification;
@@ -50,11 +51,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 @EnabledIfSystemProperty(named = "performance.tests", matches = "true")
 class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
 
-    private static final int NOTIF_TOTAL        = Integer.getInteger("perf.notifications.count", 30_000);
-    private static final int HOT_USER_NOTIFS    = Integer.getInteger("perf.notifications.hotUser", 3_000);
-    private static final int HOT_MACHINE_NOTIFS = Integer.getInteger("perf.notifications.hotMachine", 1_000);
-    private static final int READ_STATE_TOTAL   = Integer.getInteger("perf.readStates.count", 20_000);
-    private static final int HOT_USER_READS     = Integer.getInteger("perf.readStates.hotUser", 10_000);
+    private static final int NOTIF_TOTAL          = Integer.getInteger("perf.notifications.count", 30_000);
+    private static final int HOT_USER_NOTIFS      = Integer.getInteger("perf.notifications.hotUser", 3_000);
+    private static final int HOT_MACHINE_NOTIFS   = Integer.getInteger("perf.notifications.hotMachine", 1_000);
+    private static final int HOT_BROADCAST_NOTIFS = Integer.getInteger("perf.notifications.broadcast", 50);
+    private static final int READ_STATE_TOTAL     = Integer.getInteger("perf.readStates.count", 20_000);
+    private static final int HOT_USER_READS       = Integer.getInteger("perf.readStates.hotUser", 10_000);
 
     private static final int BATCH_FLUSH_SIZE = 2_000;
 
@@ -93,7 +95,7 @@ class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
         mongoTemplate.dropCollection(Notification.class);
         mongoTemplate.dropCollection(NotificationReadState.class);
 
-        ensureIndexes(Notification.class);
+        NotificationIndexes.ensure(mongoTemplate);
         ensureIndexes(NotificationReadState.class);
 
         seedNotifications();
@@ -304,7 +306,7 @@ class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
 
     private static Query listForUserQuery(String userId, int limit) {
         Query q = new Query(new Criteria().orOperator(
-                Criteria.where("recipient.userId").is(userId),
+                Criteria.where("recipient._class").is(USER_CLASS).and("recipient.userId").is(userId),
                 Criteria.where("recipient._class").is(BROADCAST_CLASS)));
         q.with(Sort.by(Sort.Direction.DESC, "_id"));
         q.limit(limit);
@@ -313,7 +315,7 @@ class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
 
     private static Query listForUserSearchQuery(String userId, String search, int limit) {
         Query q = new Query(new Criteria().orOperator(
-                Criteria.where("recipient.userId").is(userId),
+                Criteria.where("recipient._class").is(USER_CLASS).and("recipient.userId").is(userId),
                 Criteria.where("recipient._class").is(BROADCAST_CLASS)));
         q.addCriteria(Criteria.where("title").regex(java.util.regex.Pattern.quote(search), "i"));
         q.with(Sort.by(Sort.Direction.DESC, "_id"));
@@ -323,7 +325,7 @@ class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
 
     private static Query countForUserQuery(String userId) {
         return new Query(new Criteria().orOperator(
-                Criteria.where("recipient.userId").is(userId),
+                Criteria.where("recipient._class").is(USER_CLASS).and("recipient.userId").is(userId),
                 Criteria.where("recipient._class").is(BROADCAST_CLASS)));
     }
 
@@ -335,7 +337,7 @@ class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
 
     private static Query listForMachineQuery(String machineId, int limit) {
         Query q = new Query(new Criteria().orOperator(
-                Criteria.where("recipient.machineId").is(machineId),
+                Criteria.where("recipient._class").is(MACHINE_CLASS).and("recipient.machineId").is(machineId),
                 Criteria.where("recipient._class").is(BROADCAST_CLASS)));
         q.with(Sort.by(Sort.Direction.DESC, "_id"));
         q.limit(limit);
@@ -377,10 +379,11 @@ class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
         inserter.flush();
     }
 
-    private record Target(String userId, String machineId) {
-        static Target hotUser()        { return new Target(HOT_USER, null); }
-        static Target hotMachine()     { return new Target(null, HOT_MACHINE); }
-        static Target noise(int index) { return new Target("user-noise-" + (index % 100), null); }
+    private record Target(String userId, String machineId, boolean isBroadcast) {
+        static Target hotUser()        { return new Target(HOT_USER, null, false); }
+        static Target hotMachine()     { return new Target(null, HOT_MACHINE, false); }
+        static Target broadcast()      { return new Target(null, null, true); }
+        static Target noise(int index) { return new Target("user-noise-" + (index % 100), null, false); }
     }
 
     private static Target targetFor(int index) {
@@ -389,6 +392,9 @@ class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
         }
         if (index < HOT_USER_NOTIFS + HOT_MACHINE_NOTIFS) {
             return Target.hotMachine();
+        }
+        if (index < HOT_USER_NOTIFS + HOT_MACHINE_NOTIFS + HOT_BROADCAST_NOTIFS) {
+            return Target.broadcast();
         }
         return Target.noise(index);
     }
@@ -400,7 +406,9 @@ class NotificationIndexUsageIT extends BaseMongoIntegrationTest {
                 .append("title", title)
                 .append("createdAt", new Date())
                 .append("context", new Document("type", "welcome").append("payload", "{}"));
-        if (target.userId() != null) {
+        if (target.isBroadcast()) {
+            doc.append("recipient", new Document("_class", BROADCAST_CLASS));
+        } else if (target.userId() != null) {
             doc.append("recipient", new Document("_class", USER_CLASS).append("userId", target.userId()));
         } else if (target.machineId() != null) {
             doc.append("recipient", new Document("_class", MACHINE_CLASS).append("machineId", target.machineId()));

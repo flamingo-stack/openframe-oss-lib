@@ -1,5 +1,6 @@
 package com.openframe.api.integration.support;
 
+import com.openframe.data.document.notification.BroadcastRecipient;
 import com.openframe.data.document.notification.GenericContext;
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.UserRecipient;
@@ -26,6 +27,15 @@ public final class NotificationFixtures {
                 .title(type)
                 .createdAt(Instant.now())
                 .context(GenericContext.builder().type(type).payload("{}").build())
+                .build();
+    }
+
+    public static Notification broadcast(String type, String payload) {
+        return Notification.builder()
+                .recipient(new BroadcastRecipient())
+                .title(type)
+                .createdAt(Instant.now())
+                .context(GenericContext.builder().type(type).payload(payload).build())
                 .build();
     }
 }

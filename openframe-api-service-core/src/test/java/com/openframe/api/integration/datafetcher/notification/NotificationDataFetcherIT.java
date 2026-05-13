@@ -499,9 +499,9 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
         }
 
         @Test
-        @DisplayName("Given Alice marks a notification read via the mutation, when Bob marks the same notification, then Bob's first call still returns true — read state is scoped to the JWT principal")
-        void given_alice_marks_via_mutation_when_bob_marks_same_then_bobs_first_call_returns_true() {
-            Notification saved = repository.save(NotificationFixtures.basic(ALICE));
+        @DisplayName("Given Alice marks a broadcast read via the mutation, when Bob marks the same broadcast, then both marks succeed independently — read state is scoped to the JWT principal")
+        void given_alice_marks_broadcast_via_mutation_when_bob_marks_same_then_both_succeed() {
+            Notification saved = repository.save(NotificationFixtures.broadcast("tenant-announcement", "{}"));
             String relayId = RELAY.toGlobalId("Notification", saved.getId());
 
             queryExecutor.executeAndExtractJsonPath(
@@ -511,6 +511,14 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
             assertThat(readStateService.markRead(ALICE, saved.getId())).isFalse();
 
             assertThat(readStateService.markRead(BOB, saved.getId())).isTrue();
+        }
+
+        @Test
+        @DisplayName("Given a user-recipient notification belonging to Alice, when Bob attempts to mark it, then the call is refused — audience check protects per-user inbox")
+        void given_alice_user_recipient_when_bob_marks_then_refused() {
+            Notification saved = repository.save(NotificationFixtures.basic(ALICE));
+
+            assertThat(readStateService.markRead(BOB, saved.getId())).isFalse();
         }
 
         @Test

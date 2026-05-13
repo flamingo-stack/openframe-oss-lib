@@ -151,6 +151,36 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
                     .hasMessageContaining("type");
             assertThat(repository.count()).isZero();
         }
+
+        @Test
+        @DisplayName("Given a UserRecipient with a null userId, when creating, then validation rejects pre-save")
+        void given_blank_user_recipient_when_creating_then_validation_rejects() {
+            Notification badUser = Notification.builder()
+                    .recipient(new UserRecipient(null))
+                    .title("Hi")
+                    .context(GenericContext.builder().type("welcome").payload("{}").build())
+                    .build();
+
+            assertThatThrownBy(() -> service.create(badUser))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("userId");
+            assertThat(repository.count()).isZero();
+        }
+
+        @Test
+        @DisplayName("Given a MachineRecipient with a blank machineId, when creating, then validation rejects pre-save")
+        void given_blank_machine_recipient_when_creating_then_validation_rejects() {
+            Notification badMachine = Notification.builder()
+                    .recipient(new com.openframe.data.document.notification.MachineRecipient("   "))
+                    .title("Hi")
+                    .context(GenericContext.builder().type("welcome").payload("{}").build())
+                    .build();
+
+            assertThatThrownBy(() -> service.create(badMachine))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("machineId");
+            assertThat(repository.count()).isZero();
+        }
     }
 
     @Nested
@@ -638,13 +668,21 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         }
 
         @Test
-        @DisplayName("Given Alice marks a notification read, when Bob marks the same notification read, then Bob's first call still returns true — read state is per-user")
-        void given_alice_marks_read_when_bob_marks_same_then_bob_first_call_returns_true() {
-            Notification saved = repository.save(NotificationFixtures.basic(ALICE));
+        @DisplayName("Given Alice marks a tenant broadcast read, when Bob marks the same broadcast read, then Bob's first call still returns true — read state is per-user")
+        void given_alice_marks_broadcast_when_bob_marks_same_then_bob_first_call_returns_true() {
+            Notification saved = repository.save(NotificationFixtures.broadcast("tenant-announcement", "{}"));
 
             service.markRead(ALICE, saved.getId());
 
             assertThat(service.markRead(BOB, saved.getId())).isTrue();
+        }
+
+        @Test
+        @DisplayName("Given a user-recipient notification belonging to Alice, when Bob attempts to mark it, then the call is refused — audience check protects per-user inbox")
+        void given_alice_user_recipient_when_bob_marks_then_refused() {
+            Notification saved = repository.save(NotificationFixtures.basic(ALICE));
+
+            assertThat(service.markRead(BOB, saved.getId())).isFalse();
         }
     }
 

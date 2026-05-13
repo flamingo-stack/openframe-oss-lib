@@ -4,7 +4,6 @@ import com.openframe.core.exception.NatsException;
 import com.openframe.data.document.notification.BroadcastRecipient;
 import com.openframe.data.document.notification.MachineRecipient;
 import com.openframe.data.document.notification.Notification;
-import com.openframe.data.document.notification.Recipient;
 import com.openframe.data.document.notification.UserRecipient;
 import com.openframe.data.nats.model.NotificationMessage;
 import lombok.RequiredArgsConstructor;
@@ -13,7 +12,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import static java.lang.String.format;
-import static org.apache.commons.lang3.StringUtils.isBlank;
 
 @Component
 @RequiredArgsConstructor
@@ -35,7 +33,7 @@ public class NotificationNatsPublisher {
         try {
             natsMessagePublisher.publishPersistent(buildTopic(notification), buildMessage(notification));
         } catch (NatsException ex) {
-            // Mongo is source of truth; clients reconcile missed live deliveries via GraphQL catch-up.
+
             log.warn("JetStream publish failed for notification {}: {}", notification.getId(), ex.getMessage());
         }
 
@@ -53,21 +51,10 @@ public class NotificationNatsPublisher {
     }
 
     private String buildTopic(Notification notification) {
-        Recipient recipient = notification.getRecipient();
-        if (recipient == null) {
-            throw new IllegalStateException("Notification recipient must not be null");
-        }
-        return switch (recipient) {
-            case UserRecipient(String userId) -> format(USER_TOPIC_TEMPLATE, requireId(userId, "UserRecipient", "userId"));
-            case MachineRecipient(String machineId) -> format(MACHINE_TOPIC_TEMPLATE, requireId(machineId, "MachineRecipient", "machineId"));
+        return switch (notification.getRecipient()) {
+            case UserRecipient(String userId) -> format(USER_TOPIC_TEMPLATE, userId);
+            case MachineRecipient(String machineId) -> format(MACHINE_TOPIC_TEMPLATE, machineId);
             case BroadcastRecipient ignored -> BROADCAST_TOPIC;
         };
-    }
-
-    private static String requireId(String value, String typeName, String fieldName) {
-        if (isBlank(value)) {
-            throw new IllegalStateException(typeName + " requires non-blank " + fieldName);
-        }
-        return value;
     }
 }

@@ -1,8 +1,10 @@
 package com.openframe.data.integration.document.notification;
 
+import com.openframe.data.config.notification.NotificationIndexes;
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.integration.BaseMongoIntegrationTest;
 import com.openframe.data.integration.support.IntegrationTestApplication;
+import org.bson.Document;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -10,13 +12,9 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.index.IndexInfo;
-import org.springframework.data.mongodb.core.index.IndexOperations;
-import org.springframework.data.mongodb.core.index.MongoPersistentEntityIndexResolver;
 
-import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -29,31 +27,51 @@ class NotificationIndexesIT extends BaseMongoIntegrationTest {
     private MongoTemplate mongoTemplate;
 
     @Test
-    @DisplayName("Given the Notification entity, when indexes are resolved, then all compound indexes exist with the expected key shape")
+    @DisplayName("Given the Notification entity, when indexes are resolved, then all three partial compound indexes exist with the expected key shape and partial filter")
     void given_notification_entity_when_indexes_resolved_then_all_compound_indexes_exist() {
-        IndexOperations indexOps = mongoTemplate.indexOps(Notification.class);
-        new MongoPersistentEntityIndexResolver(mongoTemplate.getConverter().getMappingContext())
-                .resolveIndexFor(Notification.class)
-                .forEach(indexOps::ensureIndex);
+        NotificationIndexes.ensure(mongoTemplate);
 
-        List<IndexInfo> indexes = indexOps.getIndexInfo();
-
-        Map<String, IndexInfo> byName = indexes.stream()
-                .collect(Collectors.toMap(IndexInfo::getName, i -> i));
+        Map<String, Document> byName = listIndexes();
 
         assertThat(byName).containsKeys(
-                "recipient_user_id",
-                "recipient_machine_id",
-                "recipient_class_id");
+                NotificationIndexes.USER_INDEX,
+                NotificationIndexes.MACHINE_INDEX,
+                NotificationIndexes.CLASS_INDEX);
 
-        assertThat(byName.get("recipient_user_id").getIndexFields())
-                .extracting("key")
-                .containsExactly("recipient.userId", "_id");
-        assertThat(byName.get("recipient_machine_id").getIndexFields())
-                .extracting("key")
-                .containsExactly("recipient.machineId", "_id");
-        assertThat(byName.get("recipient_class_id").getIndexFields())
-                .extracting("key")
-                .containsExactly("recipient._class", "_id");
+        assertIndex(byName, NotificationIndexes.USER_INDEX,
+                new Document("recipient.userId", 1).append("_id", -1),
+                new Document("recipient._class", NotificationIndexes.USER_CLASS));
+
+        assertIndex(byName, NotificationIndexes.MACHINE_INDEX,
+                new Document("recipient.machineId", 1).append("_id", -1),
+                new Document("recipient._class", NotificationIndexes.MACHINE_CLASS));
+
+        assertIndex(byName, NotificationIndexes.CLASS_INDEX,
+                new Document("recipient._class", 1).append("_id", -1),
+                new Document("recipient._class", NotificationIndexes.BROADCAST_CLASS));
+    }
+
+    private Map<String, Document> listIndexes() {
+        Map<String, Document> result = new HashMap<>();
+        String collection = Notification.class.getAnnotation(
+                org.springframework.data.mongodb.core.mapping.Document.class).collection();
+        for (Document idx : mongoTemplate.getCollection(collection).listIndexes()) {
+            result.put(idx.getString("name"), idx);
+        }
+        return result;
+    }
+
+    private static void assertIndex(Map<String, Document> byName,
+                                    String name,
+                                    Document expectedKey,
+                                    Document expectedPartialFilter) {
+        Document idx = byName.get(name);
+        assertThat(idx).as("index %s should exist", name).isNotNull();
+        assertThat(idx.get("key", Document.class))
+                .as("index %s should have keys in the expected order", name)
+                .isEqualTo(expectedKey);
+        assertThat(idx.get("partialFilterExpression", Document.class))
+                .as("index %s should have the expected partial filter", name)
+                .isEqualTo(expectedPartialFilter);
     }
 }

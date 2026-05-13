@@ -1,6 +1,9 @@
 package com.openframe.data.integration.performance;
 
 import com.mongodb.client.MongoCollection;
+import com.openframe.data.config.notification.NotificationIndexes;
+import com.openframe.data.document.notification.BroadcastRecipient;
+import com.openframe.data.document.notification.MachineRecipient;
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.UserRecipient;
 import com.openframe.data.integration.BaseMongoIntegrationTest;
@@ -22,7 +25,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.index.MongoPersistentEntityIndexResolver;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 
@@ -46,8 +48,15 @@ class NotificationLoadTestIT extends BaseMongoIntegrationTest {
     private static final int[] HOT_SLICES = {100, 1_000, 10_000, 100_000};
     private static final int BATCH_FLUSH_SIZE = 5_000;
     private static final int NOISE_USERS = 50_000;
+    private static final double BROADCAST_FRACTION =
+            Double.parseDouble(System.getProperty("notification.loadtest.broadcastFraction", "0.01"));
+    private static final double MACHINE_FRACTION =
+            Double.parseDouble(System.getProperty("notification.loadtest.machineFraction", "0.04"));
+    private static final int NOISE_MACHINES = 10_000;
     private static final String NOTIFS_COLL = "notifications";
     private static final String USER_CLASS = UserRecipient.class.getName();
+    private static final String MACHINE_CLASS = MachineRecipient.class.getName();
+    private static final String BROADCAST_CLASS = BroadcastRecipient.class.getName();
     private static final Path REPORT_DIR = Path.of("target", "perf-results");
 
     @Autowired private MongoTemplate mongoTemplate;
@@ -58,10 +67,7 @@ class NotificationLoadTestIT extends BaseMongoIntegrationTest {
     @BeforeAll
     void seed() {
         mongoTemplate.dropCollection(Notification.class);
-        var indexOps = mongoTemplate.indexOps(Notification.class);
-        new MongoPersistentEntityIndexResolver(mongoTemplate.getConverter().getMappingContext())
-                .resolveIndexFor(Notification.class)
-                .forEach(indexOps::ensureIndex);
+        NotificationIndexes.ensure(mongoTemplate);
 
         BatchInserter inserter = new BatchInserter(mongoTemplate.getCollection(NOTIFS_COLL));
 
@@ -76,14 +82,28 @@ class NotificationLoadTestIT extends BaseMongoIntegrationTest {
         }
 
         int remaining = Math.max(0, TOTAL - seeded);
-        for (int i = 0; i < remaining; i++) {
+        int broadcastCount = (int) Math.round(remaining * BROADCAST_FRACTION);
+        int machineCount   = (int) Math.round(remaining * MACHINE_FRACTION);
+        int noiseCount     = remaining - broadcastCount - machineCount;
+
+        for (int i = 0; i < broadcastCount; i++) {
+            inserter.add(broadcastDoc("bcast-" + i));
+        }
+        for (int i = 0; i < machineCount; i++) {
+            inserter.add(machineDoc("machine-" + (i % NOISE_MACHINES), "machine-evt-" + i));
+        }
+        for (int i = 0; i < noiseCount; i++) {
             inserter.add(notificationDoc("noise-" + (i % NOISE_USERS), "noise-" + i));
         }
         inserter.flush();
 
         long actual = mongoTemplate.getCollection(NOTIFS_COLL).countDocuments();
-        log.info("seed complete: requested={}, actual={}", TOTAL, actual);
-        recorder.withMeta("actualDocCount", actual);
+        log.info("seed complete: requested={}, actual={}, user/machine/broadcast={}/{}/{}",
+                TOTAL, actual, seeded + noiseCount, machineCount, broadcastCount);
+        recorder.withMeta("actualDocCount", actual)
+                .withMeta("userCount", seeded + noiseCount)
+                .withMeta("machineCount", machineCount)
+                .withMeta("broadcastCount", broadcastCount);
     }
 
     @AfterAll
@@ -192,22 +212,102 @@ class NotificationLoadTestIT extends BaseMongoIntegrationTest {
         assertThat(total).isGreaterThanOrEqualTo(0L);
     }
 
+    @Test
+    @DisplayName("Collection + per-index size report — captures collStats so sizing can be tracked across schema changes")
+    void report_collection_and_index_sizes() {
+        Document stats = mongoTemplate.getDb().runCommand(new Document("collStats", NOTIFS_COLL));
+
+        long count          = number(stats, "count");
+        long dataSize       = number(stats, "size");
+        long storageSize    = number(stats, "storageSize");
+        long totalIndexSize = number(stats, "totalIndexSize");
+
+        double compressionRatio = storageSize == 0 ? 0 : (double) dataSize / storageSize;
+
+        recorder.record("Collection size",
+                "docs", count,
+                "data size (uncompressed BSON)", humanBytes(dataSize),
+                "storage size (WT compressed)", humanBytes(storageSize),
+                "compression ratio", String.format("%.1fx", compressionRatio),
+                "total index size", humanBytes(totalIndexSize));
+
+        long userCount      = mongoTemplate.getCollection(NOTIFS_COLL)
+                .countDocuments(new Document("recipient.userId", new Document("$exists", true)));
+        long machineCount   = mongoTemplate.getCollection(NOTIFS_COLL)
+                .countDocuments(new Document("recipient.machineId", new Document("$exists", true)));
+        long broadcastCount = mongoTemplate.getCollection(NOTIFS_COLL)
+                .countDocuments(new Document("recipient._class", BROADCAST_CLASS));
+
+        Document indexSizes = stats.get("indexSizes", Document.class);
+        indexSizes.forEach((name, sizeObj) -> {
+            long size = ((Number) sizeObj).longValue();
+            long bucketCount = indexedDocCountFor(name, count, userCount, machineCount, broadcastCount);
+            long bytesPerEntry = bucketCount == 0 ? 0 : size / bucketCount;
+            long bytesPerTotalDoc = count == 0 ? 0 : size / count;
+
+            recorder.record("Per-index size",
+                    "name", name,
+                    "size", humanBytes(size),
+                    "bytes", size,
+                    "indexed entries", bucketCount,
+                    "bytes / indexed entry", bytesPerEntry,
+                    "bytes / total doc", bytesPerTotalDoc);
+        });
+
+        log.info("[INDEX-SIZING] {} docs ({} user / {} machine / {} broadcast); total index size {}; index breakdown: {}",
+                count, userCount, machineCount, broadcastCount, humanBytes(totalIndexSize), indexSizes.toJson());
+
+        assertThat(count).isGreaterThan(0L);
+    }
+
+    private static long indexedDocCountFor(String indexName,
+                                           long total,
+                                           long userCount,
+                                           long machineCount,
+                                           long broadcastCount) {
+        return switch (indexName) {
+            case NotificationIndexes.USER_INDEX    -> userCount;
+            case NotificationIndexes.MACHINE_INDEX -> machineCount;
+            case NotificationIndexes.CLASS_INDEX   -> broadcastCount;
+            default -> total;
+        };
+    }
+
+    private static long number(Document doc, String field) {
+        Number n = doc.get(field, Number.class);
+        return n == null ? 0 : n.longValue();
+    }
+
+    private static String humanBytes(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        double kib = bytes / 1024.0;
+        if (kib < 1024) return String.format("%.1f KiB", kib);
+        double mib = kib / 1024.0;
+        if (mib < 1024) return String.format("%.1f MiB", mib);
+        double gib = mib / 1024.0;
+        return String.format("%.2f GiB", gib);
+    }
+
     private static String filterJson(Query q) {
         return q.getQueryObject().toJson();
     }
 
     private static Query listForUserSearchQuery(String userId, String search, int limit) {
-        Query q = new Query(Criteria.where("recipient.userId").is(userId));
-        q.addCriteria(Criteria.where("recipient._class").is(USER_CLASS));
+        Query q = new Query(userAudience(userId));
         q.addCriteria(Criteria.where("title").regex(Pattern.quote(search), "i"));
         q.with(Sort.by(Sort.Direction.DESC, "_id"));
         q.limit(limit);
         return q;
     }
 
+    private static Criteria userAudience(String userId) {
+        return new Criteria().orOperator(
+                Criteria.where("recipient._class").is(USER_CLASS).and("recipient.userId").is(userId),
+                Criteria.where("recipient._class").is(BROADCAST_CLASS));
+    }
+
     private static Query countForUserQuery(String userId) {
-        return new Query(Criteria.where("recipient.userId").is(userId)
-                .and("recipient._class").is(USER_CLASS));
+        return new Query(userAudience(userId));
     }
 
     private static Query countForUserSearchQuery(String userId, String search) {
@@ -220,6 +320,26 @@ class NotificationLoadTestIT extends BaseMongoIntegrationTest {
         return new Document()
                 .append("_id", new ObjectId())
                 .append("recipient", new Document("_class", USER_CLASS).append("userId", userId))
+                .append("severity", "INFO")
+                .append("title", title)
+                .append("createdAt", new Date())
+                .append("context", new Document("type", "evt").append("payload", "{}"));
+    }
+
+    private static Document broadcastDoc(String title) {
+        return new Document()
+                .append("_id", new ObjectId())
+                .append("recipient", new Document("_class", BROADCAST_CLASS))
+                .append("severity", "INFO")
+                .append("title", title)
+                .append("createdAt", new Date())
+                .append("context", new Document("type", "evt").append("payload", "{}"));
+    }
+
+    private static Document machineDoc(String machineId, String title) {
+        return new Document()
+                .append("_id", new ObjectId())
+                .append("recipient", new Document("_class", MACHINE_CLASS).append("machineId", machineId))
                 .append("severity", "INFO")
                 .append("title", title)
                 .append("createdAt", new Date())

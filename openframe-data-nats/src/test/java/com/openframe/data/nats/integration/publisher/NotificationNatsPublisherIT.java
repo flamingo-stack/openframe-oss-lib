@@ -211,32 +211,6 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
-    @Test
-    @DisplayName("Given a UserRecipient with a blank userId, when publishing, then IllegalStateException is raised — invariants enforced before any send")
-    void user_recipient_without_user_id_throws() {
-        Notification badUser = persisted(Notification.builder()
-                .recipient(new UserRecipient(null))
-                .title("missing user id")
-                .context(GenericContext.builder().type("evt").payload("{}").build()));
-
-        assertThatThrownBy(() -> publisher.publish(badUser))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("userId");
-    }
-
-    @Test
-    @DisplayName("Given a MachineRecipient with a blank machineId, when publishing, then IllegalStateException is raised")
-    void machine_recipient_without_machine_id_throws() {
-        Notification badMachine = persisted(Notification.builder()
-                .recipient(new MachineRecipient("   "))
-                .title("missing machine id")
-                .context(GenericContext.builder().type("evt").payload("{}").build()));
-
-        assertThatThrownBy(() -> publisher.publish(badMachine))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("machineId");
-    }
-
     private static Notification persisted(Notification.NotificationBuilder builder) {
         return builder.id("not-" + System.nanoTime()).build();
     }
@@ -246,7 +220,7 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
         try {
             jsm.deleteStream(STREAM);
         } catch (JetStreamApiException ignored) {
-            // stream did not exist
+
         }
         jsm.addStream(StreamConfiguration.builder()
                 .name(STREAM)
@@ -259,7 +233,7 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
         try {
             nats.jetStreamManagement().deleteStream(STREAM);
         } catch (JetStreamApiException ignored) {
-            // stream did not exist
+
         }
     }
 }

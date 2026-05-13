@@ -1,7 +1,9 @@
 package com.openframe.data.repository.notification.impl;
 
 import com.openframe.data.document.notification.BroadcastRecipient;
+import com.openframe.data.document.notification.MachineRecipient;
 import com.openframe.data.document.notification.Notification;
+import com.openframe.data.document.notification.UserRecipient;
 import com.openframe.data.repository.notification.CustomNotificationRepository;
 import lombok.RequiredArgsConstructor;
 import org.bson.Document;
@@ -30,6 +32,8 @@ public class CustomNotificationRepositoryImpl implements CustomNotificationRepos
     private static final String FIELD_RECIPIENT_USER_ID = "recipient.userId";
     private static final String FIELD_RECIPIENT_MACHINE_ID = "recipient.machineId";
     private static final String FIELD_RECIPIENT_CLASS = "recipient._class";
+    private static final String USER_CLASS = UserRecipient.class.getName();
+    private static final String MACHINE_CLASS = MachineRecipient.class.getName();
     private static final String BROADCAST_CLASS = BroadcastRecipient.class.getName();
     private static final String READ_STATE_COLLECTION = "notification_read_states";
     private static final String NOTIFICATIONS_COLLECTION = "notifications";
@@ -60,14 +64,14 @@ public class CustomNotificationRepositoryImpl implements CustomNotificationRepos
     public List<Notification> findPageForMachine(String machineId, String search,
                                                  String cursor, boolean backward, int limit) {
         Criteria audience = new Criteria().orOperator(
-                Criteria.where(FIELD_RECIPIENT_MACHINE_ID).is(machineId),
+                Criteria.where(FIELD_RECIPIENT_CLASS).is(MACHINE_CLASS).and(FIELD_RECIPIENT_MACHINE_ID).is(machineId),
                 Criteria.where(FIELD_RECIPIENT_CLASS).is(BROADCAST_CLASS));
         return findPage(audience, search, cursor, backward, limit);
     }
 
     private static Criteria userAudience(String userId) {
         return new Criteria().orOperator(
-                Criteria.where(FIELD_RECIPIENT_USER_ID).is(userId),
+                Criteria.where(FIELD_RECIPIENT_CLASS).is(USER_CLASS).and(FIELD_RECIPIENT_USER_ID).is(userId),
                 Criteria.where(FIELD_RECIPIENT_CLASS).is(BROADCAST_CLASS));
     }
 
