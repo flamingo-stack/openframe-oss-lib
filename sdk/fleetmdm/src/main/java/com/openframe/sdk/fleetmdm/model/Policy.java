@@ -3,6 +3,8 @@ package com.openframe.sdk.fleetmdm.model;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.util.List;
+
 /**
  * Policy model from Fleet MDM representing a compliance policy
  */
@@ -44,6 +46,13 @@ public class Policy {
 
     @JsonProperty("failing_host_count")
     private Long failingHostCount;
+
+    /**
+     * Read-only list of hosts assigned to this policy. Populated by Fleet
+     * when running in openframe mode (see api-host-assignments docs).
+     */
+    @JsonProperty("hosts_include_any")
+    private List<AssignedHost> hostsIncludeAny;
 
     // Getters and setters
 
@@ -173,5 +182,13 @@ public class Policy {
 
     public void setFailingHostCount(Long failingHostCount) {
         this.failingHostCount = failingHostCount;
+    }
+
+    public List<AssignedHost> getHostsIncludeAny() {
+        return hostsIncludeAny;
+    }
+
+    public void setHostsIncludeAny(List<AssignedHost> hostsIncludeAny) {
+        this.hostsIncludeAny = hostsIncludeAny;
     }
 }

@@ -3,6 +3,8 @@ package com.openframe.sdk.fleetmdm.model;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.util.List;
+
 /**
  * Query model from Fleet MDM representing a saved query or scheduled query
  */
@@ -61,6 +63,13 @@ public class Query {
     
     @JsonProperty("stats")
     private QueryStats stats;
+
+    /**
+     * Read-only list of hosts assigned to this saved/scheduled query. Populated by Fleet
+     * when running in openframe mode (see api-host-assignments docs).
+     */
+    @JsonProperty("hosts_include_any")
+    private List<AssignedHost> hostsIncludeAny;
 
     // Getters and setters
     
@@ -222,6 +231,14 @@ public class Query {
 
     public void setStats(QueryStats stats) {
         this.stats = stats;
+    }
+
+    public List<AssignedHost> getHostsIncludeAny() {
+        return hostsIncludeAny;
+    }
+
+    public void setHostsIncludeAny(List<AssignedHost> hostsIncludeAny) {
+        this.hostsIncludeAny = hostsIncludeAny;
     }
 
     /**
