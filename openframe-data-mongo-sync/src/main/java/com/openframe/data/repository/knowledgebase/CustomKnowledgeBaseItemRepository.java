@@ -20,4 +20,6 @@ public interface CustomKnowledgeBaseItemRepository {
                                                   String cursor, int limit);
 
     long countArchivedArticles(String currentUserId, String search, List<String> itemIds);
+
+    List<KnowledgeBaseItem> findAllArticles(String currentUserId);
 }
