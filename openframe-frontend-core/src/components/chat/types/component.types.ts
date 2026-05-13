@@ -2,7 +2,7 @@
  * Component prop types
  */
 
-import type { ButtonHTMLAttributes, ComponentType, HTMLAttributes, TextareaHTMLAttributes } from 'react'
+import type { ComponentType, HTMLAttributes, TextareaHTMLAttributes } from 'react'
 import type { AssistantType, AuthorType, ChatApprovalStatus, ConnectionStatus } from './chat.types'
 import type { ApprovalRequestData, Message, MessageSegment, ToolExecutionData } from './message.types'
 import type { ChatRef } from '../chat-ref.types'
@@ -242,7 +242,7 @@ export interface ChatTypingIndicatorProps extends HTMLAttributes<HTMLDivElement>
 
 // ========== Tool Execution Display Props ==========
 
-export interface ToolExecutionDisplayProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+export interface ToolExecutionDisplayProps extends HTMLAttributes<HTMLDivElement> {
   message: ToolExecutionData
 }
 

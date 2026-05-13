@@ -6,6 +6,7 @@ import { SquareAvatar } from "../ui/square-avatar"
 import { ChatTypingIndicator } from "./chat-typing-indicator"
 import { ToolExecutionDisplay } from "./tool-execution-display"
 import { ApprovalRequestMessage } from "./approval-request-message"
+import { ApprovalBatchMessage } from "./approval-batch-message"
 import { ErrorMessageDisplay } from "./error-message-display"
 import { ContextCompactionDisplay } from "./context-compaction-display"
 import { ThinkingDisplay } from "./thinking-display"
@@ -196,6 +197,16 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                 } else if (segment.type === 'approval_request') {
                   return (
                     <ApprovalRequestMessage
+                      key={index}
+                      data={segment.data}
+                      status={segment.status}
+                      onApprove={segment.onApprove}
+                      onReject={segment.onReject}
+                    />
+                  )
+                } else if (segment.type === 'approval_batch') {
+                  return (
+                    <ApprovalBatchMessage
                       key={index}
                       data={segment.data}
                       status={segment.status}

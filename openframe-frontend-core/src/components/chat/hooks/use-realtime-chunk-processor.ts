@@ -12,7 +12,8 @@ import {
   createMessageSegmentAccumulator,
 } from '../utils/message-segment-accumulator'
 import { MESSAGE_TYPE } from '../types'
-import type { UseRealtimeChunkProcessorReturn, UseRealtimeChunkProcessorOptions, ChatApprovalStatus } from '../types'
+import type { UseRealtimeChunkProcessorReturn, UseRealtimeChunkProcessorOptions, ChatApprovalStatus, PendingToolCallData } from '../types'
+import { getCommandText } from '../utils/tool-call-helpers'
 
 /**
  * Hook for processing real-time NATS chunks into message segments
@@ -20,7 +21,17 @@ import type { UseRealtimeChunkProcessorReturn, UseRealtimeChunkProcessorOptions,
 export function useRealtimeChunkProcessor(
   options: UseRealtimeChunkProcessorOptions
 ): UseRealtimeChunkProcessorReturn {
-  const { callbacks, displayApprovalTypes = ['CLIENT'], approvalStatuses = {}, initialState, enableThinking = false } = options
+  const {
+    callbacks,
+    displayApprovalTypes = ['CLIENT'],
+    approvalStatuses = {},
+    initialState,
+    enableThinking = false,
+    // Owned by the consumer (e.g. oss-tenant chat client / openframe-frontend
+    // tickets view). Default ON so consumers that haven't wired the flag yet
+    // get the new batch UI; pass `false` explicitly to fall back to legacy.
+    batchApprovalsEnabled = true,
+  } = options
 
   const accumulatorRef = useRef<MessageSegmentAccumulator>(
     createMessageSegmentAccumulator({
@@ -50,10 +61,10 @@ export function useRealtimeChunkProcessor(
 
   const isInStreamRef = useRef(false)
 
-  // Track pending escalated approvals
-  const pendingEscalatedRef = useRef<Map<string, { command: string; explanation?: string; approvalType: string }>>(
-    new Map()
-  )
+  // Track pending escalated approvals (single or batch)
+  const pendingEscalatedRef = useRef<
+    Map<string, { command: string; explanation?: string; approvalType: string; toolCalls?: PendingToolCallData[] }>
+  >(new Map())
 
   const processChunk = useCallback(
     (chunk: unknown) => {
@@ -128,28 +139,106 @@ export function useRealtimeChunkProcessor(
           break
         }
 
+        case 'approval_batch': {
+          const { requestId, approvalType, toolCalls } = action
+          const status = (approvalStatuses[requestId] || 'pending') as ChatApprovalStatus
+
+          if (!displayApprovalTypes.includes(approvalType)) {
+            // Escalated: keep batch context locally for replay on result; surface a
+            // summary command via the legacy escalation callback.
+            const required = toolCalls.find((c) => c.requiresApproval) ?? toolCalls[0]
+            const summary = required ? getCommandText(required) : `Batch of ${toolCalls.length} tool calls`
+            pendingEscalatedRef.current.set(requestId, {
+              command: summary,
+              explanation: required?.toolExplanation,
+              approvalType,
+              toolCalls,
+            })
+            callbacks.onEscalatedApproval?.(requestId, {
+              command: summary,
+              explanation: required?.toolExplanation,
+              approvalType,
+            })
+            break
+          }
+
+          if (batchApprovalsEnabled) {
+            const segments = accumulator.addApprovalBatch(requestId, approvalType, toolCalls, status)
+            callbacks.onSegmentsUpdate?.(segments)
+            break
+          }
+
+          // Flag OFF — unfold batch into N legacy approval cards. They share
+          // `requestId`, so a click on any will approve the whole batch via a
+          // single backend call, and the resulting APPROVAL_RESULT chunk will
+          // flip status on every matching segment (see updateApprovalStatus).
+          let segments = accumulator.getSegments()
+          for (const call of toolCalls) {
+            if (!call.requiresApproval) continue
+            segments = accumulator.addApprovalRequest(
+              requestId,
+              getCommandText(call),
+              call.toolExplanation,
+              approvalType,
+              status,
+            )
+          }
+          callbacks.onSegmentsUpdate?.(segments)
+          break
+        }
+
         case 'approval_result': {
           const { requestId, approved, approvalType } = action
           const escalatedData = pendingEscalatedRef.current.get(requestId)
+          const status: ChatApprovalStatus = approved ? 'approved' : 'rejected'
+
           if (escalatedData) {
             pendingEscalatedRef.current.delete(requestId)
-            callbacks.onEscalatedApprovalResult?.(requestId, approved, escalatedData)
+            callbacks.onEscalatedApprovalResult?.(requestId, approved, {
+              command: escalatedData.command,
+              explanation: escalatedData.explanation,
+              approvalType: escalatedData.approvalType,
+            })
 
-            const segments = accumulator.addApprovalRequest(
-              requestId,
-              escalatedData.command,
-              escalatedData.explanation,
-              escalatedData.approvalType,
-              approved ? 'approved' : 'rejected'
-            )
-            callbacks.onSegmentsUpdate?.(segments)
+            if (escalatedData.toolCalls && escalatedData.toolCalls.length > 0) {
+              if (batchApprovalsEnabled) {
+                const segments = accumulator.addApprovalBatch(
+                  requestId,
+                  escalatedData.approvalType,
+                  escalatedData.toolCalls,
+                  status,
+                )
+                callbacks.onSegmentsUpdate?.(segments)
+              } else {
+                let segments = accumulator.getSegments()
+                for (const call of escalatedData.toolCalls) {
+                  if (!call.requiresApproval) continue
+                  segments = accumulator.addApprovalRequest(
+                    requestId,
+                    getCommandText(call),
+                    call.toolExplanation,
+                    escalatedData.approvalType,
+                    status,
+                  )
+                }
+                callbacks.onSegmentsUpdate?.(segments)
+              }
+            } else {
+              const segments = accumulator.addApprovalRequest(
+                requestId,
+                escalatedData.command,
+                escalatedData.explanation,
+                escalatedData.approvalType,
+                status,
+              )
+              callbacks.onSegmentsUpdate?.(segments)
+            }
           } else {
-            const segments = accumulator.updateApprovalStatus(
-              requestId,
-              approved ? 'approved' : 'rejected'
-            )
+            const segments = accumulator.updateApprovalStatus(requestId, status)
             callbacks.onSegmentsUpdate?.(segments)
           }
+          // approvalType from the result is informational; not consumed downstream yet.
+          void approvalType
           break
         }
 

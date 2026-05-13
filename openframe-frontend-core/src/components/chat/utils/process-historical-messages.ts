@@ -7,13 +7,16 @@ import {
   MESSAGE_TYPE,
   OWNER_TYPE,
   type AuthorType,
+  type ChatApprovalStatus,
   type HistoricalMessage,
+  type PendingToolCallData,
   type ProcessedMessage,
   type MessageProcessingOptions,
   type MessageData,
   type MessageOwner,
 } from '../types'
 import { MessageSegmentAccumulator, createMessageSegmentAccumulator } from './message-segment-accumulator'
+import { getCommandText } from './tool-call-helpers'
 
 function getOwnerDisplayName(owner?: MessageOwner): string {
   if (owner?.type === OWNER_TYPE.ADMIN && owner.user) {
@@ -48,7 +51,10 @@ function pushStandaloneMessages(
  */
 export interface ProcessHistoricalMessagesResult {
   messages: ProcessedMessage[]
-  escalatedApprovals: Map<string, { command: string; explanation?: string; approvalType: string }>
+  escalatedApprovals: Map<
+    string,
+    { command: string; explanation?: string; approvalType: string; toolCalls?: PendingToolCallData[] }
+  >
 }
 
 /**
@@ -71,7 +77,10 @@ export function processHistoricalMessages(
 
   const processedMessages: ProcessedMessage[] = []
   const accumulator = createMessageSegmentAccumulator({ onApprove, onReject })
-  const escalatedApprovals = new Map<string, { command: string; explanation?: string; approvalType: string }>()
+  const escalatedApprovals = new Map<
+    string,
+    { command: string; explanation?: string; approvalType: string; toolCalls?: PendingToolCallData[] }
+  >()
   
   let currentAssistantId: string | null = null
   let currentAssistantTimestamp: Date | null = null
@@ -192,9 +201,15 @@ function processMessageData(
   accumulator: MessageSegmentAccumulator,
   approvalStatuses: Record<string, string>,
   options: MessageProcessingOptions = {},
-  escalatedApprovals?: Map<string, { command: string; explanation?: string; approvalType: string }>
+  escalatedApprovals?: Map<
+    string,
+    { command: string; explanation?: string; approvalType: string; toolCalls?: PendingToolCallData[] }
+  >
 ): void {
-  const { displayApprovalTypes } = options
+  // batchApprovalsEnabled is owned by the consumer (oss-tenant chat client /
+  // openframe-frontend tickets). Defaults to ON so consumers that haven't
+  // wired the flag yet get the batch UI; pass `false` to force legacy.
+  const { displayApprovalTypes, batchApprovalsEnabled = true } = options
   switch (data.type) {
     case MESSAGE_TYPE.TEXT:
       if ('text' in data && data.text) {
@@ -217,6 +232,7 @@ function processMessageData(
             integratedToolType: data.integratedToolType || '',
             toolFunction: data.toolFunction || '',
             parameters: data.parameters,
+            toolExecutionRequestId: data.toolExecutionRequestId,
           },
         })
       }
@@ -233,6 +249,7 @@ function processMessageData(
             parameters: data.parameters,
             result: data.result,
             success: data.success,
+            toolExecutionRequestId: data.toolExecutionRequestId,
           },
         })
       }
@@ -241,18 +258,42 @@ function processMessageData(
     case MESSAGE_TYPE.APPROVAL_REQUEST:
       if ('approvalRequestId' in data && data.approvalRequestId) {
         const approvalType = data.approvalType || 'CLIENT'
+        const toolCalls: PendingToolCallData[] | undefined = Array.isArray(data.toolCalls)
+          ? data.toolCalls
+          : undefined
+        const isBatch = !!toolCalls && toolCalls.length > 0
 
         if (!displayApprovalTypes || displayApprovalTypes.includes(approvalType)) {
-          accumulator.trackApprovalRequest(data.approvalRequestId, {
-            command: data.command || '',
-            explanation: data.explanation,
-            approvalType,
-          })
+          if (isBatch) {
+            const status = (approvalStatuses[data.approvalRequestId] as ChatApprovalStatus) || 'pending'
+            if (batchApprovalsEnabled) {
+              accumulator.addApprovalBatch(data.approvalRequestId, approvalType, toolCalls!, status)
+            } else {
+              // Flag OFF — unfold batch into N legacy approval cards (same id).
+              for (const call of toolCalls!) {
+                if (!call.requiresApproval) continue
+                accumulator.addApprovalRequest(
+                  data.approvalRequestId,
+                  getCommandText(call),
+                  call.toolExplanation,
+                  approvalType,
+                  status,
+                )
+              }
+            }
+          } else {
+            accumulator.trackApprovalRequest(data.approvalRequestId, {
+              command: data.command || '',
+              explanation: data.explanation,
+              approvalType,
+            })
+          }
         } else {
           escalatedApprovals?.set(data.approvalRequestId, {
             command: data.command || '',
             explanation: data.explanation,
             approvalType,
+            ...(isBatch ? { toolCalls } : {}),
           })
         }
       }
@@ -260,9 +301,33 @@ function processMessageData(
 
     case MESSAGE_TYPE.APPROVAL_RESULT:
       if ('approvalRequestId' in data && data.approvalRequestId) {
-        const existingStatus = approvalStatuses[data.approvalRequestId]
-        const status = existingStatus || (data.approved ? 'approved' : 'rejected')
+        const existingStatus = approvalStatuses[data.approvalRequestId] as ChatApprovalStatus | undefined
+        const status: ChatApprovalStatus = existingStatus || (data.approved ? 'approved' : 'rejected')
         const escalatedData = escalatedApprovals?.get(data.approvalRequestId)
+
+        if (escalatedData?.toolCalls && escalatedData.toolCalls.length > 0) {
+          if (batchApprovalsEnabled) {
+            accumulator.addApprovalBatch(
+              data.approvalRequestId,
+              escalatedData.approvalType,
+              escalatedData.toolCalls,
+              status,
+            )
+          } else {
+            for (const call of escalatedData.toolCalls) {
+              if (!call.requiresApproval) continue
+              accumulator.addApprovalRequest(
+                data.approvalRequestId,
+                getCommandText(call),
+                call.toolExplanation,
+                escalatedData.approvalType,
+                status,
+              )
+            }
+          }
+          escalatedApprovals?.delete(data.approvalRequestId)
+          break
+        }
 
         if (escalatedData) {
           accumulator.trackApprovalRequest(data.approvalRequestId, {
@@ -272,7 +337,14 @@ function processMessageData(
           })
           escalatedApprovals?.delete(data.approvalRequestId)
         }
-        
+
+        // If a segment with this id is already present (batch or legacy), just flip its status.
+        // updateApprovalStatus matches both `approval_batch` and `approval_request` segments.
+        const before = accumulator.getSegments()
+        const after = accumulator.updateApprovalStatus(data.approvalRequestId, status)
+        const updatedExisting = before.some((s, i) => after[i] !== s)
+        if (updatedExisting) break
+
         accumulator.processApprovalResult(
           data.approvalRequestId,
           status === 'approved',
@@ -364,7 +436,10 @@ export function processHistoricalMessagesWithErrors(
 
   const processedMessages: ProcessedMessage[] = []
   const accumulator = createMessageSegmentAccumulator({ onApprove, onReject })
-  const escalatedApprovals = new Map<string, { command: string; explanation?: string; approvalType: string }>()
+  const escalatedApprovals = new Map<
+    string,
+    { command: string; explanation?: string; approvalType: string; toolCalls?: PendingToolCallData[] }
+  >()
 
   let currentAssistantId: string | null = null
   let currentAssistantTimestamp: Date | null = null
