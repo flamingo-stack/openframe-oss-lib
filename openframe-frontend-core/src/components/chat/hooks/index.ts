@@ -2,5 +2,6 @@
 
 export * from './use-chunk-catchup'
 export * from './use-collapsible'
+export * from './use-delayed-flag'
 export * from './use-nats-dialog-subscription'
 export * from './use-realtime-chunk-processor'

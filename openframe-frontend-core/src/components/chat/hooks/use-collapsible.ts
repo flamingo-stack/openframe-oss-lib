@@ -35,9 +35,18 @@ export function useCollapsible({
     return () => observer.disconnect()
   }, [element, collapsedHeight])
 
+  // When the caller asks for `"1lh"`, fall back to a measured pixel value
+  // (inner element's line-height) as soon as it's available. Setting
+  // `max-height: 1lh` via CSS resolves against the OUTER element's
+  // line-height, which can differ from the inner content's line-height and
+  // leak the top of the next block element past the clip line. The measured
+  // pixel value matches the inner content exactly.
+  const collapsedValue: number | string =
+    collapsedHeight === "1lh" ? collapsedPx || collapsedHeight : collapsedHeight
+
   const containerStyle: CSSProperties = {
     overflow: "hidden",
-    maxHeight: expanded ? contentHeight : collapsedHeight,
+    maxHeight: expanded ? contentHeight : collapsedValue,
     transition: disableTransition ? "none" : `max-height ${durationMs}ms ease-in-out`,
   }
 

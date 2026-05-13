@@ -3,7 +3,7 @@
  * Contains types for message parsing, accumulation, and processing
  */
 
-import type { MessageSegment, ProcessedMessage, ToolExecutionSegment, TokenUsageData } from './message.types'
+import type { MessageSegment, ProcessedMessage, ToolExecutionSegment, TokenUsageData, PendingToolCallData } from './message.types'
 import type { ChatApprovalStatus, AssistantType } from './chat.types'
 import type { ChunkData, NatsMessageType } from './network.types'
 
@@ -18,6 +18,7 @@ export type ParsedChunkAction =
   | { action: 'thinking'; text: string }
   | { action: 'tool_execution'; segment: ToolExecutionSegment }
   | { action: 'approval_request'; requestId: string; command: string; explanation?: string; approvalType: string }
+  | { action: 'approval_batch'; requestId: string; approvalType: string; toolCalls: PendingToolCallData[] }
   | { action: 'approval_result'; requestId: string; approved: boolean; approvalType: string }
   | { action: 'message_request'; text: string; ownerType?: string; displayName?: string }
   | { action: 'token_usage'; data: TokenUsageData }
@@ -43,7 +44,10 @@ export interface AccumulatorState {
     toolFunction: string
     parameters?: Record<string, any>
   }>
-  escalatedApprovals?: Map<string, { command: string; explanation?: string; approvalType: string }>
+  escalatedApprovals?: Map<
+    string,
+    { command: string; explanation?: string; approvalType: string; toolCalls?: PendingToolCallData[] }
+  >
 }
 
 // ========== Message Processing Options ==========
@@ -65,6 +69,13 @@ export interface MessageProcessingOptions {
   approvalStatuses?: Record<string, ChatApprovalStatus>
   /** Approval types to display directly (others get escalated) - defaults to all types */
   displayApprovalTypes?: string[]
+  /**
+   * Consumer-owned. Forwarded by the host app (e.g. oss-tenant chat client
+   * reads its `'batch-approvals'` feature flag and passes it down). The lib
+   * defaults to legacy single-card rendering when this is omitted — it will
+   * not enable the batch UI on its own.
+   */
+  batchApprovalsEnabled?: boolean
 }
 
 // ========== Chunk Processing Types ==========

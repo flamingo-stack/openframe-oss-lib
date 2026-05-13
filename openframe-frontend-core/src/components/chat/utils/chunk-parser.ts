@@ -2,7 +2,26 @@
  * Utilities for parsing NATS chunks into structured actions
  */
 
-import { MESSAGE_TYPE, type ChunkData, type ParsedChunkAction, type ToolExecutionSegment } from '../types'
+import { MESSAGE_TYPE, type ChunkData, type ParsedChunkAction, type ToolExecutionSegment, type PendingToolCallData } from '../types'
+
+function normalizeToolCalls(raw: unknown): PendingToolCallData[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .filter((item): item is Record<string, any> => !!item && typeof item === 'object')
+    .map((item) => ({
+      toolExecutionRequestId: String(item.toolExecutionRequestId ?? ''),
+      toolName: String(item.toolName ?? ''),
+      toolTitle: typeof item.toolTitle === 'string' ? item.toolTitle : undefined,
+      toolExplanation: typeof item.toolExplanation === 'string' ? item.toolExplanation : undefined,
+      toolType: typeof item.toolType === 'string' ? item.toolType : undefined,
+      requiresApproval: item.requiresApproval === true,
+      approvalType: typeof item.approvalType === 'string' ? item.approvalType : null,
+      toolCallArguments:
+        item.toolCallArguments && typeof item.toolCallArguments === 'object'
+          ? (item.toolCallArguments as Record<string, any>)
+          : null,
+    }))
+}
 
 /**
  * Parse a raw NATS chunk into a structured action
@@ -56,10 +75,11 @@ export function parseChunkToAction(chunk: unknown): ParsedChunkAction | null {
             integratedToolType: data.integratedToolType || '',
             toolFunction: data.toolFunction || '',
             parameters: data.parameters,
+            toolExecutionRequestId: typeof data.toolExecutionRequestId === 'string' ? data.toolExecutionRequestId : undefined,
           }
         }
       }
-      
+
     case MESSAGE_TYPE.EXECUTED_TOOL:
       return {
         action: 'tool_execution',
@@ -72,18 +92,33 @@ export function parseChunkToAction(chunk: unknown): ParsedChunkAction | null {
             parameters: data.parameters,
             result: data.result,
             success: data.success,
+            toolExecutionRequestId: typeof data.toolExecutionRequestId === 'string' ? data.toolExecutionRequestId : undefined,
           }
         }
       }
       
-    case MESSAGE_TYPE.APPROVAL_REQUEST:
+    case MESSAGE_TYPE.APPROVAL_REQUEST: {
+      const requestId = data.approvalRequestId || data.approval_request_id || ''
+      const approvalType = data.approvalType || 'USER'
+      const toolCalls = normalizeToolCalls(data.toolCalls)
+
+      if (toolCalls.length > 0) {
+        return {
+          action: 'approval_batch',
+          requestId,
+          approvalType,
+          toolCalls,
+        }
+      }
+
       return {
         action: 'approval_request',
-        requestId: data.approvalRequestId || data.approval_request_id || '',
+        requestId,
         command: data.command || '',
         explanation: data.explanation,
-        approvalType: data.approvalType || 'USER',
+        approvalType,
       }
+    }
       
     case MESSAGE_TYPE.APPROVAL_RESULT:
       return {

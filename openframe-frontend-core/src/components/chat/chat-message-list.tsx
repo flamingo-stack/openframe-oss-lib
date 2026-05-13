@@ -4,7 +4,9 @@ import { useRef, useEffect, useLayoutEffect, useImperativeHandle, forwardRef } f
 import { useStickToBottom } from "use-stick-to-bottom"
 import { cn } from "../../utils/cn"
 import { ChatMessageEnhanced } from "./chat-message-enhanced"
-import { ChatMessageListSkeleton } from "./chat-message-skeleton"
+import { ChatMessageListLoader } from "./chat-message-loader"
+import { useDelayedFlag } from "./hooks/use-delayed-flag"
+import { PulseDots } from "../ui/pulse-dots"
 import type { ChatMessageListProps } from "./types"
 
 /*
@@ -209,14 +211,17 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     // MutableRefObject<HTMLElement> so we cast to the public type.
     useImperativeHandle(ref, () => scrollRef.current as HTMLDivElement, [scrollRef])
 
-    if (isLoading) {
+    // Gate the loader: only show after 200ms (fast loads never flicker),
+    // and once shown, hold for at least 400ms (no sub-frame flash if data
+    // arrives a moment later).
+    const showLoader = useDelayedFlag(isLoading, { delay: 200, minDuration: 400 })
+
+    if (showLoader) {
       return (
-        <ChatMessageListSkeleton
+        <ChatMessageListLoader
           className={className}
-          showAvatars={showAvatars}
+          assistantIcon={assistantIcon}
           assistantType={assistantType}
-          contentClassName={contentClassName}
-          messageCount={6}
         />
       )
     }
@@ -262,8 +267,19 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
             )}
             style={{ minHeight: '100%' }}
           >
+            {/* Infinite scroll sentinel + loader for older pages */}
             {hasNextPage && (
               <div ref={sentinelRef} className="h-px" />
+            )}
+            {isFetchingNextPage && (
+              <div
+                className="flex justify-center py-3 animate-in fade-in duration-200"
+                role="status"
+                aria-live="polite"
+                aria-busy="true"
+              >
+                <PulseDots size="sm" />
+              </div>
             )}
             <div className="flex-1" />
             {messages.map((message, index) => (
