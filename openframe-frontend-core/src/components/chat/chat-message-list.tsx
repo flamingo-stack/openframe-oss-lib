@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useEffect, useLayoutEffect, useImperativeHandle, forwardRef } from "react"
+import { useRef, useState, useEffect, useLayoutEffect, useImperativeHandle, forwardRef } from "react"
 import { useStickToBottom } from "use-stick-to-bottom"
 import { cn } from "../../utils/cn"
 import { ChatMessageEnhanced } from "./chat-message-enhanced"
@@ -66,17 +66,27 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     // `resize: 'smooth'` — during streaming, content grows token-by-
     // token; library uses spring physics to follow the bottom for a
     // ChatGPT/Claude.ai-like feel (vs jarring instant snaps).
-    // `initial: false` — DON'T auto-scroll on mount; our dialog-change
-    // effect below owns first-paint positioning so re-opening a chat
-    // with prior history lands at the bottom without a smooth-scroll
-    // animation playing over the cold-paint.
+    // `initial: 'instant'` — snap to bottom on first mount BEFORE
+    // browser paint. Without this, a page reload that lands on a long
+    // history would briefly paint the top of the list (oldest msgs)
+    // before any post-paint effect could run `scrollTop = bottom`. The
+    // library writes scrollTop in the commit phase, so the first paint
+    // is already at the bottom.
     const { scrollRef, contentRef, scrollToBottom } = useStickToBottom({
       resize: 'smooth',
-      initial: false,
+      initial: 'instant',
     })
 
     // ---- Prepend / load-more state (NOT owned by the library) --------
-    const sentinelRef = useRef<HTMLDivElement>(null)
+    // `scrollEl` and `sentinelEl` are STATE, not refs, so the load-more
+    // effect re-runs when either element mounts/unmounts. This is the
+    // critical fix for the reload pagination bug: when the loader is
+    // showing, the scroll container is unmounted (`scrollRef.current ==
+    // null`); when the loader disappears later, neither `hasNextPage`
+    // nor `messages.length` changes — but `scrollEl` flips from null to
+    // the new element, which re-runs the effect.
+    const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null)
+    const [sentinelEl, setSentinelEl] = useState<HTMLDivElement | null>(null)
     const onLoadMoreRef = useRef(onLoadMore)
     onLoadMoreRef.current = onLoadMore
     const isFetchingRef = useRef(isFetchingNextPage)
@@ -102,8 +112,20 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     }>({ firstMessageId: undefined, firstMessageContent: undefined, scrollHeight: 0 })
 
     // ---- Force-stick: dialog change / first-load / new user message --
-    useEffect(() => {
-      if (!autoScroll) return
+    // `useLayoutEffect` so the scrollTop write lands BEFORE browser
+    // paint — otherwise a dialog switch with prior history flashes the
+    // top of the list (oldest msgs) for one frame before snapping down.
+    //
+    // Critical: gate on `scrollEl` (state, not ref). When `useDelayedFlag`
+    // is showing the loader, the scroll container is UNMOUNTED. If we
+    // ran the snap-logic during the loader phase, `scrollToBottom` would
+    // no-op AND `prevRenderRef` would record the new dialog/count — so
+    // when the loader finally hides and the container remounts, we'd
+    // think "no dialog change" and never snap. By depending on
+    // `scrollEl`, this effect re-runs the moment the container mounts
+    // and catches up on any transition that happened during the loader.
+    useLayoutEffect(() => {
+      if (!autoScroll || !scrollEl) return
 
       const dialogChanged = dialogId !== prevRenderRef.current.dialogId
       const prevCount = prevRenderRef.current.messageCount
@@ -137,7 +159,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         // already keeps the bottom locked when the user hasn't
         // escaped. No explicit call needed; spring animation runs.
       }
-    }, [autoScroll, messages, dialogId, scrollToBottom])
+    }, [autoScroll, messages, dialogId, scrollToBottom, scrollEl])
 
     // ---- Prepend anchoring (load-older) ------------------------------
     // The library doesn't preserve user position when content prepends
@@ -146,7 +168,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     // user on the same message they were reading. `useLayoutEffect`
     // so the scrollTop write lands before paint (no visible jump).
     useLayoutEffect(() => {
-      const el = scrollRef.current
+      const el = scrollEl
       if (!el) {
         prependRef.current = { firstMessageId: undefined, firstMessageContent: undefined, scrollHeight: 0 }
         return
@@ -182,29 +204,53 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       if (currentFirstContent !== prependRef.current.firstMessageContent) {
         prependRef.current.firstMessageContent = currentFirstContent
       }
-    }, [messages, scrollRef])
+    }, [messages, scrollEl])
 
     // ---- Load-more (infinite-scroll UP) ------------------------------
-    // Distinct from stick-to-bottom; uses its own IntersectionObserver
-    // on the top sentinel.
+    // Distinct from stick-to-bottom. Two mechanisms in parallel:
+    //  1. IntersectionObserver on the top sentinel — cheap, fires when
+    //     the sentinel actually enters the viewport (± rootMargin).
+    //  2. Scroll-listener fallback (200px from top) — covers the race
+    //     where IO mounts before the sentinel/scroll container has its
+    //     final geometry on page reload, and the case where the user
+    //     reaches the top on a chat that initially had `hasNextPage`
+    //     undefined (cache cold). Both call `onLoadMoreRef.current` and
+    //     guard with `isFetchingRef` so a double-fire is a single fetch.
+    // Deps include `messages.length` so the effect re-binds once content
+    // actually renders (fixes the case where the first commit has
+    // hasNextPage=true but sentinel ref isn't yet attached).
     useEffect(() => {
-      const scrollContainer = scrollRef.current
-      const sentinelElement = sentinelRef.current
-      if (!scrollContainer || !sentinelElement || !hasNextPage) return
+      const scrollContainer = scrollEl
+      const sentinelElement = sentinelEl
+      if (!scrollContainer || !hasNextPage) return
 
-      const observer = new IntersectionObserver(
-        (entries) => {
-          const entry = entries[0]
-          if (!entry) return
-          if (entry.isIntersecting && !isFetchingRef.current) {
-            onLoadMoreRef.current?.()
-          }
-        },
-        { root: scrollContainer, rootMargin: '200px', threshold: 0.1 },
-      )
-      observer.observe(sentinelElement)
-      return () => observer.disconnect()
-    }, [hasNextPage, scrollRef])
+      const tryLoad = () => {
+        if (isFetchingRef.current) return
+        onLoadMoreRef.current?.()
+      }
+
+      let observer: IntersectionObserver | undefined
+      if (sentinelElement) {
+        observer = new IntersectionObserver(
+          (entries) => {
+            const entry = entries[0]
+            if (entry?.isIntersecting) tryLoad()
+          },
+          { root: scrollContainer, rootMargin: '200px', threshold: 0.1 },
+        )
+        observer.observe(sentinelElement)
+      }
+
+      const onScroll = () => {
+        if (scrollContainer.scrollTop <= 200) tryLoad()
+      }
+      scrollContainer.addEventListener('scroll', onScroll, { passive: true })
+
+      return () => {
+        observer?.disconnect()
+        scrollContainer.removeEventListener('scroll', onScroll)
+      }
+    }, [hasNextPage, scrollEl, sentinelEl, messages.length])
 
     // Expose the scroll container ref to parents that need it (rare,
     // but the existing public contract). Library's `scrollRef` is a
@@ -243,6 +289,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     // the cleanup return path in any meaningful way for the public hook.
     const setScrollRef = (el: HTMLDivElement | null): void => {
       scrollRef(el)
+      setScrollEl(el)
     }
     const setContentRef = (el: HTMLDivElement | null): void => {
       contentRef(el)
@@ -269,7 +316,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
           >
             {/* Infinite scroll sentinel + loader for older pages */}
             {hasNextPage && (
-              <div ref={sentinelRef} className="h-px" />
+              <div ref={setSentinelEl} className="h-px" />
             )}
             {isFetchingNextPage && (
               <div
