@@ -2,7 +2,6 @@
 
 import { Button } from '../../ui/button/button'
 import { TicketStatusTag, getTicketStatusConfig } from '../../ui/ticket-status-tag'
-import { getReadableTextColor } from '../../../utils/ods-color-utils'
 import { Arrow02LeftIcon, Arrow02RightIcon, PlusIcon } from '../../icons-v2-generated'
 import type { BoardColumnDef } from './types'
 
@@ -19,7 +18,6 @@ export function BoardColumnHeader({
   onToggleCollapse,
   onAddTicket,
 }: BoardColumnHeaderProps) {
-  const textColor = getReadableTextColor(column.color)
   const count = column.total ?? column.tickets.length
   const useStatusVariant = !!getTicketStatusConfig(column.id).icon
 
@@ -35,12 +33,12 @@ export function BoardColumnHeader({
         >
           <Arrow02RightIcon className="h-6 w-6 text-ods-text-secondary" />
         </Button>
-        <div
-          className="inline-flex items-center justify-center whitespace-nowrap rounded-md p-[var(--spacing-system-xsf)] text-h5 rotate-180"
-          style={{ backgroundColor: column.color, color: textColor, writingMode: 'vertical-rl' }}
-        >
-          {column.label}
-        </div>
+        <TicketStatusTag
+          status={column.id}
+          label={column.label}
+          color={useStatusVariant ? undefined : column.color}
+          className="h-auto [writing-mode:vertical-rl]"
+        />
         <span className="text-h5" style={{ color: column.color }}>
           {count}
         </span>
