@@ -30,8 +30,9 @@
  *   layout="native"   → intrinsic aspect ratio. Bites grid, blog cards.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import MuxPlayer from '@mux/mux-player-react';
+import { PlayIcon } from '../icons-v2-generated/media-playback/play-icon';
 
 // =============================================================================
 // URL classifiers (private — `<Video>` is the only consumer)
@@ -338,6 +339,26 @@ interface YouTubeFacadeInnerProps {
   minimalControls?: boolean;
 }
 
+const YT_NOCOOKIE_ORIGIN = 'https://www.youtube-nocookie.com';
+
+// YouTube IFrame Player API state codes — documented integers.
+// https://developers.google.com/youtube/iframe_api_reference#Playback_status
+const YT_STATE_ENDED = 0;
+const YT_STATE_PLAYING = 1;
+
+// Sub-second delay before we blur the iframe after PLAYING. Zero would
+// cancel YouTube's mount-time "controls visible" intro flash entirely
+// (jarring); ~1s lets the user briefly see playback started, then we
+// kick YouTube's internal idle timer by removing DOM focus from the
+// iframe. Net result: controls fade ~1s after playback begins,
+// matching the user-locked target.
+const YT_PLAYING_BLUR_DELAY_MS = 1000;
+
+interface YouTubeInfoDeliveryMessage {
+  event?: string;
+  info?: { playerState?: number };
+}
+
 function YouTubeFacadeInner({
   videoId,
   title,
@@ -346,92 +367,124 @@ function YouTubeFacadeInner({
   minimalControls,
 }: YouTubeFacadeInnerProps): React.ReactElement {
   const [activated, setActivated] = useState(false);
-  // Wrapper ref used by the outside-click dismissal — clicks inside this
-  // box keep the iframe mounted; clicks anywhere else tear the iframe
-  // down so YouTube's persistent native controls go with it.
-  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
-  const embedParams = new URLSearchParams({
-    autoplay: '1',
-    rel: '0',
-    modestbranding: '1',
-    playsinline: '1',
-  });
-  if (minimalControls) {
-    embedParams.set('controls', '0');
-    embedParams.set('showinfo', '0');
-    embedParams.set('fs', '0');
-    embedParams.set('iv_load_policy', '3');
-    embedParams.set('cc_load_policy', '0');
-    embedParams.set('disablekb', '1');
-  }
-  const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?${embedParams.toString()}`;
-  const posterJpg = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
-  const posterWebp = `https://i.ytimg.com/vi_webp/${videoId}/mqdefault.webp`;
-
-  // Outside-click dismissal — when the iframe is mounted, listen for any
-  // pointerdown on the document. Clicks INSIDE the wrapper bubble through
-  // the iframe DOM element but never reach our handler when they occur on
-  // YouTube's own UI (the iframe is a separate browsing context, so
-  // pointer events fired inside it don't propagate to our document).
-  // Clicks OUTSIDE the wrapper fire here normally — we tear down the
-  // iframe by flipping `activated` to false. The iframe unmounts, taking
-  // YouTube's persistent native controls with it. A second click on the
-  // play poster re-mounts the iframe with `autoplay=1` (a user gesture,
-  // so iOS Safari + Chrome autoplay restrictions are satisfied).
+  // Embed URL + poster URLs only change when `videoId` or `minimalControls`
+  // do — memoize so we don't rebuild URLSearchParams on every render.
   //
-  // We hook `pointerdown` (not `click`) so the dismissal feels instant —
-  // by the time `click` fires the user has already seen the controls
-  // overlay another beat.
+  // `enablejsapi=1` opens the postMessage state channel we subscribe to
+  // below — without it, YouTube ignores `event:listening` messages and
+  // we can't detect PLAYING / ENDED to drive the auto-hide accelerator.
+  const { embedUrl, posterJpg, posterWebp } = useMemo(() => {
+    const params = new URLSearchParams({
+      autoplay: '1',
+      rel: '0',
+      modestbranding: '1',
+      playsinline: '1',
+      enablejsapi: '1',
+    });
+    if (minimalControls) {
+      params.set('controls', '0');
+      params.set('fs', '0');
+      params.set('iv_load_policy', '3');
+      params.set('cc_load_policy', '0');
+      params.set('disablekb', '1');
+    }
+    return {
+      embedUrl: `${YT_NOCOOKIE_ORIGIN}/embed/${videoId}?${params.toString()}`,
+      posterJpg: `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
+      posterWebp: `https://i.ytimg.com/vi_webp/${videoId}/mqdefault.webp`,
+    };
+  }, [videoId, minimalControls]);
+
+  // ---------------------------------------------------------------------------
+  // YouTube control-fade accelerator (user-locked target: ~1s).
+  //
+  // YouTube's native idle timer for the bottom control bar is 5–10s when
+  // the iframe holds DOM focus. The IFrame Player API has no public
+  // `hideControls` command (full `func` list verified — none expose
+  // visibility). The one legal lever from outside the iframe is
+  // `iframe.blur()`, which kicks YouTube into its post-focus idle path
+  // (~2s minimum).
+  //
+  // Subscribe to YouTube's state channel via the documented lite-mode
+  // postMessage handshake — no full `iframe_api.js` library needed:
+  // <https://developers.google.com/youtube/iframe_api_reference>.
+  //
+  //   - PLAYING (1) arrives once autoplay kicks in. Wait ~1s (so the user
+  //     briefly sees that the player started), then blur the iframe so
+  //     YouTube's idle timer fires immediately.
+  //
+  //   - ENDED (0) → tear down the iframe. Playback is already over so
+  //     there's nothing to interrupt, and removing the iframe kills the
+  //     residual "More videos" suggestion grid YouTube leaves on screen.
+  //
+  // PAUSED (2) is deliberately unhandled — the user paused on purpose,
+  // leave YouTube's UI alone so they can resume.
+  //
+  // Playback is NEVER stopped by anything in this facade. Outside-click,
+  // Escape, tab-switch — all no-ops. The only state flip is on natural
+  // end-of-video (ENDED).
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!activated) return;
+    const iframe = iframeRef.current;
+    if (!iframe) return;
 
-    function handleOutsideClick(event: PointerEvent) {
-      const target = event.target as Node | null;
-      if (!target) return;
-      if (wrapperRef.current?.contains(target)) return;
-      setActivated(false);
+    function subscribe() {
+      iframe?.contentWindow?.postMessage(
+        '{"event":"listening"}',
+        YT_NOCOOKIE_ORIGIN,
+      );
     }
 
-    document.addEventListener('pointerdown', handleOutsideClick);
-    return () => document.removeEventListener('pointerdown', handleOutsideClick);
-  }, [activated]);
+    iframe.addEventListener('load', subscribe);
+    subscribe();
 
-  // Escape-key dismissal — keyboard users should have parity with the
-  // pointer outside-click. Same tear-down semantics.
-  useEffect(() => {
-    if (!activated) return;
+    let blurTimer: ReturnType<typeof setTimeout> | null = null;
 
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') setActivated(false);
+    function handleMessage(event: MessageEvent) {
+      if (event.origin !== YT_NOCOOKIE_ORIGIN) return;
+      if (typeof event.data !== 'string') return;
+      let payload: YouTubeInfoDeliveryMessage | null = null;
+      try {
+        payload = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      if (!payload || payload.event !== 'infoDelivery') return;
+      const state = payload.info?.playerState;
+      if (typeof state !== 'number') return;
+
+      if (state === YT_STATE_PLAYING) {
+        if (blurTimer !== null) return;
+        blurTimer = setTimeout(() => {
+          blurTimer = null;
+          iframeRef.current?.blur();
+        }, YT_PLAYING_BLUR_DELAY_MS);
+        return;
+      }
+      if (state === YT_STATE_ENDED) {
+        setActivated(false);
+      }
     }
 
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
+    window.addEventListener('message', handleMessage);
+    return () => {
+      iframe.removeEventListener('load', subscribe);
+      window.removeEventListener('message', handleMessage);
+      if (blurTimer !== null) clearTimeout(blurTimer);
+    };
   }, [activated]);
 
-  // Early-return rendering. The previous imperative implementation
-  // (`document.createElement('iframe')` + state flip) had a subtle bug
-  // where the play-button overlay could linger past activation because
-  // React's commit phase and the imperative DOM mutation raced. Two
-  // mutually-exclusive return paths eliminate that race entirely — when
-  // `activated` flips, React unmounts the button branch and mounts the
-  // iframe branch in a single commit.
-  //
-  // Autoplay on iOS Safari: the user gesture (the button's onClick) and
-  // the iframe mount happen in the SAME React commit, which flushes
-  // synchronously inside event handlers. iOS treats the iframe insertion
-  // as still being inside the user-activation tick, so `autoplay=1` plays.
-  // (Verified empirically; lite-youtube-embed uses imperative DOM for
-  // legacy-React compatibility — modern React's sync-commit-on-event
-  // makes the JSX path equivalent.)
   const wrapperClass = `relative w-full ${className ?? ''}`;
   const wrapperStyle = { paddingBottom: '56.25%' as const };
 
   if (activated) {
     return (
-      <div ref={wrapperRef} className={wrapperClass} style={wrapperStyle}>
+      <div className={wrapperClass} style={wrapperStyle}>
         <iframe
+          ref={iframeRef}
           src={embedUrl}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen
@@ -443,7 +496,7 @@ function YouTubeFacadeInner({
   }
 
   return (
-    <div ref={wrapperRef} className={wrapperClass} style={wrapperStyle}>
+    <div className={wrapperClass} style={wrapperStyle}>
       <button
         type="button"
         aria-label={`Play: ${title}`}
@@ -463,9 +516,7 @@ function YouTubeFacadeInner({
         </picture>
         <div className="absolute inset-0 flex items-center justify-center bg-ods-bg-inverse bg-opacity-20 transition-opacity duration-200 group-hover:bg-opacity-30">
           <span className="flex items-center justify-center w-16 h-16 rounded-full bg-ods-accent text-ods-text-on-accent shadow-lg transition-transform duration-200 group-hover:scale-110">
-            <svg width={24} height={24} fill="currentColor" viewBox="0 0 24 24" className="ml-1">
-              <polygon points="5,3 19,12 5,21" />
-            </svg>
+            <PlayIcon size={24} color="currentColor" className="ml-1" />
           </span>
         </div>
       </button>

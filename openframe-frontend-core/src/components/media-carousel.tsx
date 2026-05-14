@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, memo, useCallback } from 'react';
 import { cn } from "../utils/cn";
 import { MediaItem } from '../utils/media-carousel-utils-stub';
 import { Video, extractYouTubeId } from './features/video';
+import { PlayIcon } from './icons-v2-generated/media-playback/play-icon';
 
 // Navigation icons
 const ChevronLeftIcon = () => (
@@ -215,9 +216,7 @@ export const MediaCarousel = memo(function MediaCarousel({
         {(item.type === 'video' || item.type === 'youtube') && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/30">
             <div className="bg-black/70 rounded-full p-1">
-              <svg width="12" height="12" fill="white" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z"/>
-              </svg>
+              <PlayIcon size={12} color="white" />
             </div>
           </div>
         )}
