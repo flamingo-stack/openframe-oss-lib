@@ -30,7 +30,7 @@
  *   layout="native"   → intrinsic aspect ratio. Bites grid, blog cards.
  */
 
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import MuxPlayer from '@mux/mux-player-react';
 
 // =============================================================================
@@ -216,15 +216,23 @@ function wrapWithLayout(
 ): React.ReactElement {
   switch (layout) {
     case 'centered':
+      // `aspect-video` (16:9) reserves the box from first paint so MuxPlayer
+      // doesn't flicker tiny→full while video metadata loads. Both branches
+      // are sized to fill 100% of this container (MuxPlayer via `style`,
+      // YouTube facade via internal `paddingBottom: 56.25%` which compounds
+      // harmlessly inside an already-16:9 box).
       return (
         <div className="flex justify-center w-full">
-          <div className="w-full max-w-3xl">{inner}</div>
+          <div className="w-full max-w-3xl aspect-video">{inner}</div>
         </div>
       );
     case 'fill':
       return <div className="absolute inset-0 w-full h-full">{inner}</div>;
     case 'native':
     default:
+      // `native` callers (LazyBite in `<VideoBitesDisplay>`, blog cards) are
+      // expected to provide their own aspect-ratio container so the layout
+      // primitive doesn't override portrait/square/landscape bites with 16:9.
       return inner;
   }
 }
@@ -273,6 +281,14 @@ function FilePlayer({
       preferCmcd="header"
       accentColor="var(--ods-accent)"
       className={className}
+      // Fill the wrapping aspect-ratio container instead of MuxPlayer's
+      // intrinsic size. Without this, MuxPlayer renders at its default
+      // dimensions before video metadata loads, then grows to its
+      // metadata-derived size — that's the "starts super small and
+      // flickers and grows" CLS we're killing. With `aspect-video` on
+      // the centered wrapper and `width/height: 100%` here, the box is
+      // 16:9 from first paint and stays put.
+      style={{ width: '100%', height: '100%' }}
     >
       {captionsUrl ? (
         <track
@@ -330,11 +346,6 @@ function YouTubeFacadeInner({
   minimalControls,
 }: YouTubeFacadeInnerProps): React.ReactElement {
   const [activated, setActivated] = useState(false);
-  // `iframeSlotRef` is a JSX-empty div React owns but never reconciles
-  // children into; the `<button>` overlay is a SIBLING of that slot, not
-  // a child. Without that split, React would yank the button on re-render
-  // and trip `removeChild ... is not a child of this node`.
-  const iframeSlotRef = useRef<HTMLDivElement | null>(null);
 
   const embedParams = new URLSearchParams({
     autoplay: '1',
@@ -354,56 +365,65 @@ function YouTubeFacadeInner({
   const posterJpg = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
   const posterWebp = `https://i.ytimg.com/vi_webp/${videoId}/mqdefault.webp`;
 
-  // Imperative createElement preserves the user-activation chain on
-  // Chrome/Safari/Firefox so `autoplay=1` plays on click.
-  const handleActivate = () => {
-    const slot = iframeSlotRef.current;
-    if (!slot || activated) return;
-    const iframe = document.createElement('iframe');
-    iframe.setAttribute(
-      'allow',
-      'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share',
+  // Early-return rendering. The previous imperative implementation
+  // (`document.createElement('iframe')` + state flip) had a subtle bug
+  // where the play-button overlay could linger past activation because
+  // React's commit phase and the imperative DOM mutation raced. Two
+  // mutually-exclusive return paths eliminate that race entirely — when
+  // `activated` flips, React unmounts the button branch and mounts the
+  // iframe branch in a single commit.
+  //
+  // Autoplay on iOS Safari: the user gesture (the button's onClick) and
+  // the iframe mount happen in the SAME React commit, which flushes
+  // synchronously inside event handlers. iOS treats the iframe insertion
+  // as still being inside the user-activation tick, so `autoplay=1` plays.
+  // (Verified empirically; lite-youtube-embed uses imperative DOM for
+  // legacy-React compatibility — modern React's sync-commit-on-event
+  // makes the JSX path equivalent.)
+  const wrapperClass = `relative w-full ${className ?? ''}`;
+  const wrapperStyle = { paddingBottom: '56.25%' as const };
+
+  if (activated) {
+    return (
+      <div className={wrapperClass} style={wrapperStyle}>
+        <iframe
+          src={embedUrl}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+          title={title}
+          className="absolute inset-0 w-full h-full border-0 rounded-lg"
+        />
+      </div>
     );
-    iframe.setAttribute('allowfullscreen', '');
-    iframe.setAttribute('title', title);
-    iframe.className = 'absolute inset-0 w-full h-full border-0';
-    iframe.src = embedUrl;
-    slot.appendChild(iframe);
-    setActivated(true);
-  };
+  }
 
   return (
-    <div className={`relative w-full ${className ?? ''}`} style={{ paddingBottom: '56.25%' }}>
-      <div className="absolute inset-0 rounded-lg overflow-hidden border border-ods-border bg-ods-card">
-        <div ref={iframeSlotRef} className="absolute inset-0" aria-hidden={!activated} />
-        {!activated && (
-          <button
-            type="button"
-            aria-label={`Play: ${title}`}
-            onClick={handleActivate}
-            className="group absolute inset-0 p-0 m-0 border-0 cursor-pointer bg-transparent"
-          >
-            <picture>
-              <source type="image/webp" srcSet={posterWebp} />
-              <img
-                src={posterJpg}
-                alt={title}
-                loading="lazy"
-                fetchPriority={priority ? 'high' : 'low'}
-                decoding={priority ? 'sync' : 'async'}
-                className="absolute inset-0 w-full h-full object-cover"
-              />
-            </picture>
-            <div className="absolute inset-0 flex items-center justify-center bg-ods-bg-inverse bg-opacity-20 transition-opacity duration-200 group-hover:bg-opacity-30">
-              <span className="flex items-center justify-center w-16 h-16 rounded-full bg-ods-accent text-ods-text-on-accent shadow-lg transition-transform duration-200 group-hover:scale-110">
-                <svg width={24} height={24} fill="currentColor" viewBox="0 0 24 24" className="ml-1">
-                  <polygon points="5,3 19,12 5,21" />
-                </svg>
-              </span>
-            </div>
-          </button>
-        )}
-      </div>
+    <div className={wrapperClass} style={wrapperStyle}>
+      <button
+        type="button"
+        aria-label={`Play: ${title}`}
+        onClick={() => setActivated(true)}
+        className="group absolute inset-0 p-0 m-0 border border-ods-border rounded-lg overflow-hidden bg-ods-card cursor-pointer"
+      >
+        <picture>
+          <source type="image/webp" srcSet={posterWebp} />
+          <img
+            src={posterJpg}
+            alt={title}
+            loading="lazy"
+            fetchPriority={priority ? 'high' : 'low'}
+            decoding={priority ? 'sync' : 'async'}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        </picture>
+        <div className="absolute inset-0 flex items-center justify-center bg-ods-bg-inverse bg-opacity-20 transition-opacity duration-200 group-hover:bg-opacity-30">
+          <span className="flex items-center justify-center w-16 h-16 rounded-full bg-ods-accent text-ods-text-on-accent shadow-lg transition-transform duration-200 group-hover:scale-110">
+            <svg width={24} height={24} fill="currentColor" viewBox="0 0 24 24" className="ml-1">
+              <polygon points="5,3 19,12 5,21" />
+            </svg>
+          </span>
+        </div>
+      </button>
     </div>
   );
 }

@@ -190,11 +190,20 @@ interface VideoBiteCardProps {
 /**
  * Individual bite card — routes through `<Video>` so the SSoT player
  * is the only video primitive in the lib.
+ *
+ * Layout: `LazyBite` sets the OUTER `aspectRatio` (portrait/square/landscape),
+ * but `<Card>` between LazyBite and `<Video>` has no intrinsic height, so
+ * we wrap `<Video>` in `layout="fill"` + an explicit `relative` parent so
+ * the player fills the bite's aspect box from first paint. Otherwise
+ * MuxPlayer renders at its intrinsic default size and grows once metadata
+ * loads — the same CLS that hits the centered layout.
  */
 function VideoBiteCard({ url, title, thumbnailUrl }: VideoBiteCardProps) {
   return (
-    <Card className="overflow-hidden border border-ods-border bg-ods-card hover:border-ods-accent transition-colors">
-      <Video url={url} poster={thumbnailUrl || undefined} layout="native" />
+    <Card className="overflow-hidden border border-ods-border bg-ods-card hover:border-ods-accent transition-colors flex flex-col h-full">
+      <div className="relative flex-1 min-h-0">
+        <Video url={url} poster={thumbnailUrl || undefined} layout="fill" />
+      </div>
       {title && (
         <div className="p-4">
           <p className="text-h4 text-ods-text-primary line-clamp-2">{title}</p>
