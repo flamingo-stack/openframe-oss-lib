@@ -292,7 +292,7 @@ export type Database = {
           description: string | null
           cover_url: string | null
           audio_url: string | null
-          video_url: string | null
+          main_video_url: string | null
           media_type: string | null
           duration_seconds: number | null
           status: string | null
@@ -313,7 +313,7 @@ export type Database = {
           description?: string | null
           cover_url?: string | null
           audio_url?: string | null
-          video_url?: string | null
+          main_video_url?: string | null
           media_type?: string | null
           duration_seconds?: number | null
           status?: string | null
@@ -334,7 +334,7 @@ export type Database = {
           description?: string | null
           cover_url?: string | null
           audio_url?: string | null
-          video_url?: string | null
+          main_video_url?: string | null
           media_type?: string | null
           duration_seconds?: number | null
           status?: string | null
@@ -368,7 +368,7 @@ export type Database = {
           end_at: string | null
           timezone: string | null
           registration_url: string | null
-          recording_url: string | null
+          main_video_url: string | null
           hosts: Json | null
           platform_id: string
           is_deleted: boolean | null
@@ -386,7 +386,7 @@ export type Database = {
           end_at?: string | null
           timezone?: string | null
           registration_url?: string | null
-          recording_url?: string | null
+          main_video_url?: string | null
           hosts?: Json | null
           platform_id: string
           is_deleted?: boolean | null
@@ -404,7 +404,7 @@ export type Database = {
           end_at?: string | null
           timezone?: string | null
           registration_url?: string | null
-          recording_url?: string | null
+          main_video_url?: string | null
           hosts?: Json | null
           platform_id?: string
           is_deleted?: boolean | null

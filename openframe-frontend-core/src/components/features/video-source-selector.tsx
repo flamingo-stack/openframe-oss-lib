@@ -20,9 +20,9 @@ export interface VideoSourceSelectorProps {
   /** Callback when YouTube URL changes */
   onYoutubeUrlChange: (url: string) => void;
   /** Uploaded video URL value */
-  uploadedVideoUrl: string;
+  mainVideoUrl: string;
   /** Callback when uploaded video URL changes */
-  onUploadedVideoUrlChange: (url: string) => void;
+  onMainVideoUrlChange: (url: string) => void;
   /** Callback to handle video upload - receives file and returns URL or throws error */
   onUploadVideo: (file: File, onProgress?: (progress: number) => void) => Promise<string>;
   /** Optional: Show AI generated badge on uploaded video */
@@ -72,8 +72,8 @@ export function VideoSourceSelector({
   onVideoSourceTypeChange,
   youtubeUrl,
   onYoutubeUrlChange,
-  uploadedVideoUrl,
-  onUploadedVideoUrlChange,
+  mainVideoUrl,
+  onMainVideoUrlChange,
   onUploadVideo,
   showAIBadge = true,
   isAIGenerated = false,
@@ -114,7 +114,7 @@ export function VideoSourceSelector({
         });
         setUploadProgress(100);
         setUploadMessage('Upload complete!');
-        onUploadedVideoUrlChange(url);
+        onMainVideoUrlChange(url);
       } catch (err) {
         setUploadError(err instanceof Error ? err.message : 'Failed to upload video');
       } finally {
@@ -126,11 +126,11 @@ export function VideoSourceSelector({
       }
     };
     input.click();
-  }, [onUploadVideo, onUploadedVideoUrlChange]);
+  }, [onUploadVideo, onMainVideoUrlChange]);
 
   const handleDeleteVideo = useCallback(() => {
-    onUploadedVideoUrlChange('');
-  }, [onUploadedVideoUrlChange]);
+    onMainVideoUrlChange('');
+  }, [onMainVideoUrlChange]);
 
   return (
     <div className={`space-y-4 p-6 bg-ods-card border border-ods-border rounded-lg ${className}`}>
@@ -239,10 +239,10 @@ export function VideoSourceSelector({
           )}
 
           {/* Video Preview */}
-          {uploadedVideoUrl ? (
+          {mainVideoUrl ? (
             VideoPreviewComponent ? (
               <VideoPreviewComponent
-                videoUrl={uploadedVideoUrl}
+                videoUrl={mainVideoUrl}
                 onDelete={handleDeleteVideo}
                 isAIGenerated={isAIGenerated}
               />
@@ -250,7 +250,7 @@ export function VideoSourceSelector({
               // Default simple preview
               <div className="relative rounded-lg border border-ods-border overflow-hidden">
                 <video
-                  src={uploadedVideoUrl}
+                  src={mainVideoUrl}
                   className="w-full h-auto max-h-[300px] object-contain bg-black"
                   controls
                 />
