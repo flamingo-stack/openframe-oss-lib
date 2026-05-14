@@ -11,6 +11,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
@@ -63,27 +64,27 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
     public List<KnowledgeBaseItem> findArticles(String currentUserId, String parentId, String search,
                                                  KnowledgeBaseItemType type, List<String> itemIds,
                                                  String cursor, int limit) {
-        Query query = buildItemQuery(currentUserId, parentId, search, type, itemIds);
-        return findWithCursor(query, cursor, limit);
+        Query query = buildItemQuery(currentUserId, parentId, search, type, itemIds, cursor);
+        return executeWithSort(query, limit);
     }
 
     @Override
     public long countArticles(String currentUserId, String parentId, String search,
                               KnowledgeBaseItemType type, List<String> itemIds) {
-        Query query = buildItemQuery(currentUserId, parentId, search, type, itemIds);
+        Query query = buildItemQuery(currentUserId, parentId, search, type, itemIds, null);
         return mongoTemplate.count(query, KnowledgeBaseItem.class);
     }
 
     @Override
     public List<KnowledgeBaseItem> findArchivedArticles(String currentUserId, String search, List<String> itemIds,
                                                          String cursor, int limit) {
-        Query query = buildArchivedArticlesQuery(currentUserId, search, itemIds);
-        return findWithCursor(query, cursor, limit);
+        Query query = buildArchivedArticlesQuery(currentUserId, search, itemIds, cursor);
+        return executeWithSort(query, limit);
     }
 
     @Override
     public long countArchivedArticles(String currentUserId, String search, List<String> itemIds) {
-        Query query = buildArchivedArticlesQuery(currentUserId, search, itemIds);
+        Query query = buildArchivedArticlesQuery(currentUserId, search, itemIds, null);
         return mongoTemplate.count(query, KnowledgeBaseItem.class);
     }
 
@@ -98,7 +99,7 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
     }
 
     private Query buildItemQuery(String currentUserId, String parentId, String search,
-                                  KnowledgeBaseItemType type, List<String> itemIds) {
+                                  KnowledgeBaseItemType type, List<String> itemIds, String cursor) {
         Query query = new Query();
 
         if (itemIds != null && !itemIds.isEmpty()) {
@@ -115,11 +116,11 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
 
         query.addCriteria(Criteria.where(FIELD_STATUS).ne(KnowledgeBaseArticleStatus.ARCHIVED));
 
-        addSearchAndVisibility(query, search, currentUserId);
+        addComposites(query, search, currentUserId, cursor);
         return query;
     }
 
-    private Query buildArchivedArticlesQuery(String currentUserId, String search, List<String> itemIds) {
+    private Query buildArchivedArticlesQuery(String currentUserId, String search, List<String> itemIds, String cursor) {
         Query query = new Query();
         query.addCriteria(Criteria.where(FIELD_TYPE).is(KnowledgeBaseItemType.ARTICLE));
         query.addCriteria(Criteria.where(FIELD_STATUS).is(KnowledgeBaseArticleStatus.ARCHIVED));
@@ -128,25 +129,36 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
             query.addCriteria(Criteria.where(ID_FIELD).in(itemIds));
         }
 
-        addSearchAndVisibility(query, search, currentUserId);
+        addComposites(query, search, currentUserId, cursor);
         return query;
     }
 
     /**
-     * Combines search ($or on name/summary) and DRAFT visibility ($or on status/createdBy)
-     * into a single $and Criteria. Two separate $or criteria on a Query trigger Spring Data Mongo's
-     * "duplicate key" error since both have null field name.
+     * Combines visibility ($or on status/createdBy), search ($or on name/summary),
+     * and cursor ($or on updatedAt/id) into a single $and at root.
+     * Spring Data Mongo rejects multiple $or criteria on the same Query (null-key collision).
      */
-    private void addSearchAndVisibility(Query query, String search, String currentUserId) {
-        Criteria visibility = buildDraftVisibilityCriteria(currentUserId);
-        if (!StringUtils.hasText(search)) {
-            query.addCriteria(visibility);
-            return;
+    private void addComposites(Query query, String search, String currentUserId, String cursor) {
+        List<Criteria> composites = new ArrayList<>();
+
+        if (StringUtils.hasText(search)) {
+            composites.add(new Criteria().orOperator(
+                    Criteria.where(FIELD_NAME).regex(search, "i"),
+                    Criteria.where(FIELD_SUMMARY).regex(search, "i")));
         }
-        Criteria searchCriteria = new Criteria().orOperator(
-                Criteria.where(FIELD_NAME).regex(search, "i"),
-                Criteria.where(FIELD_SUMMARY).regex(search, "i"));
-        query.addCriteria(new Criteria().andOperator(searchCriteria, visibility));
+
+        composites.add(buildDraftVisibilityCriteria(currentUserId));
+
+        Criteria cursorCriteria = buildCursorCriteria(cursor);
+        if (cursorCriteria != null) {
+            composites.add(cursorCriteria);
+        }
+
+        if (composites.size() == 1) {
+            query.addCriteria(composites.getFirst());
+        } else {
+            query.addCriteria(new Criteria().andOperator(composites.toArray(new Criteria[0])));
+        }
     }
 
     private Criteria buildDraftVisibilityCriteria(String currentUserId) {
@@ -155,37 +167,27 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
         return new Criteria().orOperator(notDraft, ownDraft);
     }
 
-    private List<KnowledgeBaseItem> findWithCursor(Query query, String cursor, int limit) {
-        if (StringUtils.hasText(cursor)) {
-            try {
-                ObjectId cursorId = new ObjectId(cursor);
-                applyCursorCriteria(query, cursorId);
-            } catch (IllegalArgumentException ex) {
-                log.warn("Invalid ObjectId cursor format: {}", cursor);
-            }
+    private Criteria buildCursorCriteria(String cursor) {
+        if (!StringUtils.hasText(cursor)) {
+            return null;
+        }
+        ObjectId cursorId;
+        try {
+            cursorId = new ObjectId(cursor);
+        } catch (IllegalArgumentException ex) {
+            log.warn("Invalid ObjectId cursor format: {}", cursor);
+            return null;
         }
 
-        query.with(Sort.by(
-                Sort.Order.desc(FIELD_UPDATED_AT),
-                Sort.Order.desc(ID_FIELD)
-        ));
-        query.limit(limit);
-
-        return mongoTemplate.find(query, KnowledgeBaseItem.class);
-    }
-
-    private void applyCursorCriteria(Query query, ObjectId cursorId) {
         KnowledgeBaseItem cursorDoc = mongoTemplate.findById(cursorId, KnowledgeBaseItem.class);
         if (cursorDoc == null) {
             log.warn("Cursor document not found for id: {}", cursorId);
-            query.addCriteria(Criteria.where(ID_FIELD).lt(cursorId));
-            return;
+            return Criteria.where(ID_FIELD).lt(cursorId);
         }
 
         Object cursorSortValue = cursorDoc.getUpdatedAt();
         if (cursorSortValue == null) {
-            query.addCriteria(Criteria.where(ID_FIELD).lt(cursorId));
-            return;
+            return Criteria.where(ID_FIELD).lt(cursorId);
         }
 
         Criteria pastSortValue = Criteria.where(FIELD_UPDATED_AT).lt(cursorSortValue);
@@ -193,6 +195,15 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
                 Criteria.where(FIELD_UPDATED_AT).is(cursorSortValue),
                 Criteria.where(ID_FIELD).lt(cursorId)
         );
-        query.addCriteria(new Criteria().orOperator(pastSortValue, sameSortValuePastId));
+        return new Criteria().orOperator(pastSortValue, sameSortValuePastId);
+    }
+
+    private List<KnowledgeBaseItem> executeWithSort(Query query, int limit) {
+        query.with(Sort.by(
+                Sort.Order.desc(FIELD_UPDATED_AT),
+                Sort.Order.desc(ID_FIELD)
+        ));
+        query.limit(limit);
+        return mongoTemplate.find(query, KnowledgeBaseItem.class);
     }
 }
