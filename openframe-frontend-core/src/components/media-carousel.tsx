@@ -157,7 +157,6 @@ export const MediaCarousel = memo(function MediaCarousel({
         className={`w-full h-full object-${objectFit}`}
         loading="lazy"
         onError={(e) => {
-          console.log('❌ Image failed to load:', item.src);
           const target = e.target as HTMLImageElement;
           target.style.display = 'none';
         }}
@@ -167,8 +166,6 @@ export const MediaCarousel = memo(function MediaCarousel({
 
   // Render main media item
   const renderMainMedia = (item: MediaItem, index: number) => {
-    console.log('🎬 Rendering media item:', { type: item.type, src: item.src.substring(0, 100) + '...' });
-    
     switch (item.type) {
       case 'youtube':
         return renderYouTubeEmbed(item, index);
