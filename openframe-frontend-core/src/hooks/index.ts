@@ -15,3 +15,6 @@ export * from './state'
 
 // NATS hooks
 export * from './nats/use-nats-client'
+
+// Viewport / lazy-mount primitive (shared IO singleton)
+export * from './use-near-viewport'

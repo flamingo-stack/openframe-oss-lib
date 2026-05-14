@@ -19,112 +19,6 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 
 /**
- * Extract a first-frame poster from a direct video file URL via an
- * off-DOM `<video>` + `<canvas>`. This is the most reliable way to get
- * a real thumbnail for ANY video regardless of encoding or moov atom
- * placement (which is what breaks the `#t=0.5` URL-hash trick on long
- * videos whose moov atom is written at the end of the file).
- *
- * Sequence:
- *   1. Create hidden `<video>` with `crossOrigin="anonymous"` (REQUIRED
- *      before setting src, otherwise the canvas is tainted).
- *   2. `loadedmetadata` → seek to 10% of duration (clamped 2s–30s).
- *   3. `seeked` → draw the frame to a canvas → export as data URL.
- *   4. Clean up the hidden video immediately.
- *
- * Falls back to `null` on CORS failure, decode error, or unsupported
- * video format. Callers should treat `null` as "no poster — show play
- * overlay without a thumbnail."
- */
-function useVideoFirstFramePoster(
-  url: string | undefined,
-  enabled: boolean,
-): string | null {
-  const [poster, setPoster] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!enabled || !url) {
-      setPoster(null);
-      return;
-    }
-    // Only direct video files — skip YouTube, Vimeo, HLS, etc.
-    const isDirectFile = /\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(url);
-    if (!isDirectFile) {
-      setPoster(null);
-      return;
-    }
-
-    let cancelled = false;
-    const video = document.createElement('video');
-    video.crossOrigin = 'anonymous';
-    video.preload = 'metadata';
-    video.muted = true;
-    video.playsInline = true;
-    // Tags this hidden element so regression tests can detect the poster-extractor
-    // path being entered without false-positives from any other code that might
-    // happen to set crossOrigin on a <video>. See video-player.test.tsx.
-    video.setAttribute('data-poster-extractor', 'true');
-
-    const cleanup = () => {
-      video.removeAttribute('src');
-      try { video.load(); } catch { /* noop */ }
-    };
-
-    const onLoadedMetadata = () => {
-      if (cancelled) return;
-      // Seek to 10% of the video's duration (clamped between 2s and 30s).
-      // Many videos have a dark fade-in during the first 1-2 seconds;
-      // 10% is far enough to land on real content for both short clips
-      // (30s → 3s) and long recordings (30min → 3min, clamped to 30s).
-      const dur = video.duration || 10;
-      const target = Math.max(2, Math.min(dur * 0.1, 30));
-      video.currentTime = target;
-    };
-
-    const onSeeked = () => {
-      if (cancelled) return;
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
-        if (!ctx || !canvas.width || !canvas.height) {
-          cleanup();
-          return;
-        }
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
-        if (!cancelled) setPoster(dataUrl);
-      } catch (err) {
-        // Tainted canvas (CORS) or decode failure — silently give up.
-        console.warn('[VideoPlayer] first-frame extraction failed', err);
-      } finally {
-        cleanup();
-      }
-    };
-
-    const onError = () => {
-      cleanup();
-    };
-
-    video.addEventListener('loadedmetadata', onLoadedMetadata);
-    video.addEventListener('seeked', onSeeked);
-    video.addEventListener('error', onError);
-    video.src = url;
-
-    return () => {
-      cancelled = true;
-      video.removeEventListener('loadedmetadata', onLoadedMetadata);
-      video.removeEventListener('seeked', onSeeked);
-      video.removeEventListener('error', onError);
-      cleanup();
-    };
-  }, [url, enabled]);
-
-  return poster;
-}
-
-/**
  * Global CSS injection for iOS Safari native fullscreen captions.
  * Safari hides ::-webkit-media-text-track-container in fullscreen by default.
  * This forces it visible. Injected once, persists for the page lifetime.
@@ -237,44 +131,31 @@ interface VideoPlayerProps {
   /** Label for the subtitle track (default: 'English') */
   subtitleLabel?: string;
   /**
-   * When true, defers all network activity for the video until the user clicks play:
-   *   - Skips the hidden-video first-frame poster extraction (no canvas dance)
-   *   - Sets `preload="none"` on the underlying `<video>` (zero bytes fetched on mount)
-   *   - On play-click, switches `preload="auto"` and synchronously calls `videoEl.play()`
-   *     inside the click handler to preserve the iOS Safari user-activation chain
+   * Controls how aggressively the browser preloads the video before the user
+   * presses play. Mirrors the underlying `<video preload>` attribute.
    *
-   * Use for testimonial/marketing videos where:
-   *   - The video may never be played (most visitors don't click)
-   *   - A real poster image is available (`poster` prop) so the user has something to look at
-   *   - You want to eliminate the redundant hidden-video metadata fetch that races
-   *     ReactPlayer's own metadata fetch
+   *   - `'auto'`     — browser may download the entire file. Use for hero
+   *                    videos that you expect every visitor to play.
+   *   - `'metadata'` — (default) browser fetches the moov atom + a few KB
+   *                    so dimensions, duration, and the first frame are
+   *                    ready by the time the user clicks. Tiny bandwidth
+   *                    cost vs. dramatic click→first-frame improvement.
+   *   - `'none'`     — zero bytes fetched until click. Opt in for modal
+   *                    videos that are rarely played.
    *
-   * Interaction semantics:
-   *   - `lazyMount + autoPlay` → `autoPlay` wins; lazyMount is ignored (caller has explicitly committed)
-   *   - `lazyMount + loop` → orthogonal; loop applies after first play
-   *   - `lazyMount + useNativeAspectRatio` → orthogonal; native aspect comes from the existing `<video>`
+   * Caveat for long videos with `moov` at the end (common for iPhone
+   * screen recordings): `'metadata'` may pull several MB before any frame
+   * decodes. Run a faststart remux on the source to eliminate this. For
+   * grid/list pages, gate mount with `useNearViewport` (lib hook) so only
+   * near-viewport bites mount + start their metadata fetch.
    *
-   * Behavior change for non-lazy callers (lazyMount=false): once `hasStarted=true`, preload
-   * dynamically promotes from `'metadata'` to `'auto'` for aggressive buffering. Browser
-   * dedupes ranged requests on the same resource so this is benign in practice.
-   *
-   * @default false
+   * @default 'metadata'
    */
-  lazyMount?: boolean;
+  preloadStrategy?: 'auto' | 'metadata' | 'none';
 }
 
 /** Playback speed options */
 const SPEED_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
-
-/**
- * Grace period after a lazyMount click before we surface a play() failure to
- * the user via the error UI. Calibrated for the typical case where a slow
- * Supabase Storage origin takes 1-2s to first-byte, then ReactPlayer's React
- * state-driven .play() retry takes another ~500ms. Anything still paused
- * AND carrying an `HTMLMediaElement.error` after this window is genuinely
- * broken (codec mismatch, 404, CORS), not just slow.
- */
-const LAZY_MOUNT_PLAY_FAILURE_GRACE_MS = 2000;
 
 /** Format seconds to M:SS or H:MM:SS display */
 function formatTime(secs: number): string {
@@ -299,7 +180,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   srtContent,
   captionsUrl,
   subtitleLabel,
-  lazyMount = false,
+  preloadStrategy = 'metadata',
 }) => {
   // =========================================================================
   // Core state
@@ -323,10 +204,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const clickTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const iosFullscreenTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-  // Tracks the iOS lazyMount play() failure-escalation timer so unmount can
-  // cancel it. Without this, a click-then-navigate within the grace window
-  // would fire `setHasError` on a torn-down component (React 18 warns).
-  const lazyMountFailureTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Subtitle + fullscreen state
   const [captionsEnabled, setCaptionsEnabled] = useState(true);
@@ -666,10 +543,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     handleTouchToggle();
   }, [hasStarted, handleTouchToggle]);
 
-  // Extract first frame as poster when no explicit poster provided.
-  // Skipped entirely in lazyMount mode (no hidden-video element, no canvas dance).
-  const extractedPoster = useVideoFirstFramePoster(url, !lazyMount && !hasStarted && !poster);
-  const effectivePoster = poster || extractedPoster || undefined;
+  // Posters come from the server (admin form thumbnail extraction or Mux
+  // poster URL post-Phase-2). The legacy hidden-`<video>` first-frame
+  // extractor was deleted — it competed with the main player for sockets
+  // on multi-bite pages and produced flaky CORS failures.
+  const effectivePoster = poster || undefined;
   const posterBgColor = useImageEdgeColor(effectivePoster);
 
   useEffect(() => {
@@ -679,7 +557,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       clearTimeout(clickTimerRef.current);
       clearTimeout(hideTimeoutRef.current);
       clearTimeout(iosFullscreenTimerRef.current);
-      clearTimeout(lazyMountFailureTimerRef.current);
       isDraggingRef.current = false;
       if (dragListenersRef.current) {
         document.removeEventListener('mousemove', dragListenersRef.current.move);
@@ -707,39 +584,25 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const handlePause = useCallback(() => setIsPlaying(false), []);
   const handleEnded = useCallback(() => setIsPlaying(false), []);
   const handlePlayClick = useCallback(() => {
-    // iOS user-activation belt-and-suspenders: when lazyMount is on, the React state
-    // updates below cause a re-render that promotes preload to 'auto' and triggers
-    // ReactPlayer's internal play() — but that play() call may run in a separate task
-    // from the click event, which iOS Safari treats as non-user-initiated.
-    // Calling .play() synchronously here preserves the user-activation flag.
+    // iOS user-activation belt-and-suspenders: react-player's `playing={isPlaying}`
+    // state-driven .play() runs in a state-update microtask, which Safari iOS
+    // treats as non-user-initiated. Calling .play() synchronously inside the
+    // click handler preserves the user-activation flag across all preload
+    // strategies. If the play() promise rejects (codec, autoplay policy), the
+    // underlying <video>'s `error` event fires and `handleError` surfaces the
+    // error UI — no separate grace timer needed.
     //
-    // Guards:
-    //   - `instanceof HTMLVideoElement` — `getInternalPlayer()` returns YouTube/Vimeo
-    //     iframe wrappers when those URL types are passed; we only want the native
-    //     <video> element for the file player path.
-    //   - `.catch` — escalates persistent failures to the error UI after a grace
-    //     period so users don't stare at a frozen poster forever (HEVC-in-MP4 on
-    //     Chrome/Firefox is the common cause; the admin form warns about this).
-    //   - Failure timer is stored in a ref so unmount can cancel it (otherwise
-    //     a click-then-navigate within the grace window would fire setHasError
-    //     on a torn-down component).
-    if (lazyMount) {
-      const native = playerRef.current?.getInternalPlayer();
-      if (native instanceof HTMLVideoElement) {
-        native.play().catch(() => {
-          // Allow React's state-driven play() one chance, then surface the failure.
-          clearTimeout(lazyMountFailureTimerRef.current);
-          lazyMountFailureTimerRef.current = setTimeout(() => {
-            if (native.paused && native.error) setHasError(true);
-          }, LAZY_MOUNT_PLAY_FAILURE_GRACE_MS);
-        });
-      } else if (process.env.NODE_ENV !== 'production') {
-        console.warn('[VideoPlayer] lazyMount sync play(): no native HTMLVideoElement yet');
-      }
+    // Guard: `getInternalPlayer()` returns YouTube/Vimeo iframe wrappers when
+    // those URL types are passed; we only act on the native <video> element.
+    const native = playerRef.current?.getInternalPlayer();
+    if (native instanceof HTMLVideoElement) {
+      native.play().catch(() => { /* error UI handled by ReactPlayer's onError */ });
+    } else if (process.env.NODE_ENV !== 'production') {
+      console.warn('[VideoPlayer] sync play(): no native HTMLVideoElement yet');
     }
     setHasStarted(true);
     setIsPlaying(true);
-  }, [lazyMount]);
+  }, []);
 
   const handleProgress = useCallback(({ played: p, loaded: l, playedSeconds }: { played: number; loaded: number; playedSeconds: number }) => {
     setPlayed(p);
@@ -859,7 +722,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             onBufferEnd={handleBufferEnd}
             onProgress={handleProgress}
             progressInterval={200}
-            config={{ file: { attributes: { controlsList: 'nodownload', playsInline: true, preload: lazyMount && !hasStarted ? 'none' : (hasStarted ? 'auto' : 'metadata') } } }}
+            config={{ file: { attributes: { controlsList: 'nodownload', playsInline: true, preload: hasStarted ? 'auto' : preloadStrategy } } }}
             light={false}
             playsinline
           />
