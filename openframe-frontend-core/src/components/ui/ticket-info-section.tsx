@@ -10,7 +10,6 @@ import { Tag } from "./tag"
 import { TicketStatusTag } from "./ticket-status-tag"
 import { TicketDetailSection } from "./ticket-detail-section"
 import { type TicketAttachment, TicketAttachmentsList } from "./ticket-attachments-list"
-import { type KnowledgeBaseArticle, TicketKnowledgeBaseList } from "./ticket-knowledge-base-list"
 import type { TicketNote } from "./ticket-note-card"
 import { TicketNotesSection } from "./ticket-notes-section"
 import { SimpleMarkdownRenderer } from "./simple-markdown-renderer"
@@ -62,8 +61,6 @@ export interface TicketInfoSectionProps {
   attachments?: TicketAttachment[]
   /** Tag labels */
   tags?: string[]
-  /** Knowledge base articles */
-  knowledgeBaseArticles?: KnowledgeBaseArticle[]
   /** Notes */
   notes?: TicketNote[]
   onAddNote?: (text: string) => void
@@ -118,7 +115,6 @@ export function TicketInfoSection({
   description,
   attachments,
   tags,
-  knowledgeBaseArticles,
   notes,
   onAddNote,
   onEditNote,
@@ -236,13 +232,6 @@ export function TicketInfoSection({
                     <Tag key={tag} label={tag} variant="outline" className="max-w-full" />
                   ))}
                 </div>
-              </TicketDetailSection>
-            )}
-
-            {/* Knowledge Base Articles */}
-            {knowledgeBaseArticles && knowledgeBaseArticles.length > 0 && (
-              <TicketDetailSection label="Knowledge Base Articles">
-                <TicketKnowledgeBaseList articles={knowledgeBaseArticles} />
               </TicketDetailSection>
             )}
 

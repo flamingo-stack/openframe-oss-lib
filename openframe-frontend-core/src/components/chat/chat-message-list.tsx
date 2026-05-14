@@ -1,12 +1,10 @@
 "use client"
 
-import { useRef, useState, useEffect, useLayoutEffect, useCallback, useImperativeHandle, forwardRef } from "react"
+import { useRef, useEffect, useLayoutEffect, useImperativeHandle, forwardRef } from "react"
 import { useStickToBottom } from "use-stick-to-bottom"
 import { cn } from "../../utils/cn"
 import { ChatMessageEnhanced } from "./chat-message-enhanced"
-import { ChatMessageListLoader } from "./chat-message-loader"
-import { useDelayedFlag } from "./hooks/use-delayed-flag"
-import { PulseDots } from "../ui/pulse-dots"
+import { ChatMessageListSkeleton } from "./chat-message-skeleton"
 import type { ChatMessageListProps } from "./types"
 
 /*
@@ -40,7 +38,6 @@ import type { ChatMessageListProps } from "./types"
  * — pass them directly as `ref={scrollRef}` / `ref={contentRef}`.
  */
 
-
 const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
   (
     {
@@ -67,33 +64,17 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     // `resize: 'smooth'` — during streaming, content grows token-by-
     // token; library uses spring physics to follow the bottom for a
     // ChatGPT/Claude.ai-like feel (vs jarring instant snaps).
-    // `initial: 'instant'` — snap to bottom on first mount BEFORE
-    // browser paint. Without this, a page reload that lands on a long
-    // history would briefly paint the top of the list (oldest msgs)
-    // before any post-paint effect could run `scrollTop = bottom`. The
-    // library writes scrollTop in the commit phase, so the first paint
-    // is already at the bottom.
-    //
-    // `escapedFromLock` is exposed so the stream-tail branch below can
-    // honor user intent: if they scroll UP during streaming, the lib
-    // flips it true via the wheel/touch handlers, and we stop forcing
-    // the viewport to follow. Scrolling back DOWN to near-bottom
-    // resets it to false and tailing resumes.
-    const { scrollRef, contentRef, scrollToBottom, escapedFromLock } = useStickToBottom({
+    // `initial: false` — DON'T auto-scroll on mount; our dialog-change
+    // effect below owns first-paint positioning so re-opening a chat
+    // with prior history lands at the bottom without a smooth-scroll
+    // animation playing over the cold-paint.
+    const { scrollRef, contentRef, scrollToBottom } = useStickToBottom({
       resize: 'smooth',
-      initial: 'instant',
+      initial: false,
     })
 
     // ---- Prepend / load-more state (NOT owned by the library) --------
-    // `scrollEl` and `sentinelEl` are STATE, not refs, so the load-more
-    // effect re-runs when either element mounts/unmounts. This is the
-    // critical fix for the reload pagination bug: when the loader is
-    // showing, the scroll container is unmounted (`scrollRef.current ==
-    // null`); when the loader disappears later, neither `hasNextPage`
-    // nor `messages.length` changes — but `scrollEl` flips from null to
-    // the new element, which re-runs the effect.
-    const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null)
-    const [sentinelEl, setSentinelEl] = useState<HTMLDivElement | null>(null)
+    const sentinelRef = useRef<HTMLDivElement>(null)
     const onLoadMoreRef = useRef(onLoadMore)
     onLoadMoreRef.current = onLoadMore
     const isFetchingRef = useRef(isFetchingNextPage)
@@ -118,36 +99,9 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       scrollHeight: number
     }>({ firstMessageId: undefined, firstMessageContent: undefined, scrollHeight: 0 })
 
-    // ---- Force-stick: dialog change / first-load / new user message / stream tail --
-    // `useLayoutEffect` so the scrollTop write lands BEFORE browser
-    // paint — otherwise a dialog switch with prior history flashes the
-    // top of the list (oldest msgs) for one frame before snapping down.
-    //
-    // Critical: gate on `scrollEl` (state, not ref). When `useDelayedFlag`
-    // is showing the loader, the scroll container is UNMOUNTED. If we
-    // ran the snap-logic during the loader phase, `scrollToBottom` would
-    // no-op AND `prevRenderRef` would record the new dialog/count — so
-    // when the loader finally hides and the container remounts, we'd
-    // think "no dialog change" and never snap. By depending on
-    // `scrollEl`, this effect re-runs the moment the container mounts
-    // and catches up on any transition that happened during the loader.
-    //
-    // Streaming tail (added 2026-05): the library's RO-driven follow
-    // depends on its internal `state.isAtBottom`, which starts FALSE
-    // and only flips true on an explicit `scrollToBottom` call
-    // (without `preserveScrollPosition`). For a flow where the
-    // consumer wraps `contentRef` with a `<div className="flex-1" />`
-    // spacer + `minHeight: 100%` (so messages visually bottom-align
-    // when content is short), the library's initial-snap RO callback
-    // runs with `preserveScrollPosition: true` → bails on
-    // `!state.isAtBottom`, never flips it true. Result: streaming
-    // assistant content grows but viewport stays at scrollTop=0.
-    // We explicitly tail on every messages update when the user is
-    // within `STREAM_TAIL_THRESHOLD_PX` of the bottom — independent
-    // of the library's internal state. This restores 2026-grade
-    // "follow during stream, release when user scrolls up" UX.
-    useLayoutEffect(() => {
-      if (!autoScroll || !scrollEl) return
+    // ---- Force-stick: dialog change / first-load / new user message --
+    useEffect(() => {
+      if (!autoScroll) return
 
       const dialogChanged = dialogId !== prevRenderRef.current.dialogId
       const prevCount = prevRenderRef.current.messageCount
@@ -166,18 +120,6 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         return
       }
       if (newCount > prevCount) {
-        // Load-older PREPEND: new content arrived at the START of the
-        // array (firstMessageId changed). DON'T snap — the prepend-
-        // anchor effect below preserves the user's reading position.
-        // Without this guard, `messages.slice(prevCount)` would pick
-        // up old user messages now sitting at the tail and falsely
-        // trigger a scrollToBottom.
-        const isPrepend =
-          prependRef.current.firstMessageId !== undefined &&
-          messages[0]?.id !== prependRef.current.firstMessageId
-
-        if (isPrepend) return
-
         // Scan the new tail for any user-role message. Handles the
         // coalesced-render case where optimistic-user + server-
         // assistant land in the same diff (last is assistant, but a
@@ -188,34 +130,12 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         const hasNewUser = newSlice.some((m) => m.role === 'user')
         if (hasNewUser) {
           void scrollToBottom({ animation: 'instant', ignoreEscapes: true })
-          return
         }
-        // Assistant placeholder appended (no user in the slice) —
-        // instant-snap so the bubble lands pinned to the bottom and
-        // subsequent token streams keep the user oriented. Without
-        // this snap, the library's RO can fail to follow if its
-        // internal `isAtBottom` was never set true (see top comment).
-        void scrollToBottom({ animation: 'instant', ignoreEscapes: true })
-        return
+        // Assistant-only new messages → the library's resize-watch
+        // already keeps the bottom locked when the user hasn't
+        // escaped. No explicit call needed; spring animation runs.
       }
-
-      // Stream tail: same count, last id unchanged → assistant content
-      // is streaming in. Follow the bottom unless the user has
-      // explicitly escaped the lock (scrolled up). We can't gate on
-      // current `distToBottom` because the server may emit ~100KB
-      // of sources/refs metadata in ONE chunk before the text stream
-      // begins — by the time this useLayoutEffect runs after that
-      // render, distToBottom is already in the thousands of pixels
-      // and any threshold check would mis-fire as "user is far away".
-      // `escapedFromLock` is the canonical "did the user intentionally
-      // step out of follow-mode" signal — driven by the lib's wheel
-      // + touch + scroll handlers, not by post-render geometry.
-      // `smooth` animation matches the library's `resize: 'smooth'`
-      // option — spring-physics glide instead of jarring snap.
-      if (!escapedFromLock) {
-        void scrollToBottom({ animation: 'smooth' })
-      }
-    }, [autoScroll, messages, dialogId, scrollToBottom, scrollEl, escapedFromLock])
+    }, [autoScroll, messages, dialogId, scrollToBottom])
 
     // ---- Prepend anchoring (load-older) ------------------------------
     // The library doesn't preserve user position when content prepends
@@ -224,7 +144,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     // user on the same message they were reading. `useLayoutEffect`
     // so the scrollTop write lands before paint (no visible jump).
     useLayoutEffect(() => {
-      const el = scrollEl
+      const el = scrollRef.current
       if (!el) {
         prependRef.current = { firstMessageId: undefined, firstMessageContent: undefined, scrollHeight: 0 }
         return
@@ -260,63 +180,46 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       if (currentFirstContent !== prependRef.current.firstMessageContent) {
         prependRef.current.firstMessageContent = currentFirstContent
       }
-    }, [messages, scrollEl])
+    }, [messages, scrollRef])
 
     // ---- Load-more (infinite-scroll UP) ------------------------------
-    // Distinct from stick-to-bottom. Two mechanisms in parallel:
-    //  1. IntersectionObserver on the top sentinel — cheap, fires when
-    //     the sentinel actually enters the viewport (± rootMargin).
-    //  2. Scroll-listener fallback (200px from top) — covers the race
-    //     where IO mounts before the sentinel/scroll container has its
-    //     final geometry on page reload, and the case where the user
-    //     reaches the top on a chat that initially had `hasNextPage`
-    //     undefined (cache cold). Both call `onLoadMoreRef.current` and
-    //     guard with `isFetchingRef` so a double-fire is a single fetch.
-    // Deps include `messages.length` so the effect re-binds once content
-    // actually renders (fixes the case where the first commit has
-    // hasNextPage=true but sentinel ref isn't yet attached).
+    // Distinct from stick-to-bottom; uses its own IntersectionObserver
+    // on the top sentinel.
     useEffect(() => {
-      const scrollContainer = scrollEl
-      const sentinelElement = sentinelEl
-      if (!scrollContainer || !hasNextPage) return
+      const scrollContainer = scrollRef.current
+      const sentinelElement = sentinelRef.current
+      if (!scrollContainer || !sentinelElement || !hasNextPage) return
 
-      const tryLoad = () => {
-        if (isFetchingRef.current) return
-        onLoadMoreRef.current?.()
-      }
-
-      let observer: IntersectionObserver | undefined
-      if (sentinelElement) {
-        observer = new IntersectionObserver(
-          (entries) => {
-            const entry = entries[0]
-            if (entry?.isIntersecting) tryLoad()
-          },
-          { root: scrollContainer, rootMargin: '200px', threshold: 0.1 },
-        )
-        observer.observe(sentinelElement)
-      }
-
-      const onScroll = () => {
-        if (scrollContainer.scrollTop <= 200) tryLoad()
-      }
-      scrollContainer.addEventListener('scroll', onScroll, { passive: true })
-
-      return () => {
-        observer?.disconnect()
-        scrollContainer.removeEventListener('scroll', onScroll)
-      }
-    }, [hasNextPage, scrollEl, sentinelEl, messages.length])
+      const observer = new IntersectionObserver(
+        (entries) => {
+          const entry = entries[0]
+          if (!entry) return
+          if (entry.isIntersecting && !isFetchingRef.current) {
+            onLoadMoreRef.current?.()
+          }
+        },
+        { root: scrollContainer, rootMargin: '200px', threshold: 0.1 },
+      )
+      observer.observe(sentinelElement)
+      return () => observer.disconnect()
+    }, [hasNextPage, scrollRef])
 
     // Expose the scroll container ref to parents that need it (rare,
     // but the existing public contract). Library's `scrollRef` is a
     // MutableRefObject<HTMLElement> so we cast to the public type.
     useImperativeHandle(ref, () => scrollRef.current as HTMLDivElement, [scrollRef])
 
-    // Gate the loader: only show after 200ms (fast loads never flicker),
-    // and once shown, hold for at least 400ms (no sub-frame flash if data
-    // arrives a moment later).
-    const showLoader = useDelayedFlag(isLoading, { delay: 200, minDuration: 400 })
+    if (isLoading) {
+      return (
+        <ChatMessageListSkeleton
+          className={className}
+          showAvatars={showAvatars}
+          assistantType={assistantType}
+          contentClassName={contentClassName}
+          messageCount={6}
+        />
+      )
+    }
 
     // Adapt the library's refs to React's `Ref<HTMLDivElement>` JSX
     // slot. The library types its refs against `HTMLElement` (broader
@@ -333,31 +236,11 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     // cleanup contract). The hub's React types reject that union in a
     // JSX `Ref<T>` slot. Force `void` here — the library doesn't use
     // the cleanup return path in any meaningful way for the public hook.
-    // CRITICAL: memoize these ref callbacks. Inline refs (new function
-    // each render) cause React to call cleanup(null) then setup(el) on
-    // EVERY render — which would flip `scrollEl` state null→el every
-    // render, churning the prepend-anchor `useLayoutEffect` and
-    // wiping `prependRef.current.scrollHeight` to 0 on each null pass
-    // (see the `if (!el)` branch in the prepend effect). The net
-    // effect is that load-older never has a valid prev-height snapshot
-    // and the user's scroll position isn't preserved after pagination.
-    // Must live ABOVE the `showLoader` early return — Rules of Hooks.
-    const setScrollRef = useCallback((el: HTMLDivElement | null): void => {
+    const setScrollRef = (el: HTMLDivElement | null): void => {
       scrollRef(el)
-      setScrollEl(el)
-    }, [scrollRef])
-    const setContentRef = useCallback((el: HTMLDivElement | null): void => {
+    }
+    const setContentRef = (el: HTMLDivElement | null): void => {
       contentRef(el)
-    }, [contentRef])
-
-    if (showLoader) {
-      return (
-        <ChatMessageListLoader
-          className={className}
-          assistantIcon={assistantIcon}
-          assistantType={assistantType}
-        />
-      )
     }
 
     return (
@@ -379,19 +262,8 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
             )}
             style={{ minHeight: '100%' }}
           >
-            {/* Infinite scroll sentinel + loader for older pages */}
             {hasNextPage && (
-              <div ref={setSentinelEl} className="h-px" />
-            )}
-            {isFetchingNextPage && (
-              <div
-                className="flex justify-center py-3 animate-in fade-in duration-200"
-                role="status"
-                aria-live="polite"
-                aria-busy="true"
-              >
-                <PulseDots size="sm" />
-              </div>
+              <div ref={sentinelRef} className="h-px" />
             )}
             <div className="flex-1" />
             {messages.map((message, index) => (
