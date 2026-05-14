@@ -338,16 +338,28 @@ interface YouTubeFacadeInnerProps {
   minimalControls?: boolean;
 }
 
-// YouTube IFrame Player API state value (documented integer). The full list
-// is at https://developers.google.com/youtube/iframe_api_reference#Playback_status
-// We only consume ENDED — the user-locked contract is that we NEVER stop
-// playback on outside click. ENDED is the one state where playback is
-// already over (no playback to interrupt), so tearing down the iframe is
-// safe and removes the "More videos" suggestion overlay that YouTube
-// leaves lingering on the page.
+// YouTube IFrame Player API state values (documented integers).
+// https://developers.google.com/youtube/iframe_api_reference#Playback_status
+// We consume:
+//   - ENDED (0): tear down the iframe to kill YouTube's "More videos"
+//     post-playback suggestion overlay.
+//   - PLAYING (1): blur the iframe so YouTube's internal idle timer for
+//     the bottom control bar fires sooner. YouTube treats a focused
+//     iframe as "user actively engaging" and keeps controls visible 5–10s.
+//     A blur at PLAYING-start cuts that to YouTube's minimum (~2s).
 const YT_STATE_ENDED = 0;
+const YT_STATE_PLAYING = 1;
 
 const YT_NOCOOKIE_ORIGIN = 'https://www.youtube-nocookie.com';
+
+// Aggressive state-channel subscription window. The "listening" postMessage
+// is idempotent on YouTube's side, so re-sending costs nothing — but a
+// single send on iframe `load` can miss when YouTube's API isn't ready
+// yet, leaving us deaf to ENDED for short videos. Resending every 250 ms
+// for the first 2 s guarantees the subscription lands before any plausible
+// playback finishes.
+const YT_SUBSCRIBE_RETRY_INTERVAL_MS = 250;
+const YT_SUBSCRIBE_RETRY_WINDOW_MS = 2000;
 
 /**
  * Shape of the `infoDelivery` message YouTube broadcasts on every state
@@ -451,14 +463,37 @@ function YouTubeFacadeInner({
     // about:blank harmlessly; the load-event call hits the real player.
     subscribeToYouTubeStateChannel();
 
+    // Retry every 250 ms for the first 2 s to guarantee the subscription
+    // lands even if `load` fires before YouTube's IFrame API is ready
+    // (slow networks, short videos). YouTube treats duplicate listening
+    // subscriptions as idempotent, so this is safe.
+    const retryInterval = setInterval(
+      subscribeToYouTubeStateChannel,
+      YT_SUBSCRIBE_RETRY_INTERVAL_MS,
+    );
+    const stopRetry = setTimeout(
+      () => clearInterval(retryInterval),
+      YT_SUBSCRIBE_RETRY_WINDOW_MS,
+    );
+
     return () => {
       iframe.removeEventListener('load', subscribeToYouTubeStateChannel);
+      clearInterval(retryInterval);
+      clearTimeout(stopRetry);
     };
   }, [activated]);
 
-  // Listen for `infoDelivery` messages — tear down on ENDED only. All other
-  // states (PAUSED / PLAYING / BUFFERING / CUED / UNSTARTED) are unhandled
-  // so playback control stays in the user's hands.
+  // Listen for `infoDelivery` messages. Two state codes drive behavior:
+  //   - PLAYING (1): blur the iframe so YouTube's idle timer fires sooner
+  //     and the bottom control bar fades faster than YouTube's 5–10 s
+  //     default. The video keeps playing; we only remove DOM focus, not
+  //     pointer hover or playback state.
+  //   - ENDED (0): tear the iframe down. Playback is over — there's
+  //     nothing to interrupt — and removing the iframe kills the residual
+  //     "More videos" suggestion overlay YouTube otherwise hangs on the
+  //     page for the user to see indefinitely.
+  // PAUSED is deliberately unhandled — the user paused on purpose, leave
+  // YouTube's UI in place so they can resume.
   useEffect(() => {
     if (!activated) return;
 
@@ -474,9 +509,11 @@ function YouTubeFacadeInner({
       if (!payload || payload.event !== 'infoDelivery') return;
       const state = payload.info?.playerState;
       if (typeof state !== 'number') return;
+      if (state === YT_STATE_PLAYING) {
+        iframeRef.current?.blur();
+        return;
+      }
       if (state === YT_STATE_ENDED) {
-        // Playback already over — tearing down kills YouTube's residual
-        // "More videos" suggestion overlay without interrupting anything.
         setActivated(false);
       }
     }
