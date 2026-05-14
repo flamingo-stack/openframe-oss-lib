@@ -50,7 +50,6 @@ export const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
   minimalControls = false,
   aboveTheFold = false,
 }) => {
-  const containerRef = useRef<HTMLDivElement | null>(null);
   const [activated, setActivated] = useState(false);
 
   // Build embed URL — youtube-nocookie + autoplay=1 (synchronous click → play preserves activation).
@@ -77,9 +76,20 @@ export const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
   // preserves the user-activation chain for autoplay across all browsers.
   // Doing this via React state would punt iframe insertion into a future
   // commit, which Chrome / Safari treat as non-user-initiated and block.
+  //
+  // DOM-vs-React rule: the iframe is appended to `iframeSlotRef` — a div that
+  // React owns but never renders children into. The `<button>` overlay lives
+  // as a SIBLING of that slot (NOT inside it) so React's reconciler can
+  // remove the button on re-render without bumping into our imperative iframe.
+  // Earlier impl used `replaceChildren(iframe)` on the same element React
+  // was rendering the button into, which yanked the button out of the DOM
+  // and triggered a `Failed to execute 'removeChild' ... is not a child of
+  // this node` reconciler error on the next render.
+  const iframeSlotRef = useRef<HTMLDivElement | null>(null);
+
   const handleActivate = () => {
-    const container = containerRef.current;
-    if (!container) return;
+    const slot = iframeSlotRef.current;
+    if (!slot || activated) return;
     const iframe = document.createElement('iframe');
     iframe.setAttribute(
       'allow',
@@ -87,10 +97,10 @@ export const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
     );
     iframe.setAttribute('allowfullscreen', '');
     iframe.setAttribute('title', title);
-    iframe.className = 'w-full h-full border-0';
+    iframe.className = 'absolute inset-0 w-full h-full border-0';
     iframe.style.border = 'none';
     iframe.src = embedUrl;
-    container.replaceChildren(iframe);
+    slot.appendChild(iframe);
     setActivated(true);
   };
 
@@ -104,16 +114,22 @@ export const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
 
       {/* 16:9 wrapper */}
       <div className="video-wrapper relative w-full" style={{ paddingBottom: '56.25%' }}>
-        <div
-          ref={containerRef}
-          className="absolute inset-0 rounded-lg overflow-hidden border border-ods-border bg-ods-card"
-        >
+        <div className="absolute inset-0 rounded-lg overflow-hidden border border-ods-border bg-ods-card">
+          {/* React-owned but JSX-empty slot. The iframe gets appended here
+              imperatively in handleActivate. React does not reconcile its
+              contents (no children in JSX) so the imperative iframe sticks. */}
+          <div ref={iframeSlotRef} className="absolute inset-0" aria-hidden={!activated} />
+
+          {/* Facade overlay — sibling of the iframe slot, NOT a child of it.
+              When activated flips to true, React removes the button cleanly
+              because the button is still in React's tree (siblings of an
+              imperatively-managed div don't get yanked). */}
           {!activated && (
             <button
               type="button"
               aria-label={`Play: ${title}`}
               onClick={handleActivate}
-              className="group relative w-full h-full p-0 m-0 border-0 cursor-pointer bg-transparent"
+              className="group absolute inset-0 p-0 m-0 border-0 cursor-pointer bg-transparent"
             >
               <picture>
                 <source type="image/webp" srcSet={posterWebp} />
@@ -134,7 +150,6 @@ export const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
               </div>
             </button>
           )}
-          {/* When activated, the iframe is injected imperatively above. React doesn't manage it. */}
         </div>
       </div>
 
