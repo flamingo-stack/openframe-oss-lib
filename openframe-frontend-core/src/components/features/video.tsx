@@ -30,7 +30,7 @@
  *   layout="native"   → intrinsic aspect ratio. Bites grid, blog cards.
  */
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import MuxPlayer from '@mux/mux-player-react';
 
 // =============================================================================
@@ -338,42 +338,7 @@ interface YouTubeFacadeInnerProps {
   minimalControls?: boolean;
 }
 
-// YouTube IFrame Player API state values (documented integers).
-// https://developers.google.com/youtube/iframe_api_reference#Playback_status
-// We consume:
-//   - ENDED (0): tear down the iframe to kill YouTube's "More videos"
-//     post-playback suggestion overlay.
-//   - PLAYING (1): blur the iframe so YouTube's internal idle timer for
-//     the bottom control bar fires sooner. YouTube treats a focused
-//     iframe as "user actively engaging" and keeps controls visible 5–10s.
-//     A blur at PLAYING-start cuts that to YouTube's minimum (~2s).
-const YT_STATE_ENDED = 0;
-const YT_STATE_PLAYING = 1;
-
 const YT_NOCOOKIE_ORIGIN = 'https://www.youtube-nocookie.com';
-
-// Aggressive state-channel subscription window. The "listening" postMessage
-// is idempotent on YouTube's side, so re-sending costs nothing — but a
-// single send on iframe `load` can miss when YouTube's API isn't ready
-// yet, leaving us deaf to ENDED for short videos. Resending every 250 ms
-// for the first 2 s guarantees the subscription lands before any plausible
-// playback finishes.
-const YT_SUBSCRIBE_RETRY_INTERVAL_MS = 250;
-const YT_SUBSCRIBE_RETRY_WINDOW_MS = 2000;
-
-/**
- * Shape of the `infoDelivery` message YouTube broadcasts on every state
- * change. We only read `playerState`; the rest of the envelope (currentTime,
- * duration, volume, etc.) is typed for future consumers.
- */
-interface YouTubeInfoDeliveryMessage {
-  event?: string;
-  info?: {
-    playerState?: number;
-    currentTime?: number;
-    duration?: number;
-  };
-}
 
 function YouTubeFacadeInner({
   videoId,
@@ -383,27 +348,16 @@ function YouTubeFacadeInner({
   minimalControls,
 }: YouTubeFacadeInnerProps): React.ReactElement {
   const [activated, setActivated] = useState(false);
-  const wrapperRef = useRef<HTMLDivElement | null>(null);
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   // Embed URL + poster URLs only change when `videoId` or `minimalControls`
   // do — memoize so we don't rebuild URLSearchParams on every render.
-  //
-  // `enablejsapi=1` opens the postMessage state channel we subscribe to
-  // below (YouTube ignores `event:listening` messages without it).
-  // `origin=` binds the player to our origin as an anti-hijack measure
-  // documented in YouTube's IFrame Player API guide.
   const { embedUrl, posterJpg, posterWebp } = useMemo(() => {
-    const pageOrigin =
-      typeof window !== 'undefined' ? window.location.origin : '';
     const params = new URLSearchParams({
       autoplay: '1',
       rel: '0',
       modestbranding: '1',
       playsinline: '1',
-      enablejsapi: '1',
     });
-    if (pageOrigin) params.set('origin', pageOrigin);
     if (minimalControls) {
       params.set('controls', '0');
       params.set('fs', '0');
@@ -418,172 +372,24 @@ function YouTubeFacadeInner({
     };
   }, [videoId, minimalControls]);
 
-  // ---------------------------------------------------------------------------
-  // User-locked contract for this facade (do not regress):
+  // Pure lite-youtube-embed pattern: poster + click → iframe. Two
+  // mutually-exclusive return paths eliminate the imperative-DOM race the
+  // previous implementation had. Autoplay works because the user gesture
+  // (the button's onClick) and the iframe mount happen in the SAME React
+  // commit — iOS Safari treats the iframe insertion as still inside the
+  // user-activation tick.
   //
-  //   1. **NEVER stop playback on outside click.** If the video is playing,
-  //      clicking elsewhere on the page MUST NOT pause / tear down / reload.
-  //      Earlier iterations tried that and the user explicitly forbid it.
-  //
-  //   2. **Make YouTube's controls hide FASTER on outside click.** YouTube's
-  //      native idle timer is 5–10 seconds. We can shave that by blurring
-  //      the iframe so YouTube stops treating it as "actively focused" —
-  //      its internal timer then fires sooner. We can't go below ~3 seconds
-  //      (YouTube's minimum) because the IFrame Player API has no
-  //      `hideControls` command. Verified against the full `func` list.
-  //
-  //   3. **Tear down on ENDED only.** When YouTube reports state=0 (ENDED),
-  //      playback is already over — there's nothing to interrupt. Removing
-  //      the iframe at that point kills the "More videos" suggestion grid
-  //      that YouTube otherwise leaves hanging indefinitely.
-  //
-  // PAUSED (state=2) is deliberately UNHANDLED. If the user pauses inside
-  // the iframe, that's their explicit intent — leaving YouTube's overlay
-  // visible is correct (they want to resume).
-  //
-  // Subscribe to YouTube's postMessage state channel — the "listening"
-  // handshake is the documented lite-mode protocol used by production
-  // embeds that don't pull in the full `iframe_api.js` library:
-  // <https://developers.google.com/youtube/iframe_api_reference>.
-  // ---------------------------------------------------------------------------
-  useEffect(() => {
-    if (!activated) return;
-    const iframe: HTMLIFrameElement | null = iframeRef.current;
-    if (!iframe) return;
-
-    function subscribeToYouTubeStateChannel() {
-      iframe?.contentWindow?.postMessage(
-        '{"event":"listening"}',
-        YT_NOCOOKIE_ORIGIN,
-      );
-    }
-
-    iframe.addEventListener('load', subscribeToYouTubeStateChannel);
-    // Idempotent fallback for cached iframes / HMR — first call may hit
-    // about:blank harmlessly; the load-event call hits the real player.
-    subscribeToYouTubeStateChannel();
-
-    // Retry every 250 ms for the first 2 s to guarantee the subscription
-    // lands even if `load` fires before YouTube's IFrame API is ready
-    // (slow networks, short videos). YouTube treats duplicate listening
-    // subscriptions as idempotent, so this is safe.
-    const retryInterval = setInterval(
-      subscribeToYouTubeStateChannel,
-      YT_SUBSCRIBE_RETRY_INTERVAL_MS,
-    );
-    const stopRetry = setTimeout(
-      () => clearInterval(retryInterval),
-      YT_SUBSCRIBE_RETRY_WINDOW_MS,
-    );
-
-    return () => {
-      iframe.removeEventListener('load', subscribeToYouTubeStateChannel);
-      clearInterval(retryInterval);
-      clearTimeout(stopRetry);
-    };
-  }, [activated]);
-
-  // Listen for `infoDelivery` messages. Two state codes drive behavior:
-  //   - PLAYING (1): blur the iframe so YouTube's idle timer fires sooner
-  //     and the bottom control bar fades faster than YouTube's 5–10 s
-  //     default. The video keeps playing; we only remove DOM focus, not
-  //     pointer hover or playback state.
-  //   - ENDED (0): tear the iframe down. Playback is over — there's
-  //     nothing to interrupt — and removing the iframe kills the residual
-  //     "More videos" suggestion overlay YouTube otherwise hangs on the
-  //     page for the user to see indefinitely.
-  // PAUSED is deliberately unhandled — the user paused on purpose, leave
-  // YouTube's UI in place so they can resume.
-  useEffect(() => {
-    if (!activated) return;
-
-    function handleMessage(event: MessageEvent) {
-      if (event.origin !== YT_NOCOOKIE_ORIGIN) return;
-      if (typeof event.data !== 'string') return;
-      let payload: YouTubeInfoDeliveryMessage | null = null;
-      try {
-        payload = JSON.parse(event.data);
-      } catch {
-        return;
-      }
-      if (!payload || payload.event !== 'infoDelivery') return;
-      const state = payload.info?.playerState;
-      if (typeof state !== 'number') return;
-      if (state === YT_STATE_PLAYING) {
-        iframeRef.current?.blur();
-        return;
-      }
-      if (state === YT_STATE_ENDED) {
-        setActivated(false);
-      }
-    }
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [activated]);
-
-  // Outside-pointerdown — blur the iframe so YouTube's internal idle timer
-  // fires sooner and its bottom control bar fades faster than the natural
-  // 5–10 s. This does NOT pause / tear down playback — the iframe stays
-  // mounted and the video keeps playing. The blur is the only legal lever
-  // we have over YouTube's UI from outside the iframe; there's no postMessage
-  // command to hide controls.
-  //
-  // Capture phase so we react before any consumer's click handlers.
-  useEffect(() => {
-    if (!activated) return;
-
-    function handleOutsidePointerDown(event: PointerEvent) {
-      const target = event.target;
-      if (!(target instanceof Node)) return;
-      const wrapper = wrapperRef.current;
-      if (!wrapper || wrapper.contains(target)) return;
-      iframeRef.current?.blur();
-    }
-
-    document.addEventListener('pointerdown', handleOutsidePointerDown, true);
-    return () =>
-      document.removeEventListener('pointerdown', handleOutsidePointerDown, true);
-  }, [activated]);
-
-  // Escape-key parity for keyboard users. Same blur, no playback impact.
-  // Escape pressed INSIDE the cross-origin iframe doesn't bubble up to our
-  // document — this only fires when focus is on our page.
-  useEffect(() => {
-    if (!activated) return;
-
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key !== 'Escape') return;
-      iframeRef.current?.blur();
-    }
-
-    document.addEventListener('keydown', handleEscape, true);
-    return () => document.removeEventListener('keydown', handleEscape, true);
-  }, [activated]);
-
-  // Early-return rendering. The previous imperative implementation
-  // (`document.createElement('iframe')` + state flip) had a subtle bug
-  // where the play-button overlay could linger past activation because
-  // React's commit phase and the imperative DOM mutation raced. Two
-  // mutually-exclusive return paths eliminate that race entirely — when
-  // `activated` flips, React unmounts the button branch and mounts the
-  // iframe branch in a single commit.
-  //
-  // Autoplay on iOS Safari: the user gesture (the button's onClick) and
-  // the iframe mount happen in the SAME React commit, which flushes
-  // synchronously inside event handlers. iOS treats the iframe insertion
-  // as still being inside the user-activation tick, so `autoplay=1` plays.
-  // (Verified empirically; lite-youtube-embed uses imperative DOM for
-  // legacy-React compatibility — modern React's sync-commit-on-event
-  // makes the JSX path equivalent.)
+  // Behavior in the activated state is left to YouTube's native player —
+  // no outside-click handlers, no postMessage state subscription, no
+  // focus shuffling, no teardown. Earlier iterations layered all that on
+  // and it was the wrong shape for the user's actual use case.
   const wrapperClass = `relative w-full ${className ?? ''}`;
   const wrapperStyle = { paddingBottom: '56.25%' as const };
 
   if (activated) {
     return (
-      <div ref={wrapperRef} className={wrapperClass} style={wrapperStyle}>
+      <div className={wrapperClass} style={wrapperStyle}>
         <iframe
-          ref={iframeRef}
           src={embedUrl}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen
@@ -595,7 +401,7 @@ function YouTubeFacadeInner({
   }
 
   return (
-    <div ref={wrapperRef} className={wrapperClass} style={wrapperStyle}>
+    <div className={wrapperClass} style={wrapperStyle}>
       <button
         type="button"
         aria-label={`Play: ${title}`}
