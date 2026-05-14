@@ -44,4 +44,19 @@ enum SortDirection {
 input SortInput {
     field: String
     direction: SortDirection
-} 
+}
+
+# Generic mutation primitives
+type MutationError {
+    field: [String!]
+    message: String!
+}
+
+type MutationDeletePayload {
+    deletedId: ID
+    userErrors: [MutationError!]!
+}
+
+input MutationDeleteInput {
+    id: ID!
+}
