@@ -280,7 +280,14 @@ function FilePlayer({
       playsInline
       muted={muted}
       preferCmcd="header"
-      accentColor="var(--ods-accent)"
+      // MuxPlayer's built-in default is `#fa50b5` (Mux brand pink) — when
+      // its `--media-accent-color` resolves to nothing the player falls
+      // through to that hardcoded pink. The `var(--ods-accent,
+      // var(--color-accent-primary))` chain hits the platform-aware
+      // ODS token first, then the semantic accent alias if `--ods-accent`
+      // is ever undefined on a `data-app-type` we haven't themed yet.
+      // NEVER let Mux pink leak onto a non-Flamingo platform.
+      accentColor="var(--ods-accent, var(--color-accent-primary))"
       className={className}
       // Fill the wrapping aspect-ratio container instead of MuxPlayer's
       // intrinsic size. Without this, MuxPlayer renders at its default
