@@ -32,6 +32,7 @@
 
 import React, { useMemo, useState } from 'react';
 import MuxPlayer from '@mux/mux-player-react';
+import { PlayIcon } from '../icons-v2-generated/media-playback/play-icon';
 
 // =============================================================================
 // URL classifiers (private — `<Video>` is the only consumer)
@@ -421,9 +422,7 @@ function YouTubeFacadeInner({
         </picture>
         <div className="absolute inset-0 flex items-center justify-center bg-ods-bg-inverse bg-opacity-20 transition-opacity duration-200 group-hover:bg-opacity-30">
           <span className="flex items-center justify-center w-16 h-16 rounded-full bg-ods-accent text-ods-text-on-accent shadow-lg transition-transform duration-200 group-hover:scale-110">
-            <svg width={24} height={24} fill="currentColor" viewBox="0 0 24 24" className="ml-1">
-              <polygon points="5,3 19,12 5,21" />
-            </svg>
+            <PlayIcon size={24} color="currentColor" className="ml-1" />
           </span>
         </div>
       </button>
