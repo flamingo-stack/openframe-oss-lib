@@ -25,7 +25,7 @@ public class AuthUser {
     private String lastName;
     private List<UserRole> roles;
     private UserStatus status;
-    private String image;
+    private Object image;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
