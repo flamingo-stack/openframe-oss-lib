@@ -33,7 +33,15 @@ export * from './social-links-manager'
 export * from './start-with-openframe-button'
 export * from './status-filter-component'
 export * from './tags-selector'
-export * from './video-player'
+// Unified video primitives — single source of truth across all platforms.
+// `<Video>` replaces the deleted `<VideoPlayer>` + `<YouTubeEmbed>` pair;
+// `<EntityVideoSection>` + `<VideoBitesDisplay>` are the public detail-page
+// wrappers; `video-ratio-tabs` exports the aspect-ratio grouping primitives
+// shared by the public bites grid and the admin editors.
+export * from './video'
+export * from './video-ratio-tabs'
+export * from './video-bites-display'
+export * from './entity-video-section'
 export * from './video-source-selector'
 export * from './transcript-summary-editor'
 export * from './highlight-video-section'
@@ -46,7 +54,6 @@ export * from './highlight-video-preview'
 export * from './transcribe-and-summarize-combined-section'
 export * from './highlight-video-combined-section'
 export * from './view-toggle'
-export * from './youtube-embed'
 // AI Enrich components
 export * from './ai-enrich'
 export * from './policy-configuration-panel'
