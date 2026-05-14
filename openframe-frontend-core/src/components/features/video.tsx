@@ -30,7 +30,7 @@
  *   layout="native"   → intrinsic aspect ratio. Bites grid, blog cards.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import MuxPlayer from '@mux/mux-player-react';
 
 // =============================================================================
@@ -338,6 +338,31 @@ interface YouTubeFacadeInnerProps {
   minimalControls?: boolean;
 }
 
+// YouTube IFrame Player API state value (documented integer). The full list
+// is at https://developers.google.com/youtube/iframe_api_reference#Playback_status
+// We only consume ENDED — the user-locked contract is that we NEVER stop
+// playback on outside click. ENDED is the one state where playback is
+// already over (no playback to interrupt), so tearing down the iframe is
+// safe and removes the "More videos" suggestion overlay that YouTube
+// leaves lingering on the page.
+const YT_STATE_ENDED = 0;
+
+const YT_NOCOOKIE_ORIGIN = 'https://www.youtube-nocookie.com';
+
+/**
+ * Shape of the `infoDelivery` message YouTube broadcasts on every state
+ * change. We only read `playerState`; the rest of the envelope (currentTime,
+ * duration, volume, etc.) is typed for future consumers.
+ */
+interface YouTubeInfoDeliveryMessage {
+  event?: string;
+  info?: {
+    playerState?: number;
+    currentTime?: number;
+    duration?: number;
+  };
+}
+
 function YouTubeFacadeInner({
   videoId,
   title,
@@ -346,162 +371,158 @@ function YouTubeFacadeInner({
   minimalControls,
 }: YouTubeFacadeInnerProps): React.ReactElement {
   const [activated, setActivated] = useState(false);
-  // Wrapper hosts BOTH the play button (pre-activation) and the iframe
-  // (post-activation). `tabIndex={-1}` is critical: it makes the wrapper
-  // programmatically focusable so we can park focus there on outside
-  // click, defeating YouTube's "keep controls visible while iframe is
-  // focused" behavior. Without that, blurring the iframe just sends
-  // focus to <body> and iOS Safari sometimes treats it as if focus
-  // never left.
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   // Embed URL + poster URLs only change when `videoId` or `minimalControls`
   // do — memoize so we don't rebuild URLSearchParams on every render.
+  //
+  // `enablejsapi=1` opens the postMessage state channel we subscribe to
+  // below (YouTube ignores `event:listening` messages without it).
+  // `origin=` binds the player to our origin as an anti-hijack measure
+  // documented in YouTube's IFrame Player API guide.
   const { embedUrl, posterJpg, posterWebp } = useMemo(() => {
+    const pageOrigin =
+      typeof window !== 'undefined' ? window.location.origin : '';
     const params = new URLSearchParams({
       autoplay: '1',
       rel: '0',
       modestbranding: '1',
       playsinline: '1',
+      enablejsapi: '1',
     });
+    if (pageOrigin) params.set('origin', pageOrigin);
     if (minimalControls) {
       params.set('controls', '0');
-      params.set('showinfo', '0');
       params.set('fs', '0');
       params.set('iv_load_policy', '3');
       params.set('cc_load_policy', '0');
       params.set('disablekb', '1');
     }
     return {
-      embedUrl: `https://www.youtube-nocookie.com/embed/${videoId}?${params.toString()}`,
+      embedUrl: `${YT_NOCOOKIE_ORIGIN}/embed/${videoId}?${params.toString()}`,
       posterJpg: `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
       posterWebp: `https://i.ytimg.com/vi_webp/${videoId}/mqdefault.webp`,
     };
   }, [videoId, minimalControls]);
 
   // ---------------------------------------------------------------------------
-  // Hide YouTube's persistent controls without pausing the video.
+  // User-locked contract for this facade (do not regress):
   //
-  // Why this works (researched against the YouTube IFrame Player API + Media
-  // Chrome conventions used by Mux Player):
+  //   1. **NEVER stop playback on outside click.** If the video is playing,
+  //      clicking elsewhere on the page MUST NOT pause / tear down / reload.
+  //      Earlier iterations tried that and the user explicitly forbid it.
   //
-  //   YouTube's iframe player keeps the bottom control bar visible as long
-  //   as the iframe holds DOM focus (`document.activeElement === iframe`).
-  //   That's why clicking elsewhere on the page doesn't auto-hide them — the
-  //   pointer leaves, but focus stays, so YouTube treats the player as
-  //   "still being interacted with."
+  //   2. **Make YouTube's controls hide FASTER on outside click.** YouTube's
+  //      native idle timer is 5–10 seconds. We can shave that by blurring
+  //      the iframe so YouTube stops treating it as "actively focused" —
+  //      its internal timer then fires sooner. We can't go below ~3 seconds
+  //      (YouTube's minimum) because the IFrame Player API has no
+  //      `hideControls` command. Verified against the full `func` list.
   //
-  //   The YouTube postMessage API has NO `hideControls`/`blur` command — we
-  //   verified the full `func` list (playVideo, pauseVideo, seekTo,
-  //   getCurrentTime, addEventListener, …, none expose control visibility).
-  //   But blurring the iframe via the standard DOM `blur()` triggers
-  //   YouTube's internal idle timer (~3s) and the bar fades out — same
-  //   feel as Mux Player's Media Chrome `autohide="2"`.
+  //   3. **Tear down on ENDED only.** When YouTube reports state=0 (ENDED),
+  //      playback is already over — there's nothing to interrupt. Removing
+  //      the iframe at that point kills the "More videos" suggestion grid
+  //      that YouTube otherwise leaves hanging indefinitely.
   //
-  //   We park focus on the wrapper (`tabIndex={-1}`) rather than letting it
-  //   fall through to <body> — iOS Safari is finicky about reading
-  //   `document.activeElement` after a bare `blur()`, and the explicit
-  //   focus parent is the documented workaround.
+  // PAUSED (state=2) is deliberately UNHANDLED. If the user pauses inside
+  // the iframe, that's their explicit intent — leaving YouTube's overlay
+  // visible is correct (they want to resume).
   //
-  //   The video is NEVER paused (we don't call the `pauseVideo` postMessage
-  //   command). Outside-click = "remove the visual overlay", not "stop
-  //   playing".
-  //
-  //   Pointer events INSIDE the iframe never fire on `document` (separate
-  //   browsing context, cross-origin policy) — so YouTube's own interactions
-  //   pass through cleanly. Only genuine outside clicks trigger the blur.
+  // Subscribe to YouTube's postMessage state channel — the "listening"
+  // handshake is the documented lite-mode protocol used by production
+  // embeds that don't pull in the full `iframe_api.js` library:
+  // <https://developers.google.com/youtube/iframe_api_reference>.
   // ---------------------------------------------------------------------------
-  const hideYouTubeControls = useCallback(() => {
-    const iframe = iframeRef.current;
-    const wrapper = wrapperRef.current;
-    if (!iframe || !wrapper) return;
-    // Only do the focus shuffle when the iframe actually holds focus.
-    // Otherwise YouTube's controls are already in their idle / mouse-leave
-    // state and this call would just steal focus from whatever else has
-    // it (e.g. an unrelated modal whose Escape just closed it). The guard
-    // makes all three triggers (outside pointerdown / Escape / tab-restore)
-    // no-ops when there's nothing to fix.
-    if (document.activeElement !== iframe) return;
-    iframe.blur();
-    // Defensive: if browser has a stale activeElement (iOS Safari quirk),
-    // explicitly park focus on the tabIndex=-1 wrapper so YouTube's
-    // post-blur state is unambiguous.
-    wrapper.focus({ preventScroll: true });
-  }, []);
+  useEffect(() => {
+    if (!activated) return;
+    const iframe: HTMLIFrameElement | null = iframeRef.current;
+    if (!iframe) return;
 
-  // Outside-pointerdown — pointer surface for the auto-hide gesture. Capture
-  // phase so we react BEFORE any consumer's click handlers; the blur happens
-  // in the same tick as the gesture that triggered it, so there's no
-  // perceptible delay between clicking outside and the fade starting.
+    function subscribeToYouTubeStateChannel() {
+      iframe?.contentWindow?.postMessage(
+        '{"event":"listening"}',
+        YT_NOCOOKIE_ORIGIN,
+      );
+    }
+
+    iframe.addEventListener('load', subscribeToYouTubeStateChannel);
+    // Idempotent fallback for cached iframes / HMR — first call may hit
+    // about:blank harmlessly; the load-event call hits the real player.
+    subscribeToYouTubeStateChannel();
+
+    return () => {
+      iframe.removeEventListener('load', subscribeToYouTubeStateChannel);
+    };
+  }, [activated]);
+
+  // Listen for `infoDelivery` messages — tear down on ENDED only. All other
+  // states (PAUSED / PLAYING / BUFFERING / CUED / UNSTARTED) are unhandled
+  // so playback control stays in the user's hands.
+  useEffect(() => {
+    if (!activated) return;
+
+    function handleMessage(event: MessageEvent) {
+      if (event.origin !== YT_NOCOOKIE_ORIGIN) return;
+      if (typeof event.data !== 'string') return;
+      let payload: YouTubeInfoDeliveryMessage | null = null;
+      try {
+        payload = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      if (!payload || payload.event !== 'infoDelivery') return;
+      const state = payload.info?.playerState;
+      if (typeof state !== 'number') return;
+      if (state === YT_STATE_ENDED) {
+        // Playback already over — tearing down kills YouTube's residual
+        // "More videos" suggestion overlay without interrupting anything.
+        setActivated(false);
+      }
+    }
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [activated]);
+
+  // Outside-pointerdown — blur the iframe so YouTube's internal idle timer
+  // fires sooner and its bottom control bar fades faster than the natural
+  // 5–10 s. This does NOT pause / tear down playback — the iframe stays
+  // mounted and the video keeps playing. The blur is the only legal lever
+  // we have over YouTube's UI from outside the iframe; there's no postMessage
+  // command to hide controls.
+  //
+  // Capture phase so we react before any consumer's click handlers.
   useEffect(() => {
     if (!activated) return;
 
     function handleOutsidePointerDown(event: PointerEvent) {
-      // `instanceof Node` narrows EventTarget cleanly — no `as` cast needed,
-      // and skips the case where target is null or a non-DOM type (rare but
-      // possible for synthetic events / browser test harnesses).
       const target = event.target;
       if (!(target instanceof Node)) return;
       const wrapper = wrapperRef.current;
       if (!wrapper || wrapper.contains(target)) return;
-      hideYouTubeControls();
+      iframeRef.current?.blur();
     }
 
     document.addEventListener('pointerdown', handleOutsidePointerDown, true);
     return () =>
       document.removeEventListener('pointerdown', handleOutsidePointerDown, true);
-  }, [activated, hideYouTubeControls]);
+  }, [activated]);
 
-  // Escape-key parity — keyboard surface for the same auto-hide gesture.
-  // Capture phase matches the pointerdown handler so a parent modal /
-  // dropdown that swallows Escape on bubble doesn't starve us.
-  //
-  // Scope note: Escape pressed INSIDE the cross-origin iframe does NOT
-  // bubble up to our document — browser security isolates keyboard events
-  // to the iframe's own document when focus is inside it. This handler
-  // covers the case where the user has already moved focus OUT of the
-  // iframe (e.g. by clicking elsewhere) and then presses Escape; YouTube's
-  // native Escape-to-exit-fullscreen handles the in-iframe case.
+  // Escape-key parity for keyboard users. Same blur, no playback impact.
+  // Escape pressed INSIDE the cross-origin iframe doesn't bubble up to our
+  // document — this only fires when focus is on our page.
   useEffect(() => {
     if (!activated) return;
 
     function handleEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') hideYouTubeControls();
+      if (event.key !== 'Escape') return;
+      iframeRef.current?.blur();
     }
 
     document.addEventListener('keydown', handleEscape, true);
     return () => document.removeEventListener('keydown', handleEscape, true);
-  }, [activated, hideYouTubeControls]);
-
-  // Tab-visibility — when the user backgrounds the tab and returns, browsers
-  // can leave the iframe in an inconsistent focus state and YouTube may
-  // re-show its bar. Re-running the focus shuffle on visibility-restore
-  // keeps parity with Mux Player's autohide behavior across tab cycles.
-  //
-  // `requestAnimationFrame` defers the shuffle past YouTube's own
-  // post-visibility-change re-focus tick — without it, our blur runs first,
-  // YouTube re-focuses on the next microtask, and the bar reappears.
-  useEffect(() => {
-    if (!activated) return;
-
-    let frameId: number | null = null;
-
-    function handleVisibility() {
-      if (document.visibilityState !== 'visible') return;
-      if (frameId !== null) cancelAnimationFrame(frameId);
-      frameId = requestAnimationFrame(() => {
-        frameId = null;
-        hideYouTubeControls();
-      });
-    }
-
-    document.addEventListener('visibilitychange', handleVisibility);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibility);
-      if (frameId !== null) cancelAnimationFrame(frameId);
-    };
-  }, [activated, hideYouTubeControls]);
+  }, [activated]);
 
   // Early-return rendering. The previous imperative implementation
   // (`document.createElement('iframe')` + state flip) had a subtle bug
@@ -522,23 +543,8 @@ function YouTubeFacadeInner({
   const wrapperStyle = { paddingBottom: '56.25%' as const };
 
   if (activated) {
-    // `[&:focus-visible]:outline-none` is scoped to the wrapper element
-    // itself (via the `&:` attribute selector) — descendants keep their
-    // own focus rings. The wrapper is a presentational programmatic focus
-    // target (we park focus here after `iframe.blur()` to defeat
-    // YouTube's "keep controls visible while iframe is focused"
-    // behavior), so its ring would be visual noise; the iframe, on the
-    // other hand, is the real focus surface for keyboard play/pause
-    // hotkeys and gets its native ring untouched. The pre-activation
-    // branch below doesn't need this class because the <button> child
-    // owns its own focus ring there.
     return (
-      <div
-        ref={wrapperRef}
-        className={`${wrapperClass} [&:focus-visible]:outline-none`}
-        style={wrapperStyle}
-        tabIndex={-1}
-      >
+      <div ref={wrapperRef} className={wrapperClass} style={wrapperStyle}>
         <iframe
           ref={iframeRef}
           src={embedUrl}
@@ -552,7 +558,7 @@ function YouTubeFacadeInner({
   }
 
   return (
-    <div ref={wrapperRef} className={wrapperClass} style={wrapperStyle} tabIndex={-1}>
+    <div ref={wrapperRef} className={wrapperClass} style={wrapperStyle}>
       <button
         type="button"
         aria-label={`Play: ${title}`}
