@@ -125,17 +125,34 @@ export const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
   );
 };
 
-const YT_ID_PATTERNS = [
-  /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
-  /youtube\.com\/v\/([^&\n?#]+)/,
-  /youtube\.com\/watch\?.*v=([^&\n?#]+)/,
-];
+const YT_HOSTS = new Set([
+  'youtube.com', 'www.youtube.com', 'm.youtube.com',
+  'youtu.be',
+  'youtube-nocookie.com', 'www.youtube-nocookie.com',
+]);
 
+// `youtube.com/(embed|v|shorts)/<id>` — anchored, no `.*`, ReDoS-safe.
+const YT_PATH_RE = /^\/(?:embed|v|shorts)\/([^/]+)\/?$/;
+
+/**
+ * Extract the YouTube video id from any common URL shape. Uses `URL`
+ * parsing + a strict, anchored pathname regex — NOT the previous
+ * `.*v=` pattern that CodeQL flagged for polynomial-time backtracking
+ * on adversarial input like `youtube.com/watch?` repeated N times.
+ */
 export const extractYouTubeId = (url: string): string | null => {
-  for (const pattern of YT_ID_PATTERNS) {
-    const match = url.match(pattern);
-    if (match) return match[1];
+  let u: URL;
+  try { u = new URL(url); } catch { return null; }
+  if (!YT_HOSTS.has(u.hostname.toLowerCase())) return null;
+  // `youtu.be/<id>` — id is the first path segment.
+  if (u.hostname.toLowerCase().endsWith('youtu.be')) {
+    return u.pathname.split('/').filter(Boolean)[0] ?? null;
   }
-  return null;
+  // `youtube.com/watch?v=<id>` — query parameter.
+  const v = u.searchParams.get('v');
+  if (v) return v;
+  // `youtube.com/(embed|v|shorts)/<id>` — anchored pathname match.
+  const m = u.pathname.match(YT_PATH_RE);
+  return m ? m[1] : null;
 };
 
