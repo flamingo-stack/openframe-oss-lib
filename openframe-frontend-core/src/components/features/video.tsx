@@ -30,7 +30,7 @@
  *   layout="native"   → intrinsic aspect ratio. Bites grid, blog cards.
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import MuxPlayer from '@mux/mux-player-react';
 
 // =============================================================================
@@ -346,6 +346,10 @@ function YouTubeFacadeInner({
   minimalControls,
 }: YouTubeFacadeInnerProps): React.ReactElement {
   const [activated, setActivated] = useState(false);
+  // Wrapper ref used by the outside-click dismissal — clicks inside this
+  // box keep the iframe mounted; clicks anywhere else tear the iframe
+  // down so YouTube's persistent native controls go with it.
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
 
   const embedParams = new URLSearchParams({
     autoplay: '1',
@@ -364,6 +368,47 @@ function YouTubeFacadeInner({
   const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?${embedParams.toString()}`;
   const posterJpg = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
   const posterWebp = `https://i.ytimg.com/vi_webp/${videoId}/mqdefault.webp`;
+
+  // Outside-click dismissal — when the iframe is mounted, listen for any
+  // pointerdown on the document. Clicks INSIDE the wrapper bubble through
+  // the iframe DOM element but never reach our handler when they occur on
+  // YouTube's own UI (the iframe is a separate browsing context, so
+  // pointer events fired inside it don't propagate to our document).
+  // Clicks OUTSIDE the wrapper fire here normally — we tear down the
+  // iframe by flipping `activated` to false. The iframe unmounts, taking
+  // YouTube's persistent native controls with it. A second click on the
+  // play poster re-mounts the iframe with `autoplay=1` (a user gesture,
+  // so iOS Safari + Chrome autoplay restrictions are satisfied).
+  //
+  // We hook `pointerdown` (not `click`) so the dismissal feels instant —
+  // by the time `click` fires the user has already seen the controls
+  // overlay another beat.
+  useEffect(() => {
+    if (!activated) return;
+
+    function handleOutsideClick(event: PointerEvent) {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (wrapperRef.current?.contains(target)) return;
+      setActivated(false);
+    }
+
+    document.addEventListener('pointerdown', handleOutsideClick);
+    return () => document.removeEventListener('pointerdown', handleOutsideClick);
+  }, [activated]);
+
+  // Escape-key dismissal — keyboard users should have parity with the
+  // pointer outside-click. Same tear-down semantics.
+  useEffect(() => {
+    if (!activated) return;
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') setActivated(false);
+    }
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [activated]);
 
   // Early-return rendering. The previous imperative implementation
   // (`document.createElement('iframe')` + state flip) had a subtle bug
@@ -385,7 +430,7 @@ function YouTubeFacadeInner({
 
   if (activated) {
     return (
-      <div className={wrapperClass} style={wrapperStyle}>
+      <div ref={wrapperRef} className={wrapperClass} style={wrapperStyle}>
         <iframe
           src={embedUrl}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -398,7 +443,7 @@ function YouTubeFacadeInner({
   }
 
   return (
-    <div className={wrapperClass} style={wrapperStyle}>
+    <div ref={wrapperRef} className={wrapperClass} style={wrapperStyle}>
       <button
         type="button"
         aria-label={`Play: ${title}`}
