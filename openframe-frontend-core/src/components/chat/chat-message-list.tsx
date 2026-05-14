@@ -40,6 +40,7 @@ import type { ChatMessageListProps } from "./types"
  * — pass them directly as `ref={scrollRef}` / `ref={contentRef}`.
  */
 
+
 const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
   (
     {
@@ -72,7 +73,13 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     // before any post-paint effect could run `scrollTop = bottom`. The
     // library writes scrollTop in the commit phase, so the first paint
     // is already at the bottom.
-    const { scrollRef, contentRef, scrollToBottom } = useStickToBottom({
+    //
+    // `escapedFromLock` is exposed so the stream-tail branch below can
+    // honor user intent: if they scroll UP during streaming, the lib
+    // flips it true via the wheel/touch handlers, and we stop forcing
+    // the viewport to follow. Scrolling back DOWN to near-bottom
+    // resets it to false and tailing resumes.
+    const { scrollRef, contentRef, scrollToBottom, escapedFromLock } = useStickToBottom({
       resize: 'smooth',
       initial: 'instant',
     })
@@ -111,7 +118,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       scrollHeight: number
     }>({ firstMessageId: undefined, firstMessageContent: undefined, scrollHeight: 0 })
 
-    // ---- Force-stick: dialog change / first-load / new user message --
+    // ---- Force-stick: dialog change / first-load / new user message / stream tail --
     // `useLayoutEffect` so the scrollTop write lands BEFORE browser
     // paint — otherwise a dialog switch with prior history flashes the
     // top of the list (oldest msgs) for one frame before snapping down.
@@ -124,6 +131,21 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     // think "no dialog change" and never snap. By depending on
     // `scrollEl`, this effect re-runs the moment the container mounts
     // and catches up on any transition that happened during the loader.
+    //
+    // Streaming tail (added 2026-05): the library's RO-driven follow
+    // depends on its internal `state.isAtBottom`, which starts FALSE
+    // and only flips true on an explicit `scrollToBottom` call
+    // (without `preserveScrollPosition`). For a flow where the
+    // consumer wraps `contentRef` with a `<div className="flex-1" />`
+    // spacer + `minHeight: 100%` (so messages visually bottom-align
+    // when content is short), the library's initial-snap RO callback
+    // runs with `preserveScrollPosition: true` → bails on
+    // `!state.isAtBottom`, never flips it true. Result: streaming
+    // assistant content grows but viewport stays at scrollTop=0.
+    // We explicitly tail on every messages update when the user is
+    // within `STREAM_TAIL_THRESHOLD_PX` of the bottom — independent
+    // of the library's internal state. This restores 2026-grade
+    // "follow during stream, release when user scrolls up" UX.
     useLayoutEffect(() => {
       if (!autoScroll || !scrollEl) return
 
@@ -154,24 +176,46 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
           prependRef.current.firstMessageId !== undefined &&
           messages[0]?.id !== prependRef.current.firstMessageId
 
-        if (!isPrepend) {
-          // Scan the new tail for any user-role message. Handles the
-          // coalesced-render case where optimistic-user + server-
-          // assistant land in the same diff (last is assistant, but a
-          // user message DID arrive). When the user just sent a
-          // message, they expect their bubble pinned to the bottom,
-          // regardless of where they were scrolled.
-          const newSlice = messages.slice(prevCount)
-          const hasNewUser = newSlice.some((m) => m.role === 'user')
-          if (hasNewUser) {
-            void scrollToBottom({ animation: 'instant', ignoreEscapes: true })
-          }
-          // Assistant-only new messages → the library's resize-watch
-          // already keeps the bottom locked when the user hasn't
-          // escaped. No explicit call needed; spring animation runs.
+        if (isPrepend) return
+
+        // Scan the new tail for any user-role message. Handles the
+        // coalesced-render case where optimistic-user + server-
+        // assistant land in the same diff (last is assistant, but a
+        // user message DID arrive). When the user just sent a
+        // message, they expect their bubble pinned to the bottom,
+        // regardless of where they were scrolled.
+        const newSlice = messages.slice(prevCount)
+        const hasNewUser = newSlice.some((m) => m.role === 'user')
+        if (hasNewUser) {
+          void scrollToBottom({ animation: 'instant', ignoreEscapes: true })
+          return
         }
+        // Assistant placeholder appended (no user in the slice) —
+        // instant-snap so the bubble lands pinned to the bottom and
+        // subsequent token streams keep the user oriented. Without
+        // this snap, the library's RO can fail to follow if its
+        // internal `isAtBottom` was never set true (see top comment).
+        void scrollToBottom({ animation: 'instant', ignoreEscapes: true })
+        return
       }
-    }, [autoScroll, messages, dialogId, scrollToBottom, scrollEl])
+
+      // Stream tail: same count, last id unchanged → assistant content
+      // is streaming in. Follow the bottom unless the user has
+      // explicitly escaped the lock (scrolled up). We can't gate on
+      // current `distToBottom` because the server may emit ~100KB
+      // of sources/refs metadata in ONE chunk before the text stream
+      // begins — by the time this useLayoutEffect runs after that
+      // render, distToBottom is already in the thousands of pixels
+      // and any threshold check would mis-fire as "user is far away".
+      // `escapedFromLock` is the canonical "did the user intentionally
+      // step out of follow-mode" signal — driven by the lib's wheel
+      // + touch + scroll handlers, not by post-render geometry.
+      // `smooth` animation matches the library's `resize: 'smooth'`
+      // option — spring-physics glide instead of jarring snap.
+      if (!escapedFromLock) {
+        void scrollToBottom({ animation: 'smooth' })
+      }
+    }, [autoScroll, messages, dialogId, scrollToBottom, scrollEl, escapedFromLock])
 
     // ---- Prepend anchoring (load-older) ------------------------------
     // The library doesn't preserve user position when content prepends
