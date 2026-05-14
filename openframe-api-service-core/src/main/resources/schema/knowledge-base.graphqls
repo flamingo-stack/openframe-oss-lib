@@ -15,6 +15,7 @@ extend type Query {
         first: Int
         after: String
     ): KnowledgeBaseItemConnection!
+    knowledgeBaseAttachmentDownloadUrl(attachmentId: ID!): String!
 }
 
 input KnowledgeBaseFilterInput {
@@ -36,6 +37,55 @@ extend type Mutation {
     deleteFolder(input: DeleteFolderInput!): Boolean!
     addTagToKnowledgeBaseItem(itemId: ID!, tagId: ID!): KnowledgeBaseItem!
     removeTagFromKnowledgeBaseItem(itemId: ID!, tagId: ID!): KnowledgeBaseItem!
+
+    createKnowledgeBaseTempAttachmentUploadUrl(input: CreateKnowledgeBaseTempAttachmentInput!): KnowledgeBaseTempAttachmentPayload!
+    deleteKnowledgeBaseTempAttachment(input: MutationDeleteInput!): MutationDeletePayload!
+    linkKnowledgeBaseTempAttachmentsToArticle(input: LinkKnowledgeBaseTempAttachmentsInput!): [KnowledgeBaseItemAttachment!]!
+    createKnowledgeBaseAttachmentUploadUrl(input: CreateKnowledgeBaseAttachmentInput!): KnowledgeBaseAttachmentUploadPayload!
+    deleteKnowledgeBaseAttachment(input: MutationDeleteInput!): MutationDeletePayload!
+}
+
+type TempAttachment {
+    id: ID!
+    fileName: String!
+    contentType: String
+    fileSize: Long
+    uploadUrl: String!
+    createdAt: Instant
+}
+
+type KnowledgeBaseAttachmentUpload {
+    attachment: KnowledgeBaseItemAttachment!
+    uploadUrl: String!
+}
+
+type KnowledgeBaseTempAttachmentPayload {
+    tempAttachment: TempAttachment
+    userErrors: [MutationError!]!
+}
+
+type KnowledgeBaseAttachmentUploadPayload {
+    attachment: KnowledgeBaseItemAttachment
+    uploadUrl: String
+    userErrors: [MutationError!]!
+}
+
+input CreateKnowledgeBaseTempAttachmentInput {
+    fileName: String!
+    contentType: String
+    fileSize: Long
+}
+
+input CreateKnowledgeBaseAttachmentInput {
+    articleId: ID!
+    fileName: String!
+    contentType: String
+    fileSize: Long
+}
+
+input LinkKnowledgeBaseTempAttachmentsInput {
+    articleId: ID!
+    tempIds: [ID!]!
 }
 
 type KnowledgeBaseItem implements AssignableTarget & Node {
