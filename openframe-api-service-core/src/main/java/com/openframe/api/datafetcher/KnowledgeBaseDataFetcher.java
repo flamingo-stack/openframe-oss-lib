@@ -6,18 +6,28 @@ import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.knowledgebase.CreateArticleInput;
+import com.openframe.api.dto.knowledgebase.CreateKnowledgeBaseAttachmentInput;
+import com.openframe.api.dto.knowledgebase.CreateKnowledgeBaseTempAttachmentInput;
 import com.openframe.api.dto.knowledgebase.DeleteFolderInput;
+import com.openframe.api.dto.knowledgebase.KnowledgeBaseAttachmentUploadPayload;
+import com.openframe.api.dto.knowledgebase.KnowledgeBaseTempAttachmentPayload;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseFilterCriteria;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseFilterInput;
+import com.openframe.api.dto.knowledgebase.LinkKnowledgeBaseTempAttachmentsInput;
 import com.openframe.api.dto.knowledgebase.UpdateArticleInput;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.dto.shared.MutationDeleteInput;
+import com.openframe.api.dto.shared.MutationDeletePayload;
 import com.openframe.api.mapper.GraphQLKnowledgeBaseMapper;
+import com.openframe.api.service.KnowledgeBaseAttachmentService;
+import com.openframe.api.service.KnowledgeBaseTempAttachmentService;
 import com.openframe.api.service.KnowledgeBaseService;
 import com.openframe.api.service.KnowledgeBaseTagService;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItemAttachment;
 import com.openframe.data.document.tag.Tag;
+import com.openframe.data.document.ticket.TempAttachment;
 import com.openframe.data.document.user.User;
 import com.openframe.security.authentication.AuthPrincipal;
 import jakarta.validation.Valid;
@@ -32,6 +42,8 @@ import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 @DgsComponent
 @Slf4j
@@ -43,6 +55,8 @@ public class KnowledgeBaseDataFetcher {
 
     private final KnowledgeBaseService knowledgeBaseService;
     private final KnowledgeBaseTagService knowledgeBaseTagService;
+    private final KnowledgeBaseTempAttachmentService knowledgeBaseTempAttachmentService;
+    private final KnowledgeBaseAttachmentService knowledgeBaseAttachmentService;
     private final GraphQLKnowledgeBaseMapper mapper;
 
     @DgsQuery
@@ -216,6 +230,76 @@ public class KnowledgeBaseDataFetcher {
         return knowledgeBaseService.getItem(rawItemId).orElse(null);
     }
 
+    @DgsQuery
+    public String knowledgeBaseAttachmentDownloadUrl(@InputArgument @NotBlank String attachmentId) {
+        log.info("Generating download URL for Knowledge Base attachment: {}", attachmentId);
+        return knowledgeBaseAttachmentService.generateDownloadUrl(attachmentId);
+    }
+
+    @DgsMutation
+    public KnowledgeBaseTempAttachmentPayload createKnowledgeBaseTempAttachmentUploadUrl(@InputArgument @Valid CreateKnowledgeBaseTempAttachmentInput input) {
+        String currentUserId = getCurrentUserId();
+        log.info("Creating Knowledge Base temp attachment upload URL: file={}, size={} by user: {}",
+                input.getFileName(), input.getFileSize(), currentUserId);
+        return executeMutation(
+                () -> knowledgeBaseTempAttachmentService.createUploadUrl(
+                        currentUserId, input.getFileName(), input.getContentType(), input.getFileSize()),
+                KnowledgeBaseTempAttachmentPayload::success,
+                KnowledgeBaseTempAttachmentPayload::error);
+    }
+
+    @DgsMutation
+    public MutationDeletePayload deleteKnowledgeBaseTempAttachment(@InputArgument @Valid MutationDeleteInput input) {
+        String currentUserId = getCurrentUserId();
+        log.info("Deleting Knowledge Base temp attachment: {} by user: {}", input.getId(), currentUserId);
+        return executeMutation(
+                () -> {
+                    knowledgeBaseTempAttachmentService.deleteTempAttachment(currentUserId, input.getId());
+                    return input.getId();
+                },
+                MutationDeletePayload::success,
+                MutationDeletePayload::error);
+    }
+
+    @DgsMutation
+    public List<KnowledgeBaseItemAttachment> linkKnowledgeBaseTempAttachmentsToArticle(@InputArgument @Valid LinkKnowledgeBaseTempAttachmentsInput input) {
+        String currentUserId = getCurrentUserId();
+        String rawArticleId = RELAY.fromGlobalId(input.getArticleId()).getId();
+        log.info("Linking {} temp attachments to Knowledge Base article: {} by user: {}",
+                input.getTempIds().size(), rawArticleId, currentUserId);
+        return knowledgeBaseTempAttachmentService.linkTempAttachmentsToArticle(rawArticleId, input.getTempIds(), currentUserId);
+    }
+
+    @DgsMutation
+    public KnowledgeBaseAttachmentUploadPayload createKnowledgeBaseAttachmentUploadUrl(@InputArgument @Valid CreateKnowledgeBaseAttachmentInput input) {
+        String currentUserId = getCurrentUserId();
+        String rawArticleId = RELAY.fromGlobalId(input.getArticleId()).getId();
+        log.info("Creating Knowledge Base attachment upload URL for article: {} by user: {}", rawArticleId, currentUserId);
+        return executeMutation(
+                () -> knowledgeBaseAttachmentService.createUploadUrl(
+                        currentUserId, rawArticleId, input.getFileName(), input.getContentType(), input.getFileSize()),
+                result -> KnowledgeBaseAttachmentUploadPayload.success(result.getAttachment(), result.getUploadUrl()),
+                KnowledgeBaseAttachmentUploadPayload::error);
+    }
+
+    @DgsMutation
+    public MutationDeletePayload deleteKnowledgeBaseAttachment(@InputArgument @Valid MutationDeleteInput input) {
+        log.info("Deleting Knowledge Base attachment: {}", input.getId());
+        return executeMutation(
+                () -> {
+                    knowledgeBaseAttachmentService.deleteAttachment(input.getId());
+                    return input.getId();
+                },
+                MutationDeletePayload::success,
+                MutationDeletePayload::error);
+    }
+
+    @DgsData(parentType = "TempAttachment", field = "uploadUrl")
+    public String tempAttachmentUploadUrl(DgsDataFetchingEnvironment dfe) {
+        TempAttachment temp = dfe.getSource();
+        return knowledgeBaseTempAttachmentService.generateUploadUrl(temp);
+    }
+
     @DgsData(parentType = "KnowledgeBaseItem", field = "id")
     public String knowledgeBaseItemNodeId(DgsDataFetchingEnvironment dfe) {
         KnowledgeBaseItem item = dfe.getSource();
@@ -258,5 +342,16 @@ public class KnowledgeBaseDataFetcher {
     private String getCurrentUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         return AuthPrincipal.fromJwt((Jwt) auth.getPrincipal()).getId();
+    }
+
+    private <T, P> P executeMutation(
+            Supplier<T> action,
+            Function<T, P> onSuccess,
+            Function<String, P> onError) {
+        try {
+            return onSuccess.apply(action.get());
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return onError.apply(e.getMessage());
+        }
     }
 }
