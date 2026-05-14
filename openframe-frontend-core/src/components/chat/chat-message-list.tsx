@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState, useEffect, useLayoutEffect, useImperativeHandle, forwardRef } from "react"
+import { useRef, useState, useEffect, useLayoutEffect, useCallback, useImperativeHandle, forwardRef } from "react"
 import { useStickToBottom } from "use-stick-to-bottom"
 import { cn } from "../../utils/cn"
 import { ChatMessageEnhanced } from "./chat-message-enhanced"
@@ -144,20 +144,32 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         return
       }
       if (newCount > prevCount) {
-        // Scan the new tail for any user-role message. Handles the
-        // coalesced-render case where optimistic-user + server-
-        // assistant land in the same diff (last is assistant, but a
-        // user message DID arrive). When the user just sent a
-        // message, they expect their bubble pinned to the bottom,
-        // regardless of where they were scrolled.
-        const newSlice = messages.slice(prevCount)
-        const hasNewUser = newSlice.some((m) => m.role === 'user')
-        if (hasNewUser) {
-          void scrollToBottom({ animation: 'instant', ignoreEscapes: true })
+        // Load-older PREPEND: new content arrived at the START of the
+        // array (firstMessageId changed). DON'T snap — the prepend-
+        // anchor effect below preserves the user's reading position.
+        // Without this guard, `messages.slice(prevCount)` would pick
+        // up old user messages now sitting at the tail and falsely
+        // trigger a scrollToBottom.
+        const isPrepend =
+          prependRef.current.firstMessageId !== undefined &&
+          messages[0]?.id !== prependRef.current.firstMessageId
+
+        if (!isPrepend) {
+          // Scan the new tail for any user-role message. Handles the
+          // coalesced-render case where optimistic-user + server-
+          // assistant land in the same diff (last is assistant, but a
+          // user message DID arrive). When the user just sent a
+          // message, they expect their bubble pinned to the bottom,
+          // regardless of where they were scrolled.
+          const newSlice = messages.slice(prevCount)
+          const hasNewUser = newSlice.some((m) => m.role === 'user')
+          if (hasNewUser) {
+            void scrollToBottom({ animation: 'instant', ignoreEscapes: true })
+          }
+          // Assistant-only new messages → the library's resize-watch
+          // already keeps the bottom locked when the user hasn't
+          // escaped. No explicit call needed; spring animation runs.
         }
-        // Assistant-only new messages → the library's resize-watch
-        // already keeps the bottom locked when the user hasn't
-        // escaped. No explicit call needed; spring animation runs.
       }
     }, [autoScroll, messages, dialogId, scrollToBottom, scrollEl])
 
@@ -262,16 +274,6 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     // arrives a moment later).
     const showLoader = useDelayedFlag(isLoading, { delay: 200, minDuration: 400 })
 
-    if (showLoader) {
-      return (
-        <ChatMessageListLoader
-          className={className}
-          assistantIcon={assistantIcon}
-          assistantType={assistantType}
-        />
-      )
-    }
-
     // Adapt the library's refs to React's `Ref<HTMLDivElement>` JSX
     // slot. The library types its refs against `HTMLElement` (broader
     // than `HTMLDivElement`); MutableRefObject is INVARIANT in its
@@ -287,12 +289,31 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     // cleanup contract). The hub's React types reject that union in a
     // JSX `Ref<T>` slot. Force `void` here — the library doesn't use
     // the cleanup return path in any meaningful way for the public hook.
-    const setScrollRef = (el: HTMLDivElement | null): void => {
+    // CRITICAL: memoize these ref callbacks. Inline refs (new function
+    // each render) cause React to call cleanup(null) then setup(el) on
+    // EVERY render — which would flip `scrollEl` state null→el every
+    // render, churning the prepend-anchor `useLayoutEffect` and
+    // wiping `prependRef.current.scrollHeight` to 0 on each null pass
+    // (see the `if (!el)` branch in the prepend effect). The net
+    // effect is that load-older never has a valid prev-height snapshot
+    // and the user's scroll position isn't preserved after pagination.
+    // Must live ABOVE the `showLoader` early return — Rules of Hooks.
+    const setScrollRef = useCallback((el: HTMLDivElement | null): void => {
       scrollRef(el)
       setScrollEl(el)
-    }
-    const setContentRef = (el: HTMLDivElement | null): void => {
+    }, [scrollRef])
+    const setContentRef = useCallback((el: HTMLDivElement | null): void => {
       contentRef(el)
+    }, [contentRef])
+
+    if (showLoader) {
+      return (
+        <ChatMessageListLoader
+          className={className}
+          assistantIcon={assistantIcon}
+          assistantType={assistantType}
+        />
+      )
     }
 
     return (
