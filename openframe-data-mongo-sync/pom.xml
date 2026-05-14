@@ -51,6 +51,13 @@
             <groupId>org.springframework</groupId>
             <artifactId>spring-aspects</artifactId>
         </dependency>
+
+        <!-- Google Cloud Storage for presigned URLs -->
+        <dependency>
+            <groupId>com.google.cloud</groupId>
+            <artifactId>google-cloud-storage</artifactId>
+            <version>2.36.1</version>
+        </dependency>
     </dependencies>
 
 </project>
