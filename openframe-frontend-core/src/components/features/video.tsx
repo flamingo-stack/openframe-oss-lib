@@ -412,6 +412,21 @@ function YouTubeFacadeInner({
   // `enablejsapi=1` opens the postMessage state channel we subscribe to
   // below — without it, YouTube ignores `event:listening` messages and
   // we can't detect PLAYING / ENDED to drive the auto-hide accelerator.
+  //
+  // `origin=<parent-page-origin>` is REQUIRED when `enablejsapi=1` is set.
+  // Without it, the YouTube widget inside the iframe defaults its
+  // `postMessage` targetOrigin to its OWN origin (`youtube-nocookie.com`)
+  // when emitting state-change events back to the parent. The browser
+  // then drops every message and logs:
+  //   "Failed to execute 'postMessage' on 'DOMWindow': The target origin
+  //   provided ('https://www.youtube-nocookie.com') does not match the
+  //   recipient window's origin ('https://www.<our-site>')"
+  // Setting `origin` tells the widget the real parent host so it sends
+  // with the matching targetOrigin. Documented in YouTube's IFrame Player
+  // API reference (developers.google.com/youtube/iframe_api_reference).
+  // SSR-safe: the URL is rebuilt client-side in the same useMemo on
+  // hydration when `window` becomes available; the first SSR pass emits
+  // the URL without `origin` (no jsapi traffic yet — no iframe mounted).
   const { embedUrl, posterJpg, posterWebp } = useMemo(() => {
     const params = new URLSearchParams({
       autoplay: '1',
@@ -420,6 +435,9 @@ function YouTubeFacadeInner({
       playsinline: '1',
       enablejsapi: '1',
     });
+    if (typeof window !== 'undefined') {
+      params.set('origin', window.location.origin);
+    }
     if (minimalControls) {
       params.set('controls', '0');
       params.set('fs', '0');
