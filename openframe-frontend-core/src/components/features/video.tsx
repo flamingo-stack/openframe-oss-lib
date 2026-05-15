@@ -35,6 +35,36 @@ import MuxPlayer from '@mux/mux-player-react';
 import { PlayIcon } from '../icons-v2-generated/media-playback/play-icon';
 
 // =============================================================================
+// Suppress Google Cast SDK loading (CSP-friendly)
+// =============================================================================
+//
+// Why: MuxPlayer is built on `media-chrome`, which is built on `castable-video`.
+// `castable-video`'s `loadCastFramework()` UNCONDITIONALLY injects a
+// `<script src="https://www.gstatic.com/cv/.../cast_sender.js?loadCastFramework=1">`
+// whenever Chrome is detected. That script then internally loads further
+// scripts from `http://www.gstatic.com/eureka/clank/...` and
+// `http://www.gstatic.com/cast/sdk/libs/...` — over **HTTP, not HTTPS** —
+// which can never pass any reasonable CSP. Result: every video render
+// emits 3+ "Loading the script ... violates CSP" errors in the browser
+// console.
+//
+// The loader has a single early-exit: `if (globalThis.chrome?.cast)
+// return;`. So we make `chrome.cast` truthy (with `isAvailable: false`
+// so existing apps that consult that flag still see "no cast") BEFORE
+// MuxPlayer's `castable-mixin` runs. Module-level code in this file
+// executes during the import that brings `MuxPlayer` into the bundle —
+// safely before any instance mounts.
+//
+// We don't use Chromecast anywhere in the hub. If we ever do, replace
+// this block with explicit cast initialization at the call site.
+if (typeof window !== 'undefined') {
+  const w = window as unknown as { chrome?: { cast?: unknown } };
+  if (!w.chrome?.cast) {
+    w.chrome = { ...(w.chrome ?? {}), cast: { isAvailable: false } };
+  }
+}
+
+// =============================================================================
 // URL classifiers (private — `<Video>` is the only consumer)
 // =============================================================================
 
