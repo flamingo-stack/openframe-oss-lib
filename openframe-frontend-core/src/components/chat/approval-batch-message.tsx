@@ -7,8 +7,7 @@ import { Button } from "../ui/button"
 import { Tag } from "../ui/tag"
 import { ToolType } from "../platform"
 import { ToolIcon } from "../tool-icon"
-import { CheckCircleIcon, XmarkCircleIcon } from "../icons-v2-generated"
-import { PulseDots } from "../ui/pulse-dots"
+import { CheckCircleIcon, DotsLoaderIcon, XmarkCircleIcon } from "../icons-v2-generated"
 import { ExpandChevron } from "./expand-chevron"
 import { useCollapsible } from "./hooks/use-collapsible"
 import { ArgRow, ResultBlock } from "./tool-call-blocks"
@@ -40,8 +39,8 @@ function getArgEntries(call: PendingToolCallData): Array<[string, unknown]> {
 /**
  * Status icon for one tool call inside an approved/done batch.
  *  - pending batch     → null (chevron-only row, no status icon)
- *  - approved, no exec → PulseDots (queued / waiting for backend)
- *  - executing         → PulseDots
+ *  - approved, no exec → DotsLoaderIcon (queued / waiting for backend)
+ *  - executing         → DotsLoaderIcon
  *  - done + success    → green check
  *  - done + failure    → red cross
  */
@@ -53,7 +52,7 @@ function ExecutionStatusIcon({
   execution: ApprovalBatchExecutionState | undefined
 }) {
   if (batchStatus !== "approved") return null
-  if (!execution || execution.status === "executing") return <PulseDots size="sm" />
+  if (!execution || execution.status === "executing") return <DotsLoaderIcon size={16} className="text-ods-text-secondary" />
   if (execution.success === false) return <XmarkCircleIcon className="w-4 h-4 text-ods-error" />
   return <CheckCircleIcon className="w-4 h-4 text-ods-success" />
 }
