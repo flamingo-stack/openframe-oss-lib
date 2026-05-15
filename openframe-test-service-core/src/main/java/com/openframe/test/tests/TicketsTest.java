@@ -4,7 +4,6 @@ import com.openframe.test.api.DeviceApi;
 import com.openframe.test.api.OrganizationApi;
 import com.openframe.test.api.TicketApi;
 import com.openframe.test.api.UserApi;
-import com.openframe.test.config.UserConfig;
 import com.openframe.test.data.dto.device.Machine;
 import com.openframe.test.data.dto.organization.Organization;
 import com.openframe.test.data.dto.shared.CursorPaginationInput;
@@ -61,12 +60,12 @@ public class TicketsTest extends BaseTest {
     @DisplayName("Create ticket")
     @Order(1)
     public void testCreateTicket() {
-        String email = UserConfig.getUser().getEmail();
+        String assigneeEmail = "test@flamingo.cx";
         String assigneeId = UserApi.getUsers().stream()
-                .filter(u -> email.equalsIgnoreCase(u.getEmail()))
+                .filter(u -> assigneeEmail.equalsIgnoreCase(u.getEmail()))
                 .map(AuthUser::getId)
                 .findFirst()
-                .orElseThrow(() -> new AssertionError("Current user not found by email: " + email));
+                .orElseThrow(() -> new AssertionError("Assignee not found by email: " + assigneeEmail));
 
         Organization organization = OrganizationApi.getOrganizations(true).getFirst();
         Machine device = DeviceApi.getAnyDevice(onlineDevicesFilter(), offlineDevicesFilter());
