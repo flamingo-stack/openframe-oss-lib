@@ -13,19 +13,4 @@ public class AssignedAgent {
     @JsonProperty("agent_id")
     private String agentId;
 
-    private String hostname;
-
-    private String plat;
-
-    @JsonProperty("operating_system")
-    private String operatingSystem;
-
-    @JsonProperty("time_zone")
-    private String timeZone;
-
-    @JsonProperty("client_name")
-    private String clientName;
-
-    @JsonProperty("site_name")
-    private String siteName;
 }
