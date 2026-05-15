@@ -45,9 +45,6 @@ public class TacticalScheduledTask {
 
     private List<TaskAction> actions;
 
-    /**
-     * Tactical RMM agent IDs (UUID strings) currently assigned to this schedule.
-     * Populated by Tactical when fetching a single schedule via GET /script-schedules/{id}/.
-     */
-    private List<String> agents;
+    @JsonProperty("assigned_agents")
+    private List<AssignedAgent> agents;
 }
