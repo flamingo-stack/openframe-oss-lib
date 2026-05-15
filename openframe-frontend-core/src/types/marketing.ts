@@ -345,6 +345,7 @@ export type ContentSourceType =
   | 'podcast'             // Podcast episodes
   | 'webinar'             // Webinars
   | 'investor_update'     // Investor updates
+  | 'onboarding_guide'    // Onboarding guides (lives on openframe platform)
   | 'from_scratch';
 
 export type URLInjectionPreference = 'none' | 'in_post' | 'as_comment';

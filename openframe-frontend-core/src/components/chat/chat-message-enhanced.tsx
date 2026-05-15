@@ -182,12 +182,19 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
               return <span className="text-ods-text-primary">{fallbackTitle}</span>
             }
           }
+          // Chat-context links ALWAYS open in a new tab — same rule
+          // every chat-inline entity card uses via `navLinkProps({
+          // alwaysNewTab: true })`. The user's CURRENT context is the
+          // conversation; navigating away in-place would unmount the
+          // chat and lose the thread. Applies to absolute (http) AND
+          // relative (`/foo/bar`) hrefs so the rule is one line, not
+          // a branching check.
           return (
             <a
               href={href}
               className={linkClassName}
-              target={typeof href === 'string' && href.startsWith('http') ? '_blank' : undefined}
-              rel={typeof href === 'string' && href.startsWith('http') ? 'noopener noreferrer' : undefined}
+              target={typeof href === 'string' && href.length > 0 ? '_blank' : undefined}
+              rel={typeof href === 'string' && href.length > 0 ? 'noopener noreferrer' : undefined}
               {...rest}
             >
               {children}
