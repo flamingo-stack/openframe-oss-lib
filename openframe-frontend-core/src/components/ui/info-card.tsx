@@ -98,7 +98,7 @@ function InfoCardValueRow({ label, value, showLabel, copyable, copyAriaLabel }: 
   const { copy, copied } = useCopyToClipboard()
 
   return (
-    <div className="flex h-6 items-center gap-0.5 self-stretch w-full">
+    <div className="flex h-6 items-center gap-[var(--spacing-system-xs)] self-stretch w-full">
       <span className="text-h4 text-ods-text-primary whitespace-nowrap">
         {showLabel ? label : ''}
       </span>

@@ -5,7 +5,7 @@
 
 import type { ChunkData, NatsMessageType, FetchChunksFunction } from './network.types'
 import type { ChatType, ChatApprovalStatus } from './chat.types'
-import type { MessageSegment, TokenUsageData } from './message.types'
+import type { MessageSegment, PendingToolCallData, TokenUsageData } from './message.types'
 
 // ========== Hook Options ==========
 
@@ -152,7 +152,10 @@ export interface UseRealtimeChunkProcessorOptions {
     /** Executing tools waiting for completion */
     executingTools?: Map<string, { integratedToolType: string; toolFunction: string; parameters?: Record<string, any> }>
     /** Escalated approvals */
-    escalatedApprovals?: Map<string, { command: string; explanation?: string; approvalType: string }>
+    escalatedApprovals?: Map<
+      string,
+      { command: string; explanation?: string; approvalType: string; toolCalls?: PendingToolCallData[] }
+    >
   }
   /**
    * When true, THINKING chunks are processed into thinking segments. When false
@@ -160,6 +163,19 @@ export interface UseRealtimeChunkProcessorOptions {
    * accumulator or store.
    */
   enableThinking?: boolean
+  /**
+   * Consumer-owned (e.g. set in `openframe-oss-tenant` chat client via the
+   * `'batch-approvals'` feature flag and forwarded here). The lib does NOT
+   * default this to a batch-on behavior — when omitted it falls back to the
+   * legacy single-card rendering.
+   *
+   * When true: `APPROVAL_REQUEST` chunks containing `toolCalls[]` are rendered
+   * as a single batch card. When false / omitted: the batch is split into N
+   * legacy approval cards (one per tool that requires approval), all sharing
+   * the same `approvalRequestId`. Tools with `requiresApproval=false` are
+   * dropped from the UI in the unfolded mode.
+   */
+  batchApprovalsEnabled?: boolean
 }
 
 export interface UseRealtimeChunkProcessorReturn {
@@ -172,7 +188,10 @@ export interface UseRealtimeChunkProcessorReturn {
   /** Update approval status for a request */
   updateApprovalStatus: (requestId: string, status: ChatApprovalStatus) => MessageSegment[]
   /** Get pending approval requests */
-  getPendingApprovals: () => Map<string, { command: string; explanation?: string; approvalType: string }>
+  getPendingApprovals: () => Map<
+    string,
+    { command: string; explanation?: string; approvalType: string; toolCalls?: PendingToolCallData[] }
+  >
 }
 
 // ========== API Request Types ==========

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useImperativeHandle, forwardRef, useCallback, useEffect, useMemo, type KeyboardEvent, type ChangeEvent } from "react"
 import { cn } from "../../utils/cn"
-import { Send01Icon, StopIcon } from "../icons-v2-generated"
+import { Send01Icon, StopCircleIcon } from "../icons-v2-generated"
 import { Textarea } from "../ui/textarea"
 import { ChatTypingIndicator } from "./chat-typing-indicator"
 import { SlashCommandSuggestions } from "./slash-command-suggestions"
@@ -71,27 +71,18 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
       (): ChatInputRef => ({
         focus: () => focusTextarea(),
         blur: () => textareaRef.current?.blur(),
-        clear: () => {
-          setValue('')
-          if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto'
-          }
-        },
+        clear: () => setValue(''),
         setValue: (next: string) => {
           setValue(next)
-          // Defer until React commits the new value so scrollHeight reflects
-          // the updated DOM. requestAnimationFrame is the standard escape
-          // hatch. After focus, set selection to the END of the new value —
+          // After focus, set selection to the END of the new value —
           // programmatic `.focus()` on a textarea defaults to caret-at-0
           // (browser-standard), which would land the cursor at the start of
           // the prefilled `/cmd ` and force users to arrow-right past every
-          // character before typing.
+          // character before typing. Auto-grow is handled by the Textarea's
+          // native `field-sizing: content` — no manual height mgmt needed.
           requestAnimationFrame(() => {
             const el = textareaRef.current
-            if (!el) return
-            el.style.height = 'auto'
-            el.style.height = `${el.scrollHeight}px`
-            if (disabled || el.disabled) return
+            if (!el || disabled || el.disabled) return
             el.focus()
             el.setSelectionRange(next.length, next.length)
           })
@@ -105,12 +96,9 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
           const clamped = Math.max(0, Math.min(cursorOffset, next.length))
           requestAnimationFrame(() => {
             const el = textareaRef.current
-            if (el) {
-              el.style.height = 'auto'
-              el.style.height = `${el.scrollHeight}px`
-              el.focus()
-              el.setSelectionRange(clamped, clamped)
-            }
+            if (!el) return
+            el.focus()
+            el.setSelectionRange(clamped, clamped)
           })
         },
         submit: (next: string) => {
@@ -123,9 +111,6 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
           if (!trimmed) return
           onSend(trimmed)
           setValue('')
-          if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto'
-          }
           shouldRefocusRef.current = true
           focusTextarea()
         },
@@ -143,11 +128,6 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
       if (message && !sending && !disabled && onSend) {
         onSend(message)
         setValue('')
-
-        if (textareaRef.current) {
-          textareaRef.current.style.height = 'auto'
-        }
-
         shouldRefocusRef.current = true
         focusTextarea()
       }
@@ -263,11 +243,6 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
 
     const handleChange = useCallback((e: ChangeEvent<HTMLTextAreaElement>) => {
       setValue(e.target.value)
-
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto'
-        textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
-      }
     }, [])
 
     const [isStopping, setIsStopping] = useState(false)
@@ -307,7 +282,6 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
       }
     }, [onStop, isStopping])
 
-    // Show awaiting response state
     if (awaitingResponse) {
       return (
         <div
@@ -315,26 +289,20 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
             "mx-auto w-full max-w-3xl items-end gap-6",
             reserveAvatarOffset ? "grid grid-cols-[32px_1fr]" : "grid grid-cols-[1fr]",
             "flex-shrink-0",
-            className
+            className,
           )}
         >
           {reserveAvatarOffset && <div className="invisible h-8 w-8" aria-hidden />}
-          <div
-            className={cn(
-              "relative flex items-center justify-center gap-2",
-              "rounded-md bg-ods-card border border-ods-border",
-              "px-3 py-3",
-              "transition-colors",
-            )}
-          >
+          <div className="relative flex items-center justify-center gap-2 rounded-md bg-ods-card border border-ods-border px-3 py-3 transition-colors">
             <ChatTypingIndicator size="sm" dotClassName="bg-ods-text-primary" />
-            <p className="text-h4 text-ods-text-secondary">
-              Waiting for Technician Response
-            </p>
+            <p className="text-h4 text-ods-text-secondary">Waiting for Technician Response</p>
           </div>
         </div>
       )
     }
+
+    const isStopMode = sending && !!onStop
+    const sendDisabled = sending || disabled || !value.trim()
 
     return (
       <div
@@ -342,7 +310,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
           "mx-auto w-full max-w-3xl items-end gap-6",
           reserveAvatarOffset ? "grid grid-cols-[32px_1fr]" : "grid grid-cols-[1fr]",
           "flex-shrink-0",
-          className
+          className,
         )}
       >
         {reserveAvatarOffset && <div className="invisible h-8 w-8" aria-hidden />}
@@ -355,67 +323,27 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
             resolveSourceIcon={slashCommands?.resolveSourceIcon}
             onAction={slashCommands?.onAction}
           />
-          <div
-            className={cn(
-              "flex items-center gap-2",
-              "rounded-md bg-ods-card border border-ods-border",
-              "transition-colors",
-              "text-left text-ods-text-primary",
-            )}
-          >
-            <Textarea
-              ref={textareaRef}
-              value={value}
-              onChange={handleChange}
-              onKeyDown={handleKeyDown}
-              placeholder={disabled ? "Connection lost. Waiting to reconnect..." : placeholder}
-              disabled={sending || disabled}
-              rows={1}
-              className={cn(
-                "flex-1 resize-none bg-transparent px-3 border-none focus-visible:ring-0",
-                "font-dm-sans text-[18px] font-medium leading-[24px]",
-                "placeholder:text-ods-text-secondary",
-                "overflow-hidden text-ellipsis",
-                "min-h-[20px] max-h-[160px] focus:outline-none",
-                "disabled:opacity-50 disabled:cursor-not-allowed"
-              )}
-              {...inputProps}
-            />
-
-            {sending && onStop ? (
-              <button
-                type="button"
-                onClick={handleStop}
-                disabled={isStopping}
-                className={cn(
-                  "rounded-md px-3 text-ods-text-secondary transition-all",
-                  isStopping ? "cursor-not-allowed opacity-40" : "hover:text-ods-accent active:scale-95",
-                  "focus:outline-none"
-                )}
-                aria-label="Stop generation"
-              >
-                <StopIcon size={24} />
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={sending || disabled || !value.trim()}
-                className={cn(
-                  "rounded-md px-3 text-ods-text-secondary transition-all",
-                  sending || disabled || !value.trim() ? "cursor-not-allowed opacity-40" : "hover:text-ods-text-primary active:scale-95",
-                  "focus:outline-none"
-                )}
-                aria-label="Send message"
-              >
-                <Send01Icon size={24} />
-              </button>
-            )}
-          </div>
+          <Textarea
+            ref={textareaRef}
+            value={value}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            placeholder={disabled ? "Connection lost. Waiting to reconnect..." : placeholder}
+            disabled={sending || disabled}
+            rows={1}
+            endIcon={isStopMode ? <StopCircleIcon size={20} /> : <Send01Icon size={20} />}
+            endIconAsButton
+            endIconButtonProps={{
+              onClick: isStopMode ? handleStop : handleSubmit,
+              disabled: isStopMode ? isStopping : sendDisabled,
+              'aria-label': isStopMode ? 'Stop generation' : 'Send message',
+            }}
+            {...inputProps}
+          />
         </div>
       </div>
     )
-  }
+  },
 )
 
 ChatInput.displayName = "ChatInput"

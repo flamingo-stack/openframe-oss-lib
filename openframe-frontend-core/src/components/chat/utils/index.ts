@@ -30,3 +30,6 @@ export {
 export {
   extractIncompleteMessageState,
 } from './extract-incomplete-message-state'
+
+// Tool call helpers
+export { getCommandText } from './tool-call-helpers'

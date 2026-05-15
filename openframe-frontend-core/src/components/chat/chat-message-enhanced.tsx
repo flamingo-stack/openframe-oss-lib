@@ -4,8 +4,10 @@ import { forwardRef, memo, useMemo } from "react"
 import { cn } from "../../utils/cn"
 import { SquareAvatar } from "../ui/square-avatar"
 import { ChatTypingIndicator } from "./chat-typing-indicator"
+import { CyclingPhrase } from "./cycling-phrase"
 import { ToolExecutionDisplay } from "./tool-execution-display"
 import { ApprovalRequestMessage } from "./approval-request-message"
+import { ApprovalBatchMessage } from "./approval-batch-message"
 import { ErrorMessageDisplay } from "./error-message-display"
 import { ContextCompactionDisplay } from "./context-compaction-display"
 import { ThinkingDisplay } from "./thinking-display"
@@ -20,6 +22,22 @@ function normalizeContent(content: MessageContent): MessageSegment[] {
   }
   return content
 }
+
+// Flamingo-themed cycling words shown next to the streaming indicator
+// (Claude-Code-style activity hint). Mix of classic AI verbs, flamingo
+// behaviours (strut/wade/preen/flock), and one Mingo neologism.
+const STREAMING_WORDS = [
+  'Thinking',
+  'Vibing',
+  'Mingoing',
+  'Strutting',
+  'Pondering',
+  'Wading',
+  'Hatching',
+  'Preening',
+  'Conjuring',
+  'Riffing',
+] as const
 
 const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>(
   ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, authorType: authorTypeProp, assistantIcon, chatRefs, renderEntityCard, ...props }, ref) => {
@@ -119,6 +137,16 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
 
     const isSystem = authorType === 'system'
 
+    // While `isTyping` says streaming is active, the agent is actually
+    // PAUSED whenever the last segment is an approval awaiting user
+    // input — pending status (or undefined, which is the initial state
+    // before backend confirms). Showing the typing indicator in this
+    // state would lie to the user about what's happening.
+    const lastSegment = segments[segments.length - 1]
+    const isPausedOnApproval = !!lastSegment
+      && (lastSegment.type === 'approval_request' || lastSegment.type === 'approval_batch')
+      && (lastSegment.status === undefined || lastSegment.status === 'pending')
+
     return (
       <div
         ref={ref}
@@ -166,10 +194,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           
           {/* Message segments — hidden for system messages without content */}
           {(!isSystem || segments.length > 0) && <div className="flex flex-col gap-2">
-            {isTyping && segments.length === 0 ? (
-              <ChatTypingIndicator />
-            ) : (
-              segments.map((segment, index) => {
+            {segments.map((segment, index) => {
                 if (segment.type === 'text') {
                   return (
                     <div key={index} className={cn(
@@ -203,6 +228,16 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                       onReject={segment.onReject}
                     />
                   )
+                } else if (segment.type === 'approval_batch') {
+                  return (
+                    <ApprovalBatchMessage
+                      key={index}
+                      data={segment.data}
+                      status={segment.status}
+                      onApprove={segment.onApprove}
+                      onReject={segment.onReject}
+                    />
+                  )
                 } else if (segment.type === 'error') {
                   return (
                     <ErrorMessageDisplay
@@ -229,7 +264,15 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                   )
                 }
                 return null
-              })
+              })}
+            {isTyping && !isPausedOnApproval && (
+              <div className="flex items-center gap-3">
+                <ChatTypingIndicator />
+                <CyclingPhrase
+                  words={STREAMING_WORDS}
+                  className="text-ods-text-secondary text-body-sm"
+                />
+              </div>
             )}
           </div>}
         </div>

@@ -12,9 +12,12 @@ import type {
   MessageSegment,
   ToolExecutionSegment,
   ApprovalRequestSegment,
+  ApprovalBatchSegment,
+  ApprovalBatchExecutionState,
   ContextCompactionSegment,
   ErrorSegment,
   PendingApproval,
+  PendingToolCallData,
   AccumulatorState,
   ChatApprovalStatus,
 } from '../types'
@@ -136,13 +139,27 @@ export class MessageSegmentAccumulator {
   }
 
   /**
-   * Add a tool execution segment
-   * If adding EXECUTED_TOOL, replace the matching EXECUTING_TOOL
+   * Add a tool execution segment.
+   *
+   * Routing:
+   *  1) If `toolExecutionRequestId` matches a tool call inside an existing
+   *     `approval_batch` segment, merge the state into that batch's
+   *     `executions` map (no standalone segment is pushed).
+   *  2) Otherwise: pair EXECUTING ↔ EXECUTED by `toolExecutionRequestId`.
+   *     If no id is present (older backends), fall back to
+   *     `(integratedToolType, toolFunction)` so repeat calls of the same
+   *     function don't all bucket under one key.
    */
   addToolExecution(segment: ToolExecutionSegment): MessageSegment[] {
     const toolData = segment.data
-    const toolKey = `${toolData.integratedToolType}-${toolData.toolFunction}`
-    
+    const execId = toolData.toolExecutionRequestId
+
+    if (execId && this.applyExecutionToBatch(execId, toolData)) {
+      return this.getSegments()
+    }
+
+    const toolKey = execId || `${toolData.integratedToolType}-${toolData.toolFunction}`
+
     if (toolData.type === 'EXECUTING_TOOL') {
       this.executingTools.set(toolKey, {
         integratedToolType: toolData.integratedToolType,
@@ -155,10 +172,12 @@ export class MessageSegmentAccumulator {
         (s): s is ToolExecutionSegment =>
           s.type === 'tool_execution' &&
           s.data.type === 'EXECUTING_TOOL' &&
-          s.data.integratedToolType === toolData.integratedToolType &&
-          s.data.toolFunction === toolData.toolFunction
+          (execId
+            ? s.data.toolExecutionRequestId === execId
+            : s.data.integratedToolType === toolData.integratedToolType &&
+              s.data.toolFunction === toolData.toolFunction),
       )
-      
+
       const executingTool = this.executingTools.get(toolKey)
       const mergedSegment: ToolExecutionSegment = {
         type: 'tool_execution',
@@ -167,17 +186,48 @@ export class MessageSegmentAccumulator {
           parameters: toolData.parameters || executingTool?.parameters,
         }
       }
-      
+
       if (existingIndex !== -1) {
         this.segments[existingIndex] = mergedSegment
       } else {
         this.segments.push(mergedSegment)
       }
-      
+
       this.executingTools.delete(toolKey)
     }
-    
+
     return this.getSegments()
+  }
+
+  /**
+   * Try to merge a tool execution event into an existing approval_batch
+   * segment whose `toolCalls` contains the same `toolExecutionRequestId`.
+   * Returns true when a batch was updated, false when no batch matches.
+   */
+  private applyExecutionToBatch(execId: string, toolData: ToolExecutionSegment['data']): boolean {
+    let matched = false
+    this.segments = this.segments.map((seg) => {
+      if (matched) return seg
+      if (seg.type !== 'approval_batch') return seg
+      const hasCall = seg.data.toolCalls.some((c) => c.toolExecutionRequestId === execId)
+      if (!hasCall) return seg
+
+      const prev: ApprovalBatchExecutionState | undefined = seg.data.executions?.[execId]
+      const next: ApprovalBatchExecutionState =
+        toolData.type === 'EXECUTED_TOOL'
+          ? { status: 'done', result: toolData.result, success: toolData.success }
+          : { status: 'executing', result: prev?.result, success: prev?.success }
+
+      matched = true
+      return {
+        ...seg,
+        data: {
+          ...seg.data,
+          executions: { ...(seg.data.executions ?? {}), [execId]: next },
+        },
+      }
+    })
+    return matched
   }
 
   /**
@@ -209,7 +259,67 @@ export class MessageSegmentAccumulator {
       onApprove: this.callbacks.onApprove,
       onReject: this.callbacks.onReject,
     }
-    
+
+    this.segments.push(segment)
+    return this.getSegments()
+  }
+
+  /**
+   * Add a batch approval segment containing multiple tool calls. Upserts by
+   * `approvalRequestId`: when a batch with the same id is already in the
+   * accumulator, the existing segment is updated in place rather than a
+   * second segment being pushed. This matters for the consumer-store replay
+   * path, which feeds `[existing..., new...]` into `replaySegments` and would
+   * otherwise produce two batch segments for the same approval after a
+   * status flip or per-tool execution merge.
+   *
+   * `approvalType` is the highest-privilege type required across the batch.
+   * `executions` is forwarded as-is. On upsert, a new `executions` object
+   * overrides the existing one (so the latest replay wins).
+   */
+  addApprovalBatch(
+    approvalRequestId: string,
+    approvalType: string,
+    toolCalls: PendingToolCallData[],
+    status: ChatApprovalStatus = 'pending',
+    executions?: Record<string, ApprovalBatchExecutionState>,
+  ): MessageSegment[] {
+    const existingIndex = this.segments.findIndex(
+      (s): s is ApprovalBatchSegment =>
+        s.type === 'approval_batch' && s.data.approvalRequestId === approvalRequestId,
+    )
+
+    if (existingIndex !== -1) {
+      const existing = this.segments[existingIndex] as ApprovalBatchSegment
+      const mergedExecutions = executions ?? existing.data.executions
+      this.segments[existingIndex] = {
+        ...existing,
+        data: {
+          approvalRequestId,
+          approvalType,
+          toolCalls,
+          ...(mergedExecutions ? { executions: mergedExecutions } : {}),
+        },
+        status,
+        onApprove: this.callbacks.onApprove,
+        onReject: this.callbacks.onReject,
+      }
+      return this.getSegments()
+    }
+
+    const segment: ApprovalBatchSegment = {
+      type: 'approval_batch',
+      data: {
+        approvalRequestId,
+        approvalType,
+        toolCalls,
+        ...(executions ? { executions } : {}),
+      },
+      status,
+      onApprove: this.callbacks.onApprove,
+      onReject: this.callbacks.onReject,
+    }
+
     this.segments.push(segment)
     return this.getSegments()
   }
@@ -249,11 +359,14 @@ export class MessageSegmentAccumulator {
   }
 
   /**
-   * Update status of an existing approval segment
+   * Update status of an existing approval segment (single or batch)
    */
   updateApprovalStatus(requestId: string, status: ChatApprovalStatus): MessageSegment[] {
     this.segments = this.segments.map(segment => {
       if (segment.type === 'approval_request' && segment.data.requestId === requestId) {
+        return { ...segment, status }
+      }
+      if (segment.type === 'approval_batch' && segment.data.approvalRequestId === requestId) {
         return { ...segment, status }
       }
       return segment
@@ -363,6 +476,17 @@ export class MessageSegmentAccumulator {
             data.explanation,
             data.approvalType || '',
             status,
+          )
+          break
+        }
+        case 'approval_batch': {
+          const { data, status } = segment
+          this.addApprovalBatch(
+            data.approvalRequestId,
+            data.approvalType,
+            data.toolCalls,
+            status,
+            data.executions,
           )
           break
         }

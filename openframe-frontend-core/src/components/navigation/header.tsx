@@ -141,11 +141,21 @@ export function Header({ config, platform }: HeaderProps) {
           </Button>
           
           {/* Always render dropdown in DOM so crawlers see child <a> links;
-              toggle visibility via CSS. `invisible` (visibility:hidden) also
-              removes anchors from tab order and the accessibility tree. */}
+              toggle visibility via CSS + `inert`.
+
+              Why `inert` (not `aria-hidden`):
+                - `aria-hidden=true` HIDES from screen readers but DOES NOT
+                  remove focusable descendants from the tab order. If a child
+                  retains focus (e.g., the dropdown closes while a child was
+                  hovered/focused), the browser correctly flags "Blocked
+                  aria-hidden on an element because its descendant retained
+                  focus" — a real WAI-ARIA violation.
+                - `inert` is the HTML-standard attribute that does BOTH:
+                  removes from a11y tree + blocks focus + prevents click +
+                  removes from tab order. Native React 19 support. */}
           <div
             ref={(el) => { dropdownRefs.current[item.id] = el }}
-            aria-hidden={!isOpen}
+            inert={!isOpen}
             className={cn(
               "absolute top-full left-0 mt-1",
               item.dropdownClassName ? "" : "bg-ods-card border border-ods-border",

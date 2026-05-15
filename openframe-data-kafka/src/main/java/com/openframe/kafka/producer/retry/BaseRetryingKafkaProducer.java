@@ -18,18 +18,13 @@ public abstract class BaseRetryingKafkaProducer {
         this.recoveryHandler = recoveryHandler;
     }
 
-    /**
-     * Public entry point that Spring Retry will proxy.
-     * Make it final so subclasses can’t accidentally remove @Retryable.
-     */
     @Retryable(
             retryFor = { TransientKafkaSendException.class },
             noRetryFor = { NonRetryableKafkaException.class },
             maxAttempts = 5,
             backoff = @Backoff(delay = 500, multiplier = 2.0, maxDelay = 5000)
     )
-    public final void publish(String topic, String key, KafkaMessage payload) {
-        // you may add pre-processing here if needed
+    public void publish(String topic, String key, KafkaMessage payload) {
         producer.sendAndAwaitMessage(topic, payload, key);
     }
 

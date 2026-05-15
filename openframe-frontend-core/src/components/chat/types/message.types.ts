@@ -38,6 +38,12 @@ export interface ToolExecutionData {
   parameters?: Record<string, any>
   result?: string
   success?: boolean
+  /**
+   * Backend-issued id (matches `PendingToolCallData.toolExecutionRequestId`).
+   * When present, lets the accumulator merge this execution event into the
+   * matching approval batch row instead of emitting a standalone segment.
+   */
+  toolExecutionRequestId?: string
 }
 
 // ========== Approval Request Types ==========
@@ -55,6 +61,45 @@ export interface ApprovalResultData {
   approvalRequestId: string
   approved: boolean
   approvalType?: string
+}
+
+/**
+ * Single tool call inside a batch approval request.
+ * Mirrors backend PendingToolCallDto.
+ */
+export interface PendingToolCallData {
+  toolExecutionRequestId: string
+  toolName: string
+  toolTitle?: string
+  toolExplanation?: string
+  toolType?: string
+  requiresApproval: boolean
+  approvalType?: string | null
+  toolCallArguments?: Record<string, any> | null
+}
+
+/**
+ * Per-tool execution state inside an approval batch.
+ * Populated by EXECUTING_TOOL / EXECUTED_TOOL chunks that carry a
+ * `toolExecutionRequestId` matching one of the batch's tool calls.
+ */
+export interface ApprovalBatchExecutionState {
+  status: 'executing' | 'done'
+  result?: string
+  success?: boolean
+}
+
+export interface ApprovalBatchData {
+  approvalRequestId: string
+  /** Highest approval type required across the batch (e.g. ADMIN beats CLIENT). */
+  approvalType: string
+  toolCalls: PendingToolCallData[]
+  /**
+   * Keyed by `PendingToolCallData.toolExecutionRequestId`. Absent before
+   * approval; rows without an entry render as "queued" (loader) once the
+   * batch itself is approved.
+   */
+  executions?: Record<string, ApprovalBatchExecutionState>
 }
 
 // ========== Message Segment Types ==========
@@ -82,6 +127,14 @@ export type ApprovalRequestSegment = {
   onReject?: (requestId?: string) => void | Promise<void>
 }
 
+export type ApprovalBatchSegment = {
+  type: 'approval_batch'
+  data: ApprovalBatchData
+  status?: ChatApprovalStatus
+  onApprove?: (requestId?: string) => void | Promise<void>
+  onReject?: (requestId?: string) => void | Promise<void>
+}
+
 export type ErrorSegment = {
   type: 'error'
   title: string
@@ -94,7 +147,7 @@ export type ContextCompactionSegment = {
   summary?: string
 }
 
-export type MessageSegment = TextSegment | ThinkingSegment | ToolExecutionSegment | ApprovalRequestSegment | ErrorSegment | ContextCompactionSegment
+export type MessageSegment = TextSegment | ThinkingSegment | ToolExecutionSegment | ApprovalRequestSegment | ApprovalBatchSegment | ErrorSegment | ContextCompactionSegment
 
 export type MessageContent = string | MessageSegment[]
 
@@ -119,6 +172,7 @@ export interface ExecutingToolMessageData extends MessageDataBase {
   integratedToolType?: string
   toolFunction?: string
   parameters?: Record<string, any>
+  toolExecutionRequestId?: string
 }
 
 export interface ExecutedToolMessageData extends MessageDataBase {
@@ -128,6 +182,7 @@ export interface ExecutedToolMessageData extends MessageDataBase {
   parameters?: Record<string, any>
   result?: string
   success?: boolean
+  toolExecutionRequestId?: string
 }
 
 export interface ApprovalRequestMessageData extends MessageDataBase {
@@ -136,6 +191,8 @@ export interface ApprovalRequestMessageData extends MessageDataBase {
   approvalType?: string
   command?: string
   explanation?: string
+  /** Present when the approval is a batch of tool calls (new format). */
+  toolCalls?: PendingToolCallData[]
 }
 
 export interface ApprovalResultMessageData extends MessageDataBase {
