@@ -47,14 +47,8 @@ public class Policy {
     @JsonProperty("failing_host_count")
     private Long failingHostCount;
 
-    /**
-     * Read-only list of hosts assigned to this policy. Populated by Fleet
-     * when running in openframe mode (see api-host-assignments docs).
-     */
     @JsonProperty("hosts_include_any")
     private List<AssignedHost> hostsIncludeAny;
-
-    // Getters and setters
 
     public Long getId() {
         return id;
