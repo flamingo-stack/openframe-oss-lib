@@ -14,6 +14,12 @@ export interface ChatRef {
   /** documentType from the host's RAG config (e.g. 'webinar', 'customer_interview').
    *  Treated as opaque by the OSS-lib — the host owns the type vocabulary. */
   type: string
+  /** RagTableConfig.id (e.g. 'data-room-docs', 'webinars'). Drives the
+   *  icon + label lookup in the host's `RAG_SOURCE_DISPLAY` registry —
+   *  same direct-keyed lookup the chips + search results use. Optional
+   *  for backward-compat with older wire payloads; when absent the host
+   *  resolver falls back to reverse-mapping `type → sourceRepo`. */
+  sourceRepo?: string
   /** Primary-key value. Opaque string downstream. */
   id: string
   /** Display title — used for fallback rendering when the host's renderer
