@@ -12,6 +12,8 @@ import java.util.Optional;
 @Repository
 public interface TagAssignmentRepository extends MongoRepository<TagAssignment, String> {
 
+    List<TagAssignment> findByEntityType(TagEntityType entityType);
+
     List<TagAssignment> findByEntityIdAndEntityType(String entityId, TagEntityType entityType);
 
     List<TagAssignment> findByTagId(String tagId);
