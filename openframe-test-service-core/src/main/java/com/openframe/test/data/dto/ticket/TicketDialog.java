@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -14,5 +16,5 @@ import lombok.NoArgsConstructor;
 public class TicketDialog {
     private String id;
     private String currentMode;
-    private TicketTokenUsage tokenUsage;
+    private List<TicketTokenUsage> tokenUsage;
 }
