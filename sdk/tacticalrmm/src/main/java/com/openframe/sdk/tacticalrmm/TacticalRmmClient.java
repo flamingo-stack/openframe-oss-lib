@@ -14,7 +14,7 @@ import com.openframe.sdk.tacticalrmm.model.CreateScriptRequest;
 import com.openframe.sdk.tacticalrmm.model.RunScriptRequest;
 import com.openframe.sdk.tacticalrmm.model.ScriptListItem;
 import com.openframe.sdk.tacticalrmm.model.ScriptScheduleAgentsResult;
-import com.openframe.sdk.tacticalrmm.model.TacticalScheduledTask;
+import com.openframe.sdk.tacticalrmm.model.TacticalScheduledScript;
 import com.openframe.sdk.tacticalrmm.model.TacticalScript;
 import com.openframe.sdk.tacticalrmm.model.CreateScriptScheduleRequest;
 import com.openframe.sdk.tacticalrmm.model.UpdateScriptScheduleRequest;
@@ -615,7 +615,7 @@ public class TacticalRmmClient {
     /**
      * List all script schedules from /script-schedules/.
      */
-    public List<TacticalScheduledTask> listScriptSchedules(String tacticalServerUrl, String apiKey) {
+    public List<TacticalScheduledScript> listScriptSchedules(String tacticalServerUrl, String apiKey) {
         try {
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(URI.create(tacticalServerUrl + "/script-schedules/"))
@@ -627,7 +627,7 @@ public class TacticalRmmClient {
                     .build();
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             checkSuccess(response, "list script schedules", null);
-            TypeReference<List<TacticalScheduledTask>> typeRef = new TypeReference<>() {};
+            TypeReference<List<TacticalScheduledScript>> typeRef = new TypeReference<>() {};
 
             return objectMapper.readValue(response.body(), typeRef);
         } catch (TacticalRmmApiException e) {
@@ -640,7 +640,7 @@ public class TacticalRmmClient {
     /**
      * Get a script schedule by numeric ID.
      */
-    public TacticalScheduledTask getScriptSchedule(String tacticalServerUrl, String apiKey, String scheduleId) {
+    public TacticalScheduledScript getScriptSchedule(String tacticalServerUrl, String apiKey, String scheduleId) {
         try {
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(URI.create(tacticalServerUrl + "/script-schedules/" + scheduleId + "/"))
@@ -653,7 +653,7 @@ public class TacticalRmmClient {
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             checkSuccess(response, "get script schedule", scheduleId);
 
-            return objectMapper.readValue(response.body(), TacticalScheduledTask.class);
+            return objectMapper.readValue(response.body(), TacticalScheduledScript.class);
         } catch (TacticalRmmApiException e) {
             throw e;
         } catch (Exception e) {
@@ -664,7 +664,7 @@ public class TacticalRmmClient {
     /**
      * Create a script schedule and return the created entity.
      */
-    public TacticalScheduledTask createScriptSchedule(
+    public TacticalScheduledScript createScriptSchedule(
             String tacticalServerUrl,
             String apiKey,
             CreateScriptScheduleRequest request
@@ -681,7 +681,7 @@ public class TacticalRmmClient {
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             checkSuccess(response, "create script schedule", null);
 
-            return objectMapper.readValue(response.body(), TacticalScheduledTask.class);
+            return objectMapper.readValue(response.body(), TacticalScheduledScript.class);
         } catch (TacticalRmmApiException e) {
             throw e;
         } catch (Exception e) {
@@ -692,7 +692,7 @@ public class TacticalRmmClient {
     /**
      * Update an existing script schedule.
      */
-    public TacticalScheduledTask updateScriptSchedule(
+    public TacticalScheduledScript updateScriptSchedule(
             String tacticalServerUrl,
             String apiKey,
             int scheduleId,
@@ -710,7 +710,7 @@ public class TacticalRmmClient {
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             checkSuccess(response, "update script schedule", String.valueOf(scheduleId));
 
-            return objectMapper.readValue(response.body(), TacticalScheduledTask.class);
+            return objectMapper.readValue(response.body(), TacticalScheduledScript.class);
         } catch (TacticalRmmApiException e) {
             throw e;
         } catch (Exception e) {
@@ -820,7 +820,7 @@ public class TacticalRmmClient {
         }
     }
 
-    public CompletableFuture<List<TacticalScheduledTask>> listScriptSchedulesAsync(String tacticalServerUrl, String apiKey) {
+    public CompletableFuture<List<TacticalScheduledScript>> listScriptSchedulesAsync(String tacticalServerUrl, String apiKey) {
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create(tacticalServerUrl + "/script-schedules/"))
                 .GET()
@@ -834,7 +834,7 @@ public class TacticalRmmClient {
                     checkSuccess(response, "list script schedules", null);
 
                     try {
-                        TypeReference<List<TacticalScheduledTask>> typeRef = new TypeReference<>() {};
+                        TypeReference<List<TacticalScheduledScript>> typeRef = new TypeReference<>() {};
 
                         return objectMapper.readValue(response.body(), typeRef);
                     } catch (Exception e) {
@@ -843,7 +843,7 @@ public class TacticalRmmClient {
                 });
     }
 
-    public CompletableFuture<TacticalScheduledTask> getScriptScheduleAsync(String tacticalServerUrl, String apiKey, String scheduleId) {
+    public CompletableFuture<TacticalScheduledScript> getScriptScheduleAsync(String tacticalServerUrl, String apiKey, String scheduleId) {
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create(tacticalServerUrl + "/script-schedules/" + scheduleId + "/"))
                 .GET()
@@ -857,14 +857,14 @@ public class TacticalRmmClient {
                     checkSuccess(response, "get script schedule", scheduleId);
 
                     try {
-                        return objectMapper.readValue(response.body(), TacticalScheduledTask.class);
+                        return objectMapper.readValue(response.body(), TacticalScheduledScript.class);
                     } catch (Exception e) {
                         throw new TacticalRmmException("Failed to parse script schedule response: " + scheduleId, e);
                     }
                 });
     }
 
-    public CompletableFuture<TacticalScheduledTask> createScriptScheduleAsync(String tacticalServerUrl, String apiKey, CreateScriptScheduleRequest request) {
+    public CompletableFuture<TacticalScheduledScript> createScriptScheduleAsync(String tacticalServerUrl, String apiKey, CreateScriptScheduleRequest request) {
         try {
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(URI.create(tacticalServerUrl + "/script-schedules/"))
@@ -879,19 +879,19 @@ public class TacticalRmmClient {
                         checkSuccess(response, "create script schedule", null);
 
                         try {
-                            return objectMapper.readValue(response.body(), TacticalScheduledTask.class);
+                            return objectMapper.readValue(response.body(), TacticalScheduledScript.class);
                         } catch (Exception e) {
                             throw new TacticalRmmException("Failed to parse create schedule response", e);
                         }
                     });
         } catch (Exception e) {
-            CompletableFuture<TacticalScheduledTask> failed = new CompletableFuture<>();
+            CompletableFuture<TacticalScheduledScript> failed = new CompletableFuture<>();
             failed.completeExceptionally(new TacticalRmmException("Failed to create script schedule: " + request.getName(), e));
             return failed;
         }
     }
 
-    public CompletableFuture<TacticalScheduledTask> updateScriptScheduleAsync(String tacticalServerUrl, String apiKey, int scheduleId, UpdateScriptScheduleRequest request) {
+    public CompletableFuture<TacticalScheduledScript> updateScriptScheduleAsync(String tacticalServerUrl, String apiKey, int scheduleId, UpdateScriptScheduleRequest request) {
         try {
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(URI.create(tacticalServerUrl + "/script-schedules/" + scheduleId + "/"))
@@ -906,13 +906,13 @@ public class TacticalRmmClient {
                         checkSuccess(response, "update script schedule", String.valueOf(scheduleId));
 
                         try {
-                            return objectMapper.readValue(response.body(), TacticalScheduledTask.class);
+                            return objectMapper.readValue(response.body(), TacticalScheduledScript.class);
                         } catch (Exception e) {
                             throw new TacticalRmmException("Failed to parse update schedule response", e);
                         }
                     });
         } catch (Exception e) {
-            CompletableFuture<TacticalScheduledTask> failed = new CompletableFuture<>();
+            CompletableFuture<TacticalScheduledScript> failed = new CompletableFuture<>();
             failed.completeExceptionally(new TacticalRmmException("Failed to update script schedule: " + scheduleId, e));
             return failed;
         }
