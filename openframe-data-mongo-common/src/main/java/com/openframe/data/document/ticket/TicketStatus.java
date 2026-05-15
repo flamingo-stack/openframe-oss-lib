@@ -22,7 +22,7 @@ public enum TicketStatus {
             case ACTIVE -> Set.of(TECH_REQUIRED, ON_HOLD, RESOLVED);
             case TECH_REQUIRED -> Set.of(ACTIVE, ON_HOLD, RESOLVED);
             case ON_HOLD -> Set.of(ACTIVE, TECH_REQUIRED, RESOLVED);
-            case RESOLVED -> Set.of(ACTIVE, ARCHIVED);
+            case RESOLVED -> Set.of(ARCHIVED);
             case ARCHIVED -> Set.of(RESOLVED);
         };
     }

@@ -2,6 +2,7 @@
 
 // Chat components exports
 export * from './approval-request-message'
+export * from './approval-batch-message'
 export * from './context-compaction-display'
 export * from './expand-chevron'
 export * from './thinking-display'
@@ -16,6 +17,7 @@ export * from './chat-ticket-item'
 export * from './chat-ticket-list'
 export * from './chat-typing-indicator'
 export * from './tool-execution-display'
+export * from './tool-call-blocks'
 export * from './model-display'
 export * from './chat-sidebar'
 export type { ChatRef } from './chat-ref.types'

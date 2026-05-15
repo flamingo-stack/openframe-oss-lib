@@ -173,6 +173,16 @@
 
   /* Adaptive Current Color (Platform-Specific) */
   --ods-current: var(--color-text-primary); /* Default to primary text */
+
+  /* Adaptive Accent Color (Platform-Specific).
+   * Defaults to yellow — matches OpenMSP / OpenFrame brand. Every
+   * `[data-app-type="X"]` block below overrides this for its platform.
+   * Critical: MuxPlayer reads this via `accentColor="var(--ods-accent)"`
+   * and falls back to its built-in `#fa50b5` (pink) if the variable is
+   * undefined. Keeping a `:root` default guarantees the video player
+   * never paints with Mux's brand color on a platform we haven't
+   * explicitly themed yet. */
+  --ods-accent: var(--ods-open-yellow-base);
 }
 
 
@@ -194,6 +204,53 @@
   /* OpenFrame uses yellow as adaptive color */
   --ods-current: var(--ods-open-yellow-base);
   --ods-accent: var(--ods-open-yellow-base);
+}
+
+[data-app-type="openmsp"] {
+  /* OpenMSP brand: yellow primary (#FFC008). Matches `openmsp.config.tsx`
+   * brandColors.primary. Before this block existed, OpenMSP had no
+   * `--ods-accent` defined, so the MuxPlayer video controls inherited
+   * its built-in pink (`#fa50b5`) — wrong brand color on every video
+   * surface in the OpenMSP platform. */
+  --color-accent-primary: var(--ods-open-yellow-base);
+  --color-accent-hover: var(--ods-open-yellow-hover);
+  --color-accent-active: var(--ods-open-yellow-action);
+  --color-accent-focus: var(--ods-open-yellow-base);
+  --color-focus-ring: var(--ods-open-yellow-base);
+  --color-focus-visible: var(--ods-open-yellow-base);
+  --color-link: var(--ods-open-yellow-base);
+  --color-link-hover: var(--ods-open-yellow-hover);
+  --color-bg: var(--ods-system-greys-background);
+  --color-bg-card: var(--ods-system-greys-black);
+  --color-bg-hover: var(--ods-system-greys-black-hover);
+  --color-bg-active: var(--ods-system-greys-black-action);
+
+  /* OpenMSP uses yellow as adaptive color */
+  --ods-current: var(--ods-open-yellow-base);
+  --ods-accent: var(--ods-open-yellow-base);
+}
+
+[data-app-type="flamingo-teaser"] {
+  /* Flamingo Teaser uses the same Flamingo pink brand as the full
+   * Flamingo app — matches `flamingo-teaser.config.tsx`. Without this
+   * block the video player would fall back to MuxPlayer's pink default,
+   * which is coincidentally close but not the brand pink. */
+  --color-accent-primary: var(--ods-flamingo-pink-base);
+  --color-accent-hover: var(--ods-flamingo-pink-hover);
+  --color-accent-active: var(--ods-flamingo-pink-action);
+  --color-accent-focus: var(--ods-flamingo-pink-base);
+  --color-focus-ring: var(--ods-flamingo-pink-base);
+  --color-focus-visible: var(--ods-flamingo-pink-base);
+  --color-link: var(--ods-flamingo-pink-base);
+  --color-link-hover: var(--ods-flamingo-pink-hover);
+  --color-bg: var(--ods-system-greys-background);
+  --color-bg-card: var(--ods-system-greys-black);
+  --color-bg-hover: var(--ods-system-greys-black-hover);
+  --color-bg-active: var(--ods-system-greys-black-action);
+
+  /* Flamingo Teaser uses pink as adaptive color */
+  --ods-current: var(--ods-flamingo-pink-base);
+  --ods-accent: var(--ods-flamingo-pink-base);
 }
 
 [data-app-type="flamingo"] {

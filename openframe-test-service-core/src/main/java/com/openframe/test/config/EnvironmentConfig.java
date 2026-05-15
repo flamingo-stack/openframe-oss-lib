@@ -12,6 +12,7 @@ public class EnvironmentConfig {
 
     public static final String DEFAULT_BASE_URL = "https://localhost/";
     public static final String GRAPHQL = "api/graphql";
+    public static final String CHAT_GRAPHQL = "chat/graphql";
 
     private static String envMode;
     private static String testBaseUrl;

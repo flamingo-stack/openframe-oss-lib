@@ -33,7 +33,9 @@ export function extractIncompleteMessageState(
     switch (segment.type) {
       case 'tool_execution':
         if (segment.data.type === 'EXECUTING_TOOL') {
-          const toolKey = `${segment.data.integratedToolType}-${segment.data.toolFunction}`
+          const toolKey =
+            segment.data.toolExecutionRequestId ||
+            `${segment.data.integratedToolType}-${segment.data.toolFunction}`
           executingTools.set(toolKey, {
             integratedToolType: segment.data.integratedToolType,
             toolFunction: segment.data.toolFunction,
@@ -53,6 +55,22 @@ export function extractIncompleteMessageState(
           hasIncompleteState = true
         }
         break
+
+      case 'approval_batch': {
+        // Treat a batch as in-progress until every tool call has a
+        // `done` execution OR the batch was rejected. Otherwise the realtime
+        // accumulator won't hold the segment and post-approval EXECUTED_TOOL
+        // chunks won't be able to merge into it via `applyExecutionToBatch`.
+        const allDone =
+          !!segment.data.executions &&
+          segment.data.toolCalls.every(
+            (c) => segment.data.executions?.[c.toolExecutionRequestId]?.status === 'done',
+          )
+        if (segment.status !== 'rejected' && !allDone) {
+          hasIncompleteState = true
+        }
+        break
+      }
 
       case 'context_compaction':
         if (segment.status === 'started') {

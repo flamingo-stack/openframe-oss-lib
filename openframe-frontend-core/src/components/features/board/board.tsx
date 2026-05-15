@@ -6,9 +6,12 @@ import {
   DragOverlay,
   KeyboardSensor,
   PointerSensor,
-  closestCenter,
+  closestCorners,
+  pointerWithin,
+  rectIntersection,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
   type DragOverEvent,
   type DragStartEvent,
@@ -60,6 +63,34 @@ export function Board({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
+  const collisionDetection = React.useCallback<CollisionDetection>((args) => {
+    const pointer = pointerWithin(args)
+    const intersections = pointer.length > 0 ? pointer : rectIntersection(args)
+
+    const ticketHit = intersections.find(
+      c => c.data?.droppableContainer?.data?.current?.type === 'ticket',
+    )
+    if (ticketHit) return [ticketHit]
+
+    const columnHit = intersections.find(
+      c => c.data?.droppableContainer?.data?.current?.type === 'column',
+    )
+    if (columnHit) {
+      const columnId = columnHit.data?.droppableContainer?.data?.current?.columnId
+      const ticketsInColumn = args.droppableContainers.filter(c => {
+        const d = c.data.current as { type?: string; columnId?: string } | undefined
+        return d?.type === 'ticket' && d.columnId === columnId
+      })
+      if (ticketsInColumn.length > 0) {
+        const closest = closestCorners({ ...args, droppableContainers: ticketsInColumn })
+        if (closest.length > 0) return closest
+      }
+      return [columnHit]
+    }
+
+    return closestCorners(args)
+  }, [])
+
   const handleDragStart = (e: DragStartEvent) => {
     const id = String(e.active.id)
     const located = locate(items, id)
@@ -107,8 +138,7 @@ export function Board({
         } else {
           const activeRect = active.rect.current.translated
           const overRect = over.rect
-          const isBelow =
-            !!activeRect && activeRect.top + activeRect.height / 2 > overRect.top + overRect.height / 2
+          const isBelow = !!activeRect && activeRect.top > overRect.top + overRect.height / 2
           toIndex = overIndex + (isBelow ? 1 : 0)
         }
       }
@@ -196,7 +226,7 @@ export function Board({
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCenter}
+      collisionDetection={collisionDetection}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}

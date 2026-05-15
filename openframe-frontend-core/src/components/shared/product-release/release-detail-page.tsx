@@ -11,8 +11,7 @@ import { ImageGalleryModal } from '../../ui/image-gallery-modal';
 import { GitHubIcon } from '../../icons/github-icon';
 import { AlertTriangle, ExternalLink, BookMarked } from 'lucide-react';
 import { formatReleaseDate } from '../../../utils/date-formatters';
-import { YouTubeEmbed, extractYouTubeId } from '../../features/youtube-embed';
-import { VideoPlayer } from '../../features/video-player';
+import { Video } from '../../features/video';
 import { DetailPageSkeleton } from '../detail-page-skeleton';
 import type { ChangelogEntry } from '../../../types/product-release';
 import type { VideoTeaser } from '../../../types/video-processing';
@@ -308,7 +307,7 @@ export function ReleaseDetailPage({
                 }}
               >
                 {mediaItem.media_type === 'video' || mediaItem.media_type === 'demo' ? (
-                  <VideoPlayer url={mediaItem.media_url} useNativeAspectRatio={false} />
+                  <Video url={mediaItem.media_url} layout="native" />
                 ) : (
                   <img src={mediaItem.media_url} alt={mediaItem.title || `Media ${index + 1}`} className="w-full h-full object-cover" />
                 )}
@@ -340,25 +339,33 @@ export function ReleaseDetailPage({
           />
         ) : (
           <>
-            {youtubeUrl && (() => {
-              const videoId = extractYouTubeId(youtubeUrl);
-              return videoId ? (
-                <YouTubeEmbed videoId={videoId} title={`${releaseTitle} - Video`} showTitle={false} showMeta={true} />
-              ) : null;
-            })()}
+            {/*
+              Fallback when no `VideoDisplaySection` is injected. `<Video>` is the
+              SSoT for every video surface — single source of truth across YouTube,
+              HLS, and MP4 paths.
+            */}
+            {youtubeUrl && (
+              <Video
+                kind="youtube"
+                url={youtubeUrl}
+                title={`${releaseTitle} - Video`}
+                layout="native"
+              />
+            )}
             {!youtubeUrl && mainVideoUrl && (
-              <div className="flex justify-center w-full">
-                <div className="w-full max-w-3xl">
-                  <VideoPlayer url={mainVideoUrl} srtContent={release?.srt_content as string | undefined} captionsUrl={release?.captionsUrl as string | undefined} />
-                </div>
-              </div>
+              <Video
+                url={mainVideoUrl}
+                srtContent={release?.srt_content as string | undefined}
+                captionsUrl={release?.captionsUrl as string | undefined}
+                layout="centered"
+              />
             )}
             {highlightVideoUrl && (
-              <div className="flex justify-center w-full">
-                <div className="w-full max-w-3xl">
-                  <VideoPlayer url={highlightVideoUrl} poster={highlightVideoThumbnail} />
-                </div>
-              </div>
+              <Video
+                url={highlightVideoUrl}
+                poster={highlightVideoThumbnail}
+                layout="centered"
+              />
             )}
           </>
         )}

@@ -41,6 +41,7 @@ export interface ChunkData {
   parameters?: Record<string, any>
   result?: string
   success?: boolean
+  toolExecutionRequestId?: string
   error?: string
   details?: string
   approvalRequestId?: string
@@ -49,6 +50,7 @@ export interface ChunkData {
   command?: string
   explanation?: string
   approved?: boolean
+  toolCalls?: any[]
   modelName?: string
   providerName?: string
   provider?: string
