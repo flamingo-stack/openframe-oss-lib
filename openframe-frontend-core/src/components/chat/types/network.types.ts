@@ -38,6 +38,8 @@ export interface ChunkData {
   text?: string
   integratedToolType?: string
   toolFunction?: string
+  /** Execution chunks carry the human-readable title as `title`. */
+  title?: string
   parameters?: Record<string, any>
   result?: string
   success?: boolean

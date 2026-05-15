@@ -3,8 +3,7 @@
 import { forwardRef } from "react"
 
 import { cn } from "../../utils/cn"
-import { CheckCircleIcon } from "../icons-v2-generated"
-import { PulseDots } from "../ui/pulse-dots"
+import { CheckCircleIcon, DotsLoaderIcon } from "../icons-v2-generated"
 import type { ContextCompactionDisplayProps } from "./types"
 
 
@@ -28,7 +27,7 @@ const ContextCompactionDisplay = forwardRef<HTMLDivElement, ContextCompactionDis
           {label}
         </span>
         {isStarted ? (
-          <PulseDots size="sm" />
+          <DotsLoaderIcon size={16} className="text-ods-text-secondary" />
         ) : (
           <CheckCircleIcon className="w-4 h-4 text-ods-success shrink-0" />
         )}

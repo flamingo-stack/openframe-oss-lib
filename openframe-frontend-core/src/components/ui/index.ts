@@ -44,8 +44,6 @@ export * from './menubar'
 export * from './navigation-menu'
 export * from './tab-content'
 export * from './tab-navigation'
-// Animation components
-export * from './pulse-dots'
 // Feedback components
 export * from './alert'
 export * from './badge'
