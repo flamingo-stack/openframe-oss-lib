@@ -1,24 +1,20 @@
 package com.openframe.data.repository.notification.impl;
 
-import com.openframe.data.document.notification.BroadcastRecipient;
-import com.openframe.data.document.notification.MachineRecipient;
 import com.openframe.data.document.notification.Notification;
-import com.openframe.data.document.notification.UserRecipient;
+import com.openframe.data.document.notification.NotificationReadState;
+import com.openframe.data.document.notification.ReadStatus;
+import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.repository.notification.CustomNotificationRepository;
+import com.openframe.data.repository.notification.NotificationWithStatus;
 import lombok.RequiredArgsConstructor;
-import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.aggregation.Aggregation;
-import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
-import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.regex.Pattern;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
@@ -29,65 +25,99 @@ public class CustomNotificationRepositoryImpl implements CustomNotificationRepos
 
     private static final String FIELD_ID = "_id";
     private static final String FIELD_TITLE = "title";
-    private static final String FIELD_RECIPIENT_USER_ID = "recipient.userId";
-    private static final String FIELD_RECIPIENT_MACHINE_ID = "recipient.machineId";
-    private static final String FIELD_RECIPIENT_CLASS = "recipient._class";
-    private static final String USER_CLASS = UserRecipient.class.getName();
-    private static final String MACHINE_CLASS = MachineRecipient.class.getName();
-    private static final String BROADCAST_CLASS = BroadcastRecipient.class.getName();
-    private static final String READ_STATE_COLLECTION = "notification_read_states";
-    private static final String NOTIFICATIONS_COLLECTION = "notifications";
-    private static final String LOOKUP_FIELD = "rs";
+    private static final String FIELD_RECIPIENT_ID = "recipientId";
+    private static final String FIELD_RECIPIENT_TYPE = "recipientType";
+    private static final String FIELD_NOTIFICATION_ID = "notificationId";
+    private static final String FIELD_STATUS = "status";
 
     private final MongoTemplate mongoTemplate;
 
     @Override
-    public List<Notification> findPageForUser(String userId, String cursor, boolean backward, int limit) {
-        return findPageForUser(userId, null, null, cursor, backward, limit);
-    }
-
-    @Override
-    public List<Notification> findPageForUser(String userId, Boolean readFilter, String search,
-                                              String cursor, boolean backward, int limit) {
-        if (readFilter == null) {
-            return findPage(userAudience(userId), search, cursor, backward, limit);
+    public List<NotificationWithStatus> findPageForRecipient(String recipientId, RecipientType recipientType,
+                                                             Boolean readFilter, String search,
+                                                             String cursor, boolean backward, int limit) {
+        LinkedHashMap<String, ReadStatus> idsToStatus =
+                findVisibleNotificationStatuses(recipientId, recipientType, readFilter, cursor, backward, limit);
+        if (idsToStatus.isEmpty()) {
+            return List.of();
         }
-        return findUserPageWithReadFilter(userId, readFilter, search, cursor, backward, limit);
+        return fetchNotificationsPreservingOrder(idsToStatus, search);
     }
 
-    @Override
-    public List<Notification> findPageForMachine(String machineId, String cursor, boolean backward, int limit) {
-        return findPageForMachine(machineId, null, cursor, backward, limit);
-    }
+    private LinkedHashMap<String, ReadStatus> findVisibleNotificationStatuses(
+            String recipientId, RecipientType recipientType, Boolean readFilter,
+            String cursor, boolean backward, int limit) {
+        Criteria criteria = Criteria.where(FIELD_RECIPIENT_ID).is(recipientId)
+                .and(FIELD_RECIPIENT_TYPE).is(recipientType);
+        applyStatusFilter(criteria, readFilter);
+        applyCursor(criteria, cursor, backward);
 
-    @Override
-    public List<Notification> findPageForMachine(String machineId, String search,
-                                                 String cursor, boolean backward, int limit) {
-        Criteria audience = new Criteria().orOperator(
-                Criteria.where(FIELD_RECIPIENT_CLASS).is(MACHINE_CLASS).and(FIELD_RECIPIENT_MACHINE_ID).is(machineId),
-                Criteria.where(FIELD_RECIPIENT_CLASS).is(BROADCAST_CLASS));
-        return findPage(audience, search, cursor, backward, limit);
-    }
-
-    private static Criteria userAudience(String userId) {
-        return new Criteria().orOperator(
-                Criteria.where(FIELD_RECIPIENT_CLASS).is(USER_CLASS).and(FIELD_RECIPIENT_USER_ID).is(userId),
-                Criteria.where(FIELD_RECIPIENT_CLASS).is(BROADCAST_CLASS));
-    }
-
-    private List<Notification> findPage(Criteria audience, String search,
-                                        String cursor, boolean backward, int limit) {
-        Query query = new Query(audience);
-
-        Criteria searchCriteria = searchCriteria(search);
-        if (searchCriteria != null) {
-            query.addCriteria(searchCriteria);
-        }
-        applyCursor(query, cursor, backward);
-        query.with(Sort.by(backward ? Sort.Direction.ASC : Sort.Direction.DESC, FIELD_ID));
+        Query query = new Query(criteria);
+        query.fields().include(FIELD_NOTIFICATION_ID).include(FIELD_STATUS);
+        query.with(Sort.by(backward ? Sort.Direction.ASC : Sort.Direction.DESC, FIELD_NOTIFICATION_ID));
         query.limit(limit);
 
-        return mongoTemplate.find(query, Notification.class);
+        List<NotificationReadState> rows = mongoTemplate.find(query, NotificationReadState.class);
+        LinkedHashMap<String, ReadStatus> ordered = new LinkedHashMap<>(rows.size());
+        for (NotificationReadState row : rows) {
+            ordered.put(row.getNotificationId(), row.getStatus());
+        }
+        return ordered;
+    }
+
+    private List<NotificationWithStatus> fetchNotificationsPreservingOrder(
+            LinkedHashMap<String, ReadStatus> idsToStatus, String search) {
+        List<ObjectId> objectIds = new ArrayList<>(idsToStatus.size());
+        for (String id : idsToStatus.keySet()) {
+            try {
+                objectIds.add(new ObjectId(id));
+            } catch (IllegalArgumentException ignored) {
+                // skip malformed ids (legacy data)
+            }
+        }
+        if (objectIds.isEmpty()) {
+            return List.of();
+        }
+        Criteria criteria = Criteria.where(FIELD_ID).in(objectIds);
+        Criteria searchCriteria = searchCriteria(search);
+        if (searchCriteria != null) {
+            criteria = new Criteria().andOperator(criteria, searchCriteria);
+        }
+        List<Notification> fetched = mongoTemplate.find(new Query(criteria), Notification.class);
+
+        Map<String, Notification> byId = new HashMap<>(fetched.size());
+        for (Notification n : fetched) {
+            byId.put(n.getId(), n);
+        }
+        List<NotificationWithStatus> ordered = new ArrayList<>(idsToStatus.size());
+        for (Map.Entry<String, ReadStatus> entry : idsToStatus.entrySet()) {
+            Notification n = byId.get(entry.getKey());
+            if (n != null) {
+                ordered.add(new NotificationWithStatus(n, entry.getValue()));
+            }
+        }
+        return ordered;
+    }
+
+    private static void applyStatusFilter(Criteria criteria, Boolean readFilter) {
+        if (readFilter == null) {
+            criteria.and(FIELD_STATUS).ne(ReadStatus.DELETED);
+        } else if (readFilter) {
+            criteria.and(FIELD_STATUS).is(ReadStatus.READ);
+        } else {
+            criteria.and(FIELD_STATUS).is(ReadStatus.UNREAD);
+        }
+    }
+
+    private static void applyCursor(Criteria criteria, String cursor, boolean backward) {
+        if (isBlank(cursor)) {
+            return;
+        }
+        if (backward) {
+            criteria.and(FIELD_NOTIFICATION_ID).gt(cursor);
+        } else {
+            criteria.and(FIELD_NOTIFICATION_ID).lt(cursor);
+        }
     }
 
     private static Criteria searchCriteria(String search) {
@@ -95,85 +125,5 @@ public class CustomNotificationRepositoryImpl implements CustomNotificationRepos
             return null;
         }
         return Criteria.where(FIELD_TITLE).regex(Pattern.quote(search), "i");
-    }
-
-    private static void applyCursor(Query query, String cursor, boolean backward) {
-        ObjectId cursorId = parseCursor(cursor);
-        if (cursorId == null) {
-            return;
-        }
-        query.addCriteria(cursorCriteria(cursorId, backward));
-    }
-
-    private static Criteria cursorCriteria(ObjectId cursorId, boolean backward) {
-        return backward
-                ? Criteria.where(FIELD_ID).gt(cursorId)
-                : Criteria.where(FIELD_ID).lt(cursorId);
-    }
-
-    private List<Notification> findUserPageWithReadFilter(String userId, boolean read, String search,
-                                                          String cursor, boolean backward, int limit) {
-        Criteria audience = userAudience(userId);
-
-        List<Criteria> firstStageGuards = new ArrayList<>();
-        firstStageGuards.add(audience);
-        ObjectId cursorId = parseCursor(cursor);
-        if (cursorId != null) {
-            firstStageGuards.add(cursorCriteria(cursorId, backward));
-        }
-        Criteria searchCriteria = searchCriteria(search);
-        if (searchCriteria != null) {
-            firstStageGuards.add(searchCriteria);
-        }
-        Criteria firstStage = firstStageGuards.size() == 1
-                ? firstStageGuards.get(0)
-                : new Criteria().andOperator(firstStageGuards.toArray(new Criteria[0]));
-
-        List<AggregationOperation> ops = new ArrayList<>();
-        ops.add(Aggregation.match(firstStage));
-        ops.add(Aggregation.sort(backward ? Sort.Direction.ASC : Sort.Direction.DESC, FIELD_ID));
-        ops.add(context -> new Document("$lookup", new Document()
-                .append("from", READ_STATE_COLLECTION)
-                .append("let", new Document("nid", new Document("$toString", "$_id")))
-                .append("pipeline", List.of(
-                        new Document("$match", new Document("$expr", new Document("$and", List.of(
-                                new Document("$eq", List.of("$userId", userId)),
-                                new Document("$eq", List.of("$notificationId", "$$nid"))
-                        )))),
-                        new Document("$project", new Document("_id", 1)),
-                        new Document("$limit", 1)))
-                .append("as", LOOKUP_FIELD)));
-        ops.add(Aggregation.match(read
-                ? Criteria.where(LOOKUP_FIELD).not().size(0)
-                : Criteria.where(LOOKUP_FIELD).size(0)));
-        ops.add(Aggregation.limit(limit));
-
-        AggregationResults<Notification> results = mongoTemplate.aggregate(
-                Aggregation.newAggregation(ops), NOTIFICATIONS_COLLECTION, Notification.class);
-        return results.getMappedResults();
-    }
-
-    private static ObjectId parseCursor(String cursor) {
-        if (isBlank(cursor)) {
-            return null;
-        }
-        try {
-            return new ObjectId(cursor);
-        } catch (IllegalArgumentException ex) {
-            throw new IllegalArgumentException("Invalid notification cursor: " + cursor, ex);
-        }
-    }
-
-    @Override
-    public List<String> findRecentIdsForUser(String userId, int limit) {
-        Query query = new Query(userAudience(userId));
-        query.fields().include(FIELD_ID);
-        query.with(Sort.by(Sort.Direction.DESC, FIELD_ID));
-        query.limit(limit);
-
-        List<Document> rows = mongoTemplate.find(query, Document.class, NOTIFICATIONS_COLLECTION);
-        return rows.stream()
-                .map(row -> row.getObjectId(FIELD_ID).toHexString())
-                .toList();
     }
 }

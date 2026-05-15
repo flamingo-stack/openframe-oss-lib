@@ -7,18 +7,17 @@ import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.notification.NotificationFilter;
 import com.openframe.api.dto.notification.NotificationFilterInput;
 import com.openframe.api.dto.notification.NotificationView;
-import com.openframe.data.document.notification.MachineRecipient;
-import com.openframe.data.document.notification.Recipient;
-import com.openframe.data.document.notification.UserRecipient;
+import com.openframe.api.dto.notification.UnreadTypeCount;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.mapper.GraphQLNotificationMapper;
 import com.openframe.api.service.NotificationService;
 import com.openframe.core.exception.UnauthorizedException;
+import com.openframe.data.document.notification.RecipientType;
+import com.openframe.data.service.notification.NotificationReadStateService;
 import com.openframe.security.authentication.ActorType;
 import com.openframe.security.authentication.AuthPrincipal;
 import graphql.relay.Relay;
-import jakarta.annotation.Nullable;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -27,8 +26,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.validation.annotation.Validated;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
 import static org.apache.commons.lang3.StringUtils.isBlank;
-import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @DgsComponent
 @RequiredArgsConstructor
@@ -39,6 +41,7 @@ public class NotificationDataFetcher {
     private static final Relay RELAY = new Relay();
 
     private final NotificationService notificationService;
+    private final NotificationReadStateService readStateService;
     private final GraphQLNotificationMapper notificationMapper;
 
     @DgsData(parentType = "Notification", field = "id")
@@ -50,7 +53,6 @@ public class NotificationDataFetcher {
     @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")
     @DgsQuery
     public GenericConnection<GenericEdge<NotificationView>> notifications(
-            @InputArgument @Nullable String machineId,
             @InputArgument NotificationFilterInput filter,
             @InputArgument String search,
             @InputArgument Integer first,
@@ -58,9 +60,8 @@ public class NotificationDataFetcher {
             @InputArgument Integer last,
             @InputArgument String before) {
 
-        Recipient recipient = resolveRecipient(machineId);
-        log.debug("Listing notifications for {} (filter={}, search={}, first={}, after={}, last={}, before={})",
-                recipient, filter, search, first, after, last, before);
+        Recipient r = currentRecipient();
+        log.debug("Listing notifications for {} {} (filter={}, search={})", r.type(), r.id(), filter, search);
 
         ConnectionArgs args = ConnectionArgs.builder()
                 .first(first).after(after).last(last).before(before)
@@ -70,42 +71,73 @@ public class NotificationDataFetcher {
                 filter == null ? null : filter.getRead(), search);
 
         GenericQueryResult<NotificationView> result = notificationService.list(
-                recipient, serviceFilter, pagination);
+                r.id(), r.type(), serviceFilter, pagination);
         return notificationMapper.toConnection(result);
     }
 
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")
     @DgsQuery
     public boolean hasUnreadNotifications() {
-        String userId = currentUserId();
-        return notificationService.hasUnread(userId);
+        Recipient r = currentRecipient();
+        return readStateService.hasUnread(r.id(), r.type());
     }
 
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")
+    @DgsQuery
+    public List<UnreadTypeCount> unreadCountsByType() {
+        Recipient r = currentRecipient();
+        Map<String, Long> counts = readStateService.unreadCountsByType(r.id(), r.type());
+        List<UnreadTypeCount> result = new ArrayList<>(counts.size());
+        for (Map.Entry<String, Long> entry : counts.entrySet()) {
+            result.add(new UnreadTypeCount(entry.getKey(), entry.getValue()));
+        }
+        return result;
+    }
+
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")
     @DgsMutation
     public boolean markNotificationAsRead(@InputArgument String notificationId) {
-        String userId = currentUserId();
-        String rawId = decodeNotificationId(notificationId);
-        log.debug("Marking notification {} as read for user {}", rawId, userId);
-        return notificationService.markRead(userId, rawId);
+        Recipient r = currentRecipient();
+        return readStateService.markRead(r.id(), r.type(), decodeNotificationId(notificationId));
     }
 
-    private Recipient resolveRecipient(@Nullable String machineIdArg) {
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")
+    @DgsMutation
+    public long markAllNotificationsAsRead() {
+        Recipient r = currentRecipient();
+        return readStateService.markAllAsRead(r.id(), r.type());
+    }
+
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")
+    @DgsMutation
+    public boolean deleteNotification(@InputArgument String notificationId) {
+        Recipient r = currentRecipient();
+        return readStateService.deleteNotification(r.id(), r.type(), decodeNotificationId(notificationId));
+    }
+
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")
+    @DgsMutation
+    public long deleteAllReadNotifications() {
+        Recipient r = currentRecipient();
+        return readStateService.deleteAllRead(r.id(), r.type());
+    }
+
+    private record Recipient(String id, RecipientType type) {}
+
+    private Recipient currentRecipient() {
         AuthPrincipal principal = currentPrincipal();
         if (principal.getActorType() == ActorType.AGENT) {
-            String agentMachineId = principal.getMachineId();
-            if (isBlank(agentMachineId)) {
+            String machineId = principal.getMachineId();
+            if (isBlank(machineId)) {
                 throw new UnauthorizedException("AGENT principal missing machine_id claim");
             }
-            if (isNotBlank(machineIdArg) && !machineIdArg.equals(agentMachineId)) {
-                throw new UnauthorizedException("AGENT cannot read another machine's notifications");
-            }
-            return new MachineRecipient(agentMachineId);
+            return new Recipient(machineId, RecipientType.MACHINE);
         }
-        if (isNotBlank(machineIdArg)) {
-            return new MachineRecipient(machineIdArg);
+        String userId = principal.getId();
+        if (isBlank(userId)) {
+            throw new UnauthorizedException("Authenticated user is required to access notifications");
         }
-        return new UserRecipient(requireUserId(principal));
+        return new Recipient(userId, RecipientType.USER);
     }
 
     private String decodeNotificationId(String input) {
@@ -123,18 +155,6 @@ public class NotificationDataFetcher {
                     "notificationId references the wrong type: " + resolved.getType());
         }
         return resolved.getId();
-    }
-
-    private String currentUserId() {
-        return requireUserId(currentPrincipal());
-    }
-
-    private static String requireUserId(AuthPrincipal principal) {
-        String id = principal.getId();
-        if (isBlank(id)) {
-            throw new UnauthorizedException("Authenticated user is required to access notifications");
-        }
-        return id;
     }
 
     private AuthPrincipal currentPrincipal() {

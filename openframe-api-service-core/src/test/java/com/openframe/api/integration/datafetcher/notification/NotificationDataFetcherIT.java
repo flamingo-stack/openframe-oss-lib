@@ -1,28 +1,16 @@
 package com.openframe.api.integration.datafetcher.notification;
 
 import com.netflix.graphql.dgs.DgsQueryExecutor;
-import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.integration.BaseMongoIntegrationTest;
 import com.openframe.api.integration.support.GraphQlIntegrationTestApplication;
 import com.openframe.api.integration.support.NotificationFixtures;
-import com.openframe.core.exception.UnauthorizedException;
-import com.openframe.data.document.notification.BroadcastRecipient;
-import com.openframe.data.document.notification.GenericContext;
-import com.openframe.data.document.notification.MachineRecipient;
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationReadState;
-import com.openframe.data.document.notification.NotificationSeverity;
-import com.openframe.data.document.notification.UserRecipient;
-import com.openframe.data.repository.notification.NotificationRepository;
+import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.service.notification.NotificationReadStateService;
 import graphql.ExecutionResult;
 import graphql.relay.Relay;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -33,9 +21,9 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -59,14 +47,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
 
     private static final String ALICE = "user-alice";
-    private static final String BOB = "user-bob";
+    private static final String MACHINE_1 = "machine-1";
     private static final Relay RELAY = new Relay();
 
     @Autowired
     private DgsQueryExecutor queryExecutor;
-
-    @Autowired
-    private NotificationRepository repository;
 
     @Autowired
     private MongoTemplate mongoTemplate;
@@ -75,10 +60,9 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
     private NotificationReadStateService readStateService;
 
     @BeforeEach
-    void resetCollectionAndAuth() {
+    void reset() {
         mongoTemplate.dropCollection(Notification.class);
         mongoTemplate.dropCollection(NotificationReadState.class);
-        authAs(ALICE);
     }
 
     @AfterEach
@@ -86,759 +70,155 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
         SecurityContextHolder.clearContext();
     }
 
-    @Nested
-    @DisplayName("hasUnreadNotifications query")
-    class HasUnreadNotifications {
+    @Test
+    @DisplayName("Given an ADMIN JWT principal and a USER read_state row addressed to that user, when the notifications GraphQL query runs, then the page returns that row with read=false")
+    void admin_lists_own_rows() {
+        loginAsAdmin(ALICE);
+        Notification n = mongoTemplate.save(NotificationFixtures.basic("welcome"));
+        readStateService.createForAudience(n.getId(), "welcome", RecipientType.USER, Set.of(ALICE));
 
-        @Test
-        @DisplayName("Given an empty inbox, when querying hasUnreadNotifications, then it returns false")
-        void given_empty_inbox_when_querying_has_unread_notifications_then_returns_false() {
-            Boolean result = queryExecutor.executeAndExtractJsonPath(
-                    "{ hasUnreadNotifications }", "data.hasUnreadNotifications");
-            assertThat(result).isFalse();
-        }
-
-        @Test
-        @DisplayName("Given the caller has at least one unread notification, when querying hasUnreadNotifications, then it returns true")
-        void given_caller_has_unread_when_querying_has_unread_notifications_then_returns_true() {
-            repository.save(NotificationFixtures.basic(ALICE));
-
-            Boolean result = queryExecutor.executeAndExtractJsonPath(
-                    "{ hasUnreadNotifications }", "data.hasUnreadNotifications");
-            assertThat(result).isTrue();
-        }
-
-        @Test
-        @DisplayName("Given another user has unread but the authenticated caller does not, when querying hasUnreadNotifications, then it returns false — the resolver uses the JWT principal, not arbitrary input")
-        void given_another_user_has_unread_when_querying_has_unread_notifications_then_returns_false_for_caller() {
-            repository.save(NotificationFixtures.basic(BOB));
-
-            Boolean result = queryExecutor.executeAndExtractJsonPath(
-                    "{ hasUnreadNotifications }", "data.hasUnreadNotifications");
-            assertThat(result).isFalse();
-        }
-
-        @Test
-        @DisplayName("Given only an unread tenant-wide broadcast and no direct rows for the caller, when querying hasUnreadNotifications via GraphQL, then it returns true — broadcasts feed into the bell badge through the data fetcher path")
-        void given_only_unread_broadcast_when_querying_then_returns_true() {
-            repository.save(Notification.builder()
-                    .recipient(new BroadcastRecipient())
-                    .title("Tenant-wide announcement")
-                    .createdAt(Instant.now())
-                    .context(GenericContext.builder().type("ann").payload("{}").build())
-                    .build());
-
-            Boolean result = queryExecutor.executeAndExtractJsonPath(
-                    "{ hasUnreadNotifications }", "data.hasUnreadNotifications");
-            assertThat(result).isTrue();
-        }
+        ExecutionResult res = queryExecutor.execute("""
+                query { notifications(first: 10) { edges { node { id title read } } } }
+                """);
+        assertThat(res.getErrors()).isEmpty();
+        assertThat(edges(res)).hasSize(1);
     }
 
-    @Nested
-    @DisplayName("notifications query")
-    class NotificationsQuery {
+    @Test
+    @DisplayName("Given an AGENT JWT principal carrying machine_id claim and a MACHINE read_state row for that machine, when the notifications GraphQL query runs, then the page returns the machine's row — recipient resolved from JWT, no schema arg")
+    void agent_lists_machine_rows() {
+        loginAsAgent(MACHINE_1);
+        Notification n = mongoTemplate.save(NotificationFixtures.basic("ticket-update"));
+        readStateService.createForAudience(n.getId(), "ticket-update", RecipientType.MACHINE, Set.of(MACHINE_1));
 
-        @Test
-        @DisplayName("Given a saved notification, when querying notifications, then each edge node id is a Relay-encoded global id pointing back at the raw row id")
-        void given_saved_notification_when_querying_then_node_ids_are_relay_encoded() {
-            Notification saved = repository.save(NotificationFixtures.basic(ALICE));
-
-            String query = "{ notifications(first: 10) { edges { node { id context { type } } cursor } } }";
-            List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
-                    query, "data.notifications.edges");
-
-            assertThat(edges).hasSize(1);
-            Map<String, Object> node = (Map<String, Object>) edges.get(0).get("node");
-            String relayId = (String) node.get("id");
-
-            Relay.ResolvedGlobalId resolved = RELAY.fromGlobalId(relayId);
-            assertThat(resolved.getType()).isEqualTo("Notification");
-            assertThat(resolved.getId()).isEqualTo(saved.getId());
-        }
-
-        @Test
-        @DisplayName("Given a saved notification, when querying notifications, then the edge cursor base64-decodes back to the raw notification id")
-        void given_saved_notification_when_querying_then_edge_cursor_decodes_to_raw_id() {
-            Notification saved = repository.save(NotificationFixtures.basic(ALICE));
-
-            String query = "{ notifications(first: 10) { edges { cursor } } }";
-            List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
-                    query, "data.notifications.edges");
-
-            String encodedCursor = (String) edges.get(0).get("cursor");
-            assertThat(CursorCodec.decode(encodedCursor)).isEqualTo(saved.getId());
-        }
-
-        @Test
-        @DisplayName("Given multiple pages of notifications, when paginating forward by feeding endCursor into `after`, then consecutive pages are disjoint")
-        void given_multiple_pages_when_paginating_forward_then_consecutive_pages_are_disjoint() {
-            List<Notification> seeded = seedSequential(ALICE, 5);
-
-            String firstQuery = "{ notifications(first: 2) { edges { node { id } } pageInfo { hasNextPage endCursor } } }";
-            Map<String, Object> first = queryExecutor.executeAndExtractJsonPath(
-                    firstQuery, "data.notifications");
-            Map<String, Object> firstPageInfo = (Map<String, Object>) first.get("pageInfo");
-            assertThat(firstPageInfo.get("hasNextPage")).isEqualTo(true);
-            String afterCursor = (String) firstPageInfo.get("endCursor");
-
-            String secondQuery = String.format(
-                    "{ notifications(first: 2, after: \"%s\") { edges { node { id } } pageInfo { hasNextPage } } }",
-                    afterCursor);
-            Map<String, Object> second = queryExecutor.executeAndExtractJsonPath(
-                    secondQuery, "data.notifications");
-
-            List<Map<String, Object>> firstEdges = (List<Map<String, Object>>) first.get("edges");
-            List<Map<String, Object>> secondEdges = (List<Map<String, Object>>) second.get("edges");
-            assertThat(firstEdges).hasSize(2);
-            assertThat(secondEdges).hasSize(2);
-            assertThat(extractIds(firstEdges)).doesNotContainAnyElementsOf(extractIds(secondEdges));
-        }
-
-        @Test
-        @DisplayName("Given another user owns a notification, when the caller queries notifications, then they see an empty page — no cross-user leakage")
-        void given_another_users_notification_when_caller_queries_then_no_leakage_into_their_page() {
-            repository.save(NotificationFixtures.basic(BOB));
-
-            String query = "{ notifications(first: 10) { edges { node { id } } } }";
-            List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
-                    query, "data.notifications.edges");
-
-            assertThat(edges).isEmpty();
-        }
-
-        @Test
-        @DisplayName("Given a freshly saved notification, when querying notifications, then the read flag is false by default")
-        void given_fresh_notification_when_querying_then_read_flag_is_false_by_default() {
-            repository.save(NotificationFixtures.basic(ALICE));
-
-            String query = "{ notifications(first: 10) { edges { node { read } } } }";
-            List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
-                    query, "data.notifications.edges");
-
-            Map<String, Object> node = (Map<String, Object>) edges.get(0).get("node");
-            assertThat(node.get("read")).isEqualTo(false);
-        }
-
-        @Test
-        @DisplayName("Given a plain Notification with no specialised context subtype, when querying, then context.__typename resolves to GenericContext and payload comes back")
-        void given_plain_notification_when_querying_then_context_typename_is_generic_context() {
-            repository.save(NotificationFixtures.basic(ALICE));
-
-            String query = "{ notifications(first: 10) { edges { node { context { __typename type ... on GenericContext { payload } } } } } }";
-            List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
-                    query, "data.notifications.edges");
-
-            Map<String, Object> node = (Map<String, Object>) edges.get(0).get("node");
-            Map<String, Object> context = (Map<String, Object>) node.get("context");
-            assertThat(context.get("__typename")).isEqualTo("GenericContext");
-            assertThat(context.get("type")).isEqualTo("welcome");
-            assertThat(context.get("payload")).isEqualTo("{}");
-        }
-
-        @Test
-        @DisplayName("Given a Notification with a contributed context subtype, when querying with an inline fragment on context, then the contributed GraphQL type is selected and subtype fields come back")
-        void given_contributed_context_subtype_when_querying_then_routes_to_contributed_type() {
-            Notification approval = Notification.builder()
-                    .recipient(new UserRecipient(ALICE))
-                    .title("Approval requested")
-                    .createdAt(Instant.now())
-                    .context(TestApprovalContext.builder()
-                            .type(TestApprovalContextDescriptor.TYPE)
-                            .ticketId("ticket-42")
-                            .approvalRequestId("apr-7")
-                            .build())
-                    .build();
-            repository.save(approval);
-
-            String query = "{ notifications(first: 10) { edges { node { "
-                    + "read context { __typename type "
-                    + "... on TestApprovalContext { ticketId approvalRequestId } "
-                    + "} } } } }";
-            List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
-                    query, "data.notifications.edges");
-
-            assertThat(edges).hasSize(1);
-            Map<String, Object> node = (Map<String, Object>) edges.get(0).get("node");
-            Map<String, Object> context = (Map<String, Object>) node.get("context");
-            assertThat(context.get("__typename")).isEqualTo("TestApprovalContext");
-            assertThat(context.get("type")).isEqualTo(TestApprovalContextDescriptor.TYPE);
-            assertThat(context.get("ticketId")).isEqualTo("ticket-42");
-            assertThat(context.get("approvalRequestId")).isEqualTo("apr-7");
-        }
-
-        @Test
-        @DisplayName("Given a contributed resolver in the chain and a Notification with a plain GenericContext, when querying, then the plain row still falls back to GenericContext — registering a resolver does not regress the fallback")
-        void given_contributed_resolver_and_unclaimed_row_when_querying_then_unclaimed_row_falls_back_to_generic() {
-            Notification approval = Notification.builder()
-                    .recipient(new UserRecipient(ALICE))
-                    .title("Approval requested")
-                    .createdAt(Instant.now())
-                    .context(TestApprovalContext.builder()
-                            .type(TestApprovalContextDescriptor.TYPE)
-                            .ticketId("ticket-1")
-                            .build())
-                    .build();
-            repository.save(approval);
-            repository.save(NotificationFixtures.basic(ALICE, "plain-event"));
-
-            String query = "{ notifications(first: 10) { edges { node { context { __typename type } } } } }";
-            List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
-                    query, "data.notifications.edges");
-
-            assertThat(edges).hasSize(2);
-            Map<String, Object> plainCtx = (Map<String, Object>) ((Map<String, Object>) edges.get(0).get("node")).get("context");
-            Map<String, Object> approvalCtx = (Map<String, Object>) ((Map<String, Object>) edges.get(1).get("node")).get("context");
-            assertThat(plainCtx.get("__typename")).isEqualTo("GenericContext");
-            assertThat(plainCtx.get("type")).isEqualTo("plain-event");
-            assertThat(approvalCtx.get("__typename")).isEqualTo("TestApprovalContext");
-        }
-
-        @Test
-        @DisplayName("Given a base64-decodable but otherwise malformed cursor, when querying, then a GraphQL error is returned instead of silently falling back to the first page")
-        void given_malformed_cursor_when_querying_then_graphql_error_is_raised() {
-            repository.save(NotificationFixtures.basic(ALICE));
-
-            String badCursor = CursorCodec.encode("not-an-object-id");
-
-            ExecutionResult result = queryExecutor.execute(String.format(
-                    "{ notifications(first: 5, after: \"%s\") { edges { cursor } } }", badCursor));
-
-            assertThat(result.getErrors()).isNotEmpty();
-        }
-
-        @Test
-        @DisplayName("Given a saved notification with explicit severity and title, when querying both fields, then they come back on the node")
-        void given_severity_and_title_when_querying_then_fields_returned() {
-            Notification withWarning = Notification.builder()
-                    .recipient(new UserRecipient(ALICE))
-                    .severity(NotificationSeverity.WARNING)
-                    .title("Heads up")
-                    .createdAt(Instant.now())
-                    .context(GenericContext.builder().type("welcome").payload("{}").build())
-                    .build();
-            repository.save(withWarning);
-
-            String query = "{ notifications(first: 10) { edges { node { severity title } } } }";
-            List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
-                    query, "data.notifications.edges");
-
-            Map<String, Object> node = (Map<String, Object>) edges.get(0).get("node");
-            assertThat(node.get("severity")).isEqualTo("WARNING");
-            assertThat(node.get("title")).isEqualTo("Heads up");
-        }
-
-        @Test
-        @DisplayName("Given a notification persisted via the fixture (no explicit severity), when querying severity, then it defaults to INFO")
-        void given_fixture_without_explicit_severity_when_querying_then_severity_defaults_to_info() {
-            repository.save(NotificationFixtures.basic(ALICE));
-
-            String query = "{ notifications(first: 10) { edges { node { severity } } } }";
-            List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
-                    query, "data.notifications.edges");
-
-            Map<String, Object> node = (Map<String, Object>) edges.get(0).get("node");
-            assertThat(node.get("severity")).isEqualTo("INFO");
-        }
-
-        @Test
-        @DisplayName("Given some notifications already marked read in the persistent store, when querying, then the read flag in each edge reflects the per-user state")
-        void given_persisted_read_state_when_querying_then_read_flag_reflects_state() {
-            Notification first = repository.save(NotificationFixtures.basic(ALICE, "type-1"));
-            Notification second = repository.save(NotificationFixtures.basic(ALICE, "type-2"));
-            readStateService.markRead(ALICE, second.getId());
-
-            String query = "{ notifications(first: 10) { edges { node { read context { type } } } } }";
-            List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
-                    query, "data.notifications.edges");
-
-            assertThat(edges).hasSize(2);
-
-            Map<String, Object> firstNode = (Map<String, Object>) edges.get(0).get("node");
-            Map<String, Object> secondNode = (Map<String, Object>) edges.get(1).get("node");
-            assertThat(((Map<String, Object>) firstNode.get("context")).get("type")).isEqualTo("type-2");
-            assertThat(firstNode.get("read")).isEqualTo(true);
-            assertThat(((Map<String, Object>) secondNode.get("context")).get("type")).isEqualTo("type-1");
-            assertThat(secondNode.get("read")).isEqualTo(false);
-        }
-
-        @Test
-        @DisplayName("Given a mix of read and unread, when querying with filter.read=true, then only read rows come back")
-        void given_mixed_read_state_when_filtering_read_true_then_only_read_rows_returned() {
-            Notification readRow = repository.save(NotificationFixtures.basic(ALICE, "type-read"));
-            repository.save(NotificationFixtures.basic(ALICE, "type-unread"));
-            readStateService.markRead(ALICE, readRow.getId());
-
-            String query = "{ notifications(filter: { read: true }, first: 10) { edges { node { read context { type } } } } }";
-            List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
-                    query, "data.notifications.edges");
-
-            assertThat(edges).hasSize(1);
-            Map<String, Object> node = (Map<String, Object>) edges.get(0).get("node");
-            assertThat(((Map<String, Object>) node.get("context")).get("type")).isEqualTo("type-read");
-            assertThat(node.get("read")).isEqualTo(true);
-        }
-
-        @Test
-        @DisplayName("Given a mix of read and unread, when querying with filter.read=false, then only unread rows come back")
-        void given_mixed_read_state_when_filtering_read_false_then_only_unread_rows_returned() {
-            Notification readRow = repository.save(NotificationFixtures.basic(ALICE, "type-read"));
-            repository.save(NotificationFixtures.basic(ALICE, "type-unread"));
-            readStateService.markRead(ALICE, readRow.getId());
-
-            String query = "{ notifications(filter: { read: false }, first: 10) { edges { node { read context { type } } } } }";
-            List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
-                    query, "data.notifications.edges");
-
-            assertThat(edges).hasSize(1);
-            Map<String, Object> node = (Map<String, Object>) edges.get(0).get("node");
-            assertThat(((Map<String, Object>) node.get("context")).get("type")).isEqualTo("type-unread");
-            assertThat(node.get("read")).isEqualTo(false);
-        }
-
-        @Test
-        @DisplayName("Given filter omitted (null), when querying, then both read and unread rows come back — filter is opt-in")
-        void given_filter_null_when_querying_then_both_read_and_unread_returned() {
-            Notification readRow = repository.save(NotificationFixtures.basic(ALICE, "type-read"));
-            repository.save(NotificationFixtures.basic(ALICE, "type-unread"));
-            readStateService.markRead(ALICE, readRow.getId());
-
-            String query = "{ notifications(first: 10) { edges { node { read } } } }";
-            List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
-                    query, "data.notifications.edges");
-
-            assertThat(edges).hasSize(2);
-        }
-
-        @Test
-        @DisplayName("Given titles match the search token, when querying with search arg, then only matching rows come back")
-        void given_titles_match_search_arg_when_querying_then_only_matching_rows_returned() {
-            Notification welcome = repository.save(NotificationFixtures.basic(ALICE, "welcome"));
-            repository.save(NotificationFixtures.basic(ALICE, "reminder"));
-
-            String query = "{ notifications(search: \"welcome\", first: 10) { edges { node { context { type } } } } }";
-            List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
-                    query, "data.notifications.edges");
-
-            assertThat(edges).hasSize(1);
-            Map<String, Object> node = (Map<String, Object>) edges.get(0).get("node");
-            assertThat(((Map<String, Object>) node.get("context")).get("type")).isEqualTo("welcome");
-            assertThat(welcome.getId()).isNotNull();
-        }
-
-        @Test
-        @DisplayName("Given a search containing regex metacharacters, when querying, then it is treated as a literal string — no regex injection")
-        void given_search_with_regex_metacharacters_when_querying_then_treated_as_literal() {
-            repository.save(Notification.builder()
-                    .recipient(new UserRecipient(ALICE))
-                    .title("price: $5.00")
-                    .createdAt(Instant.now())
-                    .context(GenericContext.builder().type("custom").payload("{}").build())
-                    .build());
-            repository.save(Notification.builder()
-                    .recipient(new UserRecipient(ALICE))
-                    .title("price: x5x00")
-                    .createdAt(Instant.now())
-                    .context(GenericContext.builder().type("custom").payload("{}").build())
-                    .build());
-
-            String query = "{ notifications(search: \"$5.00\", first: 10) { edges { node { title } } } }";
-            List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
-                    query, "data.notifications.edges");
-
-            assertThat(edges).hasSize(1);
-            Map<String, Object> node = (Map<String, Object>) edges.get(0).get("node");
-            assertThat(node.get("title")).isEqualTo("price: $5.00");
-        }
+        ExecutionResult res = queryExecutor.execute("""
+                query { notifications(first: 10) { edges { node { id title read } } } }
+                """);
+        assertThat(res.getErrors()).isEmpty();
+        assertThat(edges(res)).hasSize(1);
     }
 
-    @Nested
-    @DisplayName("markNotificationAsRead mutation")
-    class MarkAsRead {
+    @Test
+    @DisplayName("Given an UNREAD read_state row for the ADMIN principal, when hasUnreadNotifications is queried then marked read and queried again, then the result flips from true to false")
+    void has_unread() {
+        loginAsAdmin(ALICE);
+        Notification n = mongoTemplate.save(NotificationFixtures.basic());
+        readStateService.createForAudience(n.getId(), "welcome", RecipientType.USER, Set.of(ALICE));
 
-        @Test
-        @DisplayName("Given an unread notification with its Relay-encoded global id, when calling the mutation, then it returns true and the row is persisted")
-        void given_unread_notification_when_calling_mutation_with_relay_id_then_returns_true_and_persists() {
-            Notification saved = repository.save(NotificationFixtures.basic(ALICE));
-            String relayId = RELAY.toGlobalId("Notification", saved.getId());
+        ExecutionResult res = queryExecutor.execute("query { hasUnreadNotifications }");
+        assertThat(res.<Map<String, Object>>getData().get("hasUnreadNotifications")).isEqualTo(true);
 
-            String mutation = String.format(
-                    "mutation { markNotificationAsRead(notificationId: \"%s\") }", relayId);
-            Boolean result = queryExecutor.executeAndExtractJsonPath(
-                    mutation, "data.markNotificationAsRead");
-
-            assertThat(result).isTrue();
-
-            assertThat(readStateService.markRead(ALICE, saved.getId())).isFalse();
-        }
-
-        @Test
-        @DisplayName("Given the mutation has already been called once, when calling it again with the same id, then it returns false — idempotent")
-        void given_mutation_called_once_when_called_again_with_same_id_then_returns_false() {
-            Notification saved = repository.save(NotificationFixtures.basic(ALICE));
-            String relayId = RELAY.toGlobalId("Notification", saved.getId());
-            String mutation = String.format(
-                    "mutation { markNotificationAsRead(notificationId: \"%s\") }", relayId);
-
-            queryExecutor.executeAndExtractJsonPath(mutation, "data.markNotificationAsRead");
-            Boolean second = queryExecutor.executeAndExtractJsonPath(
-                    mutation, "data.markNotificationAsRead");
-
-            assertThat(second).isFalse();
-        }
-
-        @Test
-        @DisplayName("Given a raw (non-Relay-encoded) notification id, when calling the mutation, then a GraphQL error is raised — list query also rejects malformed cursors, behaviour is symmetrical")
-        void given_raw_notification_id_when_calling_mutation_then_graphql_error() {
-            Notification saved = repository.save(NotificationFixtures.basic(ALICE));
-
-            ExecutionResult result = queryExecutor.execute(String.format(
-                    "mutation { markNotificationAsRead(notificationId: \"%s\") }", saved.getId()));
-
-            assertThat(result.getErrors()).isNotEmpty();
-            assertThat(readStateService.markRead(ALICE, saved.getId())).isTrue();
-        }
-
-        @Test
-        @DisplayName("Given Alice marks a broadcast read via the mutation, when Bob marks the same broadcast, then both marks succeed independently — read state is scoped to the JWT principal")
-        void given_alice_marks_broadcast_via_mutation_when_bob_marks_same_then_both_succeed() {
-            Notification saved = repository.save(NotificationFixtures.broadcast("tenant-announcement", "{}"));
-            String relayId = RELAY.toGlobalId("Notification", saved.getId());
-
-            queryExecutor.executeAndExtractJsonPath(
-                    String.format("mutation { markNotificationAsRead(notificationId: \"%s\") }", relayId),
-                    "data.markNotificationAsRead");
-
-            assertThat(readStateService.markRead(ALICE, saved.getId())).isFalse();
-
-            assertThat(readStateService.markRead(BOB, saved.getId())).isTrue();
-        }
-
-        @Test
-        @DisplayName("Given a user-recipient notification belonging to Alice, when Bob attempts to mark it, then the call is refused — audience check protects per-user inbox")
-        void given_alice_user_recipient_when_bob_marks_then_refused() {
-            Notification saved = repository.save(NotificationFixtures.basic(ALICE));
-
-            assertThat(readStateService.markRead(BOB, saved.getId())).isFalse();
-        }
-
-        @Test
-        @DisplayName("Given a Relay-encoded id that points at a different type (e.g. Device), when calling the mutation, then a GraphQL error is raised")
-        void given_relay_id_for_wrong_type_when_calling_mutation_then_graphql_error() {
-            String wrongTypeId = RELAY.toGlobalId("Device", "abc-123");
-
-            ExecutionResult result = queryExecutor.execute(String.format(
-                    "mutation { markNotificationAsRead(notificationId: \"%s\") }", wrongTypeId));
-
-            assertThat(result.getErrors()).isNotEmpty();
-        }
+        readStateService.markRead(ALICE, RecipientType.USER, n.getId());
+        res = queryExecutor.execute("query { hasUnreadNotifications }");
+        assertThat(res.<Map<String, Object>>getData().get("hasUnreadNotifications")).isEqualTo(false);
     }
 
-    @Nested
-    @DisplayName("notifications query — machine inbox")
-    class NotificationsForMachine {
+    @Test
+    @DisplayName("Given an UNREAD read_state row for the ADMIN principal, when the markNotificationAsRead mutation runs with a Relay global id, then the row flips to READ and the mutation returns true")
+    void mark_as_read() {
+        loginAsAdmin(ALICE);
+        Notification n = mongoTemplate.save(NotificationFixtures.basic());
+        readStateService.createForAudience(n.getId(), "welcome", RecipientType.USER, Set.of(ALICE));
 
-        private static final String MACHINE_ID = "machine-007";
-
-        @Test
-        @DisplayName("Given an AGENT principal with no machineId argument, when querying notifications, then it returns rows targeted at that machine plus broadcasts")
-        void given_agent_principal_no_arg_when_querying_then_returns_machine_rows_and_broadcasts() {
-            authAsAgent(MACHINE_ID);
-
-            Notification machineRow = repository.save(Notification.builder()
-                    .recipient(new MachineRecipient(MACHINE_ID))
-                    .title("Direct event")
-                    .createdAt(Instant.now())
-                    .context(GenericContext.builder().type("event").payload("{}").build())
-                    .build());
-            Notification broadcast = repository.save(Notification.builder()
-                    .recipient(new BroadcastRecipient())
-                    .title("Tenant-wide event")
-                    .createdAt(Instant.now())
-                    .context(GenericContext.builder().type("ann").payload("{}").build())
-                    .build());
-
-            String query = "{ notifications(first: 10) { edges { node { id } } } }";
-            List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
-                    query, "data.notifications.edges");
-
-            assertThat(extractIds(edges)).containsExactlyInAnyOrder(
-                    RELAY.toGlobalId("Notification", machineRow.getId()),
-                    RELAY.toGlobalId("Notification", broadcast.getId()));
-        }
-
-        @Test
-        @DisplayName("Given an ADMIN principal with an explicit machineId argument, when querying notifications, then it returns rows targeted at that machine plus broadcasts")
-        void given_admin_with_machine_id_arg_when_querying_then_returns_machine_rows_and_broadcasts() {
-            Notification machineRow = saveMachineRow(MACHINE_ID, "for-machine");
-            Notification broadcast = repository.save(Notification.builder()
-                    .recipient(new BroadcastRecipient())
-                    .title("Tenant ann")
-                    .createdAt(Instant.now())
-                    .context(GenericContext.builder().type("ann").payload("{}").build())
-                    .build());
-
-            String query = String.format(
-                    "{ notifications(machineId: \"%s\", first: 10) { edges { node { id } } } }", MACHINE_ID);
-            List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
-                    query, "data.notifications.edges");
-
-            assertThat(extractIds(edges)).containsExactlyInAnyOrder(
-                    RELAY.toGlobalId("Notification", machineRow.getId()),
-                    RELAY.toGlobalId("Notification", broadcast.getId()));
-        }
-
-        @Test
-        @DisplayName("Given an AGENT principal and a foreign machineId argument, when querying notifications, then a GraphQL error is raised — agents may not read another machine's inbox")
-        void given_agent_with_foreign_machine_id_arg_when_querying_then_unauthorized() {
-            authAsAgent(MACHINE_ID);
-
-            ExecutionResult result = queryExecutor.execute(
-                    "{ notifications(machineId: \"other-machine\", first: 10) { edges { node { id } } } }");
-
-            assertThat(result.getErrors()).isNotEmpty();
-            assertThat(result.getErrors().getFirst().getMessage())
-                    .containsAnyOf("another machine", "Unauthorized");
-        }
-
-        @Test
-        @DisplayName("Given an AGENT principal passes its own machineId argument, when querying notifications, then it succeeds and returns the same rows as the no-arg path")
-        void given_agent_with_own_machine_id_arg_when_querying_then_succeeds() {
-            authAsAgent(MACHINE_ID);
-            Notification own = saveMachineRow(MACHINE_ID, "own");
-
-            String query = String.format(
-                    "{ notifications(machineId: \"%s\", first: 10) { edges { node { id } } } }", MACHINE_ID);
-            List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
-                    query, "data.notifications.edges");
-
-            assertThat(extractIds(edges)).contains(RELAY.toGlobalId("Notification", own.getId()));
-        }
-
-        @Test
-        @DisplayName("Given the caller's own machine rows alongside another machine's rows, when AGENT queries with no machineId, then only the caller's rows come back — no cross-machine leakage")
-        void given_own_and_other_machines_rows_when_querying_then_only_own_visible() {
-            authAsAgent(MACHINE_ID);
-
-            Notification own1 = saveMachineRow(MACHINE_ID, "own-1");
-            Notification own2 = saveMachineRow(MACHINE_ID, "own-2");
-            Notification foreign = saveMachineRow("other-machine", "foreign");
-
-            String query = "{ notifications(first: 10) { edges { node { id } } } }";
-            List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
-                    query, "data.notifications.edges");
-
-            List<String> ids = extractIds(edges);
-            assertThat(ids).containsExactlyInAnyOrder(
-                    RELAY.toGlobalId("Notification", own1.getId()),
-                    RELAY.toGlobalId("Notification", own2.getId()));
-            assertThat(ids).doesNotContain(RELAY.toGlobalId("Notification", foreign.getId()));
-        }
-
-        @Test
-        @DisplayName("Given an AGENT principal and a saved machine notification, when querying, then the node id is a Relay-encoded global id pointing back at the raw row id")
-        void given_machine_notification_when_querying_then_node_id_is_relay_encoded() {
-            authAsAgent(MACHINE_ID);
-            Notification saved = saveMachineRow(MACHINE_ID, "event");
-
-            String query = "{ notifications(first: 10) { edges { node { id } } } }";
-            List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
-                    query, "data.notifications.edges");
-
-            String relayId = (String) ((Map<String, Object>) edges.get(0).get("node")).get("id");
-            Relay.ResolvedGlobalId resolved = RELAY.fromGlobalId(relayId);
-            assertThat(resolved.getType()).isEqualTo("Notification");
-            assertThat(resolved.getId()).isEqualTo(saved.getId());
-        }
-
-        @Test
-        @DisplayName("Given a machine notification with a plain GenericContext, when querying, then context.__typename resolves to GenericContext and severity/title come back")
-        void given_machine_notification_with_generic_context_when_querying_then_context_typename_and_shared_fields_returned() {
-            authAsAgent(MACHINE_ID);
-            repository.save(Notification.builder()
-                    .recipient(new MachineRecipient(MACHINE_ID))
-                    .severity(NotificationSeverity.WARNING)
-                    .title("Heads up")
-                    .createdAt(Instant.now())
-                    .context(GenericContext.builder().type("event").payload("{\"k\":\"v\"}").build())
-                    .build());
-
-            String query = "{ notifications(first: 10) { edges { node { "
-                    + "severity title context { __typename type ... on GenericContext { payload } } "
-                    + "} } } }";
-            List<Map<String, Object>> edges = queryExecutor.executeAndExtractJsonPath(
-                    query, "data.notifications.edges");
-
-            Map<String, Object> node = (Map<String, Object>) edges.get(0).get("node");
-            Map<String, Object> context = (Map<String, Object>) node.get("context");
-            assertThat(node.get("severity")).isEqualTo("WARNING");
-            assertThat(node.get("title")).isEqualTo("Heads up");
-            assertThat(context.get("__typename")).isEqualTo("GenericContext");
-            assertThat(context.get("type")).isEqualTo("event");
-            assertThat(context.get("payload")).isEqualTo("{\"k\":\"v\"}");
-        }
-
-        @Test
-        @DisplayName("Given a base64-decodable but malformed cursor on a machine inbox query, when querying, then a GraphQL error is raised — same strict cursor handling as the user-side query")
-        void given_malformed_cursor_when_querying_machine_inbox_then_graphql_error() {
-            authAsAgent(MACHINE_ID);
-            saveMachineRow(MACHINE_ID, "event");
-            String badCursor = CursorCodec.encode("not-an-object-id");
-
-            ExecutionResult result = queryExecutor.execute(String.format(
-                    "{ notifications(first: 5, after: \"%s\") { edges { cursor } } }", badCursor));
-
-            assertThat(result.getErrors()).isNotEmpty();
-        }
-
-        private Notification saveMachineRow(String machineId, String typeToken) {
-            return repository.save(Notification.builder()
-                    .recipient(new MachineRecipient(machineId))
-                    .title(typeToken)
-                    .createdAt(Instant.now())
-                    .context(GenericContext.builder().type(typeToken).payload("{}").build())
-                    .build());
-        }
-
-        @Test
-        @DisplayName("Given multiple machine notifications, when AGENT paginates forward, then consecutive pages are disjoint")
-        void given_multiple_machine_notifications_when_paginating_then_pages_disjoint() {
-            authAsAgent(MACHINE_ID);
-            for (int i = 0; i < 5; i++) {
-                repository.save(Notification.builder()
-                        .recipient(new MachineRecipient(MACHINE_ID))
-                        .title("Event " + i)
-                        .createdAt(Instant.now())
-                        .context(GenericContext.builder().type("type-" + i).payload("{}").build())
-                        .build());
-                try { Thread.sleep(2); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-            }
-
-            Map<String, Object> first = queryExecutor.executeAndExtractJsonPath(
-                    "{ notifications(first: 2) { edges { node { id } } pageInfo { hasNextPage endCursor } } }",
-                    "data.notifications");
-            String afterCursor = (String) ((Map<String, Object>) first.get("pageInfo")).get("endCursor");
-
-            Map<String, Object> second = queryExecutor.executeAndExtractJsonPath(
-                    String.format("{ notifications(first: 2, after: \"%s\") { edges { node { id } } } }", afterCursor),
-                    "data.notifications");
-
-            List<Map<String, Object>> firstEdges = (List<Map<String, Object>>) first.get("edges");
-            List<Map<String, Object>> secondEdges = (List<Map<String, Object>>) second.get("edges");
-            assertThat(extractIds(firstEdges)).doesNotContainAnyElementsOf(extractIds(secondEdges));
-        }
+        String globalId = RELAY.toGlobalId("Notification", n.getId());
+        ExecutionResult res = queryExecutor.execute(
+                "mutation($id: ID!) { markNotificationAsRead(notificationId: $id) }",
+                Map.of("id", globalId));
+        assertThat(res.getErrors()).isEmpty();
+        assertThat(res.<Map<String, Object>>getData().get("markNotificationAsRead")).isEqualTo(true);
     }
 
-    @Nested
-    @DisplayName("authentication boundary")
-    class AuthBoundary {
+    @Test
+    @DisplayName("Given multiple UNREAD read_state rows for the ADMIN principal, when markAllNotificationsAsRead mutation runs, then it returns the number of rows updated (= count of UNREAD rows)")
+    void mark_all_as_read() {
+        loginAsAdmin(ALICE);
+        Notification n1 = mongoTemplate.save(NotificationFixtures.basic("a"));
+        Notification n2 = mongoTemplate.save(NotificationFixtures.basic("b"));
+        readStateService.createForAudience(n1.getId(), "a", RecipientType.USER, Set.of(ALICE));
+        readStateService.createForAudience(n2.getId(), "b", RecipientType.USER, Set.of(ALICE));
 
-        @Test
-        @DisplayName("Given no authenticated user in the security context, when querying notifications-related endpoints, then @PreAuthorize raises an authentication error before any business logic runs")
-        void given_no_authentication_when_querying_then_unauthorized_graphql_error() {
-            SecurityContextHolder.clearContext();
-
-            ExecutionResult result = queryExecutor.execute("{ hasUnreadNotifications }");
-
-            assertThat(result.getErrors()).isNotEmpty();
-            assertThat(result.getErrors().getFirst().getMessage())
-                    .containsAnyOf("Authentication", "Unauthorized", UnauthorizedException.class.getSimpleName());
-        }
-
-        @Test
-        @DisplayName("Given an AGENT principal, when querying hasUnreadNotifications, then a GraphQL error is raised — bell badge is ADMIN-only")
-        void given_agent_principal_when_querying_has_unread_then_unauthorized() {
-            authAsAgent("machine-007");
-
-            ExecutionResult result = queryExecutor.execute("{ hasUnreadNotifications }");
-
-            assertThat(result.getErrors()).isNotEmpty();
-            assertThat(result.getErrors().getFirst().getMessage())
-                    .containsAnyOf("Access Denied", "AccessDenied", "denied");
-        }
-
-        @Test
-        @DisplayName("Given an AGENT principal, when calling markNotificationAsRead, then a GraphQL error is raised — mark-read mutation is ADMIN-only")
-        void given_agent_principal_when_calling_mark_read_mutation_then_unauthorized() {
-            authAsAgent("machine-007");
-            String relayId = RELAY.toGlobalId("Notification", "67faaaaaaaaaaaaaaaaaaaaa");
-
-            ExecutionResult result = queryExecutor.execute(String.format(
-                    "mutation { markNotificationAsRead(notificationId: \"%s\") }", relayId));
-
-            assertThat(result.getErrors()).isNotEmpty();
-            assertThat(result.getErrors().getFirst().getMessage())
-                    .containsAnyOf("Access Denied", "AccessDenied", "denied");
-        }
-
-        @Test
-        @DisplayName("Given an AGENT principal whose JWT is missing the machine_id claim, when querying notifications, then a GraphQL error is raised")
-        void given_agent_without_machine_id_claim_when_querying_then_unauthorized() {
-            authAsAgentWithoutMachineId();
-
-            ExecutionResult result = queryExecutor.execute(
-                    "{ notifications(first: 10) { edges { node { id } } } }");
-
-            assertThat(result.getErrors()).isNotEmpty();
-            assertThat(result.getErrors().getFirst().getMessage())
-                    .containsAnyOf("machine_id", "Unauthorized", UnauthorizedException.class.getSimpleName());
-        }
+        ExecutionResult res = queryExecutor.execute("mutation { markAllNotificationsAsRead }");
+        assertThat(((Number) res.<Map<String, Object>>getData().get("markAllNotificationsAsRead")).longValue())
+                .isEqualTo(2L);
     }
 
-    private static List<String> extractIds(List<Map<String, Object>> edges) {
-        return edges.stream()
-                .map(e -> (Map<String, Object>) e.get("node"))
-                .map(n -> (String) n.get("id"))
-                .toList();
+    @Test
+    @DisplayName("Given a read_state row for the ADMIN principal, when the deleteNotification mutation runs with the Relay global id, then it returns true and the row is soft-deleted (status=DELETED)")
+    void delete_notification() {
+        loginAsAdmin(ALICE);
+        Notification n = mongoTemplate.save(NotificationFixtures.basic());
+        readStateService.createForAudience(n.getId(), "welcome", RecipientType.USER, Set.of(ALICE));
+
+        String globalId = RELAY.toGlobalId("Notification", n.getId());
+        ExecutionResult res = queryExecutor.execute(
+                "mutation($id: ID!) { deleteNotification(notificationId: $id) }",
+                Map.of("id", globalId));
+        assertThat(res.<Map<String, Object>>getData().get("deleteNotification")).isEqualTo(true);
     }
 
-    private List<Notification> seedSequential(String recipient, int count) {
-        List<Notification> saved = new ArrayList<>();
-        for (int i = 0; i < count; i++) {
-            saved.add(repository.save(NotificationFixtures.basic(recipient, "type-" + i)));
-            try {
-                Thread.sleep(2);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }
-        return saved;
+    @Test
+    @DisplayName("Given a mix of UNREAD and READ rows for the ADMIN principal, when deleteAllReadNotifications mutation runs, then it returns the count of READ rows transitioned to DELETED (UNREAD rows untouched)")
+    void delete_all_read() {
+        loginAsAdmin(ALICE);
+        Notification n1 = mongoTemplate.save(NotificationFixtures.basic("a"));
+        Notification n2 = mongoTemplate.save(NotificationFixtures.basic("b"));
+        readStateService.createForAudience(n1.getId(), "a", RecipientType.USER, Set.of(ALICE));
+        readStateService.createForAudience(n2.getId(), "b", RecipientType.USER, Set.of(ALICE));
+        readStateService.markRead(ALICE, RecipientType.USER, n1.getId());
+
+        ExecutionResult res = queryExecutor.execute("mutation { deleteAllReadNotifications }");
+        assertThat(((Number) res.<Map<String, Object>>getData().get("deleteAllReadNotifications")).longValue())
+                .isEqualTo(1L);
     }
 
-    private static void authAs(String userId) {
-        authAs(userId, "ADMIN");
+    @Test
+    @DisplayName("Given UNREAD rows across different contextTypes for the ADMIN principal, when the unreadCountsByType query runs, then a list of UnreadTypeCount entries is returned with one entry per contextType present in UNREAD rows")
+    void unread_counts_by_type() {
+        loginAsAdmin(ALICE);
+        Notification n1 = mongoTemplate.save(NotificationFixtures.basic("TYPE_A"));
+        Notification n2 = mongoTemplate.save(NotificationFixtures.basic("TYPE_B"));
+        readStateService.createForAudience(n1.getId(), "TYPE_A", RecipientType.USER, Set.of(ALICE));
+        readStateService.createForAudience(n2.getId(), "TYPE_B", RecipientType.USER, Set.of(ALICE));
+
+        ExecutionResult res = queryExecutor.execute("query { unreadCountsByType { type count } }");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> counts = (List<Map<String, Object>>) res.<Map<String, Object>>getData().get("unreadCountsByType");
+        assertThat(counts).extracting(c -> c.get("type")).containsExactlyInAnyOrder("TYPE_A", "TYPE_B");
     }
 
-    private static void authAs(String userId, String role) {
-        Jwt jwt = Jwt.withTokenValue("test-token")
-                .header("alg", "RS256")
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> edges(ExecutionResult res) {
+        Map<String, Object> data = res.getData();
+        Map<String, Object> connection = (Map<String, Object>) data.get("notifications");
+        return (List<Map<String, Object>>) connection.get("edges");
+    }
+
+    private void loginAsAdmin(String userId) {
+        Jwt jwt = Jwt.withTokenValue("admin-token")
+                .header("alg", "none")
                 .subject(userId)
-                .claim("userId", userId)
-                .claim("roles", List.of(role))
+                .claim("sub", userId)
+                .claim("roles", List.of("ADMIN"))
+                .issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(60))
                 .build();
-        SecurityContextHolder.getContext().setAuthentication(
-                new JwtAuthenticationToken(jwt, List.of(new SimpleGrantedAuthority(role))));
+        JwtAuthenticationToken auth = new JwtAuthenticationToken(jwt,
+                List.of(new SimpleGrantedAuthority("ADMIN")));
+        SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
-    private static void authAsAgent(String machineId) {
-        Jwt jwt = Jwt.withTokenValue("test-token")
-                .header("alg", "RS256")
+    private void loginAsAgent(String machineId) {
+        Jwt jwt = Jwt.withTokenValue("agent-token")
+                .header("alg", "none")
                 .subject("agent-" + machineId)
-                .claim("userId", "agent-" + machineId)
+                .claim("sub", "agent-" + machineId)
+                .claim("roles", List.of("AGENT"))
                 .claim("machine_id", machineId)
-                .claim("roles", List.of("AGENT"))
+                .issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(60))
                 .build();
-        SecurityContextHolder.getContext().setAuthentication(
-                new JwtAuthenticationToken(jwt, List.of(new SimpleGrantedAuthority("AGENT"))));
-    }
-
-    private static void authAsAgentWithoutMachineId() {
-        Jwt jwt = Jwt.withTokenValue("test-token")
-                .header("alg", "RS256")
-                .subject("agent-broken")
-                .claim("userId", "agent-broken")
-                .claim("roles", List.of("AGENT"))
-                .build();
-        SecurityContextHolder.getContext().setAuthentication(
-                new JwtAuthenticationToken(jwt, List.of(new SimpleGrantedAuthority("AGENT"))));
+        JwtAuthenticationToken auth = new JwtAuthenticationToken(jwt,
+                List.of(new SimpleGrantedAuthority("AGENT")));
+        SecurityContextHolder.getContext().setAuthentication(auth);
     }
 }

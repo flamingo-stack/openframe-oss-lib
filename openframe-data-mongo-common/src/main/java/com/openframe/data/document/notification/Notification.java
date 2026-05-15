@@ -20,12 +20,12 @@ public class Notification {
     @Id
     private String id;
 
-    private Recipient recipient;
-
     @Builder.Default
     private NotificationSeverity severity = NotificationSeverity.INFO;
 
     private String title;
+
+    private String description;
 
     @CreatedDate
     private Instant createdAt;

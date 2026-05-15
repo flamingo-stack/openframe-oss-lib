@@ -6,6 +6,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -43,6 +44,15 @@ public final class MongoExplain {
         return Stats.parse(template.getDb().runCommand(command));
     }
 
+    public static Stats explainAggregation(MongoTemplate template, String collection, List<Document> pipeline) {
+        Document command = new Document("explain",
+                new Document("aggregate", collection)
+                        .append("pipeline", pipeline)
+                        .append("cursor", new Document()))
+                .append("verbosity", "executionStats");
+        return Stats.parse(template.getDb().runCommand(command));
+    }
+
     public static Stats explainUpsert(MongoTemplate template, String collection, Query query, Update update) {
         Document updateOp = new Document("q", query.getQueryObject())
                 .append("u", update.getUpdateObject())
@@ -71,13 +81,25 @@ public final class MongoExplain {
 
         private static Stats parse(Document explainResult) {
             Document execStats = (Document) explainResult.get("executionStats");
+            Document queryPlanner = (Document) explainResult.get("queryPlanner");
+
+            // Aggregation pipelines: executionStats and queryPlanner live inside stages[0].$cursor
+            if (execStats == null && explainResult.get("stages") instanceof List<?> stages && !stages.isEmpty()) {
+                Object firstStage = stages.get(0);
+                if (firstStage instanceof Document stageDoc && stageDoc.get("$cursor") instanceof Document cursor) {
+                    execStats = (Document) cursor.get("executionStats");
+                    if (queryPlanner == null) {
+                        queryPlanner = (Document) cursor.get("queryPlanner");
+                    }
+                }
+            }
+
             if (execStats == null) {
                 throw new IllegalStateException(
                         "explain result missing executionStats — was verbosity not 'executionStats'? "
                                 + explainResult.toJson());
             }
 
-            Document queryPlanner = (Document) explainResult.get("queryPlanner");
             Document winningPlan = queryPlanner == null ? null : (Document) queryPlanner.get("winningPlan");
 
             if (winningPlan != null && winningPlan.get("queryPlan") instanceof Document qp) {
@@ -137,6 +159,14 @@ public final class MongoExplain {
             assertThat(indexNames())
                     .as("expected at least one IXSCAN on '%s'. Plan: %s", expectedName, raw.toJson())
                     .contains(expectedName);
+            return this;
+        }
+
+        public Stats assertUsesAnyOf(String... expectedNames) {
+            assertThat(indexNames())
+                    .as("expected at least one IXSCAN on any of %s. Plan: %s",
+                            Arrays.toString(expectedNames), raw.toJson())
+                    .containsAnyOf(expectedNames);
             return this;
         }
 

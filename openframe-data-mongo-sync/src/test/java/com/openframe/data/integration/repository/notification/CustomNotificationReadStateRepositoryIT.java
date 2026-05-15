@@ -2,26 +2,20 @@ package com.openframe.data.integration.repository.notification;
 
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationReadState;
+import com.openframe.data.document.notification.ReadStatus;
+import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.integration.BaseMongoIntegrationTest;
 import com.openframe.data.integration.support.IntegrationTestApplication;
 import com.openframe.data.repository.notification.NotificationReadStateRepository;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -32,6 +26,9 @@ class CustomNotificationReadStateRepositoryIT extends BaseMongoIntegrationTest {
 
     private static final String ALICE = "user-alice";
     private static final String BOB = "user-bob";
+    private static final String MACHINE_1 = "machine-1";
+    private static final RecipientType U = RecipientType.USER;
+    private static final RecipientType M = RecipientType.MACHINE;
 
     @Autowired
     private NotificationReadStateRepository repository;
@@ -46,112 +43,125 @@ class CustomNotificationReadStateRepositoryIT extends BaseMongoIntegrationTest {
     }
 
     @Nested
-    @DisplayName("markRead")
-    class MarkRead {
+    @DisplayName("createForAudience")
+    class CreateForAudience {
 
         @Test
-        @DisplayName("Given an unread (user, notification) pair, when markRead is called, then a read-state row is inserted with the userId, notificationId and readAt populated")
-        void given_unread_pair_when_mark_read_called_then_read_state_row_created() {
-            boolean inserted = repository.markRead(ALICE, "notif-1");
-
-            assertThat(inserted).isTrue();
-            List<NotificationReadState> rows = mongoTemplate.findAll(NotificationReadState.class);
-            assertThat(rows).hasSize(1);
-            assertThat(rows.get(0).getUserId()).isEqualTo(ALICE);
-            assertThat(rows.get(0).getNotificationId()).isEqualTo("notif-1");
-            assertThat(rows.get(0).getReadAt()).isNotNull();
-        }
-
-        @Test
-        @DisplayName("Given the same (user, notification) pair, when markRead is called twice, then the second call is idempotent — returns false and creates no extra row")
-        void given_same_pair_when_mark_read_called_twice_then_second_call_is_idempotent() {
-            boolean firstCall = repository.markRead(ALICE, "notif-1");
-            boolean secondCall = repository.markRead(ALICE, "notif-1");
-
-            assertThat(firstCall).isTrue();
-            assertThat(secondCall).isFalse();
-            assertThat(mongoTemplate.findAll(NotificationReadState.class)).hasSize(1);
-        }
-
-        @Test
-        @DisplayName("Given two different users marking the same notification, when markRead is called for each, then each gets their own read-state row")
-        void given_two_users_when_each_marks_same_notification_read_then_each_has_own_row() {
-            repository.markRead(ALICE, "notif-1");
-            repository.markRead(BOB, "notif-1");
+        @DisplayName("Given multiple recipientIds and a single notificationId, when createForAudience is called, then one UNREAD row is inserted per recipient with denormalized contextType and the supplied recipientType")
+        void bulk_insert_per_recipient() {
+            repository.createForAudience("notif-1", "TEST_TYPE", U, Set.of(ALICE, BOB));
 
             List<NotificationReadState> rows = mongoTemplate.findAll(NotificationReadState.class);
             assertThat(rows).hasSize(2);
-            assertThat(rows).extracting(NotificationReadState::getUserId)
-                    .containsExactlyInAnyOrder(ALICE, BOB);
+            assertThat(rows).allSatisfy(r -> {
+                assertThat(r.getNotificationId()).isEqualTo("notif-1");
+                assertThat(r.getStatus()).isEqualTo(ReadStatus.UNREAD);
+                assertThat(r.getContextType()).isEqualTo("TEST_TYPE");
+                assertThat(r.getRecipientType()).isEqualTo(U);
+            });
         }
 
         @Test
-        @DisplayName("Given many threads racing markRead on the same (user, notification) pair, when all calls land at once, then exactly one returns true and exactly one row is written — the unique index plus DuplicateKeyException catch hold under contention")
-        void given_concurrent_callers_when_marking_same_pair_then_exactly_one_winner_and_one_row() throws InterruptedException {
-            int threads = 32;
-            ExecutorService pool = Executors.newFixedThreadPool(threads);
-            CountDownLatch start = new CountDownLatch(1);
-            CountDownLatch done = new CountDownLatch(threads);
-            AtomicInteger winners = new AtomicInteger();
+        @DisplayName("Given a machineId and recipientType=MACHINE, when createForAudience is called, then the inserted row stores recipientType=MACHINE so types remain distinguishable from USER")
+        void machine_recipient_type() {
+            repository.createForAudience("notif-1", "T", M, Set.of(MACHINE_1));
+            List<NotificationReadState> rows = mongoTemplate.findAll(NotificationReadState.class);
+            assertThat(rows).hasSize(1);
+            assertThat(rows.get(0).getRecipientType()).isEqualTo(M);
+        }
 
-            try {
-                for (int i = 0; i < threads; i++) {
-                    pool.submit(() -> {
-                        try {
-                            start.await();
-                            if (repository.markRead(ALICE, "notif-1")) {
-                                winners.incrementAndGet();
-                            }
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                        } finally {
-                            done.countDown();
-                        }
-                    });
-                }
-                start.countDown();
-                assertThat(done.await(10, TimeUnit.SECONDS)).isTrue();
-            } finally {
-                pool.shutdownNow();
-            }
-
-            assertThat(winners.get()).isEqualTo(1);
-            assertThat(mongoTemplate.findAll(NotificationReadState.class)).hasSize(1);
+        @Test
+        @DisplayName("Given an empty recipient set, when createForAudience is called, then no rows are inserted (silent no-op)")
+        void empty_set_noop() {
+            repository.createForAudience("notif-1", "T", U, Set.of());
+            assertThat(mongoTemplate.findAll(NotificationReadState.class)).isEmpty();
         }
     }
 
     @Nested
-    @DisplayName("findReadIds")
-    class FindReadIds {
+    @DisplayName("markRead")
+    class MarkRead {
 
         @Test
-        @DisplayName("Given a mix of read entries for different users and ids, when findReadIds is called for one user, then only that user's matching ids come back")
-        void given_mixed_read_entries_when_find_read_ids_called_then_returns_only_matching_user_and_ids() {
-            repository.markRead(ALICE, "notif-1");
-            repository.markRead(ALICE, "notif-2");
-            repository.markRead(BOB, "notif-1");
-
-            Set<String> aliceRead = repository.findReadIds(ALICE,
-                    List.of("notif-1", "notif-2", "notif-3"));
-
-            assertThat(aliceRead).containsExactlyInAnyOrder("notif-1", "notif-2");
+        @DisplayName("Given a pre-created UNREAD row for the recipient, when markRead is called, then the row flips to status=READ with readAt populated and the call returns true")
+        void unread_row_marked_read() {
+            repository.createForAudience("notif-1", "T", U, Set.of(ALICE));
+            assertThat(repository.markRead(ALICE, U, "notif-1")).isTrue();
+            NotificationReadState row = mongoTemplate.findAll(NotificationReadState.class).get(0);
+            assertThat(row.getStatus()).isEqualTo(ReadStatus.READ);
+            assertThat(row.getReadAt()).isNotNull();
         }
 
         @Test
-        @DisplayName("Given an empty id collection, when findReadIds is called, then it returns an empty set")
-        void given_empty_id_collection_when_find_read_ids_called_then_returns_empty_set() {
-            repository.markRead(ALICE, "notif-1");
-
-            assertThat(repository.findReadIds(ALICE, List.of())).isEmpty();
+        @DisplayName("Given a row already in status=READ, when markRead is called again, then it returns false (idempotent — no row state changes)")
+        void already_read_idempotent() {
+            repository.createForAudience("notif-1", "T", U, Set.of(ALICE));
+            repository.markRead(ALICE, U, "notif-1");
+            assertThat(repository.markRead(ALICE, U, "notif-1")).isFalse();
         }
 
         @Test
-        @DisplayName("Given a null id collection, when findReadIds is called, then it returns an empty set")
-        void given_null_id_collection_when_find_read_ids_called_then_returns_empty_set() {
-            repository.markRead(ALICE, "notif-1");
+        @DisplayName("Given no read_state row exists for the (recipient, notification) pair, when markRead is called, then it returns false and no row is created — caller is not in audience")
+        void no_row_returns_false() {
+            assertThat(repository.markRead(ALICE, U, "notif-1")).isFalse();
+        }
 
-            assertThat(repository.findReadIds(ALICE, null)).isEmpty();
+        @Test
+        @DisplayName("Given a USER row for some id, when markRead is called with the same id but recipientType=MACHINE, then it returns false — recipientType disambiguates id namespace")
+        void recipient_types_isolated() {
+            repository.createForAudience("notif-1", "T", U, Set.of("same-id"));
+            assertThat(repository.markRead("same-id", M, "notif-1")).isFalse();
+            assertThat(repository.markRead("same-id", U, "notif-1")).isTrue();
         }
     }
 
+    @Nested
+    @DisplayName("High-level ops")
+    class HighLevelOps {
+
+        @Test
+        @DisplayName("Given UNREAD rows for two recipients, when markAllAsRead is called for one of them, then only that recipient's rows flip to READ and the other recipient's hasUnread stays true")
+        void mark_all_as_read() {
+            repository.createForAudience("n1", "T", U, Set.of(ALICE));
+            repository.createForAudience("n2", "T", U, Set.of(ALICE));
+            repository.createForAudience("n3", "T", U, Set.of(BOB));
+
+            long modified = repository.markAllAsRead(ALICE, U);
+
+            assertThat(modified).isEqualTo(2L);
+            assertThat(repository.hasUnread(ALICE, U)).isFalse();
+            assertThat(repository.hasUnread(BOB, U)).isTrue();
+        }
+
+        @Test
+        @DisplayName("Given a non-deleted row, when softDelete is called, then status flips to DELETED so the row no longer appears in default listings")
+        void soft_delete() {
+            repository.createForAudience("n1", "T", U, Set.of(ALICE));
+            assertThat(repository.softDelete(ALICE, U, "n1")).isTrue();
+            NotificationReadState row = mongoTemplate.findAll(NotificationReadState.class).get(0);
+            assertThat(row.getStatus()).isEqualTo(ReadStatus.DELETED);
+        }
+
+        @Test
+        @DisplayName("Given a mix of UNREAD and READ rows for the recipient, when softDeleteAllRead is called, then only READ rows transition to DELETED — UNREAD rows are left intact")
+        void soft_delete_all_read() {
+            repository.createForAudience("n1", "T", U, Set.of(ALICE));
+            repository.createForAudience("n2", "T", U, Set.of(ALICE));
+            repository.markRead(ALICE, U, "n1");
+            assertThat(repository.softDeleteAllRead(ALICE, U)).isEqualTo(1L);
+        }
+
+        @Test
+        @DisplayName("Given UNREAD rows across different contextTypes, when unreadCountsByType is called, then a map of contextType → count is returned aggregating only UNREAD rows (READ rows excluded)")
+        void unread_counts_by_type() {
+            repository.createForAudience("n1", "TYPE_A", U, Set.of(ALICE));
+            repository.createForAudience("n2", "TYPE_A", U, Set.of(ALICE));
+            repository.createForAudience("n3", "TYPE_B", U, Set.of(ALICE));
+            repository.markRead(ALICE, U, "n2");
+
+            Map<String, Long> counts = repository.unreadCountsByType(ALICE, U);
+            assertThat(counts).containsEntry("TYPE_A", 1L).containsEntry("TYPE_B", 1L);
+        }
+
+    }
 }

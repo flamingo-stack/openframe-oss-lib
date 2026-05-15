@@ -14,12 +14,15 @@ import java.time.Instant;
 @Document(collection = "notification_read_states")
 @CompoundIndexes({
         @CompoundIndex(
-                name = "user_notification_unique",
-                def = "{'userId': 1, 'notificationId': 1}",
+                name = "recipient_notification_unique",
+                def = "{'recipientId': 1, 'recipientType': 1, 'notificationId': 1}",
                 unique = true),
         @CompoundIndex(
-                name = "user_read_at",
-                def = "{'userId': 1, 'readAt': -1}")
+                name = "recipient_status",
+                def = "{'recipientId': 1, 'recipientType': 1, 'status': 1}"),
+        @CompoundIndex(
+                name = "recipient_contextType_status",
+                def = "{'recipientId': 1, 'recipientType': 1, 'contextType': 1, 'status': 1}")
 })
 @Data
 @Builder
@@ -30,9 +33,15 @@ public class NotificationReadState {
     @Id
     private String id;
 
-    private String userId;
+    private String recipientId;
+
+    private RecipientType recipientType;
 
     private String notificationId;
+
+    private ReadStatus status;
+
+    private String contextType;
 
     private Instant readAt;
 }

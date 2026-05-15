@@ -2,9 +2,10 @@ package com.openframe.data.integration.service.notification;
 
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationReadState;
+import com.openframe.data.document.notification.ReadStatus;
+import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.integration.BaseMongoIntegrationTest;
 import com.openframe.data.integration.support.IntegrationTestApplication;
-import com.openframe.data.integration.support.NotificationFixtures;
 import com.openframe.data.service.notification.NotificationReadStateService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -15,7 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
 
-import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,6 +28,9 @@ class NotificationReadStateServiceIT extends BaseMongoIntegrationTest {
 
     private static final String ALICE = "user-alice";
     private static final String BOB = "user-bob";
+    private static final String MACHINE_1 = "machine-1";
+    private static final RecipientType U = RecipientType.USER;
+    private static final RecipientType M = RecipientType.MACHINE;
 
     @Autowired
     private NotificationReadStateService service;
@@ -41,107 +45,91 @@ class NotificationReadStateServiceIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    @DisplayName("Given an unread notification, when the caller marks it read, then hasUnread flips from true to false")
-    void given_unread_notification_when_marked_read_then_has_unread_flips_to_false() {
-        Notification persisted = mongoTemplate.save(NotificationFixtures.basic(ALICE));
-
-        assertThat(service.hasUnread(ALICE)).isTrue();
-
-        boolean inserted = service.markRead(ALICE, persisted.getId());
-
-        assertThat(inserted).isTrue();
-        assertThat(service.hasUnread(ALICE)).isFalse();
+    @DisplayName("Given an eager-created UNREAD row, when markRead is called, then hasUnread flips from true to false for the recipient")
+    void unread_to_read_round_trip() {
+        service.createForAudience("notif-1", "T", U, Set.of(ALICE));
+        assertThat(service.hasUnread(ALICE, U)).isTrue();
+        assertThat(service.markRead(ALICE, U, "notif-1")).isTrue();
+        assertThat(service.hasUnread(ALICE, U)).isFalse();
     }
 
     @Test
-    @DisplayName("Given a blank or null userId, when hasUnread is called, then it short-circuits to false without hitting the database")
-    void given_blank_or_null_user_id_when_has_unread_called_then_short_circuits_to_false() {
-        mongoTemplate.save(NotificationFixtures.basic(ALICE));
-
-        assertThat(service.hasUnread(null)).isFalse();
-        assertThat(service.hasUnread("")).isFalse();
-        assertThat(service.hasUnread("   ")).isFalse();
+    @DisplayName("Given a blank/null recipientId or null recipientType, when hasUnread is called, then it short-circuits to false without hitting the database")
+    void blank_short_circuits() {
+        service.createForAudience("notif-1", "T", U, Set.of(ALICE));
+        assertThat(service.hasUnread(null, U)).isFalse();
+        assertThat(service.hasUnread("", U)).isFalse();
+        assertThat(service.hasUnread(ALICE, null)).isFalse();
     }
 
     @Test
-    @DisplayName("Given a mix of read and unread notifications, when findReadIds is called, then only the ids the user has read come back")
-    void given_mix_of_read_and_unread_when_find_read_ids_then_returns_only_read_subset() {
-        Notification first = mongoTemplate.save(NotificationFixtures.basic(ALICE));
-        Notification second = mongoTemplate.save(NotificationFixtures.basic(ALICE));
-        Notification third = mongoTemplate.save(NotificationFixtures.basic(ALICE));
-
-        service.markRead(ALICE, first.getId());
-        service.markRead(ALICE, third.getId());
-
-        Set<String> readIds = service.findReadIds(ALICE,
-                List.of(first.getId(), second.getId(), third.getId()));
-
-        assertThat(readIds).containsExactlyInAnyOrder(first.getId(), third.getId());
+    @DisplayName("Given no read_state row for the caller, when markRead is called, then it returns false — caller is not in audience")
+    void mark_read_no_audience() {
+        assertThat(service.markRead(ALICE, U, "ghost")).isFalse();
     }
 
     @Test
-    @DisplayName("Given an empty inbox, when hasUnread is called, then it returns false")
-    void given_empty_inbox_when_has_unread_called_then_returns_false() {
-        assertThat(service.hasUnread(ALICE)).isFalse();
+    @DisplayName("Given two recipients sharing a notification, when one marks it read, then the other recipient's hasUnread stays true — markRead is per-recipient")
+    void audience_isolation_by_id() {
+        service.createForAudience("notif-1", "T", U, Set.of(ALICE, BOB));
+        service.markRead(ALICE, U, "notif-1");
+
+        assertThat(service.hasUnread(ALICE, U)).isFalse();
+        assertThat(service.hasUnread(BOB, U)).isTrue();
     }
 
     @Test
-    @DisplayName("Given every notification has been read, when hasUnread is called, then it returns false")
-    void given_all_notifications_read_when_has_unread_called_then_returns_false() {
-        Notification first = mongoTemplate.save(NotificationFixtures.basic(ALICE));
-        Notification second = mongoTemplate.save(NotificationFixtures.basic(ALICE));
+    @DisplayName("Given separate USER and MACHINE rows, when hasUnread is queried per recipientType, then each type sees only its own state — recipientType disambiguates")
+    void audience_isolation_by_type() {
+        service.createForAudience("notif-user", "T", U, Set.of(ALICE));
+        service.createForAudience("notif-machine", "T", M, Set.of(MACHINE_1));
 
-        service.markRead(ALICE, first.getId());
-        service.markRead(ALICE, second.getId());
-
-        assertThat(service.hasUnread(ALICE)).isFalse();
+        assertThat(service.hasUnread(ALICE, U)).isTrue();
+        assertThat(service.hasUnread(ALICE, M)).isFalse();
+        assertThat(service.hasUnread(MACHINE_1, M)).isTrue();
+        assertThat(service.hasUnread(MACHINE_1, U)).isFalse();
     }
 
     @Test
-    @DisplayName("Given some notifications read and some unread, when hasUnread is called, then it returns true")
-    void given_some_read_and_some_unread_when_has_unread_called_then_returns_true() {
-        Notification first = mongoTemplate.save(NotificationFixtures.basic(ALICE));
-        mongoTemplate.save(NotificationFixtures.basic(ALICE));
+    @DisplayName("Given multiple UNREAD rows for the recipient, when markAllAsRead is called, then every row flips to READ in one bulk update and hasUnread becomes false")
+    void mark_all_as_read() {
+        service.createForAudience("n1", "T", U, Set.of(ALICE));
+        service.createForAudience("n2", "T", U, Set.of(ALICE));
 
-        service.markRead(ALICE, first.getId());
-
-        assertThat(service.hasUnread(ALICE)).isTrue();
+        assertThat(service.markAllAsRead(ALICE, U)).isEqualTo(2L);
+        assertThat(service.hasUnread(ALICE, U)).isFalse();
     }
 
     @Test
-    @DisplayName("Given Bob has an unread row and Alice marks an unrelated id, when hasUnread runs, then Alice's mark-read does not affect Bob's bell")
-    void given_one_user_marks_unrelated_id_when_has_unread_called_then_other_user_state_is_isolated() {
-        Notification shared = mongoTemplate.save(NotificationFixtures.basic(BOB));
-        service.markRead(ALICE, shared.getId());
+    @DisplayName("Given a read_state row for the caller, when deleteNotification is called, then the row is soft-deleted (status=DELETED) — Notification document and other recipients are untouched")
+    void delete_notification_soft_deletes() {
+        service.createForAudience("n1", "T", U, Set.of(ALICE));
+        assertThat(service.deleteNotification(ALICE, U, "n1")).isTrue();
 
-        assertThat(service.hasUnread(BOB)).isTrue();
-        assertThat(service.hasUnread(ALICE)).isFalse();
+        NotificationReadState row = mongoTemplate.findAll(NotificationReadState.class).get(0);
+        assertThat(row.getStatus()).isEqualTo(ReadStatus.DELETED);
     }
 
     @Test
-    @DisplayName("Given only an unread tenant-wide broadcast and no direct rows, when hasUnread is called, then it returns true")
-    void given_only_unread_broadcast_when_has_unread_called_then_returns_true() {
-        mongoTemplate.save(NotificationFixtures.broadcast("tenant-announcement", "{}"));
+    @DisplayName("Given a mix of UNREAD and READ rows for the recipient, when deleteAllRead is called, then only READ rows transition to DELETED — UNREAD rows remain visible and hasUnread stays true")
+    void delete_all_read() {
+        service.createForAudience("n1", "T", U, Set.of(ALICE));
+        service.createForAudience("n2", "T", U, Set.of(ALICE));
+        service.markRead(ALICE, U, "n1");
 
-        assertThat(service.hasUnread(ALICE)).isTrue();
+        assertThat(service.deleteAllRead(ALICE, U)).isEqualTo(1L);
+        assertThat(service.hasUnread(ALICE, U)).isTrue();
     }
 
     @Test
-    @DisplayName("Given a broadcast that the caller has marked read, when hasUnread is called, then it returns false for the caller but stays true for users who never read it")
-    void given_broadcast_read_by_caller_when_has_unread_called_then_caller_sees_false_others_see_true() {
-        Notification broadcast = mongoTemplate.save(NotificationFixtures.broadcast("tenant-announcement", "{}"));
+    @DisplayName("Given UNREAD rows across multiple contextTypes for the recipient, when unreadCountsByType is called, then a map of contextType → count is returned aggregating only that recipient's UNREAD rows")
+    void unread_counts_by_type() {
+        service.createForAudience("n1", "TYPE_A", U, Set.of(ALICE));
+        service.createForAudience("n2", "TYPE_A", U, Set.of(ALICE));
+        service.createForAudience("n3", "TYPE_B", U, Set.of(ALICE));
 
-        service.markRead(ALICE, broadcast.getId());
-
-        assertThat(service.hasUnread(ALICE)).isFalse();
-        assertThat(service.hasUnread(BOB)).isTrue();
+        Map<String, Long> counts = service.unreadCountsByType(ALICE, U);
+        assertThat(counts).containsEntry("TYPE_A", 2L).containsEntry("TYPE_B", 1L);
     }
 
-    @Test
-    @DisplayName("Given only another user's unread notifications, when hasUnread is called for the caller, then it returns false")
-    void given_only_other_users_notifications_when_has_unread_called_for_caller_then_returns_false() {
-        mongoTemplate.save(NotificationFixtures.basic(BOB));
-
-        assertThat(service.hasUnread(ALICE)).isFalse();
-    }
 }

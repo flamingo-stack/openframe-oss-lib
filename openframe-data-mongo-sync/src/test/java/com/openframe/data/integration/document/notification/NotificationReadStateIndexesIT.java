@@ -29,29 +29,33 @@ class NotificationReadStateIndexesIT extends BaseMongoIntegrationTest {
     private MongoTemplate mongoTemplate;
 
     @Test
-    @DisplayName("Given the NotificationReadState entity, when indexes are resolved, then the unique (userId, notificationId) and (userId, readAt) compound indexes exist")
-    void given_read_state_entity_when_indexes_resolved_then_unique_user_notification_and_user_read_at_exist() {
+    @DisplayName("Given the NotificationReadState entity, when indexes are resolved against Mongo, then the recipient-keyed compound indexes (unique recipient+notification, recipient+status, recipient+contextType+status) exist and the legacy user_read_at index is absent")
+    void given_read_state_entity_when_indexes_resolved_then_required_compound_indexes_exist() {
         IndexOperations indexOps = mongoTemplate.indexOps(NotificationReadState.class);
         new MongoPersistentEntityIndexResolver(mongoTemplate.getConverter().getMappingContext())
                 .resolveIndexFor(NotificationReadState.class)
                 .forEach(indexOps::ensureIndex);
 
         List<IndexInfo> indexes = indexOps.getIndexInfo();
-
         Map<String, IndexInfo> byName = indexes.stream()
                 .collect(Collectors.toMap(IndexInfo::getName, i -> i));
 
-        assertThat(byName).containsKey("user_notification_unique");
-        assertThat(byName).containsKey("user_read_at");
+        assertThat(byName).containsKeys(
+                "recipient_notification_unique",
+                "recipient_status",
+                "recipient_contextType_status");
 
-        IndexInfo unique = byName.get("user_notification_unique");
+        IndexInfo unique = byName.get("recipient_notification_unique");
         assertThat(unique.isUnique()).isTrue();
-        assertThat(unique.getIndexFields())
-                .extracting("key")
-                .containsExactly("userId", "notificationId");
+        assertThat(unique.getIndexFields()).extracting("key")
+                .containsExactly("recipientId", "recipientType", "notificationId");
 
-        assertThat(byName.get("user_read_at").getIndexFields())
-                .extracting("key")
-                .containsExactly("userId", "readAt");
+        assertThat(byName.get("recipient_status").getIndexFields()).extracting("key")
+                .containsExactly("recipientId", "recipientType", "status");
+
+        assertThat(byName.get("recipient_contextType_status").getIndexFields()).extracting("key")
+                .containsExactly("recipientId", "recipientType", "contextType", "status");
+
+        assertThat(byName).doesNotContainKey("user_read_at");
     }
 }

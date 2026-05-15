@@ -1,7 +1,6 @@
 package com.openframe.data.integration.support;
 
 import com.openframe.data.config.NotificationContextMongoConfig;
-import com.openframe.data.config.notification.NotificationIndexConfiguration;
 import com.openframe.data.integration.document.notification.TestExtendedContextDescriptor;
 import com.openframe.data.repository.notification.NotificationRepository;
 import com.openframe.data.repository.notification.impl.CustomNotificationReadStateRepositoryImpl;
@@ -22,7 +21,6 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
         CustomNotificationReadStateRepositoryImpl.class,
         NotificationReadStateService.class,
         NotificationContextMongoConfig.class,
-        NotificationIndexConfiguration.class,
         TestExtendedContextDescriptor.class
 })
 public class IntegrationTestApplication {

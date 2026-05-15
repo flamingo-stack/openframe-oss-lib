@@ -20,6 +20,7 @@ public class NotificationMessage {
     private String id;
     private NotificationSeverity severity;
     private String title;
+    private String description;
     private Instant createdAt;
     private NotificationContext context;
 }

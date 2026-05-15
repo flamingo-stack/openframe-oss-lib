@@ -2,8 +2,6 @@ package com.openframe.data.integration.document.notification;
 
 import com.openframe.data.document.notification.GenericContext;
 import com.openframe.data.document.notification.Notification;
-import com.openframe.data.document.notification.NotificationContext;
-import com.openframe.data.document.notification.UserRecipient;
 import com.openframe.data.integration.BaseMongoIntegrationTest;
 import com.openframe.data.integration.support.IntegrationTestApplication;
 import com.openframe.data.repository.notification.NotificationRepository;
@@ -44,7 +42,6 @@ class NotificationContextDispatchIT extends BaseMongoIntegrationTest {
     @DisplayName("Given a saved Notification with an extended context, when re-read, then context comes back as the concrete subclass with its extra fields populated")
     void given_extended_context_when_reread_then_dispatches_to_concrete_subclass() {
         Notification original = Notification.builder()
-                .recipient(new UserRecipient("user-1"))
                 .title("Extended event")
                 .createdAt(Instant.now())
                 .context(TestExtendedContext.builder()
@@ -70,7 +67,6 @@ class NotificationContextDispatchIT extends BaseMongoIntegrationTest {
     @DisplayName("Given a saved Notification with a generic context, when re-read, then context comes back as GenericContext with payload preserved")
     void given_generic_context_when_reread_then_round_trips_as_generic() {
         Notification original = Notification.builder()
-                .recipient(new UserRecipient("user-1"))
                 .title("Plain event")
                 .createdAt(Instant.now())
                 .context(GenericContext.builder().type("plain-event").payload("{\"k\":\"v\"}").build())
@@ -91,7 +87,6 @@ class NotificationContextDispatchIT extends BaseMongoIntegrationTest {
     @DisplayName("Given a saved Notification, when inspecting the raw Mongo document, then the embedded context has no internal _class field — type is the sole discriminator")
     void given_saved_notification_when_inspecting_raw_doc_then_context_has_no_class_field() {
         Notification original = Notification.builder()
-                .recipient(new UserRecipient("user-1"))
                 .title("Extended event")
                 .createdAt(Instant.now())
                 .context(TestExtendedContext.builder()

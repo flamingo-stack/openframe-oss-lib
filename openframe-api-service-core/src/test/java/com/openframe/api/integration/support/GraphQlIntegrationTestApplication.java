@@ -8,9 +8,9 @@ import com.openframe.api.datafetcher.notification.NotificationContextGraphQlType
 import com.openframe.api.integration.datafetcher.notification.TestApprovalContextDescriptor;
 import com.openframe.api.mapper.GraphQLNotificationMapper;
 import com.openframe.api.service.NotificationService;
-import com.openframe.data.config.NotificationContextMongoConfig;
 import com.openframe.data.config.NotificationContextJacksonConfig;
-import com.openframe.data.nats.service.NotificationPublishingService;
+import com.openframe.data.config.NotificationContextMongoConfig;
+import com.openframe.data.nats.service.NotificationBroadcaster;
 import com.openframe.data.repository.notification.NotificationRepository;
 import com.openframe.data.repository.notification.impl.CustomNotificationReadStateRepositoryImpl;
 import com.openframe.data.repository.notification.impl.CustomNotificationRepositoryImpl;
@@ -53,7 +53,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 @Import({
         CustomNotificationRepositoryImpl.class,
         CustomNotificationReadStateRepositoryImpl.class,
-        NotificationPublishingService.class,
+        NotificationBroadcaster.class,
         NotificationReadStateService.class,
         NotificationService.class,
         GraphQLNotificationMapper.class,

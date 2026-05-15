@@ -1,21 +1,13 @@
 package com.openframe.data.service.notification;
 
-import com.openframe.data.document.notification.BroadcastRecipient;
-import com.openframe.data.document.notification.MachineRecipient;
-import com.openframe.data.document.notification.Notification;
-import com.openframe.data.document.notification.Recipient;
-import com.openframe.data.document.notification.UserRecipient;
+import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.repository.notification.NotificationReadStateRepository;
-import com.openframe.data.repository.notification.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.Map;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
@@ -24,48 +16,55 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 @RequiredArgsConstructor
 public class NotificationReadStateService {
 
-    private final NotificationRepository notificationRepository;
     private final NotificationReadStateRepository repository;
 
-    @Value("${openframe.notifications.unread-scan-window:1000}")
-    private int unreadScanWindow;
-
-    public boolean hasUnread(String recipientUserId) {
-        if (isBlank(recipientUserId)) {
-            return false;
+    public void createForAudience(String notificationId, String contextType,
+                                  RecipientType recipientType, Collection<String> recipientIds) {
+        if (isBlank(notificationId) || recipientType == null || recipientIds == null || recipientIds.isEmpty()) {
+            return;
         }
-        List<String> recentIds = notificationRepository.findRecentIdsForUser(recipientUserId, unreadScanWindow);
-        if (recentIds.isEmpty()) {
-            return false;
-        }
-        Set<String> readIds = repository.findReadIds(recipientUserId, recentIds);
-        return readIds.size() < recentIds.size();
+        repository.createForAudience(notificationId, contextType, recipientType, recipientIds);
     }
 
-    public boolean markRead(String userId, String notificationId) {
-        Optional<Notification> existing = notificationRepository.findById(notificationId);
-        if (existing.isEmpty()) {
-            log.warn("markRead skipped — notification {} does not exist", notificationId);
+    public boolean hasUnread(String recipientId, RecipientType recipientType) {
+        if (isBlank(recipientId) || recipientType == null) {
             return false;
         }
-        if (!canMark(userId, existing.get().getRecipient())) {
-            log.warn("markRead skipped — user {} cannot mark notification {} (recipient={})",
-                    userId, notificationId, existing.get().getRecipient());
+        return repository.hasUnread(recipientId, recipientType);
+    }
+
+    public boolean markRead(String recipientId, RecipientType recipientType, String notificationId) {
+        if (isBlank(recipientId) || recipientType == null || isBlank(notificationId)) {
             return false;
         }
-        return repository.markRead(userId, notificationId);
+        return repository.markRead(recipientId, recipientType, notificationId);
     }
 
-    public Set<String> findReadIds(String userId, Collection<String> notificationIds) {
-        return repository.findReadIds(userId, notificationIds);
+    public long markAllAsRead(String recipientId, RecipientType recipientType) {
+        if (isBlank(recipientId) || recipientType == null) {
+            return 0L;
+        }
+        return repository.markAllAsRead(recipientId, recipientType);
     }
 
-    private static boolean canMark(String userId, Recipient recipient) {
-        return switch (recipient) {
-            case UserRecipient(String uid) -> userId.equals(uid);
-            case BroadcastRecipient ignored -> true;
-            case MachineRecipient ignored -> false;
-            case null -> false;
-        };
+    public boolean deleteNotification(String recipientId, RecipientType recipientType, String notificationId) {
+        if (isBlank(recipientId) || recipientType == null || isBlank(notificationId)) {
+            return false;
+        }
+        return repository.softDelete(recipientId, recipientType, notificationId);
+    }
+
+    public long deleteAllRead(String recipientId, RecipientType recipientType) {
+        if (isBlank(recipientId) || recipientType == null) {
+            return 0L;
+        }
+        return repository.softDeleteAllRead(recipientId, recipientType);
+    }
+
+    public Map<String, Long> unreadCountsByType(String recipientId, RecipientType recipientType) {
+        if (isBlank(recipientId) || recipientType == null) {
+            return Map.of();
+        }
+        return repository.unreadCountsByType(recipientId, recipientType);
     }
 }
