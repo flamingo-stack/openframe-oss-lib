@@ -13,7 +13,4 @@ public class AssignedHost {
     @JsonProperty("id")
     private Long id;
 
-    @JsonProperty("hostname")
-    private String hostname;
-
 }
