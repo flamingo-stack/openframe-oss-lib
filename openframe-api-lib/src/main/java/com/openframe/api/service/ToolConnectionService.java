@@ -1,7 +1,6 @@
 package com.openframe.api.service;
 
 import com.openframe.data.document.tool.ToolConnection;
-import com.openframe.data.document.tool.ToolType;
 import com.openframe.data.repository.tool.ToolConnectionRepository;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
