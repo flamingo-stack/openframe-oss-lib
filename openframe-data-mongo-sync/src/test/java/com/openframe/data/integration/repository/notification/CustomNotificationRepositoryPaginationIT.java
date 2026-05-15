@@ -169,6 +169,72 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
         assertThat(page).extracting(it -> it.notification().getId()).containsExactly(alert.getId());
     }
 
+    @Test
+    @DisplayName("Given many notifications where only a few titles match the search, when listing with a small limit, then the streaming search returns a full page of `limit` matches — pre-fix non-matching ids would have undersized the page")
+    void search_streams_until_full_page_collected() {
+        List<Notification> matching = new ArrayList<>();
+        for (int i = 0; i < 20; i++) {
+            boolean isMatch = i % 4 == 0;
+            String title = isMatch ? "alert-" + i : "noise-" + i;
+            Notification n = repository.save(NotificationFixtures.basic(title, "{}"));
+            seedReadState(ALICE, U, n.getId(), ReadStatus.UNREAD);
+            if (isMatch) {
+                matching.add(n);
+            }
+            sleepBriefly();
+        }
+
+        List<NotificationWithStatus> page = repository.findPageForRecipient(ALICE, U, null, "alert", null, false, 3);
+
+        assertThat(page).hasSize(3);
+        assertThat(page).allSatisfy(it -> assertThat(it.notification().getTitle()).startsWith("alert"));
+        Notification newestMatch = matching.get(matching.size() - 1);
+        assertThat(page.get(0).notification().getId()).isEqualTo(newestMatch.getId());
+    }
+
+    @Test
+    @DisplayName("Given fewer search-matching titles than limit, when listing with a small limit, then only the matches are returned and size signals exhaustion (size < limit ⇒ caller infers no more)")
+    void search_exhausts_when_fewer_matches_than_limit() {
+        for (int i = 0; i < 10; i++) {
+            String title = i == 3 ? "alert-one" : "noise-" + i;
+            Notification n = repository.save(NotificationFixtures.basic(title, "{}"));
+            seedReadState(ALICE, U, n.getId(), ReadStatus.UNREAD);
+            sleepBriefly();
+        }
+
+        List<NotificationWithStatus> page = repository.findPageForRecipient(ALICE, U, null, "alert", null, false, 5);
+
+        assertThat(page).hasSize(1);
+        assertThat(page.get(0).notification().getTitle()).isEqualTo("alert-one");
+    }
+
+    @Test
+    @DisplayName("Given a search-driven first page of `limit` matches, when re-querying with the last item's id as cursor, then the next page returns the remaining matches below the cursor — cursors stay valid under search streaming")
+    void search_pagination_continues_via_cursor() {
+        List<Notification> matching = new ArrayList<>();
+        for (int i = 0; i < 12; i++) {
+            boolean isMatch = i % 3 == 0;
+            String title = isMatch ? "alert-" + i : "noise-" + i;
+            Notification n = repository.save(NotificationFixtures.basic(title, "{}"));
+            seedReadState(ALICE, U, n.getId(), ReadStatus.UNREAD);
+            if (isMatch) {
+                matching.add(n);
+            }
+            sleepBriefly();
+        }
+
+        List<NotificationWithStatus> first = repository.findPageForRecipient(ALICE, U, null, "alert", null, false, 2);
+        assertThat(first).hasSize(2);
+
+        String cursor = first.get(first.size() - 1).notification().getId();
+        List<NotificationWithStatus> second = repository.findPageForRecipient(ALICE, U, null, "alert", cursor, false, 10);
+
+        assertThat(second).extracting(it -> it.notification().getId())
+                .doesNotContainAnyElementsOf(first.stream().map(it -> it.notification().getId()).toList());
+        assertThat(second).extracting(it -> it.notification().getId())
+                .isSubsetOf(matching.stream().map(Notification::getId).toList());
+    }
+
     private Notification seedNotification(String type) {
         Notification n = repository.save(NotificationFixtures.basic(type, "{}"));
         sleepBriefly();

@@ -1,5 +1,7 @@
 package com.openframe.data.repository.notification.impl;
 
+import com.mongodb.MongoBulkWriteException;
+import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.InsertOneModel;
 import com.mongodb.client.model.WriteModel;
 import com.openframe.data.document.notification.NotificationReadState;
@@ -7,6 +9,7 @@ import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.repository.notification.CustomNotificationReadStateRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
@@ -19,6 +22,7 @@ import org.springframework.stereotype.Repository;
 import java.time.Instant;
 import java.util.*;
 
+@Slf4j
 @Repository
 @RequiredArgsConstructor
 public class CustomNotificationReadStateRepositoryImpl implements CustomNotificationReadStateRepository {
@@ -49,7 +53,22 @@ public class CustomNotificationReadStateRepositoryImpl implements CustomNotifica
                     .append(FIELD_CONTEXT_TYPE, contextType);
             writes.add(new InsertOneModel<>(doc));
         }
-        mongoTemplate.getCollection(COLLECTION).bulkWrite(writes);
+        try {
+            mongoTemplate.getCollection(COLLECTION).bulkWrite(writes, new BulkWriteOptions().ordered(false));
+        } catch (MongoBulkWriteException ex) {
+            if (!allDuplicateKeyErrors(ex)) {
+                throw ex;
+            }
+            log.debug("createForAudience duplicate-key on retry for notificationId={} ({} errors)",
+                    notificationId, ex.getWriteErrors().size());
+        }
+    }
+
+    private static boolean allDuplicateKeyErrors(MongoBulkWriteException ex) {
+        if (ex.getWriteErrors().isEmpty()) {
+            return false;
+        }
+        return ex.getWriteErrors().stream().allMatch(err -> err.getCode() == 11000);
     }
 
     @Override

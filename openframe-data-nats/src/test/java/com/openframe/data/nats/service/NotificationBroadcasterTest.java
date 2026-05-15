@@ -39,11 +39,8 @@ class NotificationBroadcasterTest {
         readStateService = mock(NotificationReadStateService.class);
         natsPublisher = mock(NotificationNatsPublisher.class);
         broadcaster = new NotificationBroadcaster(notificationRepository, readStateService, Optional.of(natsPublisher));
-        when(notificationRepository.save(any(Notification.class))).thenAnswer(inv -> {
-            Notification n = inv.getArgument(0);
-            n.setId("notif-id-1");
-            return n;
-        });
+        when(notificationRepository.save(any(Notification.class))).thenAnswer(inv ->
+                inv.<Notification>getArgument(0).withId("notif-id-1"));
     }
 
     @Test
