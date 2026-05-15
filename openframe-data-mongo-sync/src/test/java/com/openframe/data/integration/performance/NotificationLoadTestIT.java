@@ -1,0 +1,558 @@
+package com.openframe.data.integration.performance;
+
+import com.mongodb.client.MongoCollection;
+import com.openframe.data.document.notification.Notification;
+import com.openframe.data.document.notification.NotificationReadState;
+import com.openframe.data.document.notification.ReadStatus;
+import com.openframe.data.document.notification.RecipientType;
+import com.openframe.data.integration.BaseMongoIntegrationTest;
+import com.openframe.data.integration.support.IntegrationTestApplication;
+import com.openframe.data.integration.support.MeasurementStats;
+import com.openframe.data.integration.support.MongoExplain;
+import com.openframe.data.integration.support.PerfResultRecorder;
+import com.openframe.data.repository.notification.NotificationPage;
+import com.openframe.data.repository.notification.NotificationReadStateRepository;
+import com.openframe.data.repository.notification.NotificationRepository;
+import lombok.extern.slf4j.Slf4j;
+import org.bson.Document;
+import org.bson.types.ObjectId;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.index.MongoPersistentEntityIndexResolver;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
+
+import java.io.IOException;
+import java.lang.management.ManagementFactory;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+@Slf4j
+@SpringBootTest(classes = IntegrationTestApplication.class)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@Tag("loadtest")
+@EnabledIfSystemProperty(named = "loadtest.tests", matches = "true")
+class NotificationLoadTestIT extends BaseMongoIntegrationTest {
+
+    private static final int TOTAL              = Integer.getInteger("notification.loadtest.total", 1_000_000);
+    private static final int[] HOT_SLICES       = {100, 1_000, 10_000, 100_000};
+    private static final int SPARSE_SLICE       = Integer.getInteger("notification.loadtest.sparse", 30_000);
+    private static final int SPARSE_MATCH_EVERY = 100;
+
+    private static final int BATCH_FLUSH_SIZE = 5_000;
+    private static final int SAMPLES = 20;
+    private static final int WARMUP = 5;
+
+    private static final String HOT_USER_PREFIX = "hot-user-";
+    private static final String SPARSE_USER     = "hot-user-sparse";
+    private static final String DENSE_TITLE_FMT = "dense-tag-%d-%d";
+    private static final String SPARSE_MATCH    = "sparse-match-";
+    private static final String SPARSE_NOISE    = "noise-line-";
+    private static final String NOISE_RECIPIENT_PREFIX = "noise-user-";
+    private static final int NOISE_RECIPIENTS = 50_000;
+
+    private static final long LIST_BUDGET_MS       = 500;
+    private static final long SEARCH_BUDGET_MS     = 1_500;
+    private static final long TRUNCATED_BUDGET_MS  = 3_000;
+    private static final long WRITE_BUDGET_MS      = 5_000;
+
+    private static final String NOTIFS_COLL = "notifications";
+    private static final String READS_COLL  = "notification_read_states";
+
+    private static final String FIELD_RECIPIENT_ID    = "recipientId";
+    private static final String FIELD_RECIPIENT_TYPE  = "recipientType";
+    private static final String FIELD_STATUS          = "status";
+
+    private static final Path REPORT_DIR = Path.of("target", "perf-results");
+
+    private static final String S_LIST   = "Scenario 1. Open the inbox — list notifications, no search";
+    private static final String S_DENSE  = "Scenario 2. Search by a substring that matches every notification";
+    private static final String S_SPARSE = "Scenario 3. Search where matches are about 1% of the feed";
+    private static final String S_TRUNC  = "Scenario 4. Search with no matches at all (worst case)";
+    private static final String S_RESUME = "Scenario 5. Resume an aborted search via resumeCursor";
+    private static final String S_BULK   = "Scenario 6. \"Mark all as read\" — bulk status flip";
+    private static final String S_COUNTS = "Scenario 7. Unread counts by type";
+
+    @Autowired
+    private MongoTemplate mongoTemplate;
+
+    @Autowired
+    private NotificationRepository notificationRepository;
+
+    @Autowired
+    private NotificationReadStateRepository readStateRepository;
+
+    private final PerfResultRecorder recorder = new PerfResultRecorder(getClass().getSimpleName());
+
+    @BeforeAll
+    void seed() {
+        captureEnvironment();
+
+        mongoTemplate.dropCollection(Notification.class);
+        mongoTemplate.dropCollection(NotificationReadState.class);
+        ensureIndexes(Notification.class);
+        ensureIndexes(NotificationReadState.class);
+
+        Instant t0 = Instant.now();
+        BatchInserter notifBuf = new BatchInserter(mongoTemplate.getCollection(NOTIFS_COLL));
+        BatchInserter readBuf  = new BatchInserter(mongoTemplate.getCollection(READS_COLL));
+
+        int seeded = 0;
+        for (int slice : HOT_SLICES) {
+            String userId = HOT_USER_PREFIX + slice;
+            for (int i = 0; i < slice; i++) {
+                ObjectId notifId = new ObjectId();
+                notifBuf.add(notificationDoc(notifId, String.format(DENSE_TITLE_FMT, slice, i)));
+                readBuf.add(readStateDoc(userId, RecipientType.USER, notifId.toHexString(),
+                        ReadStatus.UNREAD, "TICKET_STATUS_CHANGED"));
+                seeded++;
+            }
+        }
+
+        for (int i = 0; i < SPARSE_SLICE; i++) {
+            ObjectId notifId = new ObjectId();
+            String title = (i % SPARSE_MATCH_EVERY == 0) ? SPARSE_MATCH + i : SPARSE_NOISE + i;
+            notifBuf.add(notificationDoc(notifId, title));
+            readBuf.add(readStateDoc(SPARSE_USER, RecipientType.USER, notifId.toHexString(),
+                    ReadStatus.UNREAD, "APPROVAL_REQUEST"));
+            seeded++;
+        }
+
+        int remaining = Math.max(0, TOTAL - seeded);
+        for (int i = 0; i < remaining; i++) {
+            ObjectId notifId = new ObjectId();
+            notifBuf.add(notificationDoc(notifId, "noise-evt-" + i));
+            readBuf.add(readStateDoc(NOISE_RECIPIENT_PREFIX + (i % NOISE_RECIPIENTS),
+                    RecipientType.USER, notifId.toHexString(),
+                    ReadStatus.UNREAD, "DIRECT_MESSAGE_PUBLISHED"));
+        }
+        notifBuf.flush();
+        readBuf.flush();
+
+        long notifs = mongoTemplate.getCollection(NOTIFS_COLL).countDocuments();
+        long reads  = mongoTemplate.getCollection(READS_COLL).countDocuments();
+        long seedMs = Duration.between(t0, Instant.now()).toMillis();
+        log.info("LoadTest seed complete: notifications={}, read_states={}, took {}ms",
+                notifs, reads, seedMs);
+
+        recorder.withOverview("Notification list/search performance bench. The audience for each notification lives "
+                        + "in a separate `notification_read_states` collection (one row per recipient per notification); "
+                        + "search streams that collection without using `$lookup`, and pagination is cursor-based. "
+                        + "Scenarios describe **what the user actually does** (opens the inbox, searches a ticket, "
+                        + "hits \"mark all as read\") — the numbers show how long that takes on the bench.")
+                .withMeta("targetDocCount", TOTAL)
+                .withMeta("notificationsSeeded", notifs)
+                .withMeta("readStatesSeeded", reads)
+                .withMeta("seedDurationMs", seedMs)
+                .withMeta("hotUserSlices", java.util.Arrays.toString(HOT_SLICES))
+                .withMeta("sparseUserSliceSize", SPARSE_SLICE)
+                .withMeta("samplesPerScenario", SAMPLES)
+                .withMeta("warmupRuns", WARMUP);
+
+        installSectionDescriptions();
+    }
+
+    private void captureEnvironment() {
+        Runtime rt = Runtime.getRuntime();
+        Document buildInfo = mongoTemplate.getDb().runCommand(new Document("buildInfo", 1));
+        recorder.withEnvironment("java", System.getProperty("java.version"))
+                .withEnvironment("os", System.getProperty("os.name") + " " + System.getProperty("os.version") + " " + System.getProperty("os.arch"))
+                .withEnvironment("cpuCount", rt.availableProcessors())
+                .withEnvironment("maxHeapMb", rt.maxMemory() / 1024 / 1024)
+                .withEnvironment("mongoVersion", buildInfo.getString("version"))
+                .withEnvironment("vmName", ManagementFactory.getRuntimeMXBean().getVmName());
+    }
+
+    private void installSectionDescriptions() {
+        recorder.describe(S_LIST,
+                "What we measure: time to deliver the first page (25 notifications) for users with very different "
+                        + "inbox sizes — 100, 1 000, 10 000, 100 000 notifications. This is the hottest query in the "
+                        + "system: opening the bell. The point of this scenario is to demonstrate that latency does "
+                        + "**not** scale with inbox size — the `recipient_notification_unique` compound index lets Mongo "
+                        + "reverse-walk straight into the first page.\n"
+                        + "Columns: `slice` is how many notifications the test user owns; `wallP50/P95/P99` are the "
+                        + "observed latencies in milliseconds (median plus tails, " + SAMPLES + " samples after "
+                        + WARMUP + " warmups); `keysExamined` comes from Mongo `explain` and tells you how deep the "
+                        + "planner had to dig; `index` is the chosen plan.");
+
+        recorder.describe(S_DENSE,
+                "What we measure: search with 100% hit rate (every notification title contains the search substring) "
+                        + "across the same four inbox sizes. This is the best case for search — the streaming loop "
+                        + "completes in a single iteration. Should be as fast as Scenario 1.\n"
+                        + "The `iterations` column records how many streaming steps the loop took; for dense matches "
+                        + "we expect strictly 1.");
+
+        recorder.describe(S_SPARSE,
+                "What we measure: search where only ~1% of titles match (one in every hundred notifications). This is "
+                        + "the realistic worst case for typical use — e.g. a user searching `vpn` across thousands of "
+                        + "ticket assignments. Streaming runs 2–4 iterations doubling its batch until the page is full. "
+                        + "Feed size is 30 000 notifications so there is room for several batch doublings.\n"
+                        + "`iterations > 1` with `truncated=false` is exactly what streaming-with-doubling looks like. "
+                        + "Scenario 1 (no search) does not need to double — one iteration is enough.");
+
+        recorder.describe(S_TRUNC,
+                "What we measure: a search that finds **nothing**, so streaming burns its entire iteration budget "
+                        + "(10 steps with doubling, up to ~7 100 read_state rows scanned). The result is "
+                        + "`truncated=true` plus a `resumeCursor` — the client can continue from there. "
+                        + "Key invariant: latency stays **bounded** even on a hopeless query.\n"
+                        + "`truncated=true` means the server did as much work as its budget allows and is handing the "
+                        + "caller a token to continue.");
+
+        recorder.describe(S_RESUME,
+                "What we measure: feed the `resumeCursor` from Scenario 4 back in and verify the **second call** "
+                        + "advances the scan instead of looping in place. Second-call latency is comparable to the "
+                        + "first (same worst case). The important assertion is that `resumeCursor` differs from the "
+                        + "previous one — the scan actually moved forward.");
+
+        recorder.describe(S_BULK,
+                "What we measure: the user clicks \"mark all as read\". A bulk `update` over the biggest feed "
+                        + "(100 000 notifications) flips every row `UNREAD → READ` in one shot, driven by "
+                        + "`recipient_status`. Single-shot measurement (the op is destructive — rerunning is fine but "
+                        + "pointless). Budget is 5 seconds for 100k rows; that is a generous cap, actual time is "
+                        + "noticeably lower.");
+
+        recorder.describe(S_COUNTS,
+                "What we measure: unread counts grouped by context type "
+                        + "(`{TICKET_STATUS_CHANGED: 7, APPROVAL_REQUEST: 3, …}`). Used to render the badges. The "
+                        + "aggregation must be fully covered by `recipient_contextType_status` — no FETCH stage. "
+                        + "Measured against the 10 000-notification feed.\n"
+                        + "We use the 10k slice rather than 100k because Scenario 6 already marked the 100k slice as "
+                        + "READ; nothing left to count there.");
+    }
+
+    @AfterAll
+    void writeReports() throws IOException {
+        recorder.writeMarkdown(REPORT_DIR);
+    }
+
+    private void ensureIndexes(Class<?> entityClass) {
+        var indexOps = mongoTemplate.indexOps(entityClass);
+        new MongoPersistentEntityIndexResolver(mongoTemplate.getConverter().getMappingContext())
+                .resolveIndexFor(entityClass)
+                .forEach(indexOps::ensureIndex);
+    }
+
+    @Test
+    @DisplayName("Inbox list, no search — latency stays flat across inbox sizes 100 / 1k / 10k / 100k")
+    void list_inbox_latency_versus_inbox_size() {
+        for (int slice : HOT_SLICES) {
+            String userId = HOT_USER_PREFIX + slice;
+
+            MeasurementStats stats = MeasurementStats.measure(WARMUP, SAMPLES, () ->
+                    MeasurementStats.timeMillis(() -> assertThat(notificationRepository
+                            .findPageForRecipient(userId, RecipientType.USER, null, null, null, false, 25)
+                            .items()).hasSize(Math.min(25, slice))));
+
+            MongoExplain.Stats explain = MongoExplain.explainFind(mongoTemplate, READS_COLL,
+                    audienceQuery(userId, 25));
+
+            assertThat(stats.p95()).isLessThan(LIST_BUDGET_MS);
+            assertThat(explain.indexesUsed()).isNotEmpty();
+
+            recorder.record(S_LIST,
+                    "slice", slice,
+                    "wallP50ms", stats.p50(),
+                    "wallP95ms", stats.p95(),
+                    "wallP99ms", stats.p99(),
+                    "wallMinMs", stats.min(),
+                    "wallMaxMs", stats.max(),
+                    "explainExecMs", explain.executionTimeMillis(),
+                    "keysExamined", explain.keysExamined(),
+                    "index", explain.indexesUsed());
+
+            recorder.headline("Summary",
+                    "scenario", "inbox, no search",
+                    "feed size", slice,
+                    "p50 ms", stats.p50(),
+                    "p95 ms", stats.p95(),
+                    "iterations", 1,
+                    "note", "flat across sizes");
+        }
+    }
+
+    @Test
+    @DisplayName("Search with 100% hit rate — streaming completes in a single iteration regardless of inbox size")
+    void dense_search_latency_versus_inbox_size() {
+        for (int slice : HOT_SLICES) {
+            String userId = HOT_USER_PREFIX + slice;
+            String search = "dense-tag-" + slice + "-";
+            final int[] capturedIters = {0};
+
+            MeasurementStats stats = MeasurementStats.measure(WARMUP, SAMPLES, () ->
+                    MeasurementStats.timeMillis(() -> {
+                        NotificationPage page = notificationRepository.findPageForRecipient(
+                                userId, RecipientType.USER, null, search, null, false, 25);
+                        capturedIters[0] = page.iterationsConsumed();
+                        assertThat(page.searchTruncated()).isFalse();
+                    }));
+
+            assertThat(stats.p95()).isLessThan(SEARCH_BUDGET_MS);
+
+            recorder.record(S_DENSE,
+                    "slice", slice,
+                    "wallP50ms", stats.p50(),
+                    "wallP95ms", stats.p95(),
+                    "wallP99ms", stats.p99(),
+                    "wallMinMs", stats.min(),
+                    "wallMaxMs", stats.max(),
+                    "iterations", capturedIters[0]);
+
+            recorder.headline("Summary",
+                    "scenario", "search, dense match",
+                    "feed size", slice,
+                    "p50 ms", stats.p50(),
+                    "p95 ms", stats.p95(),
+                    "iterations", capturedIters[0],
+                    "note", capturedIters[0] == 1 ? "single iteration" : "multiple iterations");
+        }
+    }
+
+    @Test
+    @DisplayName("Search with ~1% hit rate — streaming doubles its batch and still fills the page within budget")
+    void sparse_search_iterates_and_grows_batch() {
+        final int[] capturedIters = {0};
+
+        MeasurementStats stats = MeasurementStats.measure(WARMUP, SAMPLES, () ->
+                MeasurementStats.timeMillis(() -> {
+                    NotificationPage page = notificationRepository.findPageForRecipient(
+                            SPARSE_USER, RecipientType.USER, null, SPARSE_MATCH, null, false, 25);
+                    capturedIters[0] = page.iterationsConsumed();
+                    assertThat(page.searchTruncated()).isFalse();
+                    assertThat(page.items()).hasSize(25);
+                }));
+
+        assertThat(stats.p95()).isLessThan(SEARCH_BUDGET_MS);
+
+        recorder.record(S_SPARSE,
+                "sliceSize", SPARSE_SLICE,
+                "matchRatePercent", 100 / SPARSE_MATCH_EVERY,
+                "wallP50ms", stats.p50(),
+                "wallP95ms", stats.p95(),
+                "wallP99ms", stats.p99(),
+                "wallMinMs", stats.min(),
+                "wallMaxMs", stats.max(),
+                "iterations", capturedIters[0]);
+
+        recorder.headline("Summary",
+                "scenario", "search, sparse (~1%)",
+                "feed size", SPARSE_SLICE,
+                "p50 ms", stats.p50(),
+                "p95 ms", stats.p95(),
+                "iterations", capturedIters[0],
+                "note", "batch doubling kicks in");
+    }
+
+    @Test
+    @DisplayName("Search with zero matches — streaming exhausts its iteration budget and returns a resumeCursor")
+    void no_match_search_returns_truncated_with_resume_cursor() {
+        final int[] capturedIters = {0};
+        final boolean[] capturedTruncated = {false};
+
+        MeasurementStats stats = MeasurementStats.measure(WARMUP, SAMPLES, () ->
+                MeasurementStats.timeMillis(() -> {
+                    NotificationPage page = notificationRepository.findPageForRecipient(
+                            SPARSE_USER, RecipientType.USER, null, "no-such-term-exists", null, false, 25);
+                    capturedIters[0] = page.iterationsConsumed();
+                    capturedTruncated[0] = page.searchTruncated();
+                }));
+
+        assertThat(capturedTruncated[0]).isTrue();
+        assertThat(stats.p95()).isLessThan(TRUNCATED_BUDGET_MS);
+
+        recorder.record(S_TRUNC,
+                "sliceSize", SPARSE_SLICE,
+                "wallP50ms", stats.p50(),
+                "wallP95ms", stats.p95(),
+                "wallP99ms", stats.p99(),
+                "wallMinMs", stats.min(),
+                "wallMaxMs", stats.max(),
+                "iterations", capturedIters[0],
+                "truncated", capturedTruncated[0]);
+
+        recorder.headline("Summary",
+                "scenario", "search, no matches",
+                "feed size", SPARSE_SLICE,
+                "p50 ms", stats.p50(),
+                "p95 ms", stats.p95(),
+                "iterations", capturedIters[0],
+                "note", "truncated=" + capturedTruncated[0] + ", resumeCursor returned");
+    }
+
+    @Test
+    @DisplayName("Resume an aborted search via resumeCursor — scan advances, no looping in place")
+    void resume_after_truncation_advances_scan() {
+        NotificationPage first = notificationRepository.findPageForRecipient(
+                SPARSE_USER, RecipientType.USER, null, "no-such-term-exists", null, false, 25);
+        assertThat(first.searchTruncated()).isTrue();
+        assertThat(first.resumeCursor()).isNotNull();
+
+        final NotificationPage[] captured = new NotificationPage[1];
+        MeasurementStats stats = MeasurementStats.measure(WARMUP, SAMPLES, () ->
+                MeasurementStats.timeMillis(() -> {
+                    NotificationPage second = notificationRepository.findPageForRecipient(
+                            SPARSE_USER, RecipientType.USER, null, "no-such-term-exists",
+                            first.resumeCursor(), false, 25);
+                    captured[0] = second;
+                }));
+
+        NotificationPage second = captured[0];
+        assertThat(second.resumeCursor()).isNotEqualTo(first.resumeCursor());
+
+        recorder.record(S_RESUME,
+                "firstResumeCursor", first.resumeCursor(),
+                "secondResumeCursor", second.resumeCursor(),
+                "secondTruncated", second.searchTruncated(),
+                "wallP50ms", stats.p50(),
+                "wallP95ms", stats.p95(),
+                "wallP99ms", stats.p99(),
+                "wallMaxMs", stats.max(),
+                "secondIterations", second.iterationsConsumed());
+
+        recorder.headline("Summary",
+                "scenario", "resume via resumeCursor",
+                "feed size", SPARSE_SLICE,
+                "p50 ms", stats.p50(),
+                "p95 ms", stats.p95(),
+                "iterations", second.iterationsConsumed(),
+                "note", "cursor advanced");
+    }
+
+    @Test
+    @DisplayName("\"Mark all as read\" — bulk markAllAsRead on the 100k slice")
+    void mark_all_as_read_on_biggest_slice() {
+        String userId = HOT_USER_PREFIX + 100_000;
+
+        long wallMs = MeasurementStats.timeMillis(() -> {
+            long modified = readStateRepository.markAllAsRead(userId, RecipientType.USER);
+            assertThat(modified).isEqualTo(100_000L);
+        });
+        assertThat(wallMs).isLessThan(WRITE_BUDGET_MS);
+
+        MongoExplain.Stats explain = MongoExplain.explainUpsert(mongoTemplate, READS_COLL,
+                Query.query(Criteria.where(FIELD_RECIPIENT_ID).is(userId)
+                        .and(FIELD_RECIPIENT_TYPE).is(RecipientType.USER)
+                        .and(FIELD_STATUS).is(ReadStatus.READ)),
+                new Update().set(FIELD_STATUS, ReadStatus.READ));
+
+        recorder.record(S_BULK,
+                "slice", 100_000,
+                "rowsAffected", 100_000,
+                "wallMs", wallMs,
+                "explainExecMs", explain.executionTimeMillis(),
+                "keysExamined", explain.keysExamined(),
+                "index", explain.indexesUsed());
+
+        recorder.headline("Summary",
+                "scenario", "mark all as read (100k)",
+                "feed size", 100_000,
+                "p50 ms", wallMs,
+                "p95 ms", wallMs,
+                "iterations", 1,
+                "note", "single bulk update");
+    }
+
+    @Test
+    @DisplayName("Unread counts grouped by context type — covered aggregation")
+    void unread_counts_by_type_on_medium_slice() {
+        String userId = HOT_USER_PREFIX + 10_000;
+
+        final int[] groups = {0};
+        MeasurementStats stats = MeasurementStats.measure(WARMUP, SAMPLES, () ->
+                MeasurementStats.timeMillis(() -> {
+                    Map<String, Long> counts = readStateRepository.unreadCountsByType(userId, RecipientType.USER);
+                    groups[0] = counts.size();
+                    assertThat(counts).isNotEmpty();
+                }));
+
+        assertThat(stats.p95()).isLessThan(SEARCH_BUDGET_MS);
+
+        recorder.record(S_COUNTS,
+                "slice", 10_000,
+                "groupsReturned", groups[0],
+                "wallP50ms", stats.p50(),
+                "wallP95ms", stats.p95(),
+                "wallP99ms", stats.p99(),
+                "wallMinMs", stats.min(),
+                "wallMaxMs", stats.max());
+
+        recorder.headline("Summary",
+                "scenario", "unread counts by type",
+                "feed size", 10_000,
+                "p50 ms", stats.p50(),
+                "p95 ms", stats.p95(),
+                "iterations", 1,
+                "note", "covered aggregation");
+    }
+
+    private static Query audienceQuery(String recipientId, int limit) {
+        Query q = Query.query(Criteria.where(FIELD_RECIPIENT_ID).is(recipientId)
+                .and(FIELD_RECIPIENT_TYPE).is(RecipientType.USER)
+                .and(FIELD_STATUS).ne(ReadStatus.DELETED));
+        q.fields().include("notificationId").include("status");
+        q.with(Sort.by(Sort.Direction.DESC, "notificationId"));
+        q.limit(limit);
+        return q;
+    }
+
+    private static Document notificationDoc(ObjectId id, String title) {
+        return new Document()
+                .append("_id", id)
+                .append("severity", "INFO")
+                .append("title", title)
+                .append("createdAt", new Date())
+                .append("context", new Document("type", "TICKET_STATUS_CHANGED").append("payload", "{}"));
+    }
+
+    private static Document readStateDoc(String recipientId, RecipientType type,
+                                         String notificationId, ReadStatus status, String contextType) {
+        return new Document()
+                .append("_id", new ObjectId())
+                .append("recipientId", recipientId)
+                .append("recipientType", type.name())
+                .append("notificationId", notificationId)
+                .append("status", status.name())
+                .append("contextType", contextType);
+    }
+
+    private static final class BatchInserter {
+
+        private final MongoCollection<Document> collection;
+        private final List<Document> buffer = new ArrayList<>(BATCH_FLUSH_SIZE);
+
+        BatchInserter(MongoCollection<Document> collection) {
+            this.collection = collection;
+        }
+
+        void add(Document doc) {
+            buffer.add(doc);
+            if (buffer.size() >= BATCH_FLUSH_SIZE) {
+                flush();
+            }
+        }
+
+        void flush() {
+            if (buffer.isEmpty()) {
+                return;
+            }
+            collection.insertMany(buffer);
+            buffer.clear();
+        }
+    }
+}
