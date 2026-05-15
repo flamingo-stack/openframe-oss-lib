@@ -200,6 +200,11 @@ public class TagService {
     public Tag createTag(String key, TagEntityType entityType, String description, String color) {
         log.info("Creating tag '{}' with entityType: {}", key, entityType);
 
+        Tag existing = tagRepository.findByKeyAndEntityType(key, entityType);
+        if (existing != null) {
+            return existing;
+        }
+
         Tag tag = Tag.builder()
                 .key(key)
                 .entityType(entityType)
