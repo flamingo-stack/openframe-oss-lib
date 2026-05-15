@@ -1,10 +1,8 @@
 "use client"
 
-import { forwardRef, memo, useMemo } from "react"
+import React, { forwardRef, memo, useMemo } from "react"
 import { cn } from "../../utils/cn"
 import { SquareAvatar } from "../ui/square-avatar"
-import { ChatTypingIndicator } from "./chat-typing-indicator"
-import { CyclingPhrase } from "./cycling-phrase"
 import { ToolExecutionDisplay } from "./tool-execution-display"
 import { ApprovalRequestMessage } from "./approval-request-message"
 import { ApprovalBatchMessage } from "./approval-batch-message"
@@ -14,7 +12,16 @@ import { ThinkingDisplay } from "./thinking-display"
 import { SimpleMarkdownRenderer } from "../ui/simple-markdown-renderer"
 import type { ChatRef } from "./chat-ref.types"
 import { remarkCardLinks } from "./remark-card-links"
+import { BlockCard, type BlockCardProps } from "./block-card"
 import type { MessageSegment, MessageContent, ChatMessageEnhancedProps } from "./types"
+
+/**
+ * Same regex shape as `remarkCardLinks` — kept in lockstep so the
+ * pre-scan and the remark plugin see the SAME set of markers. If the
+ * grammar widens (today: snake_case OR kebab-case; closer `]` OR `)`),
+ * both files must update.
+ */
+const CARD_MARKER_REGEX = /\[card:\/\/([a-zA-Z0-9_-]+):([a-zA-Z0-9_-]+)[\])]/g
 
 function normalizeContent(content: MessageContent): MessageSegment[] {
   if (typeof content === 'string') {
@@ -22,22 +29,6 @@ function normalizeContent(content: MessageContent): MessageSegment[] {
   }
   return content
 }
-
-// Flamingo-themed cycling words shown next to the streaming indicator
-// (Claude-Code-style activity hint). Mix of classic AI verbs, flamingo
-// behaviours (strut/wade/preen/flock), and one Mingo neologism.
-const STREAMING_WORDS = [
-  'Thinking',
-  'Vibing',
-  'Mingoing',
-  'Strutting',
-  'Pondering',
-  'Wading',
-  'Hatching',
-  'Preening',
-  'Conjuring',
-  'Riffing',
-] as const
 
 const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>(
   ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, authorType: authorTypeProp, assistantIcon, chatRefs, renderEntityCard, ...props }, ref) => {
@@ -63,15 +54,113 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       () => (hasMarkerSupport ? [remarkCardLinks] : []),
       [hasMarkerSupport],
     )
+
+    const segments = useMemo(() => normalizeContent(content), [content])
+
+    /**
+     * Per-message rendering plan for `[card://type:id]` markers.
+     *
+     * Block-bearing markers SPLIT their containing text segment so the
+     * block payload (e.g. video player) renders AT THE MARKER POSITION
+     * in the text flow — not at the end of the segment, which causes
+     * the block to "appear high and drift down" while text streams in.
+     *
+     * Per-segment output is an array of parts:
+     *   - `{ kind: 'text' }` — substring of the segment text, rendered
+     *                         through `<SimpleMarkdownRenderer>`. Ends
+     *                         with the block marker so the inline pill
+     *                         lands at the right spot via the `<a>`
+     *                         override.
+     *   - `{ kind: 'block' }` — block payload, rendered as a sibling
+     *                         BELOW the preceding text chunk and above
+     *                         the next one.
+     *
+     * Inline-only markers (no `<BlockCard>` wrapper) do NOT split the
+     * segment; they're handled by the override at marker position via
+     * the shared `inlineByKey` map.
+     *
+     * Streaming behaviour: as a marker becomes complete in the streamed
+     * text, the regex matches, the segment splits at that point, and
+     * the block card lands right after the inline pill. Subsequent
+     * tokens render in the trailing chunk — block stays in position.
+     */
+    const renderingPlan = useMemo(() => {
+      if (!hasMarkerSupport) return null
+      const refs = chatRefs ?? {}
+      const render = renderEntityCard
+      const inlineByKey = new Map<string, React.ReactNode>()
+      type SegmentPart =
+        | { kind: 'text'; text: string }
+        | { kind: 'block'; key: string; node: React.ReactNode }
+      const partsBySegment = new Map<number, SegmentPart[]>()
+      if (!render) return { inlineByKey, partsBySegment }
+      const seenRendered = new Map<string, React.ReactNode>()
+      segments.forEach((segment, segIdx) => {
+        if (segment.type !== 'text') return
+        const text = segment.text
+        const parts: SegmentPart[] = []
+        let cursor = 0
+        CARD_MARKER_REGEX.lastIndex = 0
+        let match: RegExpExecArray | null
+        while ((match = CARD_MARKER_REGEX.exec(text)) !== null) {
+          const cardType = match[1]
+          const cardId = match[2]
+          const key = `${cardType}:${cardId}`
+          // Dedup renderEntityCard calls per unique key across the
+          // whole message — same key emitted twice (rare but possible)
+          // returns the cached node so React reuses the same instance.
+          let rendered = seenRendered.get(key)
+          if (!seenRendered.has(key)) {
+            const refMatch = refs[key]
+            rendered = refMatch ? render(refMatch) : undefined
+            seenRendered.set(key, rendered)
+          }
+          if (React.isValidElement(rendered) && rendered.type === BlockCard) {
+            const props = rendered.props as BlockCardProps
+            const markerEnd = match.index + match[0].length
+            // Text chunk INCLUDING the marker — the inline pill renders
+            // at the marker position via the `<a>` override.
+            parts.push({ kind: 'text', text: text.slice(cursor, markerEnd) })
+            parts.push({ kind: 'block', key, node: props.children })
+            cursor = markerEnd
+            const refMatch = refs[key]
+            inlineByKey.set(
+              key,
+              props.inline != null
+                ? props.inline
+                : <span className="text-ods-text-primary font-medium">{refMatch?.title ?? cardId}</span>,
+            )
+          } else if (rendered != null) {
+            // Inline-only — no split; remembered for the override.
+            inlineByKey.set(key, rendered)
+          }
+        }
+        // Trailing text after the last block marker (or the entire
+        // segment when no block markers fired).
+        if (cursor < text.length) {
+          parts.push({ kind: 'text', text: text.slice(cursor) })
+        }
+        // Only register the split plan when at least one block marker
+        // fired — otherwise the segment renders as one SimpleMarkdown-
+        // Renderer call (existing behaviour preserved for the
+        // overwhelming majority of segments that have no block cards).
+        if (parts.some((p) => p.kind === 'block')) {
+          partsBySegment.set(segIdx, parts)
+        }
+      })
+      return { inlineByKey, partsBySegment }
+    }, [hasMarkerSupport, chatRefs, renderEntityCard, segments])
+
     const cardComponentOverrides = useMemo(() => {
       if (!hasMarkerSupport) return undefined
       const refs = chatRefs ?? {}
-      const render = renderEntityCard
+      const inlineByKey = renderingPlan?.inlineByKey
       return {
-        // Override `<a>` to detect `card://` URLs emitted by `remarkCardLinks`
-        // and delegate rendering to the host. Other href schemes pass
-        // through unchanged — react-markdown's default `<a>` handler covers
-        // them.
+        // Override `<a>` to detect `card://` URLs emitted by `remarkCardLinks`.
+        // The render result was pre-computed in `renderingPlan` so block-level
+        // payloads (e.g. video player cards) can be hoisted out of the
+        // paragraph as siblings — the inline pill stays at the marker
+        // position. Other href schemes pass through unchanged.
         a: ({ href, children, className: linkClassName, ...rest }: any) => {
           if (typeof href === 'string' && href.startsWith('card://')) {
             const stripped = href.slice('card://'.length)
@@ -80,15 +169,13 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
               const cardType = stripped.slice(0, sepIdx)
               const cardId = stripped.slice(sepIdx + 1)
               const key = `${cardType}:${cardId}`
-              const refMatch: ChatRef | undefined = refs[key]
-              if (refMatch && render) {
-                const rendered = render(refMatch)
-                if (rendered != null) return rendered
-              }
+              const inline = inlineByKey?.get(key)
+              if (inline != null) return inline
               // No renderer, no ref, OR renderer returned null — fall back
               // to plain text title-only. Use any same-type ref's title if
               // available; otherwise the bare cardId. Never render the
               // literal `card://` URL.
+              const refMatch: ChatRef | undefined = refs[key]
               const fallbackTitle = (refMatch?.title)
                 ?? Object.values(refs).find((r) => r.type === cardType)?.title
                 ?? cardId
@@ -108,7 +195,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           )
         },
       }
-    }, [hasMarkerSupport, chatRefs, renderEntityCard])
+    }, [hasMarkerSupport, chatRefs, renderingPlan])
 
     const getAvatarProps = () => {
       const displayName = name || (isUser ? "User" : assistantType === 'mingo' ? "Mingo" : "Fae")
@@ -133,19 +220,8 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     }
     
     const avatarProps = getAvatarProps()
-    const segments = normalizeContent(content)
 
     const isSystem = authorType === 'system'
-
-    // While `isTyping` says streaming is active, the agent is actually
-    // PAUSED whenever the last segment is an approval awaiting user
-    // input — pending status (or undefined, which is the initial state
-    // before backend confirms). Showing the typing indicator in this
-    // state would lie to the user about what's happening.
-    const lastSegment = segments[segments.length - 1]
-    const isPausedOnApproval = !!lastSegment
-      && (lastSegment.type === 'approval_request' || lastSegment.type === 'approval_batch')
-      && (lastSegment.status === undefined || lastSegment.status === 'pending')
 
     return (
       <div
@@ -196,19 +272,58 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           {(!isSystem || segments.length > 0) && <div className="flex flex-col gap-2">
             {segments.map((segment, index) => {
                 if (segment.type === 'text') {
+                  const parts = renderingPlan?.partsBySegment.get(index)
+                  const wrapperClass = cn(
+                    "min-w-0 w-full break-words text-h4",
+                    isError ? "text-ods-error" : "text-ods-text-primary",
+                  )
+                  // No block markers in this segment → single
+                  // SimpleMarkdownRenderer call (existing behaviour
+                  // preserved for the vast majority of messages).
+                  if (!parts || parts.length === 0) {
+                    return (
+                      <div key={index} className={wrapperClass}>
+                        <SimpleMarkdownRenderer
+                          content={segment.text}
+                          textSize="compact"
+                          additionalRemarkPlugins={cardRemarkPlugins}
+                          componentOverrides={cardComponentOverrides}
+                        />
+                      </div>
+                    )
+                  }
+                  // Block markers present → split text at each marker
+                  // and interleave block payloads. Each text chunk
+                  // includes its trailing marker so the inline pill
+                  // renders at the right position via the `<a>`
+                  // override. Block payloads land AS SIBLINGS between
+                  // text chunks — HTML-valid (block DOM never nests
+                  // inside `<p>`) AND positionally correct (block
+                  // appears where the marker is in the flow, not at
+                  // the segment's end). Stable React keys come from
+                  // the card key (block) and chunk position (text);
+                  // streaming token-by-token reuses the same React
+                  // instances so `<Video>` doesn't remount mid-play.
                   return (
-                    <div key={index} className={cn(
-                      "min-w-0 w-full break-words text-h4",
-                      isError
-                        ? "text-ods-error"
-                        : "text-ods-text-primary"
-                    )}>
-                      <SimpleMarkdownRenderer
-                        content={segment.text}
-                        textSize="compact"
-                        additionalRemarkPlugins={cardRemarkPlugins}
-                        componentOverrides={cardComponentOverrides}
-                      />
+                    <div key={index} className={wrapperClass}>
+                      {parts.map((part, pIdx) => {
+                        if (part.kind === 'text') {
+                          return (
+                            <SimpleMarkdownRenderer
+                              key={`t-${pIdx}`}
+                              content={part.text}
+                              textSize="compact"
+                              additionalRemarkPlugins={cardRemarkPlugins}
+                              componentOverrides={cardComponentOverrides}
+                            />
+                          )
+                        }
+                        return (
+                          <div key={`b-${part.key}`} className="my-3">
+                            {part.node}
+                          </div>
+                        )
+                      })}
                     </div>
                   )
                 } else if (segment.type === 'tool_execution') {
@@ -265,15 +380,6 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                 }
                 return null
               })}
-            {isTyping && !isPausedOnApproval && (
-              <div className="flex items-center gap-3">
-                <ChatTypingIndicator />
-                <CyclingPhrase
-                  words={STREAMING_WORDS}
-                  className="text-ods-text-secondary text-body-sm"
-                />
-              </div>
-            )}
           </div>}
         </div>
       </div>

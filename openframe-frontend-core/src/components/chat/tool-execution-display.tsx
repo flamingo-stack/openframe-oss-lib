@@ -3,14 +3,13 @@
 import { forwardRef, useMemo, useState } from "react"
 
 import { cn } from "../../utils/cn"
-import { CheckCircleIcon, XmarkCircleIcon } from "../icons-v2-generated"
+import { CheckCircleIcon, DotsLoaderIcon, XmarkCircleIcon } from "../icons-v2-generated"
 import { ToolType } from "../platform"
 import { ToolIcon } from "../tool-icon"
-import { PulseDots } from "../ui/pulse-dots"
 import { ExpandChevron } from "./expand-chevron"
 import { useCollapsible } from "./hooks/use-collapsible"
 import { ArgRow, ResultBlock } from "./tool-call-blocks"
-import { COMMAND_BODY_ARG_KEYS } from "./utils/tool-call-helpers"
+import { COMMAND_BODY_ARG_KEYS, getToolCallTitle } from "./utils/tool-call-helpers"
 import type { ToolExecutionDisplayProps } from "./types"
 
 const COMMAND_BODY_KEYS = new Set<string>(COMMAND_BODY_ARG_KEYS)
@@ -24,11 +23,15 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
     const isExecuted = message.type === "EXECUTED_TOOL"
     const integratedToolType = (message.integratedToolType as ToolType) || ("OPENFRAME" as ToolType)
 
-    const previewText = useMemo(() => {
-      const command = message.parameters?.command ?? message.parameters?.query
-      if (command) return String(command)
-      return message.toolFunction ?? ""
-    }, [message.toolFunction, message.parameters])
+    const previewText = useMemo(
+      () =>
+        getToolCallTitle({
+          args: message.parameters,
+          title: message.toolTitle,
+          name: message.toolFunction,
+        }),
+      [message.parameters, message.toolTitle, message.toolFunction],
+    )
 
     const argEntries = useMemo<Array<[string, unknown]>>(() => {
       if (!message.parameters || typeof message.parameters !== "object") return []
@@ -41,7 +44,7 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
     const hasBody = argEntries.length > 0 || hasResult || isExecuting
 
     const renderStatusIcon = () => {
-      if (isExecuting) return <PulseDots size="sm" />
+      if (isExecuting) return <DotsLoaderIcon size={16} className="text-ods-text-secondary" />
       if (isExecuted && message.success === true) return <CheckCircleIcon className="w-4 h-4 text-ods-success" />
       if (isExecuted && message.success === false) return <XmarkCircleIcon className="w-4 h-4 text-ods-error" />
       return null
@@ -72,7 +75,7 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
                 : "text-ods-text-secondary line-clamp-2 max-h-10 break-all",
             )}
           >
-            {expanded ? message.toolFunction || previewText : previewText}
+            {previewText}
           </div>
           <div className="flex items-center justify-center shrink-0 w-5 h-5">{renderStatusIcon()}</div>
           <div className="flex items-center justify-center shrink-0 w-5 h-5">
@@ -91,7 +94,7 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
                 {isExecuting && (
                   <div className="flex flex-col gap-1 items-start w-full">
                     <span className="text-ods-text-secondary">Result:</span>
-                    <PulseDots size="sm" />
+                    <DotsLoaderIcon size={16} className="text-ods-text-secondary" />
                   </div>
                 )}
               </div>

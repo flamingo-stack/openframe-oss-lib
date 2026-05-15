@@ -102,7 +102,7 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
                                   KnowledgeBaseItemType type, List<String> itemIds, String cursor) {
         Query query = new Query();
 
-        if (itemIds != null && !itemIds.isEmpty()) {
+        if (itemIds != null) {
             query.addCriteria(Criteria.where(ID_FIELD).in(itemIds));
         } else if (StringUtils.hasText(parentId)) {
             query.addCriteria(Criteria.where(FIELD_PARENT_ID).is(parentId));

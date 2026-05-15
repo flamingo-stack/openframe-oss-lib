@@ -7,6 +7,7 @@ import type {
   ProcessedMessage,
   MessageSegment,
   PendingApproval,
+  ExecutingToolState,
 } from '../types'
 
 /**
@@ -18,7 +19,7 @@ export function extractIncompleteMessageState(
 ): {
   existingSegments?: MessageSegment[]
   pendingApprovals?: Map<string, PendingApproval>
-  executingTools?: Map<string, { integratedToolType: string; toolFunction: string; parameters?: Record<string, any> }>
+  executingTools?: Map<string, ExecutingToolState>
 } | undefined {
   if (!lastMessage || lastMessage.role !== 'assistant' || typeof lastMessage.content === 'string') {
     return undefined
@@ -26,7 +27,7 @@ export function extractIncompleteMessageState(
 
   const segments = lastMessage.content as MessageSegment[]
   const pendingApprovals = new Map<string, PendingApproval>()
-  const executingTools = new Map<string, { integratedToolType: string; toolFunction: string; parameters?: Record<string, any> }>()
+  const executingTools = new Map<string, ExecutingToolState>()
   let hasIncompleteState = false
 
   segments.forEach(segment => {
@@ -39,6 +40,7 @@ export function extractIncompleteMessageState(
           executingTools.set(toolKey, {
             integratedToolType: segment.data.integratedToolType,
             toolFunction: segment.data.toolFunction,
+            toolTitle: segment.data.toolTitle,
             parameters: segment.data.parameters,
           })
           hasIncompleteState = true

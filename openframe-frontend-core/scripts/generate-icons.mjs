@@ -25,6 +25,34 @@ function toKebabCase(str) {
   return str.replace(/\s+/g, '-').toLowerCase();
 }
 
+// SVGO's prefixIds (run by SVGR) prefixes `id` attributes but does NOT
+// update the SMIL timing references in `begin`/`end` that point at them
+// (e.g. `begin="0;a.end-0.25s"` while the id became `prefix__a`). That
+// silently breaks looping animations after the first cycle. Re-sync the
+// references to the actual prefixed ids.
+function fixSmilReferences(content) {
+  const ids = [...content.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]);
+  if (ids.length === 0) return content;
+
+  // Map the "bare" id (token after the last `__`, i.e. the form SVGO
+  // leaves behind inside begin/end) to the actual prefixed id.
+  const bareToFull = new Map();
+  for (const id of ids) {
+    const bare = id.includes('__') ? id.slice(id.lastIndexOf('__') + 2) : id;
+    if (bare !== id) bareToFull.set(bare, id);
+  }
+  if (bareToFull.size === 0) return content;
+
+  return content.replace(/\b(begin|end)="([^"]+)"/g, (_m, attr, value) => {
+    const fixed = value.replace(
+      /(?<![\w-])([\w-]+)\.(begin|end)/g,
+      (ref, token, evt) =>
+        bareToFull.has(token) ? `${bareToFull.get(token)}.${evt}` : ref
+    );
+    return `${attr}="${fixed}"`;
+  });
+}
+
 // Get all category directories
 function getCategories() {
   return readdirSync(ICONS_V2_DIR).filter((item) => {
@@ -96,6 +124,8 @@ function processGeneratedCategory(categoryPath, originalNames) {
       .replace(new RegExp(`interface ${svgrPropsName}`, 'g'), `interface ${propsName}`)
       .replace(new RegExp(`}: ${svgrPropsName}`, 'g'), `}: ${propsName}`)
       .replace(new RegExp(`function ${svgrFuncName}\\(`, 'g'), `function ${componentName}(`);
+
+    content = fixSmilReferences(content);
 
     writeFileSync(newFilePath, content);
 

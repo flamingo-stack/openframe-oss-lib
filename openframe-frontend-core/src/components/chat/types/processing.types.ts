@@ -3,7 +3,7 @@
  * Contains types for message parsing, accumulation, and processing
  */
 
-import type { MessageSegment, ProcessedMessage, ToolExecutionSegment, TokenUsageData, PendingToolCallData } from './message.types'
+import type { MessageSegment, ProcessedMessage, ToolExecutionSegment, TokenUsageData, PendingToolCallData, ExecutingToolState } from './message.types'
 import type { ChatApprovalStatus, AssistantType } from './chat.types'
 import type { ChunkData, NatsMessageType } from './network.types'
 
@@ -39,11 +39,7 @@ export interface PendingApproval {
 export interface AccumulatorState {
   segments: MessageSegment[]
   pendingApprovals: Map<string, PendingApproval>
-  executingTools: Map<string, {
-    integratedToolType: string
-    toolFunction: string
-    parameters?: Record<string, any>
-  }>
+  executingTools: Map<string, ExecutingToolState>
   escalatedApprovals?: Map<
     string,
     { command: string; explanation?: string; approvalType: string; toolCalls?: PendingToolCallData[] }
