@@ -9,6 +9,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import static java.lang.String.format;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 @Component
 @RequiredArgsConstructor
@@ -22,10 +23,16 @@ public class NotificationNatsPublisher {
     private final NatsMessagePublisher natsMessagePublisher;
 
     public void publishToUser(String userId, Notification notification) {
+        if (isBlank(userId)) {
+            throw new IllegalArgumentException("userId must not be blank when publishing to user subject");
+        }
         publish(format(USER_TOPIC_TEMPLATE, userId), notification);
     }
 
     public void publishToMachine(String machineId, Notification notification) {
+        if (isBlank(machineId)) {
+            throw new IllegalArgumentException("machineId must not be blank when publishing to machine subject");
+        }
         publish(format(MACHINE_TOPIC_TEMPLATE, machineId), notification);
     }
 

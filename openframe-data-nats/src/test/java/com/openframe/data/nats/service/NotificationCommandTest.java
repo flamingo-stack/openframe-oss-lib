@@ -141,6 +141,38 @@ class NotificationCommandTest {
     }
 
     @Test
+    @DisplayName("Given an adminAudience set containing a blank string, when build() runs, then IllegalArgumentException is raised — blank ids would propagate to NATS subjects like `user..notification`")
+    void blank_admin_audience_entry_rejected() {
+        Set<String> withBlank = new HashSet<>();
+        withBlank.add("admin-1");
+        withBlank.add("   ");
+        assertThatThrownBy(() -> NotificationCommand.builder()
+                .title("X")
+                .severity(NotificationSeverity.INFO)
+                .context(genericContext("X"))
+                .adminAudience(withBlank)
+                .build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("adminAudience");
+    }
+
+    @Test
+    @DisplayName("Given a machineAudience set containing a blank string, when build() runs, then IllegalArgumentException is raised — same invariant as adminAudience, applied to machine subjects")
+    void blank_machine_audience_entry_rejected() {
+        Set<String> withBlank = new HashSet<>();
+        withBlank.add("m-1");
+        withBlank.add("");
+        assertThatThrownBy(() -> NotificationCommand.builder()
+                .title("X")
+                .severity(NotificationSeverity.INFO)
+                .context(genericContext("X"))
+                .machineAudience(withBlank)
+                .build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("machineAudience");
+    }
+
+    @Test
     @DisplayName("Given null adminAudience and a non-empty machineAudience, when build() runs, then it does not NPE and adminAudience normalizes to an empty set")
     void null_audience_normalizes_to_empty() {
         NotificationCommand cmd = NotificationCommand.builder()

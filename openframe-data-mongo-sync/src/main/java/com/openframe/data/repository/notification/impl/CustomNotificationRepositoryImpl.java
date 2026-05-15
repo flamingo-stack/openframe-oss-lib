@@ -5,8 +5,10 @@ import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.repository.notification.CustomNotificationRepository;
+import com.openframe.data.repository.notification.NotificationPage;
 import com.openframe.data.repository.notification.NotificationWithStatus;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.bson.types.ObjectId;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -19,6 +21,7 @@ import java.util.regex.Pattern;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
+@Slf4j
 @Repository
 @RequiredArgsConstructor
 public class CustomNotificationRepositoryImpl implements CustomNotificationRepository {
@@ -32,41 +35,46 @@ public class CustomNotificationRepositoryImpl implements CustomNotificationRepos
 
     private static final int SEARCH_MIN_BATCH = 64;
     private static final int SEARCH_BATCH_MULTIPLIER = 4;
+    private static final int SEARCH_MAX_BATCH = 1024;
     private static final int SEARCH_MAX_ITERATIONS = 10;
 
     private final MongoTemplate mongoTemplate;
 
     @Override
-    public List<NotificationWithStatus> findPageForRecipient(String recipientId, RecipientType recipientType,
-                                                             Boolean readFilter, String search,
-                                                             String cursor, boolean backward, int limit) {
+    public NotificationPage findPageForRecipient(String recipientId, RecipientType recipientType,
+                                                 Boolean readFilter, String search,
+                                                 String cursor, boolean backward, int limit) {
         if (isBlank(search)) {
             return findPageNoSearch(recipientId, recipientType, readFilter, cursor, backward, limit);
         }
         return findPageStreamingSearch(recipientId, recipientType, readFilter, search, cursor, backward, limit);
     }
 
-    private List<NotificationWithStatus> findPageNoSearch(String recipientId, RecipientType recipientType,
-                                                          Boolean readFilter, String cursor,
-                                                          boolean backward, int limit) {
+    private NotificationPage findPageNoSearch(String recipientId, RecipientType recipientType,
+                                              Boolean readFilter, String cursor,
+                                              boolean backward, int limit) {
         LinkedHashMap<String, ReadStatus> idsToStatus = fetchReadStatesBatch(
                 recipientId, recipientType, readFilter, cursor, backward, limit);
         if (idsToStatus.isEmpty()) {
-            return List.of();
+            return NotificationPage.of(List.of());
         }
-        return fetchNotificationsPreservingOrder(idsToStatus, null);
+        return NotificationPage.of(fetchNotificationsPreservingOrder(idsToStatus, null));
     }
 
-    private List<NotificationWithStatus> findPageStreamingSearch(String recipientId, RecipientType recipientType,
-                                                                 Boolean readFilter, String search,
-                                                                 String cursor, boolean backward, int limit) {
+    private NotificationPage findPageStreamingSearch(String recipientId, RecipientType recipientType,
+                                                     Boolean readFilter, String search,
+                                                     String cursor, boolean backward, int limit) {
         List<NotificationWithStatus> collected = new ArrayList<>(limit);
         String iterCursor = cursor;
-        int batchSize = Math.max(limit * SEARCH_BATCH_MULTIPLIER, SEARCH_MIN_BATCH);
+        int batchSize = Math.clamp((long) limit * SEARCH_BATCH_MULTIPLIER, SEARCH_MIN_BATCH, SEARCH_MAX_BATCH);
+        boolean readStatesExhausted = false;
+        int iterationsConsumed = 0;
         for (int iter = 0; iter < SEARCH_MAX_ITERATIONS && collected.size() < limit; iter++) {
+            iterationsConsumed = iter + 1;
             LinkedHashMap<String, ReadStatus> batch = fetchReadStatesBatch(
                     recipientId, recipientType, readFilter, iterCursor, backward, batchSize);
             if (batch.isEmpty()) {
+                readStatesExhausted = true;
                 break;
             }
             List<NotificationWithStatus> matched = fetchNotificationsPreservingOrder(batch, search);
@@ -77,15 +85,25 @@ public class CustomNotificationRepositoryImpl implements CustomNotificationRepos
                 }
             }
             if (batch.size() < batchSize) {
+                readStatesExhausted = true;
                 break;
             }
             String last = lastKey(batch);
             if (last == null || last.equals(iterCursor)) {
+                readStatesExhausted = true;
                 break;
             }
             iterCursor = last;
+            batchSize = Math.min(batchSize * 2, SEARCH_MAX_BATCH);
         }
-        return collected;
+        if (!readStatesExhausted && collected.size() < limit) {
+            log.warn("Notification search exhausted iteration cap before filling page "
+                            + "(recipientId={}, recipientType={}, search='{}', collected={}, limit={}, lastCursor={}); "
+                            + "returning truncated page with resumeCursor so caller can continue.",
+                    recipientId, recipientType, search, collected.size(), limit, iterCursor);
+            return NotificationPage.truncated(collected, iterCursor, iterationsConsumed);
+        }
+        return NotificationPage.streamed(collected, iterationsConsumed);
     }
 
     private LinkedHashMap<String, ReadStatus> fetchReadStatesBatch(String recipientId, RecipientType recipientType,

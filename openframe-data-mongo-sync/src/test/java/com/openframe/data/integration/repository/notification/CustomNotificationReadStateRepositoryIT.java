@@ -12,6 +12,7 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.index.MongoPersistentEntityIndexResolver;
 
 import java.util.List;
 import java.util.Map;
@@ -40,6 +41,10 @@ class CustomNotificationReadStateRepositoryIT extends BaseMongoIntegrationTest {
     void resetCollections() {
         mongoTemplate.dropCollection(Notification.class);
         mongoTemplate.dropCollection(NotificationReadState.class);
+        var indexOps = mongoTemplate.indexOps(NotificationReadState.class);
+        new MongoPersistentEntityIndexResolver(mongoTemplate.getConverter().getMappingContext())
+                .resolveIndexFor(NotificationReadState.class)
+                .forEach(indexOps::ensureIndex);
     }
 
     @Nested
@@ -75,6 +80,29 @@ class CustomNotificationReadStateRepositoryIT extends BaseMongoIntegrationTest {
         void empty_set_noop() {
             repository.createForAudience("notif-1", "T", U, Set.of());
             assertThat(mongoTemplate.findAll(NotificationReadState.class)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Given existing rows for ALICE+BOB on notif-1, when createForAudience is called again with ALICE+CAROL, then the duplicate ALICE row is swallowed (MongoBulkWriteException with code 11000) and only CAROL is inserted — broadcast retries stay idempotent")
+        void duplicate_recipients_idempotent_inserts_only_new() {
+            repository.createForAudience("notif-1", "T", U, Set.of(ALICE, BOB));
+
+            repository.createForAudience("notif-1", "T", U, Set.of(ALICE, "user-carol"));
+
+            List<NotificationReadState> rows = mongoTemplate.findAll(NotificationReadState.class);
+            assertThat(rows).hasSize(3);
+            assertThat(rows).extracting(NotificationReadState::getRecipientId)
+                    .containsExactlyInAnyOrder(ALICE, BOB, "user-carol");
+        }
+
+        @Test
+        @DisplayName("Given identical recipient set inserted twice for the same notificationId, when createForAudience is called the second time, then no exception is thrown and row count stays at the audience size — full overlap is also idempotent")
+        void full_overlap_idempotent_noop() {
+            repository.createForAudience("notif-1", "T", U, Set.of(ALICE, BOB));
+
+            repository.createForAudience("notif-1", "T", U, Set.of(ALICE, BOB));
+
+            assertThat(mongoTemplate.findAll(NotificationReadState.class)).hasSize(2);
         }
     }
 

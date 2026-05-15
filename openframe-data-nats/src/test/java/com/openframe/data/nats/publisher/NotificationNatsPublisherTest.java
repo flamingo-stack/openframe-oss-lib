@@ -66,6 +66,26 @@ class NotificationNatsPublisherTest {
     }
 
     @Test
+    @DisplayName("Given a blank userId, when publishToUser is called, then IllegalArgumentException is raised before any broker call — blank ids would produce malformed subject `user..notification`")
+    void blank_user_id_rejected() {
+        Notification notification = persistedNotification();
+        assertThatThrownBy(() -> publisher.publishToUser("   ", notification))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("userId");
+        verifyNoInteractions(messagePublisher);
+    }
+
+    @Test
+    @DisplayName("Given a blank machineId, when publishToMachine is called, then IllegalArgumentException is raised before any broker call — same invariant as publishToUser")
+    void blank_machine_id_rejected() {
+        Notification notification = persistedNotification();
+        assertThatThrownBy(() -> publisher.publishToMachine("", notification))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("machineId");
+        verifyNoInteractions(messagePublisher);
+    }
+
+    @Test
     @DisplayName("Given a notification without an id, when publishToUser is called, then IllegalArgumentException is raised before any broker call — caller must save() first")
     void unpersisted_notification_throws_before_broker() {
         Notification unpersisted = Notification.builder()

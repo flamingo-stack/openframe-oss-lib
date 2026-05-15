@@ -7,8 +7,10 @@ import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.integration.BaseMongoIntegrationTest;
 import com.openframe.data.integration.support.IntegrationTestApplication;
 import com.openframe.data.integration.support.NotificationFixtures;
+import com.openframe.data.repository.notification.NotificationPage;
 import com.openframe.data.repository.notification.NotificationRepository;
 import com.openframe.data.repository.notification.NotificationWithStatus;
+import org.bson.types.ObjectId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -50,7 +52,7 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
     void given_no_cursor_returns_descending() {
         List<Notification> seeded = seedSequentialForRecipient(ALICE, U, 5);
 
-        List<NotificationWithStatus> page = repository.findPageForRecipient(ALICE, U, null, null, null, false, 10);
+        List<NotificationWithStatus> page = page(ALICE, U, null, null, null, false, 10);
 
         assertThat(page).hasSize(5);
         assertThat(page.get(0).notification().getId()).isEqualTo(seeded.get(4).getId());
@@ -64,7 +66,7 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
         List<Notification> seeded = seedSequentialForRecipient(ALICE, U, 5);
         String cursor = seeded.get(2).getId();
 
-        List<NotificationWithStatus> page = repository.findPageForRecipient(ALICE, U, null, null, cursor, false, 10);
+        List<NotificationWithStatus> page = page(ALICE, U, null, null, cursor, false, 10);
 
         assertThat(page).extracting(it -> it.notification().getId())
                 .containsExactly(seeded.get(1).getId(), seeded.get(0).getId());
@@ -76,7 +78,7 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
         List<Notification> seeded = seedSequentialForRecipient(ALICE, U, 5);
         String cursor = seeded.get(2).getId();
 
-        List<NotificationWithStatus> page = repository.findPageForRecipient(ALICE, U, null, null, cursor, true, 10);
+        List<NotificationWithStatus> page = page(ALICE, U, null, null, cursor, true, 10);
 
         assertThat(page).extracting(it -> it.notification().getId())
                 .containsExactlyInAnyOrder(seeded.get(3).getId(), seeded.get(4).getId());
@@ -88,7 +90,7 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
         seedSequentialForRecipient(ALICE, U, 3);
         seedSequentialForRecipient(BOB, U, 3);
 
-        List<NotificationWithStatus> alicePage = repository.findPageForRecipient(ALICE, U, null, null, null, false, 10);
+        List<NotificationWithStatus> alicePage = page(ALICE, U, null, null, null, false, 10);
         assertThat(alicePage).hasSize(3);
     }
 
@@ -99,21 +101,21 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
         seedSequentialForRecipient(sharedId, U, 2);
         seedSequentialForRecipient(sharedId, M, 3);
 
-        assertThat(repository.findPageForRecipient(sharedId, U, null, null, null, false, 10)).hasSize(2);
-        assertThat(repository.findPageForRecipient(sharedId, M, null, null, null, false, 10)).hasSize(3);
+        assertThat(page(sharedId, U, null, null, null, false, 10)).hasSize(2);
+        assertThat(page(sharedId, M, null, null, null, false, 10)).hasSize(3);
     }
 
     @Test
     @DisplayName("Given more rows than the requested limit, when listing for the recipient, then only `limit` rows come back")
     void limit_honored() {
         seedSequentialForRecipient(ALICE, U, 10);
-        assertThat(repository.findPageForRecipient(ALICE, U, null, null, null, false, 4)).hasSize(4);
+        assertThat(page(ALICE, U, null, null, null, false, 4)).hasSize(4);
     }
 
     @Test
     @DisplayName("Given no read_state rows for the recipient, when listing, then an empty page is returned")
     void empty_when_no_rows() {
-        assertThat(repository.findPageForRecipient("ghost", U, null, null, null, false, 10)).isEmpty();
+        assertThat(page("ghost", U, null, null, null, false, 10)).isEmpty();
     }
 
     @Test
@@ -124,7 +126,7 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
         seedReadState(ALICE, U, a.getId(), ReadStatus.UNREAD);
         seedReadState(ALICE, U, b.getId(), ReadStatus.DELETED);
 
-        List<NotificationWithStatus> page = repository.findPageForRecipient(ALICE, U, null, null, null, false, 10);
+        List<NotificationWithStatus> page = page(ALICE, U, null, null, null, false, 10);
         assertThat(page).extracting(it -> it.notification().getId()).containsExactly(a.getId());
     }
 
@@ -136,7 +138,7 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
         seedReadState(ALICE, U, a.getId(), ReadStatus.UNREAD);
         seedReadState(ALICE, U, b.getId(), ReadStatus.READ);
 
-        List<NotificationWithStatus> page = repository.findPageForRecipient(ALICE, U, true, null, null, false, 10);
+        List<NotificationWithStatus> page = page(ALICE, U, true, null, null, false, 10);
         assertThat(page).hasSize(1);
         assertThat(page.get(0).notification().getId()).isEqualTo(b.getId());
         assertThat(page.get(0).status()).isEqualTo(ReadStatus.READ);
@@ -150,7 +152,7 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
         seedReadState(ALICE, U, a.getId(), ReadStatus.UNREAD);
         seedReadState(ALICE, U, b.getId(), ReadStatus.READ);
 
-        List<NotificationWithStatus> page = repository.findPageForRecipient(ALICE, U, false, null, null, false, 10);
+        List<NotificationWithStatus> page = page(ALICE, U, false, null, null, false, 10);
         assertThat(page).hasSize(1);
         assertThat(page.get(0).notification().getId()).isEqualTo(a.getId());
         assertThat(page.get(0).status()).isEqualTo(ReadStatus.UNREAD);
@@ -165,7 +167,7 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
         seedReadState(ALICE, U, welcome.getId(), ReadStatus.UNREAD);
         seedReadState(ALICE, U, alert.getId(), ReadStatus.UNREAD);
 
-        List<NotificationWithStatus> page = repository.findPageForRecipient(ALICE, U, null, "alert", null, false, 10);
+        List<NotificationWithStatus> page = page(ALICE, U, null, "alert", null, false, 10);
         assertThat(page).extracting(it -> it.notification().getId()).containsExactly(alert.getId());
     }
 
@@ -184,7 +186,7 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
             sleepBriefly();
         }
 
-        List<NotificationWithStatus> page = repository.findPageForRecipient(ALICE, U, null, "alert", null, false, 3);
+        List<NotificationWithStatus> page = page(ALICE, U, null, "alert", null, false, 3);
 
         assertThat(page).hasSize(3);
         assertThat(page).allSatisfy(it -> assertThat(it.notification().getTitle()).startsWith("alert"));
@@ -202,10 +204,33 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
             sleepBriefly();
         }
 
-        List<NotificationWithStatus> page = repository.findPageForRecipient(ALICE, U, null, "alert", null, false, 5);
+        List<NotificationWithStatus> page = page(ALICE, U, null, "alert", null, false, 5);
 
         assertThat(page).hasSize(1);
         assertThat(page.get(0).notification().getTitle()).isEqualTo("alert-one");
+    }
+
+    @Test
+    @DisplayName("Given more non-matching read_states than the initial streaming batch (64) with the few matches placed past the first batch window, when listing, then the streaming search grows its batch and still returns every match — guards against the page being silently truncated when matches are sparse and far from the cursor")
+    void search_grows_batch_to_reach_distant_matches() {
+        List<Notification> matching = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            Notification n = repository.save(NotificationFixtures.basic("alert-" + i, "{}"));
+            seedReadState(ALICE, U, n.getId(), ReadStatus.UNREAD);
+            matching.add(n);
+            sleepBriefly();
+        }
+        for (int i = 0; i < 100; i++) {
+            Notification n = repository.save(NotificationFixtures.basic("noise-" + i, "{}"));
+            seedReadState(ALICE, U, n.getId(), ReadStatus.UNREAD);
+            sleepBriefly();
+        }
+
+        List<NotificationWithStatus> page = page(ALICE, U, null, "alert", null, false, 5);
+
+        assertThat(page).hasSize(3);
+        assertThat(page).extracting(it -> it.notification().getId())
+                .containsExactlyInAnyOrderElementsOf(matching.stream().map(Notification::getId).toList());
     }
 
     @Test
@@ -223,16 +248,58 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
             sleepBriefly();
         }
 
-        List<NotificationWithStatus> first = repository.findPageForRecipient(ALICE, U, null, "alert", null, false, 2);
+        List<NotificationWithStatus> first = page(ALICE, U, null, "alert", null, false, 2);
         assertThat(first).hasSize(2);
 
         String cursor = first.get(first.size() - 1).notification().getId();
-        List<NotificationWithStatus> second = repository.findPageForRecipient(ALICE, U, null, "alert", cursor, false, 10);
+        List<NotificationWithStatus> second = page(ALICE, U, null, "alert", cursor, false, 10);
 
         assertThat(second).extracting(it -> it.notification().getId())
                 .doesNotContainAnyElementsOf(first.stream().map(it -> it.notification().getId()).toList());
         assertThat(second).extracting(it -> it.notification().getId())
                 .isSubsetOf(matching.stream().map(Notification::getId).toList());
+    }
+
+    @Test
+    @DisplayName("Given enough non-matching read_state rows to fill all 10 streaming iterations (orphan notificationIds → 0 matches per batch), when search runs, then the result is NotificationPage.truncated with a non-null resumeCursor — replaces the silent undersized page bug")
+    void search_truncated_signals_resume_cursor_when_iter_cap_hit() {
+        int orphanRows = 7200;
+        List<NotificationReadState> rows = new ArrayList<>(orphanRows);
+        for (int i = 0; i < orphanRows; i++) {
+            rows.add(NotificationReadState.builder()
+                    .recipientId(ALICE)
+                    .recipientType(U)
+                    .notificationId(new ObjectId().toHexString())
+                    .status(ReadStatus.UNREAD)
+                    .contextType("test")
+                    .build());
+        }
+        mongoTemplate.insert(rows, NotificationReadState.class);
+
+        NotificationPage result = repository.findPageForRecipient(ALICE, U, null, "doesnotmatch", null, false, 5);
+
+        assertThat(result.searchTruncated()).isTrue();
+        assertThat(result.resumeCursor()).isNotNull();
+        assertThat(result.items()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Given a recipient with a sparse-match search that completes within the iteration cap, when search runs, then NotificationPage is not truncated and resumeCursor is null — sanity check that the truncation flag stays off in the normal happy path")
+    void search_not_truncated_when_matches_found_in_one_iter() {
+        Notification alert = repository.save(NotificationFixtures.basic("alert", "{}"));
+        seedReadState(ALICE, U, alert.getId(), ReadStatus.UNREAD);
+
+        NotificationPage result = repository.findPageForRecipient(ALICE, U, null, "alert", null, false, 10);
+
+        assertThat(result.searchTruncated()).isFalse();
+        assertThat(result.resumeCursor()).isNull();
+        assertThat(result.items()).hasSize(1);
+    }
+
+    private List<NotificationWithStatus> page(String recipientId, RecipientType type,
+                                              Boolean readFilter, String search,
+                                              String cursor, boolean backward, int limit) {
+        return repository.findPageForRecipient(recipientId, type, readFilter, search, cursor, backward, limit).items();
     }
 
     private Notification seedNotification(String type) {

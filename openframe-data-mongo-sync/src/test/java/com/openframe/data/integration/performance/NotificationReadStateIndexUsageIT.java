@@ -118,7 +118,7 @@ class NotificationReadStateIndexUsageIT extends BaseMongoIntegrationTest {
         int limit = 25;
 
         List<NotificationWithStatus> page = notificationRepository.findPageForRecipient(
-                HOT_ADMIN, RecipientType.USER, null, null, null, false, limit);
+                HOT_ADMIN, RecipientType.USER, null, null, null, false, limit).items();
         assertThat(page).hasSize(limit);
 
         Stats stats = MongoExplain.explainFind(mongoTemplate, READS_COLL, readStateAudienceQuery(HOT_ADMIN, RecipientType.USER, limit));
@@ -141,7 +141,7 @@ class NotificationReadStateIndexUsageIT extends BaseMongoIntegrationTest {
         int limit = 25;
 
         List<NotificationWithStatus> page = notificationRepository.findPageForRecipient(
-                HOT_MACHINE, RecipientType.MACHINE, null, null, null, false, limit);
+                HOT_MACHINE, RecipientType.MACHINE, null, null, null, false, limit).items();
         assertThat(page).hasSize(limit);
 
         Stats stats = MongoExplain.explainFind(mongoTemplate, READS_COLL, readStateAudienceQuery(HOT_MACHINE, RecipientType.MACHINE, limit));

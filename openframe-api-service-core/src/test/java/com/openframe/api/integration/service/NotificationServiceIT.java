@@ -10,8 +10,10 @@ import com.openframe.api.integration.support.ServiceIntegrationTestApplication;
 import com.openframe.api.service.NotificationService;
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationReadState;
+import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.service.notification.NotificationReadStateService;
+import org.bson.types.ObjectId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -21,6 +23,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -116,6 +120,55 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
 
         var unreadPage = notificationService.list(ALICE, U, new NotificationFilter(false, null), page10());
         assertThat(unreadPage.getItems()).extracting(NotificationView::getId).containsExactly(n2.getId());
+    }
+
+    @Test
+    @DisplayName("Given a 1-character search term, when list is called, then the search is normalized to no-search (term is too short to be meaningful) and the full page is returned — guards against single-keystroke FE input matching everything via case-insensitive regex")
+    void short_search_normalized_to_no_search() {
+        Notification welcome = mongoTemplate.save(NotificationFixtures.basic("welcome"));
+        Notification alert = mongoTemplate.save(NotificationFixtures.basic("alert"));
+        readStateService.createForAudience(welcome.getId(), "welcome", U, Set.of(ALICE));
+        readStateService.createForAudience(alert.getId(), "alert", U, Set.of(ALICE));
+
+        var page = notificationService.list(ALICE, U, new NotificationFilter(null, "a"), page10());
+
+        assertThat(page.getItems()).extracting(NotificationView::getId)
+                .containsExactlyInAnyOrder(welcome.getId(), alert.getId());
+    }
+
+    @Test
+    @DisplayName("Given a whitespace-only search term, when list is called, then it is normalized to no-search after trim and the full page is returned — pre-fix the raw regex would have searched on the unstripped whitespace")
+    void whitespace_search_normalized_to_no_search() {
+        Notification n = mongoTemplate.save(NotificationFixtures.basic("welcome"));
+        readStateService.createForAudience(n.getId(), "welcome", U, Set.of(ALICE));
+
+        var page = notificationService.list(ALICE, U, new NotificationFilter(null, "   "), page10());
+
+        assertThat(page.getItems()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Given enough orphan read_states to exhaust the streaming search's iteration cap (no matching notifications doc → 0 matches per batch), when list is called with a search term, then PageInfo.hasNextPage=true and endCursor encodes the streaming resumeCursor — caller can keep scrolling even though the page itself is empty (truncation propagates as cursor, not as `false hasNextPage`)")
+    void search_truncation_propagates_to_page_info_with_resume_cursor() {
+        int orphanRows = 7200;
+        List<NotificationReadState> rows = new ArrayList<>(orphanRows);
+        for (int i = 0; i < orphanRows; i++) {
+            rows.add(NotificationReadState.builder()
+                    .recipientId(ALICE)
+                    .recipientType(U)
+                    .notificationId(new ObjectId().toHexString())
+                    .status(ReadStatus.UNREAD)
+                    .contextType("test")
+                    .build());
+        }
+        mongoTemplate.insert(rows, NotificationReadState.class);
+
+        GenericQueryResult<NotificationView> result = notificationService.list(
+                ALICE, U, new NotificationFilter(null, "doesnotmatch"), page10());
+
+        assertThat(result.getItems()).isEmpty();
+        assertThat(result.getPageInfo().isHasNextPage()).isTrue();
+        assertThat(result.getPageInfo().getEndCursor()).isNotNull();
     }
 
     @Test
