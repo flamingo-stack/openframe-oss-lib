@@ -94,6 +94,7 @@ export interface VideoProcessingFields {
  * - product_release: Product release videos with transcription/bites/highlight
  * - marketing_campaign: Marketing campaign content generation (autonomous workflow)
  * - case_study: Case study generation from customer interviews
+ * - onboarding_guide: Step-by-step onboarding guides with optional video walkthrough
  */
 export type VideoProcessingEntityType =
   | 'customer_interview'
@@ -103,3 +104,5 @@ export type VideoProcessingEntityType =
   | 'webinar'
   | 'podcast_episode'
   | 'investor_update'
+  | 'onboarding_guide'
+// Fri May 15 14:58:59 EDT 2026
