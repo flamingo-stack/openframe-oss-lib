@@ -10,7 +10,7 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class TacticalScheduledTask {
+public class TacticalScheduledScript {
 
     private Integer id;
     private String name;
@@ -45,4 +45,6 @@ public class TacticalScheduledTask {
 
     private List<TaskAction> actions;
 
+    @JsonProperty("assigned_agents")
+    private List<AssignedAgent> agents;
 }

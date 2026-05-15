@@ -23,4 +23,6 @@ public interface ToolConnectionRepository extends MongoRepository<ToolConnection
     Optional<ToolConnection> findByMachineIdAndToolType(String machineId, ToolType toolType);
 
     List<ToolConnection> findByToolType(ToolType toolType);
+
+    List<ToolConnection> findByAgentToolIdInAndToolType(List<String> agentToolIds, ToolType toolType);
 }
