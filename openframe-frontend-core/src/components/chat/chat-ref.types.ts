@@ -27,6 +27,13 @@ export interface ChatRef {
   title: string
   /** Resolved external URL — null when the entity has no public link. */
   url: string | null
+  /** Platform that owns the destination at `url` — sourced by the host's
+   *  RAG mapper from the row's `platforms` junction (or the rag-config's
+   *  default). Threaded through to the host's nav hook so the same-app-
+   *  vs-cross-app routing decision is deterministic (no origin guess in
+   *  dev where every platform shares localhost). Null when `url` is
+   *  external/unknown or the mapper didn't supply it (backward-compat). */
+  targetPlatform?: string | null
   /** ISO date for the entity's canonical time. Optional. */
   date?: string
   /** PII-sanitized hover preview text. Optional. */

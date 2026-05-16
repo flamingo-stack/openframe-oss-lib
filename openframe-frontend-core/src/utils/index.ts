@@ -4,7 +4,7 @@ export { cn, formatDate, formatNumber, formatPrice, formatBytes, getAllPlatformB
 export { PLAY_ICON_PATH } from '../components/icons-v2-generated/media-playback/play-icon'
 export { getPlatformAccentColor, getCurrentPlatform, type ColorCategory } from './ods-color-utils'
 export { delay, generateRandomString, truncateString, deepClone, getSlackCommunityJoinUrl } from './common'
-export { getBaseUrl } from '../utils/cn'
+export { getBaseUrl, getPlatformProductionUrl } from '../utils/cn'
 
 export * from './platform-config'
 export * from './os-platforms'
