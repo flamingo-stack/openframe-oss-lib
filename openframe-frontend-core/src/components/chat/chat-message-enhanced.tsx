@@ -31,7 +31,7 @@ function normalizeContent(content: MessageContent): MessageSegment[] {
 }
 
 const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>(
-  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, authorType: authorTypeProp, assistantIcon, chatRefs, renderEntityCard, ...props }, ref) => {
+  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, authorType: authorTypeProp, assistantIcon, chatRefs, renderEntityCard, NavLinkAnchor, ...props }, ref) => {
     const isUser = role === 'user'
     const isError = role === 'error'
     const authorType = authorTypeProp ?? (isUser ? 'user' : assistantType === 'mingo' ? 'mingo' : 'fae')
@@ -182,48 +182,42 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
               return <span className="text-ods-text-primary">{fallbackTitle}</span>
             }
           }
-          // Unified click rule: same-origin → same tab, cross-origin →
-          // new tab. Mirrors the host's `navLinkProps` rule that every
-          // entity card + chip + search result uses, so every clickable
-          // surface (chips, inline cards, chat-markdown links, search
-          // dropdowns, catalog cards) behaves identically — single mental
-          // model. Anchor-only (`#section`) stays in-tab.
+          // Unified click rule — delegated to the host's `NavLinkAnchor`
+          // component. The host wraps its own `useNavLink` hook so EVERY
+          // clickable surface (source chips, inline cards, search rows,
+          // action cards, chat-markdown links) shares the same routing
+          // decision: modifier-clicks pass through, cross-origin → new
+          // tab, in-page doc-tree path → soft swap, same-origin → soft
+          // RSC nav. Single mental model across the app, single source
+          // of truth in the hub.
           //
-          // Cross-origin detection: `new URL(href, location.origin)` —
-          // SSR returns no tab attrs (then rehydrates client-side with
-          // the correct value). Relative paths (starting with `/` but
-          // not `//`) are same-origin by construction.
-          const isAnchorOnly =
-            typeof href === 'string' && href.startsWith('#')
-          let isCrossOrigin = false
+          // Anchor-only links (`#section`) bypass NavLinkAnchor — the
+          // host's router would treat them as navigation, but the user
+          // wants the browser's native scroll-to-anchor behavior.
+          //
+          // When the host has NOT supplied `NavLinkAnchor` (e.g. the
+          // flamingo hero-demo with mock content), fall back to a plain
+          // `<a href>`. No cross-origin sniffing here — the OSS-lib does
+          // not own routing decisions; the host does.
           if (
             typeof href === 'string' &&
-            href.length > 0 &&
-            !isAnchorOnly &&
-            !(href.startsWith('/') && !href.startsWith('//')) &&
-            typeof window !== 'undefined'
+            NavLinkAnchor &&
+            !href.startsWith('#')
           ) {
-            try {
-              const u = new URL(href, window.location.origin)
-              isCrossOrigin = u.origin !== window.location.origin
-            } catch {
-              isCrossOrigin = false
-            }
+            return (
+              <NavLinkAnchor href={href} className={linkClassName} {...rest}>
+                {children}
+              </NavLinkAnchor>
+            )
           }
           return (
-            <a
-              href={href}
-              className={linkClassName}
-              target={isCrossOrigin ? '_blank' : undefined}
-              rel={isCrossOrigin ? 'noopener noreferrer' : undefined}
-              {...rest}
-            >
+            <a href={href} className={linkClassName} {...rest}>
               {children}
             </a>
           )
         },
       }
-    }, [hasMarkerSupport, chatRefs, renderingPlan])
+    }, [hasMarkerSupport, chatRefs, renderingPlan, NavLinkAnchor])
 
     const getAvatarProps = () => {
       const displayName = name || (isUser ? "User" : assistantType === 'mingo' ? "Mingo" : "Fae")
@@ -435,7 +429,8 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     // Without this check, a parent re-render with a new (but equivalent)
     // refs object would force a full markdown re-render every keystroke.
     prevProps.chatRefs === nextProps.chatRefs &&
-    prevProps.renderEntityCard === nextProps.renderEntityCard
+    prevProps.renderEntityCard === nextProps.renderEntityCard &&
+    prevProps.NavLinkAnchor === nextProps.NavLinkAnchor
   )
 })
 

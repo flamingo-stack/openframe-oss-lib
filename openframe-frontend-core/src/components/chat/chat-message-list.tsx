@@ -74,6 +74,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       isFetchingNextPage,
       onLoadMore,
       renderEntityCard,
+      NavLinkAnchor,
       ...props
     },
     ref,
@@ -319,6 +320,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                 assistantIcon={message.role !== 'user' ? assistantIcon : undefined}
                 chatRefs={message.chatRefs}
                 renderEntityCard={renderEntityCard}
+                NavLinkAnchor={NavLinkAnchor}
               />
             ))}
           </div>
@@ -363,6 +365,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
               showAvatar={showAvatars}
               assistantType={assistantType}
               assistantIcon={assistantIcon}
+              NavLinkAnchor={NavLinkAnchor}
               className="py-3"
             />
           </div>

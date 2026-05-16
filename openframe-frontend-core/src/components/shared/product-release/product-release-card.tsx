@@ -17,6 +17,25 @@ import { cn } from '../../../utils/cn'
  */
 export type ProductReleaseCardSize = 'default' | 'sm'
 
+/**
+ * Minimal structural `<a>` prop bundle the consumer composes (typically
+ * via the hub's `useNavLink` hook — single source of truth for click
+ * routing). Kept structural here so the OSS lib has zero hub coupling;
+ * the consumer's `NavLinkProps` is type-compatible by shape.
+ *
+ * When supplied, the outer element renders as `<a {...anchorProps}>` so
+ * the SAME routing decision (modifier-click → browser default, cross-
+ * origin → new tab, same-origin → `router.push`) runs identically to
+ * every other entity card. When absent, the legacy `onClick` branch is
+ * used (back-compat for the public `/releases` page).
+ */
+export interface ProductReleaseCardAnchorProps {
+  href: string
+  target?: '_blank'
+  rel?: 'noopener noreferrer'
+  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void
+}
+
 export interface ProductReleaseCardProps {
   /** Release title */
   title: string
@@ -26,8 +45,22 @@ export interface ProductReleaseCardProps {
   version: string
   /** Formatted date string for display */
   formattedDate: string
-  /** Click handler for navigation */
+  /**
+   * Legacy click handler — kept for back-compat with public-page callers
+   * (e.g. `/releases` tab) that route via `router.push()` directly. When
+   * `anchorProps` is also supplied, `anchorProps` wins and this is
+   * ignored.
+   */
   onClick?: () => void
+  /**
+   * `<a>` prop bundle from the consumer's `useNavLink` (or equivalent).
+   * When provided, the card's outer element renders as a real anchor so
+   * routing (cross-origin → new tab, same-origin → soft RSC nav,
+   * modifier-click → browser default) is owned by the hook — the card
+   * writes NO click logic of its own. This is the path every other
+   * entity card uses; `onClick` is only kept for the one legacy caller.
+   */
+  anchorProps?: ProductReleaseCardAnchorProps
   /** Additional CSS classes */
   className?: string
   /** Card density. Defaults to `'default'`. */
@@ -40,13 +73,22 @@ export function ProductReleaseCard({
   version,
   formattedDate,
   onClick,
+  anchorProps,
   className,
   size = 'default',
 }: ProductReleaseCardProps) {
   // ----- COMPACT branch (chat / tight surfaces) ------------------------------
-  // Outer must be `<span>` (no `<div>`/`<h3>` allowed inside markdown `<p>`),
-  // so we cannot reuse `InteractiveCard` (a `<div>`). Click handler is wired
-  // directly; keyboard accessibility comes from `role="button"` + `tabIndex`.
+  // Outer must be a phrasing-content element (`<a>` or `<span>`) — block
+  // elements like `<div>`/`<h3>` are illegal inside markdown `<p>`, so we
+  // cannot reuse `InteractiveCard` (a `<div>`).
+  //
+  // - When `anchorProps` is set, render as a real `<a>` so the consumer's
+  //   click hook (`useNavLink`) owns routing identically to every other
+  //   entity card — cross-origin → new tab, same-origin → soft RSC nav.
+  // - Else fall back to legacy `<span role="button">` behavior driven by
+  //   `onClick` (kept for the public `/releases` page caller).
+  // - When neither is set, render a static non-interactive span.
+  //
   // Inner layout mirrors BlogCard/CaseStudyCard compact: 56px square slot +
   // primary text + 1-line meta + optional summary clamp.
   if (size === 'sm') {
@@ -57,31 +99,27 @@ export function ProductReleaseCard({
         onClick()
       }
     }
-    return (
-      <span
-        role={onClick ? 'button' : undefined}
-        tabIndex={onClick ? 0 : undefined}
-        onClick={onClick}
-        onKeyDown={onClick ? handleKey : undefined}
-        className={cn(
-          // The base frame (`my-1.5 flex … no-underline`) mirrors the
-          // hub's `COMPACT_CARD_OUTER` in `components/shared/compact-
-          // card/compact-card-classes.ts` byte-for-byte. The OSS lib
-          // can't import from the consumer, so the two strings are
-          // kept identical by hand — if you edit one, edit the other.
-          //
-          // The interactive branch ADDS `cursor-pointer` + a focus-
-          // visible ring because this outer is a `<span role="button">`
-          // (not an `<a>`), so it needs explicit keyboard-focus
-          // styling that the hub's anchor variants get for free.
-          'my-1.5 flex items-start gap-3 w-full p-2',
-          'rounded-lg border border-ods-border bg-ods-card no-underline',
-          onClick
-            ? 'transition-colors hover:border-ods-text-secondary/40 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent focus-visible:ring-offset-1 focus-visible:ring-offset-ods-card'
-            : 'cursor-default',
-          className,
-        )}
-      >
+    const isInteractive = !!anchorProps || !!onClick
+    const outerClassName = cn(
+      // The base frame (`my-1.5 flex … no-underline`) mirrors the
+      // hub's `COMPACT_CARD_OUTER` in `components/shared/compact-
+      // card/compact-card-classes.ts` byte-for-byte. The OSS lib
+      // can't import from the consumer, so the two strings are
+      // kept identical by hand — if you edit one, edit the other.
+      //
+      // The interactive branch ADDS `cursor-pointer` + a focus-
+      // visible ring. The `<a>` form would normally get focus styling
+      // from the browser, but `no-underline` strips the default
+      // affordance, so explicit ring styles match the `<span role>` form.
+      'my-1.5 flex items-start gap-3 w-full p-2',
+      'rounded-lg border border-ods-border bg-ods-card no-underline',
+      isInteractive
+        ? 'transition-colors hover:border-ods-text-secondary/40 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent focus-visible:ring-offset-1 focus-visible:ring-offset-ods-card'
+        : 'cursor-default',
+      className,
+    )
+    const innerChildren = (
+      <>
         <span className="flex h-14 w-14 aspect-square shrink-0 self-start items-center justify-center rounded-md bg-ods-bg text-ods-accent">
           <Package className="h-5 w-5" />
         </span>
@@ -120,11 +158,87 @@ export function ProductReleaseCard({
             </span>
           </span>
         </span>
+      </>
+    )
+    // Anchor variant — consumer's `useNavLink` (or equivalent) owns the
+    // click decision; the card just spreads the prop bundle and renders
+    // a real `<a>` so cmd/ctrl-click new-tab + middle-click work without
+    // any extra JS. This is the SAME pattern BlogCard / CaseStudyCard /
+    // ProgramCard / etc. use across the consumer codebase.
+    if (anchorProps) {
+      return (
+        <a {...anchorProps} className={outerClassName}>
+          {innerChildren}
+        </a>
+      )
+    }
+    // Legacy fallback — `onClick` (no href). Keeps the public `/releases`
+    // page's existing `router.push(...)` flow working unchanged. When
+    // neither `anchorProps` nor `onClick` is set, renders a static
+    // non-interactive span.
+    return (
+      <span
+        role={onClick ? 'button' : undefined}
+        tabIndex={onClick ? 0 : undefined}
+        onClick={onClick}
+        onKeyDown={onClick ? handleKey : undefined}
+        className={outerClassName}
+      >
+        {innerChildren}
       </span>
     )
   }
 
-  // ----- DEFAULT branch (existing /releases card, unchanged) -----------------
+  // ----- DEFAULT branch (existing /releases card layout) -----------------
+  // When `anchorProps` is supplied, the card behaves like every other
+  // entity card on the related-content rail — real `<a>` with the
+  // consumer's `useNavLink` bundle (cross-origin → new tab, same-origin
+  // → soft RSC nav, modifier-click → browser default). The
+  // `<InteractiveCard onClick>` form remains the back-compat path for
+  // the public `/releases` tab caller which still routes via
+  // `router.push()` directly.
+  if (anchorProps) {
+    return (
+      <a
+        {...anchorProps}
+        className={cn(
+          'bg-ods-card border border-ods-border rounded-[6px]',
+          'flex flex-col md:flex-row',
+          'items-start md:items-center',
+          'gap-3 md:gap-4',
+          'p-4 no-underline',
+          'transition-colors hover:border-ods-text-secondary/40',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent focus-visible:ring-offset-1 focus-visible:ring-offset-ods-card',
+          className,
+        )}
+      >
+        {/* Left column - content */}
+        <div className="flex-1 w-full md:w-auto min-w-0 flex flex-col justify-center gap-2">
+          <div className="min-h-[48px] flex items-center">
+            <h3 className="text-h3 text-ods-text-primary tracking-[-0.36px] line-clamp-2">
+              {title}
+            </h3>
+          </div>
+          <p className="text-h4 text-ods-text-secondary line-clamp-3">
+            {summary || ' '}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 w-full md:w-auto justify-start md:justify-end shrink-0">
+          <div className="w-[200px] flex flex-col justify-center gap-2">
+            <p className="text-h3 text-ods-text-primary tracking-[-0.36px] truncate">
+              {version}
+            </p>
+            <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary truncate">
+              {formattedDate}
+            </p>
+          </div>
+          <div className="flex items-center justify-center p-3 shrink-0">
+            <ChevronRight className="h-6 w-6 text-ods-text-primary" />
+          </div>
+        </div>
+      </a>
+    )
+  }
   return (
     <InteractiveCard
       clickable={true}
