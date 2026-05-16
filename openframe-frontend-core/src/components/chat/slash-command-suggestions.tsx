@@ -83,7 +83,14 @@ export function SlashCommandSuggestions({
           ? resolveSourceIcon(cmd.primarySourceId)
           : undefined
         const Icon = meta?.Icon
-        const sourceLabel = meta?.label
+        // Display label priority:
+        //   1. `cmd.label` — the DB-projected per-command label (e.g.
+        //      "My Tickets", "OpenFrame Commits"). Same field that
+        //      drives the empty-state chip title — single source of
+        //      truth so the dropdown row and the chip never drift.
+        //   2. `meta.label` — fallback from `resolveSourceIcon` for
+        //      legacy command summaries that don't carry a `label`.
+        const sourceLabel = cmd.label ?? meta?.label
         const isHighlighted = idx === highlightedIdx
         return (
           <div

@@ -118,14 +118,17 @@ export interface ChatMessageListRef {
  *  affordances. The host (e.g. multi-platform-hub) owns the mapping
  *  from id → input-buffer mutation:
  *
- *   - `browse` : submit `/<id>` bare → top-N items / canonical doc.
- *   - `search` : prefill `/<id> ` → user types FTS query.
- *   - `find`   : prefill `/<id> ""` (cursor between quotes) → singular
- *                lookup (ILIKE).
+ *   - `browse`  : submit `/<id>` bare → top-N items / canonical doc.
+ *   - `search`  : prefill `/<id> ` → user types FTS query.
+ *   - `find`    : prefill `/<id> ""` (cursor between quotes) → singular
+ *                 lookup (ILIKE).
+ *   - `display` : prefill `/<id> display ""` (cursor between quotes) →
+ *                 server-side intercept reads the matched row's raw
+ *                 markdown body verbatim into the chat (no LLM turn).
  *
  *  Mirrors the server-side `SlashCommandActionId` union; kept as a
  *  string-literal union (not enum) so JSON wire shape is stable. */
-export type SlashCommandActionId = 'browse' | 'search' | 'find'
+export type SlashCommandActionId = 'browse' | 'search' | 'find' | 'display'
 
 /** Resolved action affordance — `label` is ALWAYS populated by the
  *  server (override OR default). The OSS-lib renders directly without
@@ -145,10 +148,16 @@ export interface SlashCommandSummary {
   argumentHint?: string
   /** Opaque source id (e.g. `'podcasts'`, `'clickup-roadmap'`) — resolved
    *  by the consumer-provided `resolveSourceIcon` callback into an icon
-   *  + label so the autocomplete row carries the same visual identity as
-   *  the empty-state chip. When the resolver returns undefined OR this
+   *  so the autocomplete row carries the same visual identity as the
+   *  empty-state chip. When the resolver returns undefined OR this
    *  field is missing, the row renders without an icon (fallback). */
   primarySourceId?: string
+  /** Human-readable command label (e.g. "My Tickets", "Product Releases").
+   *  When set, the dropdown row renders this as the bold heading instead
+   *  of the raw `primarySourceId` slug. Single source of truth: same
+   *  field that backs the empty-state chip's title. Falls back to the
+   *  `primarySourceId` slug when undefined. */
+  label?: string
   /** Action affordances declared by the server-side registry. The
    *  dropdown row renders one button per entry, in array order. Empty
    *  array = no buttons (degenerate; servers should always declare
@@ -166,21 +175,20 @@ export interface SlashCommandSourceMeta {
 }
 
 export interface SlashCommandsProp {
-  /** DocSource identifier for the registry lookup. Kept as a plain string so
-   *  the OSS lib doesn't import hub-internal types. */
-  source: string
   /** Server-side fetch — typically wraps `GET /api/docs/commands`. The hub
-   *  provides this; the OSS-lib has no knowledge of hub route paths. */
+   *  provides this; the OSS-lib has no knowledge of hub route paths. The
+   *  chat source is resolved server-side from the calling deployment, so
+   *  this callback does NOT take a `source` parameter — passing one would
+   *  let a tampered client request a different platform's commands. */
   fetchCommands: (
-    source: string,
     prefix: string,
     signal?: AbortSignal,
   ) => Promise<SlashCommandSummary[]>
   /** Optional: resolve a `primarySourceId` to an icon + label pair so the
    *  autocomplete row carries the same visual identity as the empty-state
-   *  chip for that source. Hub provides this by looking up
-   *  `RAG_SOURCE_DISPLAY[sourceId]`. Returns undefined for unknown ids;
-   *  the row falls back to no-icon rendering. */
+   *  chip for that source. The host provides this by looking up the
+   *  table's icon name and resolving to a React component. Returns
+   *  undefined for unknown ids; the row falls back to no-icon rendering. */
   resolveSourceIcon?: (sourceId: string) => SlashCommandSourceMeta | undefined
   /** Generic action handler — fires when the user clicks any of the
    *  command's declared action buttons (Recent / Search / Find / …).

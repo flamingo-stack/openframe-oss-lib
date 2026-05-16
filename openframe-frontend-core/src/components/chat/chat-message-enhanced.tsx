@@ -182,19 +182,40 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
               return <span className="text-ods-text-primary">{fallbackTitle}</span>
             }
           }
-          // Chat-context links ALWAYS open in a new tab — same rule
-          // every chat-inline entity card uses via `navLinkProps({
-          // alwaysNewTab: true })`. The user's CURRENT context is the
-          // conversation; navigating away in-place would unmount the
-          // chat and lose the thread. Applies to absolute (http) AND
-          // relative (`/foo/bar`) hrefs so the rule is one line, not
-          // a branching check.
+          // Unified click rule: same-origin → same tab, cross-origin →
+          // new tab. Mirrors the host's `navLinkProps` rule that every
+          // entity card + chip + search result uses, so every clickable
+          // surface (chips, inline cards, chat-markdown links, search
+          // dropdowns, catalog cards) behaves identically — single mental
+          // model. Anchor-only (`#section`) stays in-tab.
+          //
+          // Cross-origin detection: `new URL(href, location.origin)` —
+          // SSR returns no tab attrs (then rehydrates client-side with
+          // the correct value). Relative paths (starting with `/` but
+          // not `//`) are same-origin by construction.
+          const isAnchorOnly =
+            typeof href === 'string' && href.startsWith('#')
+          let isCrossOrigin = false
+          if (
+            typeof href === 'string' &&
+            href.length > 0 &&
+            !isAnchorOnly &&
+            !(href.startsWith('/') && !href.startsWith('//')) &&
+            typeof window !== 'undefined'
+          ) {
+            try {
+              const u = new URL(href, window.location.origin)
+              isCrossOrigin = u.origin !== window.location.origin
+            } catch {
+              isCrossOrigin = false
+            }
+          }
           return (
             <a
               href={href}
               className={linkClassName}
-              target={typeof href === 'string' && href.length > 0 ? '_blank' : undefined}
-              rel={typeof href === 'string' && href.length > 0 ? 'noopener noreferrer' : undefined}
+              target={isCrossOrigin ? '_blank' : undefined}
+              rel={isCrossOrigin ? 'noopener noreferrer' : undefined}
               {...rest}
             >
               {children}
