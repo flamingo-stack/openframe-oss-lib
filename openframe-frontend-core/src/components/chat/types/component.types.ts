@@ -78,6 +78,28 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
    * back to plain text title-only.
    */
   renderEntityCard?: (reference: ChatRef) => React.ReactNode
+  /**
+   * Host-provided anchor component for markdown links. When supplied, the
+   * `<a>` override in the markdown renderer delegates to this component
+   * so the host's unified click rule (e.g. `useNavLink`) owns routing
+   * for every link in the message — same-origin → soft RSC nav,
+   * cross-origin → new tab, modifier-clicks defer to the browser.
+   *
+   * Implemented as a component (not a callback) so the host can call its
+   * own routing hooks (`useRouter`, doc-tree context, etc.) inside the
+   * rendered link. When unset, the OSS-lib falls back to a built-in
+   * cross-origin heuristic (same-tab same-origin + `target="_blank"`
+   * cross-origin) — duplicated logic, kept for back-compat with hosts
+   * that haven't migrated to the prop yet.
+   *
+   * `card://` markers are still intercepted by the override BEFORE this
+   * component runs, so the host need not handle them.
+   */
+  NavLinkAnchor?: React.ComponentType<{
+    href: string
+    className?: string
+    children?: React.ReactNode
+  } & Record<string, unknown>>
 }
 
 // ========== Chat Message List Props ==========
@@ -104,6 +126,14 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
   /** Host-provided renderer for inline entity cards. Forwarded verbatim
    *  to every message's ChatMessageEnhanced. v6.1 §B.2.7. */
   renderEntityCard?: (reference: ChatRef) => React.ReactNode
+  /** Host-provided anchor for markdown links. Forwarded verbatim to every
+   *  message's ChatMessageEnhanced. Owns the unified click rule
+   *  (same-origin soft nav, cross-origin new tab). */
+  NavLinkAnchor?: React.ComponentType<{
+    href: string
+    className?: string
+    children?: React.ReactNode
+  } & Record<string, unknown>>
 }
 
 export interface ChatMessageListRef {
