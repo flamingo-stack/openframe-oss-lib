@@ -152,11 +152,12 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
       const ctrl = new AbortController()
       const handle = setTimeout(async () => {
         try {
-          const next = await slashCommands.fetchCommands(
-            slashCommands.source,
-            slashPrefix,
-            ctrl.signal,
-          )
+          // `fetchCommands` resolves the chat source server-side from
+          // the calling deployment's `NEXT_PUBLIC_APP_TYPE` (via
+          // `getCurrentChatSource()` in the host's route base). No
+          // `source` argument crosses the wire — preventing cross-
+          // platform command enumeration from the autocomplete path.
+          const next = await slashCommands.fetchCommands(slashPrefix, ctrl.signal)
           if (!cancelled) {
             setSlashSuggestions(next)
             setHighlightedIdx(0)
