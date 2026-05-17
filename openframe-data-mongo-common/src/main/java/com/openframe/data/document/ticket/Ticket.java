@@ -27,27 +27,18 @@ import java.time.Instant;
 @AllArgsConstructor
 @Document(collection = "tickets")
 @CompoundIndexes({
-        // TODO(lifecycle-rollout): drop status_created/assignee_status/organization_status/device_status indexes after legacy `status` field removal
-        @CompoundIndex(name = "status_created", def = "{'status': 1, 'createdAt': -1}"),
-        @CompoundIndex(name = "assignee_status", def = "{'assignedTo': 1, 'status': 1}"),
-        @CompoundIndex(name = "organization_status", def = "{'organizationId': 1, 'status': 1}"),
-        @CompoundIndex(name = "device_status", def = "{'deviceId': 1, 'status': 1}"),
-        @CompoundIndex(name = "tenant_status_kind_created",
-                def = "{'tenantId': 1, 'statusKind': 1, 'createdAt': -1}"),
-        @CompoundIndex(name = "tenant_assignee_status_kind",
-                def = "{'tenantId': 1, 'assignedTo': 1, 'statusKind': 1}"),
-        @CompoundIndex(name = "tenant_org_status_kind",
-                def = "{'tenantId': 1, 'organizationId': 1, 'statusKind': 1}"),
-        @CompoundIndex(name = "tenant_device_status_kind",
-                def = "{'tenantId': 1, 'deviceId': 1, 'statusKind': 1}"),
-        @CompoundIndex(name = "tenant_status_id",
-                def = "{'tenantId': 1, 'statusId': 1}")
+        // TODO(lifecycle-rollout): drop legacy status_order index after `status` field removal
+        @CompoundIndex(name = "status_order", def = "{'status': 1, 'order': 1}"),
+        @CompoundIndex(name = "tenant_status_kind", def = "{'tenantId': 1, 'statusKind': 1}"),
+        @CompoundIndex(name = "tenant_status_id_order", def = "{'tenantId': 1, 'statusId': 1, 'order': 1}"),
+        @CompoundIndex(name = "tenant_assignedTo", def = "{'tenantId': 1, 'assignedTo': 1}"),
+        @CompoundIndex(name = "tenant_organizationId", def = "{'tenantId': 1, 'organizationId': 1}"),
+        @CompoundIndex(name = "tenant_deviceId", def = "{'tenantId': 1, 'deviceId': 1}")
 })
 public class Ticket {
     @Id
     private String id;
 
-    @Indexed
     private String tenantId;
 
     @Indexed(unique = true)
@@ -58,18 +49,14 @@ public class Ticket {
     private String description;
 
     // TODO(lifecycle-rollout): drop legacy status field once all reads/writes use statusKind/statusId
-    @Indexed
     private TicketStatus status;
 
-    @Indexed
     private String statusId;
 
-    @Indexed
     private TicketStatusKind statusKind;
 
     private boolean aiDisabled;
 
-    @Indexed
     private TicketCreationSource creationSource;
 
     private TicketOwner owner;
@@ -89,7 +76,6 @@ public class Ticket {
     private String assignedTo;
     private String assignedName;
 
-    @Indexed
     private String order;
 
     @CreatedDate
