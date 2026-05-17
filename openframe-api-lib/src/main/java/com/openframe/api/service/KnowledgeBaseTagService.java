@@ -28,7 +28,14 @@ public class KnowledgeBaseTagService {
     private final TagAssignmentRepository tagAssignmentRepository;
 
     public List<Tag> getAllTags() {
-        return tagRepository.findByEntityType(ENTITY_TYPE);
+        Set<String> assignedTagIds = tagAssignmentRepository
+                .findByEntityType(ENTITY_TYPE)
+                .stream()
+                .map(TagAssignment::getTagId)
+                .collect(Collectors.toSet());
+        return assignedTagIds.isEmpty()
+                ? List.of()
+                : tagRepository.findAllById(assignedTagIds);
     }
 
     public List<Tag> getTagsForItemIds(List<String> itemIds) {

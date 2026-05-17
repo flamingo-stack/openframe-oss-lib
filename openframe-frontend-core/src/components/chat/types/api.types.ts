@@ -5,7 +5,7 @@
 
 import type { ChunkData, NatsMessageType, FetchChunksFunction } from './network.types'
 import type { ChatType, ChatApprovalStatus } from './chat.types'
-import type { MessageSegment, PendingToolCallData, TokenUsageData } from './message.types'
+import type { MessageSegment, PendingToolCallData, TokenUsageData, ExecutingToolState } from './message.types'
 
 // ========== Hook Options ==========
 
@@ -150,7 +150,7 @@ export interface UseRealtimeChunkProcessorOptions {
     /** Pending approvals that haven't been resolved */
     pendingApprovals?: Map<string, { command: string; explanation?: string; approvalType: string }>
     /** Executing tools waiting for completion */
-    executingTools?: Map<string, { integratedToolType: string; toolFunction: string; parameters?: Record<string, any> }>
+    executingTools?: Map<string, ExecutingToolState>
     /** Escalated approvals */
     escalatedApprovals?: Map<
       string,

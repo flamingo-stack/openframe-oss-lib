@@ -46,8 +46,18 @@ export interface SearchInputProps {
   results?: SearchResult[]
   /** Whether results are loading */
   isLoading?: boolean
-  /** Called when a result row is selected */
-  onResultSelect?: (result: SearchResult) => void
+  /** Called when a result row is selected.
+   *
+   *  `modifiers` carries the click event's modifier-key state when the
+   *  user picked the row via mouse — pass through so the consumer can
+   *  honor cmd/ctrl/shift/middle-click for background-tab navigation
+   *  (the row is a `<div role="option">` rather than an `<a>`, so the
+   *  browser doesn't background-tab natively even with `target="_blank"`).
+   *  Empty `{}` when the row was selected via keyboard Enter. */
+  onResultSelect?: (
+    result: SearchResult,
+    modifiers?: { metaKey?: boolean; ctrlKey?: boolean; shiftKey?: boolean; altKey?: boolean; button?: number },
+  ) => void
   /** Debounce delay in ms. 0 disables debounce. Default 300 */
   debounceMs?: number
   /** Custom renderer for a single result row */
@@ -245,8 +255,22 @@ export function SearchInput({
     inputRef.current?.focus()
   }
 
-  const handleResultClick = (result: SearchResult) => {
-    onResultSelect?.(result)
+  const handleResultClick = (
+    result: SearchResult,
+    e?: React.MouseEvent,
+  ) => {
+    onResultSelect?.(
+      result,
+      e
+        ? {
+            metaKey: e.metaKey,
+            ctrlKey: e.ctrlKey,
+            shiftKey: e.shiftKey,
+            altKey: e.altKey,
+            button: e.button,
+          }
+        : undefined,
+    )
     setIsOpen(false)
   }
 
@@ -331,7 +355,7 @@ export function SearchInput({
           isHighlighted && "bg-ods-bg-hover",
           !isHighlighted && "hover:bg-ods-bg-hover"
         )}
-        onClick={() => handleResultClick(result)}
+        onClick={(e) => handleResultClick(result, e)}
         onMouseEnter={() => setHighlightedIndex(index)}
       >
         {renderResult ? renderResult(result, isHighlighted) : defaultRenderResult(result, isHighlighted)}

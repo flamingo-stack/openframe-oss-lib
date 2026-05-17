@@ -35,6 +35,8 @@ export interface ToolExecutionData {
   type: 'EXECUTING_TOOL' | 'EXECUTED_TOOL'
   integratedToolType: string
   toolFunction: string
+  /** Backend-issued human-readable title (mirrors `PendingToolCallData.toolTitle`). */
+  toolTitle?: string
   parameters?: Record<string, any>
   result?: string
   success?: boolean
@@ -44,6 +46,21 @@ export interface ToolExecutionData {
    * matching approval batch row instead of emitting a standalone segment.
    */
   toolExecutionRequestId?: string
+}
+
+/**
+ * Snapshot of an in-flight tool kept between the `EXECUTING_TOOL` and
+ * `EXECUTED_TOOL` events. The backend only sends `toolTitle` on
+ * `EXECUTING_TOOL`; carrying this state lets the accumulator restore it onto
+ * the merged `EXECUTED_TOOL` segment instead of falling back to the raw
+ * `toolFunction`.
+ */
+export interface ExecutingToolState {
+  integratedToolType: string
+  toolFunction: string
+  /** Mirrors {@link ToolExecutionData.toolTitle}; absent on `EXECUTED_TOOL`. */
+  toolTitle?: string
+  parameters?: Record<string, any>
 }
 
 // ========== Approval Request Types ==========
@@ -171,6 +188,8 @@ export interface ExecutingToolMessageData extends MessageDataBase {
   type: 'EXECUTING_TOOL'
   integratedToolType?: string
   toolFunction?: string
+  /** Backend-issued human-readable title (wire field, mirrors `ChunkData.title`). */
+  title?: string
   parameters?: Record<string, any>
   toolExecutionRequestId?: string
 }
@@ -179,6 +198,8 @@ export interface ExecutedToolMessageData extends MessageDataBase {
   type: 'EXECUTED_TOOL'
   integratedToolType?: string
   toolFunction?: string
+  /** Backend-issued human-readable title (wire field, mirrors `ChunkData.title`). */
+  title?: string
   parameters?: Record<string, any>
   result?: string
   success?: boolean

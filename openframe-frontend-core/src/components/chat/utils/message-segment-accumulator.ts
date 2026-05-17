@@ -20,6 +20,7 @@ import type {
   PendingToolCallData,
   AccumulatorState,
   ChatApprovalStatus,
+  ExecutingToolState,
 } from '../types'
 
 export interface AccumulatorCallbacks {
@@ -34,7 +35,7 @@ export interface AccumulatorCallbacks {
 export class MessageSegmentAccumulator {
   private segments: MessageSegment[] = []
   private pendingApprovals: Map<string, PendingApproval> = new Map()
-  private executingTools: Map<string, { integratedToolType: string; toolFunction: string; parameters?: Record<string, any> }> = new Map()
+  private executingTools: Map<string, ExecutingToolState> = new Map()
   private callbacks: AccumulatorCallbacks = {}
 
   constructor(callbacks?: AccumulatorCallbacks) {
@@ -57,7 +58,7 @@ export class MessageSegmentAccumulator {
   initializeWithState(state: {
     existingSegments?: MessageSegment[]
     pendingApprovals?: Map<string, PendingApproval>
-    executingTools?: Map<string, { integratedToolType: string; toolFunction: string; parameters?: Record<string, any> }>
+    executingTools?: Map<string, ExecutingToolState>
   }): void {
     if (state.existingSegments) {
       this.segments = [...state.existingSegments]
@@ -164,6 +165,7 @@ export class MessageSegmentAccumulator {
       this.executingTools.set(toolKey, {
         integratedToolType: toolData.integratedToolType,
         toolFunction: toolData.toolFunction,
+        toolTitle: toolData.toolTitle,
         parameters: toolData.parameters,
       })
       this.segments.push(segment)
@@ -179,10 +181,17 @@ export class MessageSegmentAccumulator {
       )
 
       const executingTool = this.executingTools.get(toolKey)
+      // The backend omits `toolTitle` on EXECUTED_TOOL; restore it from the
+      // paired EXECUTING segment (or its tracked state) so the completed
+      // segment keeps the human-readable title instead of falling back to the
+      // raw `toolFunction`.
+      const existingExecuting =
+        existingIndex !== -1 ? (this.segments[existingIndex] as ToolExecutionSegment) : undefined
       const mergedSegment: ToolExecutionSegment = {
         type: 'tool_execution',
         data: {
           ...toolData,
+          toolTitle: toolData.toolTitle ?? existingExecuting?.data.toolTitle ?? executingTool?.toolTitle,
           parameters: toolData.parameters || executingTool?.parameters,
         }
       }

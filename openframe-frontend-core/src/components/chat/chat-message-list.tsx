@@ -5,7 +5,25 @@ import { useStickToBottom } from "use-stick-to-bottom"
 import { cn } from "../../utils/cn"
 import { ChatMessageEnhanced } from "./chat-message-enhanced"
 import { ChatMessageListSkeleton } from "./chat-message-skeleton"
+import { DotsLoaderIcon } from "../icons-v2-generated"
+import { CyclingPhrase } from "./cycling-phrase"
 import type { ChatMessageListProps } from "./types"
+
+// Flamingo-themed cycling words shown next to the streaming indicator
+// (Claude-Code-style activity hint). Mix of classic AI verbs, flamingo
+// behaviours (strut/wade/preen/flock), and one Mingo neologism.
+const STREAMING_WORDS = [
+  'Thinking',
+  'Vibing',
+  'Mingoing',
+  'Strutting',
+  'Pondering',
+  'Wading',
+  'Hatching',
+  'Preening',
+  'Conjuring',
+  'Riffing',
+] as const
 
 /*
  * Stick-to-bottom: `use-stick-to-bottom` (stackblitz-labs)
@@ -56,6 +74,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       isFetchingNextPage,
       onLoadMore,
       renderEntityCard,
+      NavLinkAnchor,
       ...props
     },
     ref,
@@ -243,6 +262,26 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       contentRef(el)
     }
 
+    // Footer-pinned streaming loader. Rendered OUTSIDE the scroller (a
+    // sibling of the scroll div, like the sticky approvals below) so it
+    // stays put while messages stream and grow — no jitter from the
+    // last-message height changing under it.
+    //
+    // Hidden when the agent is actually PAUSED waiting on the user: the
+    // last message's last segment is a pending approval (inline), or
+    // there are escalated pending approvals shown in the sticky bar.
+    const lastMessage = messages[messages.length - 1]
+    const lastSegments = Array.isArray(lastMessage?.content) ? lastMessage.content : null
+    const lastSegment = lastSegments?.[lastSegments.length - 1]
+    const isPausedOnApproval =
+      !!lastSegment &&
+      (lastSegment.type === 'approval_request' || lastSegment.type === 'approval_batch') &&
+      (lastSegment.status === undefined || lastSegment.status === 'pending')
+    const showStreamingLoader =
+      isTyping &&
+      !isPausedOnApproval &&
+      !(pendingApprovals && pendingApprovals.length > 0)
+
     return (
       <div className="relative flex-1 min-h-0 flex flex-col">
         <div
@@ -281,10 +320,30 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                 assistantIcon={message.role !== 'user' ? assistantIcon : undefined}
                 chatRefs={message.chatRefs}
                 renderEntityCard={renderEntityCard}
+                NavLinkAnchor={NavLinkAnchor}
               />
             ))}
           </div>
         </div>
+
+        {/* Footer-pinned streaming loader — outside the scroller so it
+            doesn't jitter as the streaming message grows. Color is set
+            via inline style (CSS var) rather than a Tailwind class so it
+            is JIT-independent when this lib is consumed via yalc. */}
+        {showStreamingLoader && (
+          <div
+            className={cn(
+              "mx-auto w-full max-w-3xl flex items-center gap-1 py-2",
+              contentClassName || "px-4",
+            )}
+            style={{ color: 'var(--color-text-muted)' }}
+            role="status"
+            aria-live="polite"
+          >
+            <DotsLoaderIcon className="w-6 h-6" />
+            <CyclingPhrase words={STREAMING_WORDS} className="text-sm" />
+          </div>
+        )}
 
         {/* Sticky Pending Approvals — outside the scroller; same
             structure as the v1 baseline. The library's RO watches
@@ -306,6 +365,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
               showAvatar={showAvatars}
               assistantType={assistantType}
               assistantIcon={assistantIcon}
+              NavLinkAnchor={NavLinkAnchor}
               className="py-3"
             />
           </div>

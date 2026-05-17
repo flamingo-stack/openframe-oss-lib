@@ -3,7 +3,7 @@
 import { forwardRef, useState } from "react"
 
 import { cn } from "../../utils/cn"
-import { PulseDots } from "../ui/pulse-dots"
+import { DotsLoaderIcon } from "../icons-v2-generated"
 import { SimpleMarkdownRenderer } from "../ui/simple-markdown-renderer"
 import { ExpandChevron } from "./expand-chevron"
 import { useCollapsible } from "./hooks/use-collapsible"
@@ -97,7 +97,7 @@ const ThinkingDisplay = forwardRef<HTMLDivElement, ThinkingDisplayProps>(
             <span className="text-sm font-medium leading-snug text-ods-text-secondary">
               {label}:
             </span>
-            {isStreaming && <PulseDots size="sm" />}
+            {isStreaming && <DotsLoaderIcon size={16} className="text-ods-text-secondary" />}
           </div>
 
           <div className="flex-1 min-w-0" style={containerStyle}>

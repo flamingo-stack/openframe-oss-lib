@@ -74,6 +74,7 @@ export function parseChunkToAction(chunk: unknown): ParsedChunkAction | null {
             type: 'EXECUTING_TOOL',
             integratedToolType: data.integratedToolType || '',
             toolFunction: data.toolFunction || '',
+            toolTitle: typeof data.title === 'string' ? data.title : undefined,
             parameters: data.parameters,
             toolExecutionRequestId: typeof data.toolExecutionRequestId === 'string' ? data.toolExecutionRequestId : undefined,
           }
@@ -89,6 +90,7 @@ export function parseChunkToAction(chunk: unknown): ParsedChunkAction | null {
             type: 'EXECUTED_TOOL',
             integratedToolType: data.integratedToolType || '',
             toolFunction: data.toolFunction || '',
+            toolTitle: typeof data.title === 'string' ? data.title : undefined,
             parameters: data.parameters,
             result: data.result,
             success: data.success,
