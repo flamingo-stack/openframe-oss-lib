@@ -23,9 +23,7 @@ import java.time.Instant;
                 def = "{'tenantId': 1, 'name': 1}", unique = true),
         @CompoundIndex(name = "tenant_kind_unique",
                 def = "{'tenantId': 1, 'kind': 1}", unique = true,
-                partialFilter = "{'kind': {$in: ['AI_ASSISTANCE', 'TECH_REQUIRED', 'RESOLVED', 'ARCHIVED']}}"),
-        @CompoundIndex(name = "tenant_position",
-                def = "{'tenantId': 1, 'position': 1}")
+                partialFilter = "{'kind': {$in: ['AI_ASSISTANCE', 'TECH_REQUIRED', 'RESOLVED', 'ARCHIVED']}}")
 })
 public class TicketStatusDefinition {
 
