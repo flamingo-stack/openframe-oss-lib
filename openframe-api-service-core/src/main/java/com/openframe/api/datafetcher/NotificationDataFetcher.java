@@ -7,12 +7,13 @@ import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.notification.NotificationFilter;
 import com.openframe.api.dto.notification.NotificationFilterInput;
 import com.openframe.api.dto.notification.NotificationView;
-import com.openframe.api.dto.notification.UnreadTypeCount;
+import com.openframe.api.dto.notification.UnreadCategoryCount;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.mapper.GraphQLNotificationMapper;
 import com.openframe.api.service.NotificationService;
 import com.openframe.core.exception.UnauthorizedException;
+import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.service.notification.NotificationReadStateService;
 import com.openframe.security.authentication.ActorType;
@@ -82,12 +83,12 @@ public class NotificationDataFetcher {
 
     @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")
     @DgsQuery
-    public List<UnreadTypeCount> unreadCountsByType() {
+    public List<UnreadCategoryCount> unreadCountsByCategory() {
         Recipient r = currentRecipient();
-        Map<String, Long> counts = readStateService.unreadCountsByType(r.id(), r.type());
-        List<UnreadTypeCount> result = new ArrayList<>(counts.size());
-        for (Map.Entry<String, Long> entry : counts.entrySet()) {
-            result.add(new UnreadTypeCount(entry.getKey(), entry.getValue()));
+        Map<NotificationCategory, Long> counts = readStateService.unreadCountsByCategory(r.id(), r.type());
+        List<UnreadCategoryCount> result = new ArrayList<>(counts.size());
+        for (Map.Entry<NotificationCategory, Long> entry : counts.entrySet()) {
+            result.add(new UnreadCategoryCount(entry.getKey(), entry.getValue()));
         }
         return result;
     }

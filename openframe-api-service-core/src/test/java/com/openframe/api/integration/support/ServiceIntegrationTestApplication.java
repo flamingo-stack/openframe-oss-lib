@@ -3,6 +3,7 @@ package com.openframe.api.integration.support;
 import com.openframe.api.mapper.GraphQLNotificationMapper;
 import com.openframe.api.service.NotificationService;
 import com.openframe.data.config.NotificationContextMongoConfig;
+import com.openframe.data.document.notification.NotificationContextDescriptorRegistry;
 import com.openframe.data.nats.service.NotificationBroadcaster;
 import com.openframe.data.repository.notification.NotificationRepository;
 import com.openframe.data.repository.notification.impl.CustomNotificationReadStateRepositoryImpl;
@@ -31,6 +32,7 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
         CustomNotificationRepositoryImpl.class,
         CustomNotificationReadStateRepositoryImpl.class,
         NotificationBroadcaster.class,
+        NotificationContextDescriptorRegistry.class,
         NotificationReadStateService.class,
         NotificationService.class,
         GraphQLNotificationMapper.class,

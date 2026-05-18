@@ -1,7 +1,7 @@
 extend type Query {
     notifications(filter: NotificationFilterInput, search: String, first: Int, after: String, last: Int, before: String): NotificationConnection!
     hasUnreadNotifications: Boolean!
-    unreadCountsByType: [UnreadTypeCount!]!
+    unreadCountsByCategory: [UnreadCategoryCount!]!
 }
 
 extend type Mutation {
@@ -36,8 +36,21 @@ type GenericContext implements NotificationContext {
     payload: String
 }
 
-type UnreadTypeCount {
-    type: String!
+enum NotificationCategory {
+    DASHBOARD
+    CUSTOMERS
+    DEVICES
+    SCRIPTS
+    MONITORING
+    SOFTWARE
+    LOGS
+    TICKETS
+    MINGO
+    GENERIC
+}
+
+type UnreadCategoryCount {
+    category: NotificationCategory!
     count: Int!
 }
 

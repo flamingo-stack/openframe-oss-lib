@@ -2,6 +2,7 @@ package com.openframe.data.integration.performance;
 
 import com.mongodb.client.MongoCollection;
 import com.openframe.data.document.notification.Notification;
+import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
@@ -38,7 +39,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -64,13 +64,13 @@ class NotificationReadStateIndexUsageIT extends BaseMongoIntegrationTest {
 
     private static final String IDX_RECIPIENT_NOTIF   = "recipient_notification_unique";
     private static final String IDX_RECIPIENT_STATUS  = "recipient_status";
-    private static final String IDX_RECIPIENT_CTX_ST  = "recipient_contextType_status";
+    private static final String IDX_RECIPIENT_CAT_ST  = "recipient_category_status";
 
     private static final String FIELD_RECIPIENT_ID    = "recipientId";
     private static final String FIELD_RECIPIENT_TYPE  = "recipientType";
     private static final String FIELD_NOTIFICATION_ID = "notificationId";
     private static final String FIELD_STATUS          = "status";
-    private static final String FIELD_CONTEXT_TYPE    = "contextType";
+    private static final String FIELD_CATEGORY        = "category";
 
     private static final long FIND_BUDGET_MS  = 200;
     private static final long WRITE_BUDGET_MS = 100;
@@ -207,25 +207,25 @@ class NotificationReadStateIndexUsageIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    @DisplayName("Given a heavily seeded read_states collection, when unreadCountsByType aggregation runs (match recipient + status=UNREAD, group by contextType), then the $match stage hits recipient_contextType_status — no collscan during group aggregation")
-    void unread_counts_by_type_uses_recipient_contextType_status_index() {
-        var counts = readStateRepository.unreadCountsByType(HOT_ADMIN, RecipientType.USER);
+    @DisplayName("Given a heavily seeded read_states collection, when unreadCountsByCategory aggregation runs (match recipient + status=UNREAD, group by category), then the $match stage hits recipient_category_status — no collscan during group aggregation")
+    void unread_counts_by_category_uses_recipient_category_status_index() {
+        var counts = readStateRepository.unreadCountsByCategory(HOT_ADMIN, RecipientType.USER);
         assertThat(counts).isNotEmpty();
 
         List<Document> pipeline = List.of(
                 new Document("$match", new Document(FIELD_RECIPIENT_ID, HOT_ADMIN)
                         .append(FIELD_RECIPIENT_TYPE, RecipientType.USER.name())
                         .append(FIELD_STATUS, ReadStatus.UNREAD.name())),
-                new Document("$group", new Document("_id", "$" + FIELD_CONTEXT_TYPE)
+                new Document("$group", new Document("_id", "$" + FIELD_CATEGORY)
                         .append("count", new Document("$sum", 1))));
 
         Stats stats = MongoExplain.explainAggregation(mongoTemplate, READS_COLL, pipeline);
 
         stats.assertNoCollectionScan()
-                .assertUsesAnyOf(IDX_RECIPIENT_CTX_ST, IDX_RECIPIENT_STATUS)
+                .assertUsesAnyOf(IDX_RECIPIENT_CAT_ST, IDX_RECIPIENT_STATUS)
                 .assertExecutionTimeBelow(FIND_BUDGET_MS);
 
-        recorder.record("unreadCountsByType — admin USER aggregate",
+        recorder.record("unreadCountsByCategory — admin USER aggregate",
                 "groups", counts.size(),
                 "executionTimeMs", stats.executionTimeMillis(),
                 "keysExamined", stats.keysExamined(),
@@ -311,23 +311,19 @@ class NotificationReadStateIndexUsageIT extends BaseMongoIntegrationTest {
 
     private void seedReadStates() {
         BatchInserter inserter = new BatchInserter(mongoTemplate.getCollection(READS_COLL));
-        // hot admin USER read_states — all UNREAD, point at real notification _ids
         for (int i = 0; i < hotAdminNotifIds.size(); i++) {
             inserter.add(readStateDocument(HOT_ADMIN, RecipientType.USER, hotAdminNotifIds.get(i),
-                    ReadStatus.UNREAD, contextTypeFor(i)));
+                    ReadStatus.UNREAD, categoryFor(i)));
         }
-        // hot machine MACHINE read_states — all UNREAD, point at real notification _ids
         for (int i = 0; i < hotMachineNotifIds.size(); i++) {
             inserter.add(readStateDocument(HOT_MACHINE, RecipientType.MACHINE, hotMachineNotifIds.get(i),
-                    ReadStatus.UNREAD, contextTypeFor(i)));
+                    ReadStatus.UNREAD, categoryFor(i)));
         }
-        // noise — other recipients across types (notificationId points at random ObjectIds,
-        // step-2 fetch will simply drop those rows; index-usage assertions still hold on step-1)
         for (int i = 0; i < NOISE_READ_STATES; i++) {
             RecipientType type = (i % 2 == 0) ? RecipientType.USER : RecipientType.MACHINE;
             String recipientId = "noise-" + type.name().toLowerCase() + "-" + (i % 500);
             inserter.add(readStateDocument(recipientId, type, new ObjectId().toHexString(),
-                    ReadStatus.UNREAD, contextTypeFor(i)));
+                    ReadStatus.UNREAD, categoryFor(i)));
         }
         inserter.flush();
     }
@@ -335,8 +331,16 @@ class NotificationReadStateIndexUsageIT extends BaseMongoIntegrationTest {
     private static String contextTypeFor(int index) {
         return switch (index % 3) {
             case 0 -> "TICKET_STATUS_CHANGED";
-            case 1 -> "APPROVAL_REQUEST";
-            default -> "DIRECT_MESSAGE_PUBLISHED";
+            case 1 -> "ADMIN_TICKET_APPROVAL_REQUEST";
+            default -> "NEW_MINGO_MESSAGE";
+        };
+    }
+
+    private static NotificationCategory categoryFor(int index) {
+        return switch (index % 3) {
+            case 0 -> NotificationCategory.TICKETS;
+            case 1 -> NotificationCategory.MINGO;
+            default -> NotificationCategory.GENERIC;
         };
     }
 
@@ -350,14 +354,14 @@ class NotificationReadStateIndexUsageIT extends BaseMongoIntegrationTest {
     }
 
     private static Document readStateDocument(String recipientId, RecipientType recipientType,
-                                              String notificationId, ReadStatus status, String contextType) {
+                                              String notificationId, ReadStatus status, NotificationCategory category) {
         Document doc = new Document()
                 .append("_id", new ObjectId())
                 .append(FIELD_RECIPIENT_ID, recipientId)
                 .append(FIELD_RECIPIENT_TYPE, recipientType.name())
                 .append(FIELD_NOTIFICATION_ID, notificationId)
                 .append(FIELD_STATUS, status.name())
-                .append(FIELD_CONTEXT_TYPE, contextType);
+                .append(FIELD_CATEGORY, category.name());
         if (status == ReadStatus.READ) {
             doc.append("readAt", new Date());
         }

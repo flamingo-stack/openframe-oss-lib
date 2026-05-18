@@ -4,6 +4,7 @@ import com.mongodb.MongoBulkWriteException;
 import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.InsertOneModel;
 import com.mongodb.client.model.WriteModel;
+import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
@@ -32,17 +33,18 @@ public class CustomNotificationReadStateRepositoryImpl implements CustomNotifica
     private static final String FIELD_RECIPIENT_TYPE = "recipientType";
     private static final String FIELD_NOTIFICATION_ID = "notificationId";
     private static final String FIELD_STATUS = "status";
-    private static final String FIELD_CONTEXT_TYPE = "contextType";
+    private static final String FIELD_CATEGORY = "category";
     private static final String FIELD_READ_AT = "readAt";
 
     private final MongoTemplate mongoTemplate;
 
     @Override
-    public void createForAudience(String notificationId, String contextType,
+    public void createForAudience(String notificationId, NotificationCategory category,
                                   RecipientType recipientType, Collection<String> recipientIds) {
         if (recipientIds == null || recipientIds.isEmpty()) {
             return;
         }
+        NotificationCategory effectiveCategory = category == null ? NotificationCategory.GENERIC : category;
         List<WriteModel<Document>> writes = new ArrayList<>(recipientIds.size());
         for (String recipientId : recipientIds) {
             Document doc = new Document()
@@ -50,7 +52,7 @@ public class CustomNotificationReadStateRepositoryImpl implements CustomNotifica
                     .append(FIELD_RECIPIENT_TYPE, recipientType.name())
                     .append(FIELD_NOTIFICATION_ID, notificationId)
                     .append(FIELD_STATUS, ReadStatus.UNREAD.name())
-                    .append(FIELD_CONTEXT_TYPE, contextType);
+                    .append(FIELD_CATEGORY, effectiveCategory.name());
             writes.add(new InsertOneModel<>(doc));
         }
         try {
@@ -117,20 +119,20 @@ public class CustomNotificationReadStateRepositoryImpl implements CustomNotifica
     }
 
     @Override
-    public Map<String, Long> unreadCountsByType(String recipientId, RecipientType recipientType) {
+    public Map<NotificationCategory, Long> unreadCountsByCategory(String recipientId, RecipientType recipientType) {
         Aggregation agg = Aggregation.newAggregation(
                 Aggregation.match(forRecipient(recipientId, recipientType)
                         .and(FIELD_STATUS).is(ReadStatus.UNREAD)),
-                Aggregation.group(FIELD_CONTEXT_TYPE).count().as("count"));
+                Aggregation.group(FIELD_CATEGORY).count().as("count"));
         AggregationResults<Document> results = mongoTemplate.aggregate(
                 agg, COLLECTION, Document.class);
-        Map<String, Long> counts = new LinkedHashMap<>();
+        Map<NotificationCategory, Long> counts = new EnumMap<>(NotificationCategory.class);
         for (Document doc : results.getMappedResults()) {
             Object key = doc.get("_id");
             if (key == null) {
                 continue;
             }
-            counts.put(key.toString(), ((Number) doc.get("count")).longValue());
+            counts.put(NotificationCategory.valueOf(key.toString()), ((Number) doc.get("count")).longValue());
         }
         return counts;
     }

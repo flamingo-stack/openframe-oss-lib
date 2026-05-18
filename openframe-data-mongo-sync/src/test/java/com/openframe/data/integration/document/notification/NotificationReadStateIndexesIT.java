@@ -29,7 +29,7 @@ class NotificationReadStateIndexesIT extends BaseMongoIntegrationTest {
     private MongoTemplate mongoTemplate;
 
     @Test
-    @DisplayName("Given the NotificationReadState entity, when indexes are resolved against Mongo, then the recipient-keyed compound indexes (unique recipient+notification, recipient+status, recipient+contextType+status) exist and the legacy user_read_at index is absent")
+    @DisplayName("Given the NotificationReadState entity, when indexes are resolved against Mongo, then the recipient-keyed compound indexes (unique recipient+notification, recipient+status, recipient+category+status) exist and the legacy user_read_at index is absent")
     void given_read_state_entity_when_indexes_resolved_then_required_compound_indexes_exist() {
         IndexOperations indexOps = mongoTemplate.indexOps(NotificationReadState.class);
         new MongoPersistentEntityIndexResolver(mongoTemplate.getConverter().getMappingContext())
@@ -43,7 +43,7 @@ class NotificationReadStateIndexesIT extends BaseMongoIntegrationTest {
         assertThat(byName).containsKeys(
                 "recipient_notification_unique",
                 "recipient_status",
-                "recipient_contextType_status");
+                "recipient_category_status");
 
         IndexInfo unique = byName.get("recipient_notification_unique");
         assertThat(unique.isUnique()).isTrue();
@@ -53,8 +53,8 @@ class NotificationReadStateIndexesIT extends BaseMongoIntegrationTest {
         assertThat(byName.get("recipient_status").getIndexFields()).extracting("key")
                 .containsExactly("recipientId", "recipientType", "status");
 
-        assertThat(byName.get("recipient_contextType_status").getIndexFields()).extracting("key")
-                .containsExactly("recipientId", "recipientType", "contextType", "status");
+        assertThat(byName.get("recipient_category_status").getIndexFields()).extracting("key")
+                .containsExactly("recipientId", "recipientType", "category", "status");
 
         assertThat(byName).doesNotContainKey("user_read_at");
     }

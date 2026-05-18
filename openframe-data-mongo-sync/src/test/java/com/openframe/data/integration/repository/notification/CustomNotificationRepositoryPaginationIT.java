@@ -1,6 +1,7 @@
 package com.openframe.data.integration.repository.notification;
 
 import com.openframe.data.document.notification.Notification;
+import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
@@ -271,7 +272,7 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
                     .recipientType(U)
                     .notificationId(new ObjectId().toHexString())
                     .status(ReadStatus.UNREAD)
-                    .contextType("test")
+                    .category(NotificationCategory.GENERIC)
                     .build());
         }
         mongoTemplate.insert(rows, NotificationReadState.class);
@@ -310,7 +311,7 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
                     .recipientType(U)
                     .notificationId(id)
                     .status(ReadStatus.UNREAD)
-                    .contextType("test")
+                    .category(NotificationCategory.GENERIC)
                     .build());
         }
         mongoTemplate.insert(rows, NotificationReadState.class);
@@ -354,7 +355,7 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
                 .recipientType(type)
                 .notificationId(notificationId)
                 .status(status)
-                .contextType("test")
+                .category(NotificationCategory.GENERIC)
                 .build();
         mongoTemplate.save(rs);
     }

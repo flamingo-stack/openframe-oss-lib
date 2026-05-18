@@ -21,8 +21,8 @@ import java.time.Instant;
                 name = "recipient_status",
                 def = "{'recipientId': 1, 'recipientType': 1, 'status': 1}"),
         @CompoundIndex(
-                name = "recipient_contextType_status",
-                def = "{'recipientId': 1, 'recipientType': 1, 'contextType': 1, 'status': 1}")
+                name = "recipient_category_status",
+                def = "{'recipientId': 1, 'recipientType': 1, 'category': 1, 'status': 1}")
 })
 @Data
 @Builder
@@ -41,7 +41,7 @@ public class NotificationReadState {
 
     private ReadStatus status;
 
-    private String contextType;
+    private NotificationCategory category;
 
     private Instant readAt;
 }

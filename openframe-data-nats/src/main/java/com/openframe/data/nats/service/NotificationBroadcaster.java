@@ -1,6 +1,8 @@
 package com.openframe.data.nats.service;
 
 import com.openframe.data.document.notification.Notification;
+import com.openframe.data.document.notification.NotificationCategory;
+import com.openframe.data.document.notification.NotificationContextDescriptorRegistry;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.nats.publisher.NotificationNatsPublisher;
 import com.openframe.data.repository.notification.NotificationRepository;
@@ -19,6 +21,7 @@ public class NotificationBroadcaster {
 
     private final NotificationRepository notificationRepository;
     private final NotificationReadStateService readStateService;
+    private final NotificationContextDescriptorRegistry descriptorRegistry;
     private final Optional<NotificationNatsPublisher> natsPublisher;
 
     public Notification broadcast(NotificationCommand command) {
@@ -34,14 +37,15 @@ public class NotificationBroadcaster {
 
         Set<String> admins = command.getAdminAudience();
         Set<String> machines = command.getMachineAudience();
+        NotificationCategory category = descriptorRegistry.categoryOf(command.getContext().getType());
         try {
             if (!admins.isEmpty()) {
                 readStateService.createForAudience(
-                        saved.getId(), command.getContext().getType(), RecipientType.USER, admins);
+                        saved.getId(), category, RecipientType.USER, admins);
             }
             if (!machines.isEmpty()) {
                 readStateService.createForAudience(
-                        saved.getId(), command.getContext().getType(), RecipientType.MACHINE, machines);
+                        saved.getId(), category, RecipientType.MACHINE, machines);
             }
         } catch (RuntimeException ex) {
             log.error("createForAudience failed for notification {} (admins={}, machines={}); "

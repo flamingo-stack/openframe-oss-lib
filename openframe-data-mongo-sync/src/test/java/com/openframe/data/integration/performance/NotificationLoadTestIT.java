@@ -2,6 +2,7 @@ package com.openframe.data.integration.performance;
 
 import com.mongodb.client.MongoCollection;
 import com.openframe.data.document.notification.Notification;
+import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
@@ -121,7 +122,7 @@ class NotificationLoadTestIT extends BaseMongoIntegrationTest {
                 ObjectId notifId = new ObjectId();
                 notifBuf.add(notificationDoc(notifId, String.format(DENSE_TITLE_FMT, slice, i)));
                 readBuf.add(readStateDoc(userId, RecipientType.USER, notifId.toHexString(),
-                        ReadStatus.UNREAD, "TICKET_STATUS_CHANGED"));
+                        ReadStatus.UNREAD, NotificationCategory.TICKETS));
                 seeded++;
             }
         }
@@ -131,7 +132,7 @@ class NotificationLoadTestIT extends BaseMongoIntegrationTest {
             String title = (i % SPARSE_MATCH_EVERY == 0) ? SPARSE_MATCH + i : SPARSE_NOISE + i;
             notifBuf.add(notificationDoc(notifId, title));
             readBuf.add(readStateDoc(SPARSE_USER, RecipientType.USER, notifId.toHexString(),
-                    ReadStatus.UNREAD, "APPROVAL_REQUEST"));
+                    ReadStatus.UNREAD, NotificationCategory.MINGO));
             seeded++;
         }
 
@@ -141,7 +142,7 @@ class NotificationLoadTestIT extends BaseMongoIntegrationTest {
             notifBuf.add(notificationDoc(notifId, "noise-evt-" + i));
             readBuf.add(readStateDoc(NOISE_RECIPIENT_PREFIX + (i % NOISE_RECIPIENTS),
                     RecipientType.USER, notifId.toHexString(),
-                    ReadStatus.UNREAD, "DIRECT_MESSAGE_PUBLISHED"));
+                    ReadStatus.UNREAD, NotificationCategory.GENERIC));
         }
         notifBuf.flush();
         readBuf.flush();
@@ -229,9 +230,9 @@ class NotificationLoadTestIT extends BaseMongoIntegrationTest {
                         + "noticeably lower.");
 
         recorder.describe(S_COUNTS,
-                "What we measure: unread counts grouped by context type "
-                        + "(`{TICKET_STATUS_CHANGED: 7, APPROVAL_REQUEST: 3, …}`). Used to render the badges. The "
-                        + "aggregation must be fully covered by `recipient_contextType_status` — no FETCH stage. "
+                "What we measure: unread counts grouped by category "
+                        + "(`{TICKETS: 7, MINGO: 3, …}`). Used to render the sidebar badges. The "
+                        + "aggregation must be fully covered by `recipient_category_status` — no FETCH stage. "
                         + "Measured against the 10 000-notification feed.\n"
                         + "We use the 10k slice rather than 100k because Scenario 6 already marked the 100k slice as "
                         + "READ; nothing left to count there.");
@@ -469,14 +470,14 @@ class NotificationLoadTestIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    @DisplayName("Unread counts grouped by context type — covered aggregation")
-    void unread_counts_by_type_on_medium_slice() {
+    @DisplayName("Unread counts grouped by category — covered aggregation")
+    void unread_counts_by_category_on_medium_slice() {
         String userId = HOT_USER_PREFIX + 10_000;
 
         final int[] groups = {0};
         MeasurementStats stats = MeasurementStats.measure(WARMUP, SAMPLES, () ->
                 MeasurementStats.timeMillis(() -> {
-                    Map<String, Long> counts = readStateRepository.unreadCountsByType(userId, RecipientType.USER);
+                    Map<NotificationCategory, Long> counts = readStateRepository.unreadCountsByCategory(userId, RecipientType.USER);
                     groups[0] = counts.size();
                     assertThat(counts).isNotEmpty();
                 }));
@@ -493,7 +494,7 @@ class NotificationLoadTestIT extends BaseMongoIntegrationTest {
                 "wallMaxMs", stats.max());
 
         recorder.headline("Summary",
-                "scenario", "unread counts by type",
+                "scenario", "unread counts by category",
                 "feed size", 10_000,
                 "p50 ms", stats.p50(),
                 "p95 ms", stats.p95(),
@@ -521,14 +522,14 @@ class NotificationLoadTestIT extends BaseMongoIntegrationTest {
     }
 
     private static Document readStateDoc(String recipientId, RecipientType type,
-                                         String notificationId, ReadStatus status, String contextType) {
+                                         String notificationId, ReadStatus status, NotificationCategory category) {
         return new Document()
                 .append("_id", new ObjectId())
                 .append("recipientId", recipientId)
                 .append("recipientType", type.name())
                 .append("notificationId", notificationId)
                 .append("status", status.name())
-                .append("contextType", contextType);
+                .append("category", category.name());
     }
 
     private static final class BatchInserter {

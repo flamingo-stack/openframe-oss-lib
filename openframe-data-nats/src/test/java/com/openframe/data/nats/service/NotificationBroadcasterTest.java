@@ -2,6 +2,8 @@ package com.openframe.data.nats.service;
 
 import com.openframe.data.document.notification.GenericContext;
 import com.openframe.data.document.notification.Notification;
+import com.openframe.data.document.notification.NotificationCategory;
+import com.openframe.data.document.notification.NotificationContextDescriptorRegistry;
 import com.openframe.data.document.notification.NotificationSeverity;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.nats.publisher.NotificationNatsPublisher;
@@ -32,6 +34,7 @@ class NotificationBroadcasterTest {
 
     private NotificationRepository notificationRepository;
     private NotificationReadStateService readStateService;
+    private NotificationContextDescriptorRegistry descriptorRegistry;
     private NotificationNatsPublisher natsPublisher;
     private NotificationBroadcaster broadcaster;
 
@@ -39,10 +42,13 @@ class NotificationBroadcasterTest {
     void setUp() {
         notificationRepository = mock(NotificationRepository.class);
         readStateService = mock(NotificationReadStateService.class);
+        descriptorRegistry = mock(NotificationContextDescriptorRegistry.class);
         natsPublisher = mock(NotificationNatsPublisher.class);
-        broadcaster = new NotificationBroadcaster(notificationRepository, readStateService, Optional.of(natsPublisher));
+        broadcaster = new NotificationBroadcaster(
+                notificationRepository, readStateService, descriptorRegistry, Optional.of(natsPublisher));
         when(notificationRepository.save(any(Notification.class))).thenAnswer(inv ->
                 inv.<Notification>getArgument(0).withId("notif-id-1"));
+        when(descriptorRegistry.categoryOf(anyString())).thenReturn(NotificationCategory.MINGO);
     }
 
     @Test
@@ -58,9 +64,9 @@ class NotificationBroadcasterTest {
         broadcaster.broadcast(cmd);
 
         verify(readStateService, times(1)).createForAudience(
-                eq("notif-id-1"), eq("APPROVAL"), eq(RecipientType.USER), eq(Set.of("admin-1", "admin-2")));
+                eq("notif-id-1"), eq(NotificationCategory.MINGO), eq(RecipientType.USER), eq(Set.of("admin-1", "admin-2")));
         verify(readStateService, never()).createForAudience(
-                anyString(), anyString(), eq(RecipientType.MACHINE), any());
+                anyString(), any(NotificationCategory.class), eq(RecipientType.MACHINE), any());
         verify(natsPublisher).publishToUser(eq("admin-1"), any(Notification.class));
         verify(natsPublisher).publishToUser(eq("admin-2"), any(Notification.class));
         verify(natsPublisher, never()).publishToMachine(anyString(), any(Notification.class));
@@ -69,6 +75,7 @@ class NotificationBroadcasterTest {
     @Test
     @DisplayName("Given a command with only machineAudience, when broadcast is called, then a Notification is persisted, MACHINE read_state rows are created and publishToMachine fires per machine — no admin-side calls")
     void machine_only_command_fans_out_to_machine_path() {
+        when(descriptorRegistry.categoryOf("TICKET_STATUS_CHANGED")).thenReturn(NotificationCategory.TICKETS);
         NotificationCommand cmd = NotificationCommand.builder()
                 .title("Ticket update")
                 .severity(NotificationSeverity.INFO)
@@ -79,9 +86,9 @@ class NotificationBroadcasterTest {
         broadcaster.broadcast(cmd);
 
         verify(readStateService, times(1)).createForAudience(
-                eq("notif-id-1"), eq("TICKET_STATUS_CHANGED"), eq(RecipientType.MACHINE), eq(Set.of("m-1", "m-2")));
+                eq("notif-id-1"), eq(NotificationCategory.TICKETS), eq(RecipientType.MACHINE), eq(Set.of("m-1", "m-2")));
         verify(readStateService, never()).createForAudience(
-                anyString(), anyString(), eq(RecipientType.USER), any());
+                anyString(), any(NotificationCategory.class), eq(RecipientType.USER), any());
         verify(natsPublisher).publishToMachine(eq("m-1"), any(Notification.class));
         verify(natsPublisher).publishToMachine(eq("m-2"), any(Notification.class));
         verify(natsPublisher, never()).publishToUser(anyString(), any(Notification.class));
@@ -90,6 +97,7 @@ class NotificationBroadcasterTest {
     @Test
     @DisplayName("Given a command carrying both admin and machine audiences, when broadcast is called, then two separate createForAudience invocations (one per RecipientType) and both publish loops fire")
     void mixed_audience_fans_out_to_both_paths() {
+        when(descriptorRegistry.categoryOf("TICKET_STATUS_CHANGED")).thenReturn(NotificationCategory.TICKETS);
         NotificationCommand cmd = NotificationCommand.builder()
                 .title("Ticket status changed")
                 .severity(NotificationSeverity.INFO)
@@ -101,9 +109,9 @@ class NotificationBroadcasterTest {
         broadcaster.broadcast(cmd);
 
         verify(readStateService).createForAudience(
-                eq("notif-id-1"), eq("TICKET_STATUS_CHANGED"), eq(RecipientType.USER), eq(Set.of("admin-1")));
+                eq("notif-id-1"), eq(NotificationCategory.TICKETS), eq(RecipientType.USER), eq(Set.of("admin-1")));
         verify(readStateService).createForAudience(
-                eq("notif-id-1"), eq("TICKET_STATUS_CHANGED"), eq(RecipientType.MACHINE), eq(Set.of("m-1")));
+                eq("notif-id-1"), eq(NotificationCategory.TICKETS), eq(RecipientType.MACHINE), eq(Set.of("m-1")));
         verify(natsPublisher).publishToUser(eq("admin-1"), any(Notification.class));
         verify(natsPublisher).publishToMachine(eq("m-1"), any(Notification.class));
     }
@@ -112,7 +120,7 @@ class NotificationBroadcasterTest {
     @DisplayName("Given the NATS publisher dependency is absent (Optional.empty), when broadcast is called, then the Notification is still persisted and read_state rows are created — clients reconcile via GraphQL catch-up")
     void no_publisher_persists_without_nats() {
         NotificationBroadcaster bcWithoutNats = new NotificationBroadcaster(
-                notificationRepository, readStateService, Optional.empty());
+                notificationRepository, readStateService, descriptorRegistry, Optional.empty());
         NotificationCommand cmd = NotificationCommand.builder()
                 .title("Approval")
                 .severity(NotificationSeverity.INFO)
@@ -125,7 +133,7 @@ class NotificationBroadcasterTest {
         assertThat(result.getId()).isEqualTo("notif-id-1");
         verify(notificationRepository).save(any(Notification.class));
         verify(readStateService).createForAudience(
-                eq("notif-id-1"), eq("APPROVAL"), eq(RecipientType.USER), eq(Set.of("admin-1")));
+                eq("notif-id-1"), eq(NotificationCategory.MINGO), eq(RecipientType.USER), eq(Set.of("admin-1")));
         verifyNoInteractions(natsPublisher);
     }
 
@@ -167,26 +175,27 @@ class NotificationBroadcasterTest {
     }
 
     @Test
-    @DisplayName("Given a command, when broadcast is called, then NotificationReadState is created with contextType equal to command.context.type — denormalization keeps counts-by-type queries lookup-free")
-    void context_type_denormalized_into_read_state() {
+    @DisplayName("Given a command, when broadcast is called, then NotificationReadState is created with category resolved from the descriptor registry by context.type — denormalization keeps unreadCountsByCategory aggregation lookup-free")
+    void category_resolved_from_registry_and_denormalized_into_read_state() {
+        when(descriptorRegistry.categoryOf("TICKET_STATUS_CHANGED")).thenReturn(NotificationCategory.TICKETS);
         NotificationCommand cmd = NotificationCommand.builder()
-                .title("Stream finished")
+                .title("Ticket status")
                 .severity(NotificationSeverity.INFO)
-                .context(genericContext("DIALOG_STREAM_FINISHED"))
+                .context(genericContext("TICKET_STATUS_CHANGED"))
                 .adminAudience(Set.of("admin-1"))
                 .build();
 
         broadcaster.broadcast(cmd);
 
         verify(readStateService).createForAudience(
-                anyString(), eq("DIALOG_STREAM_FINISHED"), eq(RecipientType.USER), any());
+                anyString(), eq(NotificationCategory.TICKETS), eq(RecipientType.USER), any());
     }
 
     @Test
     @DisplayName("Given createForAudience throws a non-dup-key RuntimeException, when broadcast is called, then the just-persisted Notification doc is deleted by id and the exception is re-thrown — invisible orphans are not left behind and NATS publish is skipped")
     void create_for_audience_failure_triggers_orphan_cleanup_and_skips_nats() {
         doThrow(new RuntimeException("mongo down")).when(readStateService).createForAudience(
-                anyString(), anyString(), eq(RecipientType.USER), any());
+                anyString(), any(NotificationCategory.class), eq(RecipientType.USER), any());
         NotificationCommand cmd = NotificationCommand.builder()
                 .title("Approval")
                 .severity(NotificationSeverity.INFO)

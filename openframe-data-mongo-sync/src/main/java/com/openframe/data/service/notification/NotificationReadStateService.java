@@ -1,5 +1,6 @@
 package com.openframe.data.service.notification;
 
+import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.repository.notification.NotificationReadStateRepository;
 import lombok.RequiredArgsConstructor;
@@ -18,12 +19,12 @@ public class NotificationReadStateService {
 
     private final NotificationReadStateRepository repository;
 
-    public void createForAudience(String notificationId, String contextType,
+    public void createForAudience(String notificationId, NotificationCategory category,
                                   RecipientType recipientType, Collection<String> recipientIds) {
         if (isBlank(notificationId) || recipientType == null || recipientIds == null || recipientIds.isEmpty()) {
             return;
         }
-        repository.createForAudience(notificationId, contextType, recipientType, recipientIds);
+        repository.createForAudience(notificationId, category, recipientType, recipientIds);
     }
 
     public boolean hasUnread(String recipientId, RecipientType recipientType) {
@@ -61,10 +62,10 @@ public class NotificationReadStateService {
         return repository.softDeleteAllRead(recipientId, recipientType);
     }
 
-    public Map<String, Long> unreadCountsByType(String recipientId, RecipientType recipientType) {
+    public Map<NotificationCategory, Long> unreadCountsByCategory(String recipientId, RecipientType recipientType) {
         if (isBlank(recipientId) || recipientType == null) {
             return Map.of();
         }
-        return repository.unreadCountsByType(recipientId, recipientType);
+        return repository.unreadCountsByCategory(recipientId, recipientType);
     }
 }

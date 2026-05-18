@@ -1,5 +1,6 @@
 package com.openframe.data.repository.notification;
 
+import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.RecipientType;
 
 import java.util.Collection;
@@ -7,7 +8,7 @@ import java.util.Map;
 
 public interface CustomNotificationReadStateRepository {
 
-    void createForAudience(String notificationId, String contextType,
+    void createForAudience(String notificationId, NotificationCategory category,
                            RecipientType recipientType, Collection<String> recipientIds);
 
     boolean markRead(String recipientId, RecipientType recipientType, String notificationId);
@@ -20,5 +21,5 @@ public interface CustomNotificationReadStateRepository {
 
     boolean hasUnread(String recipientId, RecipientType recipientType);
 
-    Map<String, Long> unreadCountsByType(String recipientId, RecipientType recipientType);
+    Map<NotificationCategory, Long> unreadCountsByCategory(String recipientId, RecipientType recipientType);
 }
