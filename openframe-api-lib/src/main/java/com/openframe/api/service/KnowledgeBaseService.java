@@ -50,7 +50,9 @@ public class KnowledgeBaseService {
 
         boolean recursive = filter.getType() != KnowledgeBaseItemType.FOLDER
                 && (StringUtils.hasText(search)
-                    || (filter.getTagIds() != null && !filter.getTagIds().isEmpty()));
+                    || (StringUtils.hasText(filter.getParentId())
+                        && filter.getTagIds() != null
+                        && !filter.getTagIds().isEmpty()));
         if (recursive) {
             return queryArticlesInSubtree(currentUserId, filter, search, normalized);
         }
