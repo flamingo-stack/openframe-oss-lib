@@ -161,6 +161,9 @@ export class MessageSegmentAccumulator {
 
     const toolKey = execId || `${toolData.integratedToolType}-${toolData.toolFunction}`
 
+    // A tool only runs after its approval gate was granted. Resolve it here.
+    this.resolvePendingApprovalForExecution()
+
     if (toolData.type === 'EXECUTING_TOOL') {
       this.executingTools.set(toolKey, {
         integratedToolType: toolData.integratedToolType,
@@ -237,6 +240,31 @@ export class MessageSegmentAccumulator {
       }
     })
     return matched
+  }
+
+  /**
+   * A tool only ever runs after its approval gate was granted. The legacy /
+   * single `approval_request` segment carries no `toolExecutionRequestId` to
+   * correlate with the execution, and an observer (e.g. a technician
+   * mirroring the client chat) may never receive an `APPROVAL_RESULT` chunk —
+   * only the tool's `EXECUTING_TOOL` / `EXECUTED_TOOL` events. Treat the
+   * arrival of a tool execution as implicit approval of the most recent
+   * still-pending gate so the card does not stay stuck `pending` in realtime.
+   *
+   * The agent stays paused while an approval is outstanding, so there is at
+   * most one relevant gate; flipping only the latest pending one is safe and
+   * monotonic (never downgrades, can't make a correct state wrong — an
+   * unapproved tool cannot execute). `approval_batch` is handled separately by
+   * `applyExecutionToBatch` and is intentionally left untouched here.
+   */
+  private resolvePendingApprovalForExecution(): void {
+    for (let i = this.segments.length - 1; i >= 0; i--) {
+      const seg = this.segments[i]
+      if (seg.type === 'approval_request' && seg.status === 'pending') {
+        this.segments[i] = { ...seg, status: 'approved' }
+        return
+      }
+    }
   }
 
   /**
