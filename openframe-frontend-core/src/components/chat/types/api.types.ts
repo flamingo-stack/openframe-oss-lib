@@ -90,6 +90,51 @@ export interface UseNatsDialogSubscriptionReturn {
   reconnectionCount: number
 }
 
+export interface UseJetStreamDialogSubscriptionOptions {
+  enabled: boolean
+  dialogId: string | null
+  /** JetStream stream name. Default: 'CHAT_CHUNKS'. */
+  streamName?: string
+  /** Single topic to subscribe to. */
+  topic: NatsMessageType
+  /**
+   * Resume from this JetStream sequence + 1. When null/undefined, the consumer starts with
+   * DeliverPolicy.New (live tail only).
+   */
+  optStartSeq?: number | null
+  onEvent?: (payload: unknown, messageType: NatsMessageType) => void
+  onConnect?: () => void
+  onDisconnect?: () => void
+  onSubscribed?: () => void
+  /** Called on disconnect, before reconnect attempt. Use to refresh auth. */
+  onBeforeReconnect?: () => Promise<void> | void
+  /** Build the NATS WebSocket URL (or null when not yet available). */
+  getNatsWsUrl: () => string | null
+  clientConfig?: {
+    name?: string
+    user?: string
+    pass?: string
+  }
+  reconnectionBackoff?: {
+    fastRetries?: number
+    fastRetryDelayMs?: number
+    initialDelayMs?: number
+    maxDelayMs?: number
+    multiplier?: number
+  }
+  /** Consumer inactivity threshold in ms before NATS auto-cleans it. Default: 5 minutes. */
+  inactiveThresholdMs?: number
+}
+
+export interface UseJetStreamDialogSubscriptionReturn {
+  isConnected: boolean
+  isSubscribed: boolean
+  /** Incremented each time the underlying NATS connection reconnects. Starts at 0. */
+  reconnectionCount: number
+  /** Highest JetStream stream sequence observed so far (null before first delivery). */
+  currentStreamSeq: number | null
+}
+
 export interface SegmentsUpdateMetadata {
   /** Segments should be appended to the last assistant message */
   append?: boolean

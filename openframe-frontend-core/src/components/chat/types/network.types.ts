@@ -34,6 +34,8 @@ export type NetworkConfig = typeof NETWORK_CONFIG
 
 export interface ChunkData {
   sequenceId?: number
+  /** JetStream stream sequence, populated from JsMsg.info.streamSequence when delivered via JetStream. */
+  streamSeq?: number
   type: string
   text?: string
   integratedToolType?: string
