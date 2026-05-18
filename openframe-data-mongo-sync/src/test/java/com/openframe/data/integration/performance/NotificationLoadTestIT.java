@@ -41,7 +41,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -477,7 +476,7 @@ class NotificationLoadTestIT extends BaseMongoIntegrationTest {
         final int[] groups = {0};
         MeasurementStats stats = MeasurementStats.measure(WARMUP, SAMPLES, () ->
                 MeasurementStats.timeMillis(() -> {
-                    Map<NotificationCategory, Long> counts = readStateRepository.unreadCountsByCategory(userId, RecipientType.USER);
+                    var counts = readStateRepository.unreadCountsByCategory(userId, RecipientType.USER);
                     groups[0] = counts.size();
                     assertThat(counts).isNotEmpty();
                 }));

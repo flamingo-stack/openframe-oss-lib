@@ -6,6 +6,7 @@ import com.openframe.api.dto.notification.NotificationView;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
+import com.openframe.api.mapper.GraphQLNotificationMapper;
 import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.repository.notification.NotificationPage;
@@ -28,6 +29,7 @@ public class NotificationService {
     static final int SEARCH_MIN_LENGTH = 2;
 
     private final NotificationRepository notificationRepository;
+    private final GraphQLNotificationMapper notificationMapper;
 
     public GenericQueryResult<NotificationView> list(String recipientId,
                                                      RecipientType recipientType,
@@ -56,7 +58,7 @@ public class NotificationService {
         }
 
         List<NotificationView> views = items.stream()
-                .map(item -> new NotificationView(item.notification(), item.status() == ReadStatus.READ))
+                .map(item -> notificationMapper.toView(item.notification(), item.status() == ReadStatus.READ))
                 .toList();
 
         return GenericQueryResult.<NotificationView>builder()
@@ -75,8 +77,8 @@ public class NotificationService {
 
     private PageInfo buildPageInfo(List<NotificationView> items, boolean hasMore,
                                    String resumeCursorId, CursorPaginationCriteria criteria) {
-        String firstItemCursor = items.isEmpty() ? null : CursorCodec.encode(items.getFirst().getId());
-        String lastItemCursor = items.isEmpty() ? null : CursorCodec.encode(items.getLast().getId());
+        String firstItemCursor = items.isEmpty() ? null : CursorCodec.encode(items.getFirst().id());
+        String lastItemCursor = items.isEmpty() ? null : CursorCodec.encode(items.getLast().id());
         String resumeCursor = resumeCursorId == null ? null : CursorCodec.encode(resumeCursorId);
 
         String startCursor;

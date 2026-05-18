@@ -1,8 +1,9 @@
 package com.openframe.data.document.notification;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Value;
-import lombok.With;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -10,23 +11,24 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.Instant;
 
 @Document(collection = "notifications")
-@Value
+@Data
 @Builder
-@With
+@NoArgsConstructor
+@AllArgsConstructor
 public class Notification {
 
     @Id
-    String id;
+    private String id;
 
     @Builder.Default
-    NotificationSeverity severity = NotificationSeverity.INFO;
+    private NotificationSeverity severity = NotificationSeverity.INFO;
 
-    String title;
+    private String title;
 
-    String description;
+    private String description;
 
     @CreatedDate
-    Instant createdAt;
+    private Instant createdAt;
 
-    NotificationContext context;
+    private NotificationContext context;
 }

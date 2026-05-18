@@ -1,16 +1,11 @@
 package com.openframe.api.dto.notification;
 
-import com.openframe.data.document.notification.Notification;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import lombok.experimental.Delegate;
+import com.openframe.data.document.notification.NotificationContext;
+import com.openframe.data.document.notification.NotificationSeverity;
+import lombok.Builder;
 
-@Getter
-@RequiredArgsConstructor
-public class NotificationView {
+import java.time.Instant;
 
-    @Delegate
-    private final Notification notification;
-
-    private final boolean read;
-}
+@Builder
+public record NotificationView(String id, NotificationSeverity severity, String title, String description,
+                               Instant createdAt, NotificationContext context, boolean read) {}

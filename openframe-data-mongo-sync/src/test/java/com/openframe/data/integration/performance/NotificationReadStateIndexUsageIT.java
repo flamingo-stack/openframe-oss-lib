@@ -155,7 +155,8 @@ class NotificationReadStateIndexUsageIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("Given a heavily seeded read_states collection, when hasUnread runs (exists check on recipient + status=UNREAD), then it hits recipient_status and short-circuits — examines at most one key")
     void has_unread_uses_recipient_status_index() {
-        boolean unread = readStateRepository.hasUnread(HOT_ADMIN, RecipientType.USER);
+        boolean unread = readStateRepository.existsByRecipientIdAndRecipientTypeAndStatus(
+                HOT_ADMIN, RecipientType.USER, ReadStatus.UNREAD);
         assertThat(unread).isTrue();
 
         Query q = Query.query(Criteria.where(FIELD_RECIPIENT_ID).is(HOT_ADMIN)

@@ -46,8 +46,11 @@ class NotificationBroadcasterTest {
         natsPublisher = mock(NotificationNatsPublisher.class);
         broadcaster = new NotificationBroadcaster(
                 notificationRepository, readStateService, descriptorRegistry, Optional.of(natsPublisher));
-        when(notificationRepository.save(any(Notification.class))).thenAnswer(inv ->
-                inv.<Notification>getArgument(0).withId("notif-id-1"));
+        when(notificationRepository.save(any(Notification.class))).thenAnswer(inv -> {
+            Notification arg = inv.getArgument(0);
+            arg.setId("notif-id-1");
+            return arg;
+        });
         when(descriptorRegistry.categoryOf(anyString())).thenReturn(NotificationCategory.MINGO);
     }
 

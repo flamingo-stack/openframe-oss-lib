@@ -46,7 +46,7 @@ public class NotificationDataFetcher {
     @DgsData(parentType = "Notification", field = "id")
     public String notificationNodeId(DgsDataFetchingEnvironment dfe) {
         NotificationView view = dfe.getSource();
-        return RELAY.toGlobalId("Notification", view.getId());
+        return RELAY.toGlobalId("Notification", view.id());
     }
 
     @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")

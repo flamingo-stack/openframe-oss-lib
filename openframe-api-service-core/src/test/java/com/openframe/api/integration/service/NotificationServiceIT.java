@@ -74,7 +74,7 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         GenericQueryResult<NotificationView> result = notificationService.list(ALICE, U, NotificationFilter.EMPTY, page10());
 
         assertThat(result.getItems()).hasSize(1);
-        assertThat(result.getItems().get(0).isRead()).isTrue();
+        assertThat(result.getItems().get(0).read()).isTrue();
     }
 
     @Test
@@ -117,10 +117,10 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         readStateService.markRead(ALICE, U, n1.getId());
 
         var readPage = notificationService.list(ALICE, U, new NotificationFilter(true, null), page10());
-        assertThat(readPage.getItems()).extracting(NotificationView::getId).containsExactly(n1.getId());
+        assertThat(readPage.getItems()).extracting(NotificationView::id).containsExactly(n1.getId());
 
         var unreadPage = notificationService.list(ALICE, U, new NotificationFilter(false, null), page10());
-        assertThat(unreadPage.getItems()).extracting(NotificationView::getId).containsExactly(n2.getId());
+        assertThat(unreadPage.getItems()).extracting(NotificationView::id).containsExactly(n2.getId());
     }
 
     @Test
@@ -133,7 +133,7 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
 
         var page = notificationService.list(ALICE, U, new NotificationFilter(null, "a"), page10());
 
-        assertThat(page.getItems()).extracting(NotificationView::getId)
+        assertThat(page.getItems()).extracting(NotificationView::id)
                 .containsExactlyInAnyOrder(welcome.getId(), alert.getId());
     }
 
