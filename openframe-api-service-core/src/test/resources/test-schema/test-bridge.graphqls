@@ -1,0 +1,11 @@
+# Test-only schema fragment.
+#
+# shared.graphqls declares `type Mutation { ... }` with no fields, expecting
+# the rest of the prod schema (event/organization/etc.) to extend it. The
+# notification IT only loads shared + notification, so Mutation would be
+# empty and graphql-java rejects the schema. This bridge adds a single
+# placeholder so the schema validates without dragging in unrelated prod
+# schemas (and their datafetchers).
+extend type Mutation {
+    _testPlaceholder: Boolean
+}

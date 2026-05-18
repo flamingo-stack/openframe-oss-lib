@@ -1,0 +1,69 @@
+extend type Query {
+    notifications(filter: NotificationFilterInput, search: String, first: Int, after: String, last: Int, before: String): NotificationConnection!
+    hasUnreadNotifications: Boolean!
+    unreadCountsByCategory: [UnreadCategoryCount!]!
+}
+
+extend type Mutation {
+    markNotificationAsRead(notificationId: ID!): Boolean!
+    markAllNotificationsAsRead: Int!
+    deleteNotification(notificationId: ID!): Boolean!
+    deleteAllReadNotifications: Int!
+}
+
+enum NotificationSeverity {
+    INFO
+    WARNING
+    DANGER
+}
+
+type Notification implements Node {
+    id: ID!
+    severity: NotificationSeverity!
+    title: String!
+    description: String
+    createdAt: Instant!
+    read: Boolean!
+    context: NotificationContext!
+}
+
+interface NotificationContext {
+    type: String!
+}
+
+type GenericContext implements NotificationContext {
+    type: String!
+    payload: String
+}
+
+enum NotificationCategory {
+    DASHBOARD
+    CUSTOMERS
+    DEVICES
+    SCRIPTS
+    MONITORING
+    SOFTWARE
+    LOGS
+    TICKETS
+    MINGO
+    GENERIC
+}
+
+type UnreadCategoryCount {
+    category: NotificationCategory!
+    count: Int!
+}
+
+input NotificationFilterInput {
+    read: Boolean
+}
+
+type NotificationConnection {
+    edges: [NotificationEdge!]!
+    pageInfo: PageInfo!
+}
+
+type NotificationEdge {
+    node: Notification!
+    cursor: String!
+}

@@ -1,0 +1,10 @@
+# Test-only concrete NotificationContext subtype.
+#
+# Exists solely to verify the NotificationContextTypeResolver SPI in
+# NotificationDataFetcherIT: TestApprovalNotificationTypeResolver routes
+# runtime TestApprovalContext documents to this GraphQL type.
+type TestApprovalContext implements NotificationContext {
+    type: String!
+    ticketId: String
+    approvalRequestId: String
+}
