@@ -48,8 +48,9 @@ public class KnowledgeBaseService {
 
         CursorPaginationCriteria normalized = paginationCriteria.normalize();
 
-        boolean recursive = StringUtils.hasText(filter.getParentId())
-                && filter.getTagIds() != null && !filter.getTagIds().isEmpty();
+        boolean recursive = filter.getType() != KnowledgeBaseItemType.FOLDER
+                && (StringUtils.hasText(search)
+                    || (filter.getTagIds() != null && !filter.getTagIds().isEmpty()));
         if (recursive) {
             return queryArticlesInSubtree(currentUserId, filter, search, normalized);
         }
@@ -328,22 +329,28 @@ public class KnowledgeBaseService {
     private CountedGenericQueryResult<KnowledgeBaseItem> queryArticlesInSubtree(
             String currentUserId, KnowledgeBaseFilterCriteria filter, String search,
             CursorPaginationCriteria normalized) {
-        List<String> tagFilteredIds = resolveTagFilter(filter.getTagIds());
-        if (tagFilteredIds == null || tagFilteredIds.isEmpty()) {
+        Set<String> subtreeArticleIds = new HashSet<>(collectArticleIdsInSubtree(filter.getParentId()));
+        if (subtreeArticleIds.isEmpty()) {
             return buildEmptyResult(normalized);
         }
 
-        Set<String> subtreeArticleIds = new HashSet<>(collectArticleIdsInSubtree(filter.getParentId()));
-        List<String> intersection = tagFilteredIds.stream()
-                .filter(subtreeArticleIds::contains)
-                .toList();
-        if (intersection.isEmpty()) {
-            return buildEmptyResult(normalized);
+        List<String> tagFilteredIds = resolveTagFilter(filter.getTagIds());
+        List<String> targetIds;
+        if (tagFilteredIds == null) {
+            targetIds = new ArrayList<>(subtreeArticleIds);
+        } else {
+            targetIds = tagFilteredIds.stream()
+                    .filter(subtreeArticleIds::contains)
+                    .toList();
+            if (targetIds.isEmpty()) {
+                return buildEmptyResult(normalized);
+            }
         }
+
         long count = repository.countArticles(
-                currentUserId, null, search, KnowledgeBaseItemType.ARTICLE, intersection);
+                currentUserId, null, search, KnowledgeBaseItemType.ARTICLE, targetIds);
         PagedArticles paged = fetchArticlesPage(currentUserId, null, search,
-                intersection, normalized.getCursor(), normalized.getLimit());
+                targetIds, normalized.getCursor(), normalized.getLimit());
 
         PageInfo pageInfo = buildPageInfo(paged.items(), paged.hasNextPage(), normalized.hasCursor());
 
