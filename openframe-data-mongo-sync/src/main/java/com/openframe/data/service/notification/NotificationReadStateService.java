@@ -6,9 +6,13 @@ import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.repository.notification.CategoryCount;
 import com.openframe.data.repository.notification.NotificationReadStateRepository;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.validation.annotation.Validated;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -16,21 +20,19 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.apache.commons.lang3.StringUtils.isBlank;
-
 @Slf4j
 @Service
+@Validated
 @RequiredArgsConstructor
 public class NotificationReadStateService {
 
     private final NotificationReadStateRepository repository;
 
-    public void createForAudience(String notificationId, NotificationCategory category, String title,
-                                  RecipientType recipientType, Collection<String> recipientIds) {
-        if (isBlank(notificationId) || recipientType == null || recipientIds == null || recipientIds.isEmpty()) {
-            return;
-        }
-        NotificationCategory effectiveCategory = category == null ? NotificationCategory.GENERIC : category;
+    public void createForAudience(@NotBlank String notificationId,
+                                  @NotNull NotificationCategory category,
+                                  String title,
+                                  @NotNull RecipientType recipientType,
+                                  @NotEmpty Collection<String> recipientIds) {
         List<NotificationReadState> rows = new ArrayList<>(recipientIds.size());
         for (String recipientId : recipientIds) {
             rows.add(NotificationReadState.builder()
@@ -38,53 +40,40 @@ public class NotificationReadStateService {
                     .recipientType(recipientType)
                     .notificationId(notificationId)
                     .status(ReadStatus.UNREAD)
-                    .category(effectiveCategory)
+                    .category(category)
                     .title(title)
                     .build());
         }
         repository.bulkInsertUnordered(rows);
     }
 
-    public boolean hasUnread(String recipientId, RecipientType recipientType) {
-        if (isBlank(recipientId) || recipientType == null) {
-            return false;
-        }
+    public boolean hasUnread(@NotBlank String recipientId, @NotNull RecipientType recipientType) {
         return repository.existsByRecipientIdAndRecipientTypeAndStatus(
                 recipientId, recipientType, ReadStatus.UNREAD);
     }
 
-    public boolean markRead(String recipientId, RecipientType recipientType, String notificationId) {
-        if (isBlank(recipientId) || recipientType == null || isBlank(notificationId)) {
-            return false;
-        }
+    public boolean markRead(@NotBlank String recipientId,
+                            @NotNull RecipientType recipientType,
+                            @NotBlank String notificationId) {
         return repository.markAsRead(recipientId, recipientType, notificationId) > 0;
     }
 
-    public long markAllAsRead(String recipientId, RecipientType recipientType) {
-        if (isBlank(recipientId) || recipientType == null) {
-            return 0L;
-        }
+    public long markAllAsRead(@NotBlank String recipientId, @NotNull RecipientType recipientType) {
         return repository.markAllAsRead(recipientId, recipientType);
     }
 
-    public boolean deleteNotification(String recipientId, RecipientType recipientType, String notificationId) {
-        if (isBlank(recipientId) || recipientType == null || isBlank(notificationId)) {
-            return false;
-        }
+    public boolean deleteNotification(@NotBlank String recipientId,
+                                      @NotNull RecipientType recipientType,
+                                      @NotBlank String notificationId) {
         return repository.softDelete(recipientId, recipientType, notificationId) > 0;
     }
 
-    public long deleteAllRead(String recipientId, RecipientType recipientType) {
-        if (isBlank(recipientId) || recipientType == null) {
-            return 0L;
-        }
+    public long deleteAllRead(@NotBlank String recipientId, @NotNull RecipientType recipientType) {
         return repository.softDeleteAllRead(recipientId, recipientType);
     }
 
-    public Map<NotificationCategory, Long> unreadCountsByCategory(String recipientId, RecipientType recipientType) {
-        if (isBlank(recipientId) || recipientType == null) {
-            return Map.of();
-        }
+    public Map<NotificationCategory, Long> unreadCountsByCategory(@NotBlank String recipientId,
+                                                                  @NotNull RecipientType recipientType) {
         List<CategoryCount> rows = repository.unreadCountsByCategory(recipientId, recipientType);
         Map<NotificationCategory, Long> counts = new EnumMap<>(NotificationCategory.class);
         for (CategoryCount row : rows) {

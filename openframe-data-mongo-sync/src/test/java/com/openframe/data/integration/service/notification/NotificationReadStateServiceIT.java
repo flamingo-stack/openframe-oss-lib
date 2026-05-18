@@ -8,6 +8,7 @@ import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.integration.BaseMongoIntegrationTest;
 import com.openframe.data.integration.support.IntegrationTestApplication;
 import com.openframe.data.service.notification.NotificationReadStateService;
+import jakarta.validation.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -21,6 +22,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(classes = IntegrationTestApplication.class)
 @Tag("integration")
@@ -57,12 +59,11 @@ class NotificationReadStateServiceIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    @DisplayName("Given a blank/null recipientId or null recipientType, when hasUnread is called, then it short-circuits to false without hitting the database")
-    void blank_short_circuits() {
-        service.createForAudience("notif-1", CAT_TICKETS, "title", U, Set.of(ALICE));
-        assertThat(service.hasUnread(null, U)).isFalse();
-        assertThat(service.hasUnread("", U)).isFalse();
-        assertThat(service.hasUnread(ALICE, null)).isFalse();
+    @DisplayName("Given a blank/null recipientId or null recipientType, when hasUnread is called, then it throws ConstraintViolationException — invalid input is caller's bug, not a silent miss")
+    void blank_input_throws() {
+        assertThatThrownBy(() -> service.hasUnread(null, U)).isInstanceOf(ConstraintViolationException.class);
+        assertThatThrownBy(() -> service.hasUnread("", U)).isInstanceOf(ConstraintViolationException.class);
+        assertThatThrownBy(() -> service.hasUnread(ALICE, null)).isInstanceOf(ConstraintViolationException.class);
     }
 
     @Test
