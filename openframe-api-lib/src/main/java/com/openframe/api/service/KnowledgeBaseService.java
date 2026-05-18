@@ -395,18 +395,24 @@ public class KnowledgeBaseService {
     private List<String> collectArticleIdsInSubtree(String folderId) {
         List<String> articleIds = new ArrayList<>();
         Deque<String> queue = new ArrayDeque<>();
-        queue.add(folderId);
+
+        // Process the starting level first — folderId may be null (global root scan)
+        // and ArrayDeque rejects null elements.
+        collectChildren(folderId, queue, articleIds);
         while (!queue.isEmpty()) {
-            List<KnowledgeBaseItem> children = repository.findByParentId(queue.poll());
-            for (KnowledgeBaseItem child : children) {
-                if (child.getType() == KnowledgeBaseItemType.ARTICLE) {
-                    articleIds.add(child.getId());
-                } else {
-                    queue.add(child.getId());
-                }
-            }
+            collectChildren(queue.poll(), queue, articleIds);
         }
         return articleIds;
+    }
+
+    private void collectChildren(String parentId, Deque<String> queue, List<String> articleIds) {
+        for (KnowledgeBaseItem child : repository.findByParentId(parentId)) {
+            if (child.getType() == KnowledgeBaseItemType.ARTICLE) {
+                articleIds.add(child.getId());
+            } else {
+                queue.add(child.getId());
+            }
+        }
     }
 
     private void createAssignments(String articleId, AssignmentTargetType targetType, List<String> targetIds) {
