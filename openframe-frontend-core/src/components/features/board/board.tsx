@@ -17,6 +17,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core'
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
+import { useHorizontalScrollbar } from '@/hooks/ui/use-horizontal-scrollbar'
 import { cn } from '../../../utils/cn'
 import { BoardColumn } from './board-column'
 import { TicketCard } from './ticket-card'
@@ -47,6 +48,19 @@ export function Board({
   className,
 }: BoardProps) {
   const { collapsed, toggle } = useBoardCollapse(collapseStorageKey)
+
+  const {
+    scrollRef,
+    trackRef,
+    thumbRef,
+    thumbRatio,
+    onScroll,
+    onTrackClick,
+    onTrackWheel,
+    onThumbPointerDown,
+    onThumbPointerMove,
+    onThumbPointerUp,
+  } = useHorizontalScrollbar()
 
   const [items, setItems] = React.useState<BoardColumnDef[]>(columns)
   const isDraggingRef = React.useRef(false)
@@ -232,31 +246,56 @@ export function Board({
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <div className={cn('flex h-full overflow-x-auto', className)}>
-        {items.map((column, i) => {
-          const prev = items[i - 1]
-          const next = items[i + 1]
-          const joinLeft = !!(column.system && prev?.system)
-          const joinRight = !!(column.system && next?.system)
-          const showGap = i > 0 && !joinLeft
-          return (
-            <React.Fragment key={column.id}>
-              {showGap && <div aria-hidden className="w-[var(--spacing-system-mf)] shrink-0" />}
-              <BoardColumn
-                column={column}
-                collapsed={!!collapsed[column.id]}
-                onToggleCollapse={() => toggle(column.id)}
-                onAddTicket={onAddTicket}
-                getTicketHref={getTicketHref}
-                renderAssignSlot={renderAssignSlot}
-                onLoadMore={onLoadMore}
-                loadMoreRootMargin={loadMoreRootMargin}
-                joinLeft={joinLeft}
-                joinRight={joinRight}
-              />
-            </React.Fragment>
-          )
-        })}
+      <div className={cn('flex flex-col h-full', className)}>
+        <div
+          ref={scrollRef}
+          onScroll={onScroll}
+          className="flex flex-1 min-h-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {items.map((column, i) => {
+            const prev = items[i - 1]
+            const next = items[i + 1]
+            const joinLeft = !!(column.system && prev?.system)
+            const joinRight = !!(column.system && next?.system)
+            const showGap = i > 0 && !joinLeft
+            return (
+              <React.Fragment key={column.id}>
+                {showGap && <div aria-hidden className="w-[var(--spacing-system-mf)] shrink-0" />}
+                <BoardColumn
+                  column={column}
+                  collapsed={!!collapsed[column.id]}
+                  onToggleCollapse={() => toggle(column.id)}
+                  onAddTicket={onAddTicket}
+                  getTicketHref={getTicketHref}
+                  renderAssignSlot={renderAssignSlot}
+                  onLoadMore={onLoadMore}
+                  loadMoreRootMargin={loadMoreRootMargin}
+                  joinLeft={joinLeft}
+                  joinRight={joinRight}
+                />
+              </React.Fragment>
+            )
+          })}
+        </div>
+
+        {thumbRatio > 0 && (
+          <div
+            ref={trackRef}
+            onClick={onTrackClick}
+            onWheel={onTrackWheel}
+            className="relative h-2 mt-[var(--spacing-system-mf)] rounded-full bg-ods-border cursor-pointer shrink-0"
+          >
+            <div
+              ref={thumbRef}
+              data-scrollbar-thumb
+              className="absolute top-0 h-full rounded-full bg-ods-text-secondary transition-colors"
+              style={{ width: `${thumbRatio * 100}%`, cursor: 'grab' }}
+              onPointerDown={onThumbPointerDown}
+              onPointerMove={onThumbPointerMove}
+              onPointerUp={onThumbPointerUp}
+            />
+          </div>
+        )}
       </div>
       <DragOverlay dropAnimation={null}>
         {activeTicket ? (
