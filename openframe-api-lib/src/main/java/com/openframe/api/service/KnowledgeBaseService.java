@@ -48,8 +48,11 @@ public class KnowledgeBaseService {
 
         CursorPaginationCriteria normalized = paginationCriteria.normalize();
 
-        boolean recursive = StringUtils.hasText(filter.getParentId())
-                && filter.getTagIds() != null && !filter.getTagIds().isEmpty();
+        boolean recursive = filter.getType() != KnowledgeBaseItemType.FOLDER
+                && (StringUtils.hasText(search)
+                    || (StringUtils.hasText(filter.getParentId())
+                        && filter.getTagIds() != null
+                        && !filter.getTagIds().isEmpty()));
         if (recursive) {
             return queryArticlesInSubtree(currentUserId, filter, search, normalized);
         }
@@ -213,17 +216,6 @@ public class KnowledgeBaseService {
     }
 
     @Transactional
-    public KnowledgeBaseItem unpublishArticle(String id) {
-        log.info("Unpublishing article {}", id);
-        KnowledgeBaseItem article = getById(id);
-        if (article.getType() != KnowledgeBaseItemType.ARTICLE) {
-            throw new IllegalStateException("Only articles can be unpublished.");
-        }
-        article.setStatus(KnowledgeBaseArticleStatus.DRAFT);
-        return repository.save(article);
-    }
-
-    @Transactional
     public KnowledgeBaseItem archiveArticle(String id) {
         log.info("Archiving article {}", id);
         KnowledgeBaseItem item = getById(id);
@@ -339,22 +331,28 @@ public class KnowledgeBaseService {
     private CountedGenericQueryResult<KnowledgeBaseItem> queryArticlesInSubtree(
             String currentUserId, KnowledgeBaseFilterCriteria filter, String search,
             CursorPaginationCriteria normalized) {
-        List<String> tagFilteredIds = resolveTagFilter(filter.getTagIds());
-        if (tagFilteredIds == null || tagFilteredIds.isEmpty()) {
+        Set<String> subtreeArticleIds = new HashSet<>(collectArticleIdsInSubtree(filter.getParentId()));
+        if (subtreeArticleIds.isEmpty()) {
             return buildEmptyResult(normalized);
         }
 
-        Set<String> subtreeArticleIds = new HashSet<>(collectArticleIdsInSubtree(filter.getParentId()));
-        List<String> intersection = tagFilteredIds.stream()
-                .filter(subtreeArticleIds::contains)
-                .toList();
-        if (intersection.isEmpty()) {
-            return buildEmptyResult(normalized);
+        List<String> tagFilteredIds = resolveTagFilter(filter.getTagIds());
+        List<String> targetIds;
+        if (tagFilteredIds == null) {
+            targetIds = new ArrayList<>(subtreeArticleIds);
+        } else {
+            targetIds = tagFilteredIds.stream()
+                    .filter(subtreeArticleIds::contains)
+                    .toList();
+            if (targetIds.isEmpty()) {
+                return buildEmptyResult(normalized);
+            }
         }
+
         long count = repository.countArticles(
-                currentUserId, null, search, KnowledgeBaseItemType.ARTICLE, intersection);
+                currentUserId, null, search, KnowledgeBaseItemType.ARTICLE, targetIds);
         PagedArticles paged = fetchArticlesPage(currentUserId, null, search,
-                intersection, normalized.getCursor(), normalized.getLimit());
+                targetIds, normalized.getCursor(), normalized.getLimit());
 
         PageInfo pageInfo = buildPageInfo(paged.items(), paged.hasNextPage(), normalized.hasCursor());
 
@@ -397,18 +395,24 @@ public class KnowledgeBaseService {
     private List<String> collectArticleIdsInSubtree(String folderId) {
         List<String> articleIds = new ArrayList<>();
         Deque<String> queue = new ArrayDeque<>();
-        queue.add(folderId);
+
+        // Process the starting level first — folderId may be null (global root scan)
+        // and ArrayDeque rejects null elements.
+        collectChildren(folderId, queue, articleIds);
         while (!queue.isEmpty()) {
-            List<KnowledgeBaseItem> children = repository.findByParentId(queue.poll());
-            for (KnowledgeBaseItem child : children) {
-                if (child.getType() == KnowledgeBaseItemType.ARTICLE) {
-                    articleIds.add(child.getId());
-                } else {
-                    queue.add(child.getId());
-                }
-            }
+            collectChildren(queue.poll(), queue, articleIds);
         }
         return articleIds;
+    }
+
+    private void collectChildren(String parentId, Deque<String> queue, List<String> articleIds) {
+        for (KnowledgeBaseItem child : repository.findByParentId(parentId)) {
+            if (child.getType() == KnowledgeBaseItemType.ARTICLE) {
+                articleIds.add(child.getId());
+            } else {
+                queue.add(child.getId());
+            }
+        }
     }
 
     private void createAssignments(String articleId, AssignmentTargetType targetType, List<String> targetIds) {
