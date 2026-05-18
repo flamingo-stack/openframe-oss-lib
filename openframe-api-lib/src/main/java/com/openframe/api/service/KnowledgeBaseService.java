@@ -213,17 +213,6 @@ public class KnowledgeBaseService {
     }
 
     @Transactional
-    public KnowledgeBaseItem unpublishArticle(String id) {
-        log.info("Unpublishing article {}", id);
-        KnowledgeBaseItem article = getById(id);
-        if (article.getType() != KnowledgeBaseItemType.ARTICLE) {
-            throw new IllegalStateException("Only articles can be unpublished.");
-        }
-        article.setStatus(KnowledgeBaseArticleStatus.DRAFT);
-        return repository.save(article);
-    }
-
-    @Transactional
     public KnowledgeBaseItem archiveArticle(String id) {
         log.info("Archiving article {}", id);
         KnowledgeBaseItem item = getById(id);
