@@ -16,9 +16,11 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -178,6 +180,46 @@ class NotificationBroadcasterTest {
 
         verify(readStateService).createForAudience(
                 anyString(), eq("DIALOG_STREAM_FINISHED"), eq(RecipientType.USER), any());
+    }
+
+    @Test
+    @DisplayName("Given createForAudience throws a non-dup-key RuntimeException, when broadcast is called, then the just-persisted Notification doc is deleted by id and the exception is re-thrown — invisible orphans are not left behind and NATS publish is skipped")
+    void create_for_audience_failure_triggers_orphan_cleanup_and_skips_nats() {
+        doThrow(new RuntimeException("mongo down")).when(readStateService).createForAudience(
+                anyString(), anyString(), eq(RecipientType.USER), any());
+        NotificationCommand cmd = NotificationCommand.builder()
+                .title("Approval")
+                .severity(NotificationSeverity.INFO)
+                .context(genericContext("APPROVAL"))
+                .adminAudience(Set.of("admin-1"))
+                .build();
+
+        assertThatThrownBy(() -> broadcaster.broadcast(cmd))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("mongo down");
+
+        verify(notificationRepository).deleteById("notif-id-1");
+        verifyNoInteractions(natsPublisher);
+    }
+
+    @Test
+    @DisplayName("Given the NATS publisher throws RuntimeException for one recipient, when broadcast is called, then subsequent recipients still receive publishToUser/publishToMachine — one bad send does not poison the loop")
+    void nats_publish_failure_for_one_recipient_does_not_skip_others() {
+        doThrow(new RuntimeException("nats reject")).when(natsPublisher).publishToUser(eq("admin-1"), any(Notification.class));
+        NotificationCommand cmd = NotificationCommand.builder()
+                .title("Approval")
+                .severity(NotificationSeverity.INFO)
+                .context(genericContext("APPROVAL"))
+                .adminAudience(Set.of("admin-1", "admin-2", "admin-3"))
+                .machineAudience(Set.of("m-1"))
+                .build();
+
+        broadcaster.broadcast(cmd);
+
+        verify(natsPublisher).publishToUser(eq("admin-1"), any(Notification.class));
+        verify(natsPublisher).publishToUser(eq("admin-2"), any(Notification.class));
+        verify(natsPublisher).publishToUser(eq("admin-3"), any(Notification.class));
+        verify(natsPublisher).publishToMachine(eq("m-1"), any(Notification.class));
     }
 
     private static GenericContext genericContext(String type) {

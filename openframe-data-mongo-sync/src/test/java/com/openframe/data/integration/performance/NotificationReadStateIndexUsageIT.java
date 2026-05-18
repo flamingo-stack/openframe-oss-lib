@@ -247,10 +247,48 @@ class NotificationReadStateIndexUsageIT extends BaseMongoIntegrationTest {
                 .assertExecutionTimeBelow(WRITE_BUDGET_MS);
     }
 
+    @Test
+    @DisplayName("Given a heavily seeded read_states collection, when findPageForRecipient step 1 runs with readFilter=false (status=UNREAD equality), then it stays indexed — pinning the plan for the common bell-icon read-filter shape so optimizer flips don't go unnoticed")
+    void list_for_recipient_unread_filter_uses_indexed_plan() {
+        int limit = 25;
+        Query q = readStateAudienceWithStatus(HOT_ADMIN, RecipientType.USER, ReadStatus.UNREAD, limit);
+
+        Stats stats = MongoExplain.explainFind(mongoTemplate, READS_COLL, q);
+
+        stats.assertNoCollectionScan()
+                .assertUsesAnyOf(IDX_RECIPIENT_NOTIF, IDX_RECIPIENT_STATUS)
+                .assertExecutionTimeBelow(FIND_BUDGET_MS);
+        stats.assertExaminedAtMost(limit * 4L);
+    }
+
+    @Test
+    @DisplayName("Given a heavily seeded read_states collection, when findPageForRecipient step 1 runs with readFilter=true (status=READ equality), then it stays indexed even when the matching slice is small/empty — guards against the optimizer falling back to collscan on selective filters")
+    void list_for_recipient_read_filter_uses_indexed_plan() {
+        int limit = 25;
+        Query q = readStateAudienceWithStatus(HOT_ADMIN, RecipientType.USER, ReadStatus.READ, limit);
+
+        Stats stats = MongoExplain.explainFind(mongoTemplate, READS_COLL, q);
+
+        stats.assertNoCollectionScan()
+                .assertUsesAnyOf(IDX_RECIPIENT_NOTIF, IDX_RECIPIENT_STATUS)
+                .assertExecutionTimeBelow(FIND_BUDGET_MS);
+        stats.assertExaminedAtMost(limit * 4L);
+    }
+
     private static Query readStateAudienceQuery(String recipientId, RecipientType type, int limit) {
         Query q = Query.query(Criteria.where(FIELD_RECIPIENT_ID).is(recipientId)
                 .and(FIELD_RECIPIENT_TYPE).is(type)
                 .and(FIELD_STATUS).ne(ReadStatus.DELETED));
+        q.fields().include(FIELD_NOTIFICATION_ID).include(FIELD_STATUS);
+        q.with(Sort.by(Sort.Direction.DESC, FIELD_NOTIFICATION_ID));
+        q.limit(limit);
+        return q;
+    }
+
+    private static Query readStateAudienceWithStatus(String recipientId, RecipientType type, ReadStatus status, int limit) {
+        Query q = Query.query(Criteria.where(FIELD_RECIPIENT_ID).is(recipientId)
+                .and(FIELD_RECIPIENT_TYPE).is(type)
+                .and(FIELD_STATUS).is(status));
         q.fields().include(FIELD_NOTIFICATION_ID).include(FIELD_STATUS);
         q.with(Sort.by(Sort.Direction.DESC, FIELD_NOTIFICATION_ID));
         q.limit(limit);

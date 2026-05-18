@@ -89,7 +89,7 @@ public class NotificationService {
             endCursor = resumeCursor != null ? resumeCursor : lastItemCursor;
         }
 
-        boolean hasNextPage = !criteria.isBackward() && hasMore;
+        boolean hasNextPage = criteria.isBackward() ? criteria.hasCursor() : hasMore;
         boolean hasPreviousPage = criteria.isBackward() ? hasMore : criteria.hasCursor();
 
         return PageInfo.builder()

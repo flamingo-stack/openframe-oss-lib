@@ -33,25 +33,47 @@ public class NotificationBroadcaster {
                 saved.getId(), command.getAdminAudience().size(), command.getMachineAudience().size());
 
         Set<String> admins = command.getAdminAudience();
-        if (!admins.isEmpty()) {
-            readStateService.createForAudience(
-                    saved.getId(), command.getContext().getType(), RecipientType.USER, admins);
-        }
         Set<String> machines = command.getMachineAudience();
-        if (!machines.isEmpty()) {
-            readStateService.createForAudience(
-                    saved.getId(), command.getContext().getType(), RecipientType.MACHINE, machines);
+        try {
+            if (!admins.isEmpty()) {
+                readStateService.createForAudience(
+                        saved.getId(), command.getContext().getType(), RecipientType.USER, admins);
+            }
+            if (!machines.isEmpty()) {
+                readStateService.createForAudience(
+                        saved.getId(), command.getContext().getType(), RecipientType.MACHINE, machines);
+            }
+        } catch (RuntimeException ex) {
+            log.error("createForAudience failed for notification {} (admins={}, machines={}); "
+                            + "deleting orphaned notification doc to keep storage consistent — caller must retry",
+                    saved.getId(), admins.size(), machines.size(), ex);
+            try {
+                notificationRepository.deleteById(saved.getId());
+            } catch (RuntimeException cleanupEx) {
+                log.error("orphan cleanup of notification {} ALSO failed — manual intervention required",
+                        saved.getId(), cleanupEx);
+            }
+            throw ex;
         }
 
         natsPublisher.ifPresentOrElse(publisher -> {
             for (String userId : admins) {
-                publisher.publishToUser(userId, saved);
+                publishSafely(() -> publisher.publishToUser(userId, saved), saved.getId(), "user", userId);
             }
             for (String machineId : machines) {
-                publisher.publishToMachine(machineId, saved);
+                publishSafely(() -> publisher.publishToMachine(machineId, saved), saved.getId(), "machine", machineId);
             }
         }, () -> log.debug("NATS publisher disabled — notification {} persisted only; clients reconcile via GraphQL catch-up", saved.getId()));
 
         return saved;
+    }
+
+    private void publishSafely(Runnable publish, String notificationId, String recipientKind, String recipientId) {
+        try {
+            publish.run();
+        } catch (RuntimeException ex) {
+            log.warn("NATS publish to {}={} for notification {} failed; recipient will catch up via GraphQL: {}",
+                    recipientKind, recipientId, notificationId, ex.getMessage());
+        }
     }
 }

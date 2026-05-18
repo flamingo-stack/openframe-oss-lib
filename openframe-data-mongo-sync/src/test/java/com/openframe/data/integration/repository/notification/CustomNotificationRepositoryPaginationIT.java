@@ -296,6 +296,35 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
         assertThat(result.items()).hasSize(1);
     }
 
+    @Test
+    @DisplayName("Given enough non-matching read_state rows past a backward cursor to exhaust the iteration cap, when search runs backward, then the result is NotificationPage.truncated with a non-null resumeCursor — backward direction is not silently undersized either")
+    void search_truncated_signals_resume_cursor_when_backward_iter_cap_hit() {
+        int orphanRows = 7200;
+        List<NotificationReadState> rows = new ArrayList<>(orphanRows);
+        List<String> ids = new ArrayList<>(orphanRows);
+        for (int i = 0; i < orphanRows; i++) {
+            String id = new ObjectId().toHexString();
+            ids.add(id);
+            rows.add(NotificationReadState.builder()
+                    .recipientId(ALICE)
+                    .recipientType(U)
+                    .notificationId(id)
+                    .status(ReadStatus.UNREAD)
+                    .contextType("test")
+                    .build());
+        }
+        mongoTemplate.insert(rows, NotificationReadState.class);
+        String anchorCursor = ids.stream().min(String::compareTo).orElseThrow();
+
+        NotificationPage result = repository.findPageForRecipient(
+                ALICE, U, null, "doesnotmatch", anchorCursor, true, 5);
+
+        assertThat(result.searchTruncated()).isTrue();
+        assertThat(result.resumeCursor()).isNotNull();
+        assertThat(result.resumeCursor()).isNotEqualTo(anchorCursor);
+        assertThat(result.items()).isEmpty();
+    }
+
     private List<NotificationWithStatus> page(String recipientId, RecipientType type,
                                               Boolean readFilter, String search,
                                               String cursor, boolean backward, int limit) {

@@ -24,7 +24,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
-import org.springframework.validation.annotation.Validated;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,7 +34,6 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 @DgsComponent
 @RequiredArgsConstructor
 @Slf4j
-@Validated
 public class NotificationDataFetcher {
 
     private static final Relay RELAY = new Relay();
@@ -162,6 +160,7 @@ public class NotificationDataFetcher {
         if (authentication instanceof JwtAuthenticationToken jwtAuth) {
             return AuthPrincipal.fromJwt(jwtAuth.getToken());
         }
-        throw new UnauthorizedException("Authenticated principal is required to access notifications");
+        throw new UnauthorizedException("Notifications require a JWT-authenticated principal; got " +
+                (authentication == null ? "no authentication" : authentication.getClass().getSimpleName()));
     }
 }
