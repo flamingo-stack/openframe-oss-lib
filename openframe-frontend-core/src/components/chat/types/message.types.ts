@@ -29,6 +29,19 @@ export const MESSAGE_TYPE = {
 
 export type MessageType = typeof MESSAGE_TYPE[keyof typeof MESSAGE_TYPE]
 
+// ========== Scroll Anchor (per-message render hint) ==========
+
+/** Per-message viewport-positioning hint sent on the per-turn metadata
+ *  leading frame at the START of every assistant response. The chat
+ *  message-list reads it to override the default `use-stick-to-bottom`
+ *  tail behaviour for a single message. Field is OPTIONAL — when omitted
+ *  (or set to `'bottom'`) the chat tails as today. Only `'top'` opts in
+ *  to the alternative behaviour (used by display-action answers whose
+ *  body is a long article and should be read top-down). */
+export const SCROLL_ANCHOR = { TOP: 'top', BOTTOM: 'bottom' } as const
+
+export type ScrollAnchor = typeof SCROLL_ANCHOR[keyof typeof SCROLL_ANCHOR]
+
 // ========== Tool Execution Types ==========
 
 export interface ToolExecutionData {
@@ -313,4 +326,11 @@ export interface Message {
    *  user messages and legacy turns omit this field. The host's
    *  `renderEntityCard` callback resolves keys to inline components. */
   chatRefs?: Record<string, MessageChatRef>
+  /** Per-message viewport-positioning hint. OPTIONAL — when omitted (the
+   *  default for every LLM Q&A / browse / search / find / Discuss path)
+   *  the chat tails as today via `use-stick-to-bottom`. Only `'top'` opts
+   *  in to the alternative top-anchor behaviour (display-action answers
+   *  whose body is a long article). The server is the sole decision-
+   *  maker — set on the metadata leading frame. */
+  scrollAnchor?: ScrollAnchor
 }
