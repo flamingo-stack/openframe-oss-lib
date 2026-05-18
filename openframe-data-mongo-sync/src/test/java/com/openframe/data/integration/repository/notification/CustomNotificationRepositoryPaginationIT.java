@@ -124,7 +124,7 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
     void deleted_excluded_by_default() {
         Notification a = seedNotification("a");
         Notification b = seedNotification("b");
-        seedReadState(ALICE, U, a.getId(), ReadStatus.UNREAD);
+        seedReadState(ALICE, U, a.getId(), ReadStatus.UNREAD, a.getTitle());
         seedReadState(ALICE, U, b.getId(), ReadStatus.DELETED);
 
         List<NotificationWithStatus> page = page(ALICE, U, null, null, null, false, 10);
@@ -136,7 +136,7 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
     void read_filter_true() {
         Notification a = seedNotification("a");
         Notification b = seedNotification("b");
-        seedReadState(ALICE, U, a.getId(), ReadStatus.UNREAD);
+        seedReadState(ALICE, U, a.getId(), ReadStatus.UNREAD, a.getTitle());
         seedReadState(ALICE, U, b.getId(), ReadStatus.READ);
 
         List<NotificationWithStatus> page = page(ALICE, U, true, null, null, false, 10);
@@ -150,7 +150,7 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
     void read_filter_false() {
         Notification a = seedNotification("a");
         Notification b = seedNotification("b");
-        seedReadState(ALICE, U, a.getId(), ReadStatus.UNREAD);
+        seedReadState(ALICE, U, a.getId(), ReadStatus.UNREAD, a.getTitle());
         seedReadState(ALICE, U, b.getId(), ReadStatus.READ);
 
         List<NotificationWithStatus> page = page(ALICE, U, false, null, null, false, 10);
@@ -165,8 +165,8 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
         Notification welcome = repository.save(NotificationFixtures.basic("welcome", "{}"));
         sleepBriefly();
         Notification alert = repository.save(NotificationFixtures.basic("ALERT", "{}"));
-        seedReadState(ALICE, U, welcome.getId(), ReadStatus.UNREAD);
-        seedReadState(ALICE, U, alert.getId(), ReadStatus.UNREAD);
+        seedReadState(ALICE, U, welcome.getId(), ReadStatus.UNREAD, welcome.getTitle());
+        seedReadState(ALICE, U, alert.getId(), ReadStatus.UNREAD, alert.getTitle());
 
         List<NotificationWithStatus> page = page(ALICE, U, null, "alert", null, false, 10);
         assertThat(page).extracting(it -> it.notification().getId()).containsExactly(alert.getId());
@@ -180,7 +180,7 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
             boolean isMatch = i % 4 == 0;
             String title = isMatch ? "alert-" + i : "noise-" + i;
             Notification n = repository.save(NotificationFixtures.basic(title, "{}"));
-            seedReadState(ALICE, U, n.getId(), ReadStatus.UNREAD);
+            seedReadState(ALICE, U, n.getId(), ReadStatus.UNREAD, n.getTitle());
             if (isMatch) {
                 matching.add(n);
             }
@@ -201,7 +201,7 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
         for (int i = 0; i < 10; i++) {
             String title = i == 3 ? "alert-one" : "noise-" + i;
             Notification n = repository.save(NotificationFixtures.basic(title, "{}"));
-            seedReadState(ALICE, U, n.getId(), ReadStatus.UNREAD);
+            seedReadState(ALICE, U, n.getId(), ReadStatus.UNREAD, n.getTitle());
             sleepBriefly();
         }
 
@@ -217,13 +217,13 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
         List<Notification> matching = new ArrayList<>();
         for (int i = 0; i < 3; i++) {
             Notification n = repository.save(NotificationFixtures.basic("alert-" + i, "{}"));
-            seedReadState(ALICE, U, n.getId(), ReadStatus.UNREAD);
+            seedReadState(ALICE, U, n.getId(), ReadStatus.UNREAD, n.getTitle());
             matching.add(n);
             sleepBriefly();
         }
         for (int i = 0; i < 100; i++) {
             Notification n = repository.save(NotificationFixtures.basic("noise-" + i, "{}"));
-            seedReadState(ALICE, U, n.getId(), ReadStatus.UNREAD);
+            seedReadState(ALICE, U, n.getId(), ReadStatus.UNREAD, n.getTitle());
             sleepBriefly();
         }
 
@@ -242,7 +242,7 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
             boolean isMatch = i % 3 == 0;
             String title = isMatch ? "alert-" + i : "noise-" + i;
             Notification n = repository.save(NotificationFixtures.basic(title, "{}"));
-            seedReadState(ALICE, U, n.getId(), ReadStatus.UNREAD);
+            seedReadState(ALICE, U, n.getId(), ReadStatus.UNREAD, n.getTitle());
             if (isMatch) {
                 matching.add(n);
             }
@@ -262,68 +262,14 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
     }
 
     @Test
-    @DisplayName("Given enough non-matching read_state rows to fill all 10 streaming iterations (orphan notificationIds → 0 matches per batch), when search runs, then the result is NotificationPage.truncated with a non-null resumeCursor — replaces the silent undersized page bug")
-    void search_truncated_signals_resume_cursor_when_iter_cap_hit() {
-        int orphanRows = 7200;
-        List<NotificationReadState> rows = new ArrayList<>(orphanRows);
-        for (int i = 0; i < orphanRows; i++) {
-            rows.add(NotificationReadState.builder()
-                    .recipientId(ALICE)
-                    .recipientType(U)
-                    .notificationId(new ObjectId().toHexString())
-                    .status(ReadStatus.UNREAD)
-                    .category(NotificationCategory.GENERIC)
-                    .build());
-        }
-        mongoTemplate.insert(rows, NotificationReadState.class);
-
-        NotificationPage result = repository.findPageForRecipient(ALICE, U, null, "doesnotmatch", null, false, 5);
-
-        assertThat(result.searchTruncated()).isTrue();
-        assertThat(result.resumeCursor()).isNotNull();
-        assertThat(result.items()).isEmpty();
-    }
-
-    @Test
-    @DisplayName("Given a recipient with a sparse-match search that completes within the iteration cap, when search runs, then NotificationPage is not truncated and resumeCursor is null — sanity check that the truncation flag stays off in the normal happy path")
-    void search_not_truncated_when_matches_found_in_one_iter() {
+    @DisplayName("Given a recipient with a single matching read_state for the search term, when search runs, then exactly that one row comes back — flat-query path, no overfetch")
+    void search_returns_only_matching_rows() {
         Notification alert = repository.save(NotificationFixtures.basic("alert", "{}"));
-        seedReadState(ALICE, U, alert.getId(), ReadStatus.UNREAD);
+        seedReadState(ALICE, U, alert.getId(), ReadStatus.UNREAD, "alert");
 
         NotificationPage result = repository.findPageForRecipient(ALICE, U, null, "alert", null, false, 10);
 
-        assertThat(result.searchTruncated()).isFalse();
-        assertThat(result.resumeCursor()).isNull();
         assertThat(result.items()).hasSize(1);
-    }
-
-    @Test
-    @DisplayName("Given enough non-matching read_state rows past a backward cursor to exhaust the iteration cap, when search runs backward, then the result is NotificationPage.truncated with a non-null resumeCursor — backward direction is not silently undersized either")
-    void search_truncated_signals_resume_cursor_when_backward_iter_cap_hit() {
-        int orphanRows = 7200;
-        List<NotificationReadState> rows = new ArrayList<>(orphanRows);
-        List<String> ids = new ArrayList<>(orphanRows);
-        for (int i = 0; i < orphanRows; i++) {
-            String id = new ObjectId().toHexString();
-            ids.add(id);
-            rows.add(NotificationReadState.builder()
-                    .recipientId(ALICE)
-                    .recipientType(U)
-                    .notificationId(id)
-                    .status(ReadStatus.UNREAD)
-                    .category(NotificationCategory.GENERIC)
-                    .build());
-        }
-        mongoTemplate.insert(rows, NotificationReadState.class);
-        String anchorCursor = ids.stream().min(String::compareTo).orElseThrow();
-
-        NotificationPage result = repository.findPageForRecipient(
-                ALICE, U, null, "doesnotmatch", anchorCursor, true, 5);
-
-        assertThat(result.searchTruncated()).isTrue();
-        assertThat(result.resumeCursor()).isNotNull();
-        assertThat(result.resumeCursor()).isNotEqualTo(anchorCursor);
-        assertThat(result.items()).isEmpty();
     }
 
     private List<NotificationWithStatus> page(String recipientId, RecipientType type,
@@ -342,7 +288,7 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
         List<Notification> saved = new ArrayList<>();
         for (int i = 0; i < count; i++) {
             Notification n = repository.save(NotificationFixtures.basic("type-" + i, "{}"));
-            seedReadState(recipientId, type, n.getId(), ReadStatus.UNREAD);
+            seedReadState(recipientId, type, n.getId(), ReadStatus.UNREAD, n.getTitle());
             sleepBriefly();
             saved.add(n);
         }
@@ -350,12 +296,17 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
     }
 
     private void seedReadState(String recipientId, RecipientType type, String notificationId, ReadStatus status) {
+        seedReadState(recipientId, type, notificationId, status, null);
+    }
+
+    private void seedReadState(String recipientId, RecipientType type, String notificationId, ReadStatus status, String title) {
         NotificationReadState rs = NotificationReadState.builder()
                 .recipientId(recipientId)
                 .recipientType(type)
                 .notificationId(notificationId)
                 .status(status)
                 .category(NotificationCategory.GENERIC)
+                .title(title)
                 .build();
         mongoTemplate.save(rs);
     }

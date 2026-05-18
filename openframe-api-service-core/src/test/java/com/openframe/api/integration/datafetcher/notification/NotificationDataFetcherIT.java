@@ -76,7 +76,7 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
     void admin_lists_own_rows() {
         loginAsAdmin(ALICE);
         Notification n = mongoTemplate.save(NotificationFixtures.basic("welcome"));
-        readStateService.createForAudience(n.getId(), NotificationCategory.TICKETS, RecipientType.USER, Set.of(ALICE));
+        readStateService.createForAudience(n.getId(), NotificationCategory.TICKETS, "title", RecipientType.USER, Set.of(ALICE));
 
         ExecutionResult res = queryExecutor.execute("""
                 query { notifications(first: 10) { edges { node { id title read } } } }
@@ -90,7 +90,7 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
     void agent_lists_machine_rows() {
         loginAsAgent(MACHINE_1);
         Notification n = mongoTemplate.save(NotificationFixtures.basic("ticket-update"));
-        readStateService.createForAudience(n.getId(), NotificationCategory.TICKETS, RecipientType.MACHINE, Set.of(MACHINE_1));
+        readStateService.createForAudience(n.getId(), NotificationCategory.TICKETS, "title", RecipientType.MACHINE, Set.of(MACHINE_1));
 
         ExecutionResult res = queryExecutor.execute("""
                 query { notifications(first: 10) { edges { node { id title read } } } }
@@ -104,7 +104,7 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
     void has_unread() {
         loginAsAdmin(ALICE);
         Notification n = mongoTemplate.save(NotificationFixtures.basic());
-        readStateService.createForAudience(n.getId(), NotificationCategory.TICKETS, RecipientType.USER, Set.of(ALICE));
+        readStateService.createForAudience(n.getId(), NotificationCategory.TICKETS, "title", RecipientType.USER, Set.of(ALICE));
 
         ExecutionResult res = queryExecutor.execute("query { hasUnreadNotifications }");
         assertThat(res.<Map<String, Object>>getData().get("hasUnreadNotifications")).isEqualTo(true);
@@ -119,7 +119,7 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
     void mark_as_read() {
         loginAsAdmin(ALICE);
         Notification n = mongoTemplate.save(NotificationFixtures.basic());
-        readStateService.createForAudience(n.getId(), NotificationCategory.TICKETS, RecipientType.USER, Set.of(ALICE));
+        readStateService.createForAudience(n.getId(), NotificationCategory.TICKETS, "title", RecipientType.USER, Set.of(ALICE));
 
         String globalId = RELAY.toGlobalId("Notification", n.getId());
         ExecutionResult res = queryExecutor.execute(
@@ -135,8 +135,8 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
         loginAsAdmin(ALICE);
         Notification n1 = mongoTemplate.save(NotificationFixtures.basic("a"));
         Notification n2 = mongoTemplate.save(NotificationFixtures.basic("b"));
-        readStateService.createForAudience(n1.getId(), NotificationCategory.TICKETS, RecipientType.USER, Set.of(ALICE));
-        readStateService.createForAudience(n2.getId(), NotificationCategory.TICKETS, RecipientType.USER, Set.of(ALICE));
+        readStateService.createForAudience(n1.getId(), NotificationCategory.TICKETS, "title", RecipientType.USER, Set.of(ALICE));
+        readStateService.createForAudience(n2.getId(), NotificationCategory.TICKETS, "title", RecipientType.USER, Set.of(ALICE));
 
         ExecutionResult res = queryExecutor.execute("mutation { markAllNotificationsAsRead }");
         assertThat(((Number) res.<Map<String, Object>>getData().get("markAllNotificationsAsRead")).longValue())
@@ -148,7 +148,7 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
     void delete_notification() {
         loginAsAdmin(ALICE);
         Notification n = mongoTemplate.save(NotificationFixtures.basic());
-        readStateService.createForAudience(n.getId(), NotificationCategory.TICKETS, RecipientType.USER, Set.of(ALICE));
+        readStateService.createForAudience(n.getId(), NotificationCategory.TICKETS, "title", RecipientType.USER, Set.of(ALICE));
 
         String globalId = RELAY.toGlobalId("Notification", n.getId());
         ExecutionResult res = queryExecutor.execute(
@@ -163,8 +163,8 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
         loginAsAdmin(ALICE);
         Notification n1 = mongoTemplate.save(NotificationFixtures.basic("a"));
         Notification n2 = mongoTemplate.save(NotificationFixtures.basic("b"));
-        readStateService.createForAudience(n1.getId(), NotificationCategory.TICKETS, RecipientType.USER, Set.of(ALICE));
-        readStateService.createForAudience(n2.getId(), NotificationCategory.TICKETS, RecipientType.USER, Set.of(ALICE));
+        readStateService.createForAudience(n1.getId(), NotificationCategory.TICKETS, "title", RecipientType.USER, Set.of(ALICE));
+        readStateService.createForAudience(n2.getId(), NotificationCategory.TICKETS, "title", RecipientType.USER, Set.of(ALICE));
         readStateService.markRead(ALICE, RecipientType.USER, n1.getId());
 
         ExecutionResult res = queryExecutor.execute("mutation { deleteAllReadNotifications }");
@@ -178,8 +178,8 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
         loginAsAdmin(ALICE);
         Notification n1 = mongoTemplate.save(NotificationFixtures.basic("TICKET_A"));
         Notification n2 = mongoTemplate.save(NotificationFixtures.basic("MINGO_A"));
-        readStateService.createForAudience(n1.getId(), NotificationCategory.TICKETS, RecipientType.USER, Set.of(ALICE));
-        readStateService.createForAudience(n2.getId(), NotificationCategory.MINGO, RecipientType.USER, Set.of(ALICE));
+        readStateService.createForAudience(n1.getId(), NotificationCategory.TICKETS, "title", RecipientType.USER, Set.of(ALICE));
+        readStateService.createForAudience(n2.getId(), NotificationCategory.MINGO, "title", RecipientType.USER, Set.of(ALICE));
 
         ExecutionResult res = queryExecutor.execute("query { unreadCountsByCategory { category count } }");
         @SuppressWarnings("unchecked")

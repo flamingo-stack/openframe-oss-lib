@@ -38,14 +38,15 @@ public class NotificationBroadcaster {
         Set<String> admins = command.getAdminAudience();
         Set<String> machines = command.getMachineAudience();
         NotificationCategory category = descriptorRegistry.categoryOf(command.getContext().getType());
+        String title = command.getTitle();
         try {
             if (!admins.isEmpty()) {
                 readStateService.createForAudience(
-                        saved.getId(), category, RecipientType.USER, admins);
+                        saved.getId(), category, title, RecipientType.USER, admins);
             }
             if (!machines.isEmpty()) {
                 readStateService.createForAudience(
-                        saved.getId(), category, RecipientType.MACHINE, machines);
+                        saved.getId(), category, title, RecipientType.MACHINE, machines);
             }
         } catch (RuntimeException ex) {
             log.error("createForAudience failed for notification {} (admins={}, machines={}); "

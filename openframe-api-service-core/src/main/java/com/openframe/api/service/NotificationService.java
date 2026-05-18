@@ -43,15 +43,8 @@ public class NotificationService {
                 recipientId, recipientType, filter.read(), effectiveSearch,
                 normalized.getCursor(), normalized.isBackward(), limit + 1);
 
-        boolean hasMore;
-        List<NotificationWithStatus> items;
-        if (repoPage.searchTruncated()) {
-            hasMore = true;
-            items = repoPage.items();
-        } else {
-            hasMore = repoPage.items().size() > limit;
-            items = hasMore ? repoPage.items().subList(0, limit) : repoPage.items();
-        }
+        boolean hasMore = repoPage.items().size() > limit;
+        List<NotificationWithStatus> items = hasMore ? repoPage.items().subList(0, limit) : repoPage.items();
 
         if (normalized.isBackward()) {
             items = items.reversed();
@@ -63,7 +56,7 @@ public class NotificationService {
 
         return GenericQueryResult.<NotificationView>builder()
                 .items(views)
-                .pageInfo(buildPageInfo(views, hasMore, repoPage.resumeCursor(), normalized))
+                .pageInfo(buildPageInfo(views, hasMore, normalized))
                 .build();
     }
 
@@ -76,20 +69,9 @@ public class NotificationService {
     }
 
     private PageInfo buildPageInfo(List<NotificationView> items, boolean hasMore,
-                                   String resumeCursorId, CursorPaginationCriteria criteria) {
+                                   CursorPaginationCriteria criteria) {
         String firstItemCursor = items.isEmpty() ? null : CursorCodec.encode(items.getFirst().id());
         String lastItemCursor = items.isEmpty() ? null : CursorCodec.encode(items.getLast().id());
-        String resumeCursor = resumeCursorId == null ? null : CursorCodec.encode(resumeCursorId);
-
-        String startCursor;
-        String endCursor;
-        if (criteria.isBackward()) {
-            startCursor = resumeCursor != null ? resumeCursor : firstItemCursor;
-            endCursor = lastItemCursor;
-        } else {
-            startCursor = firstItemCursor;
-            endCursor = resumeCursor != null ? resumeCursor : lastItemCursor;
-        }
 
         boolean hasNextPage = criteria.isBackward() ? criteria.hasCursor() : hasMore;
         boolean hasPreviousPage = criteria.isBackward() ? hasMore : criteria.hasCursor();
@@ -97,8 +79,8 @@ public class NotificationService {
         return PageInfo.builder()
                 .hasNextPage(hasNextPage)
                 .hasPreviousPage(hasPreviousPage)
-                .startCursor(startCursor)
-                .endCursor(endCursor)
+                .startCursor(firstItemCursor)
+                .endCursor(lastItemCursor)
                 .build();
     }
 }

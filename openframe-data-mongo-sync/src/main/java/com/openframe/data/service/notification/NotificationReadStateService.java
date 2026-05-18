@@ -25,7 +25,7 @@ public class NotificationReadStateService {
 
     private final NotificationReadStateRepository repository;
 
-    public void createForAudience(String notificationId, NotificationCategory category,
+    public void createForAudience(String notificationId, NotificationCategory category, String title,
                                   RecipientType recipientType, Collection<String> recipientIds) {
         if (isBlank(notificationId) || recipientType == null || recipientIds == null || recipientIds.isEmpty()) {
             return;
@@ -39,6 +39,7 @@ public class NotificationReadStateService {
                     .notificationId(notificationId)
                     .status(ReadStatus.UNREAD)
                     .category(effectiveCategory)
+                    .title(title)
                     .build());
         }
         repository.bulkInsertUnordered(rows);

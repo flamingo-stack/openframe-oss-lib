@@ -43,5 +43,7 @@ public class NotificationReadState {
 
     private NotificationCategory category;
 
+    private String title;
+
     private Instant readAt;
 }

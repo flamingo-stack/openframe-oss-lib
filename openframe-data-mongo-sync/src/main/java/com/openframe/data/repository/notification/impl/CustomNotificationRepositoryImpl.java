@@ -16,7 +16,11 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
@@ -33,91 +37,33 @@ public class CustomNotificationRepositoryImpl implements CustomNotificationRepos
     private static final String FIELD_NOTIFICATION_ID = "notificationId";
     private static final String FIELD_STATUS = "status";
 
-    private static final int SEARCH_MIN_BATCH = 64;
-    private static final int SEARCH_BATCH_MULTIPLIER = 4;
-    private static final int SEARCH_MAX_BATCH = 1024;
-    private static final int SEARCH_MAX_ITERATIONS = 10;
-
     private final MongoTemplate mongoTemplate;
 
     @Override
     public NotificationPage findPageForRecipient(String recipientId, RecipientType recipientType,
                                                  Boolean readFilter, String search,
                                                  String cursor, boolean backward, int limit) {
-        if (isBlank(search)) {
-            return findPageNoSearch(recipientId, recipientType, readFilter, cursor, backward, limit);
-        }
-        return findPageStreamingSearch(recipientId, recipientType, readFilter, search, cursor, backward, limit);
-    }
-
-    private NotificationPage findPageNoSearch(String recipientId, RecipientType recipientType,
-                                              Boolean readFilter, String cursor,
-                                              boolean backward, int limit) {
-        LinkedHashMap<String, ReadStatus> idsToStatus = fetchReadStatesBatch(
-                recipientId, recipientType, readFilter, cursor, backward, limit);
+        LinkedHashMap<String, ReadStatus> idsToStatus = fetchReadStates(
+                recipientId, recipientType, readFilter, search, cursor, backward, limit);
         if (idsToStatus.isEmpty()) {
             return NotificationPage.of(List.of());
         }
-        return NotificationPage.of(fetchNotificationsPreservingOrder(idsToStatus, null));
+        return NotificationPage.of(fetchNotificationsPreservingOrder(idsToStatus));
     }
 
-    private NotificationPage findPageStreamingSearch(String recipientId, RecipientType recipientType,
-                                                     Boolean readFilter, String search,
-                                                     String cursor, boolean backward, int limit) {
-        List<NotificationWithStatus> collected = new ArrayList<>(limit);
-        String iterCursor = cursor;
-        int batchSize = Math.clamp((long) limit * SEARCH_BATCH_MULTIPLIER, SEARCH_MIN_BATCH, SEARCH_MAX_BATCH);
-        boolean readStatesExhausted = false;
-        int iterationsConsumed = 0;
-        for (int iter = 0; iter < SEARCH_MAX_ITERATIONS && collected.size() < limit; iter++) {
-            iterationsConsumed = iter + 1;
-            LinkedHashMap<String, ReadStatus> batch = fetchReadStatesBatch(
-                    recipientId, recipientType, readFilter, iterCursor, backward, batchSize);
-            if (batch.isEmpty()) {
-                readStatesExhausted = true;
-                break;
-            }
-            List<NotificationWithStatus> matched = fetchNotificationsPreservingOrder(batch, search);
-            for (NotificationWithStatus row : matched) {
-                collected.add(row);
-                if (collected.size() >= limit) {
-                    break;
-                }
-            }
-            if (batch.size() < batchSize) {
-                readStatesExhausted = true;
-                break;
-            }
-            String last = lastKey(batch);
-            if (last == null || last.equals(iterCursor)) {
-                readStatesExhausted = true;
-                break;
-            }
-            iterCursor = last;
-            batchSize = Math.min(batchSize * 2, SEARCH_MAX_BATCH);
-        }
-        if (!readStatesExhausted && collected.size() < limit) {
-            log.warn("Notification search exhausted iteration cap before filling page "
-                            + "(recipientId={}, recipientType={}, search='{}', collected={}, limit={}, lastCursor={}); "
-                            + "returning truncated page with resumeCursor so caller can continue.",
-                    recipientId, recipientType, search, collected.size(), limit, iterCursor);
-            return NotificationPage.truncated(collected, iterCursor, iterationsConsumed);
-        }
-        return NotificationPage.streamed(collected, iterationsConsumed);
-    }
-
-    private LinkedHashMap<String, ReadStatus> fetchReadStatesBatch(String recipientId, RecipientType recipientType,
-                                                                   Boolean readFilter, String cursor,
-                                                                   boolean backward, int batchSize) {
+    private LinkedHashMap<String, ReadStatus> fetchReadStates(String recipientId, RecipientType recipientType,
+                                                              Boolean readFilter, String search,
+                                                              String cursor, boolean backward, int limit) {
         Criteria criteria = Criteria.where(FIELD_RECIPIENT_ID).is(recipientId)
                 .and(FIELD_RECIPIENT_TYPE).is(recipientType);
         applyStatusFilter(criteria, readFilter);
         applyCursor(criteria, cursor, backward);
+        applySearch(criteria, search);
 
         Query query = new Query(criteria);
         query.fields().include(FIELD_NOTIFICATION_ID).include(FIELD_STATUS);
         query.with(Sort.by(backward ? Sort.Direction.ASC : Sort.Direction.DESC, FIELD_NOTIFICATION_ID));
-        query.limit(batchSize);
+        query.limit(limit);
 
         List<NotificationReadState> rows = mongoTemplate.find(query, NotificationReadState.class);
         LinkedHashMap<String, ReadStatus> ordered = new LinkedHashMap<>(rows.size());
@@ -127,8 +73,7 @@ public class CustomNotificationRepositoryImpl implements CustomNotificationRepos
         return ordered;
     }
 
-    private List<NotificationWithStatus> fetchNotificationsPreservingOrder(
-            LinkedHashMap<String, ReadStatus> idsToStatus, String search) {
+    private List<NotificationWithStatus> fetchNotificationsPreservingOrder(LinkedHashMap<String, ReadStatus> idsToStatus) {
         List<ObjectId> objectIds = new ArrayList<>(idsToStatus.size());
         for (String id : idsToStatus.keySet()) {
             try {
@@ -139,12 +84,8 @@ public class CustomNotificationRepositoryImpl implements CustomNotificationRepos
         if (objectIds.isEmpty()) {
             return List.of();
         }
-        Criteria criteria = Criteria.where(FIELD_ID).in(objectIds);
-        Criteria searchCriteria = searchCriteria(search);
-        if (searchCriteria != null) {
-            criteria = new Criteria().andOperator(criteria, searchCriteria);
-        }
-        List<Notification> fetched = mongoTemplate.find(new Query(criteria), Notification.class);
+        List<Notification> fetched = mongoTemplate.find(
+                new Query(Criteria.where(FIELD_ID).in(objectIds)), Notification.class);
 
         Map<String, Notification> byId = new HashMap<>(fetched.size());
         for (Notification n : fetched) {
@@ -181,18 +122,10 @@ public class CustomNotificationRepositoryImpl implements CustomNotificationRepos
         }
     }
 
-    private static Criteria searchCriteria(String search) {
+    private static void applySearch(Criteria criteria, String search) {
         if (isBlank(search)) {
-            return null;
+            return;
         }
-        return Criteria.where(FIELD_TITLE).regex(Pattern.quote(search), "i");
-    }
-
-    private static String lastKey(LinkedHashMap<String, ReadStatus> map) {
-        String last = null;
-        for (String key : map.keySet()) {
-            last = key;
-        }
-        return last;
+        criteria.and(FIELD_TITLE).regex(Pattern.quote(search), "i");
     }
 }
