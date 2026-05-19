@@ -273,7 +273,12 @@ export function useJetStreamDialogSubscription({
 
     const unsubscribeStatus = client.onStatus((event) => {
       const connected = event.status === 'connected'
-      const disconnected = ['closed', 'disconnected', 'error'].includes(event.status)
+      // `error` is a protocol-level signal (e.g. -ERR Permissions Violation when
+      // CONSUMER.CREATE is denied) that does NOT close the WebSocket. Treating
+      // it as a disconnect causes scheduleRetry() to fire on every -ERR, which
+      // re-runs onBeforeReconnect (auth refresh / `/api/me`) on a loop. Real
+      // transport loss arrives separately as `disconnected` or `closed`.
+      const disconnected = event.status === 'closed' || event.status === 'disconnected'
       if (connected) {
         setIsConnected(true)
         if (hadConnectionBeforeRef.current) {
@@ -282,6 +287,14 @@ export function useJetStreamDialogSubscription({
         hadConnectionBeforeRef.current = true
         retryAttempt = 0
         onConnectRef.current?.()
+      }
+      if (event.status === 'error') {
+        // Subscription-level failures (e.g. consumer.get rejected by JetStream
+        // ACLs) already surface to the subscribe effect via the rejected
+        // promise; log here for diagnostics and let the existing WS connection
+        // keep running.
+        console.warn('[JetStream] NATS protocol error:', event.data)
+        return
       }
       if (disconnected) {
         setIsConnected(false)
