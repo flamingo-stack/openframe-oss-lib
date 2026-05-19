@@ -1,10 +1,31 @@
 import type {
   ConnectionOptions,
+  Consumer,
+  ConsumerMessages,
+  JsMsg,
   MsgHdrs as NatsHeaders,
   Msg,
   NatsConnection,
   Subscription,
 } from 'nats.ws'
+
+export type JetStreamDeliverPolicy = 'new' | 'byStartSequence'
+
+export interface JetStreamOrderedSubscribeOptions {
+  streamName: string
+  filterSubject: string
+  deliverPolicy: JetStreamDeliverPolicy
+  /** Required when deliverPolicy === 'byStartSequence'. */
+  optStartSeq?: number
+  /** Auto-cleanup the ephemeral consumer after this idle time. Default: 5 minutes. */
+  inactiveThresholdMs?: number
+  /** AbortSignal to tear down the consumer. */
+  signal?: AbortSignal
+}
+
+export interface JetStreamSubscriptionHandle {
+  unsubscribe(): void
+}
 
 export interface NatsClientOptions {
   /**
@@ -146,6 +167,16 @@ export interface NatsClient {
     onMessage: (payload: T, msg: Msg) => void | Promise<void>,
     options?: NatsSubscribeOptions,
   ): NatsSubscriptionHandle
+
+  /**
+   * Subscribe to a JetStream subject via an ephemeral OrderedConsumer (no acks).
+   * Use `optStartSeq` with `deliverPolicy: 'byStartSequence'` to resume from a known offset,
+   * or `deliverPolicy: 'new'` to live-tail.
+   */
+  subscribeJetStreamOrdered(
+    onMessage: (msg: JsMsg) => void | Promise<void>,
+    options: JetStreamOrderedSubscribeOptions,
+  ): Promise<JetStreamSubscriptionHandle>
 
   onStatus(listener: (event: NatsStatusEvent) => void): () => void
 }
@@ -473,6 +504,91 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
     )
   }
 
+  async function subscribeJetStreamOrdered(
+    onMessage: (msg: JsMsg) => void | Promise<void>,
+    opts: JetStreamOrderedSubscribeOptions,
+  ): Promise<JetStreamSubscriptionHandle> {
+    const conn = requireConnection()
+    if (opts.signal?.aborted) {
+      return { unsubscribe() {} }
+    }
+
+    const nats = await importNats()
+    if (opts.signal?.aborted) {
+      return { unsubscribe() {} }
+    }
+
+    const inactiveThresholdNs =
+      (opts.inactiveThresholdMs ?? 5 * 60_000) * 1_000_000
+
+    const js = conn.jetstream()
+    const consumer: Consumer = await js.consumers.get(opts.streamName, {
+      filterSubjects: opts.filterSubject,
+      deliver_policy: nats.DeliverPolicy.StartSequence,
+      opt_start_seq: opts.optStartSeq ?? 0,
+      inactive_threshold: inactiveThresholdNs,
+    })
+
+    const iterRef: { current: ConsumerMessages | null } = { current: null }
+    let closed = false
+
+    const onAbort = () => {
+      void teardown()
+    }
+    opts.signal?.addEventListener('abort', onAbort, { once: true })
+
+    async function teardown(): Promise<void> {
+      if (closed) return
+      closed = true
+      opts.signal?.removeEventListener('abort', onAbort)
+      const iter = iterRef.current
+      iterRef.current = null
+      if (iter) {
+        try {
+          await iter.close()
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    if (opts.signal?.aborted) {
+      void teardown()
+      return { unsubscribe() {} }
+    }
+
+    ;(async () => {
+      try {
+        const iter = await consumer.consume()
+        if (closed) {
+          try {
+            await iter.close()
+          } catch {
+            // ignore
+          }
+          return
+        }
+        iterRef.current = iter
+        for await (const msg of iter) {
+          if (closed) break
+          try {
+            await onMessage(msg)
+          } catch (e) {
+            emitStatus({ status: 'error', data: e })
+          }
+        }
+      } catch (e) {
+        if (!closed) emitStatus({ status: 'error', data: e })
+      }
+    })().catch((e) => emitStatus({ status: 'error', data: e }))
+
+    return {
+      unsubscribe() {
+        void teardown()
+      },
+    }
+  }
+
   function onStatus(listener: (event: NatsStatusEvent) => void): () => void {
     statusListeners.add(listener)
     return () => statusListeners.delete(listener)
@@ -491,6 +607,7 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
     subscribeBytes,
     subscribeString,
     subscribeJson,
+    subscribeJetStreamOrdered,
     onStatus,
   }
 }
