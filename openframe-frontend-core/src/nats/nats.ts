@@ -517,11 +517,8 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
     const js = conn.jetstream()
     const consumer: Consumer = await js.consumers.get(opts.streamName, {
       filterSubjects: opts.filterSubject,
-      deliver_policy:
-        opts.deliverPolicy === 'byStartSequence'
-          ? nats.DeliverPolicy.StartSequence
-          : nats.DeliverPolicy.New,
-      opt_start_seq: opts.deliverPolicy === 'byStartSequence' ? opts.optStartSeq ?? 0 : 0,
+      deliver_policy: nats.DeliverPolicy.StartSequence,
+      opt_start_seq: opts.optStartSeq ?? 0,
       inactive_threshold: inactiveThresholdNs,
     })
 
