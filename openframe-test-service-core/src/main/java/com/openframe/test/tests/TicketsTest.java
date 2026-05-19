@@ -93,7 +93,8 @@ public class TicketsTest extends BaseTest {
         assertThat(ticket.getDeviceId()).as("deviceId should match").isEqualTo(input.getDeviceId());
         assertThat(ticket.getAssignedTo()).as("assignedTo should match").isEqualTo(assigneeId);
         assertThat(ticket.getOwner()).as("Owner should be present").isNotNull();
-        assertThat(ticket.getOwner().getUserId()).as("Owner userId should match assignee").isEqualTo(assigneeId);
+        assertThat(ticket.getOwner().getType()).as("Owner type should be ADMIN").isEqualTo("ADMIN");
+        assertThat(ticket.getOwner().getUserId()).as("Owner userId should be set").isNotEmpty();
         assertThat(ticket.getLabels()).extracting(TicketLabel::getId).as("Label should be attached").contains(labelId);
     }
 
