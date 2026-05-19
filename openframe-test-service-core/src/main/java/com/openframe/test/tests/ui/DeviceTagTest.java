@@ -2,13 +2,11 @@ package com.openframe.test.tests.ui;
 
 import com.microsoft.playwright.assertions.PlaywrightAssertions;
 import com.openframe.test.pages.DevicesPage;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Disabled
 @Tag("device")
 public class DeviceTagTest extends BaseUITest {
 

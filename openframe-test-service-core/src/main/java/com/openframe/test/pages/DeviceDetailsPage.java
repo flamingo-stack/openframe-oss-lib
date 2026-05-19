@@ -28,7 +28,7 @@ public class DeviceDetailsPage {
     // ── Header accessors ─────────────────────────────────────────────────────
 
     /**
-     * Returns the device name shown in the h1 heading (e.g. "VM114267").
+     * Returns the device name shown in the h1 heading (e.g. "VM116194").
      */
     public String getDeviceName() {
         return page.locator(DEVICE_NAME_HEADING).innerText().trim();
@@ -80,14 +80,19 @@ public class DeviceDetailsPage {
     }
 
     /**
-     * Opens the ⋯ more-actions menu, clicks "Remote Control", and waits for
+     * Clicks the Remote Control link in the action bar and waits for
      * the URL to transition to the remote-desktop sub-route.
+     * <p>
+     * FIX: Remote Control is a dedicated split-button in the action bar, not
+     * an item inside the ⋯ more-actions menu. The previous implementation
+     * tried to open the more-actions menu and match on href="/remote-desktop/"
+     * — both wrong. Now clicks the action-bar link directly using an
+     * ends-with match on the device-scoped href.
      *
      * @return a new {@link RemoteDesktopPage} scoped to the same page
      */
     public RemoteDesktopPage openRemoteDesktop() {
-        openMoreActionsMenu();
-        page.locator("[role='menu'] a[href*='/remote-desktop/']").first().click();
+        page.locator("main a[href$='/remote-desktop/']").first().click();
         page.waitForURL(
                 url -> url.contains("/remote-desktop/"),
                 new Page.WaitForURLOptions().setTimeout(15_000));
@@ -95,14 +100,16 @@ public class DeviceDetailsPage {
     }
 
     /**
-     * Opens the ⋯ more-actions menu, clicks "File Manager", and waits for
+     * Opens the ⋯ more-actions menu, clicks "Manage Files", and waits for
      * the File Manager page to finish loading.
+     * <p>
+     * FIX: menu item was renamed from "File Manager" to "Manage Files".
      *
      * @return a new {@link FileManagerPage} scoped to the same page
      */
     public FileManagerPage openFileManager() {
         openMoreActionsMenu();
-        page.locator("[role='menu'] a[href*='/file-manager/']").first().click();
+        clickMenuItemByText("Manage Files");   // was "File Manager"
         FileManagerPage fileManagerPage = new FileManagerPage(this.page);
         page.waitForCondition(fileManagerPage::isLoaded);
         return fileManagerPage;
