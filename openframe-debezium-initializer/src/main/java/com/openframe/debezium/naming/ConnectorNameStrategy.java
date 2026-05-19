@@ -1,6 +1,7 @@
 package com.openframe.debezium.naming;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
@@ -30,6 +31,15 @@ public interface ConnectorNameStrategy {
     String resolveNextName(String baseName, List<String> existing);
 
     /**
+     * Whether this strategy supports recreating a connector under a new name
+     * during recovery. Identity returns {@code false} (reusing the same name
+     * would just collide); versioned returns {@code true}.
+     */
+    default boolean supportsRecreation() {
+        return false;
+    }
+
+    /**
      * True if at least one connector matching {@code baseName} is already
      * present in {@code existing}. Used as runaway-protection on initial
      * creation and reconcile.
@@ -45,5 +55,14 @@ public interface ConnectorNameStrategy {
     default Stream<String> staleVersions(String baseName, String currentName, List<String> existing) {
         return existing.stream()
                 .filter(c -> matchesBase(baseName, c) && !c.equals(currentName));
+    }
+
+    /**
+     * The "current" version for the given base in the existing list. Identity
+     * strategy returns the only possible match; versioned strategy returns the
+     * highest {@code _vN}. Used when detecting config drift on re-registration.
+     */
+    default Optional<String> currentVersion(String baseName, List<String> existing) {
+        return existing.stream().filter(c -> matchesBase(baseName, c)).findFirst();
     }
 }

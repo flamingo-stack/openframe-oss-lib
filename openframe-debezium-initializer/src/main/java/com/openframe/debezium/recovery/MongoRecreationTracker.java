@@ -37,12 +37,19 @@ public class MongoRecreationTracker implements RecreationTracker {
 
     @Override
     public boolean canRecreate(String baseName) {
-        long recent = repository.countByBaseNameAndCreatedAtAfter(baseName, cutoff());
-        boolean allowed = recent < maxPerHour;
-        if (!allowed) {
-            log.warn("Recreation limit reached for '{}': {}/{} in last hour", baseName, recent, maxPerHour);
+        try {
+            long recent = repository.countByBaseNameAndCreatedAtAfter(baseName, cutoff());
+            boolean allowed = recent < maxPerHour;
+            if (!allowed) {
+                log.warn("Recreation limit reached for '{}': {}/{} in last hour", baseName, recent, maxPerHour);
+            }
+            return allowed;
+        } catch (Exception e) {
+            // Fail closed: if Mongo is unreachable we deny recreation rather than
+            // risk runaway under partially-known state.
+            log.error("Failed to query recreation tracker for '{}' — denying recreate", baseName, e);
+            return false;
         }
-        return allowed;
     }
 
     @Override

@@ -3,9 +3,14 @@ package com.openframe.debezium.service;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.debezium.dto.ConnectorStatus;
 import com.openframe.debezium.naming.ConnectorNameStrategy;
+import com.openframe.debezium.recovery.RecreationTracker;
+import com.openframe.debezium.util.ConnectorSpecs;
+import com.openframe.debezium.util.DebeziumLog;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -13,47 +18,89 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
-import java.util.*;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Slf4j
 @Service
 public class DebeziumService {
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private static final String PATH_CONNECTORS = "/connectors";
+    private static final String PATH_CONFIG = "/config";
+    private static final String PATH_STATUS = "/status";
+    private static final String PATH_RESTART = "/restart";
+
     private final ConnectorNameStrategy nameStrategy;
+    private final RecreationTracker recreationTracker;
+    private RestTemplate restTemplate;
+
+    @Autowired
+    public DebeziumService(ConnectorNameStrategy nameStrategy,
+                           @Autowired(required = false) RecreationTracker recreationTracker) {
+        this.nameStrategy = nameStrategy;
+        this.recreationTracker = recreationTracker;
+    }
 
     @Value("${openframe.debezium.base-url}")
     private String debeziumUrl;
-    private String debeziumConnectorCreateUrl;
+    @Value("${openframe.debezium.connect.connect-timeout:5s}")
+    private Duration connectTimeout;
+    @Value("${openframe.debezium.connect.read-timeout:30s}")
+    private Duration readTimeout;
+    private String connectorsBaseUrl;
 
-    @Autowired
-    public DebeziumService(ConnectorNameStrategy nameStrategy) {
-        this.nameStrategy = nameStrategy;
+    @PostConstruct
+    public void init() {
+        this.connectorsBaseUrl = debeziumUrl + PATH_CONNECTORS;
+        this.restTemplate = new RestTemplateBuilder()
+                .setConnectTimeout(connectTimeout)
+                .setReadTimeout(readTimeout)
+                .build();
     }
 
     public void createOrUpdateDebeziumConnector(Object[] debeziumConnectors) {
         if (debeziumConnectors == null) return;
         Arrays.stream(debeziumConnectors)
-                .map(this::asMap)
+                .map(ConnectorSpecs::asMap)
+                .filter(Objects::nonNull)
                 .forEach(this::applyConnectorSpec);
     }
 
     private void applyConnectorSpec(Map<String, Object> spec) {
-        String baseName = (String) spec.get("name");
-        Map<String, Object> config = asMap(spec.get("config"));
+        String baseName = ConnectorSpecs.nameOf(spec);
+        if (baseName == null) {
+            log.warn("Skipping connector spec without 'name' field: {}", spec);
+            return;
+        }
+        Map<String, Object> config = ConnectorSpecs.configOf(spec);
+
         log.info("Processing Debezium connector base='{}'", baseName);
 
         List<String> existing = listConnectors();
-        if (nameStrategy.hasAnyVersion(baseName, existing)) {
-            log.info("Connector for base '{}' already present — skipping initial creation (strategy={})",
-                    baseName, nameStrategy.getClass().getSimpleName());
-            tryUpdateExistingIdentityConnector(baseName, config, existing);
+        if (!nameStrategy.hasAnyVersion(baseName, existing)) {
+            createInitialVersion(baseName, config, existing);
             return;
         }
 
+        // Base already has a version. Decide how to propagate the incoming config.
+        if (nameStrategy.supportsRecreation()) {
+            recreateOnConfigDrift(baseName, config, existing);
+        } else {
+            tryUpdateExistingIdentityConnector(baseName, config, existing);
+        }
+    }
+
+    private void createInitialVersion(String baseName, Map<String, Object> config, List<String> existing) {
         String effectiveName = nameStrategy.resolveNextName(baseName, existing);
         try {
             createConnector(effectiveName, config);
@@ -62,32 +109,104 @@ public class DebeziumService {
         }
     }
 
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> asMap(Object value) {
-        return value == null ? null : (Map<String, Object>) value;
-    }
-
     /**
-     * For backward compatibility with the identity flow: if a connector with the exact base name
-     * already exists, push the latest config (matches pre-refactor behavior of PUT /config).
-     * Versioned strategy never reaches this branch because shouldCreateInitial returns true only
-     * when no version exists at all.
+     * Identity-strategy path: a connector with the exact base name already exists,
+     * so push the latest config in place. PUT /connectors/{name}/config is
+     * idempotent and overrides whatever was stored.
      */
     private void tryUpdateExistingIdentityConnector(String baseName, Map<String, Object> config, List<String> existing) {
         if (config == null || !existing.contains(baseName)) {
             return;
         }
         try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            Map<String, Object> configWithName = new HashMap<>(config);
-            configWithName.put("name", baseName);
-            HttpEntity<Object> requestEntity = new HttpEntity<>(configWithName, headers);
-            restTemplate.put(getDebeziumConnectorConfigUrl(baseName), requestEntity);
+            HttpEntity<Object> requestEntity = jsonEntity(ConnectorSpecs.configWithName(config, baseName));
+            restTemplate.put(connectorConfigUrl(baseName), requestEntity);
             log.info("Connector '{}' config updated", baseName);
         } catch (Exception e) {
-            log.error("Failed to update connector '{}' config", baseName, e);
+            log.error("Failed to update connector '{}' config", baseName, e);log.error("Failed to update connector '{}' config", baseName, e);
         }
+    }
+
+    /**
+     * Versioned-strategy path: compare the incoming config to whatever is currently
+     * running under the latest version. If they match, do nothing. If they differ,
+     * gate the recreate on {@link RecreationTracker} (when present) to prevent
+     * register-job replay storms.
+     *
+     * <p>Special cases:
+     * <ul>
+     *   <li>{@code getConnectorConfig} returns null because Kafka Connect is
+     *       transiently unreachable → skip (don't spuriously recreate). The
+     *       distinction between "gone" (404) and "transient" is made inside
+     *       {@code getConnectorConfig}.</li>
+     *   <li>Rate-limit reached → skip with a warn; the connector keeps running
+     *       under {@code currentName} until the window rolls.</li>
+     * </ul>
+     */
+    private void recreateOnConfigDrift(String baseName, Map<String, Object> incomingConfig, List<String> existing) {
+        Optional<String> currentNameOpt = nameStrategy.currentVersion(baseName, existing);
+        if (currentNameOpt.isEmpty()) {
+            log.warn("{} Versioned base '{}' has versions but currentVersion() empty — skipping",
+                    DebeziumLog.PREFIX, baseName);
+            return;
+        }
+        String currentName = currentNameOpt.get();
+        Map<String, Object> currentConfig = getConnectorConfig(currentName);
+        if (currentConfig == null) {
+            log.warn("{} Cannot read current config for '{}' — skipping drift check to avoid spurious recreate",
+                    DebeziumLog.PREFIX, currentName);
+            return;
+        }
+        if (configsEquivalent(currentConfig, incomingConfig)) {
+            log.info("{} Versioned config unchanged: base='{}' current='{}'", DebeziumLog.PREFIX, baseName, currentName);
+            return;
+        }
+        if (recreationTracker != null && !recreationTracker.canRecreate(baseName)) {
+            log.warn("{} Drift detected but rate-limit reached: base='{}' — deferring",
+                    DebeziumLog.PREFIX, baseName);
+            return;
+        }
+        String newName = nameStrategy.resolveNextName(baseName, existing);
+        log.warn("{} Config drift detected — recreating: base='{}' current='{}' new='{}'",
+                DebeziumLog.PREFIX, baseName, currentName, newName);
+        if (recreationTracker != null) {
+            try {
+                recreationTracker.record(baseName);
+            } catch (Exception e) {
+                log.error("{} Drift recreate aborted — tracker record failed: base='{}'",
+                        DebeziumLog.PREFIX, baseName, e);
+                return;
+            }
+        }
+        try {
+            createConnector(newName, incomingConfig);
+        } catch (Exception e) {
+            log.error("{} Drift-driven recreation failed: base='{}' new='{}'", DebeziumLog.PREFIX, baseName, newName, e);
+            return;
+        }
+        nameStrategy.staleVersions(baseName, newName, existing)
+                .forEach(this::deleteConnector);
+    }
+
+    /**
+     * Compare two connector-config maps for semantic equality. Kafka Connect's
+     * {@code GET /config} returns all values as strings, but specs loaded from
+     * Mongo may carry Integer/Boolean/etc. We stringify both sides for an
+     * apples-to-apples compare and drop the {@code name} key (it always differs
+     * between the running versioned name and the base in the incoming spec).
+     */
+    private boolean configsEquivalent(Map<String, Object> a, Map<String, Object> b) {
+        if (a == null || b == null) return a == b;
+        return normalisedForCompare(a).equals(normalisedForCompare(b));
+    }
+
+    private Map<String, String> normalisedForCompare(Map<String, Object> config) {
+        Map<String, String> out = new HashMap<>();
+        config.forEach((k, v) -> {
+            if (ConnectorSpecs.KEY_NAME.equals(k) || v == null) return;
+            out.put(k, String.valueOf(v));
+        });
+        return out;
     }
 
     /**
@@ -95,19 +214,9 @@ public class DebeziumService {
      * The supplied config map is shallow-copied with {@code name} overridden to match.
      */
     public void createConnector(String effectiveName, Map<String, Object> config) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-
-        Map<String, Object> configWithName = config == null ? new HashMap<>() : new HashMap<>(config);
-        configWithName.put("name", effectiveName);
-
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("name", effectiveName);
-        payload.put("config", configWithName);
-
-        HttpEntity<Object> requestEntity = new HttpEntity<>(payload, headers);
+        Map<String, Object> payload = ConnectorSpecs.connectorPayload(effectiveName, config);
         ResponseEntity<String> response =
-                restTemplate.postForEntity(getDebeziumConnectorCreateUrl(), requestEntity, String.class);
+                restTemplate.postForEntity(connectorsBaseUrl, jsonEntity(payload), String.class);
         log.info("Connector '{}' created. Response: {}", effectiveName, response.getStatusCode());
     }
 
@@ -116,7 +225,7 @@ public class DebeziumService {
      */
     public void deleteConnector(String name) {
         try {
-            restTemplate.delete(getDebeziumConnectorUrl(name));
+            restTemplate.delete(connectorUrl(name));
             log.info("Connector '{}' deleted", name);
         } catch (HttpClientErrorException.NotFound e) {
             log.info("Connector '{}' already absent, nothing to delete", name);
@@ -125,28 +234,16 @@ public class DebeziumService {
         }
     }
 
-    private String getDebeziumConnectorCreateUrl() {
-        if (debeziumConnectorCreateUrl == null) {
-            debeziumConnectorCreateUrl = this.debeziumUrl + "/connectors";
-        }
-        return debeziumConnectorCreateUrl;
-    }
-
-    private String getDebeziumConnectorUrl(String name) {
-        return "%s/%s".formatted(getDebeziumConnectorCreateUrl(), name);
-    }
-
-    private String getDebeziumConnectorConfigUrl(String name) {
-        return "%s/config".formatted(getDebeziumConnectorUrl(name));
-    }
-
     /**
-     * List all registered connectors.
+     * List all registered connectors. Returns empty list on transient failure —
+     * callers that need to distinguish "no connectors" from "Kafka Connect down"
+     * must guard their own logic (e.g. the health-check scheduler skips reconcile
+     * when it expects connectors but receives an empty list).
      */
     @SuppressWarnings("unchecked")
     public List<String> listConnectors() {
         try {
-            List<String> connectors = restTemplate.getForObject(getDebeziumConnectorCreateUrl(), List.class);
+            List<String> connectors = restTemplate.getForObject(connectorsBaseUrl, List.class);
             return connectors != null ? connectors : Collections.emptyList();
         } catch (Exception e) {
             log.error("Failed to list connectors", e);
@@ -155,33 +252,55 @@ public class DebeziumService {
     }
 
     /**
-     * Get connector status including task states.
+     * Get connector status. Returns {@code null} when the connector is gone
+     * (Kafka Connect 404 between iterations).
      */
     public ConnectorStatus getConnectorStatus(String connectorName) {
-        String url = getDebeziumConnectorUrl(connectorName) + "/status";
-        return restTemplate.getForObject(url, ConnectorStatus.class);
+        try {
+            return restTemplate.getForObject(connectorUrl(connectorName) + PATH_STATUS, ConnectorStatus.class);
+        } catch (HttpClientErrorException.NotFound e) {
+            return null;
+        }
+    }
+
+    /**
+     * Get the currently-deployed config of a connector. Returns {@code null} if
+     * the connector is gone or Kafka Connect is unreachable.
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getConnectorConfig(String connectorName) {
+        try {
+            return restTemplate.getForObject(connectorConfigUrl(connectorName), Map.class);
+        } catch (HttpClientErrorException.NotFound e) {
+            return null;
+        } catch (Exception e) {
+            log.error("Failed to read config for connector '{}'", connectorName, e);
+            return null;
+        }
     }
 
     /**
      * Restart connector and all failed tasks in a single call (KIP-745).
-     * POST /connectors/{name}/restart?includeTasks=true&onlyFailed=true
      */
     public void restartConnectorWithFailedTasks(String connectorName) {
-        String url = getDebeziumConnectorUrl(connectorName) + "/restart?includeTasks=true&onlyFailed=true";
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
-        restTemplate.postForEntity(url, entity, Void.class);
+        String url = UriComponentsBuilder.fromHttpUrl(connectorUrl(connectorName) + PATH_RESTART)
+                .queryParam("includeTasks", "true")
+                .queryParam("onlyFailed", "true")
+                .build()
+                .toUriString();
+        restTemplate.postForEntity(url, jsonEntity(null), Void.class);
         log.info("Triggered KIP-745 restart for connector '{}' (includeTasks=true, onlyFailed=true)", connectorName);
     }
 
     /**
-     * Extract expected base names from IntegratedTool configurations.
+     * Extract expected base names from enabled IntegratedTool configurations.
+     * Disabled tools are skipped — they must not be reconciled into Kafka Connect.
      */
     public Set<String> extractExpectedConnectorNames(List<IntegratedTool> tools) {
         return tools.stream()
-                .flatMap(this::specStreamOf)
-                .map(spec -> (String) spec.get("name"))
+                .filter(IntegratedTool::isEnabled)
+                .flatMap(ConnectorSpecs::specStreamOf)
+                .map(ConnectorSpecs::nameOf)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
     }
@@ -192,17 +311,31 @@ public class DebeziumService {
      * considers a base "present" as long as any {@code base_vN} exists.
      */
     public void reconcileMissingConnectors(List<IntegratedTool> tools, Set<String> missingNames) {
-        tools.forEach(tool -> specStreamOf(tool)
-                .filter(spec -> missingNames.contains((String) spec.get("name")))
-                .forEach(spec -> {
-                    log.warn("Recreating missing connector base='{}' from IntegratedTool '{}'",
-                            spec.get("name"), tool.getName());
-                    createOrUpdateDebeziumConnector(new Object[]{spec});
-                }));
+        tools.stream()
+                .filter(IntegratedTool::isEnabled)
+                .forEach(tool -> ConnectorSpecs.specStreamOf(tool)
+                        .filter(spec -> missingNames.contains(ConnectorSpecs.nameOf(spec)))
+                        .forEach(spec -> {
+                            log.warn("Recreating missing connector base='{}' from IntegratedTool '{}'",
+                                    ConnectorSpecs.nameOf(spec), tool.getName());
+                            applyConnectorSpec(spec);
+                        }));
     }
 
-    private Stream<Map<String, Object>> specStreamOf(IntegratedTool tool) {
-        Object[] connectors = tool.getDebeziumConnectors();
-        return connectors == null ? Stream.empty() : Arrays.stream(connectors).map(this::asMap);
+    private String connectorUrl(String name) {
+        return UriComponentsBuilder.fromHttpUrl(connectorsBaseUrl)
+                .pathSegment(name)
+                .build()
+                .toUriString();
+    }
+
+    private String connectorConfigUrl(String name) {
+        return connectorUrl(name) + PATH_CONFIG;
+    }
+
+    private HttpEntity<Object> jsonEntity(Object body) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        return new HttpEntity<>(body, headers);
     }
 }

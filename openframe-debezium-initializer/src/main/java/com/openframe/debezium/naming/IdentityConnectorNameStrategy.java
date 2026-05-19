@@ -4,6 +4,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Default strategy preserving pre-existing behavior: the name from the tool
@@ -16,7 +17,7 @@ public class IdentityConnectorNameStrategy implements ConnectorNameStrategy {
 
     @Override
     public boolean matchesBase(String baseName, String connectorName) {
-        return baseName.equals(connectorName);
+        return Objects.equals(baseName, connectorName);
     }
 
     @Override
