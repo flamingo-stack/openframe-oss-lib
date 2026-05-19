@@ -509,7 +509,14 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
     opts: JetStreamOrderedSubscribeOptions,
   ): Promise<JetStreamSubscriptionHandle> {
     const conn = requireConnection()
+    if (opts.signal?.aborted) {
+      return { unsubscribe() {} }
+    }
+
     const nats = await importNats()
+    if (opts.signal?.aborted) {
+      return { unsubscribe() {} }
+    }
 
     const inactiveThresholdNs =
       (opts.inactiveThresholdMs ?? 5 * 60_000) * 1_000_000
@@ -528,22 +535,12 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
     const onAbort = () => {
       void teardown()
     }
-    if (opts.signal) {
-      if (opts.signal.aborted) {
-        // No subscription needed if already aborted.
-        return {
-          unsubscribe() {
-            // no-op
-          },
-        }
-      }
-      opts.signal.addEventListener('abort', onAbort, { once: true })
-    }
+    opts.signal?.addEventListener('abort', onAbort, { once: true })
 
     async function teardown(): Promise<void> {
       if (closed) return
       closed = true
-      if (opts.signal) opts.signal.removeEventListener('abort', onAbort)
+      opts.signal?.removeEventListener('abort', onAbort)
       const iter = iterRef.current
       iterRef.current = null
       if (iter) {
@@ -555,9 +552,22 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
       }
     }
 
+    if (opts.signal?.aborted) {
+      void teardown()
+      return { unsubscribe() {} }
+    }
+
     ;(async () => {
       try {
         const iter = await consumer.consume()
+        if (closed) {
+          try {
+            await iter.close()
+          } catch {
+            // ignore
+          }
+          return
+        }
         iterRef.current = iter
         for await (const msg of iter) {
           if (closed) break
