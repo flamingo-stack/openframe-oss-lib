@@ -219,6 +219,10 @@ const config: Config = {
         xs: "calc(var(--radius) - 6px)", // 2px
       },
 
+      maxWidth: {
+        'ods-content-narrow': '600px',
+      },
+
       fontFamily: {
         sans: ["var(--font-family-body)"],
         mono: ["var(--font-family-heading)"],

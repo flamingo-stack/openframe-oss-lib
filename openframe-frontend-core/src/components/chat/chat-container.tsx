@@ -64,7 +64,7 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
       <div
         ref={ref}
         className={cn(
-          "relative mx-auto w-full max-w-3xl",
+          "relative mx-auto w-full max-w-ods-content-narrow",
           className
         )}
         {...props}
@@ -78,7 +78,7 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
             leftIcon={<Chevron02LeftIcon size={24} className="text-ods-text-primary" />}
             className={cn(
               cardClasses,
-              "absolute -translate-y-1/2 right-full mr-3 my-6 hover:bg-ods-bg-hover"
+              "absolute top-0 right-full mr-3 hover:bg-ods-bg-hover"
             )}
           />
         )}
@@ -187,7 +187,7 @@ const ChatFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDiv
         )}
         {...props}
       >
-        <div className="mx-auto w-full max-w-3xl">
+        <div className="mx-auto w-full max-w-ods-content-narrow">
           {children}
         </div>
       </div>

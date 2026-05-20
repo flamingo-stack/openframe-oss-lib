@@ -232,11 +232,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
         variant: "round" as const,
         className: cn(
           "flex-shrink-0",
-          isUser
-            ? "invisible"
-            : isMingo
-            ? "bg-ods-flamingo-cyan"
-            : "bg-ods-flamingo-pink"
+          isMingo ? "bg-ods-flamingo-cyan" : "bg-ods-flamingo-pink"
         )
       }
     }
@@ -249,28 +245,31 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       <div
         ref={ref}
         className={cn(
-          "flex flex-row items-start gap-2 py-3",
+          "relative py-3",
           className
         )}
         {...props}
       >
-        {/* Avatar - optional, invisible spacer for system messages */}
-        {showAvatar && (isSystem ? (
-          <div className="w-12 flex-shrink-0" />
-        ) : !isUser && assistantIcon && !avatar ? (
-            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-ods-accent flex-shrink-0">
-              {assistantIcon}
-            </div>
-          ) : (
-            <SquareAvatar
-              {...avatarProps}
-              className={cn(avatarProps.className, "w-12 h-12")}
-            />
-          )
+        {/* Hanging-avatar layout — Figma spec parks the avatar in the 64px
+            gutter outside the 600px content column. Only rendered for
+            assistant messages; user and system messages have no avatar. */}
+        {showAvatar && !isSystem && !isUser && (
+          <div className="absolute -left-16 top-3">
+            {assistantIcon && !avatar ? (
+              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-ods-accent">
+                {assistantIcon}
+              </div>
+            ) : (
+              <SquareAvatar
+                {...avatarProps}
+                className={cn(avatarProps.className, "w-12 h-12")}
+              />
+            )}
+          </div>
         )}
 
-        {/* Message Content */}
-        <div className="flex flex-1 flex-col gap-1 min-w-0">
+        {/* Message Content - full width */}
+        <div className="flex flex-col gap-1 min-w-0">
           {/* Name and Timestamp Row */}
           <div className="flex items-center justify-between gap-1">
             <span className={cn(

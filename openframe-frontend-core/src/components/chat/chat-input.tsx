@@ -28,7 +28,9 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
       sending = false,
       awaitingResponse = false,
       placeholder = "Enter your Request...",
-      reserveAvatarOffset = true,
+      // Accepted for back-compat; consumed and discarded so the prop never
+      // falls through to the underlying <textarea> as an unknown DOM attr.
+      reserveAvatarOffset: _reserveAvatarOffset,
       disabled = false,
       autoFocus = false,
       ...inputProps
@@ -283,65 +285,50 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
       }
     }, [onStop, isStopping])
 
-    if (awaitingResponse) {
-      return (
-        <div
-          className={cn(
-            "mx-auto w-full max-w-3xl items-end gap-6",
-            reserveAvatarOffset ? "grid grid-cols-[32px_1fr]" : "grid grid-cols-[1fr]",
-            "flex-shrink-0",
-            className,
-          )}
-        >
-          {reserveAvatarOffset && <div className="invisible h-8 w-8" aria-hidden />}
-          <div className="relative flex items-center justify-center gap-2 rounded-md bg-ods-card border border-ods-border px-3 py-3 transition-colors">
-            <ChatTypingIndicator size="sm" dotClassName="bg-ods-text-primary" />
-            <p className="text-h4 text-ods-text-secondary">Waiting for Technician Response</p>
-          </div>
-        </div>
-      )
-    }
-
     const isStopMode = sending && !!onStop
     const sendDisabled = sending || disabled || !value.trim()
 
     return (
       <div
         className={cn(
-          "mx-auto w-full max-w-3xl items-end gap-6",
-          reserveAvatarOffset ? "grid grid-cols-[32px_1fr]" : "grid grid-cols-[1fr]",
-          "flex-shrink-0",
+          "mx-auto w-full max-w-ods-content-narrow flex-shrink-0",
           className,
         )}
       >
-        {reserveAvatarOffset && <div className="invisible h-8 w-8" aria-hidden />}
-        <div className="relative">
-          <SlashCommandSuggestions
-            commands={slashPrefix !== null ? slashSuggestions : []}
-            highlightedIdx={highlightedIdx}
-            onHover={setHighlightedIdx}
-            onSelect={acceptSuggestion}
-            resolveSourceIcon={slashCommands?.resolveSourceIcon}
-            onAction={slashCommands?.onAction}
-          />
-          <Textarea
-            ref={textareaRef}
-            value={value}
-            onChange={handleChange}
-            onKeyDown={handleKeyDown}
-            placeholder={disabled ? "Connection lost. Waiting to reconnect..." : placeholder}
-            disabled={sending || disabled}
-            rows={1}
-            endIcon={isStopMode ? <StopCircleIcon size={20} /> : <Send01Icon size={20} />}
-            endIconAsButton
-            endIconButtonProps={{
-              onClick: isStopMode ? handleStop : handleSubmit,
-              disabled: isStopMode ? isStopping : sendDisabled,
-              'aria-label': isStopMode ? 'Stop generation' : 'Send message',
-            }}
-            {...inputProps}
-          />
-        </div>
+        {awaitingResponse ? (
+          <div className="relative flex items-center justify-center gap-2 rounded-md bg-ods-card border border-ods-border px-3 py-3 transition-colors">
+            <ChatTypingIndicator size="sm" dotClassName="bg-ods-text-primary" />
+            <p className="text-h4 text-ods-text-secondary">Waiting for Technician Response</p>
+          </div>
+        ) : (
+          <div className="relative">
+            <SlashCommandSuggestions
+              commands={slashPrefix !== null ? slashSuggestions : []}
+              highlightedIdx={highlightedIdx}
+              onHover={setHighlightedIdx}
+              onSelect={acceptSuggestion}
+              resolveSourceIcon={slashCommands?.resolveSourceIcon}
+              onAction={slashCommands?.onAction}
+            />
+            <Textarea
+              ref={textareaRef}
+              value={value}
+              onChange={handleChange}
+              onKeyDown={handleKeyDown}
+              placeholder={disabled ? "Connection lost. Waiting to reconnect..." : placeholder}
+              disabled={sending || disabled}
+              rows={1}
+              endIcon={isStopMode ? <StopCircleIcon size={20} /> : <Send01Icon size={20} />}
+              endIconAsButton
+              endIconButtonProps={{
+                onClick: isStopMode ? handleStop : handleSubmit,
+                disabled: isStopMode ? isStopping : sendDisabled,
+                'aria-label': isStopMode ? 'Stop generation' : 'Send message',
+              }}
+              {...inputProps}
+            />
+          </div>
+        )}
       </div>
     )
   },
