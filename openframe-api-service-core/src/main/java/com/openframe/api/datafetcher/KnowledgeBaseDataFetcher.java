@@ -164,6 +164,13 @@ public class KnowledgeBaseDataFetcher {
     }
 
     @DgsMutation
+    public KnowledgeBaseItem unpublishArticle(@InputArgument @NotBlank String id) {
+        String rawId = RELAY.fromGlobalId(id).getId();
+        log.info("Unpublishing article: {}", rawId);
+        return knowledgeBaseService.unpublishArticle(rawId);
+    }
+
+    @DgsMutation
     public KnowledgeBaseItem moveToFolder(
             @InputArgument @NotBlank String id,
             @InputArgument String parentId) {

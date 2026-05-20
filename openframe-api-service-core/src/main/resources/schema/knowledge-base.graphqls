@@ -30,6 +30,7 @@ extend type Mutation {
     createArticle(input: CreateArticleInput!): KnowledgeBaseItem!
     updateArticle(input: UpdateArticleInput!): KnowledgeBaseItem!
     publishArticle(id: ID!): KnowledgeBaseItem!
+    unpublishArticle(id: ID!): KnowledgeBaseItem!
     moveToFolder(id: ID!, parentId: ID): KnowledgeBaseItem!
     archiveArticle(id: ID!): KnowledgeBaseItem!
     unarchiveArticle(id: ID!, parentId: ID): KnowledgeBaseItem!
