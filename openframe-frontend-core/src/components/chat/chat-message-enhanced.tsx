@@ -269,9 +269,9 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
         )}
 
         {/* Message Content - full width */}
-        <div className="flex flex-col gap-1 min-w-0">
+        <div className="flex flex-col gap-[var(--spacing-system-xxs)] min-w-0">
           {/* Name and Timestamp Row */}
-          <div className="flex items-center justify-between gap-1">
+          <div className="flex items-center justify-between gap-[var(--spacing-system-xxs)]">
             <span className={cn(
               "text-h3 !font-mono !font-medium flex-1",
               authorType === 'system' ? "text-ods-open-yellow" :

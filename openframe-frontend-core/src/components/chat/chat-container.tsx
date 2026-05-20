@@ -78,7 +78,7 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
             leftIcon={<Chevron02LeftIcon size={24} className="text-ods-text-primary" />}
             className={cn(
               cardClasses,
-              "absolute top-0 right-full mr-3 hover:bg-ods-bg-hover"
+              "absolute top-0 right-full mr-[var(--spacing-system-s)] hover:bg-ods-bg-hover"
             )}
           />
         )}
