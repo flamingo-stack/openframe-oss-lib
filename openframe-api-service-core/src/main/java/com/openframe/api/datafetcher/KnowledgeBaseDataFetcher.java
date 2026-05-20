@@ -65,15 +65,14 @@ public class KnowledgeBaseDataFetcher {
             @InputArgument String search,
             @InputArgument Integer first,
             @InputArgument String after) {
-        String currentUserId = getCurrentUserId();
-        log.debug("Fetching KB items for user {}: filter={}, search={}, first={}, after={}",
-                currentUserId, filter, search, first, after);
+        log.debug("Fetching KB items: filter={}, search={}, first={}, after={}",
+                filter, search, first, after);
 
         KnowledgeBaseFilterCriteria criteria = mapper.toFilterCriteria(filter);
         ConnectionArgs connectionArgs = ConnectionArgs.builder().first(first).after(after).build();
         CursorPaginationCriteria pagination = mapper.toCursorPaginationCriteria(connectionArgs);
         CountedGenericQueryResult<KnowledgeBaseItem> result =
-                knowledgeBaseService.queryItems(currentUserId, criteria, search, pagination);
+                knowledgeBaseService.queryItems(criteria, search, pagination);
         return mapper.toItemConnection(result);
     }
 
@@ -101,9 +100,8 @@ public class KnowledgeBaseDataFetcher {
 
     @DgsQuery
     public List<KnowledgeBaseItem> knowledgeBaseArticleTree() {
-        String currentUserId = getCurrentUserId();
-        log.debug("Fetching all KB articles for picker, user: {}", currentUserId);
-        return knowledgeBaseService.getAllArticles(currentUserId);
+        log.debug("Fetching all KB articles for picker");
+        return knowledgeBaseService.getAllArticles();
     }
 
     @DgsQuery
@@ -112,8 +110,7 @@ public class KnowledgeBaseDataFetcher {
             @InputArgument List<String> tagIds,
             @InputArgument Integer first,
             @InputArgument String after) {
-        String currentUserId = getCurrentUserId();
-        log.debug("Fetching archived KB articles for user {}: search={}, tagIds={}", currentUserId, search, tagIds);
+        log.debug("Fetching archived KB articles: search={}, tagIds={}", search, tagIds);
 
         List<String> rawTagIds = tagIds != null
                 ? tagIds.stream().map(id -> RELAY.fromGlobalId(id).getId()).toList()
@@ -121,7 +118,7 @@ public class KnowledgeBaseDataFetcher {
         ConnectionArgs connectionArgs = ConnectionArgs.builder().first(first).after(after).build();
         CursorPaginationCriteria pagination = mapper.toCursorPaginationCriteria(connectionArgs);
         return mapper.toItemConnection(
-                knowledgeBaseService.queryArchivedArticles(currentUserId, search, rawTagIds, pagination));
+                knowledgeBaseService.queryArchivedArticles(search, rawTagIds, pagination));
     }
 
     @DgsMutation
