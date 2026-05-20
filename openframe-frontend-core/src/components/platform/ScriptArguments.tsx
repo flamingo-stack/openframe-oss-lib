@@ -6,12 +6,13 @@
  * Includes an "Add Script Argument" button to add new entries.
  */
 
-import { PlusCircle, Trash2 } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
 import React from 'react'
-import { cn } from '../../utils/cn'
+import { cn } from '@/utils'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
+import {PlusCircleIcon} from "@/components/icons-v2-generated";
 
 /**
  * Single script argument with key and value
@@ -156,12 +157,12 @@ export const ScriptArguments: React.FC<ScriptArgumentsProps> = ({
       <div className="flex justify-start">
         <Button
           type="button"
-          variant="transparent"
-          className="text-ods-text-primary"
+          variant="outline"
+          size="small"
           onClick={handleAdd}
           disabled={disabled}
-          leftIcon={<PlusCircle className="size-6" />}
-          noPaddingX
+          className="self-start"
+          leftIcon={<PlusCircleIcon className="text-ods-text-secondary" />}
         >
           {addButtonLabel}
         </Button>

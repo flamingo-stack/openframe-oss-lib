@@ -284,11 +284,29 @@ function processMessageData(
               }
             }
           } else {
-            accumulator.trackApprovalRequest(data.approvalRequestId, {
-              command: data.command || '',
-              explanation: data.explanation,
-              approvalType,
-            })
+            // The resolution may already be known to the consumer (realtime
+            // flipped it and fed it back via `approvalStatuses`) while the
+            // matching APPROVAL_RESULT row is absent from the fetched history
+            // pages. Without this, the single-approval path tracks it as
+            // pending and `flushPendingApprovals()` resurrects it as a stale
+            // sticky card on every history re-process. Mirror the batch path
+            // and honor `approvalStatuses`.
+            const resolvedStatus = approvalStatuses[data.approvalRequestId] as ChatApprovalStatus | undefined
+            if (resolvedStatus === 'approved' || resolvedStatus === 'rejected') {
+              accumulator.addApprovalRequest(
+                data.approvalRequestId,
+                data.command || '',
+                data.explanation,
+                approvalType,
+                resolvedStatus,
+              )
+            } else {
+              accumulator.trackApprovalRequest(data.approvalRequestId, {
+                command: data.command || '',
+                explanation: data.explanation,
+                approvalType,
+              })
+            }
           }
         } else {
           escalatedApprovals?.set(data.approvalRequestId, {

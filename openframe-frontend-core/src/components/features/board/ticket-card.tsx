@@ -99,7 +99,7 @@ export function TicketCard({
   const body = (
     <>
       <div className="flex items-start gap-[var(--spacing-system-sf)]">
-        <div className="flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-xxs)]">
+        <div className="flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-zero)]">
           <p className="text-h3 truncate text-ods-text-primary">{ticket.title}</p>
           {showDeviceRow && (
             <div className="flex min-w-0 items-center gap-[var(--spacing-system-xxs)] text-h6 text-ods-text-secondary">
@@ -129,10 +129,12 @@ export function TicketCard({
     ...(isOverlay ? {} : sortable.listeners),
   }
 
+  const innerWrapperClass = 'relative z-10 flex flex-col gap-[var(--spacing-system-sf)]'
+
   if (isOverlay) {
     return (
       <div {...outerProps}>
-        <div className="relative z-10">{body}</div>
+        <div className={innerWrapperClass}>{body}</div>
       </div>
     )
   }
@@ -148,7 +150,7 @@ export function TicketCard({
           aria-label={ticket.title}
           className="absolute inset-0 z-0 rounded-md focus-visible:outline-none"
         />
-        <div className="pointer-events-none relative z-10">{body}</div>
+        <div className={cn('pointer-events-none', innerWrapperClass)}>{body}</div>
       </div>
     )
   }
@@ -161,7 +163,7 @@ export function TicketCard({
         aria-label={ticket.title}
         className="absolute inset-0 z-0 cursor-pointer rounded-md focus-visible:outline-none"
       />
-      <div className="pointer-events-none relative z-10">{body}</div>
+      <div className={cn('pointer-events-none', innerWrapperClass)}>{body}</div>
     </div>
   )
 }

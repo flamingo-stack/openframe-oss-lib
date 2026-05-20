@@ -8,6 +8,8 @@ import { ChatMessageListSkeleton } from "./chat-message-skeleton"
 import { DotsLoaderIcon } from "../icons-v2-generated"
 import { CyclingPhrase } from "./cycling-phrase"
 import type { ChatMessageListProps } from "./types"
+import { SCROLL_ANCHOR } from "./types/message.types"
+import type { MessageContent } from "./types/message.types"
 
 // Flamingo-themed cycling words shown next to the streaming indicator
 // (Claude-Code-style activity hint). Mix of classic AI verbs, flamingo
@@ -56,6 +58,35 @@ const STREAMING_WORDS = [
  * — pass them directly as `ref={scrollRef}` / `ref={contentRef}`.
  */
 
+/** Whether a `Message.content` (string OR `MessageSegment[]`) carries
+ *  visible text. The top-anchor effect uses this to skip the metadata-
+ *  only commit (empty assistant bubble) and wait until the body chunk
+ *  has landed in the DOM. */
+function hasNonEmptyContent(content: MessageContent): boolean {
+  if (typeof content === 'string') return content.length > 0
+  if (!Array.isArray(content)) return false
+  return content.some((s) => s.type === 'text' && s.text.length > 0)
+}
+
+/** Async-growth watcher installed by the top-anchor effect for the 2s
+ *  settle window. Single owner is `anchorWatcherRef`; the helper below
+ *  is the only place that knows how to tear one down. */
+interface AnchorWatcher {
+  id: string
+  ro: ResizeObserver
+  timer: ReturnType<typeof setTimeout>
+}
+
+/** Idempotent tear-down for an `AnchorWatcher`. Used by both the
+ *  inline supersede path (new top-anchor turn arrives mid-window) and
+ *  the component-unmount cleanup. Caller owns the surrounding ref
+ *  null-out — the helper itself doesn't touch the ref. */
+function disposeAnchorWatcher(w: AnchorWatcher | null): void {
+  if (!w) return
+  w.ro.disconnect()
+  clearTimeout(w.timer)
+}
+
 const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
   (
     {
@@ -87,7 +118,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     // effect below owns first-paint positioning so re-opening a chat
     // with prior history lands at the bottom without a smooth-scroll
     // animation playing over the cold-paint.
-    const { scrollRef, contentRef, scrollToBottom } = useStickToBottom({
+    const { scrollRef, contentRef, scrollToBottom, stopScroll } = useStickToBottom({
       resize: 'smooth',
       initial: false,
     })
@@ -201,6 +232,111 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       }
     }, [messages, scrollRef])
 
+    // ---- Per-message scrollAnchor (server-driven) --------------------
+    // Server emits `scrollAnchor: 'top'` on the metadata leading frame
+    // for display-action answers; default tail behaviour is preserved
+    // for every other path that omits the field.
+    //
+    // Per-id memoized ref callbacks preserve callback identity across
+    // the token-streaming re-renders that React.memo lets through —
+    // a fresh closure each render would detach/reattach the ref on
+    // every commit and could race the useLayoutEffect's element lookup.
+    const messageElsRef = useRef<Map<string, HTMLElement>>(new Map())
+    const refCallbacksRef = useRef<Map<string, (el: HTMLElement | null) => void>>(new Map())
+
+    const getRegisterMessageEl = (id: string): (el: HTMLElement | null) => void => {
+      let cb = refCallbacksRef.current.get(id)
+      if (cb) return cb
+      cb = (el) => {
+        if (el) {
+          messageElsRef.current.set(id, el)
+        } else {
+          messageElsRef.current.delete(id)
+          refCallbacksRef.current.delete(id)
+        }
+      }
+      refCallbacksRef.current.set(id, cb)
+      return cb
+    }
+
+    // Lazy-init: seed ONLY messages whose content is populated. Persisted
+    // reload has full bodies → all ids seeded → no scroll-replay on cold
+    // paint. A fresh turn's empty assistant placeholder (appended by
+    // useChat before streaming) is intentionally excluded so the top-
+    // anchor effect can fire when its body lands.
+    const scrolledIdsRef = useRef<Set<string> | null>(null)
+    if (scrolledIdsRef.current === null) {
+      scrolledIdsRef.current = new Set(
+        messages.filter((m) => hasNonEmptyContent(m.content)).map((m) => m.id),
+      )
+    }
+
+    // Active async-growth watcher. Stored in a ref (NOT in the effect's
+    // cleanup) so subsequent `messages` mutations during the 2s settle
+    // window don't tear it down. Cleared only when a new top-anchor turn
+    // supersedes it, or on component unmount.
+    const anchorWatcherRef = useRef<AnchorWatcher | null>(null)
+
+    useLayoutEffect(() => {
+      if (!autoScroll) return
+      const last = messages[messages.length - 1]
+      if (!last || last.role !== 'assistant' || last.scrollAnchor !== SCROLL_ANCHOR.TOP) return
+      // Metadata frame arrives BEFORE body. Wait for content so we don't
+      // snap an empty bubble and burn the one-shot.
+      if (!hasNonEmptyContent(last.content)) return
+      const seen = scrolledIdsRef.current!
+      if (seen.has(last.id)) return
+      const node = messageElsRef.current.get(last.id)
+      const container = scrollRef.current
+      if (!node || !node.isConnected || !container) return
+      seen.add(last.id)
+      // `stopScroll` MUST precede scrollIntoView — the imperative scrollTop
+      // write is what the library's geometry tracker uses to flip
+      // `escapedFromLock`, so any in-flight scrollToBottom spring is
+      // first cancelled.
+      stopScroll()
+      // Instant (not smooth): the markdown body contains async <img>
+      // children whose loads race a 300ms smooth animation and leave
+      // the viewport mid-article. Instant snap dodges the race; the
+      // ResizeObserver below re-anchors any post-snap growth.
+      node.scrollIntoView({ block: 'start' })
+
+      // Tear down any prior watcher (rapid back-to-back display turns).
+      disposeAnchorWatcher(anchorWatcherRef.current)
+      // Re-anchor on async growth for ~2s. Bail if the user scrolls
+      // meaningfully past the baseline so we don't fight their reading
+      // position. NOTE: the watcher lives in a ref, not in the effect's
+      // cleanup, so subsequent `messages` mutations during streaming
+      // don't kill it.
+      const baselineScrollTop = container.scrollTop
+      const ro = new ResizeObserver(() => {
+        if (!node.isConnected) {
+          ro.disconnect()
+          return
+        }
+        if (container.scrollTop > baselineScrollTop + 200) {
+          ro.disconnect()
+          return
+        }
+        node.scrollIntoView({ block: 'start' })
+      })
+      ro.observe(node)
+      const timer = setTimeout(() => {
+        ro.disconnect()
+        // Guard against nulling a successor watcher mid-flight.
+        if (anchorWatcherRef.current?.id === last.id) {
+          anchorWatcherRef.current = null
+        }
+      }, 2000)
+      anchorWatcherRef.current = { id: last.id, ro, timer }
+    }, [messages, autoScroll, stopScroll, scrollRef])
+
+    // Component-unmount cleanup for the active watcher.
+    useEffect(() => () => {
+      disposeAnchorWatcher(anchorWatcherRef.current)
+      anchorWatcherRef.current = null
+    }, [])
+
     // ---- Load-more (infinite-scroll UP) ------------------------------
     // Distinct from stick-to-bottom; uses its own IntersectionObserver
     // on the top sentinel.
@@ -296,8 +432,8 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
           <div
             ref={setContentRef}
             className={cn(
-              "mx-auto flex w-full max-w-3xl flex-col pb-2 min-w-0",
-              contentClassName || "px-4",
+              "mx-auto flex w-full max-w-ods-content-narrow flex-col pb-[var(--spacing-system-xs)] min-w-0",
+              contentClassName ?? "px-[var(--spacing-system-m)]",
             )}
             style={{ minHeight: '100%' }}
           >
@@ -308,6 +444,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
             {messages.map((message, index) => (
               <ChatMessageEnhanced
                 key={message.id}
+                ref={getRegisterMessageEl(message.id)}
                 role={message.role}
                 name={message.name}
                 content={message.content}
@@ -333,8 +470,8 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         {showStreamingLoader && (
           <div
             className={cn(
-              "mx-auto w-full max-w-3xl flex items-center gap-1 py-2",
-              contentClassName || "px-4",
+              "mx-auto w-full max-w-ods-content-narrow flex items-center gap-[var(--spacing-system-xxs)] py-[var(--spacing-system-xs)]",
+              contentClassName ?? "px-[var(--spacing-system-m)]",
             )}
             style={{ color: 'var(--color-text-muted)' }}
             role="status"
@@ -354,8 +491,8 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         {pendingApprovals && pendingApprovals.length > 0 && (
           <div className={cn(
             "border-t border-ods-border bg-ods-bg/95 backdrop-blur-sm",
-            "mx-auto w-full max-w-3xl",
-            contentClassName || "px-4",
+            "mx-auto w-full max-w-ods-content-narrow",
+            contentClassName ?? "px-[var(--spacing-system-m)]",
           )}>
             <ChatMessageEnhanced
               role="assistant"

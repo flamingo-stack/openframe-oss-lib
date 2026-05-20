@@ -34,6 +34,10 @@ export type NetworkConfig = typeof NETWORK_CONFIG
 
 export interface ChunkData {
   sequenceId?: number
+  /** JetStream stream sequence, populated from JsMsg.info.streamSequence when delivered via JetStream. */
+  streamSeq?: number
+  /** Authoritative dialog streaming state at the time this chunk was emitted; consumers should mirror it into their dialog cache. */
+  streamState?: 'IDLE' | 'STREAMING'
   type: string
   text?: string
   integratedToolType?: string
