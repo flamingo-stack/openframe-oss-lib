@@ -28,7 +28,7 @@ import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItemAttachment;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.ticket.TempAttachment;
-import com.openframe.data.document.user.User;
+import com.openframe.api.dto.user.UserResponse;
 import com.openframe.security.authentication.AuthPrincipal;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -322,13 +322,13 @@ public class KnowledgeBaseDataFetcher {
     }
 
     @DgsData(parentType = "KnowledgeBaseItem", field = "author")
-    public CompletableFuture<User> itemAuthor(DgsDataFetchingEnvironment dfe) {
+    public CompletableFuture<UserResponse> itemAuthor(DgsDataFetchingEnvironment dfe) {
         KnowledgeBaseItem item = dfe.getSource();
         String userId = item.getLastModifiedBy() != null ? item.getLastModifiedBy() : item.getCreatedBy();
         if (userId == null) {
             return CompletableFuture.completedFuture(null);
         }
-        DataLoader<String, User> loader = dfe.getDataLoader("userDataLoader");
+        DataLoader<String, UserResponse> loader = dfe.getDataLoader("userDataLoader");
         return loader.load(userId);
     }
 
