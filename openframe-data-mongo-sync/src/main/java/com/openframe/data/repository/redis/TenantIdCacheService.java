@@ -30,7 +30,7 @@ public class TenantIdCacheService {
     public String getTenantId(String tenantId) {
         log.debug("Fetching tenant for id: {}", tenantId);
         try {
-            return tenantRepository.findByDomain(tenantId)
+            return tenantRepository.findById(tenantId)
                     .map(Tenant::getId)
                     .orElse(null);
         } catch (Exception e) {
