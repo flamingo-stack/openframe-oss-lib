@@ -29,7 +29,7 @@ export function ChatMessageSkeleton({
           the real ChatMessageEnhanced hanging-avatar layout. */}
       {showAvatar && !isUser && (
         <div className={cn(
-          "absolute -left-16 top-3 w-12 h-12 rounded-full animate-pulse",
+          "absolute -left-16 top-[var(--spacing-system-s)] w-12 h-12 rounded-full animate-pulse",
           isMingo
             ? "bg-gradient-to-br from-cyan-400/30 to-cyan-600/30"
             : "bg-gradient-to-br from-pink-400/30 to-pink-600/30"
@@ -91,7 +91,7 @@ export function ChatMessageListSkeleton({
           className
         )}
       >
-        <div className={cn("mx-auto flex w-full max-w-ods-content-narrow flex-col pb-2 min-w-0", contentClassName ?? "px-4")} style={{ minHeight: '100%' }}>
+        <div className={cn("mx-auto flex w-full max-w-ods-content-narrow flex-col pb-[var(--spacing-system-xs)] min-w-0", contentClassName ?? "px-[var(--spacing-system-m)]")} style={{ minHeight: '100%' }}>
           <div className="flex-1" />
           <div className="space-y-6">
             {messages.map((message) => (

@@ -245,7 +245,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       <div
         ref={ref}
         className={cn(
-          "relative py-3",
+          "relative py-[var(--spacing-system-s)]",
           className
         )}
         {...props}
@@ -254,7 +254,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
             gutter outside the 600px content column. Only rendered for
             assistant messages; user and system messages have no avatar. */}
         {showAvatar && !isSystem && !isUser && (
-          <div className="absolute -left-16 top-3">
+          <div className="absolute -left-16 top-[var(--spacing-system-s)]">
             {assistantIcon && !avatar ? (
               <div className="flex items-center justify-center w-12 h-12 rounded-full bg-ods-accent">
                 {assistantIcon}

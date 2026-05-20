@@ -296,7 +296,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
         )}
       >
         {awaitingResponse ? (
-          <div className="relative flex items-center justify-center gap-2 rounded-md bg-ods-card border border-ods-border px-3 py-3 transition-colors">
+          <div className="relative flex items-center justify-center gap-[var(--spacing-system-xs)] rounded-md bg-ods-card border border-ods-border px-[var(--spacing-system-s)] py-[var(--spacing-system-s)] transition-colors">
             <ChatTypingIndicator size="sm" dotClassName="bg-ods-text-primary" />
             <p className="text-h4 text-ods-text-secondary">Waiting for Technician Response</p>
           </div>
