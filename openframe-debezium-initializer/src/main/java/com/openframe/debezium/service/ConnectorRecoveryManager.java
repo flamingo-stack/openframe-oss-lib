@@ -3,14 +3,23 @@ package com.openframe.debezium.service;
 import com.openframe.data.document.connector.ConnectorAlert;
 import com.openframe.data.document.connector.ConnectorAlertType;
 import com.openframe.data.repository.connector.ConnectorAlertRepository;
+import com.openframe.data.service.IntegratedToolService;
 import com.openframe.debezium.dto.ConnectorBackoffState;
 import com.openframe.debezium.dto.ConnectorStatus;
+import com.openframe.debezium.naming.ConnectorNameStrategy;
+import com.openframe.debezium.recovery.RecreationTracker;
+import com.openframe.debezium.util.ConnectorSpecs;
+import com.openframe.debezium.util.DebeziumLog;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -18,13 +27,21 @@ import java.util.concurrent.ConcurrentHashMap;
  * Manages health checking and auto-recovery for Debezium connectors.
  * Checks both connector and task states, applies exponential backoff,
  * and triggers KIP-745 restarts.
+ *
+ * When a non-default {@link ConnectorNameStrategy} is in scope together with a
+ * {@link RecreationTracker} bean (SaaS shared cluster), exhausted retries and
+ * non-recoverable errors lead to recreation under a new versioned name with
+ * removal of the stale versions, instead of just raising an alert.
  */
 @Slf4j
 @Component
 public class ConnectorRecoveryManager {
 
-    private static final long BACKOFF_INCREMENT_MS = 2 * 60 * 1000L; // 2 minutes
+    private static final long BACKOFF_INCREMENT_MS = Duration.ofMinutes(2).toMillis();
     private static final int MAX_RECOVERY_ATTEMPTS = 5;
+    private static final String MAX_RETRIES_MSG = "Max recovery attempts (" + MAX_RECOVERY_ATTEMPTS + ") exceeded";
+    private static final String TRIGGER_NON_RECOVERABLE = "non-recoverable";
+    private static final String TRIGGER_MAX_ATTEMPTS = "max-attempts";
 
     private static final Set<String> NON_RECOVERABLE_ERROR_PATTERNS = Set.of(
             "org.apache.kafka.common.config.ConfigException",
@@ -37,13 +54,22 @@ public class ConnectorRecoveryManager {
 
     private final DebeziumService debeziumService;
     private final ConnectorAlertRepository connectorAlertRepository;
+    private final ConnectorNameStrategy nameStrategy;
+    private final RecreationTracker recreationTracker;
+    private final IntegratedToolService integratedToolService;
     private final ConcurrentHashMap<String, ConnectorBackoffState> backoffStates = new ConcurrentHashMap<>();
 
     @Autowired
     public ConnectorRecoveryManager(DebeziumService debeziumService,
-                                    ConnectorAlertRepository connectorAlertRepository) {
+                                    ConnectorAlertRepository connectorAlertRepository,
+                                    ConnectorNameStrategy nameStrategy,
+                                    @Autowired(required = false) RecreationTracker recreationTracker,
+                                    @Autowired(required = false) IntegratedToolService integratedToolService) {
         this.debeziumService = debeziumService;
         this.connectorAlertRepository = connectorAlertRepository;
+        this.nameStrategy = nameStrategy;
+        this.recreationTracker = recreationTracker;
+        this.integratedToolService = integratedToolService;
     }
 
     /**
@@ -59,6 +85,11 @@ public class ConnectorRecoveryManager {
         for (String connector : connectors) {
             checkAndRecover(connector);
         }
+        // Drop in-memory backoff state for connectors that disappeared from
+        // Kafka Connect (e.g. deleted by an operator). Otherwise the map grows
+        // unboundedly over the pod's lifetime.
+        Set<String> live = new HashSet<>(connectors);
+        backoffStates.keySet().removeIf(name -> !live.contains(name));
     }
 
     /**
@@ -73,15 +104,18 @@ public class ConnectorRecoveryManager {
             }
 
             if (!status.hasFailures()) {
-                resetBackoffIfPresent(connectorName);
+                clearFailureState(connectorName);
                 return;
             }
 
             logFailureDetails(connectorName, status);
 
             if (isNonRecoverable(status)) {
-                log.error("Connector '{}' has a non-recoverable error — skipping restart, manual intervention required",
-                        connectorName);
+                log.error("{} Non-recoverable error: name='{}' trace={}",
+                        DebeziumLog.PREFIX, connectorName, status.getFirstFailureTrace());
+                if (tryRecreate(connectorName, status.getFirstFailureTrace(), TRIGGER_NON_RECOVERABLE)) {
+                    return;
+                }
                 createAlert(connectorName, ConnectorAlertType.NON_RECOVERABLE_ERROR,
                         status.getFirstFailureTrace(), 0);
                 return;
@@ -93,21 +127,25 @@ public class ConnectorRecoveryManager {
         }
     }
 
-    private void resetBackoffIfPresent(String connectorName) {
-        if (backoffStates.containsKey(connectorName)) {
-            log.info("Connector '{}' recovered successfully — resetting backoff state", connectorName);
-            backoffStates.remove(connectorName);
-            resolveAlert(connectorName);
-        }
+    /**
+     * Healthy-path cleanup: drop the in-memory backoff entry and resolve any
+     * open Mongo alert. Called every healthy tick (idempotent on both sides),
+     * which survives JVM restart where {@code backoffStates} is empty but a
+     * pre-restart alert is still open.
+     */
+    private void clearFailureState(String connectorName) {
+        backoffStates.remove(connectorName);
+        resolveAlert(connectorName);
     }
 
     private void logFailureDetails(String connectorName, ConnectorStatus status) {
+        String base = nameStrategy.extractBaseName(connectorName);
         if (status.isConnectorFailed()) {
-            log.warn("Connector '{}' itself is in FAILED state", connectorName);
+            log.error("{} Connector failed: name='{}' base='{}'", DebeziumLog.PREFIX, connectorName, base);
         }
         for (ConnectorStatus.TaskStatus task : status.getFailedTasks()) {
-            log.warn("Connector '{}' task {} is FAILED. Trace: {}",
-                    connectorName, task.getId(), task.firstTraceLine());
+            log.error("{} Task failed: name='{}' base='{}' task={} trace={}",
+                    DebeziumLog.PREFIX, connectorName, base, task.getId(), task.firstTraceLine());
         }
     }
 
@@ -115,11 +153,13 @@ public class ConnectorRecoveryManager {
         ConnectorBackoffState backoff = backoffStates.computeIfAbsent(connectorName, k -> new ConnectorBackoffState());
 
         if (backoff.getConsecutiveFailures() >= MAX_RECOVERY_ATTEMPTS) {
-            log.error("Connector '{}' has failed {} times — max recovery attempts ({}) exceeded, manual intervention required",
-                    connectorName, backoff.getConsecutiveFailures(), MAX_RECOVERY_ATTEMPTS);
+            log.error("{} Max retries exceeded: name='{}' attempts={}",
+                    DebeziumLog.PREFIX, connectorName, backoff.getConsecutiveFailures());
+            if (tryRecreate(connectorName, MAX_RETRIES_MSG, TRIGGER_MAX_ATTEMPTS)) {
+                return;
+            }
             createAlert(connectorName, ConnectorAlertType.MAX_RETRIES_EXCEEDED,
-                    "Max recovery attempts (" + MAX_RECOVERY_ATTEMPTS + ") exceeded",
-                    backoff.getConsecutiveFailures());
+                    MAX_RETRIES_MSG, backoff.getConsecutiveFailures());
             return;
         }
 
@@ -133,13 +173,89 @@ public class ConnectorRecoveryManager {
         try {
             debeziumService.restartConnectorWithFailedTasks(connectorName);
             backoff.recordFailure(nextBackoffMs);
-            log.info("Restart attempted for connector '{}' — attempt {}/{}, next retry eligible after {}ms",
-                    connectorName, backoff.getConsecutiveFailures(), MAX_RECOVERY_ATTEMPTS, nextBackoffMs);
+            log.warn("{} Restart attempted: name='{}' attempt={}/{} next_backoff_ms={}",
+                    DebeziumLog.PREFIX, connectorName, backoff.getConsecutiveFailures(), MAX_RECOVERY_ATTEMPTS, nextBackoffMs);
         } catch (Exception e) {
             backoff.recordFailure(nextBackoffMs);
-            log.error("Failed to restart connector '{}' — attempt {}/{}, next retry after {}ms",
-                    connectorName, backoff.getConsecutiveFailures(), MAX_RECOVERY_ATTEMPTS, nextBackoffMs, e);
+            log.error("{} Restart failed: name='{}' attempt={}/{} next_backoff_ms={}",
+                    DebeziumLog.PREFIX, connectorName, backoff.getConsecutiveFailures(), MAX_RECOVERY_ATTEMPTS, nextBackoffMs, e);
         }
+    }
+
+    /**
+     * Attempt to recreate a connector under a new versioned name when the active
+     * strategy supports recreation and a {@link RecreationTracker} is present.
+     *
+     * @return true if recreation was attempted (caller should NOT raise an alert).
+     */
+    private boolean tryRecreate(String failedName, String reason, String trigger) {
+        if (!isRecreationEnabled()) return false;
+
+        String base = nameStrategy.extractBaseName(failedName);
+        if (!recreationTracker.canRecreate(base)) {
+            log.error("{} Recreation limit reached: base='{}' trigger={}", DebeziumLog.PREFIX, base, trigger);
+            return false;
+        }
+        return lookupConfigForBase(base)
+                .map(cfg -> performRecreation(failedName, base, cfg, reason, trigger))
+                .orElseGet(() -> {
+                    log.warn("{} Recreation skipped — no source config: base='{}'", DebeziumLog.PREFIX, base);
+                    return false;
+                });
+    }
+
+    private boolean isRecreationEnabled() {
+        return recreationTracker != null
+                && integratedToolService != null
+                && nameStrategy.supportsRecreation();
+    }
+
+    private boolean performRecreation(String failedName, String base, Map<String, Object> config,
+                                      String reason, String trigger) {
+        List<String> existingBefore = debeziumService.listConnectors();
+        String newName = nameStrategy.resolveNextName(base, existingBefore);
+
+        // Reserve the rate-limit slot BEFORE the create POST. If record() fails the
+        // recreate is aborted; if record() succeeds but create POST fails the slot is
+        // already spent — next tick will not retry within the rolling window, which is
+        // the safer outcome (no runaway recreates against broken Kafka Connect).
+        try {
+            recreationTracker.record(base);
+        } catch (Exception e) {
+            log.error("{} Recreation aborted — tracker record failed: base='{}'", DebeziumLog.PREFIX, base, e);
+            return false;
+        }
+
+        try {
+            debeziumService.createConnector(newName, config);
+        } catch (Exception e) {
+            log.error("{} Recreation failed: base='{}' new='{}' trigger={}",
+                    DebeziumLog.PREFIX, base, newName, trigger, e);
+            return false;
+        }
+
+        clearFailureState(failedName);
+        log.warn("{} Connector recreated: base='{}' old='{}' new='{}' trigger={} reason={}",
+                DebeziumLog.PREFIX, base, failedName, newName, trigger, reason);
+
+        // Use the pre-create snapshot — the new version is necessarily not in it,
+        // and the stale versions we want to remove are exactly the ones that were
+        // there before. Saves one HTTP round-trip and is race-free.
+        nameStrategy.staleVersions(base, newName, existingBefore)
+                .forEach(debeziumService::deleteConnector);
+        return true;
+    }
+
+    private Optional<Map<String, Object>> lookupConfigForBase(String baseName) {
+        // Symmetric with DebeziumService.extractExpectedConnectorNames — disabled
+        // tools must not drive recreation. If a tool is later disabled, the
+        // operator is responsible for deleting the running connector.
+        return integratedToolService.getAllTools().stream()
+                .filter(com.openframe.data.document.tool.IntegratedTool::isEnabled)
+                .flatMap(ConnectorSpecs::specStreamOf)
+                .filter(spec -> baseName.equals(ConnectorSpecs.nameOf(spec)))
+                .findFirst()
+                .map(ConnectorSpecs::configOf);
     }
 
     private long calculateBackoff(int consecutiveFailures) {

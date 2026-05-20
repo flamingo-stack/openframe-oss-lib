@@ -23,6 +23,9 @@ public class MeshCentralEventDeserializer extends IntegratedToolEventDeserialize
     private static final String FIELD_ID = "_id";
     private static final String FIELD_OID = "$oid";
     private static final String FIELD_MSG = "msg";
+    private static final String FIELD_DOMAIN = "domain";
+    private static final String FIELD_TIME = "time";
+    private static final String FIELD_DATE = "$date";
 
     public MeshCentralEventDeserializer(ObjectMapper mapper) {
         super(mapper,
@@ -73,6 +76,14 @@ public class MeshCentralEventDeserializer extends IntegratedToolEventDeserialize
         return parseAndExtractField(after, FIELD_MSG);
     }
 
+    @Override
+    protected Optional<String> getTenantId(JsonNode after) {
+        if (after == null) {
+            return Optional.empty();
+        }
+        return parseAndExtractField(after, FIELD_DOMAIN);
+    }
+
     private Optional<JsonNode> parseJson(JsonNode rawNode) {
         return Optional.ofNullable(rawNode)
                 .map(JsonNode::asText)
@@ -114,9 +125,9 @@ public class MeshCentralEventDeserializer extends IntegratedToolEventDeserialize
     protected Optional<Long> getSourceEventTimestamp(JsonNode afterField) {
         return parseJson(afterField)
                 .flatMap(event -> {
-                    JsonNode timeNode = event.get("time");
-                    if (timeNode != null && timeNode.has("$date")) {
-                        return Optional.of(timeNode.get("$date").asLong());
+                    JsonNode timeNode = event.get(FIELD_TIME);
+                    if (timeNode != null && timeNode.has(FIELD_DATE)) {
+                        return Optional.of(timeNode.get(FIELD_DATE).asLong());
                     }
                     return Optional.empty();
                 });
