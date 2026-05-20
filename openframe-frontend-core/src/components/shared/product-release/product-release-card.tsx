@@ -1,8 +1,20 @@
 'use client'
 
 import React from 'react'
+import Image from 'next/image'
 import { InteractiveCard } from '../../ui/interactive-card'
-import { ChevronRight, Package } from 'lucide-react'
+import { StatusBadge } from '../../ui/status-badge'
+import { SquareAvatar } from '../../ui/square-avatar'
+import {
+  AlertTriangle,
+  ChevronRight,
+  Eye,
+  Package,
+  Play,
+  Sparkles,
+  TrendingUp,
+  Wrench,
+} from 'lucide-react'
 import { cn } from '../../../utils/cn'
 
 /**
@@ -14,8 +26,13 @@ import { cn } from '../../../utils/cn'
  *   illegal inside markdown `<p>`) for `<span>` text, swaps the outer
  *   `InteractiveCard` for a `<span>`-anchored link, and collapses to:
  *   56px icon + 1-line title + 1-line meta (version · date).
+ * - `catalog`: rich /releases catalog row. Three zones — hero (16:9 cover +
+ *   version pill + title + summary), changelog stats strip (icons + counts),
+ *   metadata grid footer (Type · Status · Released · Author). The grid
+ *   mirrors the hub's `<EntityAuthorCard>` byte-for-byte (see catalog
+ *   branch comment).
  */
-export type ProductReleaseCardSize = 'default' | 'sm'
+export type ProductReleaseCardSize = 'default' | 'sm' | 'catalog'
 
 /**
  * Minimal structural `<a>` prop bundle the consumer composes (typically
@@ -65,6 +82,39 @@ export interface ProductReleaseCardProps {
   className?: string
   /** Card density. Defaults to `'default'`. */
   size?: ProductReleaseCardSize
+
+  // ─── Catalog-only props (ignored by `default` / `sm` branches) ─────────
+  /** Cover image URL. Falls back to a neutral `Package`-icon placeholder. */
+  coverImage?: string | null
+  /** Drives the Play overlay on the cover. Caller sets `true` when the cover
+   *  came from a `*_video_thumbnail` field. */
+  hasVideoCover?: boolean
+  /** Release type for the metadata grid's first cell. */
+  releaseType?: 'major' | 'minor' | 'patch' | 'beta' | 'alpha'
+  /** Release status for the metadata grid's second cell. */
+  releaseStatus?: 'alpha' | 'beta' | 'stable' | 'deprecated'
+  /** Pre-computed `StatusBadge` colorScheme for the release-type chip. The
+   *  hub consumer maps `release_type → colorScheme` via its local helper so
+   *  the OSS card stays mapping-agnostic. */
+  releaseTypeBadgeColor?: 'error' | 'cyan' | 'success' | 'warning'
+  /** View count for the optional microline below the metadata grid. Hidden
+   *  when zero or undefined. */
+  viewCount?: number
+  /** Hydrated author (from the hub DAL's `hydrateAuthor`). When present,
+   *  renders as the last cell of the metadata grid. */
+  author?: {
+    full_name: string
+    avatar_url: string | null
+    job_title: string | null
+  }
+  /** Per-category counts for the changelog stats strip. The whole strip
+   *  is hidden when total === 0. */
+  changelogCounts?: {
+    features: number
+    fixes: number
+    improvements: number
+    breaking: number
+  }
 }
 
 export function ProductReleaseCard({
@@ -76,7 +126,265 @@ export function ProductReleaseCard({
   anchorProps,
   className,
   size = 'default',
+  coverImage,
+  hasVideoCover,
+  releaseType,
+  releaseStatus,
+  releaseTypeBadgeColor,
+  viewCount,
+  author,
+  changelogCounts,
 }: ProductReleaseCardProps) {
+  // ----- CATALOG branch (rich /releases catalog row) -------------------------
+  // The card has THREE zones:
+  //   1. Hero — cover image LEFT, version pill + title + summary RIGHT.
+  //   2. Changelog strip — icons + counts (hidden when total === 0).
+  //   3. Metadata grid footer — bordered grid of [Type | Status | Released
+  //      | Author] cells. This grid INLINES the hub's <EntityAuthorCard>
+  //      visual treatment by hand (SAME bordered grid with value-cell +
+  //      author-cell shapes, byte-for-byte). The OSS lib has zero hub
+  //      coupling by design; we cannot import the hub's
+  //      <EntityAuthorCard>. This is the SAME inline-duplication policy
+  //      documented for the COMPACT_CARD_* string set at lines ~104-108.
+  //      If the hub's <EntityAuthorCard> visual changes (cell padding,
+  //      divider styles, avatar size, etc.), update this branch in
+  //      lockstep.
+  if (size === 'catalog') {
+    const totalChangelog =
+      (changelogCounts?.features ?? 0) +
+      (changelogCounts?.fixes ?? 0) +
+      (changelogCounts?.improvements ?? 0) +
+      (changelogCounts?.breaking ?? 0)
+
+    // Build the metadata-grid cell array — mirrors the hub's
+    // EntityAuthorCard composition (extras → date → author). The
+    // release-type cell carries a colored chip; other cells are plain
+    // value + label.
+    type ValueCell = {
+      value: string
+      label: string
+      uppercase: boolean
+      colorScheme?: 'error' | 'cyan' | 'success' | 'warning'
+    }
+    const valueCells: ValueCell[] = []
+    if (releaseType && releaseTypeBadgeColor) {
+      valueCells.push({
+        value: releaseType.toUpperCase(),
+        label: 'Type',
+        uppercase: true,
+        colorScheme: releaseTypeBadgeColor,
+      })
+    }
+    if (releaseStatus) {
+      valueCells.push({
+        value: releaseStatus.toUpperCase(),
+        label: 'Status',
+        uppercase: true,
+      })
+    }
+    if (formattedDate) {
+      valueCells.push({
+        value: formattedDate,
+        label: 'Released',
+        uppercase: false,
+      })
+    }
+    const hasAuthorCell = !!author?.full_name
+    const totalCells = valueCells.length + (hasAuthorCell ? 1 : 0)
+    // Tailwind JIT cannot compile dynamic class names — explicit branches:
+    const gridColsClass =
+      totalCells >= 4 ? 'md:grid-cols-4'
+        : totalCells === 3 ? 'md:grid-cols-3'
+          : totalCells === 2 ? 'md:grid-cols-2'
+            : 'md:grid-cols-1'
+    const dividerClass = 'border-b md:border-b-0 md:border-r border-ods-border'
+
+    const frameClass = cn(
+      'group bg-ods-system-greys-black border border-ods-border rounded-lg overflow-hidden',
+      'flex flex-col p-6 gap-4',
+      'transition-all duration-300 ease-out transform hover:translate-y-[-2px]',
+      'hover:border-ods-accent hover:shadow-lg hover:shadow-ods-accent/[0.08]',
+      'focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent focus-visible:ring-offset-2 focus-visible:ring-offset-ods-bg',
+      'no-underline',
+      className,
+    )
+
+    const innerLayout = (
+      <>
+        {/* HERO ZONE — cover LEFT + version pill + title + summary RIGHT */}
+        <div className="flex flex-col md:flex-row gap-4 md:gap-6">
+          <div className="w-full md:w-[256px] flex-shrink-0">
+            <div className="relative rounded-lg overflow-hidden w-full aspect-[16/9] bg-ods-bg">
+              {coverImage ? (
+                <Image
+                  src={coverImage}
+                  alt={title}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 256px"
+                  className="object-cover"
+                  unoptimized
+                />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center text-ods-text-secondary">
+                  <Package className="w-8 h-8" />
+                </div>
+              )}
+              {hasVideoCover && coverImage && (
+                <span className="absolute inset-0 flex items-center justify-center bg-black/30">
+                  <Play className="w-10 h-10 text-white" fill="white" />
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex-1 min-w-0 flex flex-col">
+            <div className="flex items-center gap-3 mb-3">
+              <span className="font-mono font-semibold text-lg text-ods-text-primary truncate">
+                v{version}
+              </span>
+            </div>
+            <h3 className="font-['Azeret_Mono'] font-semibold text-xl md:text-2xl text-ods-text-primary leading-tight line-clamp-2 mb-3">
+              {title}
+            </h3>
+            {summary && (
+              <p className="font-['DM_Sans'] text-sm md:text-base text-ods-text-secondary leading-relaxed line-clamp-4 flex-1">
+                {summary}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* CHANGELOG STRIP — hidden when total === 0 */}
+        {totalChangelog > 0 && changelogCounts && (
+          <div className="border-t border-ods-border pt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 font-['DM_Sans'] text-sm text-ods-text-secondary">
+            {changelogCounts.features > 0 && (
+              <span className="inline-flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" />
+                {changelogCounts.features} {changelogCounts.features === 1 ? 'feature' : 'features'}
+              </span>
+            )}
+            {changelogCounts.fixes > 0 && (
+              <span className="inline-flex items-center gap-1.5">
+                <Wrench className="w-3.5 h-3.5" />
+                {changelogCounts.fixes} {changelogCounts.fixes === 1 ? 'fix' : 'fixes'}
+              </span>
+            )}
+            {changelogCounts.improvements > 0 && (
+              <span className="inline-flex items-center gap-1.5">
+                <TrendingUp className="w-3.5 h-3.5" />
+                {changelogCounts.improvements} {changelogCounts.improvements === 1 ? 'improvement' : 'improvements'}
+              </span>
+            )}
+            {changelogCounts.breaking > 0 && (
+              <span className="inline-flex items-center gap-1.5 text-[var(--ods-attention-yellow-warning)]">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                {changelogCounts.breaking} breaking
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* METADATA GRID FOOTER — mirrors EntityAuthorCard byte-for-byte */}
+        {totalCells > 0 && (
+          <div
+            className={cn(
+              'grid grid-cols-1',
+              gridColsClass,
+              'border border-ods-border rounded-md overflow-hidden w-full',
+            )}
+          >
+            {valueCells.map((cell, i) => (
+              <div
+                key={`${cell.label}-${i}`}
+                className={cn(
+                  'bg-ods-card p-4 flex flex-col gap-3',
+                  // Last value cell skips the trailing divider when no
+                  // author cell follows; otherwise every value cell gets it.
+                  (i < valueCells.length - 1 || hasAuthorCell) && dividerClass,
+                )}
+              >
+                <div className="flex flex-col gap-0">
+                  {cell.colorScheme ? (
+                    <StatusBadge
+                      text={cell.value}
+                      variant="card"
+                      colorScheme={cell.colorScheme}
+                      singleLine
+                      className="self-start"
+                    />
+                  ) : (
+                    <p className="text-h4 text-ods-text-primary">
+                      {cell.uppercase ? cell.value.toLocaleUpperCase() : cell.value}
+                    </p>
+                  )}
+                  <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
+                    {cell.label}
+                  </p>
+                </div>
+              </div>
+            ))}
+            {hasAuthorCell && author && (
+              <div className="bg-ods-card p-4 flex items-center gap-3">
+                <SquareAvatar
+                  src={author.avatar_url ?? undefined}
+                  alt={author.full_name}
+                  fallback={author.full_name.charAt(0).toUpperCase()}
+                  size="md"
+                  variant="round"
+                />
+                <div className="flex flex-col gap-0 flex-1 min-w-0">
+                  <p className="text-h3 tracking-[-0.36px] text-ods-text-primary truncate">
+                    {author.full_name}
+                  </p>
+                  <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
+                    {author.job_title || 'Author'}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {typeof viewCount === 'number' && viewCount > 0 && (
+          <div className="flex items-center gap-1.5 text-xs text-ods-text-secondary">
+            <Eye className="w-3.5 h-3.5" />
+            <span>{viewCount.toLocaleString()} views</span>
+          </div>
+        )}
+      </>
+    )
+
+    // Outer-element three-branch decision tree, matching the existing
+    // `default` branch precedence at lines ~200-241. PRECEDENCE:
+    // anchorProps WINS over onClick.
+    if (anchorProps) {
+      return (
+        <a {...anchorProps} className={frameClass} aria-label={`Open ${title}`}>
+          {innerLayout}
+        </a>
+      )
+    }
+    if (onClick) {
+      return (
+        <InteractiveCard clickable onClick={onClick} className={frameClass}>
+          {innerLayout}
+        </InteractiveCard>
+      )
+    }
+    // Non-interactive fallback — strip the hover lift / accent-border so
+    // the cursor doesn't lie about clickability.
+    return (
+      <div
+        className={cn(
+          frameClass
+            .replace('hover:border-ods-accent', '')
+            .replace('hover:translate-y-[-2px]', ''),
+        )}
+      >
+        {innerLayout}
+      </div>
+    )
+  }
+
   // ----- COMPACT branch (chat / tight surfaces) ------------------------------
   // Outer must be a phrasing-content element (`<a>` or `<span>`) — block
   // elements like `<div>`/`<h3>` are illegal inside markdown `<p>`, so we
@@ -120,8 +428,30 @@ export function ProductReleaseCard({
     )
     const innerChildren = (
       <>
-        <span className="flex h-14 w-14 aspect-square shrink-0 self-start items-center justify-center rounded-md bg-ods-bg text-ods-accent">
-          <Package className="h-5 w-5" />
+        {/* 56×56 cover slot. Mirrors BlogCard / ProgramCard / OnboardingGuide
+            sm slots — when `coverImage` is set, render the actual image
+            (object-contain to keep landscape thumbs visible); fall back to
+            the `Package` icon when no cover is provided. Play overlay
+            fires only when `hasVideoCover` is true AND a cover image was
+            actually supplied (matches the catalog variant's overlay rule). */}
+        <span className="relative flex h-14 w-14 aspect-square shrink-0 self-start items-center justify-center overflow-hidden rounded-md bg-ods-bg text-ods-accent">
+          {coverImage ? (
+            <Image
+              src={coverImage}
+              alt={title}
+              fill
+              sizes="56px"
+              className="object-contain"
+              unoptimized
+            />
+          ) : (
+            <Package className="h-5 w-5" />
+          )}
+          {hasVideoCover && coverImage && (
+            <span className="absolute inset-0 flex items-center justify-center bg-black/30">
+              <Play className="h-4 w-4 text-white" fill="white" />
+            </span>
+          )}
         </span>
         {/* Text column structure must mirror the hub's
             `COMPACT_CARD_TEXT_COL` + `COMPACT_CARD_TITLE_ROW` +
