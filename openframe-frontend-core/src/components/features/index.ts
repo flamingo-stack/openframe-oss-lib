@@ -2,6 +2,21 @@
 
 // Feature Components exports
 export { DynamicThemeProvider, useDynamicTheme } from '../providers/dynamic-theme-provider'
+// Canonical ODS theme system — thin wrapper over `next-themes`
+// (manual light/dark, default dark, no-flash handled by next-themes).
+// Headless by design: apps build their own toggle button via the lib's
+// existing <Button> + `useThemeToggle()`.
+export {
+  ThemeProvider,
+  useTheme,
+  useThemeToggle,
+  THEME_STORAGE_KEY,
+  THEME_ATTRIBUTE,
+  DEFAULT_THEME,
+  type Theme,
+  type ThemeProviderProps,
+  type UseThemeToggleResult,
+} from '../providers/theme-provider'
 export * from './array-entry-manager'
 export * from './auth-providers-list'
 export * from './changelog-manager'
