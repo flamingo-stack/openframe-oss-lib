@@ -176,4 +176,10 @@ type User implements Node {
     firstName: String
     lastName: String
     email: String
+    image: UserImage
+}
+
+type UserImage {
+    imageUrl: String
+    hash: String
 }
