@@ -13,7 +13,6 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
-import java.util.List;
 
 /**
  * Primary ticket entity for PSA/Ticketing functionality.
@@ -28,66 +27,55 @@ import java.util.List;
 @AllArgsConstructor
 @Document(collection = "tickets")
 @CompoundIndexes({
-    @CompoundIndex(name = "status_created", def = "{'status': 1, 'createdAt': -1}"),
-    @CompoundIndex(name = "assignee_status", def = "{'assignedTo': 1, 'status': 1}"),
-    @CompoundIndex(name = "organization_status", def = "{'organizationId': 1, 'status': 1}"),
-    @CompoundIndex(name = "device_status", def = "{'deviceId': 1, 'status': 1}")
+        // TODO(lifecycle-rollout): drop legacy status_order index after `status` field removal
+        @CompoundIndex(name = "status_order", def = "{'status': 1, 'order': 1}"),
+        @CompoundIndex(name = "tenant_status_kind", def = "{'tenantId': 1, 'statusKind': 1}"),
+        @CompoundIndex(name = "tenant_status_id_order", def = "{'tenantId': 1, 'statusId': 1, 'order': 1}"),
+        @CompoundIndex(name = "tenant_assignedTo", def = "{'tenantId': 1, 'assignedTo': 1}"),
+        @CompoundIndex(name = "tenant_organizationId", def = "{'tenantId': 1, 'organizationId': 1}"),
+        @CompoundIndex(name = "tenant_deviceId", def = "{'tenantId': 1, 'deviceId': 1}")
 })
 public class Ticket {
     @Id
     private String id;
 
-    /**
-     * Human-readable ticket number (e.g., 1001, 1002).
-     * Auto-incremented per tenant.
-     */
+    private String tenantId;
+
     @Indexed(unique = true)
     private Integer ticketNumber;
 
     private String title;
 
-    /**
-     * Rich text description (HTML from editor).
-     */
     private String description;
 
-    @Indexed
+    // TODO(lifecycle-rollout): drop legacy status field once all reads/writes use statusKind/statusId
     private TicketStatus status;
 
-    @Indexed
+    private String statusId;
+
+    private TicketStatusKind statusKind;
+
+    private boolean aiDisabled;
+
     private TicketCreationSource creationSource;
 
     private TicketOwner owner;
 
-    /**
-     * Device (Machine) that this ticket is about.
-     */
     @Indexed
     private String deviceId;
     private String deviceHostname;
 
-    /**
-     * Organization the device belongs to.
-     */
     @Indexed
     private String organizationId;
     private String organizationName;
 
-    /**
-     * Reporter - the end user (future: from Authentic).
-     * For now, may be null until Authentic integration.
-     */
     private String reporterId;
     private String reporterName;
 
-    /**
-     * Assigned technician (User from users collection).
-     */
     @Indexed
     private String assignedTo;
     private String assignedName;
 
-    @Indexed
     private String order;
 
     @CreatedDate
