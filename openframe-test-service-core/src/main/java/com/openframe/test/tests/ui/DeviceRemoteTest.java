@@ -23,11 +23,13 @@ class DeviceRemoteTest extends BaseUITest {
     @BeforeEach
     public void openDeviceDetails() {
         deviceDetailsPage = navigationSidebar.goToDevices().openDevice("vm115982");
+        deviceDetailsPage.clickTab("Agents");
     }
 
     @Test
     @DisplayName("Remote Shell: connect, execute command, and disconnect")
     public void testRemoteShell() {
+        assertThat(deviceDetailsPage.getAgentStatus("MeshCentral")).as("Expect Mesh ONLINE").isEqualTo("ONLINE");
         RemoteShellPage remoteShellPage = deviceDetailsPage.openRemoteShellPowerShell();
         List<String> terminalLines = remoteShellPage.getTerminalLines();
         assertThat(terminalLines).as("Terminal should have output after connection").isNotEmpty();
@@ -40,6 +42,7 @@ class DeviceRemoteTest extends BaseUITest {
     @Test
     @DisplayName("Remote Desktop: canvas is visible and desktop loads")
     public void testRemoteDesktop() {
+        assertThat(deviceDetailsPage.getAgentStatus("MeshCentral")).as("Expect Mesh ONLINE").isEqualTo("ONLINE");
         RemoteDesktopPage rdPage = deviceDetailsPage.openRemoteDesktop();
         assertThat(rdPage.remoteDesktopCanvas().isVisible())
                 .as("Remote desktop <canvas> must be visible")
@@ -50,6 +53,7 @@ class DeviceRemoteTest extends BaseUITest {
     @Test
     @DisplayName("File Manager: lists files in current folder")
     public void testRemoteFileManager() {
+        assertThat(deviceDetailsPage.getAgentStatus("MeshCentral")).as("Expect Mesh ONLINE").isEqualTo("ONLINE");
         FileManagerPage fileManagerPage = deviceDetailsPage.openFileManager();
         assertThat(fileManagerPage.getRowCount()).as("File manager should list at least one entry").isNotZero();
         assertThat(fileManagerPage.getCurrentFolder()).as("Current folder path should not be empty").isNotEmpty();
