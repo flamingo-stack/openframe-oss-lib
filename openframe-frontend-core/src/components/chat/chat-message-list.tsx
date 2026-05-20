@@ -432,8 +432,8 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
           <div
             ref={setContentRef}
             className={cn(
-              "mx-auto flex w-full max-w-3xl flex-col pb-2 min-w-0",
-              contentClassName || "px-4",
+              "mx-auto flex w-full max-w-ods-content-narrow flex-col pb-[var(--spacing-system-xs)] min-w-0",
+              contentClassName ?? "px-[var(--spacing-system-m)]",
             )}
             style={{ minHeight: '100%' }}
           >
@@ -470,8 +470,8 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         {showStreamingLoader && (
           <div
             className={cn(
-              "mx-auto w-full max-w-3xl flex items-center gap-1 py-2",
-              contentClassName || "px-4",
+              "mx-auto w-full max-w-ods-content-narrow flex items-center gap-[var(--spacing-system-xxs)] py-[var(--spacing-system-xs)]",
+              contentClassName ?? "px-[var(--spacing-system-m)]",
             )}
             style={{ color: 'var(--color-text-muted)' }}
             role="status"
@@ -491,8 +491,8 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         {pendingApprovals && pendingApprovals.length > 0 && (
           <div className={cn(
             "border-t border-ods-border bg-ods-bg/95 backdrop-blur-sm",
-            "mx-auto w-full max-w-3xl",
-            contentClassName || "px-4",
+            "mx-auto w-full max-w-ods-content-narrow",
+            contentClassName ?? "px-[var(--spacing-system-m)]",
           )}>
             <ChatMessageEnhanced
               role="assistant"

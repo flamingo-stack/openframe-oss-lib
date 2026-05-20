@@ -27,7 +27,7 @@ const buttonVariants = cva(
         destructive: buttonSurfaceClasses.destructive,
       },
       size: {
-        default: "py-[var(--spacing-system-sf)] px-[var(--spacing-system-m)] text-h3 h-12",
+        default: "py-[var(--spacing-system-sf)] px-[var(--spacing-system-m)] text-h3 md:h-12 h-10",
         small: "p-[var(--spacing-system-xs)] text-h5 h-6 md:h-8",
         "small-legacy": "py-[var(--spacing-system-xs)] px-[var(--spacing-system-m)] h-10 text-[14px] font-bold", // Temporary alias for "small" to avoid breaking changes in AnnouncementBar's CTA button; will be removed in the future
         icon: "p-[var(--spacing-system-sf)] h-11 w-11 md:h-12 md:w-12 [&_svg]:h-4 [&_svg]:w-4 md:[&_svg]:h-6 md:[&_svg]:w-6",
