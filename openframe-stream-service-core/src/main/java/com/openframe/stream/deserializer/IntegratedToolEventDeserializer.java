@@ -67,6 +67,7 @@ public abstract class IntegratedToolEventDeserializer implements KafkaMessageDes
                     .eventTimestamp(eventTimestamp)
                     .skipProcessing(getSkipProcessing(sourceEventType))
                     .isVisible(isVisible(sourceEventType))
+                    .tenantId(getTenantId(after).orElse(null))
                     .build();
         } catch (IllegalArgumentException e) {
             throw new RuntimeException("Error converting Map to DebeziumMessage", e);
@@ -147,6 +148,10 @@ public abstract class IntegratedToolEventDeserializer implements KafkaMessageDes
      * Returns empty if no timestamp field is available in the event.
      */
     protected Optional<Long> getSourceEventTimestamp(JsonNode afterField) {
+        return Optional.empty();
+    }
+
+    protected Optional<String> getTenantId(JsonNode afterField) {
         return Optional.empty();
     }
 

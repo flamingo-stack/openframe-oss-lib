@@ -7,6 +7,7 @@ import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.data.cassandra.repository.CassandraRepository;
 import org.springframework.stereotype.Component;
 
@@ -14,6 +15,11 @@ import java.time.Instant;
 
 @Slf4j
 @Component
+// TODO temporary: Cassandra is not yet deployed in the shared SaaS cluster, so
+//  the bean is gated on Spring Data Cassandra being on the classpath. Remove
+//  once shared Cassandra is provisioned and `openframe-data-cassandra` is no
+//  longer excluded from openframe-saas-stream.
+@ConditionalOnClass(CassandraRepository.class)
 public class DebeziumCassandraMessageHandler extends DebeziumMessageHandler<UnifiedLogEvent, DeserializedDebeziumMessage> {
 
     private final CassandraRepository repository;

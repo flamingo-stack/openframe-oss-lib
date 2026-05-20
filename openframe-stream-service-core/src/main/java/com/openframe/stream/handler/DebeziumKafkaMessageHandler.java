@@ -1,46 +1,41 @@
 package com.openframe.stream.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.openframe.data.model.enums.Destination;
+import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.data.service.TenantIdProvider;
-import com.openframe.kafka.producer.retry.OssTenantRetryingKafkaProducer;
+import com.openframe.kafka.model.IntegratedToolEvent;
+import com.openframe.kafka.producer.retry.BaseRetryingKafkaProducer;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
-import com.openframe.data.model.enums.EventHandlerType;
-import com.openframe.data.model.enums.Destination;
-import com.openframe.kafka.model.IntegratedToolEvent;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
 
-import java.util.concurrent.TimeUnit;
-
+// TODO when all integrated tools migrate from per-tenant clusters to the shared
+//  cluster, the tenant subclass can be removed and this hierarchy collapsed
+//  back into a single concrete handler.
 @Slf4j
-@Component
-public class DebeziumKafkaMessageHandler extends DebeziumMessageHandler<IntegratedToolEvent, DeserializedDebeziumMessage> {
+public abstract class DebeziumKafkaMessageHandler
+        extends DebeziumMessageHandler<IntegratedToolEvent, DeserializedDebeziumMessage> {
 
-    @Value("${openframe.oss-tenant.kafka.topics.outbound.integrated-tool-events}")
-    private String topic;
-
-    /**
-     * Retention window in days for incoming events. Messages older than this are skipped —
-     * protects against stale Kafka messages (e.g. from a previous customer on a recycled cluster)
-     * and matches Pinot's logs table retention.
-     */
-    @Value("${openframe.stream.event.retention-days:60}")
-    private int retentionDays;
-
-    protected final OssTenantRetryingKafkaProducer kafkaProducer;
+    protected final BaseRetryingKafkaProducer kafkaProducer;
     private final TenantIdProvider tenantIdProvider;
+    private final DebeziumEventValidator validator;
 
-    public DebeziumKafkaMessageHandler(OssTenantRetryingKafkaProducer kafkaProducer, ObjectMapper objectMapper,
-                                       TenantIdProvider tenantIdProvider) {
+    protected DebeziumKafkaMessageHandler(BaseRetryingKafkaProducer kafkaProducer,
+                                          ObjectMapper objectMapper,
+                                          TenantIdProvider tenantIdProvider,
+                                          DebeziumEventValidator validator) {
         super(objectMapper);
         this.kafkaProducer = kafkaProducer;
         this.tenantIdProvider = tenantIdProvider;
+        this.validator = validator;
     }
 
+    protected abstract String getTopic();
+
     @Override
-    protected IntegratedToolEvent transform(DeserializedDebeziumMessage debeziumMessage, IntegratedToolEnrichedData enrichedData) {
+    protected IntegratedToolEvent transform(DeserializedDebeziumMessage debeziumMessage,
+                                            IntegratedToolEnrichedData enrichedData) {
         IntegratedToolEvent message = new IntegratedToolEvent();
         try {
             message.setToolEventId(debeziumMessage.getToolEventId());
@@ -55,10 +50,10 @@ public class DebeziumKafkaMessageHandler extends DebeziumMessageHandler<Integrat
             message.setSeverity(debeziumMessage.getUnifiedEventType().getSeverity().name());
             message.setSummary(debeziumMessage.getMessage() == null || debeziumMessage.getMessage().isBlank()
                     ? debeziumMessage.getUnifiedEventType().getSummary()
-                    : debeziumMessage.getMessage() );
+                    : debeziumMessage.getMessage());
             message.setEventTimestamp(debeziumMessage.getEventTimestamp());
-            message.setTenantId(tenantIdProvider.getTenantId());
-
+            String resolvedTenantId = enrichedData.getTenantId();
+            message.setTenantId(resolvedTenantId != null ? resolvedTenantId : tenantIdProvider.getTenantId());
         } catch (Exception e) {
             log.error("Error processing Kafka message", e);
             throw e;
@@ -67,7 +62,7 @@ public class DebeziumKafkaMessageHandler extends DebeziumMessageHandler<Integrat
     }
 
     protected void handleCreate(IntegratedToolEvent message) {
-        kafkaProducer.publish(topic, buildMessageBrokerKey(message), message);
+        kafkaProducer.publish(getTopic(), buildMessageBrokerKey(message), message);
     }
 
     protected void handleRead(IntegratedToolEvent message) {
@@ -93,21 +88,16 @@ public class DebeziumKafkaMessageHandler extends DebeziumMessageHandler<Integrat
 
     @Override
     protected boolean isValidMessage(DeserializedDebeziumMessage message) {
-        return message.getIsVisible();
-    }
-
-    protected String getTopic() {
-        return topic;
+        return Boolean.TRUE.equals(message.getIsVisible()) && validator.isValid(message);
     }
 
     private String buildMessageBrokerKey(IntegratedToolEvent message) {
         if (message.getDeviceId() != null) {
             return "%s-%s".formatted(message.getDeviceId(), message.getToolType());
-        }  else if (message.getUserId() != null) {
-            return "%s-%s".formatted(message.getUserId(), message.getToolType());
-        } else {
-            return message.getToolType();
         }
+        if (message.getUserId() != null) {
+            return "%s-%s".formatted(message.getUserId(), message.getToolType());
+        }
+        return message.getToolType();
     }
-
 }
