@@ -16,6 +16,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 import static com.openframe.data.document.user.UserRole.OWNER;
@@ -58,6 +60,18 @@ public class UserService {
         UserResponse response = userMapper.toResponse(user);
         userProcessor.postProcessUserGet(response);
         return response;
+    }
+
+    public List<UserResponse> getUsersByIds(Collection<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        List<User> users = userRepository.findAllById(ids);
+        UserPageResponse pageResponse = UserPageResponse.builder()
+                .items(users.stream().map(userMapper::toResponse).toList())
+                .build();
+        userProcessor.postProcessUserGet(pageResponse);
+        return pageResponse.getItems();
     }
 
     public UserResponse updateUser(String id, UpdateUserRequest request) {
