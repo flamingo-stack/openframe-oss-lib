@@ -123,6 +123,18 @@ export interface ProductRelease {
   status: 'draft' | 'published' | 'archived'
   published_at: string | null
   author_id: string | null
+  /**
+   * Hydrated by `getRelease` (detail) and `getReleases` (list) via
+   * `hydrateAuthor` in the hub DAL. Optional so admin form + every existing
+   * consumer that doesn't read author stay backward-compatible.
+   */
+  author?: {
+    id: string
+    full_name: string
+    avatar_url: string | null
+    job_title: string | null
+    email?: string | null
+  }
 
   // Timestamps
   created_at: string
