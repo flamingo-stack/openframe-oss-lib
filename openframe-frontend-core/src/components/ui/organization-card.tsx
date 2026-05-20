@@ -4,7 +4,7 @@ import React from "react"
 import Link from "next/link"
 import { Monitor } from "lucide-react"
 import { cn } from "../../utils/cn"
-import { OrganizationIcon } from "../features/organization-icon"
+import { EntityImage } from "./entity-image"
 
 export interface Organization {
   id: string
@@ -98,13 +98,9 @@ export function OrganizationCard({
 
       {/* Header */}
       <div className="flex items-start gap-3 w-full">
-        <OrganizationIcon
-          imageUrl={fetchedImageUrl || organization.imageUrl}
-          organizationName={organization.name}
-          size="xl"
-          backgroundStyle="dark"
-          showBackground={true}
-          className="w-[60px] h-[60px]"
+        <EntityImage
+          src={fetchedImageUrl || organization.imageUrl}
+          alt={organization.name}
         />
 
         <div className="flex-1 flex flex-col justify-center py-2 min-w-0">

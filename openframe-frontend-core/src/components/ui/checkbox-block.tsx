@@ -28,14 +28,15 @@ const CheckboxBlock = React.forwardRef<
     <label
       htmlFor={id}
       className={cn(
-        "flex items-center gap-[var(--spacing-system-s)] rounded-[6px] border w-full",
+        "flex items-center gap-[var(--spacing-system-s)] rounded-md ring-1 ring-inset w-full",
         "p-[var(--spacing-system-sf)]",
-        !description && "h-11 md:h-12",
-        "bg-ods-card border-ods-border",
+        !description && "min-h-[44px] md:min-h-[48px]",
+        description && "min-h-[60px] md:min-h-[64px]",
+        "bg-ods-card ring-ods-border",
         "cursor-pointer transition-colors duration-200",
-        "hover:border-ods-accent/30",
-        disabled && "opacity-50 cursor-not-allowed hover:border-ods-border",
-        error && "border-ods-error",
+        "hover:ring-ods-accent/30",
+        disabled && "opacity-50 cursor-not-allowed hover:ring-ods-border",
+        error && "ring-ods-error",
       )}
     >
       <CheckboxPrimitive.Root
@@ -46,7 +47,7 @@ const CheckboxBlock = React.forwardRef<
         onCheckedChange={onCheckedChange}
         disabled={disabled}
         className={cn(
-          "h-6 w-6 shrink-0",
+          "h-4 w-4 md:h-6 md:w-6 shrink-0",
           "rounded-[6px] border-2",
           error ? "border-ods-error" : "border-[var(--color-border-strong)]",
           "bg-ods-card",
@@ -58,21 +59,20 @@ const CheckboxBlock = React.forwardRef<
         <CheckboxPrimitive.Indicator
           className="flex items-center justify-center text-ods-text-on-accent"
         >
-          <CheckboxCheckmarkIcon size={10} />
+          <CheckboxCheckmarkIcon className="w-2 h-2 md:w-2.5 md:h-2.5" />
         </CheckboxPrimitive.Indicator>
       </CheckboxPrimitive.Root>
       <div className="flex flex-1 flex-col justify-center min-w-0">
         <span className={cn(
-          "text-h4",
-          "text-ods-text-primary select-none",
-          !description && "truncate"
+          "text-h4 !leading-5 md:!leading-6",
+          "text-ods-text-primary select-none break-words"
         )}>
           {label}
         </span>
         {description && (
           <span className={cn(
-            "text-h6",
-            "text-ods-text-secondary select-none"
+            "text-h6 !leading-4",
+            "text-ods-text-secondary select-none break-words"
           )}>
             {description}
           </span>

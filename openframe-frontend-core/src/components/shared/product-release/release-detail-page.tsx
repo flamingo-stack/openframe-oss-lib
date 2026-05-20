@@ -9,7 +9,7 @@ import { StatusBadge } from '../../ui/status-badge';
 import { SquareAvatar } from '../../ui/square-avatar';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
 import { GitHubIcon } from '../../icons/github-icon';
-import { AlertTriangle, ExternalLink, BookMarked } from 'lucide-react';
+import { AlertTriangle, ExternalLink, BookMarked, Sparkles, TrendingUp, Wrench } from 'lucide-react';
 import { formatReleaseDate } from '../../../utils/date-formatters';
 import { Video } from '../../features/video';
 import { DetailPageSkeleton } from '../detail-page-skeleton';
@@ -392,27 +392,33 @@ export function ReleaseDetailPage({
           </Card>
         )}
 
-        {/* Changelog Sections */}
+        {/* Changelog Sections — icons match the catalog card's changelog
+            strip taxonomy (Sparkles/Wrench/TrendingUp/AlertTriangle) so the
+            user sees a consistent visual signature across catalog → detail. */}
         <ReleaseChangelogSection
           title="Breaking Changes"
           entries={breakingChanges || []}
           isBreaking
           hideTitle
+          icon={<AlertTriangle className="h-6 w-6" />}
           SimpleMarkdownRenderer={MarkdownRenderer}
         />
         <ReleaseChangelogSection
           title="Features Added"
           entries={featuresAdded || []}
+          icon={<Sparkles className="h-6 w-6" />}
           SimpleMarkdownRenderer={MarkdownRenderer}
         />
         <ReleaseChangelogSection
           title="Bugs Fixed"
           entries={bugFixed || []}
+          icon={<Wrench className="h-6 w-6" />}
           SimpleMarkdownRenderer={MarkdownRenderer}
         />
         <ReleaseChangelogSection
           title="Improvements"
           entries={improvements || []}
+          icon={<TrendingUp className="h-6 w-6" />}
           SimpleMarkdownRenderer={MarkdownRenderer}
         />
 

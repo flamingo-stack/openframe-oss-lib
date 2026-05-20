@@ -72,6 +72,7 @@ export { CheckIcon, CheckCircleIcon as LucideCheckCircleIcon, XIcon as LucideXIc
 export * from './dashboard-info-card'
 export * from './device-card'
 export * from './device-card-compact'
+export * from './entity-image'
 export * from './feature-card'
 export * from './feature-list'
 export { FloatingTooltip } from './floating-tooltip'
