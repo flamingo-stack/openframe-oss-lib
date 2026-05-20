@@ -45,7 +45,7 @@ public class ProxyUrlResolver {
             }
             log.debug("Path to proxy: {}", pathToProxy);
 
-1            pathToProxy = prependConfiguredBasePath(integratedToolUri, pathToProxy);
+            pathToProxy = prependConfiguredBasePath(integratedToolUri, pathToProxy);
 
             URI targetUri = UriComponentsBuilder.newInstance()
                     .scheme(integratedToolUri.getScheme())
