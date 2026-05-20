@@ -3,15 +3,9 @@
 import React from 'react'
 import { cn } from '../../utils/cn'
 import type { ActionsMenuGroup } from '../ui/actions-menu'
+import { EntityImage } from '../ui/entity-image'
 import { PageActions, type PageActionButton } from '../ui/page-actions'
 import { BackButton } from './back-button'
-
-function getInitials(name?: string): string {
-  if (!name) return ''
-  const words = name.trim().split(/\s+/)
-  if (words.length === 1) return words[0].charAt(0).toUpperCase()
-  return (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase()
-}
 
 export interface TitleBlockProps {
   title?: string
@@ -45,14 +39,6 @@ export function TitleBlock({
   className,
 }: TitleBlockProps) {
   const hasActions = actions && actions.length > 0
-  const [imageFailed, setImageFailed] = React.useState(false)
-
-  React.useEffect(() => {
-    setImageFailed(false)
-  }, [image?.src])
-
-  const showImageFallback = !!image && (imageFailed || !image.src)
-  const initials = getInitials(image?.alt || title)
 
   return (
     <div
@@ -83,21 +69,11 @@ export function TitleBlock({
         {(image || subtitle) ? (
           <div className="flex items-center gap-[var(--spacing-system-m)] min-w-0 w-full">
             {image && (
-              showImageFallback ? (
-                <div
-                  aria-label={image.alt}
-                  className="size-[52px] md:size-[60px] shrink-0 rounded-md border border-ods-border bg-ods-bg flex items-center justify-center text-ods-text-secondary text-h4 select-none"
-                >
-                  {initials || '?'}
-                </div>
-              ) : (
-                <img
-                  src={image.src}
-                  alt={image.alt ?? ''}
-                  onError={() => setImageFailed(true)}
-                  className="size-[52px] md:size-[60px] shrink-0 rounded-md border border-ods-border object-cover"
-                />
-              )
+              <EntityImage
+                src={image.src}
+                alt={image.alt}
+                fallbackText={image.alt || title}
+              />
             )}
             <div className="flex flex-col justify-center min-w-0 flex-1">
               {title && (

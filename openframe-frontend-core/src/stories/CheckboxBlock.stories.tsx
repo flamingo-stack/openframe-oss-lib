@@ -186,9 +186,7 @@ export const FlamingoError: Story = {
   },
   decorators: [
     (Story) => (
-      <div data-app-type="flamingo" style={{ width: '320px' }}>
-        <Story />
-      </div>
+      <Story />
     ),
   ],
 };
