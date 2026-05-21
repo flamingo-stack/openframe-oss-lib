@@ -6,6 +6,7 @@ import com.openframe.gateway.upstream.ToolUpstreamResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
 import java.util.Optional;
@@ -48,7 +49,23 @@ public class MeshCentralUpstreamResolver implements ToolUpstreamResolver {
 
     private URI build(MeshCentralRoutingProperties.Upstream upstream,
                       ServerHttpRequest request, String stripPrefix) {
-        return proxyUrlResolver.resolve(
+        URI resolved = proxyUrlResolver.resolve(
                 TOOL_ID, upstream.getUrl(), upstream.getPort(), request.getURI(), stripPrefix);
+        return prependPathPrefix(resolved, upstream.getPathPrefix());
+    }
+
+    private URI prependPathPrefix(URI uri, String pathPrefix) {
+        if (pathPrefix == null || pathPrefix.isEmpty() || "/".equals(pathPrefix)) {
+            return uri;
+        }
+        String prefix = pathPrefix.startsWith("/") ? pathPrefix : "/" + pathPrefix;
+        if (prefix.endsWith("/")) {
+            prefix = prefix.substring(0, prefix.length() - 1);
+        }
+        String existingPath = uri.getRawPath() == null ? "" : uri.getRawPath();
+        return UriComponentsBuilder.fromUri(uri)
+                .replacePath(prefix + existingPath)
+                .build(true)
+                .toUri();
     }
 }

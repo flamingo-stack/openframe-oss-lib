@@ -45,8 +45,6 @@ public class ProxyUrlResolver {
             }
             log.debug("Path to proxy: {}", pathToProxy);
 
-            pathToProxy = prependConfiguredBasePath(integratedToolUri, pathToProxy);
-
             URI targetUri = UriComponentsBuilder.newInstance()
                     .scheme(integratedToolUri.getScheme())
                     .host(isLocalProfile() ? "localhost" : integratedToolUri.getHost())
@@ -63,19 +61,6 @@ public class ProxyUrlResolver {
             log.error("Failed to resolve tool url: {}", originalUri, e);
             throw new RuntimeException("Failed to resolve tool url", e);
         }
-    }
-
-    private String prependConfiguredBasePath(URI integratedToolUri, String pathToProxy) {
-        String basePath = integratedToolUri.getRawPath();
-        if (basePath == null || basePath.isEmpty() || "/".equals(basePath)) {
-            return pathToProxy;
-        }
-        if (basePath.endsWith("/")) {
-            basePath = basePath.substring(0, basePath.length() - 1);
-        }
-        String prefixed = basePath + pathToProxy;
-        log.debug("Path to proxy with configured base: {}", prefixed);
-        return prefixed;
     }
 
     /**
