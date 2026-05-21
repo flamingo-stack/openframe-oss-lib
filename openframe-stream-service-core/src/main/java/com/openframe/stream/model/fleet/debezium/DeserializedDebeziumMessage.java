@@ -24,4 +24,5 @@ public class DeserializedDebeziumMessage extends CommonDebeziumMessage {
     private Long eventTimestamp;
     private Boolean skipProcessing;
     private Boolean isVisible;
+    private String tenantId;
 }

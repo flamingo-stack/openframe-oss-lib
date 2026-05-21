@@ -2,25 +2,29 @@ package com.openframe.stream.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.data.cassandra.model.UnifiedLogEvent;
-import com.openframe.data.cassandra.template.TenantScopedCassandraTemplate;
+import com.openframe.data.cassandra.repository.UnifiedLogEventRepository;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.data.cassandra.repository.CassandraRepository;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 
 @Slf4j
 @Component
-public class DebeziumCassandraMessageHandler extends DebeziumMessageHandler<UnifiedLogEvent, DeserializedDebeziumMessage> {
+@ConditionalOnClass(CassandraRepository.class)
+public class DebeziumCassandraMessageHandler
+        extends DebeziumMessageHandler<UnifiedLogEvent, DeserializedDebeziumMessage> {
 
-    private final TenantScopedCassandraTemplate cassandraTemplate;
+    private final UnifiedLogEventRepository repository;
 
-    protected DebeziumCassandraMessageHandler(TenantScopedCassandraTemplate cassandraTemplate, ObjectMapper objectMapper) {
+    public DebeziumCassandraMessageHandler(UnifiedLogEventRepository repository, ObjectMapper objectMapper) {
         super(objectMapper);
-        this.cassandraTemplate = cassandraTemplate;
+        this.repository = repository;
     }
 
     @Override
@@ -46,11 +50,10 @@ public class DebeziumCassandraMessageHandler extends DebeziumMessageHandler<Unif
             logEvent.setOrganizationName(enrichedData.getOrganizationName());
             logEvent.setSeverity(debeziumMessage.getUnifiedEventType().getSeverity().name());
             logEvent.setDebeziumMessage(debeziumMessage.getDebeziumMessage());
-            logEvent.setMessage(debeziumMessage.getMessage() ==  null
+            logEvent.setMessage(debeziumMessage.getMessage() == null
                     ? debeziumMessage.getUnifiedEventType().getSummary()
                     : debeziumMessage.getMessage());
             logEvent.setDetails(debeziumMessage.getDetails());
-
         } catch (Exception e) {
             log.error("Error processing Kafka message", e);
             throw e;
@@ -62,6 +65,7 @@ public class DebeziumCassandraMessageHandler extends DebeziumMessageHandler<Unif
         UnifiedLogEvent.UnifiedLogEventKey key = new UnifiedLogEvent.UnifiedLogEventKey();
         Instant timestamp = Instant.ofEpochMilli(debeziumMessage.getEventTimestamp());
 
+        key.setTenantId(debeziumMessage.getTenantId());
         key.setIngestDay(debeziumMessage.getIngestDay());
         key.setToolType(debeziumMessage.getIntegratedToolType().name());
         key.setEventType(debeziumMessage.getUnifiedEventType().name());
@@ -72,7 +76,7 @@ public class DebeziumCassandraMessageHandler extends DebeziumMessageHandler<Unif
     }
 
     protected void handleCreate(UnifiedLogEvent data) {
-        cassandraTemplate.insert(data, (e, tenantId) -> e.getKey().setTenantId(tenantId));
+        repository.save(data);
     }
 
     protected void handleRead(UnifiedLogEvent message) {
