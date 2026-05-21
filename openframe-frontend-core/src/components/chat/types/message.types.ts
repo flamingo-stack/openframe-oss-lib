@@ -78,8 +78,24 @@ export interface ExecutingToolState {
 
 // ========== Approval Request Types ==========
 
+export interface ApprovalRequestField {
+  /** Short label — e.g. "Subject", "Priority". Rendered in a muted
+   *  caps style above the value. */
+  label: string
+  /** Free-text value. Wraps and line-breaks are preserved
+   *  (`whitespace-pre-wrap`). */
+  value: string
+}
+
 export interface ApprovalRequestData {
   command: string
+  /** Structured field list — preferred over `explanation`. When set,
+   *  the approval card renders a vertical label/value stack with
+   *  proper spacing. Falls back to `explanation` (a single paragraph)
+   *  when omitted. Keep BOTH when you want hosts on older lib
+   *  versions to still see the prose; new hosts should send only
+   *  `fields`. */
+  fields?: ApprovalRequestField[]
   explanation?: string
   icon?: React.ReactNode
   requestId?: string
@@ -333,4 +349,23 @@ export interface Message {
    *  whose body is a long article). The server is the sole decision-
    *  maker — set on the metadata leading frame. */
   scrollAnchor?: ScrollAnchor
+  /** When true the message is part of the API conversation history (sent
+   *  to the LLM so it has context) but is NOT rendered in the chat UI.
+   *
+   *  Used for "synthetic continuation" turns: when the user clicks Approve
+   *  on a tool proposal, the host auto-fires a follow-up `sendMessage`
+   *  with `hidden: true` carrying a directive like "the user just
+   *  approved <tool>; ask follow-up questions per protocol". The LLM's
+   *  response IS rendered (as a normal assistant message); only the
+   *  trigger prompt is suppressed so the chat reads naturally:
+   *
+   *    user: "open a ticket"
+   *    assistant: preamble + approval card
+   *    [user clicks Approve]
+   *    assistant: "Now to triage faster, can you share..."   ← auto-fires
+   *
+   *  Without this flag the trigger prompt would surface as a confusing
+   *  bubble like "(continue per protocol)" between the approval card
+   *  and the AI's follow-up. */
+  hidden?: boolean
 }
