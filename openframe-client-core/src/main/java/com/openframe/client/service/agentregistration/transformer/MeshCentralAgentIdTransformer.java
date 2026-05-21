@@ -13,7 +13,7 @@ public class MeshCentralAgentIdTransformer implements ToolAgentIdTransformer {
 
     private final String tenantId;
 
-    public MeshCentralAgentIdTransformer(@Value("${TENANT_ID:}") String tenantId) {
+    public MeshCentralAgentIdTransformer(@Value("${openframe.cluster-id:}") String tenantId) {
         this.tenantId = tenantId == null ? "" : tenantId;
     }
 
