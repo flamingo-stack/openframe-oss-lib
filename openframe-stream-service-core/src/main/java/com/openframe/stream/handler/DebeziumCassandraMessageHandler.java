@@ -2,6 +2,7 @@ package com.openframe.stream.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.data.cassandra.model.UnifiedLogEvent;
+import com.openframe.data.cassandra.template.TenantScopedCassandraTemplate;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
@@ -22,11 +23,11 @@ import java.time.Instant;
 @ConditionalOnClass(CassandraRepository.class)
 public class DebeziumCassandraMessageHandler extends DebeziumMessageHandler<UnifiedLogEvent, DeserializedDebeziumMessage> {
 
-    private final CassandraRepository repository;
+    private final TenantScopedCassandraTemplate cassandraTemplate;
 
-    protected DebeziumCassandraMessageHandler(CassandraRepository repository, ObjectMapper objectMapper) {
+    protected DebeziumCassandraMessageHandler(TenantScopedCassandraTemplate cassandraTemplate, ObjectMapper objectMapper) {
         super(objectMapper);
-        this.repository = repository;
+        this.cassandraTemplate = cassandraTemplate;
     }
 
     @Override
@@ -78,7 +79,7 @@ public class DebeziumCassandraMessageHandler extends DebeziumMessageHandler<Unif
     }
 
     protected void handleCreate(UnifiedLogEvent data) {
-        repository.save(data);
+        cassandraTemplate.insert(data, (e, tenantId) -> e.getKey().setTenantId(tenantId));
     }
 
     protected void handleRead(UnifiedLogEvent message) {

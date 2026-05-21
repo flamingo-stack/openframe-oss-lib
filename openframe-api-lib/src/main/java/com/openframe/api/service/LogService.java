@@ -92,6 +92,7 @@ public class LogService {
         UnifiedLogEvent.UnifiedLogEventKey key = new UnifiedLogEvent.UnifiedLogEventKey();
         key.setIngestDay(ingestDay);
         key.setToolType(toolType);
+        key.setTenantId(tenantIdProvider.getTenantId());
         key.setEventType(eventType);
         key.setEventTimestamp(timestamp);
         key.setToolEventId(toolEventId);
