@@ -9,5 +9,5 @@ import java.util.List;
 @Repository
 public interface TicketStatusEventRepository extends MongoRepository<TicketStatusEvent, String> {
 
-    List<TicketStatusEvent> findByTenantIdAndTicketIdOrderByOccurredAtDesc(String tenantId, String ticketId);
+    List<TicketStatusEvent> findByTicketIdOrderByOccurredAtDesc(String ticketId);
 }

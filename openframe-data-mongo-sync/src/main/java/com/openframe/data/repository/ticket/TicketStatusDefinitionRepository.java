@@ -11,17 +11,15 @@ import java.util.Optional;
 @Repository
 public interface TicketStatusDefinitionRepository extends MongoRepository<TicketStatusDefinition, String> {
 
-    List<TicketStatusDefinition> findByTenantIdOrderByPositionAsc(String tenantId);
+    List<TicketStatusDefinition> findAllByOrderByPositionAsc();
 
-    Optional<TicketStatusDefinition> findByTenantIdAndId(String tenantId, String id);
+    Optional<TicketStatusDefinition> findByKind(TicketStatusKind kind);
 
-    Optional<TicketStatusDefinition> findByTenantIdAndKind(String tenantId, TicketStatusKind kind);
+    Optional<TicketStatusDefinition> findByName(String name);
 
-    Optional<TicketStatusDefinition> findByTenantIdAndName(String tenantId, String name);
+    List<TicketStatusDefinition> findByKindOrderByPositionAsc(TicketStatusKind kind);
 
-    List<TicketStatusDefinition> findByTenantIdAndKindOrderByPositionAsc(String tenantId, TicketStatusKind kind);
+    long countByKind(TicketStatusKind kind);
 
-    long countByTenantIdAndKind(String tenantId, TicketStatusKind kind);
-
-    boolean existsByTenantIdAndName(String tenantId, String name);
+    boolean existsByName(String name);
 }

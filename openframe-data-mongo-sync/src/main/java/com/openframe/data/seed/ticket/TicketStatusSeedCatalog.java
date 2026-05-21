@@ -33,31 +33,27 @@ public final class TicketStatusSeedCatalog {
     private TicketStatusSeedCatalog() {
     }
 
-    public static List<TicketStatusDefinition> systemStatuses(String tenantId) {
+    public static List<TicketStatusDefinition> systemStatuses() {
         return List.of(
                 TicketStatusDefinition.builder()
-                        .tenantId(tenantId)
                         .kind(AI_ASSISTANCE)
                         .name(NAME_AI_ASSISTANCE)
                         .color(COLOR_AI_ASSISTANCE)
                         .position(POSITION_AI_ASSISTANCE)
                         .build(),
                 TicketStatusDefinition.builder()
-                        .tenantId(tenantId)
                         .kind(TECH_REQUIRED)
                         .name(NAME_TECH_REQUIRED)
                         .color(COLOR_TECH_REQUIRED)
                         .position(POSITION_TECH_REQUIRED)
                         .build(),
                 TicketStatusDefinition.builder()
-                        .tenantId(tenantId)
                         .kind(RESOLVED)
                         .name(NAME_RESOLVED)
                         .color(COLOR_RESOLVED)
                         .position(POSITION_RESOLVED)
                         .build(),
                 TicketStatusDefinition.builder()
-                        .tenantId(tenantId)
                         .kind(ARCHIVED)
                         .name(NAME_ARCHIVED)
                         .color(COLOR_ARCHIVED)
@@ -66,9 +62,8 @@ public final class TicketStatusSeedCatalog {
         );
     }
 
-    public static TicketStatusDefinition onHoldCustom(String tenantId) {
+    public static TicketStatusDefinition onHoldCustom() {
         return TicketStatusDefinition.builder()
-                .tenantId(tenantId)
                 .kind(CUSTOM)
                 .name(NAME_ON_HOLD)
                 .color(COLOR_ON_HOLD_DEFAULT)

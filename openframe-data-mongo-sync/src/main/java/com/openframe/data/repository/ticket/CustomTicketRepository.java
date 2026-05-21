@@ -12,9 +12,6 @@ import java.util.Optional;
 
 public interface CustomTicketRepository {
 
-    // TODO(lifecycle-rollout): drop all methods in this Legacy block after rollout
-    // ===== Legacy (used when lifecycle feature flag is OFF) =====
-
     default Query buildTicketQuery(TicketQueryFilter filter) {
         return buildTicketQuery(filter, null, null, null);
     }
@@ -22,7 +19,16 @@ public interface CustomTicketRepository {
     Query buildTicketQuery(TicketQueryFilter filter, String search,
                            List<String> restrictToTicketIds, String ownerMachineId);
 
+    List<Ticket> findTicketsWithCursor(Query query, String cursor, int limit,
+                                        String sortField, String sortDirection);
+
+    long countTickets(Query query);
+
     Map<TicketStatus, Long> countTicketsByStatus();
+
+    Map<TicketStatusKind, Long> countTicketsByStatusKind();
+
+    Map<String, Long> countTicketsByStatusId();
 
     long getTotalCount();
 
@@ -30,40 +36,9 @@ public interface CustomTicketRepository {
 
     int updateStatusBulk(TicketStatus fromStatus, TicketStatus toStatus);
 
+    int reassignTicketsToStatus(String fromStatusId, String toStatusId, TicketStatusKind toKind);
+
     void updateTitle(String ticketId, String title);
-
-    // ===== Lifecycle feature (used when lifecycle feature flag is ON) =====
-
-    Query buildTicketQuery(String tenantId,
-                           TicketQueryFilter filter,
-                           String search,
-                           List<String> restrictToTicketIds,
-                           String ownerMachineId);
-
-    Map<TicketStatusKind, Long> countTicketsByStatusKind(String tenantId);
-
-    Map<String, Long> countTicketsByStatusId(String tenantId);
-
-    long getTotalCount(String tenantId);
-
-    Optional<Long> getAverageResolutionTimeMs(String tenantId);
-
-    int reassignTicketsToStatus(String tenantId,
-                                String fromStatusId,
-                                String toStatusId,
-                                TicketStatusKind toKind);
-
-    void updateTitle(String tenantId, String ticketId, String title);
-
-    // ===== Shared =====
-
-    List<Ticket> findTicketsWithCursor(Query query,
-                                       String cursor,
-                                       int limit,
-                                       String sortField,
-                                       String sortDirection);
-
-    long countTickets(Query query);
 
     boolean isSortableField(String field);
 

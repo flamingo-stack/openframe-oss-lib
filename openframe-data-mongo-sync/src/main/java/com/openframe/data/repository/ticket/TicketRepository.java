@@ -14,7 +14,7 @@ import java.util.Optional;
 @Repository
 public interface TicketRepository extends MongoRepository<Ticket, String>, CustomTicketRepository {
 
-    // TODO(lifecycle-rollout): drop all methods in this Legacy block after rollout
+    // TODO(lifecycle-rollout): drop legacy methods (by enum TicketStatus) after rollout
     // ===== Legacy (used when lifecycle feature flag is OFF) =====
 
     Optional<Ticket> findByTicketNumber(Integer ticketNumber);
@@ -62,52 +62,37 @@ public interface TicketRepository extends MongoRepository<Ticket, String>, Custo
 
     // ===== Lifecycle feature (used when lifecycle feature flag is ON) =====
 
-    Optional<Ticket> findByTenantIdAndTicketNumber(String tenantId, Integer ticketNumber);
+    List<Ticket> findByStatusKind(TicketStatusKind statusKind);
 
-    Optional<Ticket> findByTenantIdAndId(String tenantId, String id);
+    List<Ticket> findByStatusId(String statusId);
 
-    List<Ticket> findByTenantIdAndStatusKind(String tenantId, TicketStatusKind statusKind);
-
-    List<Ticket> findByTenantIdAndStatusId(String tenantId, String statusId);
-
-    List<Ticket> findByTenantIdAndOrganizationId(String tenantId, String organizationId);
-
-    List<Ticket> findByTenantIdAndAssignedTo(String tenantId, String assignedTo);
-
-    List<Ticket> findByTenantIdAndDeviceId(String tenantId, String deviceId);
-
-    List<Ticket> findByTenantIdAndIdIn(String tenantId, List<String> ids);
-
-    long countByTenantIdAndStatusId(String tenantId, String statusId);
-
-    @Query("{ 'tenantId': ?0, '_id': ?1, 'owner.machineId': ?2 }")
-    Optional<Ticket> findByTenantIdAndIdAndOwnerMachineId(String tenantId, String id, String machineId);
+    long countByStatusId(String statusId);
 
     @Aggregation(pipeline = {
-            "{ $match: { 'tenantId': ?0, 'statusId': ?1, 'order': { $ne: null } } }",
+            "{ $match: { 'statusId': ?0, 'order': { $ne: null } } }",
             "{ $sort: { 'order': 1 } }",
             "{ $limit: 1 }"
     })
-    Optional<Ticket> findFirstInColumnByStatusId(String tenantId, String statusId);
+    Optional<Ticket> findFirstInColumnByStatusId(String statusId);
 
     @Aggregation(pipeline = {
-            "{ $match: { 'tenantId': ?0, 'statusId': ?1, 'order': { $ne: null } } }",
+            "{ $match: { 'statusId': ?0, 'order': { $ne: null } } }",
             "{ $sort: { 'order': -1 } }",
             "{ $limit: 1 }"
     })
-    Optional<Ticket> findLastInColumnByStatusId(String tenantId, String statusId);
+    Optional<Ticket> findLastInColumnByStatusId(String statusId);
 
     @Aggregation(pipeline = {
-            "{ $match: { 'tenantId': ?0, 'statusId': ?1, 'order': { $gt: ?2 } } }",
+            "{ $match: { 'statusId': ?0, 'order': { $gt: ?1 } } }",
             "{ $sort: { 'order': 1 } }",
             "{ $limit: 1 }"
     })
-    Optional<Ticket> findFirstAfterByStatusId(String tenantId, String statusId, String order);
+    Optional<Ticket> findFirstAfterByStatusId(String statusId, String order);
 
     @Aggregation(pipeline = {
-            "{ $match: { 'tenantId': ?0, 'statusId': ?1, 'order': { $lt: ?2 } } }",
+            "{ $match: { 'statusId': ?0, 'order': { $lt: ?1 } } }",
             "{ $sort: { 'order': -1 } }",
             "{ $limit: 1 }"
     })
-    Optional<Ticket> findFirstBeforeByStatusId(String tenantId, String statusId, String order);
+    Optional<Ticket> findFirstBeforeByStatusId(String statusId, String order);
 }

@@ -17,15 +17,12 @@ import java.time.Instant;
 @AllArgsConstructor
 @Document(collection = "ticket_status_events")
 @CompoundIndexes({
-        @CompoundIndex(name = "tenant_ticket_time",
-                def = "{'tenantId': 1, 'ticketId': 1, 'occurredAt': -1}")
+        @CompoundIndex(name = "ticket_time", def = "{'ticketId': 1, 'occurredAt': -1}")
 })
 public class TicketStatusEvent {
 
     @Id
     private String id;
-
-    private String tenantId;
 
     private String ticketId;
 

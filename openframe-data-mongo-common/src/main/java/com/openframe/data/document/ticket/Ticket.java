@@ -29,17 +29,12 @@ import java.time.Instant;
 @CompoundIndexes({
         // TODO(lifecycle-rollout): drop legacy status_order index after `status` field removal
         @CompoundIndex(name = "status_order", def = "{'status': 1, 'order': 1}"),
-        @CompoundIndex(name = "tenant_status_kind", def = "{'tenantId': 1, 'statusKind': 1}"),
-        @CompoundIndex(name = "tenant_status_id_order", def = "{'tenantId': 1, 'statusId': 1, 'order': 1}"),
-        @CompoundIndex(name = "tenant_assignedTo", def = "{'tenantId': 1, 'assignedTo': 1}"),
-        @CompoundIndex(name = "tenant_organizationId", def = "{'tenantId': 1, 'organizationId': 1}"),
-        @CompoundIndex(name = "tenant_deviceId", def = "{'tenantId': 1, 'deviceId': 1}")
+        @CompoundIndex(name = "status_kind", def = "{'statusKind': 1}"),
+        @CompoundIndex(name = "status_id_order", def = "{'statusId': 1, 'order': 1}")
 })
 public class Ticket {
     @Id
     private String id;
-
-    private String tenantId;
 
     @Indexed(unique = true)
     private Integer ticketNumber;
