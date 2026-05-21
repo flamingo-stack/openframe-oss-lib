@@ -1,30 +1,45 @@
 # UI Kit Styles Usage Guide
 
 ## Overview
-This directory contains the complete styling system for @flamingo/ui-kit, including the ODS (Open Design System) and application-specific styles.
+
+This directory contains the complete styling system for `@flamingo/ui-kit` — the ODS (Open Design System) design tokens, the **light/dark theme system**, platform brand overrides, and a small set of vendor stylesheets.
+
+Two orthogonal axes drive the visual layer:
+
+| Axis     | Attribute                            | Sits on    | Controls                                              |
+| -------- | ------------------------------------ | ---------- | ----------------------------------------------------- |
+| Theme    | `data-theme="light \| dark"`         | `<html>`   | Surfaces, text, borders, status colors                |
+| Platform | `data-app-type="openframe \| …"`     | `<body>`   | Brand accent + links only (never bg/text/border)      |
+
+They compose cleanly because they live on different elements and reference the same `--ods-*` primitives.
 
 ## File Structure
 
 ```
 ui-kit/src/styles/
-├── index.css              # Main entry point - imports everything
-├── app-globals.css         # Application-specific global styles
-├── ods-colors.css          # Color tokens and semantic aliases
-├── ods-design-tokens.css   # Spacing, typography, shadows
-├── ods-dynamic-theming.css # Platform-specific theme variations
-├── ods-fluid-typography.css # Responsive typography system
-├── ods-interaction-states.css # Hover, focus, active states
-├── ods-responsive-tokens.css # Breakpoints and responsive utilities
-└── README.md              # This file
+├── index.css                  # Main entry point — imports everything below
+├── index.d.ts                 # Side-effect import declaration (no runtime API)
+├── app-globals.css            # Global resets, body styling, heading defaults
+├── ods-colors.css             # Tier 1 primitives + Tier 2 semantic aliases (theme-aware)
+├── ods-design-tokens.css      # Spacing, radii, shadows, durations, typography vars
+├── ods-interaction-states.css # Hover / focus / active / disabled state classes
+├── ods-responsive-tokens.css  # Breakpoints, fluid font-size clamps
+├── dark_theme.tokens.json     # Source of truth for dark primitives (1:1 with ods-colors.css)
+├── light_theme.tokens.json    # Source of truth for light primitives
+├── storybook-fonts.css        # Direct font CSS for Storybook (Next.js apps use next/font)
+├── vendor-react-easy-crop.css # Vendor override for react-easy-crop
+├── vendor-react-scroll.css    # Vendor override for react-scroll
+└── README.md                  # This file
 ```
 
 ## How to Use
 
-### 1. Basic Import (Recommended)
-Import the complete styling system in your main CSS file:
+### 1. Basic import (recommended)
+
+Import the complete styling system once in your root CSS:
 
 ```css
-/* app/globals.css or src/styles/globals.css */
+/* app/globals.css */
 @import "@flamingo/ui-kit/styles";
 
 @tailwind base;
@@ -33,82 +48,177 @@ Import the complete styling system in your main CSS file:
 ```
 
 This single import includes:
-- All ODS design tokens (colors, typography, spacing, etc.)
-- Application-specific global styles (React Easy Crop, Markdown editor, etc.)
-- Platform-aware theming
-- Utility classes and component styles
 
-### 2. Individual File Imports (Advanced)
-If you need granular control, you can import specific files:
+- All ODS design tokens (colors, typography, spacing, shadows, durations)
+- Both light **and** dark theme primitives (one is active at a time via `data-theme`)
+- Platform brand overrides (accent + links)
+- Global resets and vendor overrides
 
-```css
-/* Import only ODS design tokens */
-@import "@flamingo/ui-kit/styles/ods-colors.css";
-@import "@flamingo/ui-kit/styles/ods-design-tokens.css";
-@import "@flamingo/ui-kit/styles/ods-dynamic-theming.css";
+### 2. Wrap the app in `ThemeProvider`
 
-/* Import app-specific styles */
-@import "@flamingo/ui-kit/styles/app-globals.css";
+CSS alone is not enough — something has to set `data-theme` on `<html>` and persist the user's preference. That's `ThemeProvider`:
+
+```tsx
+// app/layout.tsx (Next.js App Router)
+import { ThemeProvider } from "@flamingo/ui-kit/components/features";
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body data-app-type="openframe">
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
+    </html>
+  );
+}
 ```
 
-**Note**: Individual imports are not exposed in package.json exports and are for internal use only.
+> `suppressHydrationWarning` on `<html>` is required — `next-themes` writes `data-theme` before React hydrates.
 
-## What's Included
+### 3. Build a toggle with `useThemeToggle`
 
-### ODS Design System
-- **Colors**: Comprehensive color palette with semantic aliases
-- **Typography**: Fluid responsive typography with clamp() functions
-- **Spacing**: Consistent spacing tokens for margins, padding, gaps
-- **Interactive States**: Hover, focus, active, disabled state definitions
-- **Platform Theming**: Automatic theme switching based on `NEXT_PUBLIC_APP_TYPE`
+The kit is **headless by design** — apps own their button visuals.
 
-### Application-Specific Styles
-- **React Easy Crop**: Complete styling for image cropping components
-- **Markdown Editor**: Dark theme styling for @uiw/react-md-editor
-- **Markdown Preview**: Styled markdown rendering
-- **Utility Classes**: Scrollbar hiding, mobile zoom prevention, etc.
-- **Platform Body Styling**: Platform-specific body background and text colors
-- **Vendor Components**: Logo containers, thumbnails, and display utilities
+```tsx
+"use client";
+import { useThemeToggle } from "@flamingo/ui-kit/components/features";
+import { Button } from "@flamingo/ui-kit/components/ui";
+import { Moon, Sun } from "lucide-react";
+
+export function ThemeToggle() {
+  const { isDark, toggle, mounted } = useThemeToggle();
+  return (
+    <Button
+      variant="outline"
+      size="icon"
+      onClick={toggle}
+      aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
+    >
+      {mounted && (isDark ? <Sun /> : <Moon />)}
+    </Button>
+  );
+}
+```
+
+A live demo of all three patterns (`Showcase`, `ToggleOnly`, `SideBySide`) lives in Storybook under **Foundations / Theme** (`src/stories/Theme.stories.tsx`).
+
+## Theme System
+
+### Defaults & contract
+
+- **Modes**: `light` and `dark` only. No `system` mode (`enableSystem={false}`).
+- **Default**: `dark`.
+- **Persistence**: `localStorage` key `ods-theme` (exported as `THEME_STORAGE_KEY`).
+- **Attribute**: `data-theme` on `<html>` (exported as `THEME_ATTRIBUTE`).
+- **Anti-flash**: handled by `next-themes`'s pre-paint script — no hand-rolled `<ThemeScript>` needed.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ Tier 1 — Primitives (--ods-*)                       THEME-SCOPED    │
+│   :root, [data-theme="dark"], .theme-dark   → dark values (default) │
+│   [data-theme="light"], .theme-light        → light values          │
+├─────────────────────────────────────────────────────────────────────┤
+│ Tier 2 — Semantic aliases (--color-*)               THEME-AGNOSTIC  │
+│   var(--color-bg) → var(--ods-system-greys-background)              │
+│   …auto-follows whichever tier-1 set is active                      │
+├─────────────────────────────────────────────────────────────────────┤
+│ Platform overrides ([data-app-type="…"])             ACCENT ONLY    │
+│   Override --color-accent-* / --color-link-* / --ods-accent         │
+│   Reference --ods-* so they follow the active theme automatically   │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+Components never read tier 1 directly — they always reference tier 2 (`--color-*`) or its Tailwind equivalents (`bg-ods-*`, `text-ods-*`, `border-ods-*`). That's why the same JSX renders correctly in both themes.
+
+### Escape hatches
+
+For previews, side-by-side comparisons, or scoping a theme to a subtree, use the class form:
+
+```tsx
+<div className="theme-light">
+  {/* renders with light primitives regardless of <html> data-theme */}
+</div>
+
+<div className="theme-dark">
+  {/* renders with dark primitives */}
+</div>
+```
+
+There is also a `.theme-high-contrast` opt-in for accessibility.
+
+### Source of truth
+
+`dark_theme.tokens.json` and `light_theme.tokens.json` are the canonical token values; `ods-colors.css` mirrors them 1:1. Update tokens by editing both the JSON and the CSS in lockstep (the JSON exists so design tools / token transformers can consume it).
 
 ## Platform Support
 
-The styles automatically adapt based on your `NEXT_PUBLIC_APP_TYPE` environment variable:
+Platforms set **brand accent + link colors only** (and a couple of intentional brand scrims). They never touch surfaces, text or borders — those are owned by the theme.
 
-- **openmsp**: Yellow accent (#FFC008), dark theme
-- **flamingo**: Pink accent (#F357BB), light theme
-- **openframe**: Cyan accent (#5EFAF0), dark theme
-- **flamingo-teaser**: Yellow accent (#FFC008), dark theme
+| `data-app-type`   | Accent                       | Notes                                |
+| ----------------- | ---------------------------- | ------------------------------------ |
+| `openframe`       | Yellow `--ods-open-yellow-base`     | Cyan links                    |
+| `openmsp`         | Yellow `--ods-open-yellow-base`     |                               |
+| `flamingo`        | Pink `--ods-flamingo-pink-base`     | Dark scrim by-design          |
+| `flamingo-teaser` | Pink `--ods-flamingo-pink-base`     |                               |
+| `tmcg`            | Pink `--ods-flamingo-pink-base`     | Cards share page background; dark scrim |
+| `marketing-hub`   | Pink `--ods-flamingo-pink-base`     |                               |
+| `product-hub`     | Green `--ods-attention-green-success` |                             |
+| `revenue-hub`     | Yellow-warning `--ods-attention-yellow-warning` |                   |
+| `people-hub`      | Cyan `--ods-flamingo-cyan-base`     |                               |
+| `company-hub`     | Red `--ods-attention-red-error`     |                               |
 
-## CSS Variables Available
+Adding a new platform = add one `[data-app-type="…"]` block in `ods-colors.css`. Because the block references `--ods-*` primitives (not raw hex), the new platform inherits dark/light flipping for free.
 
-### Color System
+## Key CSS Variables
+
+### Surfaces & text (Tier 2 — what components actually use)
+
 ```css
-/* Primary color system */
---color-accent-primary      /* Platform-specific accent color */
---color-bg                  /* Main background */
---color-bg-card            /* Card backgrounds */
---color-text-primary       /* Primary text color */
---color-text-secondary     /* Secondary text color */
---color-border-default     /* Default border color */
+--color-bg                  /* Page background */
+--color-bg-card             /* Card / panel surface */
+--color-bg-card-secondary   /* Secondary card layer */
+--color-bg-surface          /* Raised surface (e.g. inputs) */
+--color-bg-overlay          /* Modal scrim */
+--color-bg-backdrop         /* Heavier scrim */
 
-/* Status colors */
---color-success            /* Success green */
---color-error              /* Error red */
---color-warning            /* Warning amber */
---color-info               /* Info cyan */
+--color-text-primary
+--color-text-secondary
+--color-text-tertiary
+--color-text-muted
+--color-text-on-accent
+
+--color-border-default
+--color-border-hover
+--color-border-focus
+--color-divider
+```
+
+### Accent & status
+
+```css
+--color-accent-primary  /* Platform-set */
+--color-accent-hover
+--color-accent-active
+--color-focus-ring
+
+--color-success / -hover / -secondary
+--color-error   / -hover / -secondary
+--color-warning / -hover / -secondary
+--color-info    / -hover
 ```
 
 ### Typography
 
-All typography is driven by CSS variables defined in `ods-design-tokens.css`. Both the Tailwind config and component styles reference these variables as a single source of truth.
+All typography is driven by CSS variables defined in `ods-design-tokens.css`. Both Tailwind and component styles read these — single source of truth.
 
-#### Font Families
 ```css
-/* Base font family tokens (defined in ods-design-tokens.css) */
---font-family-heading: "Azeret Mono", "SF Mono", Monaco, Inconsolata, "Roboto Mono", Consolas, "Courier New", monospace;
---font-family-body: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+/* Font families */
+--font-family-heading: "Azeret Mono", "SF Mono", Monaco, …, monospace;
+--font-family-body:    "DM Sans", -apple-system, BlinkMacSystemFont, …, sans-serif;
 
-/* Per-heading font family tokens (reference base tokens) */
+/* Per-heading family overrides */
 --font-h1-family: var(--font-family-heading);
 --font-h2-family: var(--font-family-heading);
 --font-h3-family: var(--font-family-body);
@@ -117,90 +227,72 @@ All typography is driven by CSS variables defined in `ods-design-tokens.css`. Bo
 --font-h6-family: var(--font-family-heading);
 ```
 
-#### Tailwind Font Family Integration
-Tailwind `fontFamily` mappings reference CSS variables, not hardcoded font names:
+Tailwind `fontFamily` references the variables, not raw names:
 
-```typescript
+```ts
 // tailwind.config.ts
 fontFamily: {
-  sans: ["var(--font-family-body)"],
-  mono: ["var(--font-family-heading)"],
-  body: ["var(--font-family-body)"],
+  sans:    ["var(--font-family-body)"],
+  mono:    ["var(--font-family-heading)"],
+  body:    ["var(--font-family-body)"],
   heading: ["var(--font-family-heading)"],
 }
 ```
 
-This means `font-sans`, `font-mono`, `font-body`, `font-heading` all resolve through CSS variables, ensuring consistency with the rest of the design system.
+The `odsTypographyPlugin` ships `text-h1` … `text-h6` composite utilities that bundle family + weight + size + line-height + letter-spacing:
 
-#### Typography Utility Classes
-The `odsTypographyPlugin` in `tailwind.config.ts` provides composite typography classes that bundle font-family, weight, size, line-height, and letter-spacing:
+| Class       | Family             | Weight             | Size                          | Line-height                              | Extras              |
+| ----------- | ------------------ | ------------------ | ----------------------------- | ---------------------------------------- | ------------------- |
+| `text-h1`   | `--font-h1-family` | `--font-h1-weight` | `--font-size-h1-title`        | `--font-line-space-h1-main-title`        | `-0.02em`           |
+| `text-h2`   | `--font-h2-family` | `--font-h2-weight` | `--font-size-h2-sub-title`    | `--font-line-space-h2-sub-title`         | `-0.02em`           |
+| `text-h3`   | `--font-h3-family` | `--font-h3-weight` | `--font-size-h3-body`         | `--font-line-space-h3-body`              | `-0.02em`           |
+| `text-h4`   | `--font-h4-family` | `--font-h4-weight` | `--font-size-h4-body`         | `--font-line-space-h4-body`              | —                   |
+| `text-h5`   | `--font-h5-family` | `--font-h5-weight` | `--font-size-h5-caption`      | `--font-line-space-h5-caption`           | `-0.02em` uppercase |
+| `text-h6`   | `--font-h6-family` | `--font-h6-weight` | `--font-size-h6-caption`      | `--font-line-space-h6-caption`           | —                   |
 
-| Class | Font | Weight | Size | Line Height | Letter Spacing |
-|-------|------|--------|------|-------------|----------------|
-| `text-h1` | `--font-h1-family` | `--font-h1-weight` | `--font-size-h1-title` | `--font-line-space-h1-main-title` | `-0.02em` |
-| `text-h2` | `--font-h2-family` | `--font-h2-weight` | `--font-size-h2-sub-title` | `--font-line-space-h2-sub-title` | `-0.02em` |
-| `text-h3` | `--font-h3-family` | `--font-h3-weight` | `--font-size-h3-body` | `--font-line-space-h3-body` | `-0.02em` |
-| `text-h4` | `--font-h4-family` | `--font-h4-weight` | `--font-size-h4-body` | `--font-line-space-h4-body` | - |
-| `text-h5` | `--font-h5-family` | `--font-h5-weight` | `--font-size-h5-caption` | `--font-line-space-h5-caption` | `-0.02em` + uppercase |
-| `text-h6` | `--font-h6-family` | `--font-h6-weight` | `--font-size-h6-caption` | `--font-line-space-h6-caption` | - |
+Plus size-only utilities (`text-heading-1` … `text-heading-6`) when you want a different font-family but the heading's size + line-height. Fluid scaling via `clamp()` is defined in `ods-responsive-tokens.css`.
 
-Additionally, Tailwind `fontSize` utilities are available for size + line-height only:
+### Spacing & radii
 
-```typescript
-// Usage: text-heading-1, text-heading-2, etc.
-'heading-1': ['var(--font-size-h1-title)', { lineHeight: 'var(--font-line-space-h1-main-title)' }],
-'heading-2': ['var(--font-size-h2-sub-title)', { lineHeight: 'var(--font-line-space-h2-sub-title)' }],
-// ...
-```
-
-#### Responsive Typography
-Font sizes use `clamp()` functions for fluid scaling between breakpoints. The actual values are defined in `ods-responsive-tokens.css`.
-
-### Spacing
 ```css
-/* Consistent spacing scale */
---space-1 through --space-20
---space-px, --space-0_5, etc.
+--space-px, --space-0_5, --space-1 … --space-20
+--radius, --radius-sm, --radius-md, --radius-lg, --radius-xl
+--shadow-card, --shadow-card-hover, --shadow-modal, --shadow-focus
 ```
 
 ## Component Integration
 
-### Using with Tailwind
-The styles work seamlessly with Tailwind CSS:
+### With Tailwind
 
-```jsx
-// Typography utilities apply all styles at once
-<h1 className="text-h1">Main Title</h1>
-<h2 className="text-h2">Subtitle</h2>
-<p className="font-body text-heading-3">Body text with heading-3 size</p>
+```tsx
+<h1 className="text-h1">Main title</h1>
+<p className="text-body text-ods-text-secondary">Body copy</p>
 
-// Platform-aware colors automatically applied
-<button className="bg-ods-accent text-ods-text-on-accent">
-  Platform Button
+<button className="bg-ods-accent text-ods-text-on-accent hover:bg-ods-accent-hover">
+  Platform-coloured button
 </button>
 
-// Font family utilities
-<span className="font-heading">Azeret Mono text</span>
-<span className="font-body">DM Sans text</span>
+<div className="bg-ods-card border border-ods-border text-ods-text-primary">
+  Card surface — auto-flips between themes
+</div>
 ```
 
-### CSS-in-JS Integration
-Access design tokens in CSS-in-JS solutions:
+### With CSS-in-JS
 
-```jsx
-const StyledComponent = styled.div`
-  background-color: var(--color-bg-card);
+```tsx
+const Surface = styled.div`
+  background: var(--color-bg-card);
   color: var(--color-text-primary);
-  font-family: var(--font-family-body);
+  border: 1px solid var(--color-border-default);
   padding: var(--space-4);
   border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
 `;
 ```
 
-## Customization
+## Customisation
 
-### Adding Custom Styles
-For project-specific styles, add them after the ui-kit import:
+### Adding custom styles
 
 ```css
 @import "@flamingo/ui-kit/styles";
@@ -209,85 +301,90 @@ For project-specific styles, add them after the ui-kit import:
 @tailwind components;
 @tailwind utilities;
 
-/* Your custom styles here */
-.my-custom-component {
+.my-component {
   background: var(--color-accent-primary);
+  color: var(--color-text-on-accent);
 }
 ```
 
-### Overriding Design Tokens
-To override specific tokens, define them after the import:
+### Overriding tokens
+
+Override after the import, in the appropriate selector. **Theme-scoped** tokens must be overridden inside the matching selector so they flip:
 
 ```css
 @import "@flamingo/ui-kit/styles";
 
+/* Theme-stable override (applies to both themes) */
 :root {
-  /* Override specific tokens */
-  --color-accent-primary: #custom-color;
   --font-family-body: "Inter", sans-serif;
-  --space-custom: 2.5rem;
+  --radius-lg: 12px;
+}
+
+/* Theme-scoped override (per-theme) */
+:root[data-theme="dark"] {
+  --ods-system-greys-background: #0a0a0a;
+}
+:root[data-theme="light"] {
+  --ods-system-greys-background: #ffffff;
 }
 ```
 
 ## Troubleshooting
 
-### Styles Not Loading
-Ensure you're importing the correct path:
+### Styles not loading
+
+Import the package path, not the file path:
+
 ```css
-@import "@flamingo/ui-kit/styles"; /* Correct */
-@import "@flamingo/ui-kit/styles/index.css"; /* Incorrect */
+@import "@flamingo/ui-kit/styles";        /* correct */
+@import "@flamingo/ui-kit/styles/index.css"; /* incorrect */
 ```
 
-### Platform Theming Not Working
-1. Check that `NEXT_PUBLIC_APP_TYPE` is set correctly
-2. Verify the value matches supported platforms
-3. Ensure the import is in your root CSS file
+### Theme flashes wrong colour on first paint
 
-### CSS Variables Undefined
-Make sure you're importing the ui-kit styles before using any CSS variables:
-```css
-/* Import first */
-@import "@flamingo/ui-kit/styles";
+You're missing `suppressHydrationWarning` on `<html>` or you're not wrapping in `ThemeProvider`. Both are required for `next-themes`'s pre-paint script to do its job.
 
-/* Then use variables */
-.my-component {
-  color: var(--color-text-primary);
-}
-```
+### `useThemeToggle` returns `dark` even after toggling to light
 
-### Duplicate Styles
-If you see duplicate styles, ensure you're not importing both:
-- Individual ODS files AND the main styles
-- The ui-kit styles AND manual copies of the same styles
+You're reading `theme` before `mounted === true`. Until hydration completes, the hook returns the default (`dark`). Gate UI on `mounted` to avoid hydration mismatch — the [Showcase story](../stories/Theme.stories.tsx) shows the pattern.
+
+### Platform accent not applying
+
+1. `data-app-type` must be on `<body>` (or any ancestor of the components).
+2. The value must match one of the supported keys (see the Platform Support table).
+3. Make sure your root CSS imports `@flamingo/ui-kit/styles`.
+
+### Component uses brand colour that ignores the theme
+
+That's by design for the few theme-stable shades (`--ods-*-dark`, `--ods-*-light`) and third-party social brand colours. Use a tier-2 alias (`--color-*`) when you want theme-aware behaviour.
+
+### Duplicate styles in the bundle
+
+You're importing both the umbrella (`@flamingo/ui-kit/styles`) and individual ODS files. Pick one.
 
 ## Best Practices
 
-1. **Always import the complete styles** unless you have specific needs for granular imports
-2. **Use CSS variables** instead of hardcoded values for consistency
-3. **Use `text-h1`..`text-h6` utilities** for headings — they apply the full typography stack (family, weight, size, line-height, letter-spacing)
-4. **Use `font-heading` / `font-body`** for font-family only — they reference CSS variables, not hardcoded fonts
-5. **Leverage platform theming** by using accent colors and semantic tokens
-6. **Test across all platforms** when making style changes
-7. **Keep custom styles minimal** - prefer using design system tokens
+1. **Wrap in `ThemeProvider` once** at the app root and use `useThemeToggle()` for UI — never set `data-theme` manually from app code.
+2. **Use tier-2 aliases (`--color-*` / `bg-ods-*` / `text-ods-*`)** in components, not tier-1 primitives or raw hex.
+3. **Use `text-h1` … `text-h6`** for headings — they apply the full typography stack.
+4. **Use `font-heading` / `font-body`** for font-family only.
+5. **Test in both themes** — the easiest way is the `Foundations/Theme/SideBySide` Storybook story.
+6. **Never hardcode colours, font-families, or pixel sizes** (see project CLAUDE.md, Core Rule 2).
+7. **Keep platform overrides to accent-only**. Surfaces / text / borders are the theme's job.
 
-## Migration from Legacy Styles
+## Migration Notes
 
-If migrating from individual style files:
-
-1. Remove individual `@import` statements for ODS files
-2. Replace with single `@import "@flamingo/ui-kit/styles"`
-3. Delete duplicate style files from your project
-4. Replace hardcoded font names with CSS variable references (e.g. `"DM Sans"` -> `var(--font-family-body)`)
-5. Update any hardcoded colors/spacing to use CSS variables
-6. Test that platform theming still works correctly
+- The legacy `ods-dynamic-theming.css` and `ods-fluid-typography.css` have been folded into `ods-colors.css` and `ods-responsive-tokens.css` respectively — drop those imports if you still reference them.
+- Previous releases conflated *platform* and *theme* (e.g. "openframe = dark only"). Theme is now a **per-user** choice that exists independently of platform; both axes compose. If you previously branched layout on platform to imply theme, switch to reading `useTheme()`.
+- Hardcoded `"DM Sans"` / `"Azeret Mono"` references should become `var(--font-family-body)` / `var(--font-family-heading)`.
 
 ## Contributing
 
-When adding new styles to the ui-kit:
-
-1. **Design tokens** go in the appropriate `ods-*.css` file
-2. **Application-specific styles** go in `app-globals.css`
-3. **Platform-specific overrides** go in `ods-dynamic-theming.css`
-4. **Typography changes** must update both CSS variables in `ods-design-tokens.css` and the plugin in `tailwind.config.ts`
-5. **Update this README** when adding new features or changing structure
-6. **Test across all platforms** before committing changes
+1. **Token values** → edit both the `*.tokens.json` AND `ods-colors.css` (they must stay in sync).
+2. **New design tokens** → the appropriate `ods-*.css` file. Add a tier-2 alias if components are expected to consume it.
+3. **Global resets / body styling** → `app-globals.css`.
+4. **Platform brand overrides** → bottom of `ods-colors.css`.
+5. **Typography changes** → update CSS variables in `ods-design-tokens.css` **and** the `odsTypographyPlugin` in `tailwind.config.ts`.
+6. **Theme system changes** → update `src/components/providers/theme-provider.tsx` and the Storybook demo (`src/stories/Theme.stories.tsx`).
+7. **Update this README** when adding new files, new platforms, or changing the theme contract.
+8. **Test in both themes** and across at least two platforms before committing.
