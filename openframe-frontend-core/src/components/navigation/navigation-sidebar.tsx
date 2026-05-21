@@ -26,30 +26,44 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
   const isMdUp = useMdUp() ?? false
   const isLgUp = useLgUp() ?? false
 
-  // useLocalStorage reads from localStorage first, then falls back to this value
-  const [minimized, setMinimized] = useLocalStorage<boolean>(
+  // Tablet = md viewport but not lg. On tablet the sidebar floats over the
+  // content area (overlay) instead of pushing it like on desktop.
+  const isTablet = isMdUp && !isLgUp
+
+  // Desktop preference persists across sessions. Tablet state is in-memory
+  // only so entering tablet always starts minimized without clobbering the
+  // user's desktop choice.
+  const [desktopMinimized, setDesktopMinimized] = useLocalStorage<boolean>(
     STORAGE_KEY,
-    !isLgUp || (config.minimized ?? false)
+    config.minimized ?? false,
   )
+  const [tabletMinimized, setTabletMinimized] = useState(true)
+
+  useEffect(() => {
+    if (isTablet) setTabletMinimized(true)
+  }, [isTablet])
+
+  const minimized = isTablet ? tabletMinimized : desktopMinimized
 
   // Enable transitions only after the correct width is painted
   const [transitionsEnabled, setTransitionsEnabled] = useState(false)
 
-  // Tablet = md viewport but not lg. On tablet the sidebar floats over the
-  // content area (overlay) instead of pushing it like on desktop.
-  const isTablet = isMdUp && !isLgUp
   const isOverlayOpen = isTablet && !minimized
 
   const showLabel = !minimized
 
   const handleToggle = useCallback(() => {
-    setMinimized(prev => !prev)
+    if (isTablet) {
+      setTabletMinimized(prev => !prev)
+    } else {
+      setDesktopMinimized(prev => !prev)
+    }
     config.onToggleMinimized?.()
-  }, [setMinimized, config])
+  }, [isTablet, setDesktopMinimized, config])
 
   const closeOverlay = useCallback(() => {
-    setMinimized(true)
-  }, [setMinimized])
+    setTabletMinimized(true)
+  }, [])
 
   // Dismiss the tablet overlay with Escape so it behaves like a transient panel
   useEffect(() => {

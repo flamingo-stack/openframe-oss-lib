@@ -16,7 +16,7 @@ const splitHalfBase = [
   "whitespace-nowrap transition-colors duration-200",
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus focus-visible:z-10",
   "disabled:pointer-events-none",
-  "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:h-5 [&_svg]:w-5",
+  "[&_svg]:pointer-events-none [&_svg]:shrink-0",
 ]
 
 const splitHalfVariants = cva(splitHalfBase, {
@@ -28,8 +28,8 @@ const splitHalfVariants = cva(splitHalfBase, {
       destructive: buttonSurfaceClasses.destructive,
     },
     size: {
-      default: "h-12 px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)] text-h3",
-      small: "h-6 md:h-8 px-[var(--spacing-system-xs)] text-h5",
+      default: "h-10 md:h-12 px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)] text-h3 [&_svg]:h-4 [&_svg]:w-4 md:[&_svg]:h-6 md:[&_svg]:w-6",
+      small: "h-6 md:h-8 px-[var(--spacing-system-xs)] text-h5 [&_svg]:h-3 [&_svg]:w-3 md:[&_svg]:h-4 md:[&_svg]:w-4",
     },
     side: { main: "", icon: "" },
   },
@@ -55,8 +55,6 @@ const splitHalfVariants = cva(splitHalfBase, {
     // Icon half: per Figma, narrower than main height (default: 40×48; small: 32×32).
     { side: "icon", size: "default", class: "w-10 px-0" },
     { side: "icon", size: "small", class: "w-6 md:w-8 px-0" },
-
-    { size: "small", class: "[&_svg]:h-4 [&_svg]:w-4" },
   ],
   defaultVariants: { variant: "accent", size: "default", side: "main" },
 })
