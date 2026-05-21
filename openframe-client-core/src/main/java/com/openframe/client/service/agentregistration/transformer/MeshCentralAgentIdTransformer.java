@@ -11,11 +11,13 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 @Slf4j
 public class MeshCentralAgentIdTransformer implements ToolAgentIdTransformer {
 
-    private final String tenantId;
+    private static final String LEGACY_NODE_PREFIX = "node//";
 
-    public MeshCentralAgentIdTransformer(@Value("${openframe.cluster-id:}") String tenantId) {
-        this.tenantId = tenantId == null ? "" : tenantId;
-    }
+    @Value("${openframe.cluster-id:}")
+    private String tenantId;
+
+    @Value("${openframe.client.meshcentral.tenant-scoped-node-id:false}")
+    private boolean tenantScopedNodeId;
 
     @Override
     public ToolType getToolType() {
@@ -29,7 +31,13 @@ public class MeshCentralAgentIdTransformer implements ToolAgentIdTransformer {
             return agentToolId;
         }
 
-        String transformedId = "node/" + tenantId + "/" + agentToolId;
+        String transformedId;
+        if (tenantScopedNodeId) {
+            transformedId = "node/" + tenantId + "/" + agentToolId;
+        } else {
+            //TODO Legacy empty-domain form (kept as the default). delete after mesh release
+            transformedId = LEGACY_NODE_PREFIX + agentToolId;
+        }
         log.info("Transformed MeshCentral agent tool ID, machineId={}, agentToolId={}, transformedId={}", machineId, agentToolId, transformedId);
 
         return transformedId;
