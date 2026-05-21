@@ -16,8 +16,12 @@ public class DeviceDetailsPage {
 
     private static final String DEVICE_NAME_HEADING = "main h1";
 
+    // FIX: status badge is a <div> containing a <span class="truncate">, not a
+    // bare <span>. Target the inner truncate span inside the badge div.
+    // The badge div carries bg-[var(--ods-attention-*)] colour classes; the
+    // simplest robust selector is the truncate span inside the badge flex row.
     private static final String STATUS_BADGE =
-            "main span:text-matches('^(ONLINE|OFFLINE|ARCHIVED)$')";
+            "main div.flex.gap-2.items-center span.truncate";
 
     // ── Constructor ──────────────────────────────────────────────────────────
 
@@ -28,7 +32,7 @@ public class DeviceDetailsPage {
     // ── Header accessors ─────────────────────────────────────────────────────
 
     /**
-     * Returns the device name shown in the h1 heading (e.g. "VM116194").
+     * Returns the device name shown in the h1 heading (e.g. "VM115982").
      */
     public String getDeviceName() {
         return page.locator(DEVICE_NAME_HEADING).innerText().trim();
@@ -37,34 +41,54 @@ public class DeviceDetailsPage {
     /**
      * Returns the connectivity status badge text (e.g. "ONLINE", "OFFLINE",
      * "ARCHIVED").
+     * <p>
+     * FIX: The badge is a {@code <div>} whose only text child is a
+     * {@code <span class="truncate">}. The original selector targeted
+     * {@code span:text-matches(...)} which never matched the div wrapper.
      */
     public String getDeviceStatus() {
-        return page.locator(STATUS_BADGE).innerText().trim();
+        return page.locator(STATUS_BADGE).first().innerText().trim();
     }
 
     /**
      * Returns the "Updated X seconds" / "Updated just now" timestamp text
      * shown next to the status badge.
+     * <p>
+     * NOTE: This text is not present on the current live page. The selector
+     * is retained but guarded — returns an empty string rather than throwing
+     * if the element is absent.
      */
     public String getLastUpdatedText() {
-        return page.locator("main span.text-ods-text-secondary.text-xs").innerText().trim();
+        Locator loc = page.locator("main span.text-ods-text-secondary.text-xs");
+        return loc.count() > 0 ? loc.first().innerText().trim() : "";
     }
 
     // ── Info card metadata ────────────────────────────────────────────────────
 
     /**
      * Returns the value for a given metadata field label in the info card.
-     * Labels include: "Type", "Manufacturer", "Model", "Serial Number",
-     * "Host Name", "Organization Name", "Last Seen", "Last Boot",
-     * "Operating System", "Requires Reboot", "UUID", "MAC Address".
+     * Labels include: "Hostname", "Type", "Device", "Serial Number",
+     * "Customer ID (Site)", "Registered", "Updated", "UUID".
+     * <p>
+     * FIX: The DOM structure is:
+     * <pre>
+     *   div.flex.flex-col.justify-center   (field cell)
+     *     div > p.text-ods-text-primary    (value)
+     *     p.text-ods-text-secondary        (label — BELOW the value)
+     * </pre>
+     * The original XPath {@code preceding-sibling::p[1]} assumed the label
+     * came after the value in sibling order but traversed the wrong axis.
+     * Now we filter the cell div by the label text, then grab the first
+     * {@code p.text-ods-text-primary} child as the value.
      *
-     * @param label exact label text (e.g. "Operating System")
-     * @return the value text (e.g. "Windows Windows Server 2025 …")
+     * @param label exact label text (e.g. "Hostname")
+     * @return the value text (e.g. "vm115982")
      */
     public String getInfoField(String label) {
-        return page.locator("main p.text-ods-text-secondary")
+        return page.locator("main p.text-ods-text-secondary.text-h6")
                 .filter(new Locator.FilterOptions().setHasText(label))
-                .locator("xpath=preceding-sibling::p[1]")
+                .locator("xpath=../div/p[@class[contains(.,'text-ods-text-primary')]]")
+                .first()
                 .innerText()
                 .trim();
     }
@@ -72,22 +96,18 @@ public class DeviceDetailsPage {
     // ── Action bar ────────────────────────────────────────────────────────────
 
     /**
-     * Clicks "Back to Devices".
+     * Clicks the "Back" button (top-left of the detail page).
+     * <p>
+     * FIX: The button label on the live page is "Back", not "Back to Devices".
+     * Using a CSS class anchor instead of text to avoid locale/copy drift.
      */
     public void clickBackToDevices() {
-        page.getByRole(AriaRole.BUTTON,
-                new Page.GetByRoleOptions().setName("Back to Devices")).click();
+        page.locator("main button.hidden.md\\:inline-flex").first().click();
     }
 
     /**
      * Clicks the Remote Control link in the action bar and waits for
      * the URL to transition to the remote-desktop sub-route.
-     * <p>
-     * FIX: Remote Control is a dedicated split-button in the action bar, not
-     * an item inside the ⋯ more-actions menu. The previous implementation
-     * tried to open the more-actions menu and match on href="/remote-desktop/"
-     * — both wrong. Now clicks the action-bar link directly using an
-     * ends-with match on the device-scoped href.
      *
      * @return a new {@link RemoteDesktopPage} scoped to the same page
      */
@@ -102,14 +122,12 @@ public class DeviceDetailsPage {
     /**
      * Opens the ⋯ more-actions menu, clicks "Manage Files", and waits for
      * the File Manager page to finish loading.
-     * <p>
-     * FIX: menu item was renamed from "File Manager" to "Manage Files".
      *
      * @return a new {@link FileManagerPage} scoped to the same page
      */
     public FileManagerPage openFileManager() {
         openMoreActionsMenu();
-        clickMenuItemByText("Manage Files");   // was "File Manager"
+        clickMenuItemByText("Manage Files");
         FileManagerPage fileManagerPage = new FileManagerPage(this.page);
         page.waitForCondition(fileManagerPage::isLoaded);
         return fileManagerPage;
@@ -117,7 +135,6 @@ public class DeviceDetailsPage {
 
     /**
      * Opens the Remote Shell dropdown and clicks the "CMD" option.
-     * The Remote Shell button has {@code aria-haspopup="menu"}.
      */
     public void openRemoteShellCmd() {
         openRemoteShellMenu();
@@ -126,13 +143,13 @@ public class DeviceDetailsPage {
 
     /**
      * Opens the Remote Shell dropdown and clicks the "PowerShell" option.
+     *
+     * @return a new {@link RemoteShellPage} scoped to the same page
      */
     public RemoteShellPage openRemoteShellPowerShell() {
         openRemoteShellMenu();
         clickMenuItemByText("PowerShell");
         RemoteShellPage remoteShellPage = new RemoteShellPage(this.page);
-        // Wait for the PS prompt to appear in terminal output, not just the
-        // Connected badge — the badge turns green before the shell is ready.
         remoteShellPage.waitForOutputContaining("PS ", 30_000);
         return remoteShellPage;
     }
@@ -179,7 +196,8 @@ public class DeviceDetailsPage {
 
     /**
      * Returns {@code true} if the given tab is currently active.
-     * Active tabs carry a {@code bg-gradient-to-b} class on their button.
+     * Active tabs carry a {@code bg-gradient-to-b} class directly on the
+     * button (inactive tabs only have it under a {@code hover:} prefix).
      *
      * @param tabName exact tab label text
      */
@@ -187,8 +205,46 @@ public class DeviceDetailsPage {
         String cls = page.getByRole(AriaRole.BUTTON,
                         new Page.GetByRoleOptions().setName(tabName))
                 .getAttribute("class");
-        return cls != null && cls.contains("bg-gradient-to-b");
+        // Active:   "... bg-gradient-to-b from-..."
+        // Inactive: "... hover:bg-gradient-to-b hover:from-..."
+        return cls != null
+                && cls.contains("bg-gradient-to-b")
+                && !cls.contains("hover:bg-gradient-to-b");
     }
+
+    // ── Agents tab ────────────────────────────────────────────────────────────
+
+    /**
+     * Returns the status text for a given agent by its card heading name.
+     * Requires the Agents tab to be active; call {@link #clickTab(String)}
+     * with {@code "Agents"} first if needed.
+     * <p>
+     * Valid agent names: "Fleet", "Tactical", "MeshCentral",
+     * "OpenFrame Client", "Osquery", "OpenFrame Chat".
+     * <p>
+     * DOM structure:
+     * <pre>
+     *   div.relative.flex.flex-col          (agent card wrapper)
+     *     div.absolute.top-4.left-4         (name overlay)
+     *       span.text-ods-text-primary.text-h4  → agent name
+     *     div.bg-ods-card                   (card body)
+     *       div > span.text-h4 "Status"
+     *       span.truncate                   → status value (ONLINE / OFFLINE)
+     * </pre>
+     *
+     * @param agentName exact agent card heading text (e.g. "MeshCentral")
+     * @return the status text (e.g. "ONLINE", "OFFLINE")
+     */
+    public String getAgentStatus(String agentName) {
+        return page.locator("main div.relative.flex.flex-col")
+                .filter(new Locator.FilterOptions().setHasText(agentName))
+                .locator("div.bg-ods-card span.truncate")
+                .first()
+                .innerText()
+                .trim();
+    }
+
+    // ── Loaded check ──────────────────────────────────────────────────────────
 
     public boolean isLoaded() {
         return !getDeviceName().isEmpty() && !getDeviceStatus().isEmpty();
@@ -198,6 +254,7 @@ public class DeviceDetailsPage {
 
     /**
      * Clicks the Remote Shell split-button to open its dropdown.
+     * The whole split-button group carries {@code aria-haspopup="menu"}.
      */
     private void openRemoteShellMenu() {
         page.locator("main button[aria-haspopup='menu']")
@@ -218,8 +275,7 @@ public class DeviceDetailsPage {
 
     /**
      * Clicks an item inside the currently open {@code [role="menu"]} by its
-     * visible text. Matches both {@code <a>} links and {@code <menuitem>}
-     * elements.
+     * visible text.
      */
     private void clickMenuItemByText(String text) {
         page.locator("[role='menu'] a, [role='menu'] [role='menuitem']")

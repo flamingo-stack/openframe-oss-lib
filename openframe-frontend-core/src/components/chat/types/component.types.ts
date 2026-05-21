@@ -237,6 +237,10 @@ export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextArea
   onStop?: () => void | Promise<void>
   sending?: boolean
   awaitingResponse?: boolean
+  /**
+   * @deprecated The avatar-offset layout was removed; this prop is accepted
+   * for back-compat but silently ignored. Safe to drop from call sites.
+   */
   reserveAvatarOffset?: boolean
   disabled?: boolean
   maxRows?: number

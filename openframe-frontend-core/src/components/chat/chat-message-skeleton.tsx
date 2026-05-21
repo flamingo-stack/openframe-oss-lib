@@ -20,25 +20,24 @@ export function ChatMessageSkeleton({
   return (
     <div
       className={cn(
-        "flex flex-row items-start gap-4",
+        "relative",
         !isUser && "bg-ods-card/50 rounded-lg px-4 -mx-4",
         className
       )}
     >
-      {/* Avatar Skeleton - optional */}
-      {showAvatar && (
+      {/* Avatar Skeleton - absolutely positioned outside content area to match
+          the real ChatMessageEnhanced hanging-avatar layout. */}
+      {showAvatar && !isUser && (
         <div className={cn(
-          "flex-shrink-0 mt-1 w-8 h-8 rounded animate-pulse",
-          isUser 
-            ? "invisible"
-            : isMingo
+          "absolute -left-16 top-[var(--spacing-system-s)] w-12 h-12 rounded-full animate-pulse",
+          isMingo
             ? "bg-gradient-to-br from-cyan-400/30 to-cyan-600/30"
             : "bg-gradient-to-br from-pink-400/30 to-pink-600/30"
         )} />
       )}
-      
+
       {/* Message Content Skeleton */}
-      <div className="flex flex-1 flex-col gap-1 min-w-0">
+      <div className="flex flex-col gap-1 min-w-0">
         {/* Name and Timestamp Row Skeleton */}
         <div className="flex items-center justify-between pr-2">
           <div className="h-5 w-16 bg-ods-border rounded animate-pulse" />
@@ -92,7 +91,7 @@ export function ChatMessageListSkeleton({
           className
         )}
       >
-        <div className={cn("mx-auto flex w-full max-w-3xl flex-col pb-2 min-w-0", contentClassName || "px-4")} style={{ minHeight: '100%' }}>
+        <div className={cn("mx-auto flex w-full max-w-ods-content-narrow flex-col pb-[var(--spacing-system-xs)] min-w-0", contentClassName ?? "px-[var(--spacing-system-m)]")} style={{ minHeight: '100%' }}>
           <div className="flex-1" />
           <div className="space-y-6">
             {messages.map((message) => (

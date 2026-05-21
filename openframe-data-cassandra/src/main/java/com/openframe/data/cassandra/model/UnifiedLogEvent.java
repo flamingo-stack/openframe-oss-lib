@@ -86,22 +86,25 @@ public class UnifiedLogEvent {
         @PrimaryKeyColumn(name = "tool_type", ordinal = 1, type = PrimaryKeyType.PARTITIONED)
         private String toolType;
 
+        @PrimaryKeyColumn(name = "tenant_id", ordinal = 2, type = PrimaryKeyType.CLUSTERED)
+        private String tenantId;
+
         /**
          * Cluster by event type (login, logout, script, etc.).
          */
-        @PrimaryKeyColumn(name = "event_type", ordinal = 2, type = PrimaryKeyType.CLUSTERED)
+        @PrimaryKeyColumn(name = "event_type", ordinal = 3, type = PrimaryKeyType.CLUSTERED)
         private String eventType;
 
         /**
          * Cluster by event timestamp (descending for recent-first queries).
          */
-        @PrimaryKeyColumn(name = "event_timestamp", ordinal = 3, type = PrimaryKeyType.CLUSTERED, ordering = Ordering.DESCENDING)
+        @PrimaryKeyColumn(name = "event_timestamp", ordinal = 4, type = PrimaryKeyType.CLUSTERED, ordering = Ordering.DESCENDING)
         private Instant eventTimestamp;
 
         /**
          * Cluster by original event ID from the tool, for uniqueness.
          */
-        @PrimaryKeyColumn(name = "tool_event_id", ordinal = 4, type = PrimaryKeyType.CLUSTERED)
+        @PrimaryKeyColumn(name = "tool_event_id", ordinal = 5, type = PrimaryKeyType.CLUSTERED)
         private String toolEventId;
     }
 }

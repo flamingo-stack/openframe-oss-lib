@@ -8,10 +8,78 @@ export interface ProductReleaseCardSkeletonProps {
   className?: string
   /** Card density. Must match the loaded card's `size` prop so the loading
    *  height matches the resolved height (no layout shift on resolve). */
-  size?: 'default' | 'sm'
+  size?: 'default' | 'sm' | 'catalog'
 }
 
 export function ProductReleaseCardSkeleton({ className, size = 'default' }: ProductReleaseCardSkeletonProps) {
+  // ----- CATALOG branch — must match ProductReleaseCard size='catalog'.
+  // Same outer frame (`bg-ods-system-greys-black border border-ods-border …
+  // p-6 gap-4`). Inner: hero (16:9 cover + version pill + title + summary),
+  // changelog strip placeholder (always rendered — see note), metadata-grid
+  // footer (4 cells via grid). Heights chosen to match the loaded card's
+  // rendered metrics so the 5-card slot grid in `ReleasesList` doesn't
+  // jump on resolve.
+  //
+  // Note: the loaded card hides the changelog strip when total === 0
+  // (rare — most releases have at least one feature/fix/improvement).
+  // The skeleton always renders the placeholder; net effect is a ~28px
+  // shrink on empty-changelog releases. Documented tradeoff.
+  if (size === 'catalog') {
+    return (
+      <div
+        className={cn(
+          'bg-ods-system-greys-black border border-ods-border rounded-lg overflow-hidden',
+          'flex flex-col p-6 gap-4',
+          'animate-pulse',
+          className,
+        )}
+      >
+        {/* HERO */}
+        <div className="flex flex-col md:flex-row gap-4 md:gap-6">
+          <div className="w-full md:w-[256px] aspect-[16/9] bg-ods-bg rounded-lg flex-shrink-0" />
+          <div className="flex-1 min-w-0 flex flex-col">
+            {/* Version pill */}
+            <div className="h-6 w-20 bg-ods-bg rounded mb-3" />
+            {/* Title — 2 lines */}
+            <div className="h-7 w-3/4 bg-ods-bg rounded mb-2" />
+            <div className="h-7 w-1/2 bg-ods-bg rounded mb-3" />
+            {/* Summary — 2 lines */}
+            <div className="h-3 w-full bg-ods-bg/60 rounded mb-1" />
+            <div className="h-3 w-5/6 bg-ods-bg/60 rounded" />
+          </div>
+        </div>
+
+        {/* CHANGELOG strip placeholder — always rendered */}
+        <div className="border-t border-ods-border pt-3">
+          <div className="h-4 w-2/3 bg-ods-bg/60 rounded" />
+        </div>
+
+        {/* METADATA GRID — 4-cell placeholder */}
+        <div className="grid grid-cols-1 md:grid-cols-4 border border-ods-border rounded-md overflow-hidden w-full">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={`cell-${i}`}
+              className="bg-ods-card p-4 flex flex-col gap-3 border-b md:border-b-0 md:border-r border-ods-border"
+            >
+              <div className="flex flex-col gap-2">
+                <div className="h-6 w-24 bg-ods-bg rounded" />
+                <div className="h-3 w-16 bg-ods-bg/60 rounded" />
+              </div>
+            </div>
+          ))}
+          {/* Author cell */}
+          <div className="bg-ods-card p-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-ods-bg shrink-0" />
+            <div className="flex flex-col gap-2 flex-1 min-w-0">
+              <div className="h-4 w-3/4 bg-ods-bg rounded" />
+              <div className="h-3 w-1/2 bg-ods-bg/60 rounded" />
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // ----- COMPACT branch — must match ProductReleaseCard size='sm' exactly.
   // Same outer: span + items-start + gap-3 + p-2 + my-1.5 (no border to keep
   // the skeleton 1px lighter than the resolved card is fine — but we mirror

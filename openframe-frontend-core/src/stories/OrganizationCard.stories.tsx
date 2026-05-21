@@ -60,6 +60,20 @@ export const Default: Story = {
 }
 
 /**
+ * Card with an organization logo image.
+ */
+export const WithImage: Story = {
+  args: {
+    organization: {
+      ...baseOrg,
+      imageUrl: 'https://picsum.photos/seed/acme/120/120',
+    },
+    href: '/organizations/details/1',
+    deviceCount: 142,
+  },
+}
+
+/**
  * Card as a clickable link.
  */
 export const WithLink: Story = {
