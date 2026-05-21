@@ -441,25 +441,33 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
               <div ref={sentinelRef} className="h-px" />
             )}
             <div className="flex-1" />
-            {messages.map((message, index) => (
-              <ChatMessageEnhanced
-                key={message.id}
-                ref={getRegisterMessageEl(message.id)}
-                role={message.role}
-                name={message.name}
-                content={message.content}
-                timestamp={message.timestamp}
-                isTyping={index === messages.length - 1 && isTyping && message.role === 'assistant'}
-                avatar={showAvatars ? message.avatar : null}
-                showAvatar={showAvatars}
-                assistantType={message.assistantType || assistantType}
-                authorType={message.authorType}
-                assistantIcon={message.role !== 'user' ? assistantIcon : undefined}
-                chatRefs={message.chatRefs}
-                renderEntityCard={renderEntityCard}
-                NavLinkAnchor={NavLinkAnchor}
-              />
-            ))}
+            {messages.map((message, index) => {
+              // Hidden messages (synthetic continuation prompts the host
+              // injects after an approval card) are part of the API
+              // conversation history but never render. Skipping here
+              // keeps the visible thread coherent — see
+              // `Message.hidden` doc-comment in message.types.ts.
+              if (message.hidden) return null
+              return (
+                <ChatMessageEnhanced
+                  key={message.id}
+                  ref={getRegisterMessageEl(message.id)}
+                  role={message.role}
+                  name={message.name}
+                  content={message.content}
+                  timestamp={message.timestamp}
+                  isTyping={index === messages.length - 1 && isTyping && message.role === 'assistant'}
+                  avatar={showAvatars ? message.avatar : null}
+                  showAvatar={showAvatars}
+                  assistantType={message.assistantType || assistantType}
+                  authorType={message.authorType}
+                  assistantIcon={message.role !== 'user' ? assistantIcon : undefined}
+                  chatRefs={message.chatRefs}
+                  renderEntityCard={renderEntityCard}
+                  NavLinkAnchor={NavLinkAnchor}
+                />
+              )
+            })}
           </div>
         </div>
 

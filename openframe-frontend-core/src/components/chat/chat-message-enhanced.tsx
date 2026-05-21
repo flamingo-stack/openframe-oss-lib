@@ -111,8 +111,32 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           // returns the cached node so React reuses the same instance.
           let rendered = seenRendered.get(key)
           if (!seenRendered.has(key)) {
+            // Always invoke render() — even when the metadata map has
+            // no entry for this marker. Fetch-mode card types
+            // (delivery_item, roadmap_item, internal_task, etc.) don't
+            // ship metadata in the SSE frame; they self-fetch by `id`
+            // via the host's list-API hook, so a minimal {type,id}
+            // ChatRef is all the renderer needs to mount the loader.
+            // For no-fetch types (hubspot_ticket_self, slack_message,
+            // …) without a refMatch the host's render() returns null
+            // and we fall through to the bare-cardId fallback in the
+            // `<a card://…>` override below.
+            //
+            // SYNTHETIC REF DEFAULTS: `ChatRef.title` and `ChatRef.url`
+            // are non-optional in the type; a bare `{type, id}` cast
+            // would lie to consumers that read those fields. Default
+            // `title` to the cardId (so any host renderer that prints
+            // `ref.title` shows the id rather than `undefined`) and
+            // `url` to null (matches the no-link semantics fetch-mode
+            // cards rely on — they resolve their own URL after fetch).
             const refMatch = refs[key]
-            rendered = refMatch ? render(refMatch) : undefined
+            const refForRender: ChatRef = refMatch ?? {
+              type: cardType,
+              id: cardId,
+              title: cardId,
+              url: null,
+            }
+            rendered = render(refForRender)
             seenRendered.set(key, rendered)
           }
           if (React.isValidElement(rendered) && rendered.type === BlockCard) {
@@ -171,15 +195,33 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
               const key = `${cardType}:${cardId}`
               const inline = inlineByKey?.get(key)
               if (inline != null) return inline
-              // No renderer, no ref, OR renderer returned null — fall back
-              // to plain text title-only. Use any same-type ref's title if
-              // available; otherwise the bare cardId. Never render the
-              // literal `card://` URL.
+              // Three fallback cases — keep them DISTINCT, never blur them
+              // together. Mixing them up (which the old code did by reaching
+              // for "any same-type ref's title") makes LLM hallucinations
+              // LOOK like real cards, which the user can't tell apart from
+              // genuine references.
+              //
+              //   (1) Exact ref present, renderer returned null:
+              //       The marker is legit (server confirmed the row exists)
+              //       but no compact-card type is registered for `cardType`.
+              //       Render the ref's REAL title as plain text — accurate,
+              //       just no rich UI.
+              //
+              //   (2) Exact ref absent (refs map has no `${cardType}:${cardId}`):
+              //       The LLM emitted a marker for an ID the server did NOT
+              //       surface. Either the LLM hallucinated the id, or the
+              //       refs map and the snapshot drifted (server-side bug
+              //       worth fixing — see `MAX_ROWS_PER_ENTITY_GROUP` in
+              //       `doc-chat-utils.ts:buildSourcesMeta`). Render the raw
+              //       `cardId` so the breakage is VISIBLE; never borrow a
+              //       title from an unrelated ref — that hides the bug and
+              //       deceives the reader into thinking they're looking at
+              //       a real card.
               const refMatch: ChatRef | undefined = refs[key]
-              const fallbackTitle = (refMatch?.title)
-                ?? Object.values(refs).find((r) => r.type === cardType)?.title
-                ?? cardId
-              return <span className="text-ods-text-primary">{fallbackTitle}</span>
+              if (refMatch) {
+                return <span className="text-ods-text-primary">{refMatch.title}</span>
+              }
+              return <span className="text-ods-text-secondary opacity-60">{cardId}</span>
             }
           }
           // Unified click rule — delegated to the host's `NavLinkAnchor`

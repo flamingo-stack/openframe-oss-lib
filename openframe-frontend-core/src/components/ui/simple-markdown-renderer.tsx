@@ -7,9 +7,152 @@ import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
+import { visit } from 'unist-util-visit';
 import Image from 'next/image';
 import { AlertCircleIcon } from '../icons-v2-generated';
 import { cn } from '../../utils/cn';
+
+// ---------------------------------------------------------------------------
+// rehype HAST sanitizer — runs AFTER rehype-raw to strip XSS vectors
+// ---------------------------------------------------------------------------
+/**
+ * Minimal HAST sanitizer. Runs AFTER `rehype-raw` (which parses raw HTML
+ * embedded in markdown) and BEFORE `rehype-highlight`. Strips the
+ * attack surfaces that rehype-raw leaves wide open:
+ *
+ *   - `on*` event handlers (onerror, onload, onclick, …) on ANY element
+ *   - href / src / formaction / xlink:href / poster pointing at
+ *     `javascript:` (case + whitespace tolerant)
+ *   - `iframe srcdoc` (full-document XSS)
+ *   - `<script>`, `<style>`, `<noscript>`, `<noembed>` elements (drop)
+ *   - `data:` URIs on src-ish attrs (SVG-with-embedded-JS class of bug)
+ *
+ * Why custom (vs `rehype-sanitize`): the OSS-lib build environment
+ * doesn't have `rehype-sanitize` in its `node_modules` (sandbox
+ * restriction), but `unist-util-visit` is already a transitive dep of
+ * `rehype-raw`. This plugin is ~60 lines, ships nothing new, and is
+ * tighter than the default sanitize schema for our threat model
+ * (we want LLM-emitted markdown to be safe; we don't need full HTML5
+ * fidelity).
+ *
+ * The text-level `escapeUnknownHtmlTags` pre-pass below is still useful
+ * for catching `<their>`-style accidental tag emissions that React 19
+ * rejects, but it is NOT a security boundary. THIS is.
+ */
+const EVENT_HANDLER_ATTR_RE = /^on[a-z]+$/i
+const JAVASCRIPT_URL_RE = /^[\s\x00-\x1f]*javascript:/i
+const DATA_URL_RE = /^[\s\x00-\x1f]*data:/i
+const URL_ATTRS = new Set([
+  'href',
+  'src',
+  // `srcset` accepts `javascript:` on legacy browsers — same guard
+  // as the canonical hast-util-sanitize default schema's attr set.
+  // Multi-candidate scanning lives in `srcsetHasUnsafeCandidate` below;
+  // a single-URL check would miss a malicious second candidate like
+  // `"https://safe.png 1x, javascript:alert(1) 2x"`.
+  'srcset',
+  'formaction',
+  'xlink:href',
+  'poster',
+  'data',
+  'action',
+  'background',
+])
+
+/**
+ * Returns true if any candidate in an `srcset` attribute has a dangerous
+ * URL scheme. Per the HTML spec, srcset is a comma-separated list of
+ * candidates; each candidate is `<url> <descriptor>?` (e.g.
+ * `"https://x/a.png 2x"`). The single-URL `JAVASCRIPT_URL_RE.test(v)`
+ * check only inspects the FIRST candidate — so a malicious second
+ * candidate (`"https://safe 1x, javascript:alert(1) 2x"`) would slip
+ * through. This helper splits on `,`, trims each candidate, takes the
+ * leading whitespace-delimited token (the URL), and tests that.
+ *
+ * Splitting on every comma over-matches the rare-in-practice case of
+ * commas inside URL paths. That's the correct error bias for a
+ * sanitizer: over-strip is safe, under-strip is not.
+ */
+function srcsetHasUnsafeCandidate(srcset: string): boolean {
+  for (const candidate of srcset.split(',')) {
+    const url = candidate.trim().split(/\s+/)[0] ?? ''
+    if (JAVASCRIPT_URL_RE.test(url) || DATA_URL_RE.test(url)) return true
+  }
+  return false
+}
+// Element-level drop list. The text-pre-pass `escapeUnknownHtmlTags`
+// already escapes any `<tag>` whose name isn't on its allow-list, so
+// `<object>`, `<embed>`, `<applet>`, `<base>`, `<meta>` normally never
+// reach `rehype-raw` as elements. Re-stripping at the HAST layer
+// removes the cross-layer dependency: this sanitizer is sufficient
+// on its own even if the text pre-pass is bypassed.
+const STRIP_ELEMENTS = new Set([
+  'script',
+  'style',
+  'noscript',
+  'noembed',
+  'object',
+  'embed',
+  'applet',
+  'base',
+  'meta',
+])
+
+function rehypeStripUnsafe() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (tree: any) => {
+    visit(tree, 'element', (node: any, index: number | undefined, parent: any) => {
+      const tag = String(node.tagName ?? '').toLowerCase()
+      if (STRIP_ELEMENTS.has(tag)) {
+        if (parent && typeof index === 'number') {
+          parent.children.splice(index, 1)
+          // Return the numeric index (`unist-util-visit` treats it as
+          // `[CONTINUE, index]`) so the walker resumes at the slot the
+          // removed node vacated. Don't return `[SKIP, index]`:
+          // skip-descendants is meaningless for a node we just removed,
+          // and SKIP+index conflates two signals.
+          return index
+        }
+        // Root-level strip element (parent undefined). Rare, but
+        // possible if `rehype-raw` ever lifts one. Neutralize in
+        // place by clearing children + retagging as a blank span.
+        node.children = []
+        node.tagName = 'span'
+        node.properties = {}
+        return
+      }
+      if (!node.properties || typeof node.properties !== 'object') return
+      for (const key of Object.keys(node.properties)) {
+        // 1. event handlers
+        if (EVENT_HANDLER_ATTR_RE.test(key)) {
+          delete node.properties[key]
+          continue
+        }
+        // 2. dangerous URL schemes on URL-bearing attrs. `srcset` is
+        //    multi-candidate so it routes through `srcsetHasUnsafeCandidate`
+        //    which inspects every URL in the list (not just the first).
+        if (URL_ATTRS.has(key.toLowerCase())) {
+          const raw = node.properties[key]
+          const v = Array.isArray(raw) ? raw[0] : raw
+          if (typeof v === 'string') {
+            const unsafe =
+              key.toLowerCase() === 'srcset'
+                ? srcsetHasUnsafeCandidate(v)
+                : JAVASCRIPT_URL_RE.test(v) || DATA_URL_RE.test(v)
+            if (unsafe) {
+              delete node.properties[key]
+              continue
+            }
+          }
+        }
+        // 3. iframe srcdoc — full-document XSS vector
+        if (tag === 'iframe' && key.toLowerCase() === 'srcdoc') {
+          delete node.properties[key]
+        }
+      }
+    })
+  }
+}
 
 /**
  * URL transformer that extends react-markdown's default safe-protocol
@@ -33,6 +176,90 @@ import { cn } from '../../utils/cn';
 function cardAwareUrlTransform(url: string, key: string): string {
   if (key === 'href' && typeof url === 'string' && url.startsWith('card://')) return url;
   return defaultUrlTransform(url);
+}
+
+// ---------------------------------------------------------------------------
+// LLM-output sanitizer — escape unknown HTML-style tags
+// ---------------------------------------------------------------------------
+/**
+ * Tags `rehype-raw` is allowed to forward to React as-is. Anything
+ * outside this set gets its angle brackets escaped so it renders as
+ * plain text rather than reaching React as an unrecognized custom
+ * element.
+ *
+ * Why this matters: chat output is LLM-generated markdown. An LLM that
+ * accidentally wraps a word in angle brackets ("share <their> settings")
+ * or echoes a system-prompt XML tag ("the <ticket> element above")
+ * makes `rehype-raw` mint a `<their>` / `<ticket>` JSX element. React
+ * 18 logs "tag is unrecognized in this browser" for every unknown tag;
+ * React 19 throws on tags with reserved kebab-case forms. We pre-escape
+ * to keep the renderer pristine without losing legitimate inline HTML
+ * (details/summary, video, iframe, kbd, mark, etc.).
+ *
+ * The allow-list mirrors HTML5 + the elements the chat shell wires
+ * component overrides for. Kept lower-case; matched case-insensitively.
+ */
+const SAFE_HTML_TAGS = new Set([
+  // Block + inline text
+  'a', 'abbr', 'address', 'article', 'aside', 'b', 'bdi', 'bdo', 'blockquote',
+  'br', 'caption', 'cite', 'code', 'col', 'colgroup', 'data', 'dd', 'del',
+  'details', 'dfn', 'div', 'dl', 'dt', 'em', 'figcaption', 'figure', 'footer',
+  'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hgroup', 'hr', 'i', 'ins',
+  'kbd', 'li', 'main', 'mark', 'nav', 'ol', 'p', 'pre', 'q', 'rp', 'rt',
+  'ruby', 's', 'samp', 'section', 'small', 'span', 'strong', 'sub', 'summary',
+  'sup', 'table', 'tbody', 'td', 'tfoot', 'th', 'thead', 'time', 'tr', 'u',
+  'ul', 'var', 'wbr',
+  // Media
+  'img', 'picture', 'source', 'audio', 'video', 'iframe', 'track',
+  // Forms (rehype-raw allows them; mostly harmless for chat output)
+  'button', 'input', 'label', 'select', 'option', 'optgroup', 'textarea', 'form', 'fieldset', 'legend',
+])
+
+/**
+ * Match an opening / closing HTML tag in markdown source. Captures:
+ *   1 — optional `/` for closing tags
+ *   2 — tag name (must start with a letter)
+ *   3 — everything between the name and the closing `>` (attrs etc.)
+ *   4 — optional `/` for void-element self-close
+ */
+const TAG_LIKE_REGEX = /<(\/?)([a-zA-Z][a-zA-Z0-9-]*)([^>]*?)(\/?)>/g
+
+function escapeUnknownHtmlTags(text: string): string {
+  if (!text || text.indexOf('<') === -1) return text
+  // Carve out fenced code blocks AND inline-backtick spans so we don't
+  // corrupt `<their>` examples that legitimately live inside code. The
+  // regex matches in priority order: triple-fence first (greediest),
+  // then inline single-backtick. Each protected span is preserved
+  // verbatim; everything between/around them runs through
+  // `escapeOutsideFences`.
+  const parts: string[] = []
+  let cursor = 0
+  // Triple-fence ``` … ```  OR  single-backtick `…` (one line, no
+  // embedded newlines). Backtick group is non-greedy and forbids
+  // inner newlines per CommonMark inline-code semantics.
+  const PROTECTED_SPAN_RE = /```[\s\S]*?```|`[^`\n]+`/g
+  let span: RegExpExecArray | null
+  while ((span = PROTECTED_SPAN_RE.exec(text)) !== null) {
+    if (span.index > cursor) {
+      parts.push(escapeOutsideFences(text.slice(cursor, span.index)))
+    }
+    parts.push(span[0])
+    cursor = span.index + span[0].length
+  }
+  if (cursor < text.length) {
+    parts.push(escapeOutsideFences(text.slice(cursor)))
+  }
+  return parts.join('')
+}
+
+function escapeOutsideFences(segment: string): string {
+  return segment.replace(TAG_LIKE_REGEX, (match, slash, tag, rest, selfClose) => {
+    const lower = (tag as string).toLowerCase()
+    if (SAFE_HTML_TAGS.has(lower)) return match
+    // Unknown tag — escape so it renders as text instead of reaching
+    // React as a custom element.
+    return `&lt;${slash}${tag}${rest}${selfClose}&gt;`
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -396,7 +623,19 @@ export const SimpleMarkdownRenderer: React.FC<SimpleMarkdownRendererProps> = ({
   }, [sectionIds, sectionIdMap]);
 
   // ---- preprocess ----
-  const processedContent = preprocessContent ? preprocessContent(content) : content;
+  // Run the optional caller-supplied transform first, then defensively
+  // escape unknown HTML-style tags so an LLM that wrote `<their>` or
+  // accidentally echoed a system-prompt XML tag like `<ticket>` doesn't
+  // make `rehype-raw` hand React an unrecognized custom element (which
+  // logs a noisy "tag is unrecognized in this browser" warning AND can
+  // crash the SimpleMarkdownRenderer when the tag has a kebab-case
+  // form React rejects outright). Allow-listed tags pass through
+  // unchanged so legitimate inline HTML (details/summary, video,
+  // iframe, etc.) still renders.
+  const processedContent = useMemo(
+    () => escapeUnknownHtmlTags(preprocessContent ? preprocessContent(content) : content),
+    [preprocessContent, content],
+  );
 
   // ---- heading factory ----
   const makeHeading = useCallback(
@@ -499,7 +738,7 @@ export const SimpleMarkdownRenderer: React.FC<SimpleMarkdownRendererProps> = ({
         return (
           <span className="text-ods-accent cursor-not-allowed">
             {children}
-            <sup className="ml-1 text-xs font-bold text-red-500">[BROKEN]</sup>
+            <sup className="ml-1 text-xs font-bold text-ods-attention-red-error">[BROKEN]</sup>
           </span>
         );
       }
@@ -617,7 +856,14 @@ export const SimpleMarkdownRenderer: React.FC<SimpleMarkdownRendererProps> = ({
           <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkBreaks, ...(additionalRemarkPlugins ?? [])]}
             rehypePlugins={[
+              // ORDER MATTERS: rehype-raw parses the raw HTML embedded
+              // in the source markdown into HAST nodes; rehypeStripUnsafe
+              // then walks the HAST tree and drops XSS vectors (on*
+              // event handlers, javascript: URLs, script/style/iframe-srcdoc,
+              // data: URIs). Reversing the order would have nothing to
+              // sanitize (raw HTML would still be strings).
               rehypeRaw,
+              rehypeStripUnsafe,
               [rehypeHighlight, { detect: true, ignoreMissing: true }],
             ]}
             urlTransform={cardAwareUrlTransform}
