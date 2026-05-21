@@ -12,7 +12,7 @@ import java.util.Objects;
  * strategy and sees no behavior change.
  */
 @Component
-@ConditionalOnMissingBean(ConnectorNameStrategy.class)
+@ConditionalOnMissingBean(value = ConnectorNameStrategy.class, ignored = IdentityConnectorNameStrategy.class)
 public class IdentityConnectorNameStrategy implements ConnectorNameStrategy {
 
     @Override
