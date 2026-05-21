@@ -159,7 +159,7 @@ function CompactAssigneeDropdown({
                       variant="round"
                       className="h-6 w-6 shrink-0"
                     />
-                    <span className="flex-1 truncate text-h4 text-ods-text-primary">{opt.label}</span>
+                    <span className="flex-1 truncate text-h4 text-ods-text-primary" title={opt.label}>{opt.label}</span>
                     {isCurrent && <CheckIcon className="size-4 shrink-0 text-ods-accent" />}
                   </button>
                 )
@@ -194,7 +194,7 @@ function DefaultAssigneeDropdown({
           variant="round"
           className="h-6 w-6 shrink-0"
         />
-        <span className="truncate">{opt.label}</span>
+        <span className="truncate" title={opt.label}>{opt.label}</span>
       </div>
     )
   }, [])
@@ -253,7 +253,7 @@ function DefaultAssigneeDropdown({
                 className="flex items-center gap-[var(--spacing-system-xxs)] cursor-pointer group text-left"
               >
                 <PenEditIcon className="size-4 shrink-0 text-ods-text-secondary group-hover:text-ods-accent transition-colors" />
-                <span className="text-h4 text-ods-text-primary truncate">{currentAssignee!.name}</span>
+                <span className="text-h4 text-ods-text-primary truncate" title={currentAssignee!.name}>{currentAssignee!.name}</span>
               </button>
             </div>
             <span className="text-h6 text-ods-text-secondary truncate">Assigned</span>

@@ -66,8 +66,7 @@ export const InputTrigger = React.forwardRef<HTMLButtonElement, InputTriggerProp
 					className={cn(
 						"flex-1 min-w-0 text-left truncate",
 						isPlaceholder && "text-ods-text-secondary",
-					)}
-				>
+					)} title={isPlaceholder ? placeholder : (typeof selectedLabel === 'string' ? selectedLabel : undefined)}>
 					{isPlaceholder ? placeholder : selectedLabel}
 				</span>
 				{endIcon && (

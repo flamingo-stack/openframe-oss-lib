@@ -142,9 +142,9 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
               <div className="h-px bg-ods-border" />
               <div className="flex items-center justify-between gap-4 px-4 py-2">
                 <div className="flex flex-col min-w-0">
-                  <span className="text-heading-3 truncate">{ticketInfo.title}</span>
+                  <span className="text-heading-3 truncate" title={typeof ticketInfo.title === 'string' ? ticketInfo.title : undefined}>{ticketInfo.title}</span>
                   {ticketInfo.meta && (
-                    <div className="text-h6 text-ods-text-secondary truncate">{ticketInfo.meta}</div>
+                    <div className="text-h6 text-ods-text-secondary truncate" title={typeof ticketInfo.meta === 'string' ? ticketInfo.meta : undefined}>{ticketInfo.meta}</div>
                   )}
                 </div>
                 {ticketInfo.status && <TicketStatusTag status={ticketInfo.status} />}

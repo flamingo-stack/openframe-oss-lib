@@ -61,9 +61,9 @@ export function ServiceCard({ title, subtitle, icon, tag, rows, className }: Ser
             {resolvedIcon}
           </div>
           <div className="min-w-0">
-            <div className="text-xl font-semibold text-ods-text-primary truncate">{title}</div>
+            <div className="text-xl font-semibold text-ods-text-primary truncate" title={title}>{title}</div>
             {subtitle && (
-              <div className="text-sm text-ods-text-secondary truncate">{subtitle}</div>
+              <div className="text-sm text-ods-text-secondary truncate" title={subtitle}>{subtitle}</div>
             )}
           </div>
         </div>
@@ -104,7 +104,7 @@ function ServiceCardRowItem({ row }: { row: ServiceCardRow }) {
         <div className="w-20 md:w-24 shrink-0 text-sm font-medium text-ods-text-primary">{row.label}</div>
       )}
       <div className={cn('flex-1 h-12 rounded-md border border-ods-border bg-ods-bg px-3 md:px-4 flex items-center justify-between min-w-0', row.monospace ? 'font-mono' : '')}>
-        <div className="truncate text-ods-text-primary min-w-0">{displayValue}</div>
+        <div className="truncate text-ods-text-primary min-w-0" title={typeof row.value === 'string' ? row.value : undefined}>{displayValue}</div>
         <div className="flex items-center gap-2 pl-3 flex-shrink-0">
           {actions.reveal && (
             <button

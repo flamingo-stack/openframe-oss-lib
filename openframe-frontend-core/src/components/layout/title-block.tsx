@@ -77,10 +77,10 @@ export function TitleBlock({
             )}
             <div className="flex flex-col justify-center min-w-0 flex-1">
               {title && (
-                <h1 className="text-h2 text-ods-text-primary truncate">{title}</h1>
+                <h1 className="text-h2 text-ods-text-primary truncate" title={title}>{title}</h1>
               )}
               {subtitle && (
-                <p className="text-h6 text-ods-text-secondary truncate">{subtitle}</p>
+                <p className="text-h6 text-ods-text-secondary truncate" title={subtitle}>{subtitle}</p>
               )}
             </div>
           </div>

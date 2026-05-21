@@ -99,12 +99,12 @@ export function TicketCard({
   const body = (
     <>
       <div className="flex items-start gap-[var(--spacing-system-sf)]">
-        <div className="flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-zero)]">
+        <div className="flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-zero)]" title={ticket.title}>
           <p className="text-h3 truncate text-ods-text-primary">{ticket.title}</p>
           {showDeviceRow && (
             <div className="flex min-w-0 items-center gap-[var(--spacing-system-xxs)] text-h6 text-ods-text-secondary">
               <LaptopIcon className="size-4 shrink-0" />
-              <span className="truncate">{deviceText}</span>
+              <span className="truncate" title={deviceText}>{deviceText}</span>
             </div>
           )}
         </div>

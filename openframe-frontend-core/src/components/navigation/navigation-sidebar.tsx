@@ -1,8 +1,8 @@
 "use client"
 
-import { useCallback, useLayoutEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { useLocalStorage } from '../../hooks/ui/use-local-storage'
-import { useLgUp } from '../../hooks/ui/use-media-query'
+import { useLgUp, useMdUp } from '../../hooks/ui/use-media-query'
 import { NavigationSidebarConfig, NavigationSidebarItem } from '../../types/navigation'
 import { cn } from '../../utils'
 import { NavigationSidebarHeader } from './navigation-sidebar-header'
@@ -23,6 +23,7 @@ export interface NavigationSidebarProps {
 }
 
 export function NavigationSidebar({ config, disabled = false }: NavigationSidebarProps) {
+  const isMdUp = useMdUp() ?? false
   const isLgUp = useLgUp() ?? false
 
   // useLocalStorage reads from localStorage first, then falls back to this value
@@ -34,14 +35,31 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
   // Enable transitions only after the correct width is painted
   const [transitionsEnabled, setTransitionsEnabled] = useState(false)
 
-  // On tablet (md but not lg), force minimized layout regardless of stored value
-  const isMinimized = !isLgUp || minimized
-  const showLabel = isLgUp && !minimized
+  // Tablet = md viewport but not lg. On tablet the sidebar floats over the
+  // content area (overlay) instead of pushing it like on desktop.
+  const isTablet = isMdUp && !isLgUp
+  const isOverlayOpen = isTablet && !minimized
+
+  const showLabel = !minimized
 
   const handleToggle = useCallback(() => {
     setMinimized(prev => !prev)
     config.onToggleMinimized?.()
   }, [setMinimized, config])
+
+  const closeOverlay = useCallback(() => {
+    setMinimized(true)
+  }, [setMinimized])
+
+  // Dismiss the tablet overlay with Escape so it behaves like a transient panel
+  useEffect(() => {
+    if (!isOverlayOpen) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeOverlay()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [isOverlayOpen, closeOverlay])
 
   const handleItemClick = useCallback((item: NavigationSidebarItem, event?: React.MouseEvent) => {
     event?.stopPropagation()
@@ -58,14 +76,12 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
     secondaryItems: config.items.filter(item => item.section === 'secondary'),
   }), [config.items])
 
-  const sidebarWidth = useMemo(() => {
-    if (isLgUp === undefined) {
-      return `${MINIMIZED_WIDTH}px`
-    }
-    return isMinimized ? `${MINIMIZED_WIDTH}px` : `${EXPANDED_WIDTH}px`
-  }, [isLgUp, isMinimized])
+  const sidebarWidth = useMemo(
+    () => (minimized ? `${MINIMIZED_WIDTH}px` : `${EXPANDED_WIDTH}px`),
+    [minimized],
+  )
 
-  const isHydrated = isLgUp !== undefined
+  const isHydrated = isMdUp !== undefined && isLgUp !== undefined
 
   useLayoutEffect(() => {
     if (isHydrated && !transitionsEnabled) {
@@ -77,36 +93,47 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
   }, [isHydrated, transitionsEnabled])
 
   return (
-    <aside
-      className={cn(
-        "flex-col h-full hidden md:flex",
-        "bg-ods-card border-r border-ods-border",
-        transitionsEnabled && "transition-[width] duration-300",
-        config.className,
+    <>
+      {/* Backdrop scrim — only visible on tablet while the overlay is open */}
+      <div
+        className={cn(
+          "fixed inset-0 z-[40] bg-black/50",
+          "hidden md:block lg:hidden",
+          "transition-opacity duration-300",
+          isOverlayOpen ? "opacity-100" : "opacity-0 pointer-events-none",
+        )}
+        onClick={closeOverlay}
+        aria-hidden="true"
+      />
+
+      {/* Flex-flow placeholder — reserves the collapsed 56px slot on tablet so
+          the main content keeps its position while the sidebar floats above it */}
+      {isTablet && (
+        <div
+          className="h-full hidden md:block flex-shrink-0"
+          style={{ width: `${MINIMIZED_WIDTH}px` }}
+          aria-hidden="true"
+        />
       )}
-      style={{ width: sidebarWidth }}
-      aria-label="Main navigation sidebar"
-    >
-      {isHydrated && (
-        <>
-          <NavigationSidebarHeader minimized={isMinimized} />
 
-          <div className="flex-1 flex flex-col justify-between py-4">
-            <nav className="flex flex-col" aria-label="Primary navigation">
-              {primaryItems.map(item => (
-                <NavigationSidebarItemButton
-                  key={item.id}
-                  item={item}
-                  showLabel={showLabel}
-                  disabled={disabled}
-                  onClick={handleItemClick}
-                />
-              ))}
-            </nav>
+      <aside
+        className={cn(
+          "flex-col hidden md:flex flex-shrink-0",
+          "bg-ods-card border-r border-ods-border",
+          isTablet ? "fixed top-0 left-0 h-screen z-[45]" : "relative h-full",
+          transitionsEnabled && "transition-[width] duration-300",
+          config.className,
+        )}
+        style={{ width: sidebarWidth }}
+        aria-label="Main navigation sidebar"
+      >
+        {isHydrated && (
+          <>
+            <NavigationSidebarHeader minimized={minimized} />
 
-            {secondaryItems.length > 0 && (
-              <nav className="flex flex-col" aria-label="Secondary navigation">
-                {secondaryItems.map(item => (
+            <div className="flex-1 flex flex-col justify-between py-4 overflow-y-auto">
+              <nav className="flex flex-col" aria-label="Primary navigation">
+                {primaryItems.map(item => (
                   <NavigationSidebarItemButton
                     key={item.id}
                     item={item}
@@ -116,18 +143,30 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
                   />
                 ))}
               </nav>
-            )}
-          </div>
 
-          {isLgUp && (
+              {secondaryItems.length > 0 && (
+                <nav className="flex flex-col" aria-label="Secondary navigation">
+                  {secondaryItems.map(item => (
+                    <NavigationSidebarItemButton
+                      key={item.id}
+                      item={item}
+                      showLabel={showLabel}
+                      disabled={disabled}
+                      onClick={handleItemClick}
+                    />
+                  ))}
+                </nav>
+              )}
+            </div>
+
             <NavigationSidebarToggle
-              minimized={isMinimized}
+              minimized={minimized}
               showLabel={showLabel}
               onToggle={handleToggle}
             />
-          )}
-        </>
-      )}
-    </aside>
+          </>
+        )}
+      </aside>
+    </>
   )
 }
