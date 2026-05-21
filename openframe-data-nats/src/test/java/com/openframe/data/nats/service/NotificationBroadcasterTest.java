@@ -45,7 +45,7 @@ class NotificationBroadcasterTest {
         descriptorRegistry = mock(NotificationContextDescriptorRegistry.class);
         natsPublisher = mock(NotificationNatsPublisher.class);
         broadcaster = new NotificationBroadcaster(
-                notificationRepository, readStateService, descriptorRegistry, Optional.of(natsPublisher));
+                notificationRepository, readStateService, descriptorRegistry, Optional.of(natsPublisher), true);
         when(notificationRepository.save(any(Notification.class))).thenAnswer(inv -> {
             Notification arg = inv.getArgument(0);
             arg.setId("notif-id-1");
@@ -123,7 +123,7 @@ class NotificationBroadcasterTest {
     @DisplayName("Given the NATS publisher dependency is absent (Optional.empty), when broadcast is called, then the Notification is still persisted and read_state rows are created — clients reconcile via GraphQL catch-up")
     void no_publisher_persists_without_nats() {
         NotificationBroadcaster bcWithoutNats = new NotificationBroadcaster(
-                notificationRepository, readStateService, descriptorRegistry, Optional.empty());
+                notificationRepository, readStateService, descriptorRegistry, Optional.empty(), true);
         NotificationCommand cmd = NotificationCommand.builder()
                 .title("Approval")
                 .severity(NotificationSeverity.INFO)
@@ -232,6 +232,24 @@ class NotificationBroadcasterTest {
         verify(natsPublisher).publishToUser(eq("admin-2"), any(Notification.class));
         verify(natsPublisher).publishToUser(eq("admin-3"), any(Notification.class));
         verify(natsPublisher).publishToMachine(eq("m-1"), any(Notification.class));
+    }
+
+    @Test
+    @DisplayName("Given the notifications feature flag is disabled, when broadcast is called, then nothing is persisted or published and null is returned — the feature stays fully dormant")
+    void disabled_feature_flag_makes_broadcast_a_noop() {
+        NotificationBroadcaster disabled = new NotificationBroadcaster(
+                notificationRepository, readStateService, descriptorRegistry, Optional.of(natsPublisher), false);
+        NotificationCommand cmd = NotificationCommand.builder()
+                .title("Approval required")
+                .severity(NotificationSeverity.INFO)
+                .context(genericContext("APPROVAL"))
+                .adminAudience(Set.of("admin-1"))
+                .build();
+
+        Notification result = disabled.broadcast(cmd);
+
+        assertThat(result).isNull();
+        verifyNoInteractions(notificationRepository, readStateService, natsPublisher);
     }
 
     private static GenericContext genericContext(String type) {

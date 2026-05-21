@@ -41,9 +41,9 @@ public class NotificationNatsPublisher {
             throw new IllegalArgumentException("Notification must be persisted before publishing");
         }
         try {
-            natsMessagePublisher.publishPersistent(topic, buildMessage(notification));
+            natsMessagePublisher.publish(topic, buildMessage(notification));
         } catch (NatsException ex) {
-            log.warn("JetStream publish failed for notification {} on {}: {}",
+            log.warn("NATS publish failed for notification {} on {}: {}",
                     notification.getId(), topic, ex.getMessage());
         }
     }

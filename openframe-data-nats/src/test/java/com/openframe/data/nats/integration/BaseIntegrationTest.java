@@ -26,6 +26,10 @@ public abstract class BaseIntegrationTest {
         registry.add("spring.data.mongodb.uri",
                 () -> MONGO.getConnectionString() + "/test?directConnection=true");
         registry.add("spring.data.mongodb.auto-index-creation", () -> "true");
+        registry.add("spring.cloud.config.enabled", () -> "false");
+        registry.add("spring.cloud.stream.enabled", () -> "true");
+        registry.add("nats.spring.server", BaseIntegrationTest::natsUri);
+        registry.add("nats.spring.cloud.stream.binder.server", BaseIntegrationTest::natsUri);
     }
 
     protected static String natsUri() {
