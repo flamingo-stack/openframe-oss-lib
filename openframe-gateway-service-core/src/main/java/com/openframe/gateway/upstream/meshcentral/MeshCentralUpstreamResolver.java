@@ -63,6 +63,13 @@ public class MeshCentralUpstreamResolver implements ToolUpstreamResolver {
             prefix = prefix.substring(0, prefix.length() - 1);
         }
         String existingPath = uri.getRawPath() == null ? "" : uri.getRawPath();
+        // Skip when the path is already scoped to the tenant. Mesh's relay
+        // logic embeds the domain in tunnel URLs it hands to the agent
+        // (`*/<domain>/meshrelay.ashx`), so the agent's dial arrives already
+        // prefixed — adding the prefix again would produce /<domain>/<domain>/.
+        if (existingPath.equals(prefix) || existingPath.startsWith(prefix + "/")) {
+            return uri;
+        }
         return UriComponentsBuilder.fromUri(uri)
                 .replacePath(prefix + existingPath)
                 .build(true)
