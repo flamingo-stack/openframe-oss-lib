@@ -5,6 +5,7 @@ import com.openframe.data.model.redis.CachedMachineInfo;
 import com.openframe.data.model.redis.CachedOrganizationInfo;
 import com.openframe.data.repository.redis.MachineIdCacheService;
 import com.openframe.data.repository.redis.TenantIdCacheService;
+import com.openframe.data.service.TenantIdProvider;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import lombok.extern.slf4j.Slf4j;
@@ -17,11 +18,14 @@ public class IntegratedToolDataEnrichmentService implements DataEnrichmentServic
 
     private final MachineIdCacheService machineIdCacheService;
     private final TenantIdCacheService tenantIdCacheService;
+    private final TenantIdProvider tenantIdProvider;
 
     public IntegratedToolDataEnrichmentService(MachineIdCacheService machineIdCacheService,
-                                               @Autowired(required = false) TenantIdCacheService tenantIdCacheService) {
+                                               @Autowired(required = false) TenantIdCacheService tenantIdCacheService,
+                                               TenantIdProvider tenantIdProvider) {
         this.machineIdCacheService = machineIdCacheService;
         this.tenantIdCacheService = tenantIdCacheService;
+        this.tenantIdProvider = tenantIdProvider;
     }
 
     @Override
@@ -68,6 +72,8 @@ public class IntegratedToolDataEnrichmentService implements DataEnrichmentServic
      */
     private void enrichFromTenant(DeserializedDebeziumMessage message, IntegratedToolEnrichedData enriched) {
         if (tenantIdCacheService == null) {
+            // Tenant cluster: every event belongs to the single cluster-level tenant.
+            enriched.setTenantId(tenantIdProvider.getTenantId());
             return;
         }
         String tenantId = message.getTenantId();

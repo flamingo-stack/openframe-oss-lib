@@ -3,31 +3,24 @@ package com.openframe.stream.handler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
-import com.openframe.data.service.TenantIdProvider;
 import com.openframe.kafka.model.IntegratedToolEvent;
 import com.openframe.kafka.producer.retry.BaseRetryingKafkaProducer;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import lombok.extern.slf4j.Slf4j;
 
-// TODO when all integrated tools migrate from per-tenant clusters to the shared
-//  cluster, the tenant subclass can be removed and this hierarchy collapsed
-//  back into a single concrete handler.
 @Slf4j
 public abstract class DebeziumKafkaMessageHandler
         extends DebeziumMessageHandler<IntegratedToolEvent, DeserializedDebeziumMessage> {
 
     protected final BaseRetryingKafkaProducer kafkaProducer;
-    private final TenantIdProvider tenantIdProvider;
     private final DebeziumEventValidator validator;
 
     protected DebeziumKafkaMessageHandler(BaseRetryingKafkaProducer kafkaProducer,
                                           ObjectMapper objectMapper,
-                                          TenantIdProvider tenantIdProvider,
                                           DebeziumEventValidator validator) {
         super(objectMapper);
         this.kafkaProducer = kafkaProducer;
-        this.tenantIdProvider = tenantIdProvider;
         this.validator = validator;
     }
 
@@ -52,8 +45,7 @@ public abstract class DebeziumKafkaMessageHandler
                     ? debeziumMessage.getUnifiedEventType().getSummary()
                     : debeziumMessage.getMessage());
             message.setEventTimestamp(debeziumMessage.getEventTimestamp());
-            String resolvedTenantId = enrichedData.getTenantId();
-            message.setTenantId(resolvedTenantId != null ? resolvedTenantId : tenantIdProvider.getTenantId());
+            message.setTenantId(enrichedData.getTenantId());
         } catch (Exception e) {
             log.error("Error processing Kafka message", e);
             throw e;
