@@ -100,7 +100,7 @@ function InfoCell({ label, value, avatar, className }: InfoCellProps) {
 
       {/* Text content */}
       <div className="flex flex-col min-w-0">
-        <span className="text-ods-text-primary font-['DM_Sans'] text-[14px] leading-[20px] md:text-[18px] md:leading-[24px] font-medium truncate">
+        <span className="text-ods-text-primary font-['DM_Sans'] text-[14px] leading-[20px] md:text-[18px] md:leading-[24px] font-medium truncate" title={value}>
           {value}
         </span>
         <span className="text-ods-text-secondary font-['DM_Sans'] text-[12px] leading-[16px] md:text-[14px] md:leading-[20px] font-medium truncate">

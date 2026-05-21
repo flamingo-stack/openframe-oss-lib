@@ -50,9 +50,9 @@ export function NotificationTile({
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          {title ? <p className="truncate text-h4 text-ods-text-primary">{title}</p> : null}
+          {title ? <p className="truncate text-h4 text-ods-text-primary" title={typeof title === 'string' ? title : undefined}>{title}</p> : null}
           {description ? (
-            <p className="text-h6 line-clamp-2 text-ods-text-secondary">{description}</p>
+            <p className="text-h6 line-clamp-2 text-ods-text-secondary" title={typeof description === 'string' ? description : undefined}>{description}</p>
           ) : null}
         </div>
 

@@ -66,10 +66,10 @@ export function OnboardingStepCard({
     >
       {/* Left column - content */}
       <div className="flex-1 w-full md:w-auto min-w-0 flex flex-col justify-center gap-1">
-        <h3 className="text-h4 text-ods-text-primary truncate">
+        <h3 className="text-h4 text-ods-text-primary truncate" title={step.title}>
           {step.title}
         </h3>
-        <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary truncate h-[20px]">
+        <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary truncate h-[20px]" title={step.description}>
           {step.description}
         </p>
       </div>

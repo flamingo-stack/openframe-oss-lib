@@ -35,12 +35,12 @@ export function DeviceCardCompact({
       {...props}
     >
       {hasName && (
-        <span className="font-['DM_Sans'] font-medium text-[16px] leading-[20px] text-ods-text-primary truncate">
+        <span className="font-['DM_Sans'] font-medium text-[16px] leading-[20px] text-ods-text-primary truncate" title={deviceName}>
           {deviceName}
         </span>
       )}
       {hasOrg && (
-        <span className="font-['DM_Sans'] font-medium text-[14px] leading-[18px] text-ods-text-secondary truncate">
+        <span className="font-['DM_Sans'] font-medium text-[14px] leading-[18px] text-ods-text-secondary truncate" title={organization}>
           {organization}
         </span>
       )}

@@ -33,7 +33,7 @@ const FieldWrapper = React.forwardRef<HTMLDivElement, FieldWrapperProps>(
         )}
         {children}
         {error && (
-          <p className={cn("absolute bottom-0 left-0 right-0 translate-y-full text-h6 truncate", errorVariantClasses[errorVariant])}>
+          <p className={cn("absolute bottom-0 left-0 right-0 translate-y-full text-h6 truncate", errorVariantClasses[errorVariant])} title={error}>
             {error}
           </p>
         )}

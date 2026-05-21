@@ -463,7 +463,7 @@ export function ProductReleaseCard({
             as the loaded text — zero load-to-resolve baseline shift. */}
         <span className="flex min-w-0 flex-1 flex-col gap-0.5 min-h-14">
           <span className="flex items-center gap-2 min-w-0 h-5">
-            <span className="truncate text-sm font-semibold leading-5 text-ods-text-primary min-w-0">
+            <span className="truncate text-sm font-semibold leading-5 text-ods-text-primary min-w-0" title={title}>
               {title}
             </span>
             {version ? (
@@ -478,7 +478,7 @@ export function ProductReleaseCard({
             </span>
           </span>
           <span className="flex items-center min-w-0 h-4">
-            <span className="truncate text-[11px] leading-4 text-ods-text-secondary/80">
+            <span className="truncate text-[11px] leading-4 text-ods-text-secondary/80" title={summary || undefined}>
               {/* The literal between the curly-quote string is U+00A0
                   (NBSP). The hub's `COMPACT_CARD_ROW_FILLER` is also
                   NBSP; ASCII space here would let React collapse the
@@ -545,11 +545,11 @@ export function ProductReleaseCard({
         {/* Left column - content */}
         <div className="flex-1 w-full md:w-auto min-w-0 flex flex-col justify-center gap-2">
           <div className="min-h-[48px] flex items-center">
-            <h3 className="text-h3 text-ods-text-primary tracking-[-0.36px] line-clamp-2">
+            <h3 className="text-h3 text-ods-text-primary tracking-[-0.36px] line-clamp-2" title={title}>
               {title}
             </h3>
           </div>
-          <p className="text-h4 text-ods-text-secondary line-clamp-3">
+          <p className="text-h4 text-ods-text-secondary line-clamp-3" title={summary || ' '}>
             {summary || ' '}
           </p>
         </div>
@@ -585,11 +585,11 @@ export function ProductReleaseCard({
       {/* Left column - content */}
       <div className="flex-1 w-full md:w-auto min-w-0 flex flex-col justify-center gap-2">
         <div className="min-h-[48px] flex items-center">
-          <h3 className="text-h3 text-ods-text-primary tracking-[-0.36px] line-clamp-2">
+          <h3 className="text-h3 text-ods-text-primary tracking-[-0.36px] line-clamp-2" title={title}>
             {title}
           </h3>
         </div>
-        <p className="text-h4 text-ods-text-secondary line-clamp-3">
+        <p className="text-h4 text-ods-text-secondary line-clamp-3" title={summary || ' '}>
           {summary || ' '}
         </p>
       </div>

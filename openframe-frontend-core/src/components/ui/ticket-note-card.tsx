@@ -96,7 +96,10 @@ export function TicketNoteCard({ note, onEdit, onDelete, className }: TicketNote
         ) : (
           <>
             <p className="text-h4 text-ods-text-primary">{note.text}</p>
-            <p className="text-h6 text-ods-text-secondary truncate">
+            <p
+              className="text-h6 text-ods-text-secondary truncate"
+              title={`${note.authorName} • ${note.createdAt}`}
+            >
               {note.authorName} &bull; {note.createdAt}
             </p>
           </>
