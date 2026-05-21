@@ -6,9 +6,9 @@ import com.openframe.gateway.upstream.ToolUpstreamResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
-import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Optional;
 
 /**
@@ -70,9 +70,37 @@ public class MeshCentralUpstreamResolver implements ToolUpstreamResolver {
         if (existingPath.equals(prefix) || existingPath.startsWith(prefix + "/")) {
             return uri;
         }
-        return UriComponentsBuilder.fromUri(uri)
-                .replacePath(prefix + existingPath)
-                .build(true)
-                .toUri();
+        return withPath(uri, prefix + existingPath);
+    }
+
+    /**
+     * Rebuild {@code uri} with a new path, preserving every other component
+     * verbatim from its raw form.
+     * <p>
+     * We deliberately avoid {@link org.springframework.web.util.UriComponentsBuilder}'s
+     * {@code build(true)} here — its strict {@code QUERY_PARAM} validation
+     * rejects '=' in query values (e.g. base64 padding in mesh auth cookies),
+     * which would crash the resolver on every WS request. Concatenating the
+     * already-encoded raw components and letting {@link URI#URI(String)} parse
+     * the result sidesteps that validation.
+     */
+    private URI withPath(URI uri, String newPath) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(uri.getScheme()).append("://");
+        if (uri.getRawAuthority() != null) {
+            sb.append(uri.getRawAuthority());
+        }
+        sb.append(newPath);
+        if (uri.getRawQuery() != null) {
+            sb.append("?").append(uri.getRawQuery());
+        }
+        if (uri.getRawFragment() != null) {
+            sb.append("#").append(uri.getRawFragment());
+        }
+        try {
+            return new URI(sb.toString());
+        } catch (URISyntaxException e) {
+            throw new IllegalStateException("Failed to build mesh upstream URI", e);
+        }
     }
 }
