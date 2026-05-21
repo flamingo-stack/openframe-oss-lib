@@ -56,7 +56,7 @@ export function FilterListItem({
       )}
     >
       <div className="flex min-w-0 flex-1 flex-col">
-        <p className="truncate text-h4 text-ods-text-primary">
+        <p className="truncate text-h4 text-ods-text-primary" title={title}>
           {title}
         </p>
 

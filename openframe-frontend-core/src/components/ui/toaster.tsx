@@ -61,10 +61,10 @@ function ToastHeader({
 
       <div className="flex min-w-0 flex-1 flex-col justify-center font-['DM_Sans'] font-medium">
         {title ? (
-          <p className="truncate pr-5 text-[18px] leading-6 text-ods-text-primary">{title}</p>
+          <p className="truncate pr-5 text-[18px] leading-6 text-ods-text-primary" title={typeof title === 'string' ? title : undefined}>{title}</p>
         ) : null}
         {description ? (
-          <p className="text-[14px] leading-5 text-ods-text-secondary line-clamp-3">{description}</p>
+          <p className="text-[14px] leading-5 text-ods-text-secondary line-clamp-3" title={typeof description === 'string' ? description : undefined}>{description}</p>
         ) : null}
       </div>
 
@@ -206,7 +206,7 @@ export function CommandApprovalToast({
       >
         <div className="overflow-hidden">
           <div className="flex h-11 w-full items-center gap-2 border-b border-ods-border bg-ods-card px-3 py-2">
-            <p className="min-w-0 flex-1 truncate font-['DM_Sans'] text-[14px] font-medium leading-5 text-ods-text-primary">
+            <p className="min-w-0 flex-1 truncate font-['DM_Sans'] text-[14px] font-medium leading-5 text-ods-text-primary" title={command}>
               {command}
             </p>
             {toolType ? <ToolIcon toolType={toolType} size={16} /> : null}

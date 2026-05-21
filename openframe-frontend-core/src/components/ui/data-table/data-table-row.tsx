@@ -114,7 +114,7 @@ export const DataTableRow = memo(DataTableRowImpl) as typeof DataTableRowImpl
 function CellContent({ children }: { children: ReactNode }) {
   if (typeof children === 'string' || typeof children === 'number') {
     return (
-      <span className="text-h4 text-ods-text-primary truncate">{children}</span>
+      <span className="text-h4 text-ods-text-primary truncate" title={String(children)}>{children}</span>
     )
   }
   return <>{children}</>

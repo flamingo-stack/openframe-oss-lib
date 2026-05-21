@@ -145,8 +145,7 @@ const RadioGroupBlock = React.forwardRef<
                     className={cn(
                       "font-[family-name:var(--font-h4-family)] font-[number:var(--font-h4-weight)] text-[length:var(--font-size-h4-body)] leading-[24px]",
                       "text-ods-text-primary select-none truncate"
-                    )}
-                  >
+                    )} title={typeof option.label === 'string' ? option.label : undefined}>
                     {option.label}
                   </span>
                   {option.description && (
@@ -168,7 +167,7 @@ const RadioGroupBlock = React.forwardRef<
           })}
         </RadioGroupPrimitive.Root>
         {error && (
-          <p className="absolute bottom-0 left-0 right-0 translate-y-full text-h6 truncate text-ods-error">
+          <p className="absolute bottom-0 left-0 right-0 translate-y-full text-h6 truncate text-ods-error" title={error}>
             {error}
           </p>
         )}

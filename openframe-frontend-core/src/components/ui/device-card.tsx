@@ -103,12 +103,12 @@ export function DeviceCard({
                 className="shrink-0"
               />
             )}
-            <span className="text-h4 text-ods-text-primary truncate">
+            <span className="text-h4 text-ods-text-primary truncate" title={device.name}>
               {device.name}
             </span>
           </div>
           {device.organization && (
-            <span className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary truncate">
+            <span className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary truncate" title={device.organization}>
               {device.organization}
             </span>
           )}

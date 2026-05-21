@@ -44,7 +44,7 @@ export function TicketAttachmentsList({ attachments, className }: TicketAttachme
             </div>
           )}
           <div className="flex-1 min-w-0 overflow-hidden">
-            <p className="text-h4 text-ods-text-primary truncate">{attachment.fileName}</p>
+            <p className="text-h4 text-ods-text-primary truncate" title={attachment.fileName}>{attachment.fileName}</p>
             <p className="text-h6 text-ods-text-secondary">{attachment.fileSize}</p>
           </div>
           {attachment.onDownload && (

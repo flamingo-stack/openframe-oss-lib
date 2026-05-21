@@ -108,10 +108,10 @@ export function OrganizationCard({
         />
 
         <div className="flex-1 flex flex-col justify-center py-2 min-w-0">
-          <h3 className="font-['DM_Sans'] font-bold text-lg leading-[1.33] tracking-[-0.02em] text-ods-text-primary transition-colors truncate">
+          <h3 className="font-['DM_Sans'] font-bold text-lg leading-[1.33] tracking-[-0.02em] text-ods-text-primary transition-colors truncate" title={organization.name}>
             {organization.name}
           </h3>
-          <p className="font-['DM_Sans'] font-medium text-sm leading-[1.43] text-ods-text-secondary truncate">
+          <p className="font-['DM_Sans'] font-medium text-sm leading-[1.43] text-ods-text-secondary truncate" title={organization.industry || organization.tier || organization.websiteUrl || "Organization"}>
             {organization.industry || organization.tier || organization.websiteUrl || "Organization"}
           </p>
         </div>
@@ -120,7 +120,7 @@ export function OrganizationCard({
       {/* Description */}
       {organization.description && (
         <div className="w-full h-12 overflow-hidden">
-          <p className="font-['DM_Sans'] font-medium text-lg leading-[1.33] text-ods-text-primary line-clamp-2">
+          <p className="font-['DM_Sans'] font-medium text-lg leading-[1.33] text-ods-text-primary line-clamp-2" title={organization.description}>
             {organization.description}
           </p>
         </div>

@@ -102,13 +102,16 @@ export function UserSummary({
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-h4 text-ods-text-primary truncate">
+          <p
+            className="text-h4 text-ods-text-primary truncate"
+            title={mspPreview?.name ? `${name} • ${mspPreview.name}` : name}
+          >
             {name}
             {mspPreview?.name && (
               <span className="text-ods-text-secondary"> • {mspPreview.name}</span>
             )}
           </p>
-          <p className="text-h6 text-ods-text-secondary truncate">
+          <p className="text-h6 text-ods-text-secondary truncate" title={subtitle && subtitle.trim().length > 0 ? subtitle : (email && email.trim().length > 0 ? email : '\u00A0')}>
             {subtitle && subtitle.trim().length > 0 ? subtitle : (email && email.trim().length > 0 ? email : '\u00A0')}
           </p>
         </div>
@@ -154,34 +157,37 @@ export function UserSummary({
         <div className="flex-1 grid grid-cols-[1fr_auto] gap-4">
           {/* LEFT : text stack */}
           <div className="min-h-[6rem] flex flex-col justify-center space-y-3 truncate">
-          <p className="text-h2 text-ods-text-primary leading-none truncate">
+          <p className="text-h2 text-ods-text-primary leading-none truncate" title={name}>
             {name}
           </p>
-            <p className="text-h4 text-ods-text-secondary break-all truncate">
+            <p className="text-h4 text-ods-text-secondary break-all truncate" title={(subtitle && subtitle.trim().length > 0) ? subtitle : (email && email.trim().length > 0 ? email : '\u00A0')}>
               {(subtitle && subtitle.trim().length > 0) ? subtitle : (email && email.trim().length > 0 ? email : '\u00A0')}
             </p>
-            {mspPreview && (
-              <p className="text-h6 text-ods-text-primary truncate">
-                {/* Build string with separators */}
-                {[
-                  mspPreview.name ?? '—',
-                  typeof mspPreview.seatCount === 'number'
-                    ? `${formatNumber(mspPreview.seatCount)} Seats`
-                    : null,
-                  typeof mspPreview.technicianCount === 'number'
-                    ? `${formatNumber(mspPreview.technicianCount)} Technicians`
-                    : null,
-                  typeof mspPreview.annualRevenue === 'number'
-                    ? `$${formatNumber(mspPreview.annualRevenue)}`
-                    : null,
-                ]
-                  .filter(Boolean)
-                  .flatMap((txt, idx) => (idx === 0 ? [txt] : [' • ', txt]))
-                  .map((seg, idx) => (
-                    <span key={idx} className={seg === ' • ' ? 'text-ods-text-secondary' : ''}>{seg}</span>
-                  ))}
-              </p>
-            )}
+            {mspPreview && (() => {
+              const mspSegments = [
+                mspPreview.name ?? '—',
+                typeof mspPreview.seatCount === 'number'
+                  ? `${formatNumber(mspPreview.seatCount)} Seats`
+                  : null,
+                typeof mspPreview.technicianCount === 'number'
+                  ? `${formatNumber(mspPreview.technicianCount)} Technicians`
+                  : null,
+                typeof mspPreview.annualRevenue === 'number'
+                  ? `$${formatNumber(mspPreview.annualRevenue)}`
+                  : null,
+              ].filter(Boolean) as string[];
+              const mspTitle = mspSegments.join(' • ');
+              return (
+                <p className="text-h6 text-ods-text-primary truncate" title={mspTitle}>
+                  {/* Build string with separators */}
+                  {mspSegments
+                    .flatMap((txt, idx) => (idx === 0 ? [txt] : [' • ', txt]))
+                    .map((seg, idx) => (
+                      <span key={idx} className={seg === ' • ' ? 'text-ods-text-secondary' : ''}>{seg}</span>
+                    ))}
+                </p>
+              );
+            })()}
           </div>
 
           {/* RIGHT (desktop) */}

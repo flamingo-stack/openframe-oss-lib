@@ -40,7 +40,7 @@ export const HiddenTagsPopup = forwardRef(function HiddenTagsPopup(
             "border-b border-ods-border last:border-b-0",
           )}
         >
-          <span className="text-h5 truncate uppercase text-ods-text-primary">
+          <span className="text-h5 truncate uppercase text-ods-text-primary" title={typeof item.label === 'string' ? item.label : undefined}>
             {item.label}
           </span>
           {!disabled && onRemove && (

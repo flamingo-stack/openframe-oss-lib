@@ -329,7 +329,7 @@ export function TagsManager({
 												}}
 											>
 												<div className="flex items-center justify-between w-full">
-													<span className="truncate">{tag.name}</span>
+													<span className="truncate" title={tag.name}>{tag.name}</span>
 													<div className="flex items-center gap-1 shrink-0">
 														{isSelected && (
 															<CheckIcon
@@ -401,7 +401,7 @@ export function TagsManager({
 												size={16}
 												className="text-ods-accent shrink-0"
 											/>
-											<span className="text-ods-accent truncate">
+											<span className="text-ods-accent truncate" title={`Create "${search.trim()}"`}>
 												Create &ldquo;{search.trim()}&rdquo;
 											</span>
 										</div>

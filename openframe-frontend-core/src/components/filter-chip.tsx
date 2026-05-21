@@ -69,7 +69,7 @@ export function FilterChip({
       <span className={cn(
         "truncate font-['DM_Sans'] font-medium leading-none text-center",
         size === 'sm' ? "max-w-[100px] md:max-w-[120px]" : "max-w-[120px] md:max-w-[140px]"
-      )}>
+      )} title={label}>
         {label}
       </span>
       {removable && onRemove && (

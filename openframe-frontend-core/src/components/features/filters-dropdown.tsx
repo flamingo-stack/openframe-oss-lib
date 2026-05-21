@@ -429,7 +429,7 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
                           )}
                         >
                           <FilterCheckbox checked={isSelected} />
-                          <span className="flex-1 min-w-0 text-h4 text-ods-text-primary truncate">
+                          <span className="flex-1 min-w-0 text-h4 text-ods-text-primary truncate" title={option.label}>
                             {option.label}
                           </span>
                           {option.count !== undefined && (

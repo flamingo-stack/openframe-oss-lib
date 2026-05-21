@@ -48,12 +48,11 @@ const ChatTicketItem = React.forwardRef<HTMLButtonElement, ChatTicketItemProps>(
             className={cn(
               "text-h3 truncate",
               isResolved ? "text-ods-text-secondary" : "text-ods-text-primary",
-            )}
-          >
+            )} title={ticket.title}>
             {ticket.title}
           </p>
           {subtitle && (
-            <p className="text-h6 text-ods-text-secondary truncate">
+            <p className="text-h6 text-ods-text-secondary truncate" title={subtitle}>
               {subtitle}
             </p>
           )}
