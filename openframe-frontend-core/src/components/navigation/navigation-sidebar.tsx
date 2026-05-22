@@ -83,7 +83,9 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
     } else if (item.path) {
       config.onNavigate?.(item.path)
     }
-  }, [config])
+
+    if (isTablet) setTabletMinimized(true)
+  }, [config, isTablet])
 
   const { primaryItems, secondaryItems } = useMemo(() => ({
     primaryItems: config.items.filter(item => item.section !== 'secondary'),
