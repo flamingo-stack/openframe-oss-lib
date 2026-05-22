@@ -73,7 +73,9 @@ public class IntegratedToolDataEnrichmentService implements DataEnrichmentServic
             enriched.setTenantId(tenantIdProvider.getTenantId());
             return;
         }
-        enriched.setTenantId(clusterTenantIdResolver.resolveTenantId(message.getTenantId()));
+        String tenantId = clusterTenantIdResolver.resolveTenantId(message.getTenantId());
+        enriched.setTenantId(tenantId);
+        message.setTenantId(enriched.getTenantId());
     }
 
     @Override
