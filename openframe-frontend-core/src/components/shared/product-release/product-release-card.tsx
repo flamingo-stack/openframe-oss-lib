@@ -157,46 +157,60 @@ export function ProductReleaseCard({
       (changelogCounts?.breaking ?? 0)
 
     // Build the metadata-grid cell array — mirrors the hub's
-    // EntityAuthorCard composition (extras → date → author). The
-    // release-type cell carries a colored chip; other cells are plain
-    // value + label.
+    // EntityAuthorCard composition. ALWAYS render all 3 value cells
+    // (Type / Status / Released) — missing values render as a plain
+    // em-dash + label so the grid keeps a fixed 4-cell shape (matching
+    // the skeleton). The Author cell is also always rendered below
+    // (effectiveAuthor falls back to a placeholder shape). This is
+    // load-to-resolve baseline parity: any conditional cell would
+    // introduce a reflow when the skeleton resolves.
+    //
+    // Plan note: em-dash placeholders read as plain text (NOT a colored
+    // StatusBadge for the Type cell) so empty badges don't look broken
+    // next to populated badges.
     type ValueCell = {
       value: string
       label: string
       uppercase: boolean
       colorScheme?: 'error' | 'cyan' | 'success' | 'warning'
     }
-    const valueCells: ValueCell[] = []
-    if (releaseType && releaseTypeBadgeColor) {
-      valueCells.push({
-        value: releaseType.toUpperCase(),
-        label: 'Type',
-        uppercase: true,
-        colorScheme: releaseTypeBadgeColor,
-      })
-    }
-    if (releaseStatus) {
-      valueCells.push({
-        value: releaseStatus.toUpperCase(),
-        label: 'Status',
-        uppercase: true,
-      })
-    }
-    if (formattedDate) {
-      valueCells.push({
-        value: formattedDate,
-        label: 'Released',
-        uppercase: false,
-      })
-    }
-    const hasAuthorCell = !!author?.full_name
-    const totalCells = valueCells.length + (hasAuthorCell ? 1 : 0)
-    // Tailwind JIT cannot compile dynamic class names — explicit branches:
-    const gridColsClass =
-      totalCells >= 4 ? 'md:grid-cols-4'
-        : totalCells === 3 ? 'md:grid-cols-3'
-          : totalCells === 2 ? 'md:grid-cols-2'
-            : 'md:grid-cols-1'
+    const valueCells: ValueCell[] = [
+      releaseType && releaseTypeBadgeColor
+        ? {
+            value: releaseType.toUpperCase(),
+            label: 'Type',
+            uppercase: true,
+            colorScheme: releaseTypeBadgeColor,
+          }
+        : { value: '—', label: 'Type', uppercase: false },
+      releaseStatus
+        ? {
+            value: releaseStatus.toUpperCase(),
+            label: 'Status',
+            uppercase: true,
+          }
+        : { value: '—', label: 'Status', uppercase: false },
+      formattedDate
+        ? {
+            value: formattedDate,
+            label: 'Released',
+            uppercase: false,
+          }
+        : { value: '—', label: 'Released', uppercase: false },
+    ]
+    // EMPTY_AUTHOR_PLACEHOLDER shape — mirrors the hub's
+    // EMPTY_AUTHOR_PLACEHOLDER constant exported from
+    // components/shared/entity-author-card.tsx (hub can't be imported
+    // here; the two are kept in lockstep per the inline-duplication
+    // policy documented in the catalog branch comment above).
+    const effectiveAuthor = author?.full_name
+      ? author
+      : { full_name: '—', avatar_url: null, job_title: 'Unknown' }
+    // Fixed 4-cell grid (Type / Status / Released / Author) so the
+    // skeleton's shape matches the loaded card exactly. The earlier
+    // dynamic `gridColsClass` ternary collapsed missing cells and
+    // caused 28-56px reflow on resolve.
+    const gridColsClass = 'md:grid-cols-4'
     const dividerClass = 'border-b md:border-b-0 md:border-r border-ods-border'
 
     const frameClass = cn(
@@ -242,9 +256,15 @@ export function ProductReleaseCard({
                 v{version}
               </span>
             </div>
-            <h3 className="font-['Azeret_Mono'] font-semibold text-xl md:text-2xl text-ods-text-primary leading-tight line-clamp-2 mb-3">
-              {title}
-            </h3>
+            {/* Title — reserve a fixed 2-line height so cards with
+                1-line titles don't shrink and the catalog skeleton-to-
+                content transition is shift-free. Mirrors the
+                onboarding-guide catalog card. */}
+            <div className="min-h-[60px] md:min-h-[72px] flex items-start mb-3">
+              <h3 className="font-['Azeret_Mono'] font-semibold text-xl md:text-2xl text-ods-text-primary leading-tight line-clamp-2">
+                {title}
+              </h3>
+            </div>
             {summary && (
               <p className="font-['DM_Sans'] text-sm md:text-base text-ods-text-secondary leading-relaxed line-clamp-4 flex-1">
                 {summary}
@@ -253,96 +273,107 @@ export function ProductReleaseCard({
           </div>
         </div>
 
-        {/* CHANGELOG STRIP — hidden when total === 0 */}
-        {totalChangelog > 0 && changelogCounts && (
-          <div className="border-t border-ods-border pt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 font-['DM_Sans'] text-sm text-ods-text-secondary">
-            {changelogCounts.features > 0 && (
-              <span className="inline-flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5" />
-                {changelogCounts.features} {changelogCounts.features === 1 ? 'feature' : 'features'}
-              </span>
-            )}
-            {changelogCounts.fixes > 0 && (
-              <span className="inline-flex items-center gap-1.5">
-                <Wrench className="w-3.5 h-3.5" />
-                {changelogCounts.fixes} {changelogCounts.fixes === 1 ? 'fix' : 'fixes'}
-              </span>
-            )}
-            {changelogCounts.improvements > 0 && (
-              <span className="inline-flex items-center gap-1.5">
-                <TrendingUp className="w-3.5 h-3.5" />
-                {changelogCounts.improvements} {changelogCounts.improvements === 1 ? 'improvement' : 'improvements'}
-              </span>
-            )}
-            {changelogCounts.breaking > 0 && (
-              <span className="inline-flex items-center gap-1.5 text-[var(--ods-attention-yellow-warning)]">
-                <AlertTriangle className="w-3.5 h-3.5" />
-                {changelogCounts.breaking} breaking
-              </span>
-            )}
-          </div>
-        )}
+        {/* CHANGELOG STRIP — ALWAYS rendered so the skeleton's
+            always-on changelog placeholder matches the loaded shape
+            (zero reflow on resolve). When `totalChangelog === 0`, an
+            empty-state line takes the same vertical space as the
+            populated row. */}
+        <div className="border-t border-ods-border pt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 font-['DM_Sans'] text-sm text-ods-text-secondary">
+          {totalChangelog > 0 && changelogCounts ? (
+            <>
+              {changelogCounts.features > 0 && (
+                <span className="inline-flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  {changelogCounts.features} {changelogCounts.features === 1 ? 'feature' : 'features'}
+                </span>
+              )}
+              {changelogCounts.fixes > 0 && (
+                <span className="inline-flex items-center gap-1.5">
+                  <Wrench className="w-3.5 h-3.5" />
+                  {changelogCounts.fixes} {changelogCounts.fixes === 1 ? 'fix' : 'fixes'}
+                </span>
+              )}
+              {changelogCounts.improvements > 0 && (
+                <span className="inline-flex items-center gap-1.5">
+                  <TrendingUp className="w-3.5 h-3.5" />
+                  {changelogCounts.improvements} {changelogCounts.improvements === 1 ? 'improvement' : 'improvements'}
+                </span>
+              )}
+              {changelogCounts.breaking > 0 && (
+                <span className="inline-flex items-center gap-1.5 text-[var(--ods-attention-yellow-warning)]">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  {changelogCounts.breaking} breaking
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="text-sm text-ods-text-secondary">No changelog entries yet</span>
+          )}
+        </div>
 
-        {/* METADATA GRID FOOTER — mirrors EntityAuthorCard byte-for-byte */}
-        {totalCells > 0 && (
-          <div
-            className={cn(
-              'grid grid-cols-1',
-              gridColsClass,
-              'border border-ods-border rounded-md overflow-hidden w-full',
-            )}
-          >
-            {valueCells.map((cell, i) => (
-              <div
-                key={`${cell.label}-${i}`}
-                className={cn(
-                  'bg-ods-card p-4 flex flex-col gap-3',
-                  // Last value cell skips the trailing divider when no
-                  // author cell follows; otherwise every value cell gets it.
-                  (i < valueCells.length - 1 || hasAuthorCell) && dividerClass,
+        {/* METADATA GRID FOOTER — fixed 4-cell shape (Type / Status /
+            Released / Author) so the skeleton mirrors the loaded card
+            exactly. Empty value cells render em-dash + label (plain
+            text, no colored badge — em-dash badges read as broken next
+            to populated ones); the Author cell falls back to the
+            EMPTY_AUTHOR_PLACEHOLDER shape declared above. */}
+        <div
+          className={cn(
+            'grid grid-cols-1',
+            gridColsClass,
+            'border border-ods-border rounded-md overflow-hidden w-full',
+          )}
+        >
+          {valueCells.map((cell, i) => (
+            <div
+              key={`${cell.label}-${i}`}
+              className={cn('bg-ods-card p-4 flex flex-col gap-3', dividerClass)}
+            >
+              <div className="flex flex-col gap-0">
+                {cell.colorScheme ? (
+                  <StatusBadge
+                    text={cell.value}
+                    variant="card"
+                    colorScheme={cell.colorScheme}
+                    singleLine
+                    className="self-start"
+                  />
+                ) : (
+                  <p
+                    className={cn(
+                      'text-h4',
+                      // Em-dash placeholder reads as secondary text;
+                      // populated values stay primary.
+                      cell.value === '—' ? 'text-ods-text-secondary' : 'text-ods-text-primary',
+                    )}
+                  >
+                    {cell.uppercase ? cell.value.toLocaleUpperCase() : cell.value}
+                  </p>
                 )}
-              >
-                <div className="flex flex-col gap-0">
-                  {cell.colorScheme ? (
-                    <StatusBadge
-                      text={cell.value}
-                      variant="card"
-                      colorScheme={cell.colorScheme}
-                      singleLine
-                      className="self-start"
-                    />
-                  ) : (
-                    <p className="text-h4 text-ods-text-primary">
-                      {cell.uppercase ? cell.value.toLocaleUpperCase() : cell.value}
-                    </p>
-                  )}
-                  <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
-                    {cell.label}
-                  </p>
-                </div>
+                <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
+                  {cell.label}
+                </p>
               </div>
-            ))}
-            {hasAuthorCell && author && (
-              <div className="bg-ods-card p-4 flex items-center gap-3">
-                <SquareAvatar
-                  src={author.avatar_url ?? undefined}
-                  alt={author.full_name}
-                  fallback={author.full_name.charAt(0).toUpperCase()}
-                  size="md"
-                  variant="round"
-                />
-                <div className="flex flex-col gap-0 flex-1 min-w-0">
-                  <p className="text-h3 tracking-[-0.36px] text-ods-text-primary truncate">
-                    {author.full_name}
-                  </p>
-                  <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
-                    {author.job_title || 'Author'}
-                  </p>
-                </div>
-              </div>
-            )}
+            </div>
+          ))}
+          <div className="bg-ods-card p-4 flex items-center gap-3">
+            <SquareAvatar
+              src={effectiveAuthor.avatar_url ?? undefined}
+              alt={effectiveAuthor.full_name}
+              fallback={effectiveAuthor.full_name.charAt(0).toUpperCase()}
+              size="md"
+              variant="round"
+            />
+            <div className="flex flex-col gap-0 flex-1 min-w-0">
+              <p className="text-h3 tracking-[-0.36px] text-ods-text-primary truncate">
+                {effectiveAuthor.full_name}
+              </p>
+              <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
+                {effectiveAuthor.job_title || 'Author'}
+              </p>
+            </div>
           </div>
-        )}
+        </div>
 
         {typeof viewCount === 'number' && viewCount > 0 && (
           <div className="flex items-center gap-1.5 text-xs text-ods-text-secondary">

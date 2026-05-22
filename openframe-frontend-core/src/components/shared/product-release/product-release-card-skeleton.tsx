@@ -15,15 +15,12 @@ export function ProductReleaseCardSkeleton({ className, size = 'default' }: Prod
   // ----- CATALOG branch — must match ProductReleaseCard size='catalog'.
   // Same outer frame (`bg-ods-system-greys-black border border-ods-border …
   // p-6 gap-4`). Inner: hero (16:9 cover + version pill + title + summary),
-  // changelog strip placeholder (always rendered — see note), metadata-grid
-  // footer (4 cells via grid). Heights chosen to match the loaded card's
-  // rendered metrics so the 5-card slot grid in `ReleasesList` doesn't
-  // jump on resolve.
-  //
-  // Note: the loaded card hides the changelog strip when total === 0
-  // (rare — most releases have at least one feature/fix/improvement).
-  // The skeleton always renders the placeholder; net effect is a ~28px
-  // shrink on empty-changelog releases. Documented tradeoff.
+  // changelog strip placeholder, metadata-grid footer (4 cells via grid).
+  // Heights chosen to match the loaded card's rendered metrics so the
+  // 5-card slot grid in `ReleasesList` doesn't jump on resolve. The
+  // loaded card ALSO always renders the changelog strip + a fixed 4-cell
+  // grid (with em-dash placeholders for missing values), so this
+  // skeleton's shape matches exactly with zero load-to-resolve reflow.
   if (size === 'catalog') {
     return (
       <div
@@ -40,9 +37,11 @@ export function ProductReleaseCardSkeleton({ className, size = 'default' }: Prod
           <div className="flex-1 min-w-0 flex flex-col">
             {/* Version pill */}
             <div className="h-6 w-20 bg-ods-bg rounded mb-3" />
-            {/* Title — 2 lines */}
-            <div className="h-7 w-3/4 bg-ods-bg rounded mb-2" />
-            <div className="h-7 w-1/2 bg-ods-bg rounded mb-3" />
+            {/* Title — 2 lines (heights mirror text-xl md:text-2xl
+                leading-tight = 25px mobile / 30px desktop). `mb-3`
+                matches the loaded card's title-margin. */}
+            <div className="h-[25px] md:h-[30px] w-3/4 bg-ods-bg rounded mb-3" />
+            <div className="h-[25px] md:h-[30px] w-1/2 bg-ods-bg rounded mb-3" />
             {/* Summary — 2 lines */}
             <div className="h-3 w-full bg-ods-bg/60 rounded mb-1" />
             <div className="h-3 w-5/6 bg-ods-bg/60 rounded" />
