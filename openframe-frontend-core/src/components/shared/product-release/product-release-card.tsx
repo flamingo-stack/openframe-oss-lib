@@ -7,7 +7,6 @@ import { StatusBadge } from '../../ui/status-badge'
 import { SquareAvatar } from '../../ui/square-avatar'
 import {
   AlertTriangle,
-  ChevronRight,
   Eye,
   Package,
   Play,
@@ -18,21 +17,28 @@ import {
 import { cn } from '../../../utils/cn'
 
 /**
- * Card density:
- * - `default`: full /releases page row (vertical title + description on the
- *   left, version + date column on the right).
- * - `sm`: compact horizontal layout (~80px tall) sized for inline rendering
- *   inside chat messages and other tight surfaces. Drops `<h3>` (block-only,
+ * Card density. Two variants, both actively used across openframe + flamingo
+ * apps and the related-content rail:
+ *
+ * - `lg`: rich large card used everywhere a product release is the focal
+ *   item — openframe's `/releases` catalog row, flamingo's DevCenter tab,
+ *   investor-update related-content section. Three zones — hero (16:9 cover
+ *   + version pill + title + summary), changelog stats strip (icons +
+ *   counts), metadata grid footer (Type · Status · Released · Author). The
+ *   grid mirrors the hub's `<EntityAuthorCard>` byte-for-byte (see lg
+ *   branch comment).
+ *
+ * - `sm`: compact horizontal layout (~80px tall) for inline rendering inside
+ *   chat messages and other tight surfaces. Drops `<h3>` (block-only,
  *   illegal inside markdown `<p>`) for `<span>` text, swaps the outer
  *   `InteractiveCard` for a `<span>`-anchored link, and collapses to:
  *   56px icon + 1-line title + 1-line meta (version · date).
- * - `catalog`: rich /releases catalog row. Three zones — hero (16:9 cover +
- *   version pill + title + summary), changelog stats strip (icons + counts),
- *   metadata grid footer (Type · Status · Released · Author). The grid
- *   mirrors the hub's `<EntityAuthorCard>` byte-for-byte (see catalog
- *   branch comment).
+ *
+ * A previous `default` variant (vertical title+description / version+date
+ * column) was deleted in the 2026-05 DRY pass — it had a single consumer
+ * (the hub's RelatedContentSection) that has since moved to `lg`.
  */
-export type ProductReleaseCardSize = 'default' | 'sm' | 'catalog'
+export type ProductReleaseCardSize = 'lg' | 'sm'
 
 /**
  * Minimal structural `<a>` prop bundle the consumer composes (typically
@@ -80,7 +86,7 @@ export interface ProductReleaseCardProps {
   anchorProps?: ProductReleaseCardAnchorProps
   /** Additional CSS classes */
   className?: string
-  /** Card density. Defaults to `'default'`. */
+  /** Card density. Defaults to `'lg'` (the canonical large card). */
   size?: ProductReleaseCardSize
 
   // ─── Catalog-only props (ignored by `default` / `sm` branches) ─────────
@@ -125,7 +131,7 @@ export function ProductReleaseCard({
   onClick,
   anchorProps,
   className,
-  size = 'default',
+  size = 'lg',
   coverImage,
   hasVideoCover,
   releaseType,
@@ -135,7 +141,7 @@ export function ProductReleaseCard({
   author,
   changelogCounts,
 }: ProductReleaseCardProps) {
-  // ----- CATALOG branch (rich /releases catalog row) -------------------------
+  // ----- LG branch (rich /releases catalog row + related-content rail) -----
   // The card has THREE zones:
   //   1. Hero — cover image LEFT, version pill + title + summary RIGHT.
   //   2. Changelog strip — icons + counts (hidden when total === 0).
@@ -145,11 +151,11 @@ export function ProductReleaseCard({
   //      author-cell shapes, byte-for-byte). The OSS lib has zero hub
   //      coupling by design; we cannot import the hub's
   //      <EntityAuthorCard>. This is the SAME inline-duplication policy
-  //      documented for the COMPACT_CARD_* string set at lines ~104-108.
-  //      If the hub's <EntityAuthorCard> visual changes (cell padding,
-  //      divider styles, avatar size, etc.), update this branch in
-  //      lockstep.
-  if (size === 'catalog') {
+  //      documented for the COMPACT_CARD_* string set in the chat-card
+  //      file. If the hub's <EntityAuthorCard> visual changes (cell
+  //      padding, divider styles, avatar size, etc.), update this branch
+  //      in lockstep.
+  if (size === 'lg') {
     const totalChangelog =
       (changelogCounts?.features ?? 0) +
       (changelogCounts?.fixes ?? 0) +
@@ -556,99 +562,8 @@ export function ProductReleaseCard({
     )
   }
 
-  // ----- DEFAULT branch (existing /releases card layout) -----------------
-  // When `anchorProps` is supplied, the card behaves like every other
-  // entity card on the related-content rail — real `<a>` with the
-  // consumer's `useNavLink` bundle (cross-origin → new tab, same-origin
-  // → soft RSC nav, modifier-click → browser default). The
-  // `<InteractiveCard onClick>` form remains the back-compat path for
-  // the public `/releases` tab caller which still routes via
-  // `router.push()` directly.
-  if (anchorProps) {
-    return (
-      <a
-        {...anchorProps}
-        className={cn(
-          'bg-ods-card border border-ods-border rounded-[6px]',
-          'flex flex-col md:flex-row',
-          'items-start md:items-center',
-          'gap-3 md:gap-4',
-          'p-4 no-underline',
-          'transition-colors hover:border-ods-text-secondary/40',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent focus-visible:ring-offset-1 focus-visible:ring-offset-ods-card',
-          className,
-        )}
-      >
-        {/* Left column - content */}
-        <div className="flex-1 w-full md:w-auto min-w-0 flex flex-col justify-center gap-2">
-          <div className="min-h-[48px] flex items-center">
-            <h3 className="text-h3 text-ods-text-primary tracking-[-0.36px] line-clamp-2" title={title}>
-              {title}
-            </h3>
-          </div>
-          <p className="text-h4 text-ods-text-secondary line-clamp-3" title={summary || ' '}>
-            {summary || ' '}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 w-full md:w-auto justify-start md:justify-end shrink-0">
-          <div className="w-[200px] flex flex-col justify-center gap-2">
-            <p className="text-h3 text-ods-text-primary tracking-[-0.36px] truncate">
-              {version}
-            </p>
-            <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary truncate">
-              {formattedDate}
-            </p>
-          </div>
-          <div className="flex items-center justify-center p-3 shrink-0">
-            <ChevronRight className="h-6 w-6 text-ods-text-primary" />
-          </div>
-        </div>
-      </a>
-    )
-  }
-  return (
-    <InteractiveCard
-      clickable={true}
-      onClick={onClick}
-      className={cn(
-        'bg-ods-card border border-ods-border rounded-[6px]',
-        'flex flex-col md:flex-row',
-        'items-start md:items-center',
-        'gap-3 md:gap-4',
-        'p-4',
-        className
-      )}
-    >
-      {/* Left column - content */}
-      <div className="flex-1 w-full md:w-auto min-w-0 flex flex-col justify-center gap-2">
-        <div className="min-h-[48px] flex items-center">
-          <h3 className="text-h3 text-ods-text-primary tracking-[-0.36px] line-clamp-2" title={title}>
-            {title}
-          </h3>
-        </div>
-        <p className="text-h4 text-ods-text-secondary line-clamp-3" title={summary || ' '}>
-          {summary || ' '}
-        </p>
-      </div>
-
-      {/* Right column - version + date */}
-      <div
-        className="flex items-center gap-2 w-full md:w-auto justify-start md:justify-end shrink-0"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="w-[200px] flex flex-col justify-center gap-2">
-          <p className="text-h3 text-ods-text-primary tracking-[-0.36px] truncate">
-            {version}
-          </p>
-          <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary truncate">
-            {formattedDate}
-          </p>
-        </div>
-        {/* Icon column */}
-        <div className="flex items-center justify-center p-3 shrink-0">
-          <ChevronRight className="h-6 w-6 text-ods-text-primary" />
-        </div>
-      </div>
-    </InteractiveCard>
-  )
+  // Unreachable — `size` is typed `'lg' | 'sm'` and both branches return
+  // above. Kept as a defensive throw so a future variant addition that
+  // forgets to return doesn't silently render `undefined`.
+  throw new Error(`ProductReleaseCard: unsupported size '${size as string}'`)
 }
