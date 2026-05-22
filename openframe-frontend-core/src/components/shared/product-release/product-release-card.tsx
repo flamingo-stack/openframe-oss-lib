@@ -265,11 +265,17 @@ export function ProductReleaseCard({
                 {title}
               </h3>
             </div>
-            {summary && (
-              <p className="font-['DM_Sans'] text-sm md:text-base text-ods-text-secondary leading-relaxed line-clamp-4 flex-1">
-                {summary}
+            {/* Summary — fixed 3-line height. `line-clamp-3` caps long
+                summaries at 3 lines; `min-h` reserves the same vertical
+                space when content is shorter, so the catalog grid stays
+                row-consistent regardless of per-card content length.
+                Heights derived from text-sm md:text-base × leading-relaxed
+                (1.625): 14×1.625×3 ≈ 68 px mobile, 16×1.625×3 ≈ 78 px desktop. */}
+            <div className="min-h-[68px] md:min-h-[78px]">
+              <p className="font-['DM_Sans'] text-sm md:text-base text-ods-text-secondary leading-relaxed line-clamp-3">
+                {summary ?? ''}
               </p>
-            )}
+            </div>
           </div>
         </div>
 

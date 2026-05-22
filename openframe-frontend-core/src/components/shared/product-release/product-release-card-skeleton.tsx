@@ -31,29 +31,44 @@ export function ProductReleaseCardSkeleton({ className, size = 'default' }: Prod
           className,
         )}
       >
-        {/* HERO */}
+        {/* HERO — placeholders use `bg-ods-border` (#3a3a3a) so they
+            contrast against the card's `bg-ods-system-greys-black`
+            (#212121) container. The metadata grid cells below use
+            `bg-ods-card` containers so `bg-ods-bg` placeholders work
+            there, but in the hero the card IS `bg-ods-card`-equivalent —
+            `bg-ods-bg` (#161616) is only 6 hex points darker than the
+            card and renders nearly invisible. */}
         <div className="flex flex-col md:flex-row gap-4 md:gap-6">
-          <div className="w-full md:w-[256px] aspect-[16/9] bg-ods-bg rounded-lg flex-shrink-0" />
+          <div className="w-full md:w-[256px] aspect-[16/9] bg-ods-border rounded-lg flex-shrink-0" />
           <div className="flex-1 min-w-0 flex flex-col">
             {/* Version pill */}
-            <div className="h-6 w-20 bg-ods-bg rounded mb-3" />
+            <div className="h-6 w-20 bg-ods-border rounded mb-3" />
             {/* Title — 2 lines (heights mirror text-xl md:text-2xl
                 leading-tight = 25px mobile / 30px desktop). `mb-3`
-                matches the loaded card's title-margin. */}
-            <div className="h-[25px] md:h-[30px] w-3/4 bg-ods-bg rounded mb-3" />
-            <div className="h-[25px] md:h-[30px] w-1/2 bg-ods-bg rounded mb-3" />
-            {/* Summary — 2 lines */}
-            <div className="h-3 w-full bg-ods-bg/60 rounded mb-1" />
-            <div className="h-3 w-5/6 bg-ods-bg/60 rounded" />
+                matches the loaded card's title-margin and min-h
+                container. */}
+            <div className="h-[25px] md:h-[30px] w-3/4 bg-ods-border rounded mb-3" />
+            <div className="h-[25px] md:h-[30px] w-1/2 bg-ods-border rounded mb-3" />
+            {/* Summary — 3 lines, matching the loaded card's
+                `line-clamp-3` + `min-h-[68px] md:min-h-[78px]` container.
+                `bg-ods-border/70` keeps the summary placeholders slightly
+                dimmer than the title placeholders, mirroring the
+                rendered card's primary-vs-secondary text hierarchy. */}
+            <div className="h-3 w-full bg-ods-border/70 rounded mb-2" />
+            <div className="h-3 w-11/12 bg-ods-border/70 rounded mb-2" />
+            <div className="h-3 w-5/6 bg-ods-border/70 rounded" />
           </div>
         </div>
 
         {/* CHANGELOG strip placeholder — always rendered */}
         <div className="border-t border-ods-border pt-3">
-          <div className="h-4 w-2/3 bg-ods-bg/60 rounded" />
+          <div className="h-4 w-2/3 bg-ods-border/70 rounded" />
         </div>
 
-        {/* METADATA GRID — 4-cell placeholder */}
+        {/* METADATA GRID — 4-cell placeholder. The grid cells use
+            `bg-ods-card` containers and `bg-ods-bg` placeholders, which
+            DO contrast correctly because the cells are brighter than
+            the placeholders. */}
         <div className="grid grid-cols-1 md:grid-cols-4 border border-ods-border rounded-md overflow-hidden w-full">
           {[0, 1, 2].map((i) => (
             <div
