@@ -8,6 +8,7 @@ import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Optional;
 
 /**
@@ -48,7 +49,58 @@ public class MeshCentralUpstreamResolver implements ToolUpstreamResolver {
 
     private URI build(MeshCentralRoutingProperties.Upstream upstream,
                       ServerHttpRequest request, String stripPrefix) {
-        return proxyUrlResolver.resolve(
+        URI resolved = proxyUrlResolver.resolve(
                 TOOL_ID, upstream.getUrl(), upstream.getPort(), request.getURI(), stripPrefix);
+        return prependPathPrefix(resolved, upstream.getPathPrefix());
+    }
+
+    private URI prependPathPrefix(URI uri, String pathPrefix) {
+        if (pathPrefix == null || pathPrefix.isEmpty() || "/".equals(pathPrefix)) {
+            return uri;
+        }
+        String prefix = pathPrefix.startsWith("/") ? pathPrefix : "/" + pathPrefix;
+        if (prefix.endsWith("/")) {
+            prefix = prefix.substring(0, prefix.length() - 1);
+        }
+        String existingPath = uri.getRawPath() == null ? "" : uri.getRawPath();
+        // Skip when the path is already scoped to the tenant. Mesh's relay
+        // logic embeds the domain in tunnel URLs it hands to the agent
+        // (`*/<domain>/meshrelay.ashx`), so the agent's dial arrives already
+        // prefixed — adding the prefix again would produce /<domain>/<domain>/.
+        if (existingPath.equals(prefix) || existingPath.startsWith(prefix + "/")) {
+            return uri;
+        }
+        return withPath(uri, prefix + existingPath);
+    }
+
+    /**
+     * Rebuild {@code uri} with a new path, preserving every other component
+     * verbatim from its raw form.
+     * <p>
+     * We deliberately avoid {@link org.springframework.web.util.UriComponentsBuilder}'s
+     * {@code build(true)} here — its strict {@code QUERY_PARAM} validation
+     * rejects '=' in query values (e.g. base64 padding in mesh auth cookies),
+     * which would crash the resolver on every WS request. Concatenating the
+     * already-encoded raw components and letting {@link URI#URI(String)} parse
+     * the result sidesteps that validation.
+     */
+    private URI withPath(URI uri, String newPath) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(uri.getScheme()).append("://");
+        if (uri.getRawAuthority() != null) {
+            sb.append(uri.getRawAuthority());
+        }
+        sb.append(newPath);
+        if (uri.getRawQuery() != null) {
+            sb.append("?").append(uri.getRawQuery());
+        }
+        if (uri.getRawFragment() != null) {
+            sb.append("#").append(uri.getRawFragment());
+        }
+        try {
+            return new URI(sb.toString());
+        } catch (URISyntaxException e) {
+            throw new IllegalStateException("Failed to build mesh upstream URI", e);
+        }
     }
 }

@@ -574,7 +574,7 @@ function AutocompleteInner<T = string>(
                     )}
                     onClick={handleCreate}
                   >
-                    <span className="truncate">+ Create &quot;{inputValue.trim()}&quot;</span>
+                    <span className="truncate" title={`+ Create "${inputValue.trim()}"`}>+ Create &quot;{inputValue.trim()}&quot;</span>
                   </div>
                 ) : (
                   <div className="px-3 py-2 text-ods-text-secondary text-[14px]">
@@ -607,7 +607,7 @@ function AutocompleteInner<T = string>(
                     >
                       {renderOption ? renderOption(option, isSelected) : (
                         <div className="flex items-center justify-between w-full min-w-0">
-                          <span className="truncate">{option.label}</span>
+                          <span className="truncate" title={option.label}>{option.label}</span>
                           {isSelected && (
                             <CheckIcon className="text-ods-accent" size={20} />
                           )}

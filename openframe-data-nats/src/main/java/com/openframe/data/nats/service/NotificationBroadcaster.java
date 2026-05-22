@@ -9,6 +9,7 @@ import com.openframe.data.repository.notification.NotificationRepository;
 import com.openframe.data.service.notification.NotificationReadStateService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
@@ -24,7 +25,15 @@ public class NotificationBroadcaster {
     private final NotificationContextDescriptorRegistry descriptorRegistry;
     private final Optional<NotificationNatsPublisher> natsPublisher;
 
+    @Value("${openframe.features.notifications.enabled:false}")
+    private final boolean notificationsEnabled;
+
     public Notification broadcast(NotificationCommand command) {
+        if (!notificationsEnabled) {
+            log.debug("Notifications feature disabled — broadcast skipped (no persistence, no NATS publish)");
+            return null;
+        }
+
         Notification notification = Notification.builder()
                 .severity(command.getSeverity())
                 .title(command.getTitle())

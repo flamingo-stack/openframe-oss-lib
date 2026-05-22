@@ -212,7 +212,7 @@ export function WaitlistForm({
           onKeyDown={handleKeyDown}
         />
         {showPhoneWarning && (
-          <p className="text-h6 absolute bottom-0 left-0 translate-y-full text-[var(--ods-attention-yellow-warning)] truncate">
+          <p className="text-h6 absolute bottom-0 left-0 translate-y-full text-[var(--ods-attention-yellow-warning)] truncate" title={invalidPhoneHint}>
             {invalidPhoneHint}
           </p>
         )}

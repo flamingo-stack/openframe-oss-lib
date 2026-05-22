@@ -49,7 +49,7 @@ const PolicyRow: React.FC<{
 
       {/* Policy Info */}
       <div className="flex-1 flex flex-col min-w-0">
-        <p className="text-[16px] font-medium text-ods-text-primary truncate">
+        <p className="text-[16px] font-medium text-ods-text-primary truncate" title={policy.name}>
           {policy.name}
         </p>
         <p className="text-[12px] text-ods-text-secondary break-all font-mono">

@@ -10,6 +10,7 @@ import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.stream.handler.MessageHandler;
 import com.openframe.stream.service.DataEnrichmentService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -17,6 +18,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class GenericJsonMessageProcessor {
 
@@ -41,14 +43,17 @@ public class GenericJsonMessageProcessor {
 
     public void process(CommonDebeziumMessage message, MessageType type) {
         DeserializedDebeziumMessage deserializedKafkaMessage = deserialize(message, type);
-        if (deserializedKafkaMessage == null || deserializedKafkaMessage.getSkipProcessing()) {
+        if (deserializedKafkaMessage == null || Boolean.TRUE.equals(deserializedKafkaMessage.getSkipProcessing())) {
             return;
         }
         IntegratedToolEnrichedData enrichedData = getExtraParams(deserializedKafkaMessage, type);
+        Map<Destination, MessageHandler> handlersForType =
+                handlers.getOrDefault(type.getEventHandlerType(), Map.of());
         type.getDestinationList().forEach(destination -> {
-            MessageHandler handler = handlers.get(type.getEventHandlerType()).get(destination);
+            MessageHandler handler = handlersForType.get(destination);
             if (handler == null) {
-                throw new IllegalArgumentException("No handler found for type: " + type);
+                log.debug("No handler registered for {} on {} — skipping destination", destination, type);
+                return;
             }
             handler.handle(deserializedKafkaMessage, enrichedData);
         });

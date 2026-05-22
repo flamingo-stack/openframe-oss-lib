@@ -1,5 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { ChevronDown, ExternalLink, MoreVertical, Save, Trash2 } from 'lucide-react'
+import {
+  Chevron01DownIcon as ChevronDown,
+  Ellipsis02Icon as MoreVertical,
+  ExternalLinkIcon as ExternalLink,
+  FloppyDiscIcon as Save,
+  TrashIcon as Trash2,
+} from '../components/icons-v2-generated'
 import React from 'react'
 import { SplitButton } from '../components/ui/button'
 

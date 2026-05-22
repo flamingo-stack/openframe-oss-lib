@@ -39,5 +39,13 @@ public class MeshCentralRoutingProperties {
     public static class Upstream {
         private String url;
         private String port;
+        /**
+         * Optional path prefix prepended to the resolved upstream URI.
+         * Used for the WebSocket upstream to land agent/console connections
+         * on the correct MeshCentral domain (e.g. {@code /${TENANT_ID}}).
+         * MeshCentral REST plugin routes are bound at root, so this MUST stay
+         * empty for the {@code api} upstream.
+         */
+        private String pathPrefix;
     }
 }

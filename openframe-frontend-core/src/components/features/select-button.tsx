@@ -59,7 +59,7 @@ export const SelectButton = React.forwardRef<HTMLButtonElement, SelectButtonProp
         )}
 
         <span className="flex flex-1 flex-col justify-center min-w-0 overflow-hidden">
-          <span className="md:text-[18px] text-[14px] font-medium text-ods-text-primary truncate">
+          <span className="md:text-[18px] text-[14px] font-medium text-ods-text-primary truncate" title={title}>
             {title}
           </span>
           {description && (
@@ -67,8 +67,7 @@ export const SelectButton = React.forwardRef<HTMLButtonElement, SelectButtonProp
               className={cn(
                 "text-[14px] font-medium leading-5 truncate hidden md:flex",
                 selected ? "text-ods-accent" : "text-ods-text-secondary",
-              )}
-            >
+              )} title={description}>
               {description}
             </span>
           )}

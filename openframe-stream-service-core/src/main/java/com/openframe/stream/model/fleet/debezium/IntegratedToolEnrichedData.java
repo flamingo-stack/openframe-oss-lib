@@ -10,5 +10,6 @@ public class IntegratedToolEnrichedData {
     private String organizationId;
     private String organizationName;
     private String userId;
+    private String tenantId;
 
 }

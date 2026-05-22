@@ -79,7 +79,7 @@ export function VendorDisplayButton({ vendor, onClick, variant = 'default', exte
           </span>
         </div>
       )}
-      <span className="text-h4 text-ods-text-primary truncate min-w-0">
+      <span className="text-h4 text-ods-text-primary truncate min-w-0" title={vendor.title}>
         {vendor.title}
       </span>
     </button>

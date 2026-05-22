@@ -325,11 +325,11 @@ export function SearchInput({
         <div className={cn(
           "text-sm font-medium leading-5 truncate",
           isHighlighted ? "text-ods-accent" : "text-ods-text-primary"
-        )}>
+        )} title={result.title}>
           {result.title}
         </div>
         {result.description && (
-          <div className="text-xs leading-4 text-ods-text-secondary truncate mt-0.5">
+          <div className="text-xs leading-4 text-ods-text-secondary truncate mt-0.5" title={result.description}>
             {result.description}
           </div>
         )}

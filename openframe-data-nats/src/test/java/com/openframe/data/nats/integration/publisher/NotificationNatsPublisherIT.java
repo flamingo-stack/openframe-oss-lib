@@ -7,17 +7,13 @@ import com.openframe.data.document.notification.NotificationSeverity;
 import com.openframe.data.nats.integration.BaseIntegrationTest;
 import com.openframe.data.nats.integration.support.PublisherIntegrationTestApplication;
 import com.openframe.data.nats.model.NotificationMessage;
-import com.openframe.data.nats.publisher.NatsMessagePublisher;
 import com.openframe.data.nats.publisher.NotificationNatsPublisher;
 import io.nats.client.*;
-import io.nats.client.api.StorageType;
-import io.nats.client.api.StreamConfiguration;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 
@@ -32,35 +28,31 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @EnabledIfSystemProperty(named = "integration.tests", matches = "true")
 class NotificationNatsPublisherIT extends BaseIntegrationTest {
 
-    private static final String STREAM = "NOTIFICATIONS";
-    private static final String USER_SUBJECT_PATTERN = "user.*.notification";
-    private static final String MACHINE_SUBJECT_PATTERN = "machine.*.notification";
-
     @Autowired
     private ObjectMapper objectMapper;
 
-    private Connection nats;
+    @Autowired
     private NotificationNatsPublisher publisher;
+
+    private Connection subscriber;
 
     @BeforeEach
     void setUp() throws Exception {
-        nats = Nats.connect(natsUri());
-        ensureFreshStream();
-        publisher = new NotificationNatsPublisher(new NatsMessagePublisher(null, objectMapper, nats));
+        subscriber = Nats.connect(natsUri());
     }
 
     @AfterEach
     void tearDown() throws Exception {
-        if (nats != null) {
-            deleteStreamIfExists();
-            nats.close();
+        if (subscriber != null) {
+            subscriber.close();
         }
     }
 
     @Test
-    @DisplayName("Given a healthy JetStream stream and a persisted notification, when publishToUser is called, then the message lands on user.<userId>.notification and a subscriber receives the full payload (id, severity, title, context)")
+    @DisplayName("Given a subscriber on user.<userId>.notification, when publishToUser is called, then the message is delivered through the Spring Cloud Stream io.nats binder with the full payload (id, severity, title, context)")
     void publish_to_user_delivers_payload() throws Exception {
-        JetStreamSubscription sub = nats.jetStream().subscribe("user.alice.notification");
+        Subscription sub = subscriber.subscribe("user.alice.notification");
+        subscriber.flush(Duration.ofSeconds(2));
 
         Notification saved = persisted(Notification.builder()
                 .title("Welcome aboard")
@@ -69,7 +61,7 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
 
         publisher.publishToUser("alice", saved);
 
-        Message received = sub.nextMessage(Duration.ofSeconds(2));
+        Message received = sub.nextMessage(Duration.ofSeconds(5));
         assertThat(received).isNotNull();
         NotificationMessage decoded = objectMapper.readValue(received.getData(), NotificationMessage.class);
         assertThat(decoded.getId()).isEqualTo(saved.getId());
@@ -81,9 +73,10 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Given a subscriber on user.alice.notification, when publishToUser is called for a different userId, then alice's subscriber does not receive the message — JetStream filters by subject")
+    @DisplayName("Given a subscriber on user.alice.notification, when publishToUser is called for a different userId, then alice's subscriber receives nothing — the binder routes per subject")
     void per_user_subjects_isolated() throws Exception {
-        JetStreamSubscription aliceSub = nats.jetStream().subscribe("user.alice.notification");
+        Subscription aliceSub = subscriber.subscribe("user.alice.notification");
+        subscriber.flush(Duration.ofSeconds(2));
 
         Notification savedForBob = persisted(Notification.builder()
                 .title("for bob")
@@ -91,14 +84,15 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
 
         publisher.publishToUser("bob", savedForBob);
 
-        assertThat(aliceSub.nextMessage(Duration.ofMillis(500))).isNull();
+        assertThat(aliceSub.nextMessage(Duration.ofSeconds(1))).isNull();
     }
 
     @Test
-    @DisplayName("Given subscribers on machine.m1 and machine.other subjects, when publishToMachine is called for m1, then only m1's subscriber receives the message")
+    @DisplayName("Given subscribers on machine.m1 and machine.other, when publishToMachine is called for m1, then only m1's subscriber receives the message")
     void publish_to_machine_delivers_to_machine_subject() throws Exception {
-        JetStreamSubscription machineSub = nats.jetStream().subscribe("machine.m1.notification");
-        JetStreamSubscription otherSub = nats.jetStream().subscribe("machine.other.notification");
+        Subscription machineSub = subscriber.subscribe("machine.m1.notification");
+        Subscription otherSub = subscriber.subscribe("machine.other.notification");
+        subscriber.flush(Duration.ofSeconds(2));
 
         Notification saved = persisted(Notification.builder()
                 .title("Machine event")
@@ -106,37 +100,8 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
 
         publisher.publishToMachine("m1", saved);
 
-        assertThat(machineSub.nextMessage(Duration.ofSeconds(2))).isNotNull();
-        assertThat(otherSub.nextMessage(Duration.ofMillis(300))).isNull();
-    }
-
-    @Test
-    @DisplayName("Given JetStream persistence enabled, when a message is published before any subscriber attaches, then a late subscriber that attaches afterwards still receives the message — the property core NATS publish() did not provide")
-    void persistence_replay_to_late_subscriber() throws Exception {
-        Notification saved = persisted(Notification.builder()
-                .title("Stored before subscribe")
-                .context(GenericContext.builder().type("evt").payload("{}").build()));
-
-        publisher.publishToUser("alice", saved);
-
-        JetStreamSubscription lateSub = nats.jetStream().subscribe("user.alice.notification");
-        Message received = lateSub.nextMessage(Duration.ofSeconds(2));
-        assertThat(received).isNotNull();
-        NotificationMessage decoded = objectMapper.readValue(received.getData(), NotificationMessage.class);
-        assertThat(decoded.getTitle()).isEqualTo("Stored before subscribe");
-    }
-
-    @Test
-    @DisplayName("Given the JetStream stream is missing (broker not provisioned for our subjects), when publishToUser is called, then the failure is swallowed — Mongo is source of truth and clients reconcile via GraphQL catch-up")
-    void missing_stream_publish_swallowed() throws Exception {
-        deleteStreamIfExists();
-
-        Notification saved = persisted(Notification.builder()
-                .title("would-fail")
-                .context(GenericContext.builder().type("evt").payload("{}").build()));
-
-        publisher.publishToUser("alice", saved);
-        // void return now; no exception escapes.
+        assertThat(machineSub.nextMessage(Duration.ofSeconds(5))).isNotNull();
+        assertThat(otherSub.nextMessage(Duration.ofSeconds(1))).isNull();
     }
 
     @Test
@@ -152,25 +117,5 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
 
     private static Notification persisted(Notification.NotificationBuilder builder) {
         return builder.id("not-" + System.nanoTime()).build();
-    }
-
-    private void ensureFreshStream() throws IOException, JetStreamApiException {
-        JetStreamManagement jsm = nats.jetStreamManagement();
-        try {
-            jsm.deleteStream(STREAM);
-        } catch (JetStreamApiException ignored) {
-        }
-        jsm.addStream(StreamConfiguration.builder()
-                .name(STREAM)
-                .subjects(USER_SUBJECT_PATTERN, MACHINE_SUBJECT_PATTERN)
-                .storageType(StorageType.Memory)
-                .build());
-    }
-
-    private void deleteStreamIfExists() throws IOException {
-        try {
-            nats.jetStreamManagement().deleteStream(STREAM);
-        } catch (JetStreamApiException ignored) {
-        }
     }
 }

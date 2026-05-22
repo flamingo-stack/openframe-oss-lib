@@ -37,7 +37,7 @@ class NotificationNatsPublisherTest {
 
         ArgumentCaptor<String> subject = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<NotificationMessage> message = ArgumentCaptor.forClass(NotificationMessage.class);
-        verify(messagePublisher).publishPersistent(subject.capture(), message.capture());
+        verify(messagePublisher).publish(subject.capture(), message.capture());
         assertThat(subject.getValue()).isEqualTo("user.user-42.notification");
         assertThat(message.getValue().getId()).isEqualTo(notification.getId());
         assertThat(message.getValue().getTitle()).isEqualTo(notification.getTitle());
@@ -51,7 +51,7 @@ class NotificationNatsPublisherTest {
         publisher.publishToMachine("machine-7", notification);
 
         ArgumentCaptor<String> subject = ArgumentCaptor.forClass(String.class);
-        verify(messagePublisher).publishPersistent(subject.capture(), any());
+        verify(messagePublisher).publish(subject.capture(), any());
         assertThat(subject.getValue()).isEqualTo("machine.machine-7.notification");
     }
 
@@ -59,7 +59,7 @@ class NotificationNatsPublisherTest {
     @DisplayName("Given the broker raises NatsException, when publishToUser is called, then the failure is swallowed and no exception propagates — Mongo is source of truth")
     void broker_failure_swallowed() {
         Notification notification = persistedNotification();
-        doThrow(new NatsException("broker offline")).when(messagePublisher).publishPersistent(anyString(), any());
+        doThrow(new NatsException("broker offline")).when(messagePublisher).publish(anyString(), any());
 
         publisher.publishToUser("user-1", notification);
         // No exception escapes; nothing to assert on return — publish*() returns void now.

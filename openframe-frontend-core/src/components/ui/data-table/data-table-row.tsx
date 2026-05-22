@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import React, { memo, useCallback, type ReactNode } from 'react'
+import React, { memo, useCallback, useRef, type ReactNode } from 'react'
 import { flexRender, type Row } from '@tanstack/react-table'
 import { cn } from '../../../utils/cn'
 import { ROW_HEIGHT_DESKTOP } from './data-table-skeleton'
@@ -19,16 +19,28 @@ export interface DataTableRowProps<T> {
 /**
  * Click-bubbling protocol: any element inside a cell that should NOT trigger
  * `onRowClick` / row navigation must carry the `data-no-row-click` attribute.
- * The row checks `target.closest('[data-no-row-click]')` before firing
- * `onClick(item)`. This is the single primitive that interactive cells
- * (action buttons, dropdown menus, checkboxes) must opt into.
+ * The row checks `target.closest('[data-no-row-click]')` and short-circuits:
+ * in `onClick` mode it skips the consumer's handler; in link mode (when
+ * `href` is set) it calls `e.preventDefault()` so `<Link>` does not navigate.
+ *
+ * Clicks originating from portaled descendants (e.g. `FloatingTooltip`,
+ * dropdown menus rendered through `FloatingPortal`) bubble through React's
+ * component tree and reach this handler, but their DOM target lives outside
+ * the row subtree. The handler ignores any click whose target is not
+ * physically contained within the row element — no `stopPropagation`
+ * required at the source.
+ *
+ * In link mode the row IS the `<Link>` — content lives inside it, not under
+ * an absolute overlay — so native browser link behaviour works: hover,
+ * right-click "Open in new tab", middle-click, `Cmd+click`, focus outlines,
+ * `:visited` styles, etc.
  *
  * Example column with action buttons:
  * ```tsx
  * {
  *   id: 'actions',
  *   cell: ({ row }) => (
- *     <div data-no-row-click className="flex gap-2 justify-end pointer-events-auto">
+ *     <div data-no-row-click className="flex gap-2 justify-end">
  *       <Button onClick={() => edit(row.original)}>Edit</Button>
  *     </div>
  *   ),
@@ -49,61 +61,83 @@ function DataTableRowImpl<T>({
   className,
 }: DataTableRowProps<T>) {
   const isLinkMode = Boolean(href) && !onClick
+  const containerRef = useRef<HTMLElement | null>(null)
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       const target = e.target as HTMLElement
-      if (target.closest('[data-no-row-click]')) return
+      // React-bubbled events from portaled descendants (tooltips, dropdowns, etc.)
+      // reach this handler even though their DOM target lives outside the row.
+      // Suppress them — and in link mode, preventDefault so `<Link>` does not navigate.
+      if (!containerRef.current?.contains(target)) {
+        if (isLinkMode) e.preventDefault()
+        return
+      }
+      if (target.closest('[data-no-row-click]')) {
+        if (isLinkMode) e.preventDefault()
+        return
+      }
       onClick?.(row.original)
     },
-    [onClick, row.original],
+    [onClick, row.original, isLinkMode],
   )
+
+  const containerClassName = cn(
+    'block rounded-md bg-ods-card border border-ods-border overflow-hidden no-underline text-inherit',
+    (onClick || isLinkMode) && 'cursor-pointer hover:bg-ods-bg-active transition-colors',
+    className,
+  )
+
+  const cells = (
+    <div
+      className={cn(
+        'flex items-center gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)]',
+        compact ? 'py-[var(--spacing-system-xsf)]' : `py-0 ${ROW_HEIGHT_DESKTOP}`,
+      )}
+    >
+      {row.getVisibleCells().map(cell => {
+        const meta = cell.column.columnDef.meta
+        return (
+          <div
+            key={cell.id}
+            className={cn(
+              'flex flex-col overflow-hidden',
+              alignJustify(meta?.align),
+              meta?.width || 'flex-1 min-w-0',
+              meta?.cellClassName,
+              getHideClasses(meta?.hideAt),
+            )}
+          >
+            <CellContent>
+              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+            </CellContent>
+          </div>
+        )
+      })}
+    </div>
+  )
+
+  if (isLinkMode && href) {
+    return (
+      <Link
+        href={href}
+        prefetch={false}
+        ref={containerRef as React.RefObject<HTMLAnchorElement>}
+        className={containerClassName}
+        onClick={handleClick}
+      >
+        {cells}
+      </Link>
+    )
+  }
 
   return (
     <div
-      className={cn(
-        'relative rounded-md bg-ods-card border border-ods-border overflow-hidden',
-        (onClick || isLinkMode) &&
-          'cursor-pointer hover:bg-ods-bg-active transition-colors',
-        className,
-      )}
-      onClick={isLinkMode ? undefined : handleClick}
+      ref={containerRef as React.RefObject<HTMLDivElement>}
+      className={containerClassName}
+      onClick={onClick ? handleClick : undefined}
     >
-      {isLinkMode && href && (
-        <Link
-          href={href}
-          prefetch={false}
-          className="absolute inset-0"
-          aria-label="View details"
-        />
-      )}
-      <div
-        className={cn(
-          'relative flex items-center gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)]',
-          compact ? 'py-[var(--spacing-system-xsf)]' : `py-0 ${ROW_HEIGHT_DESKTOP}`,
-          isLinkMode && 'pointer-events-none',
-        )}
-      >
-        {row.getVisibleCells().map(cell => {
-          const meta = cell.column.columnDef.meta
-          return (
-            <div
-              key={cell.id}
-              className={cn(
-                'flex flex-col overflow-hidden',
-                alignJustify(meta?.align),
-                meta?.width || 'flex-1 min-w-0',
-                meta?.cellClassName,
-                getHideClasses(meta?.hideAt),
-              )}
-            >
-              <CellContent>
-                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-              </CellContent>
-            </div>
-          )
-        })}
-      </div>
+      {cells}
     </div>
   )
 }
@@ -114,7 +148,7 @@ export const DataTableRow = memo(DataTableRowImpl) as typeof DataTableRowImpl
 function CellContent({ children }: { children: ReactNode }) {
   if (typeof children === 'string' || typeof children === 'number') {
     return (
-      <span className="text-h4 text-ods-text-primary truncate">{children}</span>
+      <span className="text-h4 text-ods-text-primary truncate" title={String(children)}>{children}</span>
     )
   }
   return <>{children}</>

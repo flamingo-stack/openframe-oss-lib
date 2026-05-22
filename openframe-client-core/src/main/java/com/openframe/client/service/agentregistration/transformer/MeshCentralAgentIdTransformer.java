@@ -1,18 +1,23 @@
 package com.openframe.client.service.agentregistration.transformer;
 
 import com.openframe.data.document.tool.ToolType;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class MeshCentralAgentIdTransformer implements ToolAgentIdTransformer {
 
-    private static final String NODE_PREFIX = "node//";
+    private static final String LEGACY_NODE_PREFIX = "node//";
+
+    @Value("${openframe.cluster-id:}")
+    private String tenantId;
+
+    @Value("${openframe.client.meshcentral.tenant-scoped-node-id:false}")
+    private boolean tenantScopedNodeId;
 
     @Override
     public ToolType getToolType() {
@@ -26,9 +31,15 @@ public class MeshCentralAgentIdTransformer implements ToolAgentIdTransformer {
             return agentToolId;
         }
 
-        String transformedId = NODE_PREFIX + agentToolId;
+        String transformedId;
+        if (tenantScopedNodeId) {
+            transformedId = "node/" + tenantId + "/" + agentToolId;
+        } else {
+            //TODO Legacy empty-domain form (kept as the default). delete after mesh release
+            transformedId = LEGACY_NODE_PREFIX + agentToolId;
+        }
         log.info("Transformed MeshCentral agent tool ID, machineId={}, agentToolId={}, transformedId={}", machineId, agentToolId, transformedId);
-        
+
         return transformedId;
     }
 }

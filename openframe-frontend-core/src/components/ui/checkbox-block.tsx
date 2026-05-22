@@ -80,7 +80,7 @@ const CheckboxBlock = React.forwardRef<
       </div>
     </label>
     {error && (
-      <p className="absolute bottom-0 left-0 right-0 translate-y-full text-h6 truncate text-ods-error">
+      <p className="absolute bottom-0 left-0 right-0 translate-y-full text-h6 truncate text-ods-error" title={error}>
         {error}
       </p>
     )}
