@@ -15,15 +15,12 @@ export function ProductReleaseCardSkeleton({ className, size = 'default' }: Prod
   // ----- CATALOG branch — must match ProductReleaseCard size='catalog'.
   // Same outer frame (`bg-ods-system-greys-black border border-ods-border …
   // p-6 gap-4`). Inner: hero (16:9 cover + version pill + title + summary),
-  // changelog strip placeholder (always rendered — see note), metadata-grid
-  // footer (4 cells via grid). Heights chosen to match the loaded card's
-  // rendered metrics so the 5-card slot grid in `ReleasesList` doesn't
-  // jump on resolve.
-  //
-  // Note: the loaded card hides the changelog strip when total === 0
-  // (rare — most releases have at least one feature/fix/improvement).
-  // The skeleton always renders the placeholder; net effect is a ~28px
-  // shrink on empty-changelog releases. Documented tradeoff.
+  // changelog strip placeholder, metadata-grid footer (4 cells via grid).
+  // Heights chosen to match the loaded card's rendered metrics so the
+  // 5-card slot grid in `ReleasesList` doesn't jump on resolve. The
+  // loaded card ALSO always renders the changelog strip + a fixed 4-cell
+  // grid (with em-dash placeholders for missing values), so this
+  // skeleton's shape matches exactly with zero load-to-resolve reflow.
   if (size === 'catalog') {
     return (
       <div
@@ -34,27 +31,62 @@ export function ProductReleaseCardSkeleton({ className, size = 'default' }: Prod
           className,
         )}
       >
-        {/* HERO */}
+        {/* HERO — placeholders use `bg-ods-border` (#3a3a3a) so they
+            contrast against the card's `bg-ods-system-greys-black`
+            (#212121) container. The metadata grid cells below use
+            `bg-ods-card` containers so `bg-ods-bg` placeholders work
+            there, but in the hero the card IS `bg-ods-card`-equivalent —
+            `bg-ods-bg` (#161616) is only 6 hex points darker than the
+            card and renders nearly invisible.
+
+            CRITICAL: title + summary use the SAME min-h containers as
+            the loaded card so total card height is byte-identical
+            between skeleton state and loaded state. Without this,
+            individual placeholder heights underrun the loaded card's
+            min-h reservations and the page jumps on resolve. */}
         <div className="flex flex-col md:flex-row gap-4 md:gap-6">
-          <div className="w-full md:w-[256px] aspect-[16/9] bg-ods-bg rounded-lg flex-shrink-0" />
+          <div className="w-full md:w-[256px] aspect-[16/9] bg-ods-border rounded-lg flex-shrink-0" />
           <div className="flex-1 min-w-0 flex flex-col">
-            {/* Version pill */}
-            <div className="h-6 w-20 bg-ods-bg rounded mb-3" />
-            {/* Title — 2 lines */}
-            <div className="h-7 w-3/4 bg-ods-bg rounded mb-2" />
-            <div className="h-7 w-1/2 bg-ods-bg rounded mb-3" />
-            {/* Summary — 2 lines */}
-            <div className="h-3 w-full bg-ods-bg/60 rounded mb-1" />
-            <div className="h-3 w-5/6 bg-ods-bg/60 rounded" />
+            {/* Version pill — mirrors `flex items-center gap-3 mb-3` in
+                the loaded card. The loaded `<span text-lg>` renders at
+                line-height 28 px (Tailwind text-lg = 18 px / 28 px LH);
+                placeholder uses `h-7` (28 px) to match exactly. */}
+            <div className="flex items-center gap-3 mb-3">
+              <div className="h-7 w-20 bg-ods-border rounded" />
+            </div>
+            {/* Title container — SAME min-h as the loaded card so the
+                card height contributed by this region matches exactly. */}
+            <div className="min-h-[60px] md:min-h-[72px] flex flex-col gap-1.5 justify-start mb-3">
+              <div className="h-[25px] md:h-[30px] w-3/4 bg-ods-border rounded" />
+              <div className="h-[25px] md:h-[30px] w-1/2 bg-ods-border rounded" />
+            </div>
+            {/* Summary container — SAME min-h as the loaded card. The
+                3 placeholder lines mirror the rendered 3-line clamp;
+                `bg-ods-border/70` keeps summary placeholders slightly
+                dimmer than title placeholders (primary vs secondary
+                text hierarchy). */}
+            <div className="min-h-[68px] md:min-h-[78px] flex flex-col gap-2 justify-start">
+              <div className="h-3 w-full bg-ods-border/70 rounded" />
+              <div className="h-3 w-11/12 bg-ods-border/70 rounded" />
+              <div className="h-3 w-5/6 bg-ods-border/70 rounded" />
+            </div>
           </div>
         </div>
 
-        {/* CHANGELOG strip placeholder — always rendered */}
+        {/* CHANGELOG strip placeholder — always rendered. Inner
+            placeholder `h-5` mirrors the loaded strip's `text-sm`
+            line-height (20 px) so total height is consistent with the
+            loaded `border-t pt-3 + text content` (~32-33 px). */}
         <div className="border-t border-ods-border pt-3">
-          <div className="h-4 w-2/3 bg-ods-bg/60 rounded" />
+          <div className="h-5 w-2/3 bg-ods-border/70 rounded" />
         </div>
 
-        {/* METADATA GRID — 4-cell placeholder */}
+        {/* METADATA GRID — 4-cell placeholder. The grid cells use
+            `bg-ods-card` containers and `bg-ods-bg` placeholders, which
+            DO contrast correctly because the cells are brighter than
+            the placeholders. Inner content heights mirror the loaded
+            cells (`text-h4` ≈ 28 px + `DM_Sans 14px leading-20`) so
+            total grid height matches the loaded ~86 px. */}
         <div className="grid grid-cols-1 md:grid-cols-4 border border-ods-border rounded-md overflow-hidden w-full">
           {[0, 1, 2].map((i) => (
             <div
@@ -62,8 +94,8 @@ export function ProductReleaseCardSkeleton({ className, size = 'default' }: Prod
               className="bg-ods-card p-4 flex flex-col gap-3 border-b md:border-b-0 md:border-r border-ods-border"
             >
               <div className="flex flex-col gap-2">
-                <div className="h-6 w-24 bg-ods-bg rounded" />
-                <div className="h-3 w-16 bg-ods-bg/60 rounded" />
+                <div className="h-7 w-24 bg-ods-bg rounded" />
+                <div className="h-4 w-16 bg-ods-bg/60 rounded" />
               </div>
             </div>
           ))}
@@ -71,8 +103,8 @@ export function ProductReleaseCardSkeleton({ className, size = 'default' }: Prod
           <div className="bg-ods-card p-4 flex items-center gap-3">
             <div className="h-10 w-10 rounded-full bg-ods-bg shrink-0" />
             <div className="flex flex-col gap-2 flex-1 min-w-0">
-              <div className="h-4 w-3/4 bg-ods-bg rounded" />
-              <div className="h-3 w-1/2 bg-ods-bg/60 rounded" />
+              <div className="h-5 w-3/4 bg-ods-bg rounded" />
+              <div className="h-4 w-1/2 bg-ods-bg/60 rounded" />
             </div>
           </div>
         </div>
