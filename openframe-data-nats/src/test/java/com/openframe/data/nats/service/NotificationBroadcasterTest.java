@@ -13,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
 import java.util.Set;
@@ -44,8 +45,7 @@ class NotificationBroadcasterTest {
         readStateService = mock(NotificationReadStateService.class);
         descriptorRegistry = mock(NotificationContextDescriptorRegistry.class);
         natsPublisher = mock(NotificationNatsPublisher.class);
-        broadcaster = new NotificationBroadcaster(
-                notificationRepository, readStateService, descriptorRegistry, Optional.of(natsPublisher), true);
+        broadcaster = newBroadcaster(Optional.of(natsPublisher), true);
         when(notificationRepository.save(any(Notification.class))).thenAnswer(inv -> {
             Notification arg = inv.getArgument(0);
             arg.setId("notif-id-1");
@@ -122,8 +122,7 @@ class NotificationBroadcasterTest {
     @Test
     @DisplayName("Given the NATS publisher dependency is absent (Optional.empty), when broadcast is called, then the Notification is still persisted and read_state rows are created — clients reconcile via GraphQL catch-up")
     void no_publisher_persists_without_nats() {
-        NotificationBroadcaster bcWithoutNats = new NotificationBroadcaster(
-                notificationRepository, readStateService, descriptorRegistry, Optional.empty(), true);
+        NotificationBroadcaster bcWithoutNats = newBroadcaster(Optional.empty(), true);
         NotificationCommand cmd = NotificationCommand.builder()
                 .title("Approval")
                 .severity(NotificationSeverity.INFO)
@@ -237,8 +236,7 @@ class NotificationBroadcasterTest {
     @Test
     @DisplayName("Given the notifications feature flag is disabled, when broadcast is called, then nothing is persisted or published and null is returned — the feature stays fully dormant")
     void disabled_feature_flag_makes_broadcast_a_noop() {
-        NotificationBroadcaster disabled = new NotificationBroadcaster(
-                notificationRepository, readStateService, descriptorRegistry, Optional.of(natsPublisher), false);
+        NotificationBroadcaster disabled = newBroadcaster(Optional.of(natsPublisher), false);
         NotificationCommand cmd = NotificationCommand.builder()
                 .title("Approval required")
                 .severity(NotificationSeverity.INFO)
@@ -250,6 +248,13 @@ class NotificationBroadcasterTest {
 
         assertThat(result).isNull();
         verifyNoInteractions(notificationRepository, readStateService, natsPublisher);
+    }
+
+    private NotificationBroadcaster newBroadcaster(Optional<NotificationNatsPublisher> publisher, boolean notificationsEnabled) {
+        NotificationBroadcaster bc = new NotificationBroadcaster(
+                notificationRepository, readStateService, descriptorRegistry, publisher);
+        ReflectionTestUtils.setField(bc, "notificationsEnabled", notificationsEnabled);
+        return bc;
     }
 
     private static GenericContext genericContext(String type) {
