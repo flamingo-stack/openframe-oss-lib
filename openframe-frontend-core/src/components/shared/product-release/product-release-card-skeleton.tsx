@@ -48,9 +48,11 @@ export function ProductReleaseCardSkeleton({ className, size = 'default' }: Prod
           <div className="w-full md:w-[256px] aspect-[16/9] bg-ods-border rounded-lg flex-shrink-0" />
           <div className="flex-1 min-w-0 flex flex-col">
             {/* Version pill — mirrors `flex items-center gap-3 mb-3` in
-                the loaded card. */}
+                the loaded card. The loaded `<span text-lg>` renders at
+                line-height 28 px (Tailwind text-lg = 18 px / 28 px LH);
+                placeholder uses `h-7` (28 px) to match exactly. */}
             <div className="flex items-center gap-3 mb-3">
-              <div className="h-6 w-20 bg-ods-border rounded" />
+              <div className="h-7 w-20 bg-ods-border rounded" />
             </div>
             {/* Title container — SAME min-h as the loaded card so the
                 card height contributed by this region matches exactly. */}
@@ -71,15 +73,20 @@ export function ProductReleaseCardSkeleton({ className, size = 'default' }: Prod
           </div>
         </div>
 
-        {/* CHANGELOG strip placeholder — always rendered */}
+        {/* CHANGELOG strip placeholder — always rendered. Inner
+            placeholder `h-5` mirrors the loaded strip's `text-sm`
+            line-height (20 px) so total height is consistent with the
+            loaded `border-t pt-3 + text content` (~32-33 px). */}
         <div className="border-t border-ods-border pt-3">
-          <div className="h-4 w-2/3 bg-ods-border/70 rounded" />
+          <div className="h-5 w-2/3 bg-ods-border/70 rounded" />
         </div>
 
         {/* METADATA GRID — 4-cell placeholder. The grid cells use
             `bg-ods-card` containers and `bg-ods-bg` placeholders, which
             DO contrast correctly because the cells are brighter than
-            the placeholders. */}
+            the placeholders. Inner content heights mirror the loaded
+            cells (`text-h4` ≈ 28 px + `DM_Sans 14px leading-20`) so
+            total grid height matches the loaded ~86 px. */}
         <div className="grid grid-cols-1 md:grid-cols-4 border border-ods-border rounded-md overflow-hidden w-full">
           {[0, 1, 2].map((i) => (
             <div
@@ -87,8 +94,8 @@ export function ProductReleaseCardSkeleton({ className, size = 'default' }: Prod
               className="bg-ods-card p-4 flex flex-col gap-3 border-b md:border-b-0 md:border-r border-ods-border"
             >
               <div className="flex flex-col gap-2">
-                <div className="h-6 w-24 bg-ods-bg rounded" />
-                <div className="h-3 w-16 bg-ods-bg/60 rounded" />
+                <div className="h-7 w-24 bg-ods-bg rounded" />
+                <div className="h-4 w-16 bg-ods-bg/60 rounded" />
               </div>
             </div>
           ))}
@@ -96,8 +103,8 @@ export function ProductReleaseCardSkeleton({ className, size = 'default' }: Prod
           <div className="bg-ods-card p-4 flex items-center gap-3">
             <div className="h-10 w-10 rounded-full bg-ods-bg shrink-0" />
             <div className="flex flex-col gap-2 flex-1 min-w-0">
-              <div className="h-4 w-3/4 bg-ods-bg rounded" />
-              <div className="h-3 w-1/2 bg-ods-bg/60 rounded" />
+              <div className="h-5 w-3/4 bg-ods-bg rounded" />
+              <div className="h-4 w-1/2 bg-ods-bg/60 rounded" />
             </div>
           </div>
         </div>
