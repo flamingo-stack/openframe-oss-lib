@@ -4,7 +4,7 @@ import com.openframe.data.model.enums.MessageType;
 import com.openframe.kafka.enumeration.KafkaHeader;
 import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
 import com.openframe.stream.processor.GenericJsonMessageProcessor;
-    import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.Payload;
