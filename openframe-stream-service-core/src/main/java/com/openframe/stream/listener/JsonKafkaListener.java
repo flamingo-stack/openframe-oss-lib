@@ -4,7 +4,7 @@ import com.openframe.data.model.enums.MessageType;
 import com.openframe.kafka.enumeration.KafkaHeader;
 import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
 import com.openframe.stream.processor.GenericJsonMessageProcessor;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+    import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.Payload;
@@ -17,7 +17,7 @@ import org.springframework.stereotype.Service;
  * resolution). Shared SaaS deployments use {@code SharedMeshCentralKafkaListener}.
  */
 @Service
-@ConditionalOnProperty(prefix = "spring.oss-tenant.kafka", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "openframe.cluster.mode", havingValue = "tenant", matchIfMissing = true)
 public class JsonKafkaListener {
 
     private final GenericJsonMessageProcessor messageProcessor;
