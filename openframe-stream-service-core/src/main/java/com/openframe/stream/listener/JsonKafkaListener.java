@@ -17,7 +17,7 @@ import org.springframework.stereotype.Service;
  * resolution). Shared SaaS deployments use {@code SharedMeshCentralKafkaListener}.
  */
 @Service
-@ConditionalOnProperty(prefix = "spring.oss-tenant.kafka", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "openframe.cluster.mode", havingValue = "tenant", matchIfMissing = true)
 public class JsonKafkaListener {
 
     private final GenericJsonMessageProcessor messageProcessor;
