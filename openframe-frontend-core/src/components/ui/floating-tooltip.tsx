@@ -23,6 +23,8 @@ interface FloatingTooltipProps {
   side?: "top" | "right" | "bottom" | "left"
   className?: string
   delayDuration?: number
+  /** Disable the tooltip without unmounting the trigger wrapper. */
+  disabled?: boolean
 }
 
 // Parse colored text markup like [YELLOW]text[/YELLOW] into JSX
@@ -75,12 +77,13 @@ function parseColoredText(text: string): React.ReactNode {
   return parts.length > 0 ? <>{parts}</> : text
 }
 
-export function FloatingTooltip({ 
-  content, 
-  children, 
-  side = "right", 
+export function FloatingTooltip({
+  content,
+  children,
+  side = "right",
   className,
-  delayDuration = 0 
+  delayDuration = 0,
+  disabled = false,
 }: FloatingTooltipProps) {
   const [isOpen, setIsOpen] = React.useState(false)
   const arrowRef = React.useRef<HTMLDivElement>(null)
@@ -104,6 +107,7 @@ export function FloatingTooltip({
 
   const hover = useHover(context, {
     move: false,
+    enabled: !disabled,
     delay: { open: delayDuration, close: 0 },
     handleClose: safePolygon(),
   })

@@ -39,7 +39,7 @@ export function InfoCard({ data, className = '' }: InfoCardProps) {
     >
       {data.title && (
         <div className="flex items-center gap-[var(--spacing-system-xsf)] self-stretch h-6">
-          <span className="text-h4 text-ods-text-primary truncate">
+          <span className="text-h4 text-ods-text-primary truncate" title={data.title}>
             {data.title}
           </span>
           {data.icon}
@@ -48,7 +48,7 @@ export function InfoCard({ data, className = '' }: InfoCardProps) {
 
       {/* Subtitle */}
       {data.subtitle && (
-        <div className="text-h4 text-ods-text-secondary truncate self-stretch">
+        <div className="text-h4 text-ods-text-secondary truncate self-stretch" title={data.subtitle}>
           {data.subtitle}
         </div>
       )}

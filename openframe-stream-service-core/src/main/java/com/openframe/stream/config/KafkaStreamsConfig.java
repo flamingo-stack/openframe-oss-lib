@@ -7,6 +7,7 @@ import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.StreamsConfig;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafkaStreams;
@@ -25,9 +26,15 @@ import java.util.Map;
  */
 @Configuration
 @EnableKafkaStreams
+@ConditionalOnProperty(name = "kafka.stream.enabled", havingValue = "true", matchIfMissing = true)
 public class KafkaStreamsConfig {
 
-    @Value("${spring.oss-tenant.kafka.bootstrap-servers}")
+    /**
+     * Bootstrap servers for Kafka Streams.
+     * Tenant deployments set {@code spring.oss-tenant.kafka.bootstrap-servers};
+     * shared/SaaS deployments set {@code spring.saas.kafka.bootstrap-servers}.
+     */
+    @Value("${spring.oss-tenant.kafka.bootstrap-servers:${spring.saas.kafka.bootstrap-servers:}}")
     private String bootstrapServers;
 
     @Value("${spring.application.name}")

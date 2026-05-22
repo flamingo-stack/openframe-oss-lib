@@ -282,7 +282,7 @@ export function ReleaseDetailPage({
               variant="round"
             />
             <div className="flex flex-col gap-0 flex-1 min-w-0">
-              <p className="text-h3 tracking-[-0.36px] text-ods-text-primary truncate">
+              <p className="text-h3 tracking-[-0.36px] text-ods-text-primary truncate" title={author?.full_name || 'Unknown Author'}>
                 {author?.full_name || 'Unknown Author'}
               </p>
               <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">

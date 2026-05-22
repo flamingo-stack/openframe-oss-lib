@@ -48,7 +48,7 @@ export function EntityImage({ src, alt, fallbackText, className }: EntityImagePr
       alt={alt ?? ''}
       onError={() => setImageFailed(true)}
       className={cn(
-        'size-[52px] md:size-[60px] shrink-0 rounded-md border border-ods-border object-cover',
+        'size-[52px] md:size-[60px] shrink-0 rounded-md border border-ods-border object-contain',
         className,
       )}
     />

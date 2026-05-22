@@ -206,7 +206,7 @@ function VideoBiteCard({ url, title, thumbnailUrl }: VideoBiteCardProps) {
       </div>
       {title && (
         <div className="p-4">
-          <p className="text-h4 text-ods-text-primary line-clamp-2">{title}</p>
+          <p className="text-h4 text-ods-text-primary line-clamp-2" title={title}>{title}</p>
         </div>
       )}
     </Card>

@@ -76,11 +76,11 @@ export function FileManagerTableRow({
           size="md" 
         />
         <div className="flex flex-col min-w-0">
-          <span className="text-sm text-ods-text-primary truncate">
+          <span className="text-sm text-ods-text-primary truncate" title={file.name}>
             {file.name}
           </span>
           {showPath && file.path && (
-            <span className="text-xs text-ods-text-secondary truncate">
+            <span className="text-xs text-ods-text-secondary truncate" title={file.path}>
               {file.path}
             </span>
           )}

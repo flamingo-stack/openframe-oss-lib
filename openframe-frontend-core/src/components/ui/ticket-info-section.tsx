@@ -89,12 +89,11 @@ function InfoCell({ value, label, icon, onClick }: {
             <button
               type="button"
               onClick={onClick}
-              className="text-h4 text-ods-text-primary truncate hover:text-ods-accent transition-colors cursor-pointer text-left"
-            >
+              className="text-h4 text-ods-text-primary truncate hover:text-ods-accent transition-colors cursor-pointer text-left" title={value}>
               {value}
             </button>
           ) : (
-            <span className="text-h4 text-ods-text-primary truncate">{value}</span>
+            <span className="text-h4 text-ods-text-primary truncate" title={value}>{value}</span>
           )}
         </div>
         <span className="text-h6 text-ods-text-secondary truncate">{label}</span>

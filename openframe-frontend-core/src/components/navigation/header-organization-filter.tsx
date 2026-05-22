@@ -48,7 +48,7 @@ export function HeaderOrganizationFilter({
         >
           <Filter02Icon className="w-4 h-4 shrink-0 text-ods-text-secondary" />
           <div className="flex flex-col items-start justify-center min-w-0">
-            <span className="font-mono text-sm font-medium leading-5 text-ods-text-primary uppercase tracking-tight truncate">
+            <span className="font-mono text-sm font-medium leading-5 text-ods-text-primary uppercase tracking-tight truncate" title={displayName}>
               {displayName}
             </span>
             {deviceCount !== undefined && (

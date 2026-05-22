@@ -347,7 +347,7 @@ export function FileUpload({
                     )}
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-heading-5 font-medium text-ods-text-primary truncate">
+                      <p className="text-heading-5 font-medium text-ods-text-primary truncate" title={entry.fileName}>
                         {entry.fileName}
                       </p>
                       <div className="flex items-center gap-2">
@@ -385,7 +385,7 @@ export function FileUpload({
                     className="flex items-center gap-3 p-3 rounded-[6px] bg-ods-card border border-ods-border"
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-heading-5 font-medium text-ods-text-primary truncate">
+                      <p className="text-heading-5 font-medium text-ods-text-primary truncate" title={file.name}>
                         {file.name}
                       </p>
                       <p className="text-heading-6 text-ods-text-secondary">

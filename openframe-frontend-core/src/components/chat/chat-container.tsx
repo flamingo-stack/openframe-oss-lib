@@ -11,14 +11,18 @@ import type { ConnectionIndicatorProps, ChatContainerProps, ChatHeaderProps } fr
 const ConnectionIndicator: React.FC<ConnectionIndicatorProps> = ({ status }) => {
   const getStatusStyles = () => {
     switch (status) {
+      // ODS attention tokens — same scheme used by the rest of the chat
+      // shell (StatusBadge, error toast, etc.). Hex Tailwind palette
+      // (`bg-green-500` / `bg-red-500`) would diverge from the theme and
+      // is forbidden by the host's design-token policy.
       case 'connected':
-        return 'bg-green-500'
+        return 'bg-ods-attention-green-success'
       case 'connecting':
-        return 'bg-yellow-500 animate-pulse'
+        return 'bg-ods-attention-yellow-warning animate-pulse'
       case 'disconnected':
-        return 'bg-red-500'
+        return 'bg-ods-attention-red-error'
       default:
-        return 'bg-gray-500'
+        return 'bg-ods-text-tertiary'
     }
   }
 
@@ -142,9 +146,9 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
               <div className="h-px bg-ods-border" />
               <div className="flex items-center justify-between gap-4 px-4 py-2">
                 <div className="flex flex-col min-w-0">
-                  <span className="text-heading-3 truncate">{ticketInfo.title}</span>
+                  <span className="text-heading-3 truncate" title={typeof ticketInfo.title === 'string' ? ticketInfo.title : undefined}>{ticketInfo.title}</span>
                   {ticketInfo.meta && (
-                    <div className="text-h6 text-ods-text-secondary truncate">{ticketInfo.meta}</div>
+                    <div className="text-h6 text-ods-text-secondary truncate" title={typeof ticketInfo.meta === 'string' ? ticketInfo.meta : undefined}>{ticketInfo.meta}</div>
                   )}
                 </div>
                 {ticketInfo.status && <TicketStatusTag status={ticketInfo.status} />}

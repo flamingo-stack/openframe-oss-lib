@@ -177,7 +177,7 @@ export function PushButtonSelector({
                 {option.displayName || option.name}
               </div>
               {option.description && (
-                <div className="font-['DM_Sans'] text-[12px] text-ods-text-secondary line-clamp-2">
+                <div className="font-['DM_Sans'] text-[12px] text-ods-text-secondary line-clamp-2" title={option.description}>
                   {option.description}
                 </div>
               )}
