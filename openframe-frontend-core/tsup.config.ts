@@ -56,6 +56,7 @@ export default defineConfig([
       'components/icons-v2-generated/index': 'src/components/icons-v2-generated/index.ts',
       'components/navigation/index': 'src/components/navigation/index.ts',
       'hooks/index': 'src/hooks/index.ts',
+      'contexts/index': 'src/contexts/index.ts',
     },
     format: ['esm', 'cjs'],
     dts: false,

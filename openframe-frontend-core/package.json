@@ -18,6 +18,12 @@
       "require": "./dist/index.cjs",
       "default": "./dist/index.js"
     },
+    "./contexts": {
+      "types": "./dist/contexts/index.d.ts",
+      "import": "./dist/contexts/index.js",
+      "require": "./dist/contexts/index.cjs",
+      "default": "./dist/contexts/index.js"
+    },
     "./components": {
       "types": "./dist/components/index.d.ts",
       "import": "./dist/components/index.js",
