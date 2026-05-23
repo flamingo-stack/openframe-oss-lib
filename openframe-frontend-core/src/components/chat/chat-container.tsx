@@ -62,13 +62,16 @@ const ChatContainer = React.forwardRef<HTMLDivElement, ChatContainerProps>(
 ChatContainer.displayName = "ChatContainer"
 
 const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
-  ({ className, userName = 'Grace "Fae" Meadows', userTitle = "Your Personal Assistant", userAvatar, userIcon, onSettingsClick, onNewChat, onClose, onBack, showNewChat = false, connectionStatus = 'disconnected', serverUrl = null, headerActions, ticketInfo, ...props }, ref) => {
+  ({ className, userName = 'Grace "Fae" Meadows', userTitle = "Your Personal Assistant", userAvatar, userIcon, onSettingsClick, onNewChat, onClose, onBack, showNewChat = false, connectionStatus = 'disconnected', serverUrl = null, headerActions, ticketInfo, fullWidth = false, ...props }, ref) => {
     const cardClasses = "rounded-md bg-ods-card shadow-[0_18px_48px_rgba(0,0,0,0.45)] border border-ods-border ring-1 ring-black/20"
     return (
       <div
         ref={ref}
         className={cn(
-          "relative mx-auto w-full max-w-ods-content-narrow",
+          // `fullWidth` drops the centered-narrow content column for
+          // chats hosted in side panels where 600px would float in
+          // the middle of a wider container.
+          fullWidth ? "relative w-full" : "relative mx-auto w-full max-w-ods-content-narrow",
           className
         )}
         {...props}
@@ -180,8 +183,29 @@ const ChatContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDi
 )
 ChatContent.displayName = "ChatContent"
 
-const ChatFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, children, ...props }, ref) => {
+/**
+ * `ChatFooter` props.
+ *
+ * Layout API:
+ *   - `fullWidth` (preferred) — drop the inner-wrapper
+ *     `max-w-ods-content-narrow` so the footer fills the parent.
+ *   - `contentClassName` (legacy escape hatch) — explicit class names
+ *     applied to the inner wrapper. Use only when `fullWidth` is too
+ *     coarse (e.g. custom max-w value).
+ */
+export interface ChatFooterProps extends React.HTMLAttributes<HTMLDivElement> {
+  /** Same `fullWidth` semantics as `ChatHeaderProps.fullWidth` — drops
+   *  the inner wrapper's `max-w-ods-content-narrow` so the footer
+   *  spans the full parent width. */
+  fullWidth?: boolean
+  /** @deprecated Prefer `fullWidth` for the full-panel-width use case.
+   *  This prop remains supported for callers that need a NON-binary
+   *  override (custom max-w value, custom padding, etc.). */
+  contentClassName?: string
+}
+
+const ChatFooter = React.forwardRef<HTMLDivElement, ChatFooterProps>(
+  ({ className, contentClassName, fullWidth = false, children, ...props }, ref) => {
     return (
       <div
         ref={ref}
@@ -191,7 +215,17 @@ const ChatFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDiv
         )}
         {...props}
       >
-        <div className="mx-auto w-full max-w-ods-content-narrow">
+        <div
+          className={cn(
+            // `fullWidth=true` opts out of the centered-narrow column;
+            // `fullWidth=false` (default) preserves the legacy 600px
+            // max-width. `contentClassName` is appended last so a
+            // legacy caller passing it can still tweak after the
+            // fullWidth decision.
+            fullWidth ? "w-full" : "mx-auto w-full max-w-ods-content-narrow",
+            contentClassName
+          )}
+        >
           {children}
         </div>
       </div>

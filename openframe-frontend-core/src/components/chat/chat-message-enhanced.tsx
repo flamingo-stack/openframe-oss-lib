@@ -292,28 +292,38 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
         )}
         {...props}
       >
-        {/* Hanging-avatar layout — Figma spec parks the avatar in the 64px
-            gutter outside the 600px content column. Only rendered for
-            assistant messages; user and system messages have no avatar. */}
-        {showAvatar && !isSystem && !isUser && (
-          <div className="absolute -left-16 top-[var(--spacing-system-s)]">
-            {assistantIcon && !avatar ? (
-              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-ods-accent">
-                {assistantIcon}
-              </div>
-            ) : (
-              <SquareAvatar
-                {...avatarProps}
-                className={cn(avatarProps.className, "w-12 h-12")}
-              />
-            )}
-          </div>
-        )}
-
-        {/* Message Content - full width */}
+        {/* Message Content — full panel width.
+            Avatar is INLINE in the name row below (2025-2026 chat
+            pattern — Claude.ai, ChatGPT, Gemini, Perplexity).
+            Legacy hanging-avatar layout (`absolute -left-16`) wasted
+            64px of gutter and clipped in narrow panels. */}
         <div className="flex flex-col gap-[var(--spacing-system-xxs)] min-w-0">
-          {/* Name and Timestamp Row */}
-          <div className="flex items-center justify-between gap-[var(--spacing-system-xxs)]">
+          {/* Avatar + Name + Timestamp Row.
+              Sizing rationale (per design-token measurements):
+                - Name uses `text-h3` = 14px mobile / 18px desktop.
+                - Avatar uses `SquareAvatar size="sm"` = 32px — the
+                  canonical primitive at the smallest preset, giving a
+                  ~1.78x ratio against the 18px name text (Material
+                  Design 3 + Apple HIG inline-avatar standard).
+                - Gap is `var(--spacing-system-xs)` = 8px, the standard
+                  inline-component separator across this design system.
+              For the `assistantIcon` branch (host supplies a JSX icon
+              like the Mingo logo), the wrapper matches `SquareAvatar
+              size="sm"` (h-8 w-8 = 32px) so BOTH branches present at
+              the same visual weight. Host-supplied icons render
+              inside via `flex items-center justify-center` — they
+              should be sized at ~50-60% of the wrapper (h-4 w-4 =
+              16px works well for a 32px circle). */}
+          <div className="flex items-center gap-[var(--spacing-system-xs)]">
+            {showAvatar && !isSystem && !isUser && (
+              assistantIcon && !avatar ? (
+                <div className="flex items-center justify-center h-8 w-8 rounded-full bg-ods-accent flex-shrink-0">
+                  {assistantIcon}
+                </div>
+              ) : (
+                <SquareAvatar {...avatarProps} />
+              )
+            )}
             <span className={cn(
               "text-h3 !font-mono !font-medium flex-1",
               authorType === 'system' ? "text-ods-open-yellow" :

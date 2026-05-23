@@ -35,6 +35,18 @@ export interface ChatHeaderProps extends HTMLAttributes<HTMLDivElement> {
   serverUrl?: string | null
   headerActions?: React.ReactNode
   ticketInfo?: ChatHeaderTicketInfo
+  /**
+   * Drop the default `max-w-ods-content-narrow` (= 600px) constraint so
+   * the header fills the entire parent width. Use for chat dialogs
+   * embedded in narrow side panels (e.g. the multi-platform-hub
+   * `<GlobalAskAI>` panel) where the 600px column would float in the
+   * middle of a 720px panel and look misaligned vs the full-width
+   * input + content area.
+   *
+   * Default `false` — preserves the existing centered-narrow layout
+   * for legacy consumers.
+   */
+  fullWidth?: boolean
 }
 
 // ========== Connection Indicator Props ==========
@@ -113,6 +125,15 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
   smoothScroll?: boolean
   autoScroll?: boolean
   showAvatars?: boolean
+  /** Same `fullWidth` semantics as `ChatHeaderProps.fullWidth` — drops
+   *  the inner content wrapper's `max-w-ods-content-narrow` so messages
+   *  fill the entire scroller width. Preferred over `contentClassName=
+   *  "!max-w-none"` for new consumers (clearer intent, no
+   *  `!important` specificity wrestling). */
+  fullWidth?: boolean
+  /** @deprecated Prefer `fullWidth` for the full-panel-width use case.
+   *  This prop remains supported for callers that need a NON-binary
+   *  override (custom max-w value, etc.). */
   contentClassName?: string
   assistantType?: AssistantType
   assistantIcon?: React.ReactNode
@@ -237,6 +258,10 @@ export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextArea
   onStop?: () => void | Promise<void>
   sending?: boolean
   awaitingResponse?: boolean
+  /** Same `fullWidth` semantics as `ChatHeaderProps.fullWidth` — drops
+   *  the default `max-w-ods-content-narrow` so the input fills the
+   *  parent. */
+  fullWidth?: boolean
   /**
    * @deprecated The avatar-offset layout was removed; this prop is accepted
    * for back-compat but silently ignored. Safe to drop from call sites.

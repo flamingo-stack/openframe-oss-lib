@@ -33,6 +33,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
       reserveAvatarOffset: _reserveAvatarOffset,
       disabled = false,
       autoFocus = false,
+      fullWidth = false,
       ...inputProps
     } = rest
 
@@ -291,7 +292,12 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
     return (
       <div
         className={cn(
-          "mx-auto w-full max-w-ods-content-narrow flex-shrink-0",
+          // `fullWidth=true` drops the centered-narrow content column
+          // for chats hosted in side panels; default preserves the
+          // legacy 600px max-width for existing consumers.
+          fullWidth
+            ? "w-full flex-shrink-0"
+            : "mx-auto w-full max-w-ods-content-narrow flex-shrink-0",
           className,
         )}
       >
