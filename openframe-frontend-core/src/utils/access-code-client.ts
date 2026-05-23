@@ -1,16 +1,31 @@
 /**
- * Access Code Client Utilities
+ * Access Code Client Utilities — pure standalone functions.
  *
- * Simple client-side utilities for integrating access code validation
- * and consumption into registration forms.
+ * Endpoint paths are NOT hardcoded — every function takes an
+ * `endpoints` argument. The React-side wrapper that binds them from
+ * `EndpointsRuntimeContext` lives separately at
+ * `hooks/use-access-code-integration.ts` (`useAccessCodeIntegration`).
+ *
+ * Keep this file **free of React imports** — it lives in the
+ * server-safe `utils/index` tsup bundle. Any module-top-level call
+ * into `createContext()` (which the runtime context file does) would
+ * be pulled into the server bundle and crash SSR with
+ * `createContext is not a function`.
  */
 
-import React from 'react';
 import {
   AccessCodeValidation,
   AccessCodeValidationResponse,
   AccessCodeConsumptionResponse
 } from '../types/access-code-cohorts';
+
+/** Endpoints required by the standalone client utilities. The
+ *  `useAccessCodeIntegration` hook (in `hooks/`) resolves these from
+ *  `EndpointsRuntimeContext.accessCode` automatically. */
+export interface AccessCodeEndpoints {
+  validateUrl: string
+  consumeUrl: string
+}
 
 /**
  * Validate an access code for a given email
@@ -31,10 +46,11 @@ import {
  */
 export async function validateAccessCode(
   email: string,
-  code: string
+  code: string,
+  endpoints: AccessCodeEndpoints,
 ): Promise<AccessCodeValidationResponse> {
   try {
-    const response = await fetch('/api/validate-access-code', {
+    const response = await fetch(endpoints.validateUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -77,10 +93,11 @@ export async function validateAccessCode(
  */
 export async function consumeAccessCode(
   email: string,
-  code: string
+  code: string,
+  endpoints: AccessCodeEndpoints,
 ): Promise<AccessCodeConsumptionResponse> {
   try {
-    const response = await fetch('/api/consume-access-code', {
+    const response = await fetch(endpoints.consumeUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -125,17 +142,18 @@ export async function consumeAccessCode(
  */
 export async function validateAndConsumeAccessCode(
   email: string,
-  code: string
+  code: string,
+  endpoints: AccessCodeEndpoints,
 ): Promise<AccessCodeValidationResponse & { consumed?: boolean }> {
   // First validate
-  const validation = await validateAccessCode(email, code);
+  const validation = await validateAccessCode(email, code, endpoints);
 
   if (!validation.valid) {
     return validation;
   }
 
   // If valid, consume the code
-  const consumption = await consumeAccessCode(email, code);
+  const consumption = await consumeAccessCode(email, code, endpoints);
 
   return {
     ...validation,
@@ -146,67 +164,6 @@ export async function validateAndConsumeAccessCode(
   };
 }
 
-/**
- * Access Code Integration Hook (for React components)
- *
- * @example
- * const { validate, consume, isValidating, isConsuming } = useAccessCodeIntegration();
- *
- * const handleRegistration = async (formData) => {
- *   const validation = await validate(formData.email, formData.accessCode);
- *   if (!validation.valid) {
- *     setError(validation.message);
- *     return;
- *   }
- *
- *   // Process registration...
- *   const registrationResult = await registerUser(formData);
- *
- *   if (registrationResult.success) {
- *     await consume(formData.email, formData.accessCode);
- *   }
- * };
- */
-export function useAccessCodeIntegration() {
-  const [isValidating, setIsValidating] = React.useState(false);
-  const [isConsuming, setIsConsuming] = React.useState(false);
-
-  const validate = async (email: string, code: string) => {
-    setIsValidating(true);
-    try {
-      return await validateAccessCode(email, code);
-    } finally {
-      setIsValidating(false);
-    }
-  };
-
-  const consume = async (email: string, code: string) => {
-    setIsConsuming(true);
-    try {
-      return await consumeAccessCode(email, code);
-    } finally {
-      setIsConsuming(false);
-    }
-  };
-
-  const validateAndConsume = async (email: string, code: string) => {
-    setIsValidating(true);
-    setIsConsuming(true);
-    try {
-      return await validateAndConsumeAccessCode(email, code);
-    } finally {
-      setIsValidating(false);
-      setIsConsuming(false);
-    }
-  };
-
-  return {
-    validate,
-    consume,
-    validateAndConsume,
-    isValidating,
-    isConsuming,
-    isProcessing: isValidating || isConsuming,
-  };
-}
-
+// `useAccessCodeIntegration` (the React-side wrapper) lives in
+// `hooks/use-access-code-integration.ts`. It binds the endpoints from
+// `EndpointsRuntimeContext` so React callers don't have to plumb URLs.
