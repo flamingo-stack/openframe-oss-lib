@@ -794,16 +794,64 @@ export const SimpleMarkdownRenderer: React.FC<SimpleMarkdownRendererProps> = ({
     },
 
     // --- images ---
+    // Inline content image renderer. Used by blog posts, docs, AND chat
+    // messages (where users may attach screenshots / photos via the +
+    // attachment button).
+    //
+    // Sizing rules (2025-2026 best practice — Claude.ai, ChatGPT,
+    // iMessage, Slack, Discord inline image patterns):
+    //
+    //   - CAP max-width at 400px so inline images don't blow out the
+    //     message column on wide panels. Click-to-expand opens a
+    //     full-resolution modal for users who need detail.
+    //   - CAP max-height at 400px so portrait-orientation images
+    //     don't dominate vertical space (a 1000x3000 phone screenshot
+    //     would otherwise push the next message off-screen).
+    //   - Small images render at NATURAL pixel size — a 64x64
+    //     thumbnail stays 64x64, not stretched to fill the column.
+    //   - `object-contain` preserves aspect ratio when both dimensions
+    //     are constrained (long landscape, tall portrait).
+    //
+    // Implementation: Next.js `<Image>` — the project's canonical
+    // image primitive. Gives us:
+    //   - WebP/AVIF format conversion for modern browsers (smaller
+    //     bytes for the same visual quality).
+    //   - Responsive `srcset` via the `sizes` prop (browser picks the
+    //     right variant for the viewport).
+    //   - Automatic lazy-loading (`loading="lazy"` by default, mid-
+    //     page images skipped until they near the viewport).
+    //   - Automatic `decoding="async"` so image decode doesn't block
+    //     paint.
+    //
+    // `width={400} height={400}` props are REQUIRED by Next.js
+    // `<Image>` (non-`fill` mode throws without them) but they're
+    // effectively a CEILING here, not the display size — the CSS
+    // overrides (`w-auto h-auto max-w-full max-h-[400px]`) drive
+    // the actual rendered size. The inline `style={{ width: 'auto',
+    // height: 'auto' }}` is belt-and-suspenders: Next.js Image sets
+    // matching HTML `width`/`height` attributes on the rendered
+    // `<img>` and inline style wins over both HTML attributes AND
+    // utility classes regardless of CSS-specificity surprises.
+    //
+    // Layout reservation trade-off: until image bytes arrive, the
+    // browser may reserve a placeholder box up to 400x400 (the props'
+    // intrinsic-ratio hint). Once loaded, the box collapses to the
+    // natural size if smaller. This is the standard Next.js Image
+    // behavior across the codebase — accepted for the optimizer +
+    // responsive-srcset benefits. Chat attachments hosted in side
+    // panels see this only on first render of a fresh attachment
+    // (cached re-renders pop in without a perceptible shift).
     img: ({ src, alt }: any) => {
       if (!src || typeof src !== 'string' || src.trim() === '') return null;
       return (
         <Image
           src={src}
           alt={alt ?? 'No image available'}
-          width={896}
-          height={200}
-          sizes="(max-width: 896px) 100vw, 896px"
-          className="max-w-full h-auto rounded-lg"
+          width={400}
+          height={400}
+          sizes="(max-width: 400px) 100vw, 400px"
+          className="max-w-full max-h-[400px] w-auto h-auto rounded-lg object-contain"
+          style={{ width: 'auto', height: 'auto' }}
         />
       );
     },

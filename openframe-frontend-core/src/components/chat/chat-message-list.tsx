@@ -97,6 +97,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       isTyping = false,
       autoScroll = true,
       showAvatars = true,
+      fullWidth = false,
       contentClassName,
       assistantType,
       assistantIcon,
@@ -180,12 +181,53 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         const hasNewUser = newSlice.some((m) => m.role === 'user')
         if (hasNewUser) {
           void scrollToBottom({ animation: 'instant', ignoreEscapes: true })
+
+          // Image-attachment growth follow-up: if the new user message
+          // carries inline `<img>` elements (chat-attachment markdown
+          // emits `![alt](/api/storage/view/...)` which the markdown
+          // renderer turns into `<img>` / Next.js `<Image>`), those
+          // images load AFTER the initial paint. Each image-load grows
+          // the bubble height, but `useStickToBottom`'s `resize:
+          // 'smooth'` spring sometimes loses anchor under rapid
+          // resize events from Next.js Image's progressive
+          // dimensioning (observed: scroll lands 50-100px short of
+          // bottom — exactly one image-load short).
+          //
+          // Fix: after the initial scrollToBottom snaps, scan the
+          // content area for `<img>` elements that haven't loaded
+          // yet, and attach one-time `load` handlers that re-trigger
+          // `scrollToBottom`. Idempotent — runs for any image,
+          // affects only the new-user-message diff (effect dep is
+          // `messages`).
+          //
+          // `requestAnimationFrame` so the DOM has the new bubble
+          // before we query. Without rAF the new-message `<img>`s
+          // haven't been committed yet — querySelectorAll returns
+          // an empty set.
+          requestAnimationFrame(() => {
+            const el = contentRef.current
+            if (!el) return
+            const imgs = el.querySelectorAll('img')
+            imgs.forEach((img) => {
+              if (img.complete) return
+              const onLoad = () => {
+                img.removeEventListener('load', onLoad)
+                img.removeEventListener('error', onLoad)
+                // `ignoreEscapes: true` because the user may have
+                // accidentally moved scroll during the image-load
+                // window; we want their fresh send to be visible.
+                void scrollToBottom({ animation: 'instant', ignoreEscapes: true })
+              }
+              img.addEventListener('load', onLoad, { once: true })
+              img.addEventListener('error', onLoad, { once: true })
+            })
+          })
         }
         // Assistant-only new messages → the library's resize-watch
         // already keeps the bottom locked when the user hasn't
         // escaped. No explicit call needed; spring animation runs.
       }
-    }, [autoScroll, messages, dialogId, scrollToBottom])
+    }, [autoScroll, messages, dialogId, scrollToBottom, contentRef])
 
     // ---- Prepend anchoring (load-older) ------------------------------
     // The library doesn't preserve user position when content prepends
@@ -432,7 +474,12 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
           <div
             ref={setContentRef}
             className={cn(
-              "mx-auto flex w-full max-w-ods-content-narrow flex-col pb-[var(--spacing-system-xs)] min-w-0",
+              // `fullWidth=true` drops the centered-narrow column for
+              // side-panel hosts (e.g. multi-platform-hub Mingo). Same
+              // semantics as ChatHeader / ChatInput / ChatFooter.
+              fullWidth
+                ? "flex w-full flex-col pb-[var(--spacing-system-xs)] min-w-0"
+                : "mx-auto flex w-full max-w-ods-content-narrow flex-col pb-[var(--spacing-system-xs)] min-w-0",
               contentClassName ?? "px-[var(--spacing-system-m)]",
             )}
             style={{ minHeight: '100%' }}
@@ -478,7 +525,9 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         {showStreamingLoader && (
           <div
             className={cn(
-              "mx-auto w-full max-w-ods-content-narrow flex items-center gap-[var(--spacing-system-xxs)] py-[var(--spacing-system-xs)]",
+              fullWidth
+                ? "w-full flex items-center gap-[var(--spacing-system-xxs)] py-[var(--spacing-system-xs)]"
+                : "mx-auto w-full max-w-ods-content-narrow flex items-center gap-[var(--spacing-system-xxs)] py-[var(--spacing-system-xs)]",
               contentClassName ?? "px-[var(--spacing-system-m)]",
             )}
             style={{ color: 'var(--color-text-muted)' }}
@@ -499,7 +548,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         {pendingApprovals && pendingApprovals.length > 0 && (
           <div className={cn(
             "border-t border-ods-border bg-ods-bg/95 backdrop-blur-sm",
-            "mx-auto w-full max-w-ods-content-narrow",
+            fullWidth ? "w-full" : "mx-auto w-full max-w-ods-content-narrow",
             contentClassName ?? "px-[var(--spacing-system-m)]",
           )}>
             <ChatMessageEnhanced
