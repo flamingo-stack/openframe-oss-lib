@@ -173,6 +173,45 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
     }
 
     @Test
+    @DisplayName("Given three notifications for the ADMIN principal and sort={direction:ASC}, when the notifications query runs, then edges come back oldest-first — opposite of the default DESC order, cursor predicate flipped accordingly")
+    void admin_lists_oldest_first_with_sort_asc() {
+        loginAsAdmin(ALICE);
+        Notification n1 = mongoTemplate.save(NotificationFixtures.basic("one"));
+        sleepBriefly();
+        Notification n2 = mongoTemplate.save(NotificationFixtures.basic("two"));
+        sleepBriefly();
+        Notification n3 = mongoTemplate.save(NotificationFixtures.basic("three"));
+        readStateService.createForAudience(n1.getId(), NotificationCategory.TICKETS, "title", RecipientType.USER, Set.of(ALICE));
+        readStateService.createForAudience(n2.getId(), NotificationCategory.TICKETS, "title", RecipientType.USER, Set.of(ALICE));
+        readStateService.createForAudience(n3.getId(), NotificationCategory.TICKETS, "title", RecipientType.USER, Set.of(ALICE));
+
+        ExecutionResult res = queryExecutor.execute("""
+                query { notifications(first: 10, sort: { direction: ASC }) { edges { node { title } } } }
+                """);
+        assertThat(res.getErrors()).isEmpty();
+        assertThat(edges(res)).extracting(NotificationDataFetcherIT::edgeNodeTitle)
+                .containsExactly("one", "two", "three");
+    }
+
+    @Test
+    @DisplayName("Given the notifications query without a sort argument, when it runs, then edges come back newest-first — backward-compat default DESC unchanged")
+    void admin_lists_newest_first_by_default() {
+        loginAsAdmin(ALICE);
+        Notification n1 = mongoTemplate.save(NotificationFixtures.basic("one"));
+        sleepBriefly();
+        Notification n2 = mongoTemplate.save(NotificationFixtures.basic("two"));
+        readStateService.createForAudience(n1.getId(), NotificationCategory.TICKETS, "title", RecipientType.USER, Set.of(ALICE));
+        readStateService.createForAudience(n2.getId(), NotificationCategory.TICKETS, "title", RecipientType.USER, Set.of(ALICE));
+
+        ExecutionResult res = queryExecutor.execute("""
+                query { notifications(first: 10) { edges { node { title } } } }
+                """);
+        assertThat(res.getErrors()).isEmpty();
+        assertThat(edges(res)).extracting(NotificationDataFetcherIT::edgeNodeTitle)
+                .containsExactly("two", "one");
+    }
+
+    @Test
     @DisplayName("Given UNREAD rows across different categories for the ADMIN principal, when the unreadCountsByCategory query runs, then a list of UnreadCategoryCount entries is returned with one entry per category present in UNREAD rows")
     void unread_counts_by_category() {
         loginAsAdmin(ALICE);
@@ -192,6 +231,18 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
         Map<String, Object> data = res.getData();
         Map<String, Object> connection = (Map<String, Object>) data.get("notifications");
         return (List<Map<String, Object>>) connection.get("edges");
+    }
+
+    private static Object edgeNodeTitle(Map<String, Object> edge) {
+        return ((Map<?, ?>) edge.get("node")).get("title");
+    }
+
+    private static void sleepBriefly() {
+        try {
+            Thread.sleep(2);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private void loginAsAdmin(String userId) {

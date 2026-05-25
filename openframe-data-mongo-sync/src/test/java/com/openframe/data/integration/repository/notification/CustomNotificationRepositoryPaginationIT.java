@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 
 import java.util.ArrayList;
@@ -272,10 +273,77 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
         assertThat(result.items()).hasSize(1);
     }
 
+    @Test
+    @DisplayName("Given UNREAD rows for the recipient and ASC sort with no cursor, when listing forward, then rows come back oldest-first by notificationId — opposite of the default DESC order")
+    void asc_sort_no_cursor_returns_ascending() {
+        List<Notification> seeded = seedSequentialForRecipient(ALICE, U, 5);
+
+        List<NotificationWithStatus> page = page(ALICE, U, null, null, null, false, Sort.Direction.ASC, 10);
+
+        assertThat(page).extracting(it -> it.notification().getId())
+                .containsExactly(seeded.get(0).getId(), seeded.get(1).getId(),
+                        seeded.get(2).getId(), seeded.get(3).getId(), seeded.get(4).getId());
+    }
+
+    @Test
+    @DisplayName("Given ASC sort and a forward cursor at the middle row, when listing forward, then only rows with notificationId newer than the cursor are returned — cursor predicate flips with sort direction")
+    void asc_sort_forward_cursor_returns_newer_rows() {
+        List<Notification> seeded = seedSequentialForRecipient(ALICE, U, 5);
+        String cursor = seeded.get(2).getId();
+
+        List<NotificationWithStatus> page = page(ALICE, U, null, null, cursor, false, Sort.Direction.ASC, 10);
+
+        assertThat(page).extracting(it -> it.notification().getId())
+                .containsExactly(seeded.get(3).getId(), seeded.get(4).getId());
+    }
+
+    @Test
+    @DisplayName("Given ASC sort and a backward cursor (Relay walking) at the middle row, when listing, then rows with notificationId older than the cursor are returned (caller reverses for display)")
+    void asc_sort_backward_cursor_returns_older_rows() {
+        List<Notification> seeded = seedSequentialForRecipient(ALICE, U, 5);
+        String cursor = seeded.get(2).getId();
+
+        List<NotificationWithStatus> page = page(ALICE, U, null, null, cursor, true, Sort.Direction.ASC, 10);
+
+        assertThat(page).extracting(it -> it.notification().getId())
+                .containsExactlyInAnyOrder(seeded.get(0).getId(), seeded.get(1).getId());
+    }
+
+    @Test
+    @DisplayName("Given DESC sort (explicit) with no cursor, when listing forward, then result matches the implicit-default behavior — backward compatibility guard")
+    void desc_sort_explicit_matches_default() {
+        List<Notification> seeded = seedSequentialForRecipient(ALICE, U, 4);
+
+        List<NotificationWithStatus> page = page(ALICE, U, null, null, null, false, Sort.Direction.DESC, 10);
+
+        assertThat(page).extracting(it -> it.notification().getId())
+                .containsExactly(seeded.get(3).getId(), seeded.get(2).getId(),
+                        seeded.get(1).getId(), seeded.get(0).getId());
+    }
+
+    @Test
+    @DisplayName("Given the 7-arg findPageForRecipient overload (no direction), when listing, then default DESC is applied — preserves API used by perf and search ITs")
+    void overload_without_direction_defaults_to_desc() {
+        List<Notification> seeded = seedSequentialForRecipient(ALICE, U, 3);
+
+        NotificationPage page = repository.findPageForRecipient(ALICE, U, null, null, null, false, 10);
+
+        assertThat(page.items()).extracting(it -> it.notification().getId())
+                .containsExactly(seeded.get(2).getId(), seeded.get(1).getId(), seeded.get(0).getId());
+    }
+
     private List<NotificationWithStatus> page(String recipientId, RecipientType type,
                                               Boolean readFilter, String search,
                                               String cursor, boolean backward, int limit) {
-        return repository.findPageForRecipient(recipientId, type, readFilter, search, cursor, backward, limit).items();
+        return page(recipientId, type, readFilter, search, cursor, backward, Sort.Direction.DESC, limit);
+    }
+
+    private List<NotificationWithStatus> page(String recipientId, RecipientType type,
+                                              Boolean readFilter, String search,
+                                              String cursor, boolean backward,
+                                              Sort.Direction direction, int limit) {
+        return repository.findPageForRecipient(recipientId, type, readFilter, search,
+                cursor, backward, direction, limit).items();
     }
 
     private Notification seedNotification(String type) {
