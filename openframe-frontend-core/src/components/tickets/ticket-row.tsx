@@ -180,21 +180,23 @@ function DrawerBody({
       </div>
 
       <div className="border-t border-ods-border pt-4">
-        <p className="text-xs font-medium text-ods-text-secondary mb-1 uppercase tracking-wider">
+        <p className="text-xs font-medium text-ods-text-secondary mb-2 uppercase tracking-wider">
           Description &amp; Updates
         </p>
         {ticket.body ? (
           // `body` is the server's sanitized full content. The
           // update_ticket executor re-writes this property with
           // `oldContent\n\n---\n\n<addendum>` for every comment, so
-          // the user sees their original message + every comment they
-          // (or staff) added without a separate notes-engagement fetch.
-          <Textarea
-            readOnly
-            value={ticket.body}
-            rows={6}
-            className="resize-none bg-ods-bg/40"
-          />
+          // the user sees the original message + every comment they
+          // (or staff) added without a separate notes-engagement
+          // fetch. Rendered as a non-interactive scroll panel — NOT
+          // <Textarea>, which has hover/active styles for editable
+          // input that flash the surface light on mouseover.
+          <div
+            className="text-sm text-ods-text-primary whitespace-pre-wrap break-words rounded-md border border-ods-border bg-ods-card p-3 max-h-64 overflow-y-auto"
+          >
+            {ticket.body}
+          </div>
         ) : (
           <p className="text-sm text-ods-text-secondary italic">
             (No description provided.)
