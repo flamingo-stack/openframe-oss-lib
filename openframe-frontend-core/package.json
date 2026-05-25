@@ -181,6 +181,8 @@
     "@floating-ui/react": "^0.27.15",
     "@headlessui/react": "^2.2.9",
     "@mux/mux-player-react": "^3.13.0",
+    "@react-aria/overlays": "^3.31.0",
+    "@react-aria/utils": "^3.32.0",
     "@radix-ui/react-accordion": "^1.1.2",
     "@radix-ui/react-alert-dialog": "^1.1.14",
     "@radix-ui/react-aspect-ratio": "^1.0.3",

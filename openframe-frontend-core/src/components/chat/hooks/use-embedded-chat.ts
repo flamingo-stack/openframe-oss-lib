@@ -907,7 +907,13 @@ export function useEmbeddedChat(options?: UseEmbeddedChatOptions) {
           : ''
       const queryValue =
         refSlug || sanitizeTitleForChat(reference.title) || reference.id
-      const text = `/${cmdId} display "${queryValue.replace(/"/g, '\\"')}"`
+      // Escape `\` BEFORE `"` so a trailing backslash can't smuggle a
+      // close-quote past parsers that honor JS-style escapes. Matches
+      // `formatSingularLookupInvocation`'s pattern in slash-dispatch-utils.
+      const escaped = queryValue
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+      const text = `/${cmdId} display "${escaped}"`
       sendMessage(text)
     },
     [sendMessage, source, cmdIdByTableId, tableIdForDocumentType],

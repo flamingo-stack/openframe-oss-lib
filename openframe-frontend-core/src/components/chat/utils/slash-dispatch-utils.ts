@@ -95,7 +95,14 @@ export function sanitizeTitleForChat(value: string | null | undefined): string {
  * the visible string is paste-able / re-runnable.
  */
 export function formatSingularLookupInvocation(cmdId: string, value?: string | null): string {
-  const safe = sanitizeTitleForChat(value).replace(/"/g, '\\"')
+  // Escape `\` BEFORE `"` — otherwise a value ending in `\` survives the
+  // `"`-escape pass and, when wrapped in `"..."`, the trailing `\"`
+  // becomes a literal `"` to a parser that processes backslash escapes,
+  // breaking the close quote. CodeQL's `js/incomplete-sanitization` fires
+  // on the previous one-pass `\"` escape for exactly this reason.
+  const safe = sanitizeTitleForChat(value)
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
   return safe ? `/${cmdId} "${safe}"` : `/${cmdId}`
 }
 

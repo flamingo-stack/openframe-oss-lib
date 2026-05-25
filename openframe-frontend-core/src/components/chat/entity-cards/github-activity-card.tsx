@@ -85,23 +85,44 @@ function formatActivityId(id: string, kind: GitHubActivityKind): string {
 
 function parseGithubTitle(title: string, kind: GitHubActivityKind): { display: string; reviewState: PrReviewState | null } {
   if (!title) return { display: '', reviewState: null }
-  if (kind === 'pr_review') {
-    const m = title.match(/^\[\s*review\s*:\s*([A-Z_]+)\s*\]\s*(.*)$/i)
-    if (m) {
-      const stateRaw = m[1].toUpperCase()
-      const reviewState = (['APPROVED', 'CHANGES_REQUESTED', 'COMMENTED', 'DISMISSED', 'PENDING'] as PrReviewState[]).includes(stateRaw as PrReviewState)
-        ? (stateRaw as PrReviewState)
-        : null
-      return { display: m[2].trim() || 'Review', reviewState }
+
+  // Split prefix-tag from rest by hand instead of one giant regex.
+  // Avoids polynomial-redos on chained `\s*` quantifiers (`\[\s*X\s*\]`),
+  // since multiple consecutive `\s*` groups against long whitespace runs
+  // trigger exponential backtracking on CodeQL's heuristic.
+  //
+  // Algorithm: trim; if it starts with `[`, locate the matching `]`,
+  // then content[0:closing] is the tag, content[closing+1:] is the
+  // remainder. Linear scan — no regex backtracking possible.
+  const trimmed = title.trim()
+  let tag: string | null = null
+  let rest: string = trimmed
+  if (trimmed.startsWith('[')) {
+    const close = trimmed.indexOf(']')
+    if (close > 0) {
+      tag = trimmed.slice(1, close).trim().toLowerCase()
+      rest = trimmed.slice(close + 1).trim()
     }
   }
-  if (kind === 'pull_request') {
-    const m = title.match(/^\[\s*PR\s*#\s*\d+\s*\]\s*(.*)$/i)
-    if (m) return { display: m[1].trim() || title, reviewState: null }
+
+  if (kind === 'pr_review' && tag && tag.startsWith('review:')) {
+    const stateRaw = tag.slice('review:'.length).trim().toUpperCase()
+    const reviewState = (['APPROVED', 'CHANGES_REQUESTED', 'COMMENTED', 'DISMISSED', 'PENDING'] as PrReviewState[]).includes(stateRaw as PrReviewState)
+      ? (stateRaw as PrReviewState)
+      : null
+    return { display: rest || 'Review', reviewState }
   }
-  if (kind === 'commit') {
-    const m = title.match(/^\[\s*commit\s*\]\s*(.*)$/i)
-    if (m) return { display: m[1].trim() || title, reviewState: null }
+  if (kind === 'pull_request' && tag && tag.startsWith('pr')) {
+    // Accept `[PR #123]`, `[PR#123]`, `[ pr # 123 ]` etc. — anything
+    // matching `pr` followed by `#?\s*\d+`. Validate the suffix is
+    // a numeric PR id, not arbitrary text.
+    const after = tag.slice(2).trim().replace(/^#\s*/, '')
+    if (after.length > 0 && /^\d+$/.test(after)) {
+      return { display: rest || title, reviewState: null }
+    }
+  }
+  if (kind === 'commit' && tag === 'commit') {
+    return { display: rest || title, reviewState: null }
   }
   return { display: title.trim(), reviewState: null }
 }

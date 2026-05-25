@@ -561,16 +561,26 @@ export function formatUnderscoreText(text: string): string {
  * stripHtml('Test &amp; Example') // "Test & Example"
  */
 export function stripHtml(html: string): string {
-  return html
-    .replace(/<[^>]*>/g, '')
+  // Tag-strip pattern: `<[^<>]*>` rejects `<` inside the tag so the
+  // automaton can't backtrack on degenerate inputs like
+  // `<<<<<<<<<...<>` (ReDoS class fix vs. the previous `<[^>]*>`).
+  // For well-formed HTML the semantics are identical; for malformed
+  // HTML the stricter pattern leaves the stray `<` in place, which
+  // is the correct conservative behavior for plain-text extraction.
+  const noTags = html.replace(/<[^<>]*>/g, '')
+  // Decode entities. `&amp;` MUST come LAST so we don't double-decode
+  // sequences like `&amp;lt;` (which should render as the LITERAL text
+  // `&lt;`, not as `<`). All other named/numeric entities decode first;
+  // only after those have been replaced do we collapse `&amp;` → `&`.
+  return noTags
     .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&#x27;/g, "'")
     .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&')
     .replace(/\s+/g, ' ')
     .trim()
 }
@@ -612,8 +622,10 @@ export function formatBioText(
   if (!aboutHtml || !aboutHtml.trim()) return fallback
 
   if (aboutHtml.includes('<p')) {
+    // `<p[^<>]*>` rejects `<` inside the tag so the automaton can't
+    // backtrack on `<<<<<...<p>` inputs (ReDoS class fix vs. `<p[^>]*>`).
     const paragraphs = aboutHtml
-      .split(/<p[^>]*>/)
+      .split(/<p[^<>]*>/)
       .slice(1)
       .map((part) => part.split('</p>')[0])
       .map((text) => stripHtml(text).trim())

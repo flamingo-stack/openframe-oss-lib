@@ -63,6 +63,18 @@ export function createLocalStorageAdapter<T>(
     save(value: T) {
       if (!isBrowser()) return
       try {
+        // lgtm[js/clear-text-storage-of-sensitive-data]
+        // This is a GENERIC localStorage adapter. The `value` type
+        // parameter `T` means CodeQL cannot statically determine
+        // sensitivity — it conservatively flags every call as
+        // potentially-clear-text. The CONTRACT of this adapter
+        // (documented at the top of the file) is that callers must
+        // NOT pass authentication credentials, tokens, or other
+        // secrets through it. Audited call-sites store: chat history
+        // metadata (`mingo-chat-*`), UI state (sidebar collapsed,
+        // theme), feature-flag opt-ins, dismissed-onboarding markers
+        // — all explicitly non-sensitive. Auth tokens use the
+        // chat-proxy bearer flow which lives in memory, not storage.
         window.localStorage.setItem(resolveKey(), JSON.stringify(value))
       } catch (err) {
         console.warn(`${tag} write failed for key ${resolveKey()}:`, err)

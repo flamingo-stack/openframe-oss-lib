@@ -116,9 +116,12 @@ export function resolveExternalNavigation(args: {
 
   if (!abs.startsWith('http')) {
     if (args.runtime.navigation.defaultContentOrigin) {
-      abs =
-        args.runtime.navigation.defaultContentOrigin.replace(/\/+$/, '') +
-        (abs.startsWith('/') ? abs : '/' + abs)
+      // Strip trailing slashes via a loop, not `/\/+$/` — CodeQL flags
+      // the greedy `+` as polynomial-redos even with the `$` anchor.
+      // The loop is unambiguously O(n) in slash count.
+      let origin = args.runtime.navigation.defaultContentOrigin
+      while (origin.endsWith('/')) origin = origin.slice(0, -1)
+      abs = origin + (abs.startsWith('/') ? abs : '/' + abs)
     } else if (
       args.runtime.navigation.mode === 'embed' &&
       process.env.NODE_ENV !== 'production'

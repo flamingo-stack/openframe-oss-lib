@@ -24,10 +24,17 @@ const USE_CAMEL_CASE_FETCH_PRIORITY = REACT_MAJOR >= 19;
 export type FetchPriorityValue = 'high' | 'low' | 'auto';
 
 export function fetchPriorityProp(
-  priority: boolean | FetchPriorityValue,
+  priority: boolean | FetchPriorityValue | undefined,
 ): Record<string, string> {
+  // `undefined` → `'auto'` so callers can spread `{...fetchPriorityProp(maybeBool)}`
+  // without a separate null-check at every callsite. `'auto'` is the
+  // DOM default and emits no warning on either React major.
   const value: FetchPriorityValue =
-    typeof priority === 'boolean' ? (priority ? 'high' : 'low') : priority;
+    priority === undefined
+      ? 'auto'
+      : typeof priority === 'boolean'
+        ? priority ? 'high' : 'low'
+        : priority;
   return USE_CAMEL_CASE_FETCH_PRIORITY
     ? { fetchPriority: value }
     : { fetchpriority: value };
