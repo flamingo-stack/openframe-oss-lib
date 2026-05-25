@@ -1,6 +1,6 @@
 "use client"
 
-import { useRouter, useSearchParams, usePathname } from "next/navigation"
+import { useRouter, useSearchParams, usePathname } from "../embed-shims/next-navigation"
 import { Pagination } from "./pagination"
 
 interface UnifiedPaginationProps {

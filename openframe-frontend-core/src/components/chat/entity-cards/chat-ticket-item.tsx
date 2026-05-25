@@ -1,9 +1,9 @@
 'use client'
 
 import * as React from 'react'
-import { cn } from '../../utils/cn'
+import { cn } from '../../../utils/cn'
 import { ChevronRight } from 'lucide-react'
-import { TicketStatusTag, resolveTicketStatus } from '../ui/ticket-status-tag'
+import { TicketStatusTag, resolveTicketStatus } from '../../ui/ticket-status-tag'
 
 export interface ChatTicketItemData {
   id: string

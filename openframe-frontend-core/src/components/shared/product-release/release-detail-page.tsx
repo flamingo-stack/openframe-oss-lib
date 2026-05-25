@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, ComponentType } from 'react';
-import Link from 'next/link';
+import Link from '../../../embed-shims/next-link';
 import { Card, CardContent } from '../../ui/card';
 import { ArticleDetailLayout } from '../../layout/article-detail-layout';
 import { ReleaseChangelogSection } from '../../ui/release-changelog-section';
@@ -11,6 +11,7 @@ import { ImageGalleryModal } from '../../ui/image-gallery-modal';
 import { GitHubIcon } from '../../icons/github-icon';
 import { AlertTriangle, ExternalLink, BookMarked, Sparkles, TrendingUp, Wrench } from 'lucide-react';
 import { formatReleaseDate } from '../../../utils/date-formatters';
+import { nameInitials } from '../../../utils/format';
 import { Video } from '../../features/video';
 import { DetailPageSkeleton } from '../detail-page-skeleton';
 import type { ChangelogEntry } from '../../../types/product-release';
@@ -21,10 +22,15 @@ export interface MarkdownRendererProps {
   content: string;
 }
 
-export interface RoadmapItem {
-  id: string;
-  [key: string]: unknown;
-}
+// Canonical RoadmapItem shape lives in chat entity types — see
+// `src/components/chat/types/entities/roadmap-item.ts`. The product-release
+// detail page previously declared a structural placeholder
+// (`{ id; [k: string]: unknown }`) that conflicted with the canonical
+// shape once the entities barrel was added; re-exporting the canonical
+// type fixes the collision while keeping the same import path for
+// downstream consumers of `./release-detail-page`.
+export type { RoadmapItem } from '../../chat/types/entities/roadmap-item';
+import type { RoadmapItem } from '../../chat/types/entities/roadmap-item';
 
 export interface DeliveryResponse {
   completed: unknown[];
@@ -168,16 +174,6 @@ export function ReleaseDetailPage({
 
   const hasBreakingChanges = Array.isArray(release.breaking_changes) && release.breaking_changes.length > 0;
 
-  // Get initials from full name
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
   // Type assertions for release data
   const releaseTitle = release.title as string;
   const releaseVersion = release.version as string;
@@ -277,7 +273,7 @@ export function ReleaseDetailPage({
             <SquareAvatar
               src={author?.avatar_url || ''}
               alt={author?.full_name || 'Author'}
-              fallback={getInitials(author?.full_name || 'Unknown')}
+              fallback={nameInitials(author?.full_name || 'Unknown', '')}
               size="md"
               variant="round"
             />

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
+import Image from '../embed-shims/next-image';
 import { X } from 'lucide-react';
 import { Button } from './ui/button';
 import { renderSvgIcon } from './icon-utils';

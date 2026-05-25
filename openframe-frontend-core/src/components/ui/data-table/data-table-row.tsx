@@ -1,6 +1,6 @@
 'use client'
 
-import Link from 'next/link'
+import Link from '../../../embed-shims/next-link'
 import React, { memo, useCallback, useRef, type ReactNode } from 'react'
 import { flexRender, type Row } from '@tanstack/react-table'
 import { cn } from '../../../utils/cn'

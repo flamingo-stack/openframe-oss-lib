@@ -12,7 +12,7 @@ import { ThinkingDisplay } from "./thinking-display"
 import { SimpleMarkdownRenderer } from "../ui/simple-markdown-renderer"
 import type { ChatRef } from "./chat-ref.types"
 import { remarkCardLinks } from "./remark-card-links"
-import { BlockCard, type BlockCardProps } from "./block-card"
+import { BlockCard, type BlockCardProps } from "./entity-cards/block-card"
 import type { MessageSegment, MessageContent, ChatMessageEnhancedProps } from "./types"
 
 /**

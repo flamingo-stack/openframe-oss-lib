@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useState, useRef } from 'react'
-import Image from 'next/image'
+import Image from '../../embed-shims/next-image'
 import { motion, useScroll, useTransform, useMotionValue, useSpring } from 'framer-motion'
 
 interface ParallaxImageShowcaseProps {

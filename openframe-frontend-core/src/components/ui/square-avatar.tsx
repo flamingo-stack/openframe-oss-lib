@@ -1,18 +1,9 @@
 "use client"
 
 import * as React from "react";
-import Image from "next/image";
+import Image from "../../embed-shims/next-image";
 import { cn } from "../../utils/cn";
-
-// Extract initials from a name (first letter of first and last word)
-const getInitials = (name?: string): string => {
-  if (!name) return '';
-  const words = name.trim().split(/\s+/);
-  if (words.length === 1) {
-    return words[0].charAt(0).toUpperCase();
-  }
-  return (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase();
-};
+import { getFirstLastInitials } from "../../utils/format";
 
 interface SquareAvatarProps extends React.HTMLAttributes<HTMLDivElement> {
   src?: string;
@@ -58,7 +49,7 @@ const SquareAvatar = React.memo(React.forwardRef<HTMLDivElement, SquareAvatarPro
           'flex items-center justify-center text-xs font-medium text-ods-text-secondary',
           src && 'hidden'
         )}>
-          {getInitials(fallback || alt) || '?'}
+          {getFirstLastInitials(fallback || alt) || '?'}
         </div>
         {src && (
           <Image

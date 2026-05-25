@@ -1,6 +1,6 @@
 'use client'
 
-import Link from 'next/link'
+import Link from '../../../embed-shims/next-link'
 import React from 'react'
 import { cn } from '../../../utils/cn'
 import { Checkbox } from '../checkbox'

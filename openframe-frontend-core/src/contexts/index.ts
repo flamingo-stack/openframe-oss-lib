@@ -27,3 +27,12 @@ export {
   useRequiredEndpointsRuntime,
   type EndpointsRuntime,
 } from './endpoints-runtime-context'
+
+export {
+  ChatRuntimeContext,
+  useChatRuntime,
+  useRequiredChatRuntime,
+  type ChatRuntime,
+} from './chat-runtime-context'
+
+export { useOuterOrDefault } from './use-outer-or-default'

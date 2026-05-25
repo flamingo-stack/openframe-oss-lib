@@ -8,7 +8,7 @@ import remarkBreaks from 'remark-breaks';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
 import { visit } from 'unist-util-visit';
-import Image from 'next/image';
+import Image from '../../embed-shims/next-image';
 import { AlertCircleIcon } from '../icons-v2-generated';
 import { cn } from '../../utils/cn';
 

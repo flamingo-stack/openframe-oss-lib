@@ -1,5 +1,9 @@
 // Utils exports - client-side only
-export { cn, formatDate, formatNumber, formatPrice, formatBytes, getAllPlatformBaseDomains } from './cn'
+export { cn, getAllPlatformBaseDomains } from './cn'
+// Number / currency / byte / date formatters live in `./format` (single
+// source of truth). Re-exported here so existing callers that pull from
+// the barrel keep working without changing imports.
+export { formatDate, formatNumber, formatPrice, formatBytes } from './format'
 // SVG path constants — re-exported here (server-safe) because icons-v2 has "use client"
 export { PLAY_ICON_PATH } from '../components/icons-v2-generated/media-playback/play-icon'
 export { getPlatformAccentColor, getCurrentPlatform, type ColorCategory } from './ods-color-utils'
@@ -16,9 +20,18 @@ export * from './validation-utils'
 export * from './confidence-helpers'
 // Release date formatting utilities
 export * from './date-formatters'
-export * from './format-relative-time'
-// Dynamic icon registry
-export * from './dynamic-icons'
+// Dynamic icon registry — single source of truth lives at
+// components/chat/utils/icon-registry. Re-exported here so existing
+// `@flamingo-stack/openframe-frontend-core/utils` callers (hub admin
+// social-account screens) keep working without changing their import path.
+export {
+  getDynamicIcon,
+  type DynamicIconSize,
+  ICON_REGISTRY,
+  getIconComponent,
+  normalizeIconKey,
+} from '../components/chat/utils/icon-registry'
+export { getPlatformIconComponent as getPlatformLogo } from './platform-config'
 // Tool type utilities
 export * from './tool-utils'
 // Shell type utilities
@@ -29,3 +42,130 @@ export * from './os-utils'
 export * from './country-phone-utils'
 // Generic domain detection
 export * from './generic-domain-utils'
+
+// Color analysis (canvas-based image color extraction)
+export * from './color-analysis'
+
+// Image-proxy URL builder (pure, runtime-configurable)
+export {
+  type GetProxiedImageUrlOptions,
+  getProxiedImageUrl,
+  urlPathLooksLikeSvg,
+  shouldProxyImage,
+  generateImageSizes,
+} from './image-proxy'
+
+// Number / byte / duration / time / UTC date / initials / metric /
+// trend / range / text helpers — single canonical home for every
+// generic formatter consumed across the lib AND the hub. Hub keeps
+// only vendor-specific helpers (formatClassification / formatPricingModel
+// in `lib/utils/vendor-text.ts`).
+export {
+  formatLargeNumber,
+  formatAbbreviatedNumber,
+  nameInitials,
+  getFirstLastInitials,
+  formatDurationMMSS,
+  formatDurationCompact,
+  formatTimeWithTimezone,
+  formatDurationFromRange,
+  type FormatDateUTCOptions,
+  formatDateUTC,
+  formatCurrency,
+  formatPercent,
+  formatWholeDollars,
+  formatLegalDate,
+  formatBytesShort,
+  formatDateTimeAt,
+  formatDurationFromMs,
+  type MetricFormat,
+  type TrendPolarity,
+  formatCompactMetric,
+  getTrendColors,
+  formatDateRange,
+  formatDuration,
+  formatUnderscoreText,
+  stripHtml,
+  formatBioText,
+  formatClassification,
+  formatPricingModel,
+} from './format'
+
+// Date / time helpers (relative, absolute, range checks, UTC timestamp)
+export {
+  formatRelativeTime,
+  formatAbsoluteDate,
+  formatDateTime,
+  getDetailedTimeDifference,
+  isToday,
+  isWithinMinutes,
+  createUTCTimestamp,
+} from './date-utils'
+
+// Chat source-icons + labels (server-safe — lives here in src/utils/
+// instead of src/components/chat/utils/ so server-side hub callers like
+// doc-chat-utils can use them without tripping the 'use client' boundary)
+export {
+  SOURCE_ICON_NAMES,
+  getSourceIconName,
+  SOURCE_LABELS_BY_TABLE,
+  getSourceLabel,
+} from './source-icons'
+
+// Pure text/wire helpers that originated under components/chat/utils/
+// but are needed by SERVER-SIDE hub callers (doc-chat-utils,
+// hubspot-files-utils, rag-mappers). Re-exporting through utils/ keeps
+// them out of the 'use client' bundle. The chat-side re-export chain
+// stays intact for client consumers via components/chat barrel.
+export {
+  escapeMarkdownInline,
+  type ChatAttachment,
+  buildChatAttachmentViewUrl,
+  formatChatAttachmentMarkdownForBubble,
+  CHAT_ATTACHMENT_VIEW_URL_PREFIX,
+  CHAT_ATTACHMENT_VIEW_TOKEN_QUERY_PARAM,
+  ANTHROPIC_SUPPORTED_IMAGE_MIME,
+  CHAT_ATTACHMENT_VIEW_URL_PREFIX_REGEX_ESCAPED,
+  CHAT_ATTACHMENT_MARKDOWN_PATTERN,
+  stripChatAttachmentMarkdown,
+} from '../components/chat/utils/chat-attachment-markdown'
+export {
+  AUTO_CONTINUATION_DIRECTIVE_PREFIX,
+  buildAutoContinuationDirective,
+  type BuildAutoContinuationOptions,
+} from '../components/chat/utils/auto-continuation-directive'
+export { flattenAssistantContent } from '../components/chat/utils/flatten-assistant-content'
+export {
+  SCROLL_ANCHOR,
+  type ScrollAnchor,
+  SCROLL_ANCHOR_WIRE_KEY,
+  parseScrollAnchor,
+} from '../components/chat/utils/scroll-anchor'
+export {
+  type WireCommandOverride,
+  parseWireCommandOverride,
+  sanitizeTitleForChat,
+  formatSingularLookupInvocation,
+  type CommandOverride,
+  extractEntityIdFilter,
+  buildDiscussAddendum,
+} from '../components/chat/utils/slash-dispatch-utils'
+
+// ClickUp taxonomy constants + label resolver — server-safe so the
+// delivery aggregator + sync engine can read CUSTOM_ITEM_ID.BUG/.REQUEST
+// without going through the 'use client' chat barrel (which erases the
+// values to undefined when imported from server code).
+export { CUSTOM_ITEM_ID, getTaskTypeLabel } from '../components/chat/utils/clickup-task-type-utils'
+
+// Status color scheme + clickup URL helpers (pure, server-safe)
+export { type ColorScheme, getStatusColorScheme } from '../components/chat/utils/agent-status-message'
+export { clickupTaskUrl } from '../components/chat/utils/external-app-urls'
+
+// Cross-origin URL detection (pure — used by server-side rag-mappers
+// + content-url-builder for cross-origin same-tab decisions)
+export { isCrossOriginUrl } from '../components/chat/utils/is-cross-origin-url'
+
+// React-version-aware `fetchpriority` prop builder — spread into `<img>`
+// / `<iframe>` so the rendered DOM attribute is correct under React 18
+// (lowercase) AND React 19 (camelCase) without console warnings.
+export { fetchPriorityProp, type FetchPriorityValue } from './fetch-priority'

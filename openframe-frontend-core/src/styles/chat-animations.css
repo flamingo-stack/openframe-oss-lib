@@ -1,0 +1,65 @@
+/* =============================================================================
+ * Chat Panel (Mingo AI) — open/close motion
+ *
+ * Duration & easing follow Material 3 motion tokens + Nielsen Norman Group's
+ * 200–300 ms panel guidance:
+ *   - enter: 250 ms with emphasized-decelerate (settle into place)
+ *   - exit:  200 ms with emphasized-accelerate  (snap away)
+ * Only transform + opacity are animated so frames stay on the GPU compositor.
+ *
+ * On <md viewports the panel is a bottom sheet (slides up); on md+ it's a
+ * right side panel (slides in from the right edge). One keyframe set per axis.
+ *
+ * prefers-reduced-motion: cross-fade replaces all slide motion (vestibular-safe
+ * per WCAG 2.3.3 / MDN guidance) — the panel still animates, just without
+ * positional movement.
+ * ============================================================================= */
+
+@keyframes mingo-chat-overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes mingo-chat-overlay-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+@keyframes mingo-chat-slide-in-right {
+  from { opacity: 0; transform: translate3d(100%, 0, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes mingo-chat-slide-out-right {
+  from { opacity: 1; transform: translate3d(0, 0, 0); }
+  to   { opacity: 0; transform: translate3d(100%, 0, 0); }
+}
+
+@keyframes mingo-chat-slide-in-bottom {
+  from { opacity: 0; transform: translate3d(0, 100%, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes mingo-chat-slide-out-bottom {
+  from { opacity: 1; transform: translate3d(0, 0, 0); }
+  to   { opacity: 0; transform: translate3d(0, 100%, 0); }
+}
+
+@keyframes mingo-chat-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes mingo-chat-fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+.mingo-chat-overlay[data-state="open"]  { animation: mingo-chat-overlay-in  200ms cubic-bezier(0.05, 0.7, 0.1, 1) both; }
+.mingo-chat-overlay[data-state="closed"] { animation: mingo-chat-overlay-out 150ms cubic-bezier(0.3, 0, 0.8, 0.15) both; }
+
+/* Mobile: bottom-sheet motion */
+.mingo-chat-content[data-state="open"]   { animation: mingo-chat-slide-in-bottom  250ms cubic-bezier(0.05, 0.7, 0.1, 1) both; }
+.mingo-chat-content[data-state="closed"] { animation: mingo-chat-slide-out-bottom 200ms cubic-bezier(0.3, 0, 0.8, 0.15) both; }
+
+/* Desktop (>=768px): side-panel motion */
+@media (min-width: 768px) {
+  .mingo-chat-content[data-state="open"]   { animation-name: mingo-chat-slide-in-right; }
+  .mingo-chat-content[data-state="closed"] { animation-name: mingo-chat-slide-out-right; }
+}

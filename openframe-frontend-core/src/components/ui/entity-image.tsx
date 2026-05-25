@@ -2,13 +2,7 @@
 
 import React from 'react'
 import { cn } from '../../utils/cn'
-
-function getInitials(name?: string): string {
-  if (!name) return ''
-  const words = name.trim().split(/\s+/)
-  if (words.length === 1) return words[0].charAt(0).toUpperCase()
-  return (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase()
-}
+import { getFirstLastInitials } from '../../utils/format'
 
 export interface EntityImageProps {
   src?: string | null
@@ -26,7 +20,7 @@ export function EntityImage({ src, alt, fallbackText, className }: EntityImagePr
   }, [src])
 
   const showFallback = imageFailed || !src
-  const initials = getInitials(fallbackText ?? alt)
+  const initials = getFirstLastInitials(fallbackText ?? alt)
 
   if (showFallback) {
     return (

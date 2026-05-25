@@ -1,6 +1,6 @@
 "use client"
 
-import Link from 'next/link'
+import Link from '../../embed-shims/next-link'
 import React, { useEffect, useRef, useState } from 'react'
 import { HeaderConfig, NavigationItem } from '../../types/navigation'
 import { cn } from '../../utils'

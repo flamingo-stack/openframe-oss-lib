@@ -33,6 +33,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import MuxPlayer from '@mux/mux-player-react';
 import { PlayIcon } from '../icons-v2-generated/media-playback/play-icon';
+import { fetchPriorityProp } from '../../utils/fetch-priority';
 
 // =============================================================================
 // Suppress Google Cast SDK loading (CSP-friendly)
@@ -61,6 +62,46 @@ if (typeof window !== 'undefined') {
   const w = window as unknown as { chrome?: { cast?: unknown } };
   if (!w.chrome?.cast) {
     w.chrome = { ...(w.chrome ?? {}), cast: { isAvailable: false } };
+  }
+}
+
+// =============================================================================
+// Suppress benign "Media Chrome: No style sheet found ..." warning.
+// =============================================================================
+//
+// Why: MuxPlayer's UI is built on `media-chrome`, which uses custom
+// elements with shadow-DOM `<style>` tags. `media-chrome`'s internal
+// `insertCSSRule()` helper queries `style.sheet` during the element's
+// `connectedCallback`. When the player mounts inside a React portal
+// (the chat panel renders `<Video>` inside Radix's `<Dialog.Portal>`),
+// the element is moved across DOM trees BEFORE the browser hydrates
+// the shadow `<style>`'s `.sheet`. The helper then logs:
+//   "Media Chrome: No style sheet found on style tag of #shadow-root (open)"
+// and returns a no-op style shim. The warning is purely cosmetic —
+// playback, controls, and theming all render correctly because the
+// shadow stylesheet does hydrate on the next paint.
+//
+// Until upstream `media-chrome` either retries on the next microtask
+// or downgrades the warning (tracked in their issue tracker), patch
+// `console.warn` once at module load to drop only THIS exact string.
+// All other `console.warn` calls pass through unchanged.
+//
+// Why patch instead of opting out: `@mux/mux-player-react` exposes no
+// prop to disable internal style queries, importing CSS explicitly
+// doesn't seed the shadow-root stylesheets (they're per-element), and
+// the warning fires before any consumer can intercept the element.
+if (typeof window !== 'undefined' && typeof console !== 'undefined') {
+  const w = window as unknown as { __MEDIA_CHROME_WARN_PATCHED__?: boolean };
+  if (!w.__MEDIA_CHROME_WARN_PATCHED__) {
+    w.__MEDIA_CHROME_WARN_PATCHED__ = true;
+    const MEDIA_CHROME_NO_STYLESHEET_PREFIX = 'Media Chrome: No style sheet found on style tag of';
+    const originalWarn = console.warn.bind(console);
+    console.warn = (...args: unknown[]): void => {
+      if (typeof args[0] === 'string' && args[0].startsWith(MEDIA_CHROME_NO_STYLESHEET_PREFIX)) {
+        return;
+      }
+      originalWarn(...args);
+    };
   }
 }
 
@@ -564,7 +605,11 @@ function YouTubeFacadeInner({
             src={posterJpg}
             alt={title}
             loading="lazy"
-            fetchPriority={priority ? 'high' : 'low'}
+            // React 18 wants lowercase (`fetchpriority` DOM attribute);
+            // React 19 wants camelCase (`fetchPriority` prop). Detect at
+            // module load and spread the right shape so both runtimes
+            // render the DOM attribute cleanly with no console warnings.
+            {...fetchPriorityProp(priority)}
             decoding={priority ? 'sync' : 'async'}
             className="absolute inset-0 w-full h-full object-cover"
           />
