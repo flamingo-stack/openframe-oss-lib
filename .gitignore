@@ -52,3 +52,4 @@ pnpm-lock.yaml
 storybook-static
 openframe-frontend-core/tsup.config.bundled_*
 /.claude/settings.local.json
+/.claude/worktrees
