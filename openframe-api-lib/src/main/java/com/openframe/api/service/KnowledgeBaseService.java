@@ -281,7 +281,7 @@ public class KnowledgeBaseService {
                 filter.getParentId(), search, restrictToItemIds);
         long articleCount = repository.countArticles(
                 filter.getParentId(), search,
-                KnowledgeBaseItemType.ARTICLE, restrictToItemIds);
+                KnowledgeBaseItemType.ARTICLE, restrictToItemIds, filter.getStatuses());
         long totalCount = allFolders.size() + articleCount;
 
         List<KnowledgeBaseItem> displayedFolders = isFirstPage
@@ -292,7 +292,7 @@ public class KnowledgeBaseService {
         int articleLimit = Math.max(0, limit - displayedFolders.size());
         PagedArticles paged = articleLimit > 0
                 ? fetchArticlesPage(filter.getParentId(), search,
-                        restrictToItemIds, normalized.getCursor(), articleLimit)
+                        restrictToItemIds, filter.getStatuses(), normalized.getCursor(), articleLimit)
                 : new PagedArticles(List.of(), false);
 
         List<KnowledgeBaseItem> combined = Stream.concat(displayedFolders.stream(), paged.items().stream()).toList();
@@ -325,9 +325,10 @@ public class KnowledgeBaseService {
             List<String> restrictToItemIds, CursorPaginationCriteria normalized) {
         long count = repository.countArticles(
                 filter.getParentId(), search,
-                KnowledgeBaseItemType.ARTICLE, restrictToItemIds);
+                KnowledgeBaseItemType.ARTICLE, restrictToItemIds, filter.getStatuses());
         PagedArticles paged = fetchArticlesPage(filter.getParentId(),
-                search, restrictToItemIds, normalized.getCursor(), normalized.getLimit());
+                search, restrictToItemIds, filter.getStatuses(),
+                normalized.getCursor(), normalized.getLimit());
 
         PageInfo pageInfo = buildPageInfo(paged.items(), paged.hasNextPage(), normalized.hasCursor());
 
@@ -360,9 +361,10 @@ public class KnowledgeBaseService {
         }
 
         long count = repository.countArticles(
-                null, search, KnowledgeBaseItemType.ARTICLE, targetIds);
+                null, search, KnowledgeBaseItemType.ARTICLE, targetIds, filter.getStatuses());
         PagedArticles paged = fetchArticlesPage(null, search,
-                targetIds, normalized.getCursor(), normalized.getLimit());
+                targetIds, filter.getStatuses(),
+                normalized.getCursor(), normalized.getLimit());
 
         PageInfo pageInfo = buildPageInfo(paged.items(), paged.hasNextPage(), normalized.hasCursor());
 
@@ -374,9 +376,11 @@ public class KnowledgeBaseService {
     }
 
     private PagedArticles fetchArticlesPage(String parentId, String search,
-                                             List<String> itemIds, String cursor, int limit) {
+                                             List<String> itemIds,
+                                             List<KnowledgeBaseArticleStatus> statuses,
+                                             String cursor, int limit) {
         List<KnowledgeBaseItem> raw = repository.findArticles(
-                parentId, search, KnowledgeBaseItemType.ARTICLE, itemIds, cursor, limit + 1);
+                parentId, search, KnowledgeBaseItemType.ARTICLE, itemIds, statuses, cursor, limit + 1);
         boolean hasNextPage = raw.size() > limit;
         List<KnowledgeBaseItem> page = hasNextPage ? raw.subList(0, limit) : raw;
         return new PagedArticles(page, hasNextPage);
