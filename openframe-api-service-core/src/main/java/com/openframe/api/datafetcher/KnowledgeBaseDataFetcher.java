@@ -84,12 +84,13 @@ public class KnowledgeBaseDataFetcher {
     }
 
     @DgsQuery
-    public List<Tag> knowledgeBaseTags(@InputArgument String folderId) {
+    public List<Tag> knowledgeBaseTags(@InputArgument String folderId,
+                                       @InputArgument Boolean archived) {
         if (folderId != null) {
             return knowledgeBaseService.getTagsInSubtree(RELAY.fromGlobalId(folderId).getId());
         }
-        log.debug("Fetching all KB tags");
-        return knowledgeBaseTagService.getAllTags();
+        log.debug("Fetching all KB tags (archived={})", archived);
+        return knowledgeBaseTagService.getAllTags(Boolean.TRUE.equals(archived));
     }
 
     @DgsQuery
