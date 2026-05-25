@@ -22,7 +22,6 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
     private static final String FIELD_NAME = "name";
     private static final String FIELD_SUMMARY = "summary";
     private static final String FIELD_STATUS = "status";
-    private static final String FIELD_CREATED_BY = "createdBy";
     private static final String FIELD_UPDATED_AT = "updatedAt";
     private static final String ID_FIELD = "_id";
 
@@ -61,44 +60,43 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
     }
 
     @Override
-    public List<KnowledgeBaseItem> findArticles(String currentUserId, String parentId, String search,
+    public List<KnowledgeBaseItem> findArticles(String parentId, String search,
                                                  KnowledgeBaseItemType type, List<String> itemIds,
                                                  String cursor, int limit) {
-        Query query = buildItemQuery(currentUserId, parentId, search, type, itemIds, cursor);
+        Query query = buildItemQuery(parentId, search, type, itemIds, cursor);
         return executeWithSort(query, limit);
     }
 
     @Override
-    public long countArticles(String currentUserId, String parentId, String search,
+    public long countArticles(String parentId, String search,
                               KnowledgeBaseItemType type, List<String> itemIds) {
-        Query query = buildItemQuery(currentUserId, parentId, search, type, itemIds, null);
+        Query query = buildItemQuery(parentId, search, type, itemIds, null);
         return mongoTemplate.count(query, KnowledgeBaseItem.class);
     }
 
     @Override
-    public List<KnowledgeBaseItem> findArchivedArticles(String currentUserId, String search, List<String> itemIds,
+    public List<KnowledgeBaseItem> findArchivedArticles(String search, List<String> itemIds,
                                                          String cursor, int limit) {
-        Query query = buildArchivedArticlesQuery(currentUserId, search, itemIds, cursor);
+        Query query = buildArchivedArticlesQuery(search, itemIds, cursor);
         return executeWithSort(query, limit);
     }
 
     @Override
-    public long countArchivedArticles(String currentUserId, String search, List<String> itemIds) {
-        Query query = buildArchivedArticlesQuery(currentUserId, search, itemIds, null);
+    public long countArchivedArticles(String search, List<String> itemIds) {
+        Query query = buildArchivedArticlesQuery(search, itemIds, null);
         return mongoTemplate.count(query, KnowledgeBaseItem.class);
     }
 
     @Override
-    public List<KnowledgeBaseItem> findAllArticles(String currentUserId) {
+    public List<KnowledgeBaseItem> findAllArticles() {
         Query query = new Query();
         query.addCriteria(Criteria.where(FIELD_TYPE).is(KnowledgeBaseItemType.ARTICLE));
         query.addCriteria(Criteria.where(FIELD_STATUS).ne(KnowledgeBaseArticleStatus.ARCHIVED));
-        query.addCriteria(buildDraftVisibilityCriteria(currentUserId));
         query.with(Sort.by(Sort.Order.asc(FIELD_NAME), Sort.Order.desc(ID_FIELD)));
         return mongoTemplate.find(query, KnowledgeBaseItem.class);
     }
 
-    private Query buildItemQuery(String currentUserId, String parentId, String search,
+    private Query buildItemQuery(String parentId, String search,
                                   KnowledgeBaseItemType type, List<String> itemIds, String cursor) {
         Query query = new Query();
 
@@ -116,11 +114,11 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
 
         query.addCriteria(Criteria.where(FIELD_STATUS).ne(KnowledgeBaseArticleStatus.ARCHIVED));
 
-        addComposites(query, search, currentUserId, cursor);
+        addComposites(query, search, cursor);
         return query;
     }
 
-    private Query buildArchivedArticlesQuery(String currentUserId, String search, List<String> itemIds, String cursor) {
+    private Query buildArchivedArticlesQuery(String search, List<String> itemIds, String cursor) {
         Query query = new Query();
         query.addCriteria(Criteria.where(FIELD_TYPE).is(KnowledgeBaseItemType.ARTICLE));
         query.addCriteria(Criteria.where(FIELD_STATUS).is(KnowledgeBaseArticleStatus.ARCHIVED));
@@ -129,16 +127,16 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
             query.addCriteria(Criteria.where(ID_FIELD).in(itemIds));
         }
 
-        addComposites(query, search, currentUserId, cursor);
+        addComposites(query, search, cursor);
         return query;
     }
 
     /**
-     * Combines visibility ($or on status/createdBy), search ($or on name/summary),
-     * and cursor ($or on updatedAt/id) into a single $and at root.
-     * Spring Data Mongo rejects multiple $or criteria on the same Query (null-key collision).
+     * Combines search ($or on name/summary) and cursor ($or on updatedAt/id) into a single
+     * $and at root. Spring Data Mongo rejects multiple $or criteria on the same Query
+     * (null-key collision). Drafts are visible to all admins (team collaboration model).
      */
-    private void addComposites(Query query, String search, String currentUserId, String cursor) {
+    private void addComposites(Query query, String search, String cursor) {
         List<Criteria> composites = new ArrayList<>();
 
         if (StringUtils.hasText(search)) {
@@ -147,8 +145,6 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
                     Criteria.where(FIELD_SUMMARY).regex(search, "i")));
         }
 
-        composites.add(buildDraftVisibilityCriteria(currentUserId));
-
         Criteria cursorCriteria = buildCursorCriteria(cursor);
         if (cursorCriteria != null) {
             composites.add(cursorCriteria);
@@ -156,15 +152,9 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
 
         if (composites.size() == 1) {
             query.addCriteria(composites.getFirst());
-        } else {
+        } else if (!composites.isEmpty()) {
             query.addCriteria(new Criteria().andOperator(composites.toArray(new Criteria[0])));
         }
-    }
-
-    private Criteria buildDraftVisibilityCriteria(String currentUserId) {
-        Criteria notDraft = Criteria.where(FIELD_STATUS).ne(KnowledgeBaseArticleStatus.DRAFT);
-        Criteria ownDraft = Criteria.where(FIELD_CREATED_BY).is(currentUserId);
-        return new Criteria().orOperator(notDraft, ownDraft);
     }
 
     private Criteria buildCursorCriteria(String cursor) {

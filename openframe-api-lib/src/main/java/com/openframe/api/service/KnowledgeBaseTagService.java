@@ -1,8 +1,11 @@
 package com.openframe.api.service;
 
+import com.openframe.data.document.knowledgebase.KnowledgeBaseArticleStatus;
+import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
+import com.openframe.data.repository.knowledgebase.KnowledgeBaseItemRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,16 +29,31 @@ public class KnowledgeBaseTagService {
 
     private final TagRepository tagRepository;
     private final TagAssignmentRepository tagAssignmentRepository;
+    private final KnowledgeBaseItemRepository itemRepository;
 
-    public List<Tag> getAllTags() {
-        Set<String> assignedTagIds = tagAssignmentRepository
-                .findByEntityType(ENTITY_TYPE)
-                .stream()
+    public List<Tag> getAllTags(boolean archived) {
+        List<TagAssignment> assignments = tagAssignmentRepository.findByEntityType(ENTITY_TYPE);
+        if (assignments.isEmpty()) {
+            return List.of();
+        }
+
+        Set<String> itemIds = assignments.stream()
+                .map(TagAssignment::getEntityId)
+                .collect(Collectors.toSet());
+
+        Set<String> matchingItemIds = itemRepository.findAllById(itemIds).stream()
+                .filter(item -> archived
+                        ? item.getStatus() == KnowledgeBaseArticleStatus.ARCHIVED
+                        : item.getStatus() != KnowledgeBaseArticleStatus.ARCHIVED)
+                .map(KnowledgeBaseItem::getId)
+                .collect(Collectors.toSet());
+
+        Set<String> tagIds = assignments.stream()
+                .filter(a -> matchingItemIds.contains(a.getEntityId()))
                 .map(TagAssignment::getTagId)
                 .collect(Collectors.toSet());
-        return assignedTagIds.isEmpty()
-                ? List.of()
-                : tagRepository.findAllById(assignedTagIds);
+
+        return tagIds.isEmpty() ? List.of() : tagRepository.findAllById(tagIds);
     }
 
     public List<Tag> getTagsForItemIds(List<String> itemIds) {

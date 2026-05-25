@@ -9,17 +9,17 @@ public interface CustomKnowledgeBaseItemRepository {
 
     List<KnowledgeBaseItem> findFoldersForParent(String parentId, String search, List<String> itemIds);
 
-    List<KnowledgeBaseItem> findArticles(String currentUserId, String parentId, String search,
+    List<KnowledgeBaseItem> findArticles(String parentId, String search,
                                           KnowledgeBaseItemType type, List<String> itemIds,
                                           String cursor, int limit);
 
-    long countArticles(String currentUserId, String parentId, String search,
+    long countArticles(String parentId, String search,
                        KnowledgeBaseItemType type, List<String> itemIds);
 
-    List<KnowledgeBaseItem> findArchivedArticles(String currentUserId, String search, List<String> itemIds,
+    List<KnowledgeBaseItem> findArchivedArticles(String search, List<String> itemIds,
                                                   String cursor, int limit);
 
-    long countArchivedArticles(String currentUserId, String search, List<String> itemIds);
+    long countArchivedArticles(String search, List<String> itemIds);
 
-    List<KnowledgeBaseItem> findAllArticles(String currentUserId);
+    List<KnowledgeBaseItem> findAllArticles();
 }
