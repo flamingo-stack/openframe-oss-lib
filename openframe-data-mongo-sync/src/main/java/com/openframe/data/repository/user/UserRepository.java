@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface UserRepository extends MongoRepository<User, String>, BaseUserRepository<Optional<User>, Boolean, String> {
+public interface UserRepository extends MongoRepository<User, String>, BaseUserRepository<Optional<User>, Boolean, String>, CustomUserRepository {
     @Override
     Optional<User> findByEmail(String email);
 
