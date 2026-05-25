@@ -42,6 +42,12 @@
       "require": "./dist/components/chat/index.cjs",
       "default": "./dist/components/chat/index.js"
     },
+    "./components/tickets": {
+      "types": "./dist/components/tickets/index.d.ts",
+      "import": "./dist/components/tickets/index.js",
+      "require": "./dist/components/tickets/index.cjs",
+      "default": "./dist/components/tickets/index.js"
+    },
     "./components/ui/file-manager": {
       "types": "./dist/components/ui/file-manager/index.d.ts",
       "import": "./dist/components/ui/file-manager/index.js",

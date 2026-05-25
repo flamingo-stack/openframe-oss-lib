@@ -57,6 +57,15 @@ const STATUS_ALIASES: Record<string, TicketStatus> = {
   ARCHIVED: 'ARCHIVED',
   // Dialog-layer alias
   ACTION_REQUIRED: 'TECH_REQUIRED',
+  // HubSpot canonical (OPEN/CLOSED) — drives color + icon variant. The
+  // user-facing label still comes from `pipeline_stage_label` when the
+  // caller passes <TicketStatusTag label={…}>, so the badge can read
+  // "New" / "Working" / "Waiting on contact" while the canonical status
+  // remains OPEN.
+  OPEN: 'ACTIVE',
+  open: 'ACTIVE',
+  CLOSED: 'RESOLVED',
+  closed: 'RESOLVED',
   // Chat lowercase variants
   active: 'ACTIVE',
   tech_required: 'TECH_REQUIRED',
