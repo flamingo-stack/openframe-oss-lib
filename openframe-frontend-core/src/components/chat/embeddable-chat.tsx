@@ -622,9 +622,22 @@ function EmbeddableChatInner({
   }, [isOpen])
 
   // Greeting first-name comes from the SERVER-resolved identity (single
-  // source of truth — never a client-injected runtime field). `null`
-  // while loading + for anon → greeting falls back to "Hey, I'm Mingo".
-  const userName = identityUser?.name?.split(' ')[0]
+  // source of truth — never a client-injected runtime field). Resolution
+  // order:
+  //   1. `identityUser.firstName` — dedicated optional field from the
+  //      identity webservice (populated via `X-Chat-First-Name` for
+  //      bearer-act-as, or by the hub's profile lookup for cookie sessions).
+  //   2. `identityUser.name.split(' ')[0]` — legacy fallback for sources
+  //      that only return a full name. Empty-string-safe (`?.`-chain).
+  //   3. `undefined` — anon, loading, or no name available → greeting
+  //      collapses to the no-name variant `Hey, I'm Mingo`.
+  // We coalesce an empty string to `undefined` so the JSX `userName ? …`
+  // branch treats `''` the same as missing — embedders that send
+  // `firstName: ''` shouldn't render `Hey , I'm Mingo`.
+  const userName =
+    (identityUser?.firstName?.trim() ||
+      identityUser?.name?.split(' ')[0]?.trim()) ||
+    undefined
 
   const {
     messages: rawMessages,

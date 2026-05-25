@@ -51,8 +51,27 @@ export interface ChatIdentityResponse {
   /** Server-resolved display identity. `null` for anon. Read by the
    *  chat panel for the greeting first-name — embedders DON'T pass
    *  user info into the runtime; server is the single source of truth
-   *  so the displayed name always matches the auth tier. */
-  user: { name: string | null; email: string | null } | null
+   *  so the displayed name always matches the auth tier.
+   *
+   *  All sub-fields are optional and may be `null`. Consumers MUST
+   *  treat missing values as "use empty string and skip the affected
+   *  UI line" — never substitute a placeholder. */
+  user: {
+    name: string | null
+    email: string | null
+    /** Optional first name supplied by the identity webservice.
+     *  When set, the chat greeting renders `Hey ${firstName}, I'm Mingo`.
+     *  When absent (null/undefined/empty), the greeting falls back to
+     *  the no-name variant `Hey, I'm Mingo`. The chat panel does NOT
+     *  derive `firstName` from `name.split(' ')[0]` anymore — this is
+     *  the dedicated authoritative source from the identity webservice. */
+    firstName?: string | null
+    /** Optional last name. Currently unused by chat UI; surfaced for
+     *  embedders that want to display the full name elsewhere. */
+    lastName?: string | null
+    /** Optional avatar URL. Validated as https:// server-side. */
+    avatarUrl?: string | null
+  } | null
 }
 
 /** Shape returned by the hook. NEVER throws — loading + error fall
