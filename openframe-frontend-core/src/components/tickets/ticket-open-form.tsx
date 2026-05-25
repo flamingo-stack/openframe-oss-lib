@@ -26,12 +26,9 @@ import {
   ChatAttachmentChipStrip,
 } from '../chat/chat-attachment-bar'
 import { useChatAttachments } from '../chat/hooks/use-chat-attachments'
+import { TICKET_TEXT_MAX_CHARS } from './types'
 
-/** Defensive client-side cap. HubSpot Note engagement supports more
- *  but a 100KB paste should fail fast at the UI rather than burning a
- *  round trip. Tracked for future server-side hardening. */
-const CONTENT_MAX_CHARS = 5000
-const COUNTER_VISIBLE_AT = Math.floor(CONTENT_MAX_CHARS * 0.8)
+const COUNTER_VISIBLE_AT = Math.floor(TICKET_TEXT_MAX_CHARS * 0.8)
 
 export interface TicketOpenFormProps {
   /** Wired to `useTicketActions().submitTicket`. Returns true on success
@@ -56,7 +53,7 @@ export function TicketOpenForm({
 
   const trimmedSubject = subject.trim()
   const trimmedContent = content.trim()
-  const overCap = content.length > CONTENT_MAX_CHARS
+  const overCap = content.length > TICKET_TEXT_MAX_CHARS
   const showCounter = content.length >= COUNTER_VISIBLE_AT
 
   const canSubmit =
@@ -85,7 +82,6 @@ export function TicketOpenForm({
   return (
     <Card className="p-6">
       <form onSubmit={handleSubmit} className="flex flex-col md:flex-row gap-6">
-        {/* Left column — title + description, mirrors the Figma split */}
         <div className="flex-1 min-w-0 md:max-w-md">
           <h2 className="text-2xl font-semibold text-ods-text-primary mb-2">
             Need Support?
@@ -101,7 +97,6 @@ export function TicketOpenForm({
           )}
         </div>
 
-        {/* Right column — form fields */}
         <div className="flex-1 min-w-0 flex flex-col gap-4">
           <div>
             <label
@@ -143,14 +138,11 @@ export function TicketOpenForm({
                   overCap ? 'text-ods-error' : 'text-ods-text-secondary'
                 }`}
               >
-                {content.length}/{CONTENT_MAX_CHARS}
+                {content.length}/{TICKET_TEXT_MAX_CHARS}
               </p>
             )}
           </div>
 
-          {/* Attachment composer — reuses the chat composer primitives.
-              ChipStrip returns null when empty so it has no permanent
-              footprint. */}
           <ChatAttachmentChipStrip
             attachments={attachments}
             onRemove={removeAttachment}

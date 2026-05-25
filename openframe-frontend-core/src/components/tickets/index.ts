@@ -1,5 +1,3 @@
-'use client'
-
 export { TicketCenter, type TicketCenterProps } from './ticket-center'
 export { TicketOpenForm, type TicketOpenFormProps } from './ticket-open-form'
 export { TicketRow, type TicketRowProps } from './ticket-row'

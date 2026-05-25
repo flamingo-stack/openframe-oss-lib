@@ -18,8 +18,7 @@
  * tab-switches.
  */
 
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch'
 import { useChatIdentity } from '../../chat/hooks/use-chat-identity'
 import type { TicketData } from '../types'
@@ -50,15 +49,21 @@ interface UseTicketsListReturn {
 
 export function useTicketsList(): UseTicketsListReturn {
   const identity = useChatIdentity()
-  const queryClient = useQueryClient()
 
   // Anon → no fetch. The hook returns the loading=false / empty path
   // so the parent renders an EmptyState sign-in CTA instead of a
   // skeleton or a query-error.
   const enabled = identity.authTier !== 'anon' && !!identity.user?.email
 
+  // Identity-keyed cache. When the resolved email changes (admin swaps
+  // proxy creds in /debug mid-session), the queryKey changes and
+  // TanStack automatically uses the new cache slot — no flash of the
+  // previous identity's data, no manual removeQueries. The old key's
+  // entries garbage-collect via `gcTime`.
+  const identityKey = identity.user?.email ?? 'anon'
+
   const query = useQuery({
-    queryKey: ['tickets', 'self'],
+    queryKey: ['tickets', 'self', identityKey],
     enabled,
     staleTime: 60_000,
     queryFn: async (): Promise<TicketData[]> => {
@@ -75,30 +80,13 @@ export function useTicketsList(): UseTicketsListReturn {
     },
   })
 
-  // Defeat cross-identity cache poisoning: if the resolved email
-  // changes (e.g. admin swaps proxy creds in /debug mid-session),
-  // wipe ALL ticket caches so the new identity sees fresh data, not
-  // a stale flash of the previous identity's tickets.
-  //
-  // Skip the initial mount (`previousEmailRef.current === undefined`)
-  // because there's no prior identity to invalidate against — firing
-  // `removeQueries` here would defeat the cache before its first hit.
-  // We only act on a true TRANSITION between two non-initial values.
-  const previousEmailRef = useRef<string | null | undefined>(undefined)
-  useEffect(() => {
-    const previous = previousEmailRef.current
-    const current = identity.user?.email ?? null
-    previousEmailRef.current = current
-    if (previous === undefined) return // initial mount
-    if (previous === current) return // no real change
-    queryClient.removeQueries({ queryKey: ['tickets'] })
-    // useQuery refetches automatically because `enabled` flips with
-    // identity — no manual refetch needed.
-  }, [identity.user?.email, queryClient])
-
   return {
     tickets: query.data ?? [],
-    isLoading: query.isLoading && enabled,
+    // Show the skeleton during initial load AND during identity-induced
+    // refetch (no cached data yet for the new key). Without `isFetching`,
+    // an identity change briefly renders "No tickets yet" before the new
+    // query lands.
+    isLoading: enabled && (query.isLoading || (query.isFetching && (query.data ?? []).length === 0)),
     isFetching: query.isFetching,
     error: (query.error as Error | null) ?? null,
     refetch: () => {

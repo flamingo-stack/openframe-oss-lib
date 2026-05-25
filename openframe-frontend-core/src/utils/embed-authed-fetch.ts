@@ -27,13 +27,23 @@ import { applyProxyAuth } from './embed-proxy-auth-storage'
  * present in sessionStorage) and forces `credentials: 'same-origin'`
  * so Supabase auth cookies travel too.
  *
- * Headers are MERGED: caller-supplied `init.headers` keys override the
- * proxy headers (so a caller explicitly passing `Authorization` wins).
- * In practice `applyProxyAuth` only sets the keys the chat-auth chain
- * cares about and no caller should override those — but the merge
- * direction is documented so a future caller doesn't get a surprise.
+ * **Header merge direction (proxy WINS over caller):** the implementation
+ * spreads `baseHeaders` first inside `applyProxyAuth`, then sets the
+ * `Authorization` / `X-Chat-*` keys — so the proxy values take precedence
+ * over anything the caller passed. The motivation is that the bearer +
+ * act-as identity is the source of truth for embedded auth; a caller
+ * accidentally passing a stale `Authorization` header should NOT override
+ * the live proxy creds.
+ *
+ * **Cross-origin defense:** the wrapper assumes a same-origin `/api/…`
+ * relative URL. Absolute URLs are accepted only when their origin matches
+ * the current window's origin; cross-origin URLs throw before the bearer
+ * leaves the page. This is a defense-in-depth guard for future call sites
+ * — there is no legitimate cross-origin use of this fetch wrapper.
  */
 export function embedAuthedFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  assertSameOrigin(url)
+
   // `applyProxyAuth` accepts `Record<string, string>`; normalize the
   // caller's headers to that shape. RequestInit accepts `HeadersInit`
   // which is broader (Headers instance OR array of tuples).
@@ -67,4 +77,49 @@ export function embedAuthedFetch(url: string, init: RequestInit = {}): Promise<R
     // the bearer header layer; cookies are the session-tier carrier.
     credentials: init.credentials ?? 'same-origin',
   })
+}
+
+/**
+ * Reject any URL that resolves to a cross-origin destination or to a
+ * non-http(s) scheme. Every input is resolved against
+ * `window.location.href` so the same rule covers path-only
+ * (`/api/...`), absolute (`https://...`), protocol-relative
+ * (`//host/...`), AND whitespace-prefixed forms (`\t//evil.com/...`) —
+ * the WHATWG fetch spec strips leading ASCII whitespace before
+ * parsing, so any regex-based "skip relative" shortcut is bypassable
+ * with a leading `\t`/`\n`/`\r`/space. We resolve unconditionally
+ * instead and compare origins.
+ *
+ * Also blocks `javascript:` / `data:` / `blob:` etc. — only `http(s):`
+ * is allowed. This is explicit allowlisting rather than relying on
+ * `origin === 'null'` to fall out wrong.
+ *
+ * Server-side rendering: when `typeof window === 'undefined'` we skip
+ * the check — the bearer comes from sessionStorage which doesn't exist
+ * on the server, so there's nothing to leak anyway.
+ */
+function assertSameOrigin(url: string): void {
+  if (typeof window === 'undefined') return
+  let target: URL
+  let pageOrigin: string
+  try {
+    target = new URL(url, window.location.href)
+    // Derive the page origin from `href` rather than reading
+    // `window.location.origin` directly so the check works in test
+    // environments that mock `window.location` to a plain object
+    // without an `origin` field (jsdom setups do this).
+    pageOrigin = new URL(window.location.href).origin
+  } catch {
+    throw new Error(`embedAuthedFetch: refusing to fetch malformed URL (${JSON.stringify(url)})`)
+  }
+  if (target.protocol !== 'http:' && target.protocol !== 'https:') {
+    throw new Error(
+      `embedAuthedFetch: refusing non-http(s) URL (${target.protocol}) — pass a relative /api/* path instead`,
+    )
+  }
+  if (target.origin !== pageOrigin) {
+    throw new Error(
+      `embedAuthedFetch: refusing cross-origin fetch to ${target.origin} — pass a relative /api/* path instead`,
+    )
+  }
 }

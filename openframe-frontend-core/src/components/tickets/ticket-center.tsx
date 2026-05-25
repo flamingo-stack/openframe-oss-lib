@@ -59,8 +59,6 @@ export function TicketCenter({ toast = defaultToast }: TicketCenterProps = {}) {
   return <TicketCenterAuthed toast={toast} />
 }
 
-// ─── Authenticated surface ───────────────────────────────────────────
-
 function TicketCenterAuthed({ toast }: { toast: typeof defaultToast }) {
   const queryClient = useQueryClient()
   const { tickets, isLoading, isFetching, refetch, lastUpdatedAt } = useTicketsList()
@@ -84,8 +82,12 @@ function TicketCenterAuthed({ toast }: { toast: typeof defaultToast }) {
   }, [])
   const removeTicketFromCache = useCallback(
     (ticketId: string) => {
-      queryClient.setQueryData<TicketData[]>(['tickets', 'self'], (prev) =>
-        (prev ?? []).filter((t) => t.id !== ticketId),
+      // Target every cache slot under the ['tickets'] prefix — the
+      // queryKey now includes an identityKey segment (use-tickets-list)
+      // so a bare ['tickets', 'self'] write would no-op silently.
+      queryClient.setQueriesData<TicketData[] | undefined>(
+        { queryKey: ['tickets'] },
+        (prev) => (prev ?? []).filter((t) => t.id !== ticketId),
       )
       setExpandedTicketId((prev) => (prev === ticketId ? null : prev))
     },
@@ -160,6 +162,7 @@ function TicketCenterAuthed({ toast }: { toast: typeof defaultToast }) {
                 onAttachFiles={actions.attachFiles}
                 onClose={actions.closeTicket}
                 onReopen={actions.reopenTicket}
+                onActionCollapsed={() => setExpandedTicketId(null)}
               />
             ))}
           </Card>
@@ -168,8 +171,6 @@ function TicketCenterAuthed({ toast }: { toast: typeof defaultToast }) {
     </div>
   )
 }
-
-// ─── Skeletons ───────────────────────────────────────────────────────
 
 function TicketCenterSkeleton() {
   return (

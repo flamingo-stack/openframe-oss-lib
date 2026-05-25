@@ -1,14 +1,18 @@
-'use client'
-
 /**
  * Wire shape of a row returned by `POST /api/chat/agent/find-ticket`.
- * Mirrors the executor's projection at
- * `lib/data/hubspot-tools.ts` (`FIND_TICKET_SELECT` columns).
+ * Mirrors the executor's projection at `lib/data/hubspot-tools.ts`
+ * (`FIND_TICKET_SELECT` / `FindTicketResult`).
  *
- * NOTE: `find-ticket` returns `customer_emails: string[]` (jsonb array),
- * NOT a single `customer_email`. The list IS already self-scoped to the
- * caller's session email server-side; the array is exposed for admin /
- * staff surfaces, which the ticket center doesn't render.
+ * Cross-repo duplication is INTENTIONAL: this lib ships independently
+ * of the hub, so we can't import `FindTicketResult` from
+ * `hubspot-tools.ts` directly. If the server adds a column to
+ * `FIND_TICKET_SELECT`, also add it here. The smoke test in §F of the
+ * plan covers the happy path; a wire-contract test belongs in the hub.
+ *
+ * `find-ticket` returns `customer_emails: string[]` (jsonb array), NOT
+ * a single `customer_email`. The list is server-self-scoped to the
+ * caller's session email; the array is exposed for admin/staff
+ * surfaces, which the ticket center doesn't render.
  */
 export interface TicketData {
   id: string
@@ -73,6 +77,15 @@ export interface MappedTicketActionError {
    *  to mention it in the toast. */
   retryAfterSeconds?: number
 }
+
+/**
+ * Defensive client-side cap on ticket text (initial content + comment
+ * addendums). HubSpot Note engagements accept more, but a 100KB paste
+ * should fail fast at the UI rather than burning a server round-trip.
+ * Both the open-ticket form and the per-row comment textarea import
+ * this so a future server-side hardening only touches one place.
+ */
+export const TICKET_TEXT_MAX_CHARS = 5000
 
 /**
  * Centralized toast copy. Keep all wording here so QA / localization

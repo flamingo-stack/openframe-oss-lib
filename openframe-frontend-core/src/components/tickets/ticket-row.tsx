@@ -46,9 +46,7 @@ import {
 import { useChatAttachments } from '../chat/hooks/use-chat-attachments'
 import { formatRelativeTime } from '../../utils/date-utils'
 import type { AnyTicket } from './types'
-import { isOptimistic } from './types'
-
-const COMMENT_MAX_CHARS = 5000
+import { isOptimistic, TICKET_TEXT_MAX_CHARS } from './types'
 
 type ActionMode = null | 'comment' | 'attach'
 
@@ -65,6 +63,9 @@ export interface TicketRowProps {
   ) => Promise<boolean>
   onClose: (ticketId: string, resolution?: string) => Promise<boolean>
   onReopen: (ticketId: string) => Promise<boolean>
+  /** Called after a successful close/reopen so the parent can collapse
+   *  the drawer (status flipped — current action set is now stale). */
+  onActionCollapsed: () => void
 }
 
 export function TicketRow({
@@ -77,6 +78,7 @@ export function TicketRow({
   onAttachFiles,
   onClose,
   onReopen,
+  onActionCollapsed,
 }: TicketRowProps) {
   // Optimistic placeholders have no drawer — the real id hasn't arrived yet,
   // so action targets would be undefined.
@@ -120,13 +122,12 @@ export function TicketRow({
           onAttachFiles={onAttachFiles}
           onClose={onClose}
           onReopen={onReopen}
+          onActionCollapsed={onActionCollapsed}
         />
       </CollapsibleContent>
     </Collapsible>
   )
 }
-
-// ─── Drawer body ────────────────────────────────────────────────────
 
 interface DrawerBodyProps {
   ticket: AnyTicket
@@ -137,6 +138,7 @@ interface DrawerBodyProps {
   onAttachFiles: TicketRowProps['onAttachFiles']
   onClose: TicketRowProps['onClose']
   onReopen: TicketRowProps['onReopen']
+  onActionCollapsed: TicketRowProps['onActionCollapsed']
 }
 
 function DrawerBody({
@@ -148,10 +150,10 @@ function DrawerBody({
   onAttachFiles,
   onClose,
   onReopen,
+  onActionCollapsed,
 }: DrawerBodyProps) {
   return (
     <div className="bg-ods-card border-t border-ods-border px-4 py-4 flex flex-col gap-4">
-      {/* Zone 1 — metadata strip */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
         <div className="flex flex-col gap-1 text-ods-text-secondary">
           <MetadataRow label="Ticket" value={`#${ticket.external_id}`} />
@@ -172,7 +174,6 @@ function DrawerBody({
         </div>
       </div>
 
-      {/* Zone 2 — description (plaintext readonly) */}
       <div className="border-t border-ods-border pt-4">
         <p className="text-xs font-medium text-ods-text-secondary mb-1 uppercase tracking-wider">
           Description
@@ -191,7 +192,6 @@ function DrawerBody({
         )}
       </div>
 
-      {/* Zone 3 — actions */}
       <div className="border-t border-ods-border pt-4">
         {isClosed ? (
           <ReopenAction
@@ -199,6 +199,7 @@ function DrawerBody({
             busy={busy}
             supportSystemDown={supportSystemDown}
             onReopen={onReopen}
+            onActionCollapsed={onActionCollapsed}
           />
         ) : (
           <OpenActions
@@ -208,6 +209,7 @@ function DrawerBody({
             onAddNote={onAddNote}
             onAttachFiles={onAttachFiles}
             onClose={onClose}
+            onActionCollapsed={onActionCollapsed}
           />
         )}
       </div>
@@ -234,24 +236,30 @@ function MetadataRow({
   )
 }
 
-// ─── Reopen-only path (CLOSED tickets) ──────────────────────────────
-
 function ReopenAction({
   ticketId,
   busy,
   supportSystemDown,
   onReopen,
+  onActionCollapsed,
 }: {
   ticketId: string
   busy: boolean
   supportSystemDown: boolean
   onReopen: TicketRowProps['onReopen']
+  onActionCollapsed: TicketRowProps['onActionCollapsed']
 }) {
+  const handleReopen = async () => {
+    const ok = await onReopen(ticketId)
+    // Reopen flips status to OPEN — current action set (just "Reopen")
+    // is now stale; collapse so the next expand shows the OPEN actions.
+    if (ok) onActionCollapsed()
+  }
   return (
     <div className="flex justify-end">
       <Button
         type="button"
-        onClick={() => void onReopen(ticketId)}
+        onClick={() => void handleReopen()}
         disabled={busy || supportSystemDown}
         loading={busy}
       >
@@ -261,8 +269,6 @@ function ReopenAction({
   )
 }
 
-// ─── Open path (OPEN tickets) ───────────────────────────────────────
-
 function OpenActions({
   ticket,
   busy,
@@ -270,6 +276,7 @@ function OpenActions({
   onAddNote,
   onAttachFiles,
   onClose,
+  onActionCollapsed,
 }: {
   ticket: AnyTicket
   busy: boolean
@@ -277,6 +284,7 @@ function OpenActions({
   onAddNote: TicketRowProps['onAddNote']
   onAttachFiles: TicketRowProps['onAttachFiles']
   onClose: TicketRowProps['onClose']
+  onActionCollapsed: TicketRowProps['onActionCollapsed']
 }) {
   const [mode, setMode] = useState<ActionMode>(null)
   const [commentText, setCommentText] = useState('')
@@ -287,14 +295,22 @@ function OpenActions({
 
   const disabled = busy || supportSystemDown
 
+  // Reset the sub-affordance state when the user cancels OR after a
+  // successful submit. Both paths clear the textarea AND any staged
+  // attachments, even when the cancelled mode wasn't the attachment
+  // mode (defensive — symmetry prevents files leaking across mode
+  // toggles within an open drawer).
+  const resetSubAffordance = () => {
+    setMode(null)
+    setCommentText('')
+    attachments.clear()
+  }
+
   const submitComment = async () => {
     const trimmed = commentText.trim()
     if (trimmed.length === 0 || disabled) return
     const ok = await onAddNote(ticket.id, trimmed)
-    if (ok) {
-      setCommentText('')
-      setMode(null)
-    }
+    if (ok) resetSubAffordance()
   }
 
   const submitAttachments = async () => {
@@ -302,21 +318,20 @@ function OpenActions({
       return
     }
     const ok = await onAttachFiles(ticket.id, attachments.readyAttachments)
-    if (ok) {
-      attachments.clear()
-      setMode(null)
-    }
+    if (ok) resetSubAffordance()
   }
 
   const confirmClose = async () => {
     setCloseDialogOpen(false)
-    await onClose(ticket.id, resolution.trim() || undefined)
+    const ok = await onClose(ticket.id, resolution.trim() || undefined)
     setResolution('')
+    // Close flips status to CLOSED — current action set is stale;
+    // collapse the drawer so re-expand shows the Reopen-only view.
+    if (ok) onActionCollapsed()
   }
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Sub-affordance: Add Comment */}
       {mode === 'comment' && (
         <div className="flex flex-col gap-2">
           <Textarea
@@ -325,16 +340,13 @@ function OpenActions({
             placeholder="Add a note for the support team…"
             disabled={disabled}
             rows={3}
-            maxLength={COMMENT_MAX_CHARS}
+            maxLength={TICKET_TEXT_MAX_CHARS}
           />
           <div className="flex justify-end gap-2">
             <Button
               type="button"
               variant="transparent"
-              onClick={() => {
-                setCommentText('')
-                setMode(null)
-              }}
+              onClick={resetSubAffordance}
               disabled={disabled}
             >
               Cancel
@@ -351,7 +363,6 @@ function OpenActions({
         </div>
       )}
 
-      {/* Sub-affordance: Attach files */}
       {mode === 'attach' && (
         <div className="flex flex-col gap-2">
           <ChatAttachmentChipStrip
@@ -369,10 +380,7 @@ function OpenActions({
             <Button
               type="button"
               variant="transparent"
-              onClick={() => {
-                attachments.clear()
-                setMode(null)
-              }}
+              onClick={resetSubAffordance}
               disabled={disabled}
             >
               Cancel
@@ -393,7 +401,6 @@ function OpenActions({
         </div>
       )}
 
-      {/* Default action strip */}
       {mode === null && (
         <div className="flex justify-end gap-2 flex-wrap">
           <Button
@@ -423,7 +430,6 @@ function OpenActions({
         </div>
       )}
 
-      {/* Close confirmation dialog */}
       <AlertDialog open={closeDialogOpen} onOpenChange={setCloseDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -438,7 +444,7 @@ function OpenActions({
             onChange={(e) => setResolution(e.target.value)}
             placeholder="Resolution (optional)"
             rows={3}
-            maxLength={COMMENT_MAX_CHARS}
+            maxLength={TICKET_TEXT_MAX_CHARS}
           />
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
