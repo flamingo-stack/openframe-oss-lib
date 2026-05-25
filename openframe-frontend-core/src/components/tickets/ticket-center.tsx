@@ -158,8 +158,7 @@ function TicketCenterAuthed({ toast }: { toast: typeof defaultToast }) {
                 onToggle={toggleRow}
                 busy={isOptimistic(ticket) ? false : actions.isRowBusy(ticket.id)}
                 supportSystemDown={supportSystemDown}
-                onAddNote={actions.addNote}
-                onAttachFiles={actions.attachFiles}
+                onSendMessage={actions.sendMessage}
                 onClose={actions.closeTicket}
                 onReopen={actions.reopenTicket}
                 onActionCollapsed={() => setExpandedTicketId(null)}

@@ -106,8 +106,10 @@ export interface TicketRef {
 
 export interface UseTicketActionsReturn {
   submitTicket: (input: SubmitTicketInput) => Promise<boolean>
-  addNote: (ticket: TicketRef, content: string) => Promise<boolean>
-  attachFiles: (ticket: TicketRef, attachments: ChatAttachment[]) => Promise<boolean>
+  /** Single combined "reply" action — text + optional attachments
+   *  delivered as ONE HubSpot Note engagement (one bubble in the
+   *  timeline). Server creates a merged note when both are present. */
+  sendMessage: (ticket: TicketRef, text: string, attachments: ChatAttachment[]) => Promise<boolean>
   closeTicket: (ticket: TicketRef, resolution?: string) => Promise<boolean>
   reopenTicket: (ticket: TicketRef) => Promise<boolean>
   /** `true` while the form-level submit is in flight. */
@@ -396,15 +398,22 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
     [setRowBusy, enqueue, proposeAndConfirm, queryClient, toast, surfaceError, removeTicketFromCache],
   )
 
-  const addNote = useCallback(
-    (ticket: TicketRef, content: string) =>
-      updateTicket(ticket, { content_addendum: content.trim() }, TOAST_COPY.comment_success, 'add comment'),
-    [updateTicket],
-  )
-
-  const attachFiles = useCallback(
-    (ticket: TicketRef, attachments: ChatAttachment[]) =>
-      updateTicket(ticket, { attachments }, TOAST_COPY.attach_success, 'attach files'),
+  const sendMessage = useCallback(
+    (ticket: TicketRef, text: string, attachments: ChatAttachment[]) => {
+      const trimmed = text.trim()
+      const hasText = trimmed.length > 0
+      const hasFiles = attachments.length > 0
+      if (!hasText && !hasFiles) return Promise.resolve(false)
+      return updateTicket(
+        ticket,
+        {
+          ...(hasText ? { content_addendum: trimmed } : {}),
+          ...(hasFiles ? { attachments } : {}),
+        },
+        TOAST_COPY.comment_success,
+        'send message',
+      )
+    },
     [updateTicket],
   )
 
@@ -431,14 +440,13 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
   return useMemo<UseTicketActionsReturn>(
     () => ({
       submitTicket,
-      addNote,
-      attachFiles,
+      sendMessage,
       closeTicket,
       reopenTicket,
       isSubmittingForm,
       isRowBusy,
     }),
-    [submitTicket, addNote, attachFiles, closeTicket, reopenTicket, isSubmittingForm, isRowBusy],
+    [submitTicket, sendMessage, closeTicket, reopenTicket, isSubmittingForm, isRowBusy],
   )
 }
 

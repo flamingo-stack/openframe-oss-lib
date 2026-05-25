@@ -47,8 +47,6 @@ import { useTicketEngagements } from './hooks/use-ticket-engagements'
 import type { AnyTicket } from './types'
 import { isOptimistic, TICKET_TEXT_MAX_CHARS } from './types'
 
-type ActionMode = null | 'comment' | 'attach'
-
 /** Identity bundle: local mirror UUID + HubSpot external_id. Actions
  *  send `external_id` to HubSpot (the only id it recognizes) and use
  *  `id` for the React-side mutex + cache. */
@@ -60,9 +58,12 @@ export interface TicketRowProps {
   onToggle: (ticketId: string) => void
   busy: boolean
   supportSystemDown: boolean
-  onAddNote: (ticket: TicketRef, content: string) => Promise<boolean>
-  onAttachFiles: (
+  /** Single combined "reply" — text + optional attachments delivered as
+   *  ONE Note engagement. Replaces the previous Add Comment / Attach
+   *  Files split: a reply IS a message that can carry both. */
+  onSendMessage: (
     ticket: TicketRef,
+    text: string,
     attachments: import('../chat/utils/chat-attachment-markdown').ChatAttachment[],
   ) => Promise<boolean>
   onClose: (ticket: TicketRef, resolution?: string) => Promise<boolean>
@@ -78,8 +79,8 @@ export function TicketRow({
   onToggle,
   busy,
   supportSystemDown,
-  onAddNote,
-  onAttachFiles,
+  onSendMessage,
+  
   onClose,
   onReopen,
   onActionCollapsed,
@@ -122,8 +123,7 @@ export function TicketRow({
           busy={busy}
           supportSystemDown={supportSystemDown}
           isClosed={isClosed}
-          onAddNote={onAddNote}
-          onAttachFiles={onAttachFiles}
+          onSendMessage={onSendMessage}
           onClose={onClose}
           onReopen={onReopen}
           onActionCollapsed={onActionCollapsed}
@@ -138,8 +138,7 @@ interface DrawerBodyProps {
   busy: boolean
   supportSystemDown: boolean
   isClosed: boolean
-  onAddNote: TicketRowProps['onAddNote']
-  onAttachFiles: TicketRowProps['onAttachFiles']
+  onSendMessage: TicketRowProps['onSendMessage']
   onClose: TicketRowProps['onClose']
   onReopen: TicketRowProps['onReopen']
   onActionCollapsed: TicketRowProps['onActionCollapsed']
@@ -150,8 +149,8 @@ function DrawerBody({
   busy,
   supportSystemDown,
   isClosed,
-  onAddNote,
-  onAttachFiles,
+  onSendMessage,
+  
   onClose,
   onReopen,
   onActionCollapsed,
@@ -199,8 +198,7 @@ function DrawerBody({
             ticket={ticket}
             busy={busy}
             supportSystemDown={supportSystemDown}
-            onAddNote={onAddNote}
-            onAttachFiles={onAttachFiles}
+            onSendMessage={onSendMessage}
             onClose={onClose}
             onActionCollapsed={onActionCollapsed}
           />
@@ -319,7 +317,7 @@ function TimelineBubble({ label, text, attachments }: TimelineBubbleProps) {
   const hasAttachments = attachments.length > 0
   if (!hasText && !hasAttachments) return null
   return (
-    <div className="rounded-md border border-ods-border bg-ods-card p-3">
+    <div className="rounded-md border border-ods-border bg-ods-bg p-3">
       <p className="text-[10px] font-medium text-ods-text-secondary uppercase tracking-wider mb-1">
         {label}
       </p>
@@ -345,7 +343,7 @@ function AttachmentChip({
   const name = file.name ?? `file-${file.id}`
   const sizeLabel = file.size ? formatBytes(file.size) : null
   const className =
-    'inline-flex items-center gap-2 rounded-md border border-ods-border bg-ods-bg px-2 py-1 text-xs text-ods-text-primary max-w-full'
+    'inline-flex items-center gap-2 rounded-md border border-ods-border bg-ods-card px-2 py-1 text-xs text-ods-text-primary max-w-full'
   const inner = (
     <>
       <span className="text-ods-text-secondary shrink-0">📎</span>
@@ -416,54 +414,38 @@ function OpenActions({
   ticket,
   busy,
   supportSystemDown,
-  onAddNote,
-  onAttachFiles,
+  onSendMessage,
   onClose,
   onActionCollapsed,
 }: {
   ticket: AnyTicket
   busy: boolean
   supportSystemDown: boolean
-  onAddNote: TicketRowProps['onAddNote']
-  onAttachFiles: TicketRowProps['onAttachFiles']
+  onSendMessage: TicketRowProps['onSendMessage']
   onClose: TicketRowProps['onClose']
   onActionCollapsed: TicketRowProps['onActionCollapsed']
 }) {
-  const [mode, setMode] = useState<ActionMode>(null)
-  const [commentText, setCommentText] = useState('')
+  const [messageText, setMessageText] = useState('')
   const [resolution, setResolution] = useState('')
   const [closeDialogOpen, setCloseDialogOpen] = useState(false)
 
   const attachments = useChatAttachments()
 
   const disabled = busy || supportSystemDown
-
-  // Reset the sub-affordance state when the user cancels OR after a
-  // successful submit. Both paths clear the textarea AND any staged
-  // attachments, even when the cancelled mode wasn't the attachment
-  // mode (defensive — symmetry prevents files leaking across mode
-  // toggles within an open drawer).
-  const resetSubAffordance = () => {
-    setMode(null)
-    setCommentText('')
-    attachments.clear()
-  }
-
   const ticketRef: TicketRef = { id: ticket.id, external_id: ticket.external_id }
 
-  const submitComment = async () => {
-    const trimmed = commentText.trim()
-    if (trimmed.length === 0 || disabled) return
-    const ok = await onAddNote(ticketRef, trimmed)
-    if (ok) resetSubAffordance()
-  }
+  const hasText = messageText.trim().length > 0
+  const hasReadyFiles = attachments.readyAttachments.length > 0
+  const canSend =
+    !disabled && (hasText || hasReadyFiles) && !attachments.hasInflightUploads
 
-  const submitAttachments = async () => {
-    if (attachments.readyAttachments.length === 0 || attachments.hasInflightUploads || disabled) {
-      return
+  const sendMessage = async () => {
+    if (!canSend) return
+    const ok = await onSendMessage(ticketRef, messageText.trim(), attachments.readyAttachments)
+    if (ok) {
+      setMessageText('')
+      attachments.clear()
     }
-    const ok = await onAttachFiles(ticketRef, attachments.readyAttachments)
-    if (ok) resetSubAffordance()
   }
 
   const confirmClose = async () => {
@@ -477,103 +459,53 @@ function OpenActions({
 
   return (
     <div className="flex flex-col gap-3">
-      {mode === 'comment' && (
-        <div className="flex flex-col gap-2">
-          <Textarea
-            value={commentText}
-            onChange={(e) => setCommentText(e.target.value)}
-            placeholder="Add a note for the support team…"
-            disabled={disabled}
-            rows={3}
-            maxLength={TICKET_TEXT_MAX_CHARS}
-          />
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="transparent"
-              onClick={resetSubAffordance}
-              disabled={disabled}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={() => void submitComment()}
-              disabled={disabled || commentText.trim().length === 0}
-              loading={busy}
-            >
-              Post comment
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {mode === 'attach' && (
-        <div className="flex flex-col gap-2">
-          <ChatAttachmentChipStrip
-            attachments={attachments.attachments}
-            onRemove={attachments.removeAttachment}
-            disabled={disabled}
-          />
-          <div className="flex justify-end items-center gap-2">
+      {/* Always-visible composer — type a reply + optionally attach
+          files, send as ONE message. Mirrors a chat message bubble:
+          one author, one timestamp, one set of attachments. */}
+      <div className="flex flex-col gap-2">
+        <Textarea
+          value={messageText}
+          onChange={(e) => setMessageText(e.target.value)}
+          placeholder="Type a reply… (attach files if needed)"
+          disabled={disabled}
+          rows={3}
+          maxLength={TICKET_TEXT_MAX_CHARS}
+        />
+        <ChatAttachmentChipStrip
+          attachments={attachments.attachments}
+          onRemove={attachments.removeAttachment}
+          disabled={disabled}
+        />
+        <div className="flex justify-between items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
             <ChatAttachmentAddButton
               attachmentsEnabled={!supportSystemDown}
               attachmentsCount={attachments.attachments.length}
               onAddFiles={attachments.addFiles}
               disabled={disabled}
             />
+            <span className="text-xs text-ods-text-secondary">Attach files</span>
+          </div>
+          <div className="flex items-center gap-2">
             <Button
               type="button"
-              variant="transparent"
-              onClick={resetSubAffordance}
+              variant="destructive"
+              onClick={() => setCloseDialogOpen(true)}
               disabled={disabled}
             >
-              Cancel
+              Close ticket
             </Button>
             <Button
               type="button"
-              onClick={() => void submitAttachments()}
-              disabled={
-                disabled ||
-                attachments.readyAttachments.length === 0 ||
-                attachments.hasInflightUploads
-              }
+              onClick={() => void sendMessage()}
+              disabled={!canSend}
               loading={busy}
             >
-              Upload
+              Send reply
             </Button>
           </div>
         </div>
-      )}
-
-      {mode === null && (
-        <div className="flex justify-end gap-2 flex-wrap">
-          <Button
-            type="button"
-            variant="transparent"
-            onClick={() => setMode('comment')}
-            disabled={disabled}
-          >
-            Add comment
-          </Button>
-          <Button
-            type="button"
-            variant="transparent"
-            onClick={() => setMode('attach')}
-            disabled={disabled}
-          >
-            Attach files
-          </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={() => setCloseDialogOpen(true)}
-            disabled={disabled}
-          >
-            Close ticket
-          </Button>
-        </div>
-      )}
+      </div>
 
       <ModalV2 isOpen={closeDialogOpen} onClose={() => setCloseDialogOpen(false)}>
         <ModalV2Header>
