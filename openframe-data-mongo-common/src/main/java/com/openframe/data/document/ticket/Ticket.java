@@ -50,8 +50,6 @@ public class Ticket {
 
     private TicketStatusKind statusKind;
 
-    private boolean aiDisabled;
-
     private TicketCreationSource creationSource;
 
     private TicketOwner owner;
@@ -80,4 +78,8 @@ public class Ticket {
     private Instant updatedAt;
 
     private Instant resolvedAt;
+
+    public boolean isAiDisabled() {
+        return statusKind != null && statusKind != TicketStatusKind.AI_ASSISTANCE;
+    }
 }
