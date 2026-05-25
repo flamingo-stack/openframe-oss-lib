@@ -55,11 +55,22 @@ export function useRealtimeChunkProcessor(
         })
       }
 
+      // Resumed dialog: a MESSAGE_START already fired server-side. Treat
+      // subsequent continuation chunks (after the next MESSAGE_END) as
+      // post-stream so they append into the existing bubble instead of
+      // replacing its content via the cold-start cumulative path.
+      hasEverStreamedRef.current = true
       hasInitializedWithData.current = true
     }
   }, [initialState, callbacks])
 
   const isInStreamRef = useRef(false)
+  // Distinguishes post-MESSAGE_END continuation (append into prior bubble)
+  // from cold-start before any MESSAGE_START (cumulative; otherwise
+  // appendSegmentsToLastAssistant silently drops the chunk when no
+  // assistant bubble exists yet). Flipped true on MESSAGE_START and on
+  // resumed-dialog initializeWithState.
+  const hasEverStreamedRef = useRef(false)
 
   // Track pending escalated approvals (single or batch)
   const pendingEscalatedRef = useRef<
@@ -85,6 +96,7 @@ export function useRealtimeChunkProcessor(
       switch (action.action) {
         case 'message_start':
           isInStreamRef.current = true
+          hasEverStreamedRef.current = true
           callbacks.onStreamStart?.()
           accumulator.resetSegments()
           break
@@ -101,17 +113,43 @@ export function useRealtimeChunkProcessor(
 
         case 'text': {
           const segments = accumulator.appendText(action.text)
-          callbacks.onSegmentsUpdate?.(segments)
+          // Append-mode only for *true* post-stream continuation (after a
+          // MESSAGE_END we actually saw). Cold-start chunks (no prior
+          // MESSAGE_START) emit cumulative segments so the consumer can
+          // spawn the first assistant bubble — otherwise appendSegmentsToLastAssistant
+          // silently drops the chunk when no last assistant exists.
+          if (isInStreamRef.current || !hasEverStreamedRef.current) {
+            callbacks.onSegmentsUpdate?.(segments)
+          } else {
+            callbacks.onSegmentsUpdate?.([{ type: 'text', text: action.text }], { append: true })
+          }
           break
         }
 
         case 'thinking': {
           const segments = accumulator.appendThinking(action.text)
-          callbacks.onSegmentsUpdate?.(segments)
+          if (isInStreamRef.current || !hasEverStreamedRef.current) {
+            callbacks.onSegmentsUpdate?.(segments)
+          } else {
+            callbacks.onSegmentsUpdate?.([{ type: 'thinking', text: action.text }], { append: true })
+          }
           break
         }
 
         case 'tool_execution': {
+          // Post-MESSAGE_END tool chunks (cancellations / async batch
+          // results for a batch in a prior bubble) flow only through the
+          // cross-message updater. Skipping the accumulator avoids
+          // pushing a standalone segment that the next text chunk would
+          // replay into a new bubble.
+          if (!isInStreamRef.current && callbacks.onToolExecuted) {
+            callbacks.onToolExecuted(action.segment)
+            break
+          }
+          // In-stream: accumulator-driven update of the streaming bubble
+          // is the source of truth. Don't fire onToolExecuted here — its
+          // cross-message scan is first-match-wins and could touch a
+          // same-execId segment in a prior bubble (agent retry case).
           const segments = accumulator.addToolExecution(action.segment)
           callbacks.onSegmentsUpdate?.(segments)
           break
@@ -234,11 +272,20 @@ export function useRealtimeChunkProcessor(
               callbacks.onSegmentsUpdate?.(segments)
             }
           } else {
-            const segments = accumulator.updateApprovalStatus(requestId, status)
-            callbacks.onSegmentsUpdate?.(segments)
+            // Always keep the in-memory accumulator in sync so a following
+            // text/tool chunk replays the resolved status into the message.
+            accumulator.updateApprovalStatus(requestId, status)
+            // When the consumer wires cross-message resolution via
+            // `onApprovalResolved`, skip `onSegmentsUpdate` here: this path
+            // routes through `ensureAssistantMessage` + `updateStreamingMessageSegments`,
+            // which adopts/creates an assistant bubble and replays the
+            // accumulator's segments into it — turning a status flip into a
+            // bubble overwrite that wipes the original card.
+            if (!callbacks.onApprovalResolved) {
+              callbacks.onSegmentsUpdate?.(accumulator.getSegments())
+            }
           }
-          // approvalType from the result is informational; not consumed downstream yet.
-          void approvalType
+          callbacks.onApprovalResolved?.(requestId, status, approvalType)
           break
         }
 
