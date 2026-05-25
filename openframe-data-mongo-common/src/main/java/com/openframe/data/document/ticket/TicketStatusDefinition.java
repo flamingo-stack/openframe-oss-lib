@@ -34,7 +34,7 @@ public class TicketStatusDefinition {
 
     private String color;
 
-    private Integer position;
+    private String position;
 
     @CreatedDate
     private Instant createdAt;
