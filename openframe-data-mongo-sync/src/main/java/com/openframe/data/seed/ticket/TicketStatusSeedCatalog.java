@@ -18,11 +18,11 @@ public final class TicketStatusSeedCatalog {
     public static final String NAME_ARCHIVED = "Archived";
     public static final String NAME_ON_HOLD = "On Hold";
 
-    public static final String COLOR_AI_ASSISTANCE = "#7C3AED";
-    public static final String COLOR_TECH_REQUIRED = "#F59E0B";
-    public static final String COLOR_RESOLVED = "#10B981";
-    public static final String COLOR_ARCHIVED = "#6B7280";
-    public static final String COLOR_ON_HOLD_DEFAULT = "#FACC15";
+    public static final String COLOR_AI_ASSISTANCE = "#B39DDB";
+    public static final String COLOR_TECH_REQUIRED = "#E1B32F";
+    public static final String COLOR_RESOLVED = "#5EA62E";
+    public static final String COLOR_ARCHIVED = "#B0B0B0";
+    public static final String COLOR_ON_HOLD_DEFAULT = "#F0C674";
 
     public static final int POSITION_AI_ASSISTANCE = -1000;
     public static final int POSITION_TECH_REQUIRED = -100;
