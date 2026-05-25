@@ -90,16 +90,30 @@ export interface UseTicketActionsOptions {
   onSupportSystemDown: () => void
 }
 
+/**
+ * Identity bundle used by every row action: the LOCAL mirror UUID
+ * (drives the React-side mutex + optimistic cache removal) AND the
+ * HubSpot ticket id (`external_id` — drives the server call, the only
+ * id HubSpot REST recognizes). Decoupling these is mandatory: passing
+ * the UUID to HubSpot gets you a 404 "Object not found. objectId are
+ * usually numeric"; passing the external id to the React-side mutex
+ * breaks per-row disable when the cache differs.
+ */
+export interface TicketRef {
+  id: string
+  external_id: string
+}
+
 export interface UseTicketActionsReturn {
   submitTicket: (input: SubmitTicketInput) => Promise<boolean>
-  addNote: (ticketId: string, content: string) => Promise<boolean>
-  attachFiles: (ticketId: string, attachments: ChatAttachment[]) => Promise<boolean>
-  closeTicket: (ticketId: string, resolution?: string) => Promise<boolean>
-  reopenTicket: (ticketId: string) => Promise<boolean>
+  addNote: (ticket: TicketRef, content: string) => Promise<boolean>
+  attachFiles: (ticket: TicketRef, attachments: ChatAttachment[]) => Promise<boolean>
+  closeTicket: (ticket: TicketRef, resolution?: string) => Promise<boolean>
+  reopenTicket: (ticket: TicketRef) => Promise<boolean>
   /** `true` while the form-level submit is in flight. */
   isSubmittingForm: boolean
-  /** Per-row in-flight set (read-only). UI uses `isRowBusy(id)`. */
-  isRowBusy: (ticketId: string) => boolean
+  /** Per-row in-flight set (read-only). UI uses `isRowBusy(localId)`. */
+  isRowBusy: (localId: string) => boolean
 }
 
 export function useTicketActions(options: UseTicketActionsOptions): UseTicketActionsReturn {
@@ -338,16 +352,22 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
 
   const updateTicket = useCallback(
     async (
-      args: UpdateTicketArgs,
+      ticket: TicketRef,
+      serverArgs: Omit<UpdateTicketArgs, 'ticket_id'>,
       successCopy: { title: string; description?: string },
       action: string,
     ): Promise<boolean> => {
-      // Synchronous ref guard for per-row double-click defense.
-      if (busyRowsRef.current.has(args.ticket_id)) return false
-      setRowBusy(args.ticket_id, true)
+      // Mutex keyed on the LOCAL mirror id (stable across the React tree
+      // + matches the cache row's `id` for optimistic removal). Server
+      // arg uses `external_id` — HubSpot's only-numeric ticket id.
+      if (busyRowsRef.current.has(ticket.id)) return false
+      setRowBusy(ticket.id, true)
       try {
         return await enqueue(async () => {
-          await proposeAndConfirm('update_ticket', args as unknown as Record<string, unknown>)
+          await proposeAndConfirm('update_ticket', {
+            ...serverArgs,
+            ticket_id: ticket.external_id,
+          } as unknown as Record<string, unknown>)
           toast(successCopy)
           await queryClient.invalidateQueries({ queryKey: ['tickets'] })
           return true
@@ -355,11 +375,11 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
       } catch (err) {
         const mapped = surfaceError(err, action)
         if (mapped.removeRowFromCache) {
-          removeTicketFromCache(args.ticket_id)
+          removeTicketFromCache(ticket.id)
         }
         return false
       } finally {
-        setRowBusy(args.ticket_id, false)
+        setRowBusy(ticket.id, false)
       }
     },
     // `busyRowsRef` is read via .current — needs no dep entry. `busyRows`
@@ -370,22 +390,22 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
   )
 
   const addNote = useCallback(
-    (ticketId: string, content: string) =>
-      updateTicket({ ticket_id: ticketId, content_addendum: content.trim() }, TOAST_COPY.comment_success, 'add comment'),
+    (ticket: TicketRef, content: string) =>
+      updateTicket(ticket, { content_addendum: content.trim() }, TOAST_COPY.comment_success, 'add comment'),
     [updateTicket],
   )
 
   const attachFiles = useCallback(
-    (ticketId: string, attachments: ChatAttachment[]) =>
-      updateTicket({ ticket_id: ticketId, attachments }, TOAST_COPY.attach_success, 'attach files'),
+    (ticket: TicketRef, attachments: ChatAttachment[]) =>
+      updateTicket(ticket, { attachments }, TOAST_COPY.attach_success, 'attach files'),
     [updateTicket],
   )
 
   const closeTicket = useCallback(
-    (ticketId: string, resolution?: string) =>
+    (ticket: TicketRef, resolution?: string) =>
       updateTicket(
+        ticket,
         {
-          ticket_id: ticketId,
           status: 'CLOSED',
           ...(resolution?.trim() ? { resolution: resolution.trim() } : {}),
         },
@@ -396,8 +416,8 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
   )
 
   const reopenTicket = useCallback(
-    (ticketId: string) =>
-      updateTicket({ ticket_id: ticketId, status: 'OPEN' }, TOAST_COPY.reopen_success, 'reopen ticket'),
+    (ticket: TicketRef) =>
+      updateTicket(ticket, { status: 'OPEN' }, TOAST_COPY.reopen_success, 'reopen ticket'),
     [updateTicket],
   )
 

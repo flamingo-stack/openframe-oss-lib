@@ -50,19 +50,24 @@ import { isOptimistic, TICKET_TEXT_MAX_CHARS } from './types'
 
 type ActionMode = null | 'comment' | 'attach'
 
+/** Identity bundle: local mirror UUID + HubSpot external_id. Actions
+ *  send `external_id` to HubSpot (the only id it recognizes) and use
+ *  `id` for the React-side mutex + cache. */
+type TicketRef = { id: string; external_id: string }
+
 export interface TicketRowProps {
   ticket: AnyTicket
   expanded: boolean
   onToggle: (ticketId: string) => void
   busy: boolean
   supportSystemDown: boolean
-  onAddNote: (ticketId: string, content: string) => Promise<boolean>
+  onAddNote: (ticket: TicketRef, content: string) => Promise<boolean>
   onAttachFiles: (
-    ticketId: string,
+    ticket: TicketRef,
     attachments: import('../chat/utils/chat-attachment-markdown').ChatAttachment[],
   ) => Promise<boolean>
-  onClose: (ticketId: string, resolution?: string) => Promise<boolean>
-  onReopen: (ticketId: string) => Promise<boolean>
+  onClose: (ticket: TicketRef, resolution?: string) => Promise<boolean>
+  onReopen: (ticket: TicketRef) => Promise<boolean>
   /** Called after a successful close/reopen so the parent can collapse
    *  the drawer (status flipped — current action set is now stale). */
   onActionCollapsed: () => void
@@ -195,7 +200,7 @@ function DrawerBody({
       <div className="border-t border-ods-border pt-4">
         {isClosed ? (
           <ReopenAction
-            ticketId={ticket.id}
+            ticketRef={{ id: ticket.id, external_id: ticket.external_id }}
             busy={busy}
             supportSystemDown={supportSystemDown}
             onReopen={onReopen}
@@ -237,20 +242,20 @@ function MetadataRow({
 }
 
 function ReopenAction({
-  ticketId,
+  ticketRef,
   busy,
   supportSystemDown,
   onReopen,
   onActionCollapsed,
 }: {
-  ticketId: string
+  ticketRef: TicketRef
   busy: boolean
   supportSystemDown: boolean
   onReopen: TicketRowProps['onReopen']
   onActionCollapsed: TicketRowProps['onActionCollapsed']
 }) {
   const handleReopen = async () => {
-    const ok = await onReopen(ticketId)
+    const ok = await onReopen(ticketRef)
     // Reopen flips status to OPEN — current action set (just "Reopen")
     // is now stale; collapse so the next expand shows the OPEN actions.
     if (ok) onActionCollapsed()
@@ -306,10 +311,12 @@ function OpenActions({
     attachments.clear()
   }
 
+  const ticketRef: TicketRef = { id: ticket.id, external_id: ticket.external_id }
+
   const submitComment = async () => {
     const trimmed = commentText.trim()
     if (trimmed.length === 0 || disabled) return
-    const ok = await onAddNote(ticket.id, trimmed)
+    const ok = await onAddNote(ticketRef, trimmed)
     if (ok) resetSubAffordance()
   }
 
@@ -317,13 +324,13 @@ function OpenActions({
     if (attachments.readyAttachments.length === 0 || attachments.hasInflightUploads || disabled) {
       return
     }
-    const ok = await onAttachFiles(ticket.id, attachments.readyAttachments)
+    const ok = await onAttachFiles(ticketRef, attachments.readyAttachments)
     if (ok) resetSubAffordance()
   }
 
   const confirmClose = async () => {
     setCloseDialogOpen(false)
-    const ok = await onClose(ticket.id, resolution.trim() || undefined)
+    const ok = await onClose(ticketRef, resolution.trim() || undefined)
     setResolution('')
     // Close flips status to CLOSED — current action set is stale;
     // collapse the drawer so re-expand shows the Reopen-only view.
