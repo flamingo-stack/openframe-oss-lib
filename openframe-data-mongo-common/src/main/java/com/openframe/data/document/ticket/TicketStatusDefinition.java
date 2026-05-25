@@ -19,7 +19,6 @@ import java.time.Instant;
 @AllArgsConstructor
 @Document(collection = "ticket_statuses")
 @CompoundIndexes({
-        @CompoundIndex(name = "name_unique", def = "{'name': 1}", unique = true),
         @CompoundIndex(name = "kind_unique", def = "{'kind': 1}", unique = true,
                 partialFilter = "{'kind': {$in: ['AI_ASSISTANCE', 'TECH_REQUIRED', 'RESOLVED', 'ARCHIVED']}}")
 })
