@@ -42,6 +42,8 @@ import {
 } from '../chat/chat-attachment-bar'
 import { useChatAttachments } from '../chat/hooks/use-chat-attachments'
 import { formatRelativeTime } from '../../utils/date-utils'
+import { cn } from '../../utils/cn'
+import { useTicketEngagements } from './hooks/use-ticket-engagements'
 import type { AnyTicket } from './types'
 import { isOptimistic, TICKET_TEXT_MAX_CHARS } from './types'
 
@@ -178,15 +180,9 @@ function DrawerBody({
 
       <div className="border-t border-ods-border pt-4">
         <p className="text-xs font-medium text-ods-text-secondary mb-2 uppercase tracking-wider">
-          Description &amp; Updates
+          Conversation
         </p>
-        {ticket.body ? (
-          <TicketBodyPanel body={ticket.body} />
-        ) : (
-          <p className="text-sm text-ods-text-secondary italic">
-            (No description provided.)
-          </p>
-        )}
+        <TicketTimelinePanel ticket={ticket} />
       </div>
 
       <div className="border-t border-ods-border pt-4">
@@ -234,51 +230,153 @@ function MetadataRow({
 }
 
 /**
- * Render the ticket body as a vertical stack of turn paragraphs.
+ * Render the ticket conversation as a chronological timeline of
+ * message bubbles. Top: the original ticket description (`ticket.body`).
+ * Below: every Note engagement attached to the ticket via the new
+ * `useTicketEngagements` hook — each with its own attachments rendered
+ * as file chips.
  *
- * Why split: the server runs every ticket through `htmlToPreview` which
- * does `replace(/\s+/g, ' ')` — every newline collapses into a single
- * space. The `update_ticket` executor inserts a literal `\n\n---\n\n`
- * between turns when appending a comment, and the surrounding `\n\n`
- * collapse to spaces but the `---` survives as ` --- `. We split on
- * that delimiter (with optional surrounding whitespace) to recover
- * paragraph boundaries.
- *
- * First chunk = original ticket message (oldest, on top).
- * Subsequent chunks = comments / `[Resolution]` lines in chronological
- * order. Each turn renders inside its own muted bordered panel so the
- * reader can tell where one comment ends and the next begins.
+ * Why a timeline (not the previous body-split-on-`---` hack): comments
+ * were getting jammed into the ticket's `content` property AND
+ * attachments were stored as separate Note engagements — two storage
+ * locations that the drawer had to reconcile. The new model surfaces
+ * notes as first-class messages with their attachments inline. Legacy
+ * tickets whose old comments STILL live inside `ticket.body` (joined
+ * by ` --- `) split on that delimiter so the historical conversation
+ * doesn't get lost during the transition.
  */
 const TURN_SEPARATOR_RE = /\s+---\s+/g
 
-function TicketBodyPanel({ body }: { body: string }) {
-  const turns = body.split(TURN_SEPARATOR_RE).map((t) => t.trim()).filter(Boolean)
-  if (turns.length === 0) {
+function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
+  // Optimistic placeholders don't have a real external_id yet — skip
+  // the engagement fetch until the real ticket lands.
+  const externalId = isOptimistic(ticket) ? null : ticket.external_id
+  const { engagements, isLoading } = useTicketEngagements(externalId, !!externalId)
+
+  // Split the body into legacy turns (original + any pre-engagement
+  // comments that were appended to content via the old code path).
+  // The first turn is always the original message; remaining turns
+  // are legacy addendums (newer tickets won't have them).
+  const bodyTurns = ticket.body
+    ? ticket.body.split(TURN_SEPARATOR_RE).map((t) => t.trim()).filter(Boolean)
+    : []
+
+  if (bodyTurns.length === 0 && engagements.length === 0 && !isLoading) {
     return (
-      <p className="text-sm text-ods-text-secondary italic">(No description provided.)</p>
+      <p className="text-sm text-ods-text-secondary italic">
+        (No conversation yet.)
+      </p>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-2 max-h-96 overflow-y-auto">
+      {bodyTurns.map((turn, i) => {
+        const isResolution = turn.startsWith('[Resolution]')
+        const label = i === 0 ? 'Original message' : isResolution ? 'Resolution' : `Update ${i}`
+        const text = isResolution ? turn.replace(/^\[Resolution\]\s*/, '') : turn
+        return (
+          <TimelineBubble
+            key={`body-${i}-${turn.slice(0, 24)}`}
+            label={label}
+            text={text}
+            attachments={[]}
+          />
+        )
+      })}
+
+      {engagements.map((eng) => (
+        <TimelineBubble
+          key={eng.id}
+          label={formatEngagementLabel(eng.createdAt)}
+          text={eng.body ?? ''}
+          attachments={eng.attachments}
+        />
+      ))}
+
+      {isLoading && (
+        <p className="text-xs text-ods-text-secondary italic px-1">Loading conversation…</p>
+      )}
+    </div>
+  )
+}
+
+function formatEngagementLabel(createdAt: string): string {
+  if (!createdAt) return 'Update'
+  const date = new Date(createdAt)
+  if (Number.isNaN(date.getTime())) return 'Update'
+  return formatRelativeTime(date)
+}
+
+interface TimelineBubbleProps {
+  label: string
+  text: string
+  attachments: import('./hooks/use-ticket-engagements').TicketEngagementFile[]
+}
+
+function TimelineBubble({ label, text, attachments }: TimelineBubbleProps) {
+  const hasText = text.trim().length > 0
+  const hasAttachments = attachments.length > 0
+  if (!hasText && !hasAttachments) return null
+  return (
+    <div className="rounded-md border border-ods-border bg-ods-card p-3">
+      <p className="text-[10px] font-medium text-ods-text-secondary uppercase tracking-wider mb-1">
+        {label}
+      </p>
+      {hasText && (
+        <p className="text-sm text-ods-text-primary whitespace-pre-wrap break-words">{text}</p>
+      )}
+      {hasAttachments && (
+        <div className={cn('flex flex-wrap gap-2', hasText && 'mt-2')}>
+          {attachments.map((f) => (
+            <AttachmentChip key={f.id} file={f} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AttachmentChip({
+  file,
+}: {
+  file: import('./hooks/use-ticket-engagements').TicketEngagementFile
+}) {
+  const name = file.name ?? `file-${file.id}`
+  const sizeLabel = file.size ? formatBytes(file.size) : null
+  const className =
+    'inline-flex items-center gap-2 rounded-md border border-ods-border bg-ods-bg px-2 py-1 text-xs text-ods-text-primary max-w-full'
+  const inner = (
+    <>
+      <span className="text-ods-text-secondary shrink-0">📎</span>
+      <span className="truncate">{name}</span>
+      {sizeLabel && <span className="text-ods-text-secondary shrink-0">{sizeLabel}</span>}
+    </>
+  )
+  if (file.url) {
+    return (
+      <a
+        href={file.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={cn(className, 'hover:bg-ods-bg-hover')}
+        title={name}
+      >
+        {inner}
+      </a>
     )
   }
   return (
-    <div className="flex flex-col gap-2 max-h-72 overflow-y-auto">
-      {turns.map((turn, i) => {
-        const isResolution = turn.startsWith('[Resolution]')
-        const label = i === 0 ? 'Original message' : isResolution ? 'Resolution' : `Update ${i}`
-        return (
-          <div
-            key={`${i}-${turn.slice(0, 24)}`}
-            className="rounded-md border border-ods-border bg-ods-card p-3"
-          >
-            <p className="text-[10px] font-medium text-ods-text-secondary uppercase tracking-wider mb-1">
-              {label}
-            </p>
-            <p className="text-sm text-ods-text-primary whitespace-pre-wrap break-words">
-              {isResolution ? turn.replace(/^\[Resolution\]\s*/, '') : turn}
-            </p>
-          </div>
-        )
-      })}
-    </div>
+    <span className={className} title={name}>
+      {inner}
+    </span>
   )
+}
+
+function formatBytes(size: number): string {
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function ReopenAction({

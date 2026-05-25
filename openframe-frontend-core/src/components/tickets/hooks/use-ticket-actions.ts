@@ -370,7 +370,13 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
             ticket_id: ticket.external_id,
           } as unknown as Record<string, unknown>)
           toast(successCopy)
-          await queryClient.invalidateQueries({ queryKey: ['tickets'] })
+          // Invalidate BOTH ticket list (status / pipeline may have
+          // changed) AND engagements (comments + attachments produce a
+          // new Note that the timeline must pick up).
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['tickets'] }),
+            queryClient.invalidateQueries({ queryKey: ['ticket-engagements'] }),
+          ])
           return true
         })
       } catch (err) {

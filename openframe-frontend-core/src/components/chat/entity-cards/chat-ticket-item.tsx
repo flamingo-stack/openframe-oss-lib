@@ -38,7 +38,12 @@ const ChatTicketItem = React.forwardRef<HTMLButtonElement, ChatTicketItemProps>(
           "bg-ods-card border-b border-ods-border",
           "cursor-pointer transition-colors duration-150",
           "hover:bg-ods-bg-hover",
+          // `focus-visible:` covers keyboard nav AND the post-click state
+          // jsdom/Chromium leave behind. Without it, the global focus
+          // ring (1.5px white) renders as a stray "white border" after
+          // clicking a row.
           "focus:outline-none focus:bg-ods-bg-hover",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent focus-visible:ring-inset",
           className,
         )}
         {...props}
