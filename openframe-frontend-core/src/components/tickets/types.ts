@@ -19,7 +19,16 @@ export interface TicketData {
   /** HubSpot ticket id (display number, e.g. "1234"). */
   external_id: string
   subject: string | null
-  content: string | null
+  /** Short (≤400 char) HTML-stripped preview of the ticket body —
+   *  used for the list-card subtitle when needed. */
+  preview: string | null
+  /** Longer (≤4k char) sanitized body. INCLUDES every appended
+   *  `content_addendum` comment because the `update_ticket` executor
+   *  reads + re-writes the `content` property server-side with a
+   *  `---` separator. Render this in the drawer's description block
+   *  and the user sees both the original message + every comment they
+   *  (or staff) added. */
+  body: string | null
   /** Canonical OPEN | CLOSED (HubSpot pipeline derived). */
   status: string | null
   /** Human label like "New" / "Working on it" / "Waiting on contact" /
