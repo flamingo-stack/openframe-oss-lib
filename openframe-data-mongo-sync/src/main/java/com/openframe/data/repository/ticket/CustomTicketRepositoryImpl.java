@@ -32,6 +32,7 @@ public class CustomTicketRepositoryImpl implements CustomTicketRepository {
     private static final String FIELD_ORGANIZATION_ID = "organizationId";
     private static final String FIELD_ASSIGNED_TO = "assignedTo";
     private static final String FIELD_DEVICE_ID = "deviceId";
+    private static final String FIELD_CREATION_SOURCE = "creationSource";
     private static final String FIELD_OWNER_MACHINE_ID = "owner.machineId";
     private static final String FIELD_TITLE = "title";
     private static final String FIELD_DEVICE_HOSTNAME = "deviceHostname";
@@ -75,6 +76,8 @@ public class CustomTicketRepositoryImpl implements CustomTicketRepository {
             addCriteriaIfNotEmpty(query, FIELD_ORGANIZATION_ID, filter.getOrganizationIds());
             addCriteriaIfNotEmpty(query, FIELD_ASSIGNED_TO, filter.getAssigneeIds());
             addCriteriaIfNotEmpty(query, FIELD_DEVICE_ID, filter.getDeviceIds());
+            addCriteriaIfNotEmpty(query, FIELD_CREATION_SOURCE, filter.getCreationSources());
+            applyCreatedAtRange(query, filter.getCreatedAtFrom(), filter.getCreatedAtTo());
         }
 
         if (restrictToTicketIds != null) {
@@ -111,6 +114,20 @@ public class CustomTicketRepositoryImpl implements CustomTicketRepository {
         if (values != null && !values.isEmpty()) {
             query.addCriteria(Criteria.where(field).in(values));
         }
+    }
+
+    private void applyCreatedAtRange(Query query, Instant from, Instant to) {
+        if (from == null && to == null) {
+            return;
+        }
+        Criteria criteria = Criteria.where(FIELD_CREATED_AT);
+        if (from != null) {
+            criteria = criteria.gte(from);
+        }
+        if (to != null) {
+            criteria = criteria.lt(to);
+        }
+        query.addCriteria(criteria);
     }
 
     @Override
