@@ -53,7 +53,7 @@ export function OnboardingStepCard({
 
   return (
     <InteractiveCard
-      clickable={true}
+      clickable={false}
       className={cn(
         'bg-ods-card border border-ods-border rounded-[6px]',
         'flex flex-col md:flex-row',

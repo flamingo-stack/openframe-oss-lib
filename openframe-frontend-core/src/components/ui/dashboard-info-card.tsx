@@ -100,8 +100,7 @@ export function DashboardInfoCard({
         className={cn(
           baseClassName,
           'cursor-pointer group',
-          'hover:border-ods-accent',
-          '[&:hover_.text-ods-text-primary]:text-ods-accent',
+          'hover:border-ods-border-hover hover:bg-ods-card-hover',
           className
         )}
       >
