@@ -118,6 +118,8 @@ export interface TicketStatusTagProps {
    * color is computed for contrast. The status's preset icon is preserved.
    */
   color?: string
+  /** Override the status's default Tag variant (e.g. force 'outline' or 'primary'). */
+  variant?: TagVariant
   /** Additional className for the Tag */
   className?: string
   /** Show the status-specific icon (e.g. checkmark for resolved) */
@@ -133,6 +135,7 @@ export function TicketStatusTag({
   status,
   label,
   color,
+  variant,
   className,
   showIcon = true,
 }: TicketStatusTagProps) {
@@ -144,7 +147,7 @@ export function TicketStatusTag({
   return (
     <Tag
       label={label ?? config.label}
-      variant={config.variant}
+      variant={variant ?? config.variant}
       icon={showIcon ? config.icon : undefined}
       className={cn('shrink-0 w-fit', className)}
       style={customStyle}

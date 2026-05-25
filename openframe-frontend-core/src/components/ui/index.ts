@@ -148,6 +148,8 @@ export * from './image-uploader'
 
 // Ticket components
 export * from './ticket-status-tag'
+export * from './ticket-status-config-row'
+export * from './color-preset-select'
 export * from './assignee-dropdown'
 export * from './ticket-info-section'
 export * from './ticket-detail-section'
