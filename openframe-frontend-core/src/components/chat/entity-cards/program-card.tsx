@@ -404,6 +404,8 @@ export function ProgramCard<T extends BaseProgramItem>({
     return (
       <a
         href={href}
+        target={target}
+        rel={rel}
         className={cn(cardFrameClass, 'hover:border-ods-accent/50 no-underline')}
         style={cardFrameStyle}
         aria-label={`Open ${item.title}`}
@@ -427,7 +429,7 @@ export function ProgramCard<T extends BaseProgramItem>({
 
   return (
     <div className={cardFrameClass} style={cardFrameStyle}>
-      <a href={href} className="block" aria-label={`Open ${item.title}`}>
+      <a href={href} target={target} rel={rel} className="block" aria-label={`Open ${item.title}`}>
         {cardHeader}
       </a>
       {images.length > 0 && <MediaGallery images={images} title={item.title} />}
@@ -437,6 +439,7 @@ export function ProgramCard<T extends BaseProgramItem>({
             variant="outline"
             size="small-legacy"
             href={href}
+            openInNewTab={target === '_blank'}
             rightIcon={<ExternalLink className="w-5 h-5" />}
           >
             View {config.labels.singular} Details

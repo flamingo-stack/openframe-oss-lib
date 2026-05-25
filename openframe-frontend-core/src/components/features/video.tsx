@@ -292,10 +292,16 @@ function wrapWithLayout(
       // doesn't flicker tiny→full while video metadata loads. Both branches
       // are sized to fill 100% of this container (MuxPlayer via `style`,
       // YouTube facade via internal `paddingBottom: 56.25%` which compounds
-      // harmlessly inside an already-16:9 box).
+      // harmlessly inside an already-16:9 box). `rounded-lg overflow-hidden
+      // border border-ods-border` is on the wrapper (not the inner) so BOTH
+      // branches end up with the same rounded card look — YouTube's facade
+      // also paints its own internal rounded-lg on the button + iframe,
+      // matching the outer radius (so the corners stay sharp through the
+      // poster → iframe transition); MuxPlayer renders flat and inherits
+      // the wrapper's rounded corners via `overflow-hidden` clipping.
       return (
         <div className="flex justify-center w-full">
-          <div className="w-full max-w-3xl aspect-video">{inner}</div>
+          <div className="w-full max-w-3xl aspect-video rounded-lg overflow-hidden border border-ods-border">{inner}</div>
         </div>
       );
     case 'fill':

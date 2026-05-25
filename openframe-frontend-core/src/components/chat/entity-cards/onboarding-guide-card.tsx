@@ -154,6 +154,8 @@ export function OnboardingGuideCard({ guide, href, target, rel, placeholderUrl, 
     return (
       <a
         href={href}
+        target={target}
+        rel={rel}
         className={cn(
           'group block no-underline bg-ods-system-greys-black',
           'border border-ods-border rounded-lg overflow-hidden',
@@ -294,6 +296,8 @@ export function OnboardingGuideCard({ guide, href, target, rel, placeholderUrl, 
   return (
     <a
       href={href}
+      target={target}
+      rel={rel}
       className={cn(
         `flex items-start gap-3 rounded-md border border-ods-border bg-ods-card hover:border-ods-accent transition-colors ${t.padding}`,
         className,
