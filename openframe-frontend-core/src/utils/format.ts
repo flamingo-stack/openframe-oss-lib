@@ -561,13 +561,20 @@ export function formatUnderscoreText(text: string): string {
  * stripHtml('Test &amp; Example') // "Test & Example"
  */
 export function stripHtml(html: string): string {
-  // Tag-strip pattern: `<[^<>]*>` rejects `<` inside the tag so the
-  // automaton can't backtrack on degenerate inputs like
-  // `<<<<<<<<<...<>` (ReDoS class fix vs. the previous `<[^>]*>`).
-  // For well-formed HTML the semantics are identical; for malformed
-  // HTML the stricter pattern leaves the stray `<` in place, which
-  // is the correct conservative behavior for plain-text extraction.
-  const noTags = html.replace(/<[^<>]*>/g, '')
+  // Iterative tag-strip — a single pass is bypass-able by inputs like
+  // `<scr<script>ipt>`: stripping the inner `<script>` leaves the outer
+  // `<script>` reassembled. Loop until the string is stable so multi-
+  // character bypasses cannot survive (CodeQL
+  // `js/incomplete-multi-character-sanitization`). `<[^<>]*>` rejects
+  // `<` inside the tag body so each pass is itself ReDoS-safe (no
+  // backtracking on `<<<<<...<>` inputs).
+  let noTags = html
+  let prev: string
+  do {
+    prev = noTags
+    noTags = noTags.replace(/<[^<>]*>/g, '')
+  } while (noTags !== prev)
+
   // Decode entities. `&amp;` MUST come LAST so we don't double-decode
   // sequences like `&amp;lt;` (which should render as the LITERAL text
   // `&lt;`, not as `<`). All other named/numeric entities decode first;

@@ -7,12 +7,14 @@
  * on every call to `/api/docs/chat` and `/api/chat/agent/*` — proving to
  * the server that this session is acting on behalf of <email>.
  *
- * Both fields persist to localStorage and survive page reloads.
- * Admin-only by convention — the `/debug` admin route hosts the paste-creds
- * UI and is gated behind the platform's `askAI.enabled` flag. The secret
- * lands in plaintext on disk so an XSS sink on this origin could exfiltrate
- * it; the tradeoff buys admin-debug ergonomics. Restore the in-memory-only
- * model before this surface ships to non-admin traffic.
+ * Persists to **`sessionStorage`** (not `localStorage`) so the bearer
+ * token and act-as identity evaporate when the tab closes. An XSS sink
+ * on this origin can still exfiltrate the value while the tab is open
+ * (impossible to avoid without server-side opaque tokens), but the
+ * exposure window shrinks from "indefinite" to "current tab session"
+ * which is an order of magnitude better. Admin-only by convention —
+ * the `/debug` admin route hosts the paste-creds UI and is gated
+ * behind the platform's `askAI.enabled` flag.
  *
  * Namespaced under `<platform>.chat.proxy-auth.v1` so switching
  * `NEXT_PUBLIC_APP_TYPE` mid-session doesn't drag stale creds across
@@ -55,6 +57,11 @@ const adapter = createLocalStorageAdapter<ChatProxyAuth>({
   namespace: () => getAppType(),
   validate: isValidPersistedAuth,
   logTag: '[chat-proxy-auth-storage]',
+  // sessionStorage — cleared when the tab closes. Bearer token + act-as
+  // identity should NOT outlive the current session, so localStorage's
+  // indefinite persistence is the wrong choice here. See file-level
+  // doc comment for the threat-model rationale.
+  backend: 'session',
 })
 
 /** Trim + null-coerce an optional identity field so consumers can do
