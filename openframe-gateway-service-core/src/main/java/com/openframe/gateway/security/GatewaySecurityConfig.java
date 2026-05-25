@@ -97,6 +97,7 @@ public class GatewaySecurityConfig {
                         .pathMatchers(NATS_WS_ENDPOINT_PATH).hasAnyRole(AGENT, ADMIN)
                         .pathMatchers(NATS_API_WS_ENDPOINT_PATH).hasAnyRole(AGENT, ADMIN)
                         .pathMatchers(CHAT_PREFIX + "/**").hasAnyRole(AGENT, ADMIN)
+                        .pathMatchers(GUIDE_PREFIX + "/**").hasRole(ADMIN)
                         .pathMatchers(CLIENTS_PREFIX + "/**").hasRole(AGENT)
                         .pathMatchers(TOOLS_PREFIX + "/**").hasRole(ADMIN)
                         .pathMatchers(WS_TOOLS_PREFIX + "/**").hasRole(ADMIN)
