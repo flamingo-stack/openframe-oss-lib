@@ -2,7 +2,7 @@
 
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import Link from 'next/link'
+import Link from '../../../embed-shims/next-link'
 import * as React from 'react'
 import { LaptopIcon, Flag02Icon } from '../../icons-v2-generated'
 import { SquareAvatar } from '../../ui/square-avatar'

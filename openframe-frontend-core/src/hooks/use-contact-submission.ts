@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useToast } from "./use-toast";
-import { useRouter } from 'next/navigation';
+import { useRouter } from '../embed-shims/next-navigation';
 import { useRequiredEndpointsRuntime } from '../contexts/endpoints-runtime-context';
 
 interface ContactSubmissionOptions {

@@ -1,6 +1,6 @@
 "use client"
 
-import { useSearchParams, useRouter } from "next/navigation"
+import { useSearchParams, useRouter } from "../embed-shims/next-navigation"
 import { useTransition } from "react"
 
 /**

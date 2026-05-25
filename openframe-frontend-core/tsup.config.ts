@@ -49,6 +49,7 @@ export default defineConfig([
       'index': 'src/index.ts',
       'components/index': 'src/components/index.ts',
       'components/ui/index': 'src/components/ui/index.ts',
+      'components/chat/index': 'src/components/chat/index.ts',
       'components/ui/file-manager/index': 'src/components/ui/file-manager/index.ts',
       'components/features/index': 'src/components/features/index.ts',
       'components/toast/index': 'src/components/toast/index.ts',
@@ -57,6 +58,16 @@ export default defineConfig([
       'components/navigation/index': 'src/components/navigation/index.ts',
       'hooks/index': 'src/hooks/index.ts',
       'contexts/index': 'src/contexts/index.ts',
+      // Embed shims — registration-pattern wrappers for next/dynamic, next/link,
+      // next/image, and next/navigation. Each is built as its own entry so
+      // consumers can deep-import (`embed-shims/next-image`) without pulling
+      // the whole barrel. Hub also imports the barrel for the `register*`
+      // functions in its app-init wiring.
+      'embed-shims/index': 'src/embed-shims/index.ts',
+      'embed-shims/next-image': 'src/embed-shims/next-image.tsx',
+      'embed-shims/next-link': 'src/embed-shims/next-link.tsx',
+      'embed-shims/next-dynamic': 'src/embed-shims/next-dynamic.tsx',
+      'embed-shims/next-navigation': 'src/embed-shims/next-navigation.tsx',
     },
     format: ['esm', 'cjs'],
     dts: false,

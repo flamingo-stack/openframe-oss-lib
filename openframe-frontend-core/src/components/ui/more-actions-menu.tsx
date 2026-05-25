@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import Link from 'next/link'
+import Link from '../../embed-shims/next-link'
 import { cn } from '../../utils/cn'
 import { Ellipsis01Icon } from '../icons-v2-generated'
 import { Button } from './button'

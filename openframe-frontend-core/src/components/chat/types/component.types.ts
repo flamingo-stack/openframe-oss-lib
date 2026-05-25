@@ -2,10 +2,25 @@
  * Component prop types
  */
 
-import type { ComponentType, HTMLAttributes, TextareaHTMLAttributes } from 'react'
+import type { ComponentType, HTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react'
 import type { AssistantType, AuthorType, ChatApprovalStatus, ConnectionStatus } from './chat.types'
 import type { ApprovalRequestData, Message, MessageSegment, ToolExecutionData } from './message.types'
 import type { ChatRef } from '../chat-ref.types'
+
+/**
+ * Anchor component supplied by the host (or the lib's
+ * `NavLinkAnchorViaRuntime`) for markdown links. Receives at minimum
+ * `href` / `className` / `children` — what react-markdown's anchor
+ * passes. The lib's call site spreads its `rest` via `any`, so
+ * implementations are free to declare additional optional routing
+ * props (e.g. `path`, `targetPlatform`) without TS forcing the host's
+ * NavLinkAnchor prop type to know about them.
+ */
+export type NavLinkAnchorComponent = ComponentType<{
+  href: string
+  className?: string
+  children?: ReactNode
+}>
 
 // ========== Chat Container Props ==========
 
@@ -106,12 +121,13 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
    *
    * `card://` markers are still intercepted by the override BEFORE this
    * component runs, so the host need not handle them.
+   *
+   * Implementations MAY declare additional optional props (e.g.
+   * `path`, `targetPlatform` on `NavLinkAnchorViaRuntime`) — react-markdown
+   * passes its anchor `rest` props via spread, so undeclared extras
+   * simply default to undefined on the receiver.
    */
-  NavLinkAnchor?: React.ComponentType<{
-    href: string
-    className?: string
-    children?: React.ReactNode
-  } & Record<string, unknown>>
+  NavLinkAnchor?: NavLinkAnchorComponent
 }
 
 // ========== Chat Message List Props ==========
@@ -150,11 +166,7 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
   /** Host-provided anchor for markdown links. Forwarded verbatim to every
    *  message's ChatMessageEnhanced. Owns the unified click rule
    *  (same-origin soft nav, cross-origin new tab). */
-  NavLinkAnchor?: React.ComponentType<{
-    href: string
-    className?: string
-    children?: React.ReactNode
-  } & Record<string, unknown>>
+  NavLinkAnchor?: NavLinkAnchorComponent
 }
 
 export interface ChatMessageListRef {
@@ -215,6 +227,15 @@ export interface SlashCommandSummary {
    *  ≥1 action). Single source of truth — same array drives the
    *  empty-state chip on the host side via the synchronous registry. */
   actions: SlashCommandSummaryAction[]
+  /** Icon-registry key — drives both the empty-state chip glyph AND the
+   *  autocomplete dropdown row glyph. Optional; falls back to the
+   *  `primarySourceId`-based resolution when missing. */
+  iconName?: string
+  /** Admin-UI bucket id. */
+  category?: string
+  /** Empty-state chip-grid sort key. Undefined = NOT a chip (utility /
+   *  thematic command — autocomplete dropdown only). Lower = earlier. */
+  displayOrder?: number
 }
 
 /** Icon + label pair returned by the consumer's `resolveSourceIcon`. The

@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import Image from "../embed-shims/next-image";
 import { getProxiedImageUrl } from "../utils/image-proxy-stub";
 
 interface Props {

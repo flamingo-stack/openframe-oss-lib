@@ -2,7 +2,7 @@
 
 import { Search, FileText, Package } from "lucide-react"
 import { Button } from "./ui/button"
-import { useRouter } from "next/navigation"
+import { useRouter } from "../embed-shims/next-navigation"
 
 export interface EmptyStateProps {
   type: 'vendors' | 'posts' | 'search' | 'generic'

@@ -24,3 +24,6 @@ export * from './use-near-viewport'
 // pulled in via EndpointsRuntimeContext doesn't end up in the
 // server-safe utils bundle.
 export * from './use-access-code-integration'
+
+// OG placeholder URL builder hook (requires host-supplied URL builder)
+export * from './use-og-placeholder'

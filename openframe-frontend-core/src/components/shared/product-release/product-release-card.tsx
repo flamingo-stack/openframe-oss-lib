@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import Image from 'next/image'
+import Image from '../../../embed-shims/next-image'
 import { InteractiveCard } from '../../ui/interactive-card'
 import { StatusBadge } from '../../ui/status-badge'
 import { SquareAvatar } from '../../ui/square-avatar'

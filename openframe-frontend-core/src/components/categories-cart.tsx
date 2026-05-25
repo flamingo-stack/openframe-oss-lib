@@ -1,7 +1,7 @@
 "use client"
 
 import React from 'react';
-import Link from 'next/link';
+import Link from '../embed-shims/next-link';
 import { ChevronRight } from 'lucide-react';
 import { VendorIcon } from './vendor-icon';
 import type { CategoryCardProps, RealCategoryCardProps } from '../types/category';

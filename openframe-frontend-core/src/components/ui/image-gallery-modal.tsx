@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Modal, Button } from './index';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import Image from 'next/image';
+import Image from '../../embed-shims/next-image';
 
 interface ImageGalleryModalProps {
   images: string[];

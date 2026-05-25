@@ -19,7 +19,7 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from '../../embed-shims/next-navigation'
 import { DocumentNode } from 'graphql'
 
 import { extractVariablesFromQuery } from './graphql-parser'

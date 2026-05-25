@@ -11,7 +11,7 @@ import {
   GripVertical,
   Plus
 } from 'lucide-react';
-import Image from 'next/image';
+import Image from '../../embed-shims/next-image';
 
 export interface MediaItem {
   id?: string | number; // Optional for new items

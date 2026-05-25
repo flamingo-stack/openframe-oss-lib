@@ -5,7 +5,7 @@ import { Input, Textarea, Label, Button, Badge } from '../ui';
 import { ConfidenceBadge } from '../features';
 import { Globe, ExternalLink, Upload, X, Loader2, Sparkles } from 'lucide-react';
 import { cn } from '../../utils';
-import Image from 'next/image';
+import Image from '../../embed-shims/next-image';
 
 export interface SEOEditorPreviewProps {
   // SEO fields - must be strings (not undefined)
