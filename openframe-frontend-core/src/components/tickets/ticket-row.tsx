@@ -26,15 +26,12 @@ import { Card } from '../ui/card'
 import { Button } from '../ui/button'
 import { Textarea } from '../ui/textarea'
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '../ui/alert-dialog'
+  ModalV2,
+  ModalV2Content,
+  ModalV2Footer,
+  ModalV2Header,
+  ModalV2Title,
+} from '../ui/modal-v2'
 import {
   ChatTicketItem,
   type ChatTicketItemData,
@@ -184,19 +181,7 @@ function DrawerBody({
           Description &amp; Updates
         </p>
         {ticket.body ? (
-          // `body` is the server's sanitized full content. The
-          // update_ticket executor re-writes this property with
-          // `oldContent\n\n---\n\n<addendum>` for every comment, so
-          // the user sees the original message + every comment they
-          // (or staff) added without a separate notes-engagement
-          // fetch. Rendered as a non-interactive scroll panel — NOT
-          // <Textarea>, which has hover/active styles for editable
-          // input that flash the surface light on mouseover.
-          <div
-            className="text-sm text-ods-text-primary whitespace-pre-wrap break-words rounded-md border border-ods-border bg-ods-card p-3 max-h-64 overflow-y-auto"
-          >
-            {ticket.body}
-          </div>
+          <TicketBodyPanel body={ticket.body} />
         ) : (
           <p className="text-sm text-ods-text-secondary italic">
             (No description provided.)
@@ -245,6 +230,54 @@ function MetadataRow({
       </span>
       <span className="text-sm text-ods-text-primary">{value}</span>
     </span>
+  )
+}
+
+/**
+ * Render the ticket body as a vertical stack of turn paragraphs.
+ *
+ * Why split: the server runs every ticket through `htmlToPreview` which
+ * does `replace(/\s+/g, ' ')` — every newline collapses into a single
+ * space. The `update_ticket` executor inserts a literal `\n\n---\n\n`
+ * between turns when appending a comment, and the surrounding `\n\n`
+ * collapse to spaces but the `---` survives as ` --- `. We split on
+ * that delimiter (with optional surrounding whitespace) to recover
+ * paragraph boundaries.
+ *
+ * First chunk = original ticket message (oldest, on top).
+ * Subsequent chunks = comments / `[Resolution]` lines in chronological
+ * order. Each turn renders inside its own muted bordered panel so the
+ * reader can tell where one comment ends and the next begins.
+ */
+const TURN_SEPARATOR_RE = /\s+---\s+/g
+
+function TicketBodyPanel({ body }: { body: string }) {
+  const turns = body.split(TURN_SEPARATOR_RE).map((t) => t.trim()).filter(Boolean)
+  if (turns.length === 0) {
+    return (
+      <p className="text-sm text-ods-text-secondary italic">(No description provided.)</p>
+    )
+  }
+  return (
+    <div className="flex flex-col gap-2 max-h-72 overflow-y-auto">
+      {turns.map((turn, i) => {
+        const isResolution = turn.startsWith('[Resolution]')
+        const label = i === 0 ? 'Original message' : isResolution ? 'Resolution' : `Update ${i}`
+        return (
+          <div
+            key={`${i}-${turn.slice(0, 24)}`}
+            className="rounded-md border border-ods-border bg-ods-card p-3"
+          >
+            <p className="text-[10px] font-medium text-ods-text-secondary uppercase tracking-wider mb-1">
+              {label}
+            </p>
+            <p className="text-sm text-ods-text-primary whitespace-pre-wrap break-words">
+              {isResolution ? turn.replace(/^\[Resolution\]\s*/, '') : turn}
+            </p>
+          </div>
+        )
+      })}
+    </div>
   )
 }
 
@@ -444,15 +477,15 @@ function OpenActions({
         </div>
       )}
 
-      <AlertDialog open={closeDialogOpen} onOpenChange={setCloseDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Close this ticket?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Add an optional resolution note. You can reopen the ticket later if
-              needed.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
+      <ModalV2 isOpen={closeDialogOpen} onClose={() => setCloseDialogOpen(false)}>
+        <ModalV2Header>
+          <ModalV2Title>Close this ticket?</ModalV2Title>
+          <p className="text-sm text-ods-text-secondary mt-1">
+            Add an optional resolution note. You can reopen the ticket later if
+            needed.
+          </p>
+        </ModalV2Header>
+        <ModalV2Content>
           <Textarea
             value={resolution}
             onChange={(e) => setResolution(e.target.value)}
@@ -460,14 +493,24 @@ function OpenActions({
             rows={3}
             maxLength={TICKET_TEXT_MAX_CHARS}
           />
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void confirmClose()}>
-              Close ticket
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        </ModalV2Content>
+        <ModalV2Footer>
+          <Button
+            type="button"
+            variant="transparent"
+            onClick={() => setCloseDialogOpen(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={() => void confirmClose()}
+          >
+            Close ticket
+          </Button>
+        </ModalV2Footer>
+      </ModalV2>
     </div>
   )
 }
