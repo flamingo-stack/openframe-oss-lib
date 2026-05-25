@@ -65,7 +65,7 @@ export function OrganizationCard({
       className={cn(
         "flex flex-col bg-ods-card rounded-[6px] border border-ods-border overflow-clip p-4 gap-3 w-full relative",
         "transition-colors",
-        href && "cursor-pointer hover:border-ods-accent [&:hover_h3]:text-ods-accent",
+        href && "cursor-pointer hover:border-ods-border-hover hover:bg-ods-card-hover",
         className
       )}
     >
