@@ -1,6 +1,6 @@
 'use client';
 
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter } from '../embed-shims/next-navigation';
 import { useCallback } from 'react';
 import { OpenFrameLogo } from './icons';
 import { Button } from './ui/button';

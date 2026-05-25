@@ -4,7 +4,6 @@ import com.openframe.data.model.enums.DataEnrichmentServiceType;
 import com.openframe.data.model.redis.CachedMachineInfo;
 import com.openframe.data.model.redis.CachedOrganizationInfo;
 import com.openframe.data.repository.redis.MachineIdCacheService;
-import com.openframe.data.repository.redis.TenantIdCacheService;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
@@ -17,14 +16,14 @@ import org.springframework.stereotype.Service;
 public class IntegratedToolDataEnrichmentService implements DataEnrichmentService<DeserializedDebeziumMessage> {
 
     private final MachineIdCacheService machineIdCacheService;
-    private final TenantIdCacheService tenantIdCacheService;
+    private final ClusterTenantIdResolver clusterTenantIdResolver;
     private final TenantIdProvider tenantIdProvider;
 
     public IntegratedToolDataEnrichmentService(MachineIdCacheService machineIdCacheService,
-                                               @Autowired(required = false) TenantIdCacheService tenantIdCacheService,
+                                               @Autowired(required = false) ClusterTenantIdResolver clusterTenantIdResolver,
                                                TenantIdProvider tenantIdProvider) {
         this.machineIdCacheService = machineIdCacheService;
-        this.tenantIdCacheService = tenantIdCacheService;
+        this.clusterTenantIdResolver = clusterTenantIdResolver;
         this.tenantIdProvider = tenantIdProvider;
     }
 
@@ -63,24 +62,20 @@ public class IntegratedToolDataEnrichmentService implements DataEnrichmentServic
     }
 
     /**
-     * Resolve tenantId from the event payload's {@code domain} field. When no
-     * {@link TenantIdCacheService} bean is present (tenant cluster deployment),
-     * the tenant is implicit and this is a no-op. In the shared SaaS cluster
-     * the bean is configured: a missing/unknown domain marks the message as
-     * {@code skipProcessing} so downstream handlers do not publish events
-     * without a tenant attribution.
+     * Resolve tenantId for the event. Tenant clusters always use
+     * {@link TenantIdProvider} (one tenant per cluster). Shared clusters supply
+     * a {@link ClusterTenantIdResolver} bean that maps the message's
+     * cluster-scoped identifier ({@link DeserializedDebeziumMessage#getTenantId()},
+     * e.g. MeshCentral {@code domain}) to a canonical tenantId.
      */
     private void enrichFromTenant(DeserializedDebeziumMessage message, IntegratedToolEnrichedData enriched) {
-        if (tenantIdCacheService == null) {
-            // Tenant cluster: every event belongs to the single cluster-level tenant.
+        if (clusterTenantIdResolver == null) {
             enriched.setTenantId(tenantIdProvider.getTenantId());
             return;
         }
-        String tenantId = message.getTenantId();
-        if (tenantId == null || tenantId.isBlank()) {
-            return;
-        }
-        enriched.setTenantId(tenantIdCacheService.getTenantId(tenantId));
+        String tenantId = clusterTenantIdResolver.resolveTenantId(message.getTenantId());
+        enriched.setTenantId(tenantId);
+        message.setTenantId(enriched.getTenantId());
     }
 
     @Override

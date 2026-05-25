@@ -1,5 +1,5 @@
 import type * as React from 'react'
-import Link from 'next/link'
+import Link from '../../embed-shims/next-link'
 import { cn } from '../../utils/cn'
 import { QuestionCircleIcon } from '../icons-v2-generated/signs-and-symbols/question-circle-icon'
 import { CircularProgress, type CircularProgressOverflow, type CircularProgressVariant } from './circular-progress'

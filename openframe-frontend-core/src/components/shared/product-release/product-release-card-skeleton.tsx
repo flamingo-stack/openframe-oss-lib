@@ -8,11 +8,11 @@ export interface ProductReleaseCardSkeletonProps {
   className?: string
   /** Card density. Must match the loaded card's `size` prop so the loading
    *  height matches the resolved height (no layout shift on resolve). */
-  size?: 'default' | 'sm' | 'catalog'
+  size?: 'lg' | 'sm'
 }
 
-export function ProductReleaseCardSkeleton({ className, size = 'default' }: ProductReleaseCardSkeletonProps) {
-  // ----- CATALOG branch — must match ProductReleaseCard size='catalog'.
+export function ProductReleaseCardSkeleton({ className, size = 'lg' }: ProductReleaseCardSkeletonProps) {
+  // ----- LG branch — must match ProductReleaseCard size='lg'.
   // Same outer frame (`bg-ods-system-greys-black border border-ods-border …
   // p-6 gap-4`). Inner: hero (16:9 cover + version pill + title + summary),
   // changelog strip placeholder, metadata-grid footer (4 cells via grid).
@@ -21,7 +21,7 @@ export function ProductReleaseCardSkeleton({ className, size = 'default' }: Prod
   // loaded card ALSO always renders the changelog strip + a fixed 4-cell
   // grid (with em-dash placeholders for missing values), so this
   // skeleton's shape matches exactly with zero load-to-resolve reflow.
-  if (size === 'catalog') {
+  if (size === 'lg') {
     return (
       <div
         className={cn(
@@ -151,44 +151,8 @@ export function ProductReleaseCardSkeleton({ className, size = 'default' }: Prod
     )
   }
 
-  return (
-    <div
-      className={cn(
-        'bg-ods-card border border-ods-border rounded-[6px]',
-        'flex flex-col md:flex-row',
-        'items-start md:items-center',
-        'gap-3 md:gap-4',
-        'p-4',
-        'animate-pulse',
-        className
-      )}
-    >
-      {/* Left column - content */}
-      <div className="flex-1 w-full md:w-auto min-w-0 flex flex-col justify-center gap-2">
-        {/* Title skeleton - 2 lines height */}
-        <div className="min-h-[48px] flex items-center">
-          <div className="flex flex-col gap-1 w-full">
-            <div className="h-[24px] w-3/4 bg-ods-border rounded" />
-            <div className="h-[24px] w-1/2 bg-ods-border rounded" />
-          </div>
-        </div>
-        {/* Description skeleton - 3 lines */}
-        <div className="flex flex-col gap-1">
-          <div className="h-[24px] w-full bg-ods-border rounded" />
-          <div className="h-[24px] w-full bg-ods-border rounded" />
-          <div className="h-[24px] w-2/3 bg-ods-border rounded" />
-        </div>
-      </div>
-
-      {/* Right column - version + date */}
-      <div className="flex items-center gap-2 w-full md:w-auto justify-start md:justify-end shrink-0">
-        <div className="w-[200px] flex flex-col justify-center gap-2">
-          <div className="h-[24px] w-20 bg-ods-border rounded" />
-          <div className="h-[20px] w-32 bg-ods-border rounded" />
-        </div>
-        {/* Icon column */}
-        <div className="h-6 w-6 bg-ods-border rounded shrink-0 mx-3" />
-      </div>
-    </div>
-  )
+  // Unreachable — `size` is typed `'lg' | 'sm'` and both branches return
+  // above. Kept as a defensive throw so a future variant addition that
+  // forgets to return doesn't silently render `undefined`.
+  throw new Error(`ProductReleaseCardSkeleton: unsupported size '${size as string}'`)
 }

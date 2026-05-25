@@ -2,7 +2,7 @@
 
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
-import Link from "next/link"
+import Link from "../../../embed-shims/next-link"
 import React from "react"
 
 import { cn } from "../../../utils/cn"
@@ -123,6 +123,19 @@ interface ButtonProps
   href?: string
   openInNewTab?: boolean
   prefetch?: boolean
+  /**
+   * Pre-resolved anchor bundle (from `useNavLink({ href, targetPlatform })`).
+   * When set, renders the Button as `<Link>` with `href` / `target` / `rel`
+   * / `onClick` spread from this object. Lets callers thread the unified
+   * nav decision directly without `<Button asChild><a {...linkProps}/>`
+   * gymnastics. Wins over the separate `href` / `openInNewTab` props.
+   */
+  linkProps?: {
+    href: string
+    target?: '_blank'
+    rel?: 'noopener noreferrer'
+    onClick?: React.MouseEventHandler<HTMLAnchorElement>
+  } | null
   leftIcon?: React.ReactNode
   rightIcon?: React.ReactNode
   /**
@@ -158,6 +171,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
     href,
     openInNewTab,
     prefetch,
+    linkProps,
     leftIcon,
     rightIcon,
     splitIcon,
@@ -205,17 +219,26 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
       </>
     )
 
-    if (href) {
+    // `linkProps` (the pre-resolved bundle from `useNavLink({ href, targetPlatform })`)
+    // wins over the legacy `href` + `openInNewTab` props so callers can thread
+    // the unified nav decision directly. Either path produces the same `<Link>`.
+    const splitAnchor = linkProps ?? (href ? {
+      href,
+      target: openInNewTab ? '_blank' as const : undefined,
+      rel: openInNewTab ? 'noopener noreferrer' as const : undefined,
+      onClick: onClick as unknown as React.MouseEventHandler<HTMLAnchorElement> | undefined,
+    } : null)
+    if (splitAnchor) {
       return (
         <Link
-          href={href}
+          href={splitAnchor.href}
           prefetch={prefetch}
-          target={openInNewTab ? "_blank" : undefined}
-          rel={openInNewTab ? "noopener noreferrer" : undefined}
+          target={splitAnchor.target}
+          rel={splitAnchor.rel}
           aria-disabled={isDisabled || undefined}
           tabIndex={isDisabled ? -1 : undefined}
           className={cn(shellClasses, isDisabled && "pointer-events-none")}
-          onClick={onClick as unknown as React.MouseEventHandler<HTMLAnchorElement> | undefined}
+          onClick={splitAnchor.onClick}
         >
           {splitContent}
         </Link>
@@ -263,17 +286,24 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
     </>
   )
 
-  if (href) {
+  // Same `linkProps`-wins-over-href resolution as the splitIcon branch.
+  const anchor = linkProps ?? (href ? {
+    href,
+    target: openInNewTab ? '_blank' as const : undefined,
+    rel: openInNewTab ? 'noopener noreferrer' as const : undefined,
+    onClick: onClick as unknown as React.MouseEventHandler<HTMLAnchorElement> | undefined,
+  } : null)
+  if (anchor) {
     return (
       <Link
-        href={href}
+        href={anchor.href}
         prefetch={prefetch}
-        target={openInNewTab ? "_blank" : undefined}
-        rel={openInNewTab ? "noopener noreferrer" : undefined}
+        target={anchor.target}
+        rel={anchor.rel}
         aria-disabled={isDisabled || undefined}
         tabIndex={isDisabled ? -1 : undefined}
         className={cn(classes, isDisabled && "pointer-events-none")}
-        onClick={onClick as unknown as React.MouseEventHandler<HTMLAnchorElement> | undefined}
+        onClick={anchor.onClick}
       >
         {content}
       </Link>

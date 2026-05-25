@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { cn } from '../../utils/cn'
-import { ChatTicketItem, type ChatTicketItemData } from './chat-ticket-item'
+import { ChatTicketItem, type ChatTicketItemData } from './entity-cards/chat-ticket-item'
 
 export interface ChatTicketListProps extends React.HTMLAttributes<HTMLDivElement> {
   tickets: ChatTicketItemData[]

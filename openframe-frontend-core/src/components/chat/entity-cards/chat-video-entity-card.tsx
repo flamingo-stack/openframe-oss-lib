@@ -1,8 +1,8 @@
 "use client"
 
 import React from 'react'
-import { EntityVideoSection } from '../features/entity-video-section'
-import type { ChatRef } from './chat-ref.types'
+import { EntityVideoSection } from '../../features/entity-video-section'
+import type { ChatRef } from '../chat-ref.types'
 
 /**
  * <ChatVideoEntityCard> — chat-side inline render for video-bearing

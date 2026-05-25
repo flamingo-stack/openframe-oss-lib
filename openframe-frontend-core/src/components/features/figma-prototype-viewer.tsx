@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { cn } from '../../utils/cn'
+import { fetchPriorityProp } from '../../utils/fetch-priority'
 import { Badge } from '../ui/badge'
 import { SectionSelector, type SectionItem } from './section-selector'
 
@@ -421,7 +422,7 @@ function renderUnifiedUI(state: UnifiedState, handlers: {
           sandbox="allow-scripts allow-same-origin allow-popups allow-presentation"
           title={config.title}
           loading="eager"
-          {...({ fetchPriority: 'high' } as any)}
+          {...fetchPriorityProp('high')}
         />
 
         {/* Loading Skeleton */}

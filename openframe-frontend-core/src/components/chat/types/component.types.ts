@@ -2,10 +2,25 @@
  * Component prop types
  */
 
-import type { ComponentType, HTMLAttributes, TextareaHTMLAttributes } from 'react'
+import type { ComponentType, HTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react'
 import type { AssistantType, AuthorType, ChatApprovalStatus, ConnectionStatus } from './chat.types'
 import type { ApprovalRequestData, Message, MessageSegment, ToolExecutionData } from './message.types'
 import type { ChatRef } from '../chat-ref.types'
+
+/**
+ * Anchor component supplied by the host (or the lib's
+ * `NavLinkAnchorViaRuntime`) for markdown links. Receives at minimum
+ * `href` / `className` / `children` — what react-markdown's anchor
+ * passes. The lib's call site spreads its `rest` via `any`, so
+ * implementations are free to declare additional optional routing
+ * props (e.g. `path`, `targetPlatform`) without TS forcing the host's
+ * NavLinkAnchor prop type to know about them.
+ */
+export type NavLinkAnchorComponent = ComponentType<{
+  href: string
+  className?: string
+  children?: ReactNode
+}>
 
 // ========== Chat Container Props ==========
 
@@ -35,6 +50,18 @@ export interface ChatHeaderProps extends HTMLAttributes<HTMLDivElement> {
   serverUrl?: string | null
   headerActions?: React.ReactNode
   ticketInfo?: ChatHeaderTicketInfo
+  /**
+   * Drop the default `max-w-ods-content-narrow` (= 600px) constraint so
+   * the header fills the entire parent width. Use for chat dialogs
+   * embedded in narrow side panels (e.g. the multi-platform-hub
+   * `<GlobalAskAI>` panel) where the 600px column would float in the
+   * middle of a 720px panel and look misaligned vs the full-width
+   * input + content area.
+   *
+   * Default `false` — preserves the existing centered-narrow layout
+   * for legacy consumers.
+   */
+  fullWidth?: boolean
 }
 
 // ========== Connection Indicator Props ==========
@@ -94,12 +121,13 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
    *
    * `card://` markers are still intercepted by the override BEFORE this
    * component runs, so the host need not handle them.
+   *
+   * Implementations MAY declare additional optional props (e.g.
+   * `path`, `targetPlatform` on `NavLinkAnchorViaRuntime`) — react-markdown
+   * passes its anchor `rest` props via spread, so undeclared extras
+   * simply default to undefined on the receiver.
    */
-  NavLinkAnchor?: React.ComponentType<{
-    href: string
-    className?: string
-    children?: React.ReactNode
-  } & Record<string, unknown>>
+  NavLinkAnchor?: NavLinkAnchorComponent
 }
 
 // ========== Chat Message List Props ==========
@@ -113,6 +141,15 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
   smoothScroll?: boolean
   autoScroll?: boolean
   showAvatars?: boolean
+  /** Same `fullWidth` semantics as `ChatHeaderProps.fullWidth` — drops
+   *  the inner content wrapper's `max-w-ods-content-narrow` so messages
+   *  fill the entire scroller width. Preferred over `contentClassName=
+   *  "!max-w-none"` for new consumers (clearer intent, no
+   *  `!important` specificity wrestling). */
+  fullWidth?: boolean
+  /** @deprecated Prefer `fullWidth` for the full-panel-width use case.
+   *  This prop remains supported for callers that need a NON-binary
+   *  override (custom max-w value, etc.). */
   contentClassName?: string
   assistantType?: AssistantType
   assistantIcon?: React.ReactNode
@@ -129,11 +166,7 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
   /** Host-provided anchor for markdown links. Forwarded verbatim to every
    *  message's ChatMessageEnhanced. Owns the unified click rule
    *  (same-origin soft nav, cross-origin new tab). */
-  NavLinkAnchor?: React.ComponentType<{
-    href: string
-    className?: string
-    children?: React.ReactNode
-  } & Record<string, unknown>>
+  NavLinkAnchor?: NavLinkAnchorComponent
 }
 
 export interface ChatMessageListRef {
@@ -194,6 +227,15 @@ export interface SlashCommandSummary {
    *  ≥1 action). Single source of truth — same array drives the
    *  empty-state chip on the host side via the synchronous registry. */
   actions: SlashCommandSummaryAction[]
+  /** Icon-registry key — drives both the empty-state chip glyph AND the
+   *  autocomplete dropdown row glyph. Optional; falls back to the
+   *  `primarySourceId`-based resolution when missing. */
+  iconName?: string
+  /** Admin-UI bucket id. */
+  category?: string
+  /** Empty-state chip-grid sort key. Undefined = NOT a chip (utility /
+   *  thematic command — autocomplete dropdown only). Lower = earlier. */
+  displayOrder?: number
 }
 
 /** Icon + label pair returned by the consumer's `resolveSourceIcon`. The
@@ -237,6 +279,10 @@ export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextArea
   onStop?: () => void | Promise<void>
   sending?: boolean
   awaitingResponse?: boolean
+  /** Same `fullWidth` semantics as `ChatHeaderProps.fullWidth` — drops
+   *  the default `max-w-ods-content-narrow` so the input fills the
+   *  parent. */
+  fullWidth?: boolean
   /**
    * @deprecated The avatar-offset layout was removed; this prop is accepted
    * for back-compat but silently ignored. Safe to drop from call sites.

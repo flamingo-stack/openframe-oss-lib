@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useToast } from "./use-toast";
-import { useRouter } from 'next/navigation';
+import { useRouter } from '../embed-shims/next-navigation';
+import { useRequiredEndpointsRuntime } from '../contexts/endpoints-runtime-context';
 
 interface ContactSubmissionOptions {
   userId?: string;
@@ -44,6 +45,9 @@ export function useContactSubmission(options: ContactSubmissionOptions = {}) {
   const { userId, successRedirectUrl, successToastMessage, onSuccess } = options;
   const { toast } = useToast();
   const router = useRouter();
+  // Endpoint URL injected via context — hub provides hub default, embedded
+  // app provides its proxied path. Throws if no provider is mounted.
+  const { contactUrl } = useRequiredEndpointsRuntime();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
@@ -53,7 +57,7 @@ export function useContactSubmission(options: ContactSubmissionOptions = {}) {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch('/api/contact', {
+      const response = await fetch(contactUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -90,7 +94,7 @@ export function useContactSubmission(options: ContactSubmissionOptions = {}) {
     } finally {
       setIsSubmitting(false);
     }
-  }, [isSubmitting, toast, userId, successToastMessage]);
+  }, [isSubmitting, toast, userId, successToastMessage, contactUrl]);
 
   // Handle redirect after success
   useEffect(() => {

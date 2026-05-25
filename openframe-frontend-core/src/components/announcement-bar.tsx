@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
+import Image from '../embed-shims/next-image';
 import { X } from 'lucide-react';
 import { Button } from './ui/button';
 import { renderSvgIcon } from './icon-utils';
@@ -12,6 +12,7 @@ import {
 } from '../utils/announcement-storage';
 import { Announcement } from '../types/announcement';
 import { getAppType } from '../utils/app-config';
+import { useEndpointsRuntime } from '../contexts/endpoints-runtime-context';
 
 // Helper that defers to renderSvgIcon so we don't need local icon imports
 const getSvgIcon = (
@@ -33,6 +34,15 @@ export function AnnouncementBar() {
   // Get the platform type for platform-specific localStorage keys
   const platform = getAppType();
 
+  // Optional endpoint runtime: when no provider is mounted (e.g. on a
+  // bare React-tree page that doesn't wrap with HubRuntimeProvider),
+  // the bar silently skips its fetch instead of throwing. Apps that DO
+  // mount the provider get the configured URL — typically
+  // '/api/announcements/active' in the hub, or a proxied path in an
+  // embedded host.
+  const endpoints = useEndpointsRuntime();
+  const announcementsUrl = endpoints?.announcementsUrl;
+
   // Helper to determine dismissal key for localStorage
   const getDismissKey = (id: string) => `${platform}-announcement-${id}-dismissed`;
   
@@ -41,9 +51,12 @@ export function AnnouncementBar() {
 
   // Fetch active announcement from API and update state + LS
   const fetchActiveAnnouncement = async () => {
+    // No provider mounted → no URL configured → skip fetch silently.
+    // Cached announcement from previous sessions still renders if present.
+    if (!announcementsUrl) return;
     try {
       // Server-side platform injection - no URL parameter needed
-      const response = await fetch(`/api/announcements/active`);
+      const response = await fetch(announcementsUrl);
       
       if (response.ok) {
         const data = await response.json();
@@ -92,13 +105,22 @@ export function AnnouncementBar() {
       setIsVisible(!isDismissed);
     }
 
+    // No provider mounted → no URL → no fetch / no polling. Cached
+    // announcement still painted above. Skip scheduling the 5-min
+    // interval entirely to avoid an idle timer + repeated short-circuit
+    // calls.
+    if (!announcementsUrl) return;
+
     // Always fetch latest on mount
     fetchActiveAnnouncement();
 
-    // Schedule refresh every 5 minutes
+    // Schedule refresh every 5 minutes. When announcementsUrl flips
+    // (e.g. provider value swap), the effect re-runs and restarts the
+    // interval against the new URL — no stale captured fetch.
     const interval = setInterval(fetchActiveAnnouncement, 300_000);
     return () => clearInterval(interval);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [announcementsUrl]);
 
   // helpers
   const handleDismiss = () => {

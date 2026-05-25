@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react';
 import { Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from '../ui';
 import { Trash2, Plus, Image as ImageIcon, Video, Upload, Loader2, GripVertical } from 'lucide-react';
-import Image from 'next/image';
+import Image from '../../embed-shims/next-image';
 
 export interface ReleaseMediaItem {
   media_type: 'image' | 'video' | 'screenshot' | 'demo';

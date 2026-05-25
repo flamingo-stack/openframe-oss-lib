@@ -19,7 +19,7 @@
 
 'use client'
 
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from '../../embed-shims/next-navigation'
 import { useCallback, useMemo, useRef } from 'react'
 import { FlattenedParam, shouldIncludeInUrl } from './flatten-schema'
 import { JSType } from './graphql-parser'

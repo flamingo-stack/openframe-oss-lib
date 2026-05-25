@@ -18,3 +18,12 @@ export * from './nats/use-nats-client'
 
 // Viewport / lazy-mount primitive (shared IO singleton)
 export * from './use-near-viewport'
+
+// Access code integration — pairs with the standalone helpers in
+// `utils/access-code-client`. Lives in `hooks/` so the createContext
+// pulled in via EndpointsRuntimeContext doesn't end up in the
+// server-safe utils bundle.
+export * from './use-access-code-integration'
+
+// OG placeholder URL builder hook (requires host-supplied URL builder)
+export * from './use-og-placeholder'

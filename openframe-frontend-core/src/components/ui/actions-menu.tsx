@@ -2,7 +2,7 @@
 
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { Check } from "lucide-react";
-import Link from "next/link";
+import Link from "../../embed-shims/next-link";
 import React, { useCallback, useState } from "react";
 import { Chevron02RightIcon, Ellipsis01Icon } from "../icons-v2-generated";
 import { cn } from "../../utils/cn";

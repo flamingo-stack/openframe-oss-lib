@@ -26,7 +26,7 @@ public class NotificationBroadcaster {
     private final Optional<NotificationNatsPublisher> natsPublisher;
 
     @Value("${openframe.features.notifications.enabled:false}")
-    private final boolean notificationsEnabled;
+    private boolean notificationsEnabled;
 
     public Notification broadcast(NotificationCommand command) {
         if (!notificationsEnabled) {

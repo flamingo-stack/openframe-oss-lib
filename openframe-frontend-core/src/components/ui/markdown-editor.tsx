@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useRef, useCallback, useState, useEffect } from "react"
-import dynamic from "next/dynamic"
+import dynamic from "../../embed-shims/next-dynamic"
 import { Loader2, Upload } from "lucide-react"
 import { cn } from "../../utils/cn"
 
