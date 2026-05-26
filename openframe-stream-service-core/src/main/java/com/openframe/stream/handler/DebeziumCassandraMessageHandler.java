@@ -9,6 +9,7 @@ import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.cassandra.repository.CassandraRepository;
 import org.springframework.stereotype.Component;
 
@@ -17,6 +18,7 @@ import java.time.Instant;
 @Slf4j
 @Component
 @ConditionalOnClass(CassandraRepository.class)
+@ConditionalOnProperty(name = "spring.data.cassandra.enabled", havingValue = "true")
 public class DebeziumCassandraMessageHandler
         extends DebeziumMessageHandler<UnifiedLogEvent, DeserializedDebeziumMessage> {
 
