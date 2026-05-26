@@ -66,7 +66,8 @@ export function CustomerInterviewCardSkeleton({ size = 'default' }: { size?: 'de
   }
   return (
     <div className="bg-ods-card border border-ods-border rounded-lg overflow-hidden p-6 flex flex-col gap-6 animate-pulse">
-      <div className="h-[200px] w-full rounded-sm bg-ods-bg" />
+      {/* Aspect matches the loaded image slot (OG 1200×630) */}
+      <div className="w-full aspect-[1200/630] rounded-sm bg-ods-bg" />
       <div className="space-y-2">
         <div className="h-5 w-3/4 bg-ods-bg rounded" />
         <div className="h-5 w-1/2 bg-ods-bg rounded" />
@@ -130,7 +131,10 @@ export function CustomerInterviewCard({ interview, href, target, rel, placeholde
   return (
     <a href={href} target={target} rel={rel} className={cn('block h-full', className)}>
       <Card className="bg-ods-card border border-ods-border hover:border-ods-accent transition-colors p-6 flex flex-col gap-6 overflow-hidden">
-        <div className="h-[200px] w-full rounded-sm overflow-hidden bg-ods-bg shrink-0 relative">
+        {/* Fixed aspect matching standard OG card source (1200×630, 1.91:1)
+            — image renders with near-zero CSS-side crop, subject anchored
+            consistently via center-66% safe-zone convention. */}
+        <div className="w-full aspect-[1200/630] rounded-sm overflow-hidden bg-ods-bg shrink-0 relative">
           {thumbnailUrl ? (
             <>
               <img
