@@ -16,10 +16,17 @@ export * from './use-close-on-navigation'
 
 // useChat + useSSE — ported from hub `hooks/useChat.ts` + `hooks/useSSE.ts`
 // minus the MockChatService + useChatConfig dependencies (which stay in
-// hub-only code). `useEmbeddedChat` is the runtime-driven refactor of
-// the hub's `useDocChat`.
+// hub-only code).
 export * from './use-chat'
 export * from './use-sse'
+
+// Unified chat surface — single public hook + two transport adapters.
+// Consumers typically use `useUnifiedChat({ modes, activeMode })`; the
+// adapter hooks are exposed for advanced cases where direct transport
+// access is needed. `useEmbeddedChat` is the legacy SSE alias.
+export * from './use-sse-chat-adapter'
+export * from './use-nats-chat-adapter'
+export * from './use-unified-chat'
 export * from './use-embedded-chat'
 
 // useProxiedImageUrl — runtime-driven hook wrapping pure
