@@ -234,7 +234,7 @@ export function ProductReleaseCard({
         {/* HERO ZONE — cover LEFT + version pill + title + summary RIGHT */}
         <div className="flex flex-col md:flex-row gap-4 md:gap-6">
           <div className="w-full md:w-[256px] flex-shrink-0">
-            <div className="relative rounded-lg overflow-hidden w-full aspect-[16/9] bg-ods-bg">
+            <div className="relative rounded-lg overflow-hidden w-full aspect-[1200/630] bg-ods-bg">
               {coverImage ? (
                 <Image
                   src={coverImage}
