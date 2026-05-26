@@ -169,3 +169,8 @@ export { isCrossOriginUrl } from '../components/chat/utils/is-cross-origin-url'
 // / `<iframe>` so the rendered DOM attribute is correct under React 18
 // (lowercase) AND React 19 (camelCase) without console warnings.
 export { fetchPriorityProp, type FetchPriorityValue } from './fetch-priority'
+
+// Dev-center section registry (Roadmap / Delivery / Releases / Onboarding) —
+// server-safe (no JSX, no contexts/* imports); imported by route-page
+// `metadata` exports + the shared `<DevSectionView>` chrome.
+export * from './dev-sections'
