@@ -14,31 +14,24 @@
  * `authTier !== 'anon' AND isSelfScopedSource(source)` — single
  * source of truth, consumers don't combine the fields themselves.
  *
- * Implementation: TanStack Query with a shared cache slot.
- *
- * History — this hook used to be plain `useState` + `useEffect`. The
- * rationale at the time was "single consumer, no dedup benefit". Since
- * then the lib grew multiple consumers (`HelpCenterList`, `useTicketsList`,
- * `useTicketActions`, `TicketDetailDrawer`, chat panel, attachment button…)
- * and the plain `useState` model produced empty-state flashes because
- * EACH call mounted its own anon-default state independently, racing
- * the parent's already-resolved identity. Converting to TanStack Query
- * with a shared `['chat-identity', proxyEmail]` slot means every
- * `useChatIdentity()` call across the tree reads the SAME cached
- * response — no inter-consumer races. Aligns with how every other
- * shared data fetch in the lib is implemented (`useTicketsList`,
- * `useTicketEngagements`, etc.).
- *
- * The HMR concern that prompted the original move AWAY from useQuery
- * is addressed by keying on the proxy email itself (a stable value)
- * rather than passing function references — module reload doesn't
- * change the value, so the cache slot survives.
+ * **Implementation: plain `useEffect` + `useState`. NO CLIENT-SIDE
+ * CACHE.** Every consumer that needs identity gets it DRILLED IN
+ * from a parent that already gates on `identity.user?.email` — the
+ * tickets surface uses this pattern in `HelpCenterListAuthed` /
+ * `TicketCenterAuthed` / `HelpCenterCreateForm`. A previous attempt
+ * to layer TanStack Query on this hook was reverted because:
+ *   1. Client caches drift from server truth (empty-state flashes,
+ *      stale identity across credential rotations)
+ *   2. Drilling identity through props is the explicit data-flow
+ *      pattern the rest of the lib uses
+ *   3. The fetch is cheap and short — no perf justification for a
+ *      cache layer
  *
  * Endpoint URL: read from `useRequiredChatRuntime().endpoints.chatIdentityUrl`
  * so embedded apps with their own reverse-proxy topology can override.
  */
 
-import { useQuery } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context'
 import { chatAuthedFetch } from '../utils/chat-authed-fetch'
 import { getChatProxyAuth } from '../utils/chat-proxy-auth-storage'
@@ -95,53 +88,48 @@ const ANON_DEFAULTS: ChatIdentityResponse = {
 export function useChatIdentity(): ChatIdentitySurface {
   const runtime = useRequiredChatRuntime()
   const url = runtime.endpoints.chatIdentityUrl
-
   // `getChatProxyAuth()` reads localStorage every render. If the user
   // pastes bearer creds mid-session (via the `/debug` creds bar),
-  // their email arrives here and the queryKey changes → TanStack
-  // refetches the new slot. Stable values, no function references —
-  // safe under HMR.
+  // their email arrives here and the effect's dep changes → refetch.
   const proxyEmail = getChatProxyAuth()?.email ?? null
 
-  const query = useQuery<ChatIdentityResponse>({
-    queryKey: ['chat-identity', url, proxyEmail],
-    queryFn: async ({ signal }) => {
-      try {
-        const resp = await chatAuthedFetch(url, { signal })
+  const [data, setData] = useState<ChatIdentityResponse>(ANON_DEFAULTS)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    const ctrl = new AbortController()
+
+    setIsLoading(true)
+    chatAuthedFetch(url, { signal: ctrl.signal })
+      .then(async (resp) => {
         if (!resp.ok) return ANON_DEFAULTS
         return (await resp.json()) as ChatIdentityResponse
-      } catch (err) {
-        // AbortError on unmount is expected. Everything else falls
-        // back to anon defaults — keeps the UI rendering consistently
-        // instead of throwing inside hooks that consume this surface.
+      })
+      .then((next) => {
+        if (cancelled) return
+        setData(next)
+        setIsLoading(false)
+      })
+      .catch((err) => {
+        // AbortError on unmount is expected; everything else falls
+        // back to anon defaults so the UI stays consistent.
+        if (cancelled) return
         if ((err as Error).name !== 'AbortError') {
           console.warn('[useChatIdentity] fetch failed, falling back to anon:', err)
         }
-        return ANON_DEFAULTS
-      }
-    },
-    // Identity is stable for the chat session — no auto-refetch on
-    // mount / focus. Mid-session credential rotation flips the
-    // queryKey (`proxyEmail` is a key segment) so a new cache slot
-    // gets fetched.
-    staleTime: Infinity,
-    // 5-minute GC ceiling so a signed-out user's slot doesn't linger
-    // forever if they never sign back in.
-    gcTime: 5 * 60 * 1000,
-    // Don't retry — server returns 200+anon for unauthenticated
-    // callers (capability-probe pattern). A genuine network error
-    // already degrades to ANON_DEFAULTS via the try/catch above.
-    retry: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-  })
+        setData(ANON_DEFAULTS)
+        setIsLoading(false)
+      })
 
-  const data = query.data ?? ANON_DEFAULTS
-  return {
-    ...data,
-    // `query.isPending` is `true` until the first successful fetch
-    // completes (consistent across every consumer thanks to the
-    // shared cache slot — no per-call racing).
-    isLoading: query.isPending,
-  }
+    return () => {
+      cancelled = true
+      ctrl.abort()
+    }
+    // `proxyEmail` in deps → refetch the moment the user pastes creds
+    // (or rotates them) and triggers a re-render. `url` is stable for
+    // the chat session but listed for completeness.
+  }, [url, proxyEmail])
+
+  return { ...data, isLoading }
 }
