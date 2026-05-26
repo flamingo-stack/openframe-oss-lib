@@ -40,7 +40,6 @@ import {
 } from './../chat/chat-attachment-bar'
 import { useChatAttachments } from './../chat/hooks/use-chat-attachments'
 import { useChatIdentity } from './../chat/hooks/use-chat-identity'
-import { formatRelativeTime } from './../../utils/date-utils'
 import { EmptyState } from './../empty-state'
 import {
   ConversationCardRow,
@@ -90,27 +89,7 @@ export function TicketDetailDrawer({
   const isClosed = (ticket.status ?? '').toUpperCase() === 'CLOSED'
   return (
     <div className="bg-ods-card border-t border-ods-border px-4 py-4 flex flex-col gap-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-        <div className="flex flex-col gap-1 text-ods-text-secondary">
-          <MetadataRow label="Ticket" value={`#${ticket.external_id}`} />
-          <MetadataRow label="Priority" value={ticket.priority || '—'} />
-          <MetadataRow label="Pipeline" value={ticket.pipeline_stage_label || '—'} />
-          <MetadataRow label="Company" value={ticket.customer_company || '—'} />
-        </div>
-        <div className="flex flex-col gap-1 md:items-end text-ods-text-secondary">
-          <MetadataRow
-            label="Updated"
-            value={
-              ticket.hubspot_updated_at
-                ? formatRelativeTime(ticket.hubspot_updated_at)
-                : '—'
-            }
-            title={ticket.hubspot_updated_at ?? undefined}
-          />
-        </div>
-      </div>
-
-      <div className="border-t border-ods-border pt-4">
+      <div>
         <p className="text-xs font-medium text-ods-text-secondary mb-2 uppercase tracking-wider">
           Conversation
         </p>
@@ -138,25 +117,6 @@ export function TicketDetailDrawer({
         )}
       </div>
     </div>
-  )
-}
-
-function MetadataRow({
-  label,
-  value,
-  title,
-}: {
-  label: string
-  value: string
-  title?: string
-}) {
-  return (
-    <span title={title} className="flex gap-2">
-      <span className="text-xs uppercase tracking-wider opacity-60">
-        {label}
-      </span>
-      <span className="text-sm text-ods-text-primary">{value}</span>
-    </span>
   )
 }
 
