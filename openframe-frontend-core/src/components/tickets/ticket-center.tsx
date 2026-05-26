@@ -56,12 +56,27 @@ export function TicketCenter({ toast = defaultToast }: TicketCenterProps = {}) {
       />
     )
   }
-  return <TicketCenterAuthed toast={toast} />
+  return (
+    <TicketCenterAuthed
+      toast={toast}
+      sessionEmail={identity.user.email}
+    />
+  )
 }
 
-function TicketCenterAuthed({ toast }: { toast: typeof defaultToast }) {
+function TicketCenterAuthed({
+  toast,
+  sessionEmail,
+}: {
+  toast: typeof defaultToast
+  /** Identity drilled from the parent — see `useTicketsList`'s
+   *  `customerEmail` arg doc for the race-cause rationale. */
+  sessionEmail: string
+}) {
   const queryClient = useQueryClient()
-  const { tickets, isLoading, isFetching, refetch, lastUpdatedAt } = useTicketsList()
+  const { tickets, isLoading, isFetching, refetch, lastUpdatedAt } = useTicketsList({
+    customerEmail: sessionEmail,
+  })
   const [optimisticTickets, setOptimisticTickets] = useState<OptimisticTicket[]>([])
   const [expandedTicketId, setExpandedTicketId] = useState<string | null>(null)
   const [supportSystemDown, setSupportSystemDown] = useState(false)

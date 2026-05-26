@@ -143,6 +143,13 @@ function HelpCenterListAuthed({
 }: AuthedProps) {
   const queryClient = useQueryClient()
   const { tickets, isLoading, isFetching, error, refetch, totalPages } = useTicketsList({
+    // `sessionEmail` is drilled in from the parent — see the same
+    // pattern + race-cause rationale documented in
+    // `HelpCenterCreateForm.sessionName/sessionEmail`. Calling
+    // `useChatIdentity` inside `useTicketsList` would race the
+    // parent's already-resolved identity and produce an empty-state
+    // flash on first render.
+    customerEmail: sessionEmail,
     search,
     status,
     page,
