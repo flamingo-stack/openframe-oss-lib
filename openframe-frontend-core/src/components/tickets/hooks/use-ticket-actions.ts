@@ -2,15 +2,17 @@
 
 /**
  * All 5 ticket write actions funnel through one helper:
- * `proposeAndConfirm()`. The server-side chat-agent flow handles auth,
- * ACL re-bind, audit row, and HubSpot REST — we just chain
- * propose → confirm-tool with `messages: []` so the server's existing
- * phase-2 gate (confirm-tool/route.ts:569) structurally skips the
- * auto-continue prose.
+ * `executeTicketAction()`, which POSTs to `/api/chat/agent/ticket-action`
+ * — a single-roundtrip endpoint that runs the SAME `ChatToolHandler.execute`
+ * the chat agent's `confirm-tool` route uses (same ACL re-bind, same audit
+ * row, same HubSpot REST call). The only difference is REST shape: the
+ * chat path needs `propose → confirm-tool` because the LLM emits a
+ * `tool_use` the user must approve in a proposal card. The /tickets form
+ * has no approval step (the user already clicked "Open ticket" / "Send"),
+ * so the two-step is pure overhead — we collapse to one POST + JSON.
  *
  * Reuses every existing piece:
  *   - `embedAuthedFetch` for the bearer/act-as headers (same auth as chat).
- *   - `readLeadingDecisionFrame` to drain the SSE leading frame.
  *   - TanStack-Query `invalidateQueries` for refetch.
  *
  * Single-flight + serialization:
@@ -30,7 +32,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch'
-import { readLeadingDecisionFrame, type DecisionResolvedFrame } from '../../../utils/sse-decision-frame'
 import type { ChatAttachment } from '../../chat/utils/chat-attachment-markdown'
 import {
   type AnyTicket,
@@ -41,8 +42,7 @@ import {
   TOAST_COPY,
 } from '../types'
 
-const PROPOSE_ENDPOINT = '/api/chat/agent/propose'
-const CONFIRM_TOOL_ENDPOINT = '/api/chat/agent/confirm-tool'
+const TICKET_ACTION_ENDPOINT = '/api/chat/agent/ticket-action'
 
 /** 3 attempts × backoff (cumulative ~21s wall-clock). After this we
  *  drop the optimistic row and ask the user to reload. */
@@ -50,8 +50,17 @@ const MIRROR_SYNC_BACKOFF_MS = [3_000, 6_000, 12_000] as const
 
 type ToolName = 'create_ticket' | 'update_ticket'
 
-interface ProposeResponse {
-  proposal_id?: string
+/** Wire shape returned by the new `/api/chat/agent/ticket-action` endpoint.
+ *  Flat — no decision-frame wrapping — because there's no LLM approval
+ *  loop on the form path. Mirrors `ExecuteResult` from
+ *  `chat-source-strategy.ts` plus `{ ok, ticket_id }` at the top so
+ *  callers don't need to know about the underlying `id` field. */
+interface TicketActionResponse {
+  ok?: boolean
+  ticket_id?: string
+  status?: string | null
+  mirror_synced?: boolean
+  raw?: unknown
   error?: string
   code?: string
 }
@@ -172,42 +181,21 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
     return next
   }, [])
 
-  const proposeAndConfirm = useCallback(
-    async (toolName: ToolName, args: Record<string, unknown>): Promise<DecisionResolvedFrame> => {
-      const proposeRes = await embedAuthedFetch(PROPOSE_ENDPOINT, {
+  const executeTicketAction = useCallback(
+    async (toolName: ToolName, args: Record<string, unknown>): Promise<TicketActionResponse> => {
+      const res = await embedAuthedFetch(TICKET_ACTION_ENDPOINT, {
         method: 'POST',
         body: JSON.stringify({ tool_name: toolName, args }),
       })
-      if (!proposeRes.ok) {
-        const body = (await proposeRes.json().catch(() => ({}))) as ProposeResponse
-        const code = resolveErrorCode(body.code, proposeRes.status)
-        const message = body.error || `propose ${toolName} failed (${proposeRes.status})`
-        throw new TicketActionFailure(code, message, proposeRes)
+      // Server returns JSON for both success and failure — no SSE on this
+      // route. Parse once, branch on `res.ok`.
+      const body = (await res.json().catch(() => ({}))) as TicketActionResponse
+      if (!res.ok) {
+        const code = resolveErrorCode(body.code, res.status)
+        const message = body.error || `${toolName} failed (${res.status})`
+        throw new TicketActionFailure(code, message, res)
       }
-      const proposeBody = (await proposeRes.json()) as ProposeResponse
-      const proposalId = proposeBody.proposal_id
-      if (!proposalId) {
-        throw new TicketActionFailure('UNKNOWN', 'propose returned no proposal_id')
-      }
-
-      const confirmRes = await embedAuthedFetch(CONFIRM_TOOL_ENDPOINT, {
-        method: 'POST',
-        body: JSON.stringify({
-          proposal_id: proposalId,
-          action: 'approve',
-          // messages:[] makes phase-2 unreachable server-side. See
-          // §A-1 of the plan; the gate is at confirm-tool/route.ts:569.
-          messages: [],
-        }),
-      })
-      if (!confirmRes.ok) {
-        // confirm-tool returns JSON on error, SSE on success.
-        const body = (await confirmRes.json().catch(() => ({}))) as ProposeResponse
-        const code = resolveErrorCode(body.code, confirmRes.status)
-        const message = body.error || `confirm-tool failed (${confirmRes.status})`
-        throw new TicketActionFailure(code, message, confirmRes)
-      }
-      return await readLeadingDecisionFrame(confirmRes)
+      return body
     },
     [],
   )
@@ -314,14 +302,14 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
       prependOptimistic(placeholder)
       try {
         return await enqueue(async () => {
-          const frame = await proposeAndConfirm('create_ticket', {
+          const result = await executeTicketAction('create_ticket', {
             subject: input.subject.trim(),
             content: input.content.trim(),
             ...(input.attachments?.length ? { attachments: input.attachments } : {}),
           })
-          if (frame.result?.mirror_synced === false) {
+          if (result.mirror_synced === false) {
             toast(TOAST_COPY.open_mirror_pending)
-            watchMirrorSync(placeholderId, frame.result?.ticket_id)
+            watchMirrorSync(placeholderId, result.ticket_id)
           } else {
             toast(TOAST_COPY.open_success)
             // Invalidate FIRST so the refetch lands before the
@@ -343,7 +331,7 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
     },
     [
       enqueue,
-      proposeAndConfirm,
+      executeTicketAction,
       prependOptimistic,
       removeOptimistic,
       queryClient,
@@ -367,7 +355,7 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
       setRowBusy(ticket.id, true)
       try {
         return await enqueue(async () => {
-          await proposeAndConfirm('update_ticket', {
+          await executeTicketAction('update_ticket', {
             ...serverArgs,
             ticket_id: ticket.external_id,
           } as unknown as Record<string, unknown>)
@@ -395,7 +383,7 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
     // state isn't read inside this callback (only by `isRowBusy` selector
     // outside), so listing it would churn the closure on every flag flip
     // and cascade-recreate addNote/closeTicket/etc.
-    [setRowBusy, enqueue, proposeAndConfirm, queryClient, toast, surfaceError, removeTicketFromCache],
+    [setRowBusy, enqueue, executeTicketAction, queryClient, toast, surfaceError, removeTicketFromCache],
   )
 
   const sendMessage = useCallback(
@@ -525,17 +513,6 @@ export function mapTicketActionError(err: unknown): MappedTicketActionError {
           supportSystemDown: false,
           removeRowFromCache: false,
         }
-    }
-  }
-  // SSE decoder errors leak internal protocol details ("expected
-  // decision_resolved, got X") that aren't useful to users. Map them
-  // to a generic readable-server-response message.
-  if (err instanceof Error && err.message.startsWith('readLeadingDecisionFrame:')) {
-    return {
-      code: 'UNKNOWN',
-      message: "Couldn't read the server response. Please try again.",
-      supportSystemDown: false,
-      removeRowFromCache: false,
     }
   }
   return {
