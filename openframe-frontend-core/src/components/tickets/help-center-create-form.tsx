@@ -110,7 +110,8 @@ export function HelpCenterCreateForm({ actions, supportSystemDown = false }: Hel
       }}
       extraTopField={subjectField}
       submitLabel="Open ticket"
-      onCustomSubmit={async (data) => {
+      attachmentsEnabled
+      onCustomSubmit={async (data, attachments) => {
         const trimmedSubject = subject.trim()
         if (!trimmedSubject) {
           setSubjectError('Subject is required')
@@ -122,6 +123,7 @@ export function HelpCenterCreateForm({ actions, supportSystemDown = false }: Hel
         const ok = await actions.submitTicket({
           subject: trimmedSubject,
           content: data.message,
+          attachments: attachments.length > 0 ? attachments : undefined,
         })
         if (ok) {
           setSubject('')

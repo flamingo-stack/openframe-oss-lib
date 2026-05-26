@@ -44,6 +44,12 @@ import {
   Label,
 } from '../ui'
 import { useContactSubmission } from '../../hooks/use-contact-submission'
+import {
+  ChatAttachmentAddButton,
+  ChatAttachmentChipStrip,
+} from '../chat/chat-attachment-bar'
+import { useChatAttachments } from '../chat/hooks/use-chat-attachments'
+import type { ChatAttachment } from '../chat/utils/chat-attachment-markdown'
 
 /**
  * Fields the caller can suppress. Six values — every primary form
@@ -90,8 +96,21 @@ export interface ContactFormProps {
    *  the built-in `useContactSubmission` flow (no /api/contact call,
    *  no success-redirect, no built-in toast) — the caller owns the
    *  entire side-effect chain. Reset + `onSubmitSuccess` still fire
-   *  on a successful await. */
-  onCustomSubmit?: (data: ContactFormData) => Promise<void>
+   *  on a successful await.
+   *
+   *  Receives the schema-validated form payload PLUS the ready
+   *  attachments array (empty when `attachmentsEnabled === false` or
+   *  the user hasn't picked any). Caller forwards `attachments` to
+   *  whichever sink owns the upload (e.g. `actions.submitTicket`'s
+   *  `attachments` field for HubSpot Note engagements). */
+  onCustomSubmit?: (data: ContactFormData, attachments: ChatAttachment[]) => Promise<void>
+  /** Turn on the attachments bar (file `+` button + chip strip) using
+   *  the same lib primitives the chat composer uses
+   *  (`<ChatAttachmentAddButton>` + `<ChatAttachmentChipStrip>` +
+   *  `useChatAttachments`). When `false` (the default), the form
+   *  doesn't render the bar AND the attachments array passed to
+   *  `onCustomSubmit` is always empty. */
+  attachmentsEnabled?: boolean
   /** Render slot for an EXTRA field at the very top of the form,
    *  ABOVE the name/email row. Use this for ticket surfaces that need
    *  a Subject input — the field is NOT part of `ContactSchema`, so
@@ -128,6 +147,7 @@ export function ContactForm({
   defaultValues: defaultValuesProp,
   onCustomSubmit,
   extraTopField,
+  attachmentsEnabled = false,
   title = 'Hit Us Up',
   subtitle,
   footerText = 'We typically respond within 24 hours. We respect your privacy – no spam, ever.',
@@ -140,6 +160,12 @@ export function ContactForm({
   successRedirectUrl = '/blog#community',
   successToastMessage = 'Redirecting you to join our community...',
 }: ContactFormProps = {}) {
+  // Attachments staging — same hook the chat composer + ticket
+  // detail-drawer composer use. Files upload to Supabase as soon as
+  // the user picks them; `readyAttachments` is the wire-shape array
+  // ready for the next submit. `hasInflightUploads` disables Send
+  // until every upload settles.
+  const attachments = useChatAttachments()
   // Built-in contact-API flow. Hook is called unconditionally (rules
   // of hooks); we just don't dispatch its `submit` when the caller
   // passes `onCustomSubmit`. The hook owns its own toast + redirect
@@ -178,12 +204,14 @@ export function ContactForm({
 
   const handleFormSubmit = async (data: ContactFormData) => {
     if (isSubmitting) return
+    if (attachmentsEnabled && attachments.hasInflightUploads) return
     try {
       const payload = { ...data, ...(rdtCid && { rdt_cid: rdtCid }) }
+      const readyAttachments = attachmentsEnabled ? attachments.readyAttachments : []
       if (onCustomSubmit) {
         setCustomSubmitting(true)
         try {
-          await onCustomSubmit(payload)
+          await onCustomSubmit(payload, readyAttachments)
         } finally {
           setCustomSubmitting(false)
         }
@@ -192,6 +220,7 @@ export function ContactForm({
       }
       onSubmitSuccess?.()
       reset()
+      if (attachmentsEnabled) attachments.clear()
     } catch {
       // Error toast is owned by the active flow:
       //  - built-in: `useContactSubmission` toasts inside `submit()`.
@@ -409,6 +438,32 @@ export function ContactForm({
           </div>
         )}
 
+        {/* Attachments — only renders when `attachmentsEnabled` is on.
+            Uses the SAME chip strip + add button + staging hook the
+            chat composer and ticket-drawer composer use, so the visual
+            chip styling + upload-progress UX are identical everywhere
+            attachments appear. */}
+        {attachmentsEnabled && (
+          <div className="flex flex-col gap-2">
+            <ChatAttachmentChipStrip
+              attachments={attachments.attachments}
+              onRemove={attachments.removeAttachment}
+              disabled={isSubmitting}
+            />
+            <div className="flex items-center gap-2">
+              <ChatAttachmentAddButton
+                attachmentsEnabled
+                attachmentsCount={attachments.attachments.length}
+                onAddFiles={attachments.addFiles}
+                disabled={isSubmitting}
+              />
+              <span className="text-xs text-ods-text-secondary">
+                Attach files (optional)
+              </span>
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-col md:flex-row gap-4 md:gap-6 items-center justify-end w-full pt-2 mt-auto">
           {footerText && (
             <p className="font-['DM_Sans'] text-ods-text-secondary text-xs md:text-sm leading-relaxed text-center md:text-left">
@@ -418,7 +473,11 @@ export function ContactForm({
           <Button
             type="submit"
             loading={isSubmitting}
-            disabled={isSubmitting || isSuccess}
+            disabled={
+              isSubmitting ||
+              isSuccess ||
+              (attachmentsEnabled && attachments.hasInflightUploads)
+            }
             variant={buttonVariant}
             className={`w-full md:w-auto ${buttonClassName}`}
           >
