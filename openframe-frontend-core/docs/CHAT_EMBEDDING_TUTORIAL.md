@@ -109,6 +109,77 @@ That's the whole React side. The lib handles:
 - Inline entity cards (blog posts, customer interviews, etc.)
 - Image attachments
 
+### Two-mode setup (Guide + Mingo agent)
+
+`<EmbeddableChat />` is the **single** chat surface used across the
+Flamingo stack. It supports two transparent transports living
+side-by-side — Guide (SSE → hub) and Mingo (NATS → OpenFrame agent).
+Histories never merge; the user flips modes via a header toggle and
+each side keeps its own thread.
+
+Pass `modes` to opt into the new API. Configure one slot for legacy /
+single-mode hosts (toggle stays hidden), both slots for dual-mode hosts:
+
+```tsx
+import { EmbeddableChat } from '@flamingo-stack/openframe-frontend-core/components/chat'
+
+<EmbeddableChat
+  modes={{
+    guide: {
+      // Optional — overrides the lib-baked documentType → tableId map.
+      tableIdForDocumentType: (docType) => myRegistry[docType] ?? null,
+    },
+    mingo: {
+      dialogId,                          // current conversation id (null → idle)
+      getNatsWsUrl: () => natsWsUrl,     // builder, may return null
+      clientConfig: { name: 'my-app' },  // optional NATS client config
+      publishUserMessage: async (text, { hidden, dialogId }) => {
+        // Consumer-owned upstream send — typically an authenticated
+        // POST to your chat endpoint, or a NATS publish. Adapter is
+        // wire-format agnostic.
+        await fetch(`/api/mingo/${dialogId}/messages`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ text, hidden }),
+        })
+      },
+      fetchChunks: async (dialogId, chatType, fromSeqId) => {
+        // Optional — back-fills missed events when the dialog activates.
+        // When omitted, the lib's default fetcher is used (see hook docs).
+        const r = await fetch(`/api/mingo/${dialogId}/chunks?from=${fromSeqId ?? ''}`)
+        return r.json()
+      },
+    },
+  }}
+  defaultActiveMode="mingo"             // initial mode for uncontrolled state
+  // Or: activeMode={mode} + onActiveModeChange={setMode} for controlled
+/>
+```
+
+**Single-mode (legacy + guide-only embed):**
+```tsx
+// No `modes` prop → falls back to legacy guide-only behaviour. The
+// top-level `tableIdForDocumentType` prop is auto-synthesised into
+// `modes.guide`. Toggle is hidden.
+<EmbeddableChat tableIdForDocumentType={myRegistry} />
+```
+
+**Notes:**
+- The header toggle appears **only when both** `modes.guide` and
+  `modes.mingo` are configured. Single-mode hosts see no toggle.
+- Image attachments are Guide-only — the add-button is hidden when
+  active mode is Mingo regardless of `chat-identity` capability.
+- Both adapters are always mounted (React rules of hooks). The
+  inactive one stays idle: no SSE request, no NATS subscription, no
+  catchup fetch. Local message state is preserved so a mode flip
+  restores the user to where they left off.
+- `useRequiredChatRuntime()` is invoked unconditionally by the SSE
+  adapter. Mingo-only consumers (no Guide config) still need a
+  `<ChatRuntimeContext.Provider>` at the root — stub endpoints are
+  fine since the SSE adapter never makes network calls when its mode
+  isn't active.
+- Image attachments
+
 ### Why no auth in the client?
 
 Notice the runtime has NO credentials, NO bearer tokens, NO API keys. The browser makes ordinary `fetch('/api/...')` calls; the GATEWAY sees those, looks up the authenticated user from your app's session, and injects the `Authorization: Bearer <chat-proxy-secret>` + `X-Chat-Act-As: <email>` headers before forwarding to the hub.
@@ -357,6 +428,47 @@ curl -i --cookie "session=..." https://your-gateway/api/chat/identity
 # HTTP/1.1 200
 # {"authTier":"bearer-act-as","user":{"email":"you@example.com","firstName":"...","lastName":"...","avatarUrl":"..."}}
 ```
+
+---
+
+## Regression checklist for the two-mode upgrade
+
+When upgrading an existing single-mode embedder (e.g. multi-platform-hub)
+to the unified `<EmbeddableChat>`, verify these behaviours stay intact:
+
+### Multi-platform-hub (guide-only legacy path)
+
+The host passes only `tableIdForDocumentType` at the top level — no
+`modes` prop. The lib auto-synthesises `modes = { guide: { ... } }` and
+forces `activeMode = 'guide'`.
+
+- [ ] Floating "Ask AI" button still appears (legacy `showInternalTrigger` default)
+- [ ] Opening the drawer renders the Guide empty state + suggested queries
+- [ ] Slash commands (`/whoami`, `/blogs`, etc.) work
+- [ ] Inline entity cards render (blog/program/customer-interview/etc.)
+- [ ] Image attachments add-button is visible and uploads work
+- [ ] localStorage history key is unchanged (`chat:<source>`)
+- [ ] Mode toggle is NOT visible in the header
+- [ ] `discussRef` / `displayRef` from inline cards still drill into RAG retrieval
+- [ ] `currentProvider` / `currentModelLabel` propagate to `<ModelDisplay>`
+- [ ] Approval cards + tool-execution blocks render correctly
+
+### OpenFrame frontend (dual-mode new path)
+
+The host passes both `modes.guide` + `modes.mingo`. Toggle is visible.
+
+- [ ] Toggle appears in the drawer header showing "Mingo | Guide"
+- [ ] Initial mode matches `defaultActiveMode` (or first configured slot)
+- [ ] Clicking the toggle swaps message threads — each mode keeps its own history
+- [ ] Mid-stream switch: inactive mode pauses (no further chunks rendered);
+      reactivating it picks up where the stream left off (catchup for NATS,
+      partial-state for SSE)
+- [ ] Attachments add-button is hidden in Mingo mode
+- [ ] Slash menu does not surface Guide commands in Mingo mode
+      (gated automatically when NATS runtime lacks `commandsUrl`)
+- [ ] NATS subscription only opens when Mingo mode is active
+- [ ] SSE stream only fires when Guide mode is active and `sendMessage` is called
+- [ ] Both adapters return identical `UnifiedChatState` shape (TypeScript-enforced)
 
 ---
 

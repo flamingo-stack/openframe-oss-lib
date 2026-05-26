@@ -15,7 +15,7 @@
  *   - `currentPlatform()` → `useRequiredChatRuntime().source`.
  *   - `useNavLink`/`NavLinkAnchor` → chip-anchor rewrite via
  *     `handleChatNavClick` + lib's `NavLinkAnchorViaRuntime`.
- *   - `useDocChat(source)` → `useEmbeddedChat()` (reads source from runtime).
+ *   - `useDocChat(source)` → `useSseChatAdapter()` (reads source from runtime).
  *   - `tableIdForDocumentType` import deleted (dead per audit).
  *   - `renderChatInlineEntityCard` imported from lib's entity-cards barrel.
  *   - `useCloseOnNavigation` signature is `(close, pathname)` — pass `null`
@@ -54,7 +54,13 @@ import { renderChatInlineEntityCard } from './entity-cards/dispatch'
 import type { ChatCardDispatchExtras } from './entity-cards/dispatch'
 
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context'
-import { useEmbeddedChat, type ChatSource } from './hooks/use-embedded-chat'
+import { type ChatSource, type UseSseChatAdapterOptions } from './hooks/use-sse-chat-adapter'
+import {
+  useUnifiedChat,
+  type ChatMode,
+  type UseUnifiedChatModes,
+} from './hooks/use-unified-chat'
+import type { UseNatsChatAdapterConfig } from './hooks/use-nats-chat-adapter'
 import { useChatAttachments } from './hooks/use-chat-attachments'
 import { useChatAttachmentImageGallery } from './hooks/use-chat-attachment-image-gallery'
 import { useChatIdentity } from './hooks/use-chat-identity'
@@ -84,7 +90,7 @@ import { formatSingularLookupInvocation } from './utils/slash-dispatch-utils'
 
 /** Lib-side type alias kept inline to avoid leaking the (deprecated) hub
  *  `rag-table-config` `DocSource` import. The chat source is always a
- *  string id; `useEmbeddedChat` reads it from `runtime.source`. */
+ *  string id; `useSseChatAdapter` reads it from `runtime.source`. */
 type DocSource = string
 
 export interface EmbeddableChatProps {
@@ -117,10 +123,46 @@ export interface EmbeddableChatProps {
    *  (programs + product_release). Forwarded straight to
    *  `renderChatInlineEntityCard`. */
   extras?: ChatCardDispatchExtras
-  /** Optional callback used by `useEmbeddedChat`'s `displayRef` /
+  /** Optional callback used by `useSseChatAdapter`'s `displayRef` /
    *  `discussRef` flow to translate an LLM document type into the
-   *  registry table id for entity-id-filtered retrieval. */
+   *  registry table id for entity-id-filtered retrieval.
+   *
+   *  Legacy top-level form. The new shape is `modes.guide.tableIdForDocumentType`.
+   *  When both are present, `modes` wins. */
   tableIdForDocumentType?: (documentType: string) => string | null
+
+  /**
+   * Per-mode transport configuration. When omitted, the component
+   * falls back to legacy guide-only behaviour synthesised from the
+   * top-level `tableIdForDocumentType` prop — multi-platform-hub and
+   * any other existing consumer keep working with zero changes.
+   *
+   * When provided, this is the canonical way to wire chat transports:
+   *
+   *   - `modes.guide`  → SSE/Guide adapter options (RAG retrieval, hub).
+   *   - `modes.mingo`  → NATS/Mingo adapter config  (agent, openframe).
+   *
+   * Configuring both modes makes the in-panel mode toggle appear so
+   * the user can flip between Guide and Mingo without losing either
+   * history (each mode keeps its own local thread).
+   */
+  modes?: UseUnifiedChatModes
+
+  /**
+   * Controlled active-mode. When provided, `onActiveModeChange` MUST
+   * also be provided. For uncontrolled use see `defaultActiveMode`.
+   */
+  activeMode?: ChatMode
+
+  /** Controlled active-mode change handler. Required when `activeMode` is set. */
+  onActiveModeChange?: (mode: ChatMode) => void
+
+  /**
+   * Initial active mode for uncontrolled mode. Ignored when `activeMode`
+   * is set. Defaults to `'guide'` when `modes.guide` is configured,
+   * else `'mingo'`.
+   */
+  defaultActiveMode?: ChatMode
 }
 
 // =============================================================================
@@ -490,6 +532,10 @@ function EmbeddableChatInner({
   showInternalTrigger = true,
   extras,
   tableIdForDocumentType,
+  modes,
+  activeMode: controlledActiveMode,
+  onActiveModeChange,
+  defaultActiveMode,
 }: EmbeddableChatProps) {
   const runtime = useRequiredChatRuntime()
   const source = runtime.source as DocSource
@@ -639,6 +685,42 @@ function EmbeddableChatInner({
       identityUser?.name?.split(' ')[0]?.trim()) ||
     undefined
 
+  // Synthesize `modes` from legacy props when the new API isn't used.
+  // `modes` wins when both are present — the legacy top-level
+  // `tableIdForDocumentType` is then silently ignored.
+  const effectiveModes = useMemo<UseUnifiedChatModes>(() => {
+    if (modes) return modes
+    const guideOptions: UseSseChatAdapterOptions = tableIdForDocumentType
+      ? { tableIdForDocumentType }
+      : {}
+    return { guide: guideOptions }
+  }, [modes, tableIdForDocumentType])
+
+  // Initial active mode picks the first configured slot when neither
+  // controlled `activeMode` nor `defaultActiveMode` is provided. Guide
+  // wins ties so legacy callers see no behaviour change.
+  const initialActiveMode: ChatMode =
+    controlledActiveMode ??
+    defaultActiveMode ??
+    (effectiveModes.guide ? 'guide' : 'mingo')
+
+  const [uncontrolledActiveMode, setUncontrolledActiveMode] =
+    useState<ChatMode>(initialActiveMode)
+  const activeMode = controlledActiveMode ?? uncontrolledActiveMode
+  const handleActiveModeChange = useCallback(
+    (next: ChatMode) => {
+      if (controlledActiveMode === undefined) {
+        setUncontrolledActiveMode(next)
+      }
+      onActiveModeChange?.(next)
+    },
+    [controlledActiveMode, onActiveModeChange],
+  )
+
+  // Mode toggle visible only when both slots are populated.
+  const showModeToggle =
+    effectiveModes.guide !== undefined && effectiveModes.mingo !== undefined
+
   const {
     messages: rawMessages,
     isLoading: chatLoading,
@@ -654,7 +736,7 @@ function EmbeddableChatInner({
     currentCacheHitRatePct,
     currentUsageBreakdown,
     displayRef,
-  } = useEmbeddedChat({ tableIdForDocumentType })
+  } = useUnifiedChat({ modes: effectiveModes, activeMode })
 
   // Chat-attachment hooks (v2 attachment feature).
   const {
@@ -736,7 +818,7 @@ function EmbeddableChatInner({
       }
       sendMessage(augmentedText, {
         ...(readyAttachments.length > 0
-          ? { pendingAttachments: readyAttachments }
+          ? { attachments: readyAttachments }
           : {}),
       })
       if (readyAttachments.length > 0) {
@@ -894,6 +976,35 @@ function EmbeddableChatInner({
                   fullWidth
                   className="!rounded-xl"
                 />
+                {showModeToggle ? (
+                  <div
+                    role="radiogroup"
+                    aria-label="Chat mode"
+                    className="mt-3 inline-flex rounded-lg border border-ods-border bg-ods-bg-secondary p-0.5"
+                  >
+                    {(['mingo', 'guide'] as ChatMode[]).map((m) => {
+                      const isActive = activeMode === m
+                      const label = m === 'mingo' ? 'Mingo' : 'Guide'
+                      return (
+                        <button
+                          key={m}
+                          type="button"
+                          role="radio"
+                          aria-checked={isActive}
+                          onClick={() => handleActiveModeChange(m)}
+                          className={
+                            'px-3 py-1 text-sm rounded-md transition-colors ' +
+                            (isActive
+                              ? 'bg-ods-accent text-ods-text-on-accent'
+                              : 'text-ods-text-secondary hover:text-ods-text-primary')
+                          }
+                        >
+                          {label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                ) : null}
               </div>
 
               <div
@@ -1071,7 +1182,11 @@ function EmbeddableChatInner({
 
                 <div className="flex items-center gap-2 w-full">
                   <ChatAttachmentAddButton
-                    attachmentsEnabled={attachmentsEnabled}
+                    // Attachments are Guide-only: the NATS agent backend
+                    // doesn't accept them, so the add-button is hidden in
+                    // Mingo mode regardless of the identity endpoint's
+                    // capability flag.
+                    attachmentsEnabled={attachmentsEnabled && activeMode === 'guide'}
                     attachmentsCount={stagedAttachments.length}
                     onAddFiles={addAttachmentFiles}
                     disabled={chatLoading}
