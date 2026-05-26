@@ -39,7 +39,10 @@ import { useChatAttachments } from './../chat/hooks/use-chat-attachments'
 import { useChatIdentity } from './../chat/hooks/use-chat-identity'
 import { formatRelativeTime } from './../../utils/date-utils'
 import { EmptyState } from './../empty-state'
-import { ConversationCardRow } from './../shared/dev-section/dev-card-row'
+import {
+  ConversationCardRow,
+  ConversationCardRowSkeletonList,
+} from './../shared/dev-section/dev-card-row'
 import type { TicketAttachment } from './../ui/ticket-attachments-list'
 import { useTicketEngagements } from './hooks/use-ticket-engagements'
 import type {
@@ -190,7 +193,12 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
   const customerName = identity.user?.name || identity.user?.email || 'You'
   const customerAvatar = identity.user?.avatarUrl ?? undefined
 
-  if (bodyTurns.length === 0 && engagements.length === 0 && !isLoading) {
+  if (bodyTurns.length === 0 && engagements.length === 0) {
+    // No content yet — distinguish loading from empty so the user
+    // doesn't see "No conversation yet" flash during the initial fetch.
+    if (isLoading) {
+      return <ConversationCardRowSkeletonList rows={2} />
+    }
     return (
       <EmptyState
         type="generic"
@@ -259,11 +267,11 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
       })}
 
       {isLoading && (
-        <div className="p-[12px] md:p-[16px] border-t border-ods-border">
-          <p className="text-h6 text-ods-text-secondary uppercase tracking-[-0.28px]">
-            Loading conversation…
-          </p>
-        </div>
+        // Trailing single-row skeleton when the panel already has
+        // content rendered — drawer is showing the customer's body
+        // turns + cached engagements while a background refetch is
+        // in flight. Single row keeps the placeholder modest.
+        <ConversationCardRowSkeletonList rows={1} />
       )}
     </div>
   )

@@ -211,6 +211,50 @@ export function ConversationCardRow({
 }
 
 /**
+ * Skeleton variant matching `ConversationCardRow`'s layout. Used by
+ * the ticket-detail-drawer's timeline panel while engagements load —
+ * mirrors avatar + header + body so the loading→loaded swap doesn't
+ * reshape the row vertically.
+ */
+export function ConversationCardRowSkeleton() {
+  return (
+    <div className="border-b border-ods-border last:border-b-0 p-[12px] md:p-[16px] flex gap-[12px] md:gap-[16px] w-full">
+      {/* Avatar — matches SquareAvatar size="sm" (32px) used by the
+          real row. Round to match `variant="round"`. */}
+      <div className="h-8 w-8 shrink-0 rounded-full bg-ods-border animate-pulse" />
+      <div className="flex-1 min-w-0 flex flex-col gap-[8px] md:gap-[12px]">
+        {/* Header row — author + role chip + timestamp placeholders. */}
+        <div className="flex items-baseline justify-between gap-[8px]">
+          <div className="flex items-baseline gap-[8px] flex-1">
+            <div className="h-[24px] w-32 bg-ods-border rounded animate-pulse" />
+            <div className="h-[20px] w-16 bg-ods-border rounded animate-pulse" />
+          </div>
+          <div className="h-[20px] w-20 bg-ods-border rounded animate-pulse shrink-0" />
+        </div>
+        {/* Body — two-line placeholder. */}
+        <div className="space-y-2">
+          <div className="h-[20px] w-full bg-ods-border rounded animate-pulse" />
+          <div className="h-[20px] w-3/4 bg-ods-border rounded animate-pulse" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Multi-row skeleton list — drop-in for the conversation timeline's
+ *  loading state. Defaults to 2 rows so the placeholder fits in a
+ *  reasonable vertical footprint without dominating the drawer. */
+export function ConversationCardRowSkeletonList({ rows = 2 }: { rows?: number }) {
+  return (
+    <div className="bg-ods-card border border-ods-border rounded-[6px] overflow-hidden w-full">
+      {Array.from({ length: rows }, (_, i) => (
+        <ConversationCardRowSkeleton key={i} />
+      ))}
+    </div>
+  );
+}
+
+/**
  * Skeleton rendering for a single row — the bars mirror the same
  * min-heights as `DevCardRowContent` so the loading→loaded swap
  * doesn't reflow.
