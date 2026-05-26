@@ -2,97 +2,78 @@
 
 /**
  * `<TicketLinkedDeliveryCard />` — renders the ClickUp delivery task
- * linked to a HubSpot ticket as a single bordered row with:
- *   - Task title (from `clickup_tasks.name`)
- *   - Status badge (color = ClickUp's own status_color; falls back to
- *     `getStatusColorScheme(status)` when the hex is missing)
- *   - Target version label (when set)
- *   - External-link affordance pointing at the ClickUp task URL
+ * linked to a HubSpot ticket as a single `<DeliveryRow />` (the same
+ * primitive `/bug-fixes-and-enhancements` uses for its row tiles).
  *
- * Reused primitives only — `StatusBadge` for the status pill,
- * `ExternalLinkIcon` for the affordance. The card chrome matches the
- * `ConversationCardRow` border + spacing used elsewhere in the drawer
- * so the surface reads as one continuous list.
+ * Visual parity is the point: when a customer sees this card on their
+ * ticket, it looks exactly like the row they'll land on after clicking
+ * — same title placement, same status + task-type badges, same density.
  *
- * Rendered conditionally by `<TicketDetailDrawer>` ONLY when the
- * server-side `attachClickupTasks` step populated `ticket.clickup`;
- * customer-only tickets (no linked delivery) skip rendering entirely.
+ * Click behavior: navigates to
+ * `/bug-fixes-and-enhancements?focus=<external_id>`. `DeliveryLists`
+ * reads the `focus` param and smooth-scrolls + briefly highlights the
+ * matched row. Customer never leaves OpenFrame for ClickUp.
+ *
+ * Why a thin wrapper over `<DeliveryRow />`:
+ *   - Single source of truth for delivery row presentation.
+ *   - Adapts the ticket-side `TicketClickupSummary` to the shared
+ *     `DeliveryItem` wire shape exactly once, here.
+ *   - Adds the bordered card chrome (`rounded` + `border`) so the row
+ *     reads as a standalone tile inside the ticket drawer, while the
+ *     standard list view keeps the seamless table look.
  */
 
-import { StatusBadge } from '../ui/status-badge'
-import { ExternalLinkIcon } from '../icons-v2-generated/interface/external-link-icon'
-import { getStatusColorScheme } from '../chat/utils/agent-status-message'
-import { cn } from '../../utils/cn'
+import { DeliveryRow } from '../shared/delivery/delivery-row'
+import type { DeliveryItem } from '../../types/delivery'
 import type { TicketClickupSummary } from './types'
 
 export interface TicketLinkedDeliveryCardProps {
   clickup: TicketClickupSummary
+  /** Target URL for the inline navigation. Defaults to
+   *  `/bug-fixes-and-enhancements?focus=<external_id>`; embedders can
+   *  override (e.g. a third-party app hosting the lib that surfaces its
+   *  delivery list at a different route). */
+  deliveryHref?: (externalId: string) => string
   className?: string
 }
 
+const DEFAULT_DELIVERY_HREF = (externalId: string) =>
+  `/bug-fixes-and-enhancements?focus=${encodeURIComponent(externalId)}`
+
 export function TicketLinkedDeliveryCard({
   clickup,
+  deliveryHref = DEFAULT_DELIVERY_HREF,
   className,
 }: TicketLinkedDeliveryCardProps) {
-  // Prefer ClickUp's own per-status hex color so the badge matches the
-  // board exactly (e.g. "design approved" #e16b16). When missing,
-  // fall back to the abstract scheme so the badge still reads correctly.
-  const statusText = (clickup.status ?? 'Unknown').replace(/\b\w/g, (c) => c.toUpperCase())
-  const colorScheme = getStatusColorScheme(clickup.status ?? '')
-  const inlineStyle = clickup.status_color
-    ? { backgroundColor: `${clickup.status_color}26`, color: clickup.status_color, borderColor: `${clickup.status_color}66` }
-    : undefined
-
-  const Wrapper: 'a' | 'div' = clickup.url ? 'a' : 'div'
-  const wrapperProps = clickup.url
-    ? {
-        href: clickup.url,
-        target: '_blank',
-        rel: 'noopener noreferrer',
-      }
-    : {}
+  // Map the compact ticket-side projection to the canonical
+  // `DeliveryItem` shape. Null-safe — every `DeliveryRow` field has a
+  // sensible fallback when the underlying clickup_task row is missing
+  // data (e.g. a task with no description still renders, just without
+  // the description line).
+  const item: DeliveryItem = {
+    id: clickup.external_id,
+    title: clickup.title ?? 'Linked delivery task',
+    description: clickup.description ?? '',
+    status: clickup.status ?? 'unknown',
+    statusColor: clickup.status_color ?? '#87909e',
+    taskType: clickup.task_type ?? 'Request',
+    customItemId: clickup.custom_item_id,
+    listNames: clickup.list_names,
+    dateOpened: clickup.date_opened ?? 0,
+    dateUpdated: clickup.date_updated ?? clickup.date_opened ?? Date.now(),
+    dateClosed: clickup.date_closed,
+    clickupUrl: clickup.clickup_url ?? '',
+  }
 
   return (
-    <Wrapper
-      {...wrapperProps}
-      className={cn(
-        'flex items-center gap-3 px-4 py-3 rounded-md border border-ods-border bg-ods-bg',
-        clickup.url && 'hover:bg-ods-bg-hover transition-colors duration-150 cursor-pointer',
-        'no-underline text-inherit',
-        className,
-      )}
+    <div
+      className={`rounded-md border border-ods-border bg-ods-bg overflow-hidden ${className ?? ''}`}
     >
-      <div className="flex-1 min-w-0 flex flex-col gap-1">
-        <p className="text-xs font-medium uppercase tracking-wider text-ods-text-secondary">
-          Linked delivery
-        </p>
-        <p
-          className="text-h4 text-ods-text-primary truncate"
-          title={clickup.name ?? 'ClickUp task'}
-        >
-          {clickup.name ?? 'ClickUp task'}
-        </p>
-        {clickup.target_version && (
-          <p className="text-h6 text-ods-text-secondary truncate">
-            Target version: {clickup.target_version}
-          </p>
-        )}
-      </div>
-
-      <StatusBadge
-        text={statusText}
-        colorScheme={colorScheme}
-        variant="card"
-        className="border"
-        style={inlineStyle}
+      <DeliveryRow
+        item={item}
+        href={deliveryHref(clickup.external_id)}
+        caption="Linked delivery"
       />
-
-      {clickup.url && (
-        <ExternalLinkIcon
-          className="size-4 text-ods-text-secondary shrink-0"
-          aria-label="Open in ClickUp"
-        />
-      )}
-    </Wrapper>
+    </div>
   )
 }

@@ -18,6 +18,7 @@
  *      rendered only when this row is the expanded one.
  */
 
+import { useEffect, useRef } from 'react'
 import {
   Collapsible,
   CollapsibleContent,
@@ -63,6 +64,26 @@ export function TicketRow({
   // arrived yet, so action targets would be undefined.
   const optimistic = isOptimistic(ticket)
 
+  // Scroll the row's summary tile to the top of the viewport when the
+  // user expands it. Without this, expanding a row near the bottom of
+  // the viewport leaves most of the drawer (timeline + composer)
+  // hidden — the user has to scroll manually to see what they just
+  // opened.
+  //
+  // Uses smooth-scroll + `block: 'start'` so the tile lands at the top
+  // edge. Two RAFs let the Collapsible's height animation start before
+  // we measure the row position, otherwise the scroll lands at the
+  // pre-expansion position.
+  const rowRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!expanded || optimistic) return
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        rowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      })
+    })
+  }, [expanded, optimistic])
+
   const tileData: ChatTicketItemData = {
     id: ticket.id,
     title: ticket.subject ?? '(untitled)',
@@ -78,10 +99,24 @@ export function TicketRow({
     timeAgo: ticket.hubspot_updated_at
       ? formatRelativeTime(ticket.hubspot_updated_at)
       : undefined,
+    // Linked-work chip: surfaced whenever the ticket has a linked
+    // ClickUp task. Uses the linked task's own status so the chip text
+    // reads "Working" / "Waiting on version release" / etc. — useful
+    // signal pre-expand. Falls back to a generic "Linked work" label
+    // when the task exists but its status hasn't synced yet.
+    linkedTaskLabel: ticket.clickup
+      ? ticket.clickup.status
+        ? ticket.clickup.status.replace(/\b\w/g, (c) => c.toUpperCase())
+        : 'Linked work'
+      : undefined,
   }
 
   return (
-    <Collapsible open={expanded && !optimistic} className="border-b border-ods-border last:border-b-0">
+    <div ref={rowRef} className="scroll-mt-4">
+      <Collapsible
+        open={expanded && !optimistic}
+        className="border-b border-ods-border last:border-b-0"
+      >
       <ChatTicketItem
         ticket={tileData}
         onClick={optimistic ? undefined : onToggle}
@@ -102,6 +137,7 @@ export function TicketRow({
           onActionCollapsed={onActionCollapsed}
         />
       </CollapsibleContent>
-    </Collapsible>
+      </Collapsible>
+    </div>
   )
 }

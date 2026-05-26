@@ -47,11 +47,17 @@ export interface TicketData {
   hubspot_updated_at: string
 }
 
-/** Compact projection of a linked ClickUp task. Mirrors server-side
- *  `ClickupSummary` in `lib/data/hubspot-tools.ts`. */
+/** Compact projection of a linked ClickUp task — matches the server's
+ *  `ClickupSummary` and aligns with `DeliveryItem` so the linked-card
+ *  on a ticket can render through the same `DeliveryRow` primitive used
+ *  on `/bug-fixes-and-enhancements`. */
 export interface TicketClickupSummary {
+  /** ClickUp task external_id (e.g. "86ad4e022"). Used as the
+   *  `?focus=<id>` URL param to scroll the public delivery page to
+   *  this row. */
   external_id: string
-  name: string | null
+  title: string | null
+  description: string | null
   /** ClickUp status name — e.g. "complete" / "working" / "design approved"
    *  / "waiting for release". Used as the badge label. */
   status: string | null
@@ -61,9 +67,21 @@ export interface TicketClickupSummary {
   /** Bucket — `'backlog' | 'working' | 'complete' | 'unknown'`. Used as
    *  a fallback when status_color is missing. */
   status_category: string | null
-  /** Direct https://app.clickup.com/t/<id> deep link. Used as the card's
-   *  navigation target. */
-  url: string | null
+  /** ClickUp custom item label (`'Bug'` / `'Request'`) — drives the
+   *  type badge ("BUG-FIX" / "ENHANCEMENT"). */
+  task_type: string | null
+  custom_item_id: number | null
+  /** Every ClickUp list the task is associated with. UI joins with ", ". */
+  list_names: string[]
+  /** Unix-ms timestamps so the row's "ACTIVE X ago" subtitle uses the
+   *  shared `getRelativeTime()` helper. */
+  date_opened: number | null
+  date_updated: number | null
+  date_closed: number | null
+  /** Direct https://app.clickup.com/t/<id> deep link. Kept on the wire
+   *  for admin surfaces; the customer-facing linked card navigates
+   *  internally to `/bug-fixes-and-enhancements?focus=<id>` instead. */
+  clickup_url: string | null
   /** Release version label set by the delivery team, e.g. "0.9" / "1.0".
    *  Shown beside the status when present. */
   target_version: string | null

@@ -4,6 +4,8 @@ import * as React from 'react'
 import { cn } from '../../../utils/cn'
 import { ChevronRight } from 'lucide-react'
 import { TicketStatusTag, resolveTicketStatus } from '../../ui/ticket-status-tag'
+import { Tag } from '../../ui/tag'
+import { WrenchIcon } from '../../icons-v2-generated/household/wrench-icon'
 
 export interface ChatTicketItemData {
   id: string
@@ -20,6 +22,13 @@ export interface ChatTicketItemData {
   statusLabel?: string
   category?: string
   timeAgo?: string
+  /** When set, renders a "Linked work" chip with a wrench icon next to
+   *  the status tag — tells the customer at a glance that an internal
+   *  delivery task is in flight for this ticket, even before they
+   *  expand the row. The label is the linked task's status (e.g.
+   *  "Waiting on version release") so the chip carries the actual
+   *  progress signal, not just a generic marker. */
+  linkedTaskLabel?: string
 }
 
 export interface ChatTicketItemProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'onClick'> {
@@ -70,6 +79,20 @@ const ChatTicketItem = React.forwardRef<HTMLButtonElement, ChatTicketItemProps>(
           )}
         </div>
 
+        {/* Linked-work chip — only renders when the ticket has a
+            linked ClickUp delivery. Wrench icon + lowercase status
+            from the linked task. Rendered to the LEFT of the status
+            tag so the canonical ticket status still wins the
+            right-aligned slot. Hidden on small screens (sm:flex) to
+            avoid crowding the row when both badges are present. */}
+        {ticket.linkedTaskLabel && (
+          <Tag
+            label={ticket.linkedTaskLabel}
+            variant="outline"
+            icon={<WrenchIcon size={14} color="var(--ods-text-secondary)" />}
+            className="shrink-0 hidden sm:inline-flex"
+          />
+        )}
         <TicketStatusTag status={ticket.status} label={ticket.statusLabel} />
 
         <div className="flex items-center justify-center shrink-0 size-12 rounded-md bg-ods-card border border-ods-border">
