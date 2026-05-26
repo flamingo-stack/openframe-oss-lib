@@ -21,12 +21,11 @@
  */
 
 import type { ReactNode } from 'react';
-import { Avatar, AvatarFallback, AvatarImage } from '../../avatar';
+import { SquareAvatar } from '../../ui/square-avatar';
 import {
   TicketAttachmentsList,
   type TicketAttachment,
 } from '../../ui/ticket-attachments-list';
-import { cn } from '../../../utils/cn';
 import { formatRelativeTime } from '../../../utils/date-utils';
 
 export interface DevCardRowContentProps {
@@ -107,7 +106,8 @@ export interface ConversationCardRowProps {
    *  author name — e.g. "You", "Original message", "Resolution". Keeps
    *  the header line scannable on long threads. */
   role?: string;
-  /** Avatar image URL. Falls back to `author` initials when missing. */
+  /** Avatar image URL. Falls back to `author` initials when missing
+   *  (initials derived by `<SquareAvatar>` via `getFirstLastInitials`). */
   avatarSrc?: string;
   /** ISO timestamp. Renders via `formatRelativeTime` with the absolute
    *  string in the `title` for hover-precision. `null`/`undefined`
@@ -121,20 +121,17 @@ export interface ConversationCardRowProps {
    *  `<TicketAttachmentsList>` so the chip styling, file-icon picker
    *  and download button match every other attachments surface. */
   attachments?: TicketAttachment[];
-  /** Optional accent — currently only `current-user` flips the avatar
-   *  background to the accent token so the customer's own messages
-   *  pop visually without breaking the single-side layout. */
+  /** Author bucket — drives the same avatar accent the chat panel
+   *  uses (see `chat-message-enhanced.tsx#getAvatarProps`):
+   *    - `current-user` → `bg-ods-flamingo-pink` (matches chat header
+   *      + the customer's own chat-message avatar)
+   *    - `support`      → no accent fill (initials on the default
+   *      `bg-ods-bg`), so support replies recede visually next to the
+   *      customer's accented turn
+   *  No new visual treatment is introduced here — both variants are
+   *  pre-existing `<SquareAvatar>` configurations already used by the
+   *  chat panel and chat header. */
   variant?: 'current-user' | 'support';
-}
-
-/** Two-letter initials from a display name. Handles single-word names,
- *  multi-word names, and edge cases (empty string → "?"). */
-function authorInitials(name: string): string {
-  const trimmed = name.trim();
-  if (!trimmed) return '?';
-  const parts = trimmed.split(/\s+/);
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 export function ConversationCardRow({
@@ -150,7 +147,6 @@ export function ConversationCardRow({
   const hasAttachments = !!attachments && attachments.length > 0;
   if (!hasBody && !hasAttachments) return null;
 
-  const initials = authorInitials(author);
   const relativeTime = timestamp ? formatRelativeTime(timestamp) : null;
 
   return (
@@ -158,20 +154,20 @@ export function ConversationCardRow({
       className="border-b border-ods-border last:border-b-0 p-[12px] md:p-[16px] flex gap-[12px] md:gap-[16px] w-full"
       aria-label={`${author}${relativeTime ? ` · ${relativeTime}` : ''}`}
     >
-      {/* Avatar — 40px circle. Image takes priority; fallback shows
-          initials on the ods-card surface so the rim sits flush with
-          the row background. */}
-      <Avatar
-        className={cn(
-          'h-10 w-10 shrink-0',
-          variant === 'current-user' && 'ring-2 ring-ods-accent ring-offset-1 ring-offset-ods-card',
-        )}
-      >
-        {avatarSrc && <AvatarImage src={avatarSrc} alt={author} />}
-        <AvatarFallback className="bg-ods-bg text-ods-text-primary text-h5 font-medium">
-          {initials}
-        </AvatarFallback>
-      </Avatar>
+      {/* Avatar — canonical chat primitive. `size="sm"` (32px) +
+          `variant="round"` mirrors `chat-message-enhanced.tsx` (the
+          2025-2026 inline-chat-avatar standard per MD3 / Apple HIG).
+          The pink accent for the current user matches the chat
+          header's `bg-ods-flamingo-pink` treatment for the signed-in
+          customer — same token, same shape, same component. */}
+      <SquareAvatar
+        src={avatarSrc}
+        alt={author}
+        fallback={author}
+        size="sm"
+        variant="round"
+        className={variant === 'current-user' ? 'bg-ods-flamingo-pink' : ''}
+      />
 
       <div className="flex-1 min-w-0 flex flex-col gap-[8px] md:gap-[12px]">
         {/* Header row — author + optional role chip on the left,
