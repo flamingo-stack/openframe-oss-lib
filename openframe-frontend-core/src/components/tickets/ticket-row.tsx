@@ -3,54 +3,36 @@
 /**
  * Single ticket row + expanded details drawer.
  *
- * Layout:
- *   1. `<ChatTicketItem>` summary tile (existing component, reused as-is).
- *      Clicking it toggles the `expandedTicketId` state owned by the parent
- *      `<TicketCenter>` — we use the item's existing `onClick` prop rather
- *      than nesting a `<CollapsibleTrigger>` (button-in-button is invalid).
- *   2. `<CollapsibleContent>` drawer beneath the tile, rendered only when
- *      this row is the expanded one.
+ * The COMPACT summary tile (`<ChatTicketItem>`) is the row chrome
+ * specific to this composition — used by the lib's `<TicketCenter />`
+ * embed. The drawer body itself is extracted into
+ * `<TicketDetailDrawer />` so the hub's DevSection-style ticket card
+ * (different chrome, same drawer) can drop it in too.
  *
- * Drawer zones (see plan §C-3a):
- *   - Metadata strip (read-only key/value labels)
- *   - Description block (plaintext readonly Textarea — NO markdown)
- *   - Actions strip (status-dependent: comment/attach/close OR reopen)
+ * Layout:
+ *   1. `<ChatTicketItem>` summary tile. Clicking it toggles the
+ *      `expandedTicketId` state owned by the parent `<TicketCenter>` —
+ *      we use the item's existing `onClick` prop rather than nesting a
+ *      `<CollapsibleTrigger>` (button-in-button is invalid).
+ *   2. `<CollapsibleContent>` wrapping `<TicketDetailDrawer />`,
+ *      rendered only when this row is the expanded one.
  */
 
-import { useState } from 'react'
 import {
   Collapsible,
   CollapsibleContent,
 } from '../collapsible'
-import { Card } from '../ui/card'
-import { Button } from '../ui/button'
-import { Textarea } from '../ui/textarea'
-import {
-  ModalV2,
-  ModalV2Content,
-  ModalV2Footer,
-  ModalV2Header,
-  ModalV2Title,
-} from '../ui/modal-v2'
 import {
   ChatTicketItem,
   type ChatTicketItemData,
 } from '../chat/entity-cards/chat-ticket-item'
-import {
-  ChatAttachmentAddButton,
-  ChatAttachmentChipStrip,
-} from '../chat/chat-attachment-bar'
-import { useChatAttachments } from '../chat/hooks/use-chat-attachments'
 import { formatRelativeTime } from '../../utils/date-utils'
-import { cn } from '../../utils/cn'
-import { useTicketEngagements } from './hooks/use-ticket-engagements'
+import {
+  TicketDetailDrawer,
+  type TicketDetailDrawerProps,
+} from './ticket-detail-drawer'
 import type { AnyTicket } from './types'
-import { isOptimistic, TICKET_TEXT_MAX_CHARS } from './types'
-
-/** Identity bundle: local mirror UUID + HubSpot external_id. Actions
- *  send `external_id` to HubSpot (the only id it recognizes) and use
- *  `id` for the React-side mutex + cache. */
-type TicketRef = { id: string; external_id: string }
+import { isOptimistic } from './types'
 
 export interface TicketRowProps {
   ticket: AnyTicket
@@ -58,19 +40,12 @@ export interface TicketRowProps {
   onToggle: (ticketId: string) => void
   busy: boolean
   supportSystemDown: boolean
-  /** Single combined "reply" — text + optional attachments delivered as
-   *  ONE Note engagement. Replaces the previous Add Comment / Attach
-   *  Files split: a reply IS a message that can carry both. */
-  onSendMessage: (
-    ticket: TicketRef,
-    text: string,
-    attachments: import('../chat/utils/chat-attachment-markdown').ChatAttachment[],
-  ) => Promise<boolean>
-  onClose: (ticket: TicketRef, resolution?: string) => Promise<boolean>
-  onReopen: (ticket: TicketRef) => Promise<boolean>
+  onSendMessage: TicketDetailDrawerProps['onSendMessage']
+  onClose: TicketDetailDrawerProps['onClose']
+  onReopen: TicketDetailDrawerProps['onReopen']
   /** Called after a successful close/reopen so the parent can collapse
    *  the drawer (status flipped — current action set is now stale). */
-  onActionCollapsed: () => void
+  onActionCollapsed: TicketDetailDrawerProps['onActionCollapsed']
 }
 
 export function TicketRow({
@@ -80,19 +55,14 @@ export function TicketRow({
   busy,
   supportSystemDown,
   onSendMessage,
-  
   onClose,
   onReopen,
   onActionCollapsed,
 }: TicketRowProps) {
-  // Optimistic placeholders have no drawer — the real id hasn't arrived yet,
-  // so action targets would be undefined.
+  // Optimistic placeholders have no drawer — the real id hasn't
+  // arrived yet, so action targets would be undefined.
   const optimistic = isOptimistic(ticket)
 
-  // Project the wider TicketData onto the narrower ChatTicketItemData shape
-  // the existing summary tile expects. The `_optimistic` flag is dropped
-  // here so it doesn't leak to the DOM as an unknown prop on the underlying
-  // `<button>`.
   const tileData: ChatTicketItemData = {
     id: ticket.id,
     title: ticket.subject ?? '(untitled)',
@@ -103,8 +73,6 @@ export function TicketRow({
       ? formatRelativeTime(ticket.hubspot_updated_at)
       : undefined,
   }
-
-  const isClosed = (ticket.status ?? '').toUpperCase() === 'CLOSED'
 
   return (
     <Collapsible open={expanded && !optimistic} className="border-b border-ods-border last:border-b-0">
@@ -118,11 +86,10 @@ export function TicketRow({
         id={`ticket-drawer-${ticket.id}`}
         className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
       >
-        <DrawerBody
+        <TicketDetailDrawer
           ticket={ticket}
           busy={busy}
           supportSystemDown={supportSystemDown}
-          isClosed={isClosed}
           onSendMessage={onSendMessage}
           onClose={onClose}
           onReopen={onReopen}
@@ -130,417 +97,5 @@ export function TicketRow({
         />
       </CollapsibleContent>
     </Collapsible>
-  )
-}
-
-interface DrawerBodyProps {
-  ticket: AnyTicket
-  busy: boolean
-  supportSystemDown: boolean
-  isClosed: boolean
-  onSendMessage: TicketRowProps['onSendMessage']
-  onClose: TicketRowProps['onClose']
-  onReopen: TicketRowProps['onReopen']
-  onActionCollapsed: TicketRowProps['onActionCollapsed']
-}
-
-function DrawerBody({
-  ticket,
-  busy,
-  supportSystemDown,
-  isClosed,
-  onSendMessage,
-  
-  onClose,
-  onReopen,
-  onActionCollapsed,
-}: DrawerBodyProps) {
-  return (
-    <div className="bg-ods-card border-t border-ods-border px-4 py-4 flex flex-col gap-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-        <div className="flex flex-col gap-1 text-ods-text-secondary">
-          <MetadataRow label="Ticket" value={`#${ticket.external_id}`} />
-          <MetadataRow label="Priority" value={ticket.priority || '—'} />
-          <MetadataRow label="Pipeline" value={ticket.pipeline_stage_label || '—'} />
-          <MetadataRow label="Company" value={ticket.customer_company || '—'} />
-        </div>
-        <div className="flex flex-col gap-1 md:items-end text-ods-text-secondary">
-          <MetadataRow
-            label="Updated"
-            value={
-              ticket.hubspot_updated_at
-                ? formatRelativeTime(ticket.hubspot_updated_at)
-                : '—'
-            }
-            title={ticket.hubspot_updated_at ?? undefined}
-          />
-        </div>
-      </div>
-
-      <div className="border-t border-ods-border pt-4">
-        <p className="text-xs font-medium text-ods-text-secondary mb-2 uppercase tracking-wider">
-          Conversation
-        </p>
-        <TicketTimelinePanel ticket={ticket} />
-      </div>
-
-      <div className="border-t border-ods-border pt-4">
-        {isClosed ? (
-          <ReopenAction
-            ticketRef={{ id: ticket.id, external_id: ticket.external_id }}
-            busy={busy}
-            supportSystemDown={supportSystemDown}
-            onReopen={onReopen}
-            onActionCollapsed={onActionCollapsed}
-          />
-        ) : (
-          <OpenActions
-            ticket={ticket}
-            busy={busy}
-            supportSystemDown={supportSystemDown}
-            onSendMessage={onSendMessage}
-            onClose={onClose}
-            onActionCollapsed={onActionCollapsed}
-          />
-        )}
-      </div>
-    </div>
-  )
-}
-
-function MetadataRow({
-  label,
-  value,
-  title,
-}: {
-  label: string
-  value: string
-  title?: string
-}) {
-  return (
-    <span title={title} className="flex gap-2">
-      <span className="text-xs uppercase tracking-wider opacity-60">
-        {label}
-      </span>
-      <span className="text-sm text-ods-text-primary">{value}</span>
-    </span>
-  )
-}
-
-/**
- * Render the ticket conversation as a chronological timeline of
- * message bubbles. Top: the original ticket description (`ticket.body`).
- * Below: every Note engagement attached to the ticket via the new
- * `useTicketEngagements` hook — each with its own attachments rendered
- * as file chips.
- *
- * Why a timeline (not the previous body-split-on-`---` hack): comments
- * were getting jammed into the ticket's `content` property AND
- * attachments were stored as separate Note engagements — two storage
- * locations that the drawer had to reconcile. The new model surfaces
- * notes as first-class messages with their attachments inline. Legacy
- * tickets whose old comments STILL live inside `ticket.body` (joined
- * by ` --- `) split on that delimiter so the historical conversation
- * doesn't get lost during the transition.
- */
-const TURN_SEPARATOR_RE = /\s+---\s+/g
-
-function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
-  // Optimistic placeholders don't have a real external_id yet — skip
-  // the engagement fetch until the real ticket lands.
-  const externalId = isOptimistic(ticket) ? null : ticket.external_id
-  const { engagements, isLoading } = useTicketEngagements(externalId, !!externalId)
-
-  // Split the body into legacy turns (original + any pre-engagement
-  // comments that were appended to content via the old code path).
-  // The first turn is always the original message; remaining turns
-  // are legacy addendums (newer tickets won't have them).
-  const bodyTurns = ticket.body
-    ? ticket.body.split(TURN_SEPARATOR_RE).map((t) => t.trim()).filter(Boolean)
-    : []
-
-  if (bodyTurns.length === 0 && engagements.length === 0 && !isLoading) {
-    return (
-      <p className="text-sm text-ods-text-secondary italic">
-        (No conversation yet.)
-      </p>
-    )
-  }
-
-  return (
-    <div className="flex flex-col gap-2 max-h-96 overflow-y-auto">
-      {bodyTurns.map((turn, i) => {
-        const isResolution = turn.startsWith('[Resolution]')
-        const label = i === 0 ? 'Original message' : isResolution ? 'Resolution' : `Update ${i}`
-        const text = isResolution ? turn.replace(/^\[Resolution\]\s*/, '') : turn
-        return (
-          <TimelineBubble
-            key={`body-${i}-${turn.slice(0, 24)}`}
-            label={label}
-            text={text}
-            attachments={[]}
-          />
-        )
-      })}
-
-      {engagements.map((eng) => (
-        <TimelineBubble
-          key={eng.id}
-          label={formatEngagementLabel(eng.createdAt)}
-          text={eng.body ?? ''}
-          attachments={eng.attachments}
-        />
-      ))}
-
-      {isLoading && (
-        <p className="text-xs text-ods-text-secondary italic px-1">Loading conversation…</p>
-      )}
-    </div>
-  )
-}
-
-function formatEngagementLabel(createdAt: string): string {
-  if (!createdAt) return 'Update'
-  const date = new Date(createdAt)
-  if (Number.isNaN(date.getTime())) return 'Update'
-  return formatRelativeTime(date)
-}
-
-interface TimelineBubbleProps {
-  label: string
-  text: string
-  attachments: import('./hooks/use-ticket-engagements').TicketEngagementFile[]
-}
-
-function TimelineBubble({ label, text, attachments }: TimelineBubbleProps) {
-  const hasText = text.trim().length > 0
-  const hasAttachments = attachments.length > 0
-  if (!hasText && !hasAttachments) return null
-  return (
-    <div className="rounded-md border border-ods-border bg-ods-bg p-3">
-      <p className="text-[10px] font-medium text-ods-text-secondary uppercase tracking-wider mb-1">
-        {label}
-      </p>
-      {hasText && (
-        <p className="text-sm text-ods-text-primary whitespace-pre-wrap break-words">{text}</p>
-      )}
-      {hasAttachments && (
-        <div className={cn('flex flex-wrap gap-2', hasText && 'mt-2')}>
-          {attachments.map((f) => (
-            <AttachmentChip key={f.id} file={f} />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function AttachmentChip({
-  file,
-}: {
-  file: import('./hooks/use-ticket-engagements').TicketEngagementFile
-}) {
-  const name = file.name ?? `file-${file.id}`
-  const sizeLabel = file.size ? formatBytes(file.size) : null
-  const className =
-    'inline-flex items-center gap-2 rounded-md border border-ods-border bg-ods-card px-2 py-1 text-xs text-ods-text-primary max-w-full'
-  const inner = (
-    <>
-      <span className="text-ods-text-secondary shrink-0">📎</span>
-      <span className="truncate">{name}</span>
-      {sizeLabel && <span className="text-ods-text-secondary shrink-0">{sizeLabel}</span>}
-    </>
-  )
-  if (file.url) {
-    return (
-      <a
-        href={file.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={cn(className, 'hover:bg-ods-bg-hover')}
-        title={name}
-      >
-        {inner}
-      </a>
-    )
-  }
-  return (
-    <span className={className} title={name}>
-      {inner}
-    </span>
-  )
-}
-
-function formatBytes(size: number): string {
-  if (size < 1024) return `${size} B`
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`
-}
-
-function ReopenAction({
-  ticketRef,
-  busy,
-  supportSystemDown,
-  onReopen,
-  onActionCollapsed,
-}: {
-  ticketRef: TicketRef
-  busy: boolean
-  supportSystemDown: boolean
-  onReopen: TicketRowProps['onReopen']
-  onActionCollapsed: TicketRowProps['onActionCollapsed']
-}) {
-  const handleReopen = async () => {
-    const ok = await onReopen(ticketRef)
-    // Reopen flips status to OPEN — current action set (just "Reopen")
-    // is now stale; collapse so the next expand shows the OPEN actions.
-    if (ok) onActionCollapsed()
-  }
-  return (
-    <div className="flex justify-end">
-      <Button
-        type="button"
-        onClick={() => void handleReopen()}
-        disabled={busy || supportSystemDown}
-        loading={busy}
-      >
-        Reopen
-      </Button>
-    </div>
-  )
-}
-
-function OpenActions({
-  ticket,
-  busy,
-  supportSystemDown,
-  onSendMessage,
-  onClose,
-  onActionCollapsed,
-}: {
-  ticket: AnyTicket
-  busy: boolean
-  supportSystemDown: boolean
-  onSendMessage: TicketRowProps['onSendMessage']
-  onClose: TicketRowProps['onClose']
-  onActionCollapsed: TicketRowProps['onActionCollapsed']
-}) {
-  const [messageText, setMessageText] = useState('')
-  const [resolution, setResolution] = useState('')
-  const [closeDialogOpen, setCloseDialogOpen] = useState(false)
-
-  const attachments = useChatAttachments()
-
-  const disabled = busy || supportSystemDown
-  const ticketRef: TicketRef = { id: ticket.id, external_id: ticket.external_id }
-
-  const hasText = messageText.trim().length > 0
-  const hasReadyFiles = attachments.readyAttachments.length > 0
-  const canSend =
-    !disabled && (hasText || hasReadyFiles) && !attachments.hasInflightUploads
-
-  const sendMessage = async () => {
-    if (!canSend) return
-    const ok = await onSendMessage(ticketRef, messageText.trim(), attachments.readyAttachments)
-    if (ok) {
-      setMessageText('')
-      attachments.clear()
-    }
-  }
-
-  const confirmClose = async () => {
-    setCloseDialogOpen(false)
-    const ok = await onClose(ticketRef, resolution.trim() || undefined)
-    setResolution('')
-    // Close flips status to CLOSED — current action set is stale;
-    // collapse the drawer so re-expand shows the Reopen-only view.
-    if (ok) onActionCollapsed()
-  }
-
-  return (
-    <div className="flex flex-col gap-3">
-      {/* Always-visible composer — type a reply + optionally attach
-          files, send as ONE message. Mirrors a chat message bubble:
-          one author, one timestamp, one set of attachments. */}
-      <div className="flex flex-col gap-2">
-        <Textarea
-          value={messageText}
-          onChange={(e) => setMessageText(e.target.value)}
-          placeholder="Type a reply… (attach files if needed)"
-          disabled={disabled}
-          rows={3}
-          maxLength={TICKET_TEXT_MAX_CHARS}
-        />
-        <ChatAttachmentChipStrip
-          attachments={attachments.attachments}
-          onRemove={attachments.removeAttachment}
-          disabled={disabled}
-        />
-        <div className="flex justify-between items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-2">
-            <ChatAttachmentAddButton
-              attachmentsEnabled={!supportSystemDown}
-              attachmentsCount={attachments.attachments.length}
-              onAddFiles={attachments.addFiles}
-              disabled={disabled}
-            />
-            <span className="text-xs text-ods-text-secondary">Attach files</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={() => setCloseDialogOpen(true)}
-              disabled={disabled}
-            >
-              Close ticket
-            </Button>
-            <Button
-              type="button"
-              onClick={() => void sendMessage()}
-              disabled={!canSend}
-              loading={busy}
-            >
-              Send reply
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <ModalV2 isOpen={closeDialogOpen} onClose={() => setCloseDialogOpen(false)}>
-        <ModalV2Header>
-          <ModalV2Title>Close this ticket?</ModalV2Title>
-          <p className="text-sm text-ods-text-secondary mt-1">
-            Add an optional resolution note. You can reopen the ticket later if
-            needed.
-          </p>
-        </ModalV2Header>
-        <ModalV2Content>
-          <Textarea
-            value={resolution}
-            onChange={(e) => setResolution(e.target.value)}
-            placeholder="Resolution (optional)"
-            rows={3}
-            maxLength={TICKET_TEXT_MAX_CHARS}
-          />
-        </ModalV2Content>
-        <ModalV2Footer>
-          <Button
-            type="button"
-            variant="transparent"
-            onClick={() => setCloseDialogOpen(false)}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={() => void confirmClose()}
-          >
-            Close ticket
-          </Button>
-        </ModalV2Footer>
-      </ModalV2>
-    </div>
   )
 }
