@@ -37,11 +37,25 @@ export interface TicketEngagement {
    *  OUTGOING messages). Drives avatar variant + the "Customer"/"Support
    *  team" header label in the drawer's conversation thread. */
   authorRole: 'customer' | 'support'
-  /** Display name for `customer`-role engagements (resolved server-side
-   *  from the Custom Channels sender). `null` for `support` since notes
-   *  don't carry a per-engagement display name — the drawer falls back
-   *  to "Support team" for those. */
+  /** Display name. Server resolves it differently per role:
+   *    - `support` (Notes) → HubSpot owner id is resolved to an owner
+   *      email, then matched against our `profiles` table; the matched
+   *      employee's `full_name` is returned here. Null when the owner
+   *      isn't a known Flamingo employee.
+   *    - `customer` (Conversations messages) → null on new messages
+   *      (drawer renders identity.user.name LIVE for the current
+   *      user's own messages). Set only on legacy rows from earlier
+   *      migrations. */
   authorName: string | null
+  /** Resolved author email — for `support` it's the HubSpot owner's
+   *  email; for `customer` it's the message sender. Used by the
+   *  drawer to cross-check "is this me?" against `identity.user.email`. */
+  authorEmail: string | null
+  /** Avatar URL. For `support`, resolved from the matched `profiles`
+   *  row's `avatar_url`. Null when the owner isn't a known Flamingo
+   *  employee. For `customer`, always null on the wire (drawer reads
+   *  identity.user.avatarUrl live for own messages). */
+  authorAvatarUrl: string | null
   createdAt: string
   attachments: TicketEngagementFile[]
 }

@@ -243,20 +243,22 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
           ATTRIBUTION RULES (per repo convention):
             - CUSTOMER messages whose sender email matches the
               current chat-identity user → render BOTH name AND
-              avatar LIVE from `identity.user.*`. This is the
-              source of truth for the logged-in user's display info
-              (NOT the mirror's `sender_name`, which is baked-in at
-              post time and may be stale after the user updates
-              their profile / identity headers).
-            - CUSTOMER messages whose sender is a DIFFERENT email
-              (rare — shouldn't happen on /tickets since the user
-              only sees their own threads) → fall back to the
-              email shown verbatim. No profile lookup.
-            - SUPPORT/Note messages → "Support team" + neutral
-              avatar treatment. (TODO: when the engagement carries
-              a known team-member owner email, look up that
-              `profiles` row for the agent's name + avatar — see
-              hubspot-conversations-utils.ts removal note.) */}
+              avatar LIVE from `identity.user.*` (1:1 from the
+              X-Chat-First-Name + X-Chat-Last-Name + X-Chat-Avatar-Url
+              headers that drive the identity webservice). This is
+              the source of truth for the logged-in user; we never
+              query `profiles` for customer display info.
+            - CUSTOMER messages from a DIFFERENT email (rare — the
+              /tickets surface only shows the current user's own
+              threads) → fall back to whatever the mirror has
+              (eng.authorName / eng.authorEmail), no profile lookup.
+            - SUPPORT/Note messages → the server has already
+              resolved `hubspot_owner_id` → owner email → `profiles`
+              row in `list-engagements`. `eng.authorName` +
+              `eng.authorAvatarUrl` carry the matched employee's
+              display info. When the owner isn't a known Flamingo
+              employee, both fields are null and we fall back to
+              the generic "Support team" treatment. */}
       {engagements.map((eng) => {
         const isCustomer = eng.authorRole === 'customer'
         const isOwnReply =
@@ -266,13 +268,21 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
         let author: string
         let avatarSrc: string | undefined
         if (isCustomer && isOwnReply) {
-          // Live identity is the source of truth for THIS user.
+          // Live identity — 1:1 from chat auth headers.
           author = identity.user?.name?.trim() || customerName
           avatarSrc = identity.user?.avatarUrl ?? undefined
         } else if (isCustomer) {
-          author = eng.authorName ?? eng.authorId ?? customerName
+          // Cross-customer edge case (shouldn't happen on /tickets).
+          author = eng.authorName ?? eng.authorEmail ?? eng.authorId ?? customerName
           avatarSrc = undefined
+        } else if (eng.authorName) {
+          // Resolved Flamingo employee — server matched the HubSpot
+          // owner's email against `profiles`. Render their actual
+          // name + avatar.
+          author = eng.authorName
+          avatarSrc = eng.authorAvatarUrl ?? undefined
         } else {
+          // Unmatched / unknown HubSpot owner — generic fallback.
           author = 'Support team'
           avatarSrc = undefined
         }
