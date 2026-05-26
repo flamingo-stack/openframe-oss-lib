@@ -9,6 +9,8 @@ import type {
   Subscription,
 } from 'nats.ws'
 
+export type { JsMsg, Msg, Subscription } from 'nats.ws'
+
 export type JetStreamDeliverPolicy = 'new' | 'byStartSequence'
 
 export interface JetStreamOrderedSubscribeOptions {

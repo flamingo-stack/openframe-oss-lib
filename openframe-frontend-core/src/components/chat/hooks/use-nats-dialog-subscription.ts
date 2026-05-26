@@ -1,7 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { createNatsClient, type NatsClient, type NatsSubscriptionHandle } from '../../../nats'
+import {
+  acquireClient as acquireSharedClient,
+  releaseClient as releaseSharedClient,
+  getSharedConnectionFor,
+  type NatsClient,
+  type NatsSubscriptionHandle,
+  type SharedConnection,
+} from '../../../nats'
 import {
   type NatsConnectionSource,
   type NatsMessageType,
@@ -9,17 +16,6 @@ import {
   type UseNatsDialogSubscriptionReturn,
   NETWORK_CONFIG,
 } from '../types'
-
-type SharedConnection = {
-  wsUrl: string
-  client: NatsClient
-  connectPromise: Promise<void> | null
-  refCount: number
-  closeTimer: ReturnType<typeof setTimeout> | null
-  retryTimer: ReturnType<typeof setTimeout> | null
-}
-
-let shared: SharedConnection | null = null
 
 /**
  * Hook for managing NATS dialog subscriptions.
@@ -88,54 +84,21 @@ export function useNatsDialogSubscription({
     reconnectionBackoffRef.current = reconnectionBackoff
   }, [reconnectionBackoff])
 
-  const acquireClient = useCallback((url: string): SharedConnection => {
-    if (shared?.wsUrl !== url) {
-      // Close existing connection if URL changed
-      if (shared) {
-        shared.closeTimer && clearTimeout(shared.closeTimer)
-        const old = shared
-        shared = null
-        void old.client.close().catch(() => {})
-      }
-      
-      const { name = 'openframe-frontend', user = 'machine', pass = '' } = clientConfig
-      
-      const client = createNatsClient({
-        servers: url,
-        name,
-        user,
-        pass,
+  const acquireClient = useCallback(
+    (url: string): SharedConnection =>
+      acquireSharedClient(url, {
+        name: clientConfig.name ?? 'openframe-frontend',
+        user: clientConfig.user ?? 'machine',
+        pass: clientConfig.pass ?? '',
         connectTimeoutMs: NETWORK_CONFIG.CONNECT_TIMEOUT_MS,
-        reconnect: false,
         pingIntervalMs: NETWORK_CONFIG.PING_INTERVAL_MS,
         maxPingOut: NETWORK_CONFIG.MAX_PING_OUT,
-      })
-      shared = { wsUrl: url, client, connectPromise: null, refCount: 0, closeTimer: null, retryTimer: null }
-    }
-
-    shared.refCount += 1
-    shared.closeTimer && clearTimeout(shared.closeTimer)
-    shared.closeTimer = null
-    return shared
-  }, [clientConfig])
+      }),
+    [clientConfig],
+  )
 
   const releaseClient = useCallback((url: string) => {
-    if (!shared || shared.wsUrl !== url) return
-    
-    shared.refCount = Math.max(0, shared.refCount - 1)
-    if (shared.refCount > 0) return
-
-    shared.closeTimer = setTimeout(() => {
-      const s = shared
-      shared = null
-      if (s) {
-        if (s.retryTimer) {
-          clearTimeout(s.retryTimer)
-          s.retryTimer = null
-        }
-        void s.client.close().catch(() => {})
-      }
-    }, NETWORK_CONFIG.SHARED_CLOSE_DELAY_MS)
+    releaseSharedClient(url, { delayMs: NETWORK_CONFIG.SHARED_CLOSE_DELAY_MS })
   }, [])
 
   // Store the current WebSocket URL to prevent unnecessary reconnections
@@ -170,6 +133,8 @@ export function useNatsDialogSubscription({
     currentWsUrlRef.current = wsUrl
     const sharedConn = acquireClient(wsUrl)
     const client = sharedConn.client
+    const ownerToken = {}
+    if (!sharedConn.retryOwner) sharedConn.retryOwner = ownerToken
 
     clientRef.current = client
     setIsConnected(false)
@@ -179,7 +144,9 @@ export function useNatsDialogSubscription({
 
     function scheduleRetry() {
       if (closed) return
-      if (shared !== sharedConn) return
+      if (getSharedConnectionFor(wsUrl) !== sharedConn) return
+      if (!sharedConn.retryOwner) sharedConn.retryOwner = ownerToken
+      if (sharedConn.retryOwner !== ownerToken) return
 
       if (sharedConn.retryTimer) {
         clearTimeout(sharedConn.retryTimer)
@@ -202,7 +169,7 @@ export function useNatsDialogSubscription({
       sharedConn.retryTimer = setTimeout(async () => {
         sharedConn.retryTimer = null
         if (closed) return
-        if (shared !== sharedConn) return
+        if (getSharedConnectionFor(wsUrl) !== sharedConn) return
 
         try {
           await onBeforeReconnectRef.current?.()
@@ -211,7 +178,7 @@ export function useNatsDialogSubscription({
         }
 
         if (closed) return
-        if (shared !== sharedConn) return
+        if (getSharedConnectionFor(wsUrl) !== sharedConn) return
 
         const freshUrl = getNatsWsUrlRef.current()
         if (freshUrl !== wsUrl) return
@@ -220,13 +187,13 @@ export function useNatsDialogSubscription({
           sharedConn.connectPromise = null
           sharedConn.connectPromise = client.connect()
           await sharedConn.connectPromise
-          if (!closed && shared === sharedConn) {
+          if (!closed && getSharedConnectionFor(wsUrl) === sharedConn) {
             retryAttempt = 0
             setIsConnected(true)
           }
         } catch {
           sharedConn.connectPromise = null
-          if (!closed && shared === sharedConn) {
+          if (!closed && getSharedConnectionFor(wsUrl) === sharedConn) {
             scheduleRetry()
           }
         }
@@ -293,6 +260,9 @@ export function useNatsDialogSubscription({
       if (sharedConn.retryTimer) {
         clearTimeout(sharedConn.retryTimer)
         sharedConn.retryTimer = null
+      }
+      if (sharedConn.retryOwner === ownerToken) {
+        sharedConn.retryOwner = null
       }
 
       // Unsubscribe all subscriptions
