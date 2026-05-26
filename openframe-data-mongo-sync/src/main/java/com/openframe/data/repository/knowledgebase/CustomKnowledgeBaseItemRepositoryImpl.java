@@ -62,15 +62,17 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
     @Override
     public List<KnowledgeBaseItem> findArticles(String parentId, String search,
                                                  KnowledgeBaseItemType type, List<String> itemIds,
+                                                 List<KnowledgeBaseArticleStatus> statuses,
                                                  String cursor, int limit) {
-        Query query = buildItemQuery(parentId, search, type, itemIds, cursor);
+        Query query = buildItemQuery(parentId, search, type, itemIds, statuses, cursor);
         return executeWithSort(query, limit);
     }
 
     @Override
     public long countArticles(String parentId, String search,
-                              KnowledgeBaseItemType type, List<String> itemIds) {
-        Query query = buildItemQuery(parentId, search, type, itemIds, null);
+                              KnowledgeBaseItemType type, List<String> itemIds,
+                              List<KnowledgeBaseArticleStatus> statuses) {
+        Query query = buildItemQuery(parentId, search, type, itemIds, statuses, null);
         return mongoTemplate.count(query, KnowledgeBaseItem.class);
     }
 
@@ -97,7 +99,8 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
     }
 
     private Query buildItemQuery(String parentId, String search,
-                                  KnowledgeBaseItemType type, List<String> itemIds, String cursor) {
+                                  KnowledgeBaseItemType type, List<String> itemIds,
+                                  List<KnowledgeBaseArticleStatus> statuses, String cursor) {
         Query query = new Query();
 
         if (itemIds != null) {
@@ -112,7 +115,11 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
             query.addCriteria(Criteria.where(FIELD_TYPE).is(type));
         }
 
-        query.addCriteria(Criteria.where(FIELD_STATUS).ne(KnowledgeBaseArticleStatus.ARCHIVED));
+        if (statuses != null && !statuses.isEmpty()) {
+            query.addCriteria(Criteria.where(FIELD_STATUS).in(statuses));
+        } else {
+            query.addCriteria(Criteria.where(FIELD_STATUS).ne(KnowledgeBaseArticleStatus.ARCHIVED));
+        }
 
         addComposites(query, search, cursor);
         return query;

@@ -5,7 +5,13 @@
 
 import type { ChunkData, NatsMessageType, FetchChunksFunction } from './network.types'
 import type { ChatType, ChatApprovalStatus } from './chat.types'
-import type { MessageSegment, PendingToolCallData, TokenUsageData, ExecutingToolState } from './message.types'
+import type {
+  MessageSegment,
+  PendingToolCallData,
+  TokenUsageData,
+  ExecutingToolState,
+  ToolExecutionSegment,
+} from './message.types'
 
 // ========== Hook Options ==========
 
@@ -169,6 +175,22 @@ export interface RealtimeChunkCallbacks {
   onEscalatedApproval?: (requestId: string, data: { command: string; explanation?: string; approvalType: string }) => void
   /** Called when an escalated approval result is received */
   onEscalatedApprovalResult?: (requestId: string, approved: boolean, data: { command: string; explanation?: string; approvalType: string }) => void
+  /**
+   * Called whenever an `APPROVAL_RESULT` chunk is processed. Fires in addition
+   * to the accumulator's in-message status flip so consumers can find the
+   * matching `approval_request` / `approval_batch` segment in an *earlier*
+   * message bubble (e.g. when a user-interrupted approval is resolved while
+   * a new assistant message is streaming). Idempotent — safe to no-op if no
+   * matching segment is found dialog-wide.
+   */
+  onApprovalResolved?: (requestId: string, status: ChatApprovalStatus, approvalType: string) => void
+  /**
+   * Called whenever an `EXECUTED_TOOL` chunk is processed. Lets consumers
+   * merge the result into the originating `EXECUTING_TOOL` (or batch
+   * `executions[execId]`) segment in an earlier message bubble when the tool
+   * outlived its message scope. Idempotent.
+   */
+  onToolExecuted?: (segment: ToolExecutionSegment) => void
   /** Called when a DIALOG_CLOSED chunk is received */
   onDialogClosed?: () => void
 }

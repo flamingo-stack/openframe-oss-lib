@@ -1,7 +1,6 @@
-package com.openframe.api.dto.knowledgebase;
+package com.openframe.test.data.dto.knowledgebase;
 
-import com.openframe.data.document.knowledgebase.KnowledgeBaseArticleStatus;
-import com.openframe.data.document.knowledgebase.KnowledgeBaseItemType;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -13,9 +12,9 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class KnowledgeBaseFilterCriteria {
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class KnowledgeBaseFilterInput {
     private String parentId;
     private KnowledgeBaseItemType type;
     private List<String> tagIds;
-    private List<KnowledgeBaseArticleStatus> statuses;
 }

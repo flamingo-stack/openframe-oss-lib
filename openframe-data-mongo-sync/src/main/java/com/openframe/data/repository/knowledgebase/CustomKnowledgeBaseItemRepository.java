@@ -1,5 +1,6 @@
 package com.openframe.data.repository.knowledgebase;
 
+import com.openframe.data.document.knowledgebase.KnowledgeBaseArticleStatus;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItemType;
 
@@ -11,10 +12,12 @@ public interface CustomKnowledgeBaseItemRepository {
 
     List<KnowledgeBaseItem> findArticles(String parentId, String search,
                                           KnowledgeBaseItemType type, List<String> itemIds,
+                                          List<KnowledgeBaseArticleStatus> statuses,
                                           String cursor, int limit);
 
     long countArticles(String parentId, String search,
-                       KnowledgeBaseItemType type, List<String> itemIds);
+                       KnowledgeBaseItemType type, List<String> itemIds,
+                       List<KnowledgeBaseArticleStatus> statuses);
 
     List<KnowledgeBaseItem> findArchivedArticles(String search, List<String> itemIds,
                                                   String cursor, int limit);

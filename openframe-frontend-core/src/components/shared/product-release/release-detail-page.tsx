@@ -2,8 +2,10 @@
 
 import { useState, useEffect, ComponentType } from 'react';
 import Link from '../../../embed-shims/next-link';
+import { useRouter } from '../../../embed-shims/next-navigation';
 import { Card, CardContent } from '../../ui/card';
 import { ArticleDetailLayout } from '../../layout/article-detail-layout';
+import { BackButton } from '../../layout/back-button';
 import { ReleaseChangelogSection } from '../../ui/release-changelog-section';
 import { StatusBadge } from '../../ui/status-badge';
 import { SquareAvatar } from '../../ui/square-avatar';
@@ -29,13 +31,15 @@ export interface MarkdownRendererProps {
 // shape once the entities barrel was added; re-exporting the canonical
 // type fixes the collision while keeping the same import path for
 // downstream consumers of `./release-detail-page`.
-export type { RoadmapItem } from '../../chat/types/entities/roadmap-item';
 import type { RoadmapItem } from '../../chat/types/entities/roadmap-item';
-
-export interface DeliveryResponse {
-  completed: unknown[];
-  inProgress: unknown[];
-}
+import type { DeliveryResponse } from '../../../types/delivery';
+// Re-export both types for source-compat with consumers importing
+// through this module. Canonical sources:
+//   - RoadmapItem  → `../../chat/types/entities/roadmap-item`
+//   - DeliveryResponse → `../../../types/delivery` (single source of
+//     truth, shared with the lib `<DeliveryLists>` / `<DeliveryTable>`
+//     components and the new types barrel).
+export type { RoadmapItem, DeliveryResponse };
 
 export interface RoadmapSectionProps {
   items: RoadmapItem[];
@@ -91,6 +95,10 @@ export interface ReleaseDetailPageProps {
   // API endpoints for fetching linked tasks
   roadmapApiEndpoint?: string;
   deliveryApiEndpoint?: string;
+  /** Back-button config — same pattern as `DevSectionPage` /
+   *  `LegalDocumentPage`. Pass `false` to hide. Default
+   *  `{ label: 'Back to home', href: '/' }`. */
+  backButton?: { label?: string; href?: string } | false;
 }
 
 // Default simple markdown renderer (just renders as text)
@@ -108,13 +116,25 @@ export function ReleaseDetailPage({
   VideoSection,
   VideoDisplaySection,
   roadmapApiEndpoint = '/api/roadmap',
-  deliveryApiEndpoint = '/api/delivery'
+  deliveryApiEndpoint = '/api/delivery',
+  backButton
 }: ReleaseDetailPageProps) {
+  const router = useRouter();
   // Use pre-fetched data if provided (admin preview), otherwise fetch via hook (public)
   const { data: fetchedRelease, error, isLoading } = useRelease(initialData ? undefined : slug);
   const release = (initialData || fetchedRelease) as Record<string, unknown> | undefined;
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
+
+  // Back-button config — mirrors DevSectionPage / LegalDocumentPage.
+  // Default: { label: 'Back to home', href: '/' }. Pass `false` to hide
+  // (e.g. embed-mode where the host owns navigation chrome).
+  // Narrowing note: `backButton &&` already eliminates the `false` branch,
+  // so the inner expressions are typed as `{ label?, href? } | undefined`.
+  // Don't re-compare to `false` here — tsc TS2367s on the dead branch.
+  const showBackButton = backButton !== false;
+  const backLabel = (backButton ? backButton.label : undefined) ?? 'Back to home';
+  const backHref = (backButton ? backButton.href : undefined) ?? '/';
 
   // Fetch roadmap and delivery tasks if linked to this release
   const [roadmapTasks, setRoadmapTasks] = useState<RoadmapItem[]>([]);
@@ -201,6 +221,15 @@ export function ReleaseDetailPage({
 
   return (
     <ArticleDetailLayout>
+      {/* Back button — desktop-only, matches DevSectionPage / LegalDocumentPage
+          (TitleBlock renders the same `hidden md:inline-flex` BackButton). */}
+      {showBackButton && (
+        <BackButton
+          label={backLabel}
+          onClick={() => router.push(backHref)}
+          className="hidden md:inline-flex mb-4"
+        />
+      )}
       <div className="space-y-6 md:space-y-8">
         {/* Title Block */}
         <div className="flex flex-col md:flex-row md:items-end gap-4 w-full">
@@ -399,22 +428,31 @@ export function ReleaseDetailPage({
           icon={<AlertTriangle className="h-6 w-6" />}
           SimpleMarkdownRenderer={MarkdownRenderer}
         />
+        {/* Features / Bugs / Improvements use `previewFirst` — same
+            progressive-disclosure pattern as the investor-update detail
+            page's Key Highlights / Financial Notes sections. Shows the
+            first entry in full + fade-masks the rest, with a "Show N
+            more / Show less" toggle. Breaking Changes (above) stays
+            fully expanded — it's critical info, not skim-friendly. */}
         <ReleaseChangelogSection
           title="Features Added"
           entries={featuresAdded || []}
           icon={<Sparkles className="h-6 w-6" />}
+          previewFirst
           SimpleMarkdownRenderer={MarkdownRenderer}
         />
         <ReleaseChangelogSection
           title="Bugs Fixed"
           entries={bugFixed || []}
           icon={<Wrench className="h-6 w-6" />}
+          previewFirst
           SimpleMarkdownRenderer={MarkdownRenderer}
         />
         <ReleaseChangelogSection
           title="Improvements"
           entries={improvements || []}
           icon={<TrendingUp className="h-6 w-6" />}
+          previewFirst
           SimpleMarkdownRenderer={MarkdownRenderer}
         />
 
