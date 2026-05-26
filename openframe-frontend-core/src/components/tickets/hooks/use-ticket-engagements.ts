@@ -87,7 +87,13 @@ export function useTicketEngagements(externalTicketId: string | null | undefined
   const query = useQuery({
     queryKey: ['ticket-engagements', externalTicketId, identityKey],
     enabled: queryEnabled,
-    staleTime: 30_000,
+    // Caches OFF — same reasoning as `useTicketsList`. The conversation
+    // timeline must reflect HubSpot truth on every drawer-open; a stale
+    // window risks hiding a freshly-arrived agent reply.
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
     queryFn: async (): Promise<TicketEngagement[]> => {
       const response = await embedAuthedFetch(LIST_ENGAGEMENTS_ENDPOINT, {
         method: 'POST',

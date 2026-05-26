@@ -106,7 +106,15 @@ export function useTicketsList(filters: UseTicketsListFilters): UseTicketsListRe
   const query = useQuery({
     queryKey: ['tickets', 'self', identityKey, search, statusFilter, page, pageSize],
     enabled,
-    staleTime: 60_000,
+    // Caches OFF — every mount + every focus + every navigation triggers
+    // a fresh fetch. The ticket data is the customer's own list of
+    // tickets they expect to be live (sync agents reply, statuses flip,
+    // new comments arrive); a stale window of any size is worse than
+    // a sub-second refetch.
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
     queryFn: async (): Promise<FindTicketResponse> => {
       const body: Record<string, string | number> = {
         query: search,
