@@ -50,6 +50,7 @@ import { useTicketEngagements } from './hooks/use-ticket-engagements'
 import type {
   TicketEngagementFile,
 } from './hooks/use-ticket-engagements'
+import { TicketLinkedDeliveryCard } from './ticket-linked-delivery-card'
 import type { AnyTicket } from './types'
 import { isOptimistic, TICKET_TEXT_MAX_CHARS } from './types'
 
@@ -89,6 +90,15 @@ export function TicketDetailDrawer({
   const isClosed = (ticket.status ?? '').toUpperCase() === 'CLOSED'
   return (
     <div className="bg-ods-card border-t border-ods-border px-4 py-4 flex flex-col gap-4">
+      {/* Linked ClickUp delivery — rendered only when the server's
+          `attachClickupTasks` step populated `ticket.clickup`. Customer
+          tickets with no linked task skip this entirely. The card itself
+          links out to ClickUp with the per-status color badge so the
+          customer can follow the delivery progress. */}
+      {ticket.clickup && (
+        <TicketLinkedDeliveryCard clickup={ticket.clickup} />
+      )}
+
       <div>
         <p className="text-xs font-medium text-ods-text-secondary mb-2 uppercase tracking-wider">
           Conversation

@@ -11,6 +11,13 @@ export interface ChatTicketItemData {
   ticketNumber: string
   /** Accepts any known ticket status format (ACTIVE, active, ACTION_REQUIRED, etc.) */
   status: string
+  /** Optional badge label override. If set, the badge text reads this
+   *  (e.g. HubSpot's `pipeline_stage_label` — "New" / "Closed" /
+   *  "Waiting on contact" / "Waiting on version release") while the
+   *  variant + check icon still come from the canonical `status`.
+   *  When omitted, the canonical status's default label is used
+   *  ("Resolved" for closed, "Active" for open, etc.). */
+  statusLabel?: string
   category?: string
   timeAgo?: string
 }
@@ -63,7 +70,7 @@ const ChatTicketItem = React.forwardRef<HTMLButtonElement, ChatTicketItemProps>(
           )}
         </div>
 
-        <TicketStatusTag status={ticket.status} />
+        <TicketStatusTag status={ticket.status} label={ticket.statusLabel} />
 
         <div className="flex items-center justify-center shrink-0 size-12 rounded-md bg-ods-card border border-ods-border">
           <ChevronRight className="size-6 text-ods-text-secondary" />

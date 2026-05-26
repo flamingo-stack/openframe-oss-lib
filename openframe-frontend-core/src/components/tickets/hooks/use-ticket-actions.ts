@@ -293,6 +293,7 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
         status: 'OPEN',
         pipeline_stage_label: 'New',
         clickup_task_id: null,
+        clickup: null,
         priority: null,
         customer_emails: [],
         customer_company: null,

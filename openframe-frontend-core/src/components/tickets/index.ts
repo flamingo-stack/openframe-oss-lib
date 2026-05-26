@@ -6,6 +6,10 @@ export {
   type TicketDetailDrawerProps,
   type TicketRef,
 } from './ticket-detail-drawer'
+export {
+  TicketLinkedDeliveryCard,
+  type TicketLinkedDeliveryCardProps,
+} from './ticket-linked-delivery-card'
 // Help Center — full-page customer-facing surface used by
 // openframe's `/tickets` route. Composes `DevSectionPage` chrome
 // (hero + search + filter) + a creation form above the controls +
@@ -32,6 +36,7 @@ export {
 } from './hooks/use-ticket-engagements'
 export {
   type TicketData,
+  type TicketClickupSummary,
   type OptimisticTicket,
   type AnyTicket,
   type TicketActionErrorCode,

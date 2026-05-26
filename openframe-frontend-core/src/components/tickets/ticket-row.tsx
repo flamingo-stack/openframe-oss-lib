@@ -68,6 +68,12 @@ export function TicketRow({
     title: ticket.subject ?? '(untitled)',
     ticketNumber: `#${ticket.external_id}`,
     status: ticket.status ?? 'OPEN',
+    // Surface the HubSpot pipeline stage label ("New" / "Closed" /
+    // "Waiting on contact" / "Waiting on version release") instead of
+    // the canonical "Active"/"Resolved" default. The variant + check
+    // icon still come from `status` (CLOSED → check; OPEN → no check),
+    // so the badge accurately reflects "Closed" with a checkmark.
+    statusLabel: ticket.pipeline_stage_label ?? undefined,
     category: ticket.customer_company ?? undefined,
     timeAgo: ticket.hubspot_updated_at
       ? formatRelativeTime(ticket.hubspot_updated_at)

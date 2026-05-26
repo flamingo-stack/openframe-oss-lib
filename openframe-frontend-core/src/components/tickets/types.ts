@@ -35,10 +35,38 @@ export interface TicketData {
    *  "Closed". Drives the badge text; canonical status drives color. */
   pipeline_stage_label: string | null
   clickup_task_id: string | null
+  /** Snapshot of the linked ClickUp delivery task — populated server-side
+   *  via the `clickup_tasks` mirror when `clickup_task_id` is set. Drives
+   *  the "Linked delivery" card surface on the ticket drawer (status
+   *  badge + ClickUp deep link). `null` when no link OR the ClickUp row
+   *  was deleted / not yet synced. */
+  clickup: TicketClickupSummary | null
   priority: string | null
   customer_emails: string[]
   customer_company: string | null
   hubspot_updated_at: string
+}
+
+/** Compact projection of a linked ClickUp task. Mirrors server-side
+ *  `ClickupSummary` in `lib/data/hubspot-tools.ts`. */
+export interface TicketClickupSummary {
+  external_id: string
+  name: string | null
+  /** ClickUp status name — e.g. "complete" / "working" / "design approved"
+   *  / "waiting for release". Used as the badge label. */
+  status: string | null
+  /** ClickUp's per-status hex color (e.g. "#008844"). Forwarded to the
+   *  badge so colors match the ClickUp board exactly. */
+  status_color: string | null
+  /** Bucket — `'backlog' | 'working' | 'complete' | 'unknown'`. Used as
+   *  a fallback when status_color is missing. */
+  status_category: string | null
+  /** Direct https://app.clickup.com/t/<id> deep link. Used as the card's
+   *  navigation target. */
+  url: string | null
+  /** Release version label set by the delivery team, e.g. "0.9" / "1.0".
+   *  Shown beside the status when present. */
+  target_version: string | null
 }
 
 /**
