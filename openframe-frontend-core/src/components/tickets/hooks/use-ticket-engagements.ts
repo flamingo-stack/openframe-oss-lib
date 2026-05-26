@@ -32,6 +32,16 @@ export interface TicketEngagement {
   id: string
   body: string | null
   authorId: string | null
+  /** Whether this engagement is customer-authored (Custom Channels
+   *  Messages — INCOMING direction) or team-authored (Notes + future
+   *  OUTGOING messages). Drives avatar variant + the "Customer"/"Support
+   *  team" header label in the drawer's conversation thread. */
+  authorRole: 'customer' | 'support'
+  /** Display name for `customer`-role engagements (resolved server-side
+   *  from the Custom Channels sender). `null` for `support` since notes
+   *  don't carry a per-engagement display name — the drawer falls back
+   *  to "Support team" for those. */
+  authorName: string | null
   createdAt: string
   attachments: TicketEngagementFile[]
 }

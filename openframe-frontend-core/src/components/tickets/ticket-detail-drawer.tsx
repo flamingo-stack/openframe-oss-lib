@@ -229,22 +229,34 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
         )
       })}
 
-      {/* Note engagements — every reply not authored by the customer
-          is treated as "Support team" since the engagement payload
-          doesn't carry an authoritative display name yet. Engagement
-          attachments map 1:1 to the shared `TicketAttachment` shape
-          so the renderer is identical to every other lib surface. */}
-      {engagements.map((eng) => (
-        <ConversationCardRow
-          key={eng.id}
-          author="Support team"
-          role="Reply"
-          timestamp={eng.createdAt}
-          body={stripAttachmentsPreamble(eng.body ?? '')}
-          attachments={mapEngagementAttachments(eng.attachments)}
-          variant="support"
-        />
-      ))}
+      {/* Engagement timeline — interleaves customer-authored Custom
+          Channel messages (authorRole='customer') and team-authored
+          Notes (authorRole='support'). Customer messages get the
+          'current-user' avatar variant + the actual display name from
+          the Conversations sender; Notes get 'Support team' + the
+          neutral avatar treatment. Avatar uses the customer's identity
+          avatar URL when the engagement matches their own email. */}
+      {engagements.map((eng) => {
+        const isCustomer = eng.authorRole === 'customer'
+        const isOwnReply =
+          isCustomer && !!eng.authorId && !!identity.user?.email &&
+          eng.authorId.toLowerCase() === identity.user.email.toLowerCase()
+        const author = isCustomer
+          ? eng.authorName ?? eng.authorId ?? customerName
+          : 'Support team'
+        return (
+          <ConversationCardRow
+            key={eng.id}
+            author={author}
+            role={isCustomer ? 'Reply' : 'Note'}
+            avatarSrc={isOwnReply ? customerAvatar : undefined}
+            timestamp={eng.createdAt}
+            body={stripAttachmentsPreamble(eng.body ?? '')}
+            attachments={mapEngagementAttachments(eng.attachments)}
+            variant={isCustomer ? 'current-user' : 'support'}
+          />
+        )
+      })}
 
       {isLoading && (
         <div className="p-[12px] md:p-[16px] border-t border-ods-border">
