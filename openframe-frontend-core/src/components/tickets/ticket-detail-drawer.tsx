@@ -239,25 +239,50 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
 
       {/* Engagement timeline — interleaves customer-authored Custom
           Channel messages (authorRole='customer') and team-authored
-          Notes (authorRole='support'). Customer messages get the
-          'current-user' avatar variant + the actual display name from
-          the Conversations sender; Notes get 'Support team' + the
-          neutral avatar treatment. Avatar uses the customer's identity
-          avatar URL when the engagement matches their own email. */}
+          Notes (authorRole='support').
+          ATTRIBUTION RULES (per repo convention):
+            - CUSTOMER messages whose sender email matches the
+              current chat-identity user → render BOTH name AND
+              avatar LIVE from `identity.user.*`. This is the
+              source of truth for the logged-in user's display info
+              (NOT the mirror's `sender_name`, which is baked-in at
+              post time and may be stale after the user updates
+              their profile / identity headers).
+            - CUSTOMER messages whose sender is a DIFFERENT email
+              (rare — shouldn't happen on /tickets since the user
+              only sees their own threads) → fall back to the
+              email shown verbatim. No profile lookup.
+            - SUPPORT/Note messages → "Support team" + neutral
+              avatar treatment. (TODO: when the engagement carries
+              a known team-member owner email, look up that
+              `profiles` row for the agent's name + avatar — see
+              hubspot-conversations-utils.ts removal note.) */}
       {engagements.map((eng) => {
         const isCustomer = eng.authorRole === 'customer'
         const isOwnReply =
           isCustomer && !!eng.authorId && !!identity.user?.email &&
           eng.authorId.toLowerCase() === identity.user.email.toLowerCase()
-        const author = isCustomer
-          ? eng.authorName ?? eng.authorId ?? customerName
-          : 'Support team'
+
+        let author: string
+        let avatarSrc: string | undefined
+        if (isCustomer && isOwnReply) {
+          // Live identity is the source of truth for THIS user.
+          author = identity.user?.name?.trim() || customerName
+          avatarSrc = identity.user?.avatarUrl ?? undefined
+        } else if (isCustomer) {
+          author = eng.authorName ?? eng.authorId ?? customerName
+          avatarSrc = undefined
+        } else {
+          author = 'Support team'
+          avatarSrc = undefined
+        }
+
         return (
           <ConversationCardRow
             key={eng.id}
             author={author}
             role={isCustomer ? 'Reply' : 'Note'}
-            avatarSrc={isOwnReply ? customerAvatar : undefined}
+            avatarSrc={avatarSrc}
             timestamp={eng.createdAt}
             body={stripAttachmentsPreamble(eng.body ?? '')}
             attachments={mapEngagementAttachments(eng.attachments)}
