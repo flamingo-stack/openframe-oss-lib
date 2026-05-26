@@ -121,8 +121,17 @@ export function useTicketsList(filters: UseTicketsListFilters = {}): UseTicketsL
 
   return {
     tickets: data?.tickets ?? [],
+    // `isPending` (TanStack v5) is the only flag that's reliably TRUE in
+    // the single render frame between `enabled` flipping false→true
+    // (identity just resolved) and the fetch microtask actually firing
+    // — `isLoading` and `isFetching` are both still `false` in that
+    // window, which caused the EmptyState to flash for ~16ms before the
+    // skeleton took over. Using `isPending || isFetching-and-empty`
+    // covers both the initial-fetch frame AND the filter-change refetch
+    // bridge state.
     isLoading:
-      enabled && (query.isLoading || (query.isFetching && (data?.tickets ?? []).length === 0)),
+      enabled &&
+      (query.isPending || (query.isFetching && (data?.tickets ?? []).length === 0)),
     isFetching: query.isFetching,
     error: (query.error as Error | null) ?? null,
     refetch: () => {

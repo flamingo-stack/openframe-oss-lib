@@ -240,7 +240,7 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
           author="Support team"
           role="Reply"
           timestamp={eng.createdAt}
-          body={eng.body ?? ''}
+          body={stripAttachmentsPreamble(eng.body ?? '')}
           attachments={mapEngagementAttachments(eng.attachments)}
           variant="support"
         />
@@ -279,6 +279,21 @@ function formatBytes(size: number): string {
   if (size < 1024) return `${size} B`
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
   return `${(size / (1024 * 1024)).toFixed(1)} MB`
+}
+
+/** Strip the redundant `Attachments:\n\n filename.png\n filename2.png`
+ *  preamble that the server appends to Note engagement bodies. We
+ *  already render the same files through `<TicketAttachmentsList>` with
+ *  proper icons + download buttons — showing the raw filename list
+ *  again above the chip strip is duplicate noise. The regex matches
+ *  ANY trailing block that starts with "Attachments:" (case-insensitive,
+ *  optional leading whitespace) and consumes everything to end-of-string,
+ *  so server-side wording tweaks like "Attachments (3):" still strip
+ *  cleanly. Idempotent — a body with no preamble passes through
+ *  untouched. */
+const ATTACHMENTS_PREAMBLE_RE = /\s*\n\s*Attachments\b[^]*$/i
+function stripAttachmentsPreamble(body: string): string {
+  return body.replace(ATTACHMENTS_PREAMBLE_RE, '').trim()
 }
 
 function ReopenAction({
