@@ -20,14 +20,16 @@
  * non-chat surfaces (e.g. ticket center) don't have to import a
  * chat-prefixed symbol just to send the same headers.
  *
- * Persists to **`sessionStorage`** (not `localStorage`) so the bearer
- * token and act-as identity evaporate when the tab closes. An XSS sink
- * on this origin can still exfiltrate the value while the tab is open
- * (impossible to avoid without server-side opaque tokens), but the
- * exposure window shrinks from "indefinite" to "current tab session"
- * which is an order of magnitude better. Admin-only by convention —
- * the `/debug` admin route hosts the paste-creds UI and is gated
- * behind the platform's `askAI.enabled` flag.
+ * Persists to **`localStorage`** so the bearer token + act-as identity
+ * survive tab close, new-tab opens, and browser restarts — the
+ * `/debug` paste-creds UI is an admin tool and re-pasting every tab
+ * cycle was rejected as a dev-experience tradeoff that wasn't worth
+ * the security gain. An XSS sink on this origin can read the value
+ * indefinitely (vs only-this-tab with sessionStorage), but `/debug`
+ * is admin-gated behind the platform's `askAI.enabled` flag and the
+ * impersonation header it sets is server-validated against
+ * `CHAT_PROXY_SECRET` anyway. Explicit "Clear" button on the creds
+ * bar is the supported logout path; closing the tab is no longer.
  *
  * Namespaced under `<platform>.chat.proxy-auth.v1` (the storage key is
  * unchanged from the old chat-prefixed helper — that's a storage
@@ -71,11 +73,11 @@ const adapter = createLocalStorageAdapter<EmbedProxyAuth>({
   namespace: () => getAppType(),
   validate: isValidPersistedAuth,
   logTag: '[embed-proxy-auth-storage]',
-  // sessionStorage — cleared when the tab closes. Bearer token + act-as
-  // identity should NOT outlive the current session, so localStorage's
-  // indefinite persistence is the wrong choice here. See file-level
-  // doc comment for the threat-model rationale.
-  backend: 'session',
+  // localStorage — survives tab close, new tabs, and browser restarts.
+  // Admin re-pasting creds every tab cycle was the dev-experience
+  // tradeoff prior `sessionStorage` setup demanded — rejected. See
+  // file-level doc comment for the security tradeoff rationale.
+  backend: 'local',
 })
 
 /** Trim + null-coerce an optional identity field so consumers can do
