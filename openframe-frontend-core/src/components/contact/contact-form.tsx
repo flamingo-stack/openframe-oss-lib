@@ -261,6 +261,19 @@ export function ContactForm({
         onSubmit={handleSubmit(handleFormSubmit)}
         className="flex flex-col flex-grow space-y-4 md:space-y-6"
       >
+        {/* Hidden inputs for fields that are required by `ContactSchema`
+            but suppressed from the visible UI via `hideFields`. Without
+            these, `register('name')` never runs, react-hook-form skips
+            the field at submit time, and Zod's required-string check
+            fails silently — the user clicks Submit and NOTHING visible
+            happens (no error, no network call). The caller-supplied
+            `defaultValues` seed the values; the hidden inputs just tell
+            RHF to include them in the submit payload. */}
+        {!showName && <input type="hidden" {...register('name')} />}
+        {!showEmail && <input type="hidden" {...register('email')} />}
+        {!showHelpCategory && <input type="hidden" {...register('helpCategory')} />}
+        {!showMessage && <input type="hidden" {...register('message')} />}
+
         {/* Extra top field (e.g. Subject for ticket forms). Rendered
             outside the schema-driven layout so the caller fully owns
             label / placeholder / state. */}

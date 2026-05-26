@@ -39,7 +39,7 @@ import { toast as defaultToast } from '../../hooks/use-toast'
 import { useTicketsList } from './hooks/use-tickets-list'
 import { useTicketActions } from './hooks/use-ticket-actions'
 import { HelpCenterCard } from './help-center-card'
-import { HelpCenterCreateForm } from './help-center-create-form'
+import { HelpCenterCreateForm, HelpCenterCreateFormSkeleton } from './help-center-create-form'
 import type { AnyTicket, OptimisticTicket, TicketData } from './types'
 import { isOptimistic } from './types'
 
@@ -66,10 +66,14 @@ export function HelpCenterList({ toast = defaultToast }: HelpCenterListProps = {
   // Identity gate FIRST — anon visitors skip every fetch + hook below.
   // `useChatIdentity` has a brief `isLoading` window on first render
   // before the identity resolves; we render the skeleton until it lands
-  // to avoid flashing the sign-in EmptyState for authed users.
+  // to avoid flashing the sign-in EmptyState for authed users. The
+  // skeleton mirrors the AUTHED layout — form placeholder above the
+  // search/filter row, list-rows skeleton below — so the chrome
+  // doesn't shift vertically when identity resolves and the real form
+  // mounts in the `preControls` slot.
   if (identity.isLoading) {
     return (
-      <DevSectionPage sectionKey="tickets">
+      <DevSectionPage sectionKey="tickets" preControls={<HelpCenterCreateFormSkeleton />}>
         <DevCardRowSkeletonList />
       </DevSectionPage>
     )
