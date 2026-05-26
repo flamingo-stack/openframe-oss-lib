@@ -62,24 +62,33 @@ export interface HelpCenterCreateFormProps {
  * dimensions PIXEL-FOR-PIXEL so the page chrome doesn't shift when
  * identity resolves and the real form mounts.
  *
- * Structural parity — each section uses the SAME flex / spacing /
- * padding classes the real form uses, so section heights and gaps
- * propagate identically. Only the inner content swaps an
- * `<Input>` / `<Textarea>` / `<Button>` element for a same-sized
- * animated `bg-ods-border` bar. Measurements taken at lg breakpoint:
+ * Verified against live DOM bounding-rect measurements at the lg
+ * breakpoint — every section's top + height matches the real form to
+ * the pixel (skeleton wrapper 556px == real wrapper 556px). Each
+ * section uses the SAME flex / spacing / padding classes the real
+ * form uses, so the gaps propagate identically; only the inner
+ * content swaps an `<Input>` / `<Textarea>` / `<Button>` for a
+ * same-sized animated `bg-ods-border` bar.
  *
  *   wrapper          → `p-6 md:p-8 lg:p-10` + border + rounded-3xl
- *   heading area     → 56px (`mb-6 md:mb-8` container, h2 inside has
- *                       `text-h2 mb-3 md:mb-4` — 40px h2 + 16px gap)
- *   subject section  → 79px (label 24-31px + h-12 input + flex-col gap)
- *   message section  → 127px (label + h-24 textarea + flex-grow fill)
- *   attachments row  → 28px (h-7 add button + label)
+ *   heading area     → 56px (`mb-6 md:mb-8` container, h-10 inner bar
+ *                       + `mb-3 md:mb-4` = 40 + 16)
+ *   subject section  → 79px (`h-[27px]` label + `mb-1` (4px) + h-12
+ *                       input = 27 + 4 + 48)
+ *   message section  → 127px (`h-[27px]` label + `mb-1` + h-24
+ *                       textarea = 27 + 4 + 96)
+ *   attachments row  → 28px (h-7 add button + helper label)
  *   footer           → 56px (h-12 button + `pt-2 mt-auto`)
  *   between sections → `space-y-4 md:space-y-6` (16/24px)
  *
- * Verified against live DOM bounding-rect measurements; both forms
- * render at the same wrapper height (556px @ lg) so the
- * loading→loaded swap is invisible.
+ * One non-obvious detail: the real `<ContactForm>` renders 4
+ * `<input type="hidden">` registrations BEFORE the visible Subject
+ * section (for the hidden name/email/helpCategory/message fields).
+ * Tailwind's `space-y-*` rule (`:not([hidden]) ~ :not([hidden])`)
+ * counts `type="hidden"` inputs as siblings, so Subject gets a 24px
+ * top margin. The skeleton mirrors those 4 hidden inputs exactly so
+ * the spacing rule fires identically — without them the whole stack
+ * shifts up 24px on every page load.
  */
 export function HelpCenterCreateFormSkeleton() {
   return (
@@ -91,23 +100,41 @@ export function HelpCenterCreateFormSkeleton() {
         <div className="h-10 w-72 bg-ods-border rounded animate-pulse mb-3 md:mb-4" />
       </div>
 
-      {/* Form body — same `space-y-4 md:space-y-6` gap stack. */}
+      {/* Form body — same `space-y-4 md:space-y-6` gap stack.
+          IMPORTANT: the real `<ContactForm>` prepends 4
+          `<input type="hidden">` registrations for the hidden
+          name/email/helpCategory/message fields (see contact-form.tsx).
+          `space-y-*` uses `:not([hidden]) ~ :not([hidden])` — `type="hidden"`
+          inputs aren't excluded — so those hidden inputs ARE counted as
+          siblings, and the visible Subject section gets a 24px top
+          margin. The skeleton mirrors that exact structure with the
+          same 4 hidden inputs so the Subject placeholder lands at the
+          same Y as the real Subject input. Removing them would shift
+          the whole stack up by 24px on every page load. */}
       <div className="flex flex-col flex-grow space-y-4 md:space-y-6">
+        <input type="hidden" aria-hidden />
+        <input type="hidden" aria-hidden />
+        <input type="hidden" aria-hidden />
+        <input type="hidden" aria-hidden />
         {/* Subject section — `flex flex-col` matches real form. Label
-            bar mimics the rendered Label (~h-6 / 24px) plus the
-            natural margin between Label and Input. */}
+            bar uses arbitrary `h-[27px]` to match the live Label
+            component (18px font * 1.5 line-height = 27px) and `mb-1`
+            (4px) which is Tailwind's default `mb-1`. Total section
+            height: 27 + 4 + 48 (h-12 input) = 79px, identical to
+            real form. */}
         <div className="flex flex-col">
-          <div className="h-6 w-20 bg-ods-border rounded animate-pulse mb-1.5" />
+          <div className="h-[27px] w-20 bg-ods-border rounded animate-pulse mb-1" />
           <div className="h-12 w-full bg-ods-border rounded animate-pulse" />
         </div>
 
         {/* Message section — `flex flex-col flex-grow` matches real
             form (textarea fills remaining vertical space inside the
-            wrapper). h-24 bar = the textarea's natural rendered
-            height (~96px) when the wrapper has the standard list +
-            footer below it. */}
+            wrapper). h-24 bar (96px) = textarea's natural rendered
+            height when the wrapper has the standard list + footer
+            below it. Same `h-[27px]` + `mb-1` Label pattern as Subject:
+            27 + 4 + 96 = 127px, identical to real form. */}
         <div className="flex flex-col flex-grow">
-          <div className="h-6 w-32 bg-ods-border rounded animate-pulse mb-1.5" />
+          <div className="h-[27px] w-32 bg-ods-border rounded animate-pulse mb-1" />
           <div className="h-24 w-full bg-ods-border rounded animate-pulse flex-grow" />
         </div>
 
