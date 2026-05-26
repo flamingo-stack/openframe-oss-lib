@@ -121,17 +121,21 @@ export function useTicketsList(filters: UseTicketsListFilters = {}): UseTicketsL
 
   return {
     tickets: data?.tickets ?? [],
-    // `isPending` (TanStack v5) is the only flag that's reliably TRUE in
-    // the single render frame between `enabled` flipping false→true
-    // (identity just resolved) and the fetch microtask actually firing
-    // — `isLoading` and `isFetching` are both still `false` in that
-    // window, which caused the EmptyState to flash for ~16ms before the
-    // skeleton took over. Using `isPending || isFetching-and-empty`
-    // covers both the initial-fetch frame AND the filter-change refetch
-    // bridge state.
+    // Loading-state-truth = `data === undefined`. TanStack v5's
+    // `isPending` / `isLoading` flags can be `false` in transient
+    // windows where the query is enabled-but-fetch-not-yet-fired
+    // OR where stale-data exists from a sibling cache slot — both
+    // produced the EmptyState flash on /tickets first load. Treating
+    // "no data for THIS query slot yet" as the universal loading
+    // signal can't lie:
+    //   - Initial render after enabled flips: data === undefined → load
+    //   - Background refetch with existing data: data !== undefined → no load
+    //   - Filter-change refetch landing on empty results: data?.tickets===[]
+    //     + isFetching → bridge skeleton (the `||` branch)
     isLoading:
       enabled &&
-      (query.isPending || (query.isFetching && (data?.tickets ?? []).length === 0)),
+      (data === undefined ||
+        (query.isFetching && (data?.tickets ?? []).length === 0)),
     isFetching: query.isFetching,
     error: (query.error as Error | null) ?? null,
     refetch: () => {
