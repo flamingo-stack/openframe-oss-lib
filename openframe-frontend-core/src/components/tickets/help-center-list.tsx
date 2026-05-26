@@ -91,6 +91,18 @@ export function HelpCenterList({ toast = defaultToast }: HelpCenterListProps = {
     )
   }
 
+  // Identity is loaded + has an email (gated above). Resolve the
+  // authoritative session display name + email HERE so the create-form
+  // child doesn't have to call `useChatIdentity` itself — that hook is
+  // a plain `useState`+`useEffect` (no shared cache), so a second call
+  // in the child would race the first render and lock RHF's
+  // `defaultValues.email` to '' for the form's lifetime.
+  const sessionName =
+    [identity.user?.firstName, identity.user?.lastName].filter(Boolean).join(' ').trim() ||
+    identity.user?.email?.split('@')[0] ||
+    'Customer'
+  const sessionEmail = identity.user!.email!
+
   return (
     <HelpCenterListAuthed
       search={search}
@@ -100,6 +112,8 @@ export function HelpCenterList({ toast = defaultToast }: HelpCenterListProps = {
       router={router}
       pathname={pathname}
       toast={toast}
+      sessionName={sessionName}
+      sessionEmail={sessionEmail}
     />
   )
 }
@@ -112,6 +126,8 @@ interface AuthedProps {
   router: ReturnType<typeof useRouter>
   pathname: string
   toast: typeof defaultToast
+  sessionName: string
+  sessionEmail: string
 }
 
 function HelpCenterListAuthed({
@@ -122,6 +138,8 @@ function HelpCenterListAuthed({
   router,
   pathname,
   toast,
+  sessionName,
+  sessionEmail,
 }: AuthedProps) {
   const queryClient = useQueryClient()
   const { tickets, isLoading, isFetching, error, refetch, totalPages } = useTicketsList({
@@ -185,6 +203,8 @@ function HelpCenterListAuthed({
   const form = (
     <HelpCenterCreateForm
       actions={actions}
+      sessionName={sessionName}
+      sessionEmail={sessionEmail}
       supportSystemDown={supportSystemDown}
     />
   )

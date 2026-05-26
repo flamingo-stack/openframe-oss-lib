@@ -258,7 +258,20 @@ export function ContactForm({
       )}
 
       <form
-        onSubmit={handleSubmit(handleFormSubmit)}
+        onSubmit={handleSubmit(handleFormSubmit, (validationErrors) => {
+          // When validation fails on a HIDDEN field (e.g. ticket form
+          // hides name/email/helpCategory and seeds them via
+          // `defaultValues`), there's no visible error UI for the user
+          // — the submit button just appears dead. Log so the broken
+          // defaultValues wiring is at least discoverable in DevTools.
+          // eslint-disable-next-line no-console
+          console.warn(
+            '[ContactForm] submit blocked by validation:',
+            Object.fromEntries(
+              Object.entries(validationErrors).map(([k, v]) => [k, v?.message ?? v]),
+            ),
+          )
+        })}
         className="flex flex-col flex-grow space-y-4 md:space-y-6"
       >
         {/* Hidden inputs for fields that are required by `ContactSchema`
