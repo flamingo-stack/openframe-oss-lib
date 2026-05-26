@@ -6,6 +6,19 @@ export {
   type TicketDetailDrawerProps,
   type TicketRef,
 } from './ticket-detail-drawer'
+// Help Center — full-page customer-facing surface used by
+// openframe's `/tickets` route. Composes `DevSectionPage` chrome
+// (hero + search + filter) + a creation form above the controls +
+// expandable card list with `TicketDetailDrawer` beneath each row.
+// Third-party embedders mount `<HelpCenterList />` directly inside
+// their own `<PageShell>` to get the same UX.
+export { HelpCenterList, type HelpCenterListProps } from './help-center-list'
+export { HelpCenterCard, type HelpCenterCardProps } from './help-center-card'
+export {
+  HelpCenterCreateForm,
+  type HelpCenterCreateFormProps,
+  type HelpCenterCreateFormInput,
+} from './help-center-create-form'
 export { useTicketsList } from './hooks/use-tickets-list'
 export {
   useTicketActions,
