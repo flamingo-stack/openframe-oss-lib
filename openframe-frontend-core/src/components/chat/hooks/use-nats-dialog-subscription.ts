@@ -17,15 +17,6 @@ import {
   type UseNatsDialogSubscriptionReturn,
 } from '../types'
 
-/**
- * Hook for managing NATS dialog subscriptions.
- * 
- * This hook handles:
- * - Connecting to NATS WebSocket
- * - Subscribing to dialog topics (message and/or admin-message)
- * - Reconnection and error handling
- * - Shared connection management
- */
 export function useNatsDialogSubscription({
   enabled,
   dialogId,
@@ -45,8 +36,7 @@ export function useNatsDialogSubscription({
   
   const clientRef = useRef<NatsClient | null>(null)
   const subscriptionRefs = useRef<Map<NatsMessageType, NatsSubscriptionHandle | null>>(new Map())
-  
-  // Stable refs for callbacks
+
   const onEventRef = useRef(onEvent)
   useEffect(() => {
     onEventRef.current = onEvent
@@ -98,14 +88,17 @@ export function useNatsDialogSubscription({
     releaseSharedClient(url)
   }, [])
 
-  // Store the current WebSocket URL to prevent unnecessary reconnections
   const currentWsUrlRef = useRef<string>('')
-  
-  // Connection effect
+
+  // Resolve the URL synchronously each render so the effect's dep is the URL string
+  // itself, not the (often inline-allocated) getNatsWsUrl callback identity. Without
+  // this the effect re-runs on every render that produces a new callback identity —
+  // e.g. every silent token rotation when `useNatsAppConfig` rebuilds getWsUrl —
+  // tearing the WS down and reacquiring even though the resolved URL hasn't changed.
+  const wsUrl = getNatsWsUrl()
+
   useEffect(() => {
-    const wsUrl = getNatsWsUrl()
     if (!enabled || !wsUrl) {
-      // Clean up if disabled or no URL
       if (currentWsUrlRef.current && clientRef.current) {
         releaseClient(currentWsUrlRef.current)
         clientRef.current = null
@@ -120,7 +113,6 @@ export function useNatsDialogSubscription({
       return
     }
 
-    // Clean up existing connection if URL changed
     if (currentWsUrlRef.current && currentWsUrlRef.current !== wsUrl && clientRef.current) {
       releaseClient(currentWsUrlRef.current)
       clientRef.current = null
@@ -190,7 +182,7 @@ export function useNatsDialogSubscription({
         currentWsUrlRef.current = ''
       }
     }
-  }, [enabled, getNatsWsUrl, acquireClient, releaseClient])
+  }, [enabled, wsUrl, acquireClient, releaseClient])
 
   const topicsKey = topics.join(',')
   const lastSubscribedDialogIdRef = useRef<string | null>(null)
@@ -200,16 +192,13 @@ export function useNatsDialogSubscription({
     isConnectedRef.current = isConnected
   }, [isConnected])
 
-  // Track subscription state separately from dialog changes
   const currentDialogIdRef = useRef<string | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
-  
-  // Handle dialog changes and subscription lifecycle
+
   useEffect(() => {
     currentDialogIdRef.current = dialogId
-    
+
     if (!enabled || !dialogId) {
-      // Clean up if disabled or no dialog
       if (subscriptionRefs.current.size > 0) {
         setIsSubscribed(false)
         subscriptionRefs.current.forEach((sub) => {
@@ -235,7 +224,6 @@ export function useNatsDialogSubscription({
       return
     }
     
-    // Clean up any existing subscriptions before creating new ones
     if (subscriptionRefs.current.size > 0) {
       subscriptionRefs.current.forEach((sub) => {
         try {
@@ -247,8 +235,7 @@ export function useNatsDialogSubscription({
       subscriptionRefs.current.clear()
       abortControllerRef.current?.abort()
     }
-    
-    // Create new abort controller for this subscription set
+
     abortControllerRef.current = new AbortController()
     const abort = abortControllerRef.current
 
@@ -275,7 +262,6 @@ export function useNatsDialogSubscription({
         }
       }
       
-      // Subscribe to all configured topics
       topics.forEach((topic) => {
         const subscription = client.subscribeBytes(
           `chat.${dialogId}.${topic}`,
@@ -309,8 +295,7 @@ export function useNatsDialogSubscription({
       abortControllerRef.current = null
     }
   }, [enabled, dialogId, topicsKey, topics])
-  
-  // Separate effect to handle connection state changes
+
   useEffect(() => {
     if (!enabled || !currentDialogIdRef.current || !isConnected) {
       return
@@ -339,7 +324,6 @@ export function useNatsDialogSubscription({
         }
       }
       
-      // Subscribe to all configured topics
       topics.forEach((topic) => {
         const subscription = client.subscribeBytes(
           `chat.${dialogId}.${topic}`,
@@ -353,7 +337,6 @@ export function useNatsDialogSubscription({
       setIsSubscribed(true)
       onSubscribedRef.current?.()
     } else if (subscriptionRefs.current.size > 0) {
-      // We have subscriptions, just update the state
       setIsSubscribed(true)
     }
   }, [isConnected, enabled, topics, topicsKey])

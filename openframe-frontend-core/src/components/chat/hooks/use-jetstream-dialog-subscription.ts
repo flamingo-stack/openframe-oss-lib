@@ -117,9 +117,13 @@ export function useJetStreamDialogSubscription({
 
   const currentWsUrlRef = useRef<string>('')
 
-  // Connection lifecycle: acquire/release the shared client based on enabled + URL.
+  // Resolve the URL synchronously each render so the effect depends on the URL string
+  // itself, not the (often inline-allocated) getNatsWsUrl callback identity. Otherwise
+  // every silent token rotation that rebuilds getNatsWsUrl in the caller would tear
+  // the WS down and reacquire even though the resolved URL hasn't changed.
+  const wsUrl = getNatsWsUrl()
+
   useEffect(() => {
-    const wsUrl = getNatsWsUrl()
     if (!enabled || !wsUrl) {
       if (currentWsUrlRef.current && clientRef.current) {
         releaseClient(currentWsUrlRef.current)
@@ -211,7 +215,7 @@ export function useJetStreamDialogSubscription({
         currentWsUrlRef.current = ''
       }
     }
-  }, [enabled, getNatsWsUrl, acquireClient, releaseClient])
+  }, [enabled, wsUrl, acquireClient, releaseClient])
 
   // Subscription lifecycle: (re)create the ephemeral JetStream consumer whenever
   // we transition into a connected state for a dialog, and whenever the dialog
