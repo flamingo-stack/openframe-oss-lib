@@ -31,13 +31,18 @@ export interface DevSectionPageProps {
   sectionKey: OpenframeDevSectionKey;
   /** The page-specific list body (e.g. `<RoadmapList />`). */
   children: ReactNode;
+  /** Optional slot rendered BETWEEN the hero and search/filter — see
+   *  `DevSectionView.preControls`. Used by surfaces that want an entry
+   *  action (e.g. Help Center's "Open a new ticket" form) above the
+   *  controls instead of below them. */
+  preControls?: ReactNode;
   /** Back-button config — same shape as `LegalDocumentPage` /
    *  `ReleaseDetailPage`. Pass `false` to hide. Default
    *  `{ label: 'Back to home', href: '/' }`. */
   backButton?: { label?: string; href?: string } | false;
 }
 
-export function DevSectionPage({ sectionKey, children, backButton }: DevSectionPageProps) {
+export function DevSectionPage({ sectionKey, children, preControls, backButton }: DevSectionPageProps) {
   const router = useRouter();
   const section = OPENFRAME_DEV_SECTIONS[sectionKey];
   const Icon = section.icon;
@@ -63,6 +68,7 @@ export function DevSectionPage({ sectionKey, children, backButton }: DevSectionP
             icon: <Icon className={SECTION_HERO_ICON_CLASS} />,
             description: section.hero.description,
           }}
+          preControls={preControls}
         >
           {children}
         </DevSectionView>

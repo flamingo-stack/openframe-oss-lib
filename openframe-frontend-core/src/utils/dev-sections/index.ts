@@ -12,6 +12,7 @@ export {
   OPENFRAME_DEV_SECTIONS,
   ROADMAP_STATUS_OPTIONS,
   DELIVERY_TASK_TYPE_OPTIONS,
+  TICKET_STATUS_OPTIONS,
   type OpenframeDevSection,
   type OpenframeDevSectionKey,
 } from './openframe-dev-sections'
