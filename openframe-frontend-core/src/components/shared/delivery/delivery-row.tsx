@@ -25,6 +25,7 @@
  */
 
 import * as React from 'react'
+import Link from '../../../embed-shims/next-link'
 import { StatusBadge } from '../../ui/status-badge'
 import { getStatusColorScheme } from '../../../utils'
 import {
@@ -50,15 +51,12 @@ function getRelativeTime(timestamp: number): string {
 
 export interface DeliveryRowProps {
   item: DeliveryItem
-  /** When set, the row is an `<a href>` — used to deep-link from the
-   *  ticket's linked-card to `/bug-fixes-and-enhancements?focus=<id>`. */
+  /** When set, the row becomes a clickable anchor. The ticket-side
+   *  linked-card composes this from `buildDevSectionUrl('delivery', id)`
+   *  which carries `?search=<id>` — the delivery list filters to that
+   *  exact task on landing (canonical deep-link mechanism, same one
+   *  the chat-inline delivery card uses). */
   href?: string
-  /** DOM id assigned to the outer element. Set on the standard delivery
-   *  table so `?focus=<id>` can scroll the page to it. */
-  id?: string
-  /** When true, applies the `animate-flash-focus` highlight. Driven by
-   *  the consuming page after `scrollIntoView`. */
-  highlighted?: boolean
   /** Small uppercase caption rendered above the title. Used by the
    *  linked-delivery card variant ("LINKED DELIVERY"). */
   caption?: string
@@ -68,8 +66,6 @@ export interface DeliveryRowProps {
 export function DeliveryRow({
   item,
   href,
-  id,
-  highlighted,
   caption,
   className,
 }: DeliveryRowProps) {
@@ -126,27 +122,22 @@ export function DeliveryRow({
   const baseClass = cn(
     'block p-[12px] md:p-[16px] no-underline text-inherit transition-colors duration-150',
     href && 'hover:bg-ods-bg-hover cursor-pointer',
-    highlighted && 'bg-ods-bg-hover ring-2 ring-ods-accent ring-inset',
     className,
   )
 
   if (href) {
+    // `Link` is the env-aware embed-shim — delegates to `next/link` on
+    // a Next.js host (soft RSC nav, back-button restores the previous
+    // page's React state intact), falls back to a plain `<a>` on
+    // non-Next embedders. A raw `<a href>` was hard-navigating +
+    // losing TanStack-Query state on back, leaving /tickets stuck on
+    // its skeleton.
     return (
-      <a
-        id={id}
-        href={href}
-        className={baseClass}
-        // No `target="_blank"` — internal nav stays in the same tab so
-        // the focus param survives + `?focus=<id>` triggers scroll.
-      >
+      <Link href={href} className={baseClass} prefetch={false}>
         {inner}
-      </a>
+      </Link>
     )
   }
 
-  return (
-    <div id={id} className={baseClass}>
-      {inner}
-    </div>
-  )
+  return <div className={baseClass}>{inner}</div>
 }

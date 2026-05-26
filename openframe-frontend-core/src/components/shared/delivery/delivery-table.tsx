@@ -23,10 +23,6 @@ import type { DeliveryItem } from '../../../types/delivery';
 interface DeliveryTableProps {
   items: DeliveryItem[];
   isLoading?: boolean;
-  /** ClickUp external_id to highlight (matches `?focus=<id>` in the
-   *  URL). The matched row gets a flashing accent border so the user
-   *  can tell where their linked ticket landed them. */
-  focusId?: string | null;
 }
 
 /**
@@ -70,7 +66,7 @@ function SkeletonRow() {
  * DeliveryTable Component
  * Displays bug fixes and enhancements with fixed-height rows
  */
-export function DeliveryTable({ items, isLoading = false, focusId = null }: DeliveryTableProps) {
+export function DeliveryTable({ items, isLoading = false }: DeliveryTableProps) {
   // Show skeletons while loading
   if (isLoading) {
     return (
@@ -103,11 +99,7 @@ export function DeliveryTable({ items, isLoading = false, focusId = null }: Deli
             key={item.id}
             className="border-b border-ods-border last:border-b-0"
           >
-            <DeliveryRow
-              item={item}
-              id={`delivery-${item.id}`}
-              highlighted={focusId === item.id}
-            />
+            <DeliveryRow item={item} />
           </div>
         ))}
       </div>

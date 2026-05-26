@@ -80,8 +80,15 @@ export interface TicketClickupSummary {
   date_closed: number | null
   /** Direct https://app.clickup.com/t/<id> deep link. Kept on the wire
    *  for admin surfaces; the customer-facing linked card navigates
-   *  internally to `/bug-fixes-and-enhancements?focus=<id>` instead. */
+   *  internally instead. */
   clickup_url: string | null
+  /** Composed server-side via the SAME `buildDevSectionUrl` helper the
+   *  chat-inline delivery card uses. Carries `?search=<id>` so the
+   *  delivery list filters to that single task on landing. */
+  delivery_href: string
+  /** Target platform name for the host's `useNavLink` to decide
+   *  same-tab vs new-tab on cross-platform links. */
+  delivery_target_platform: string
   /** Release version label set by the delivery team, e.g. "0.9" / "1.0".
    *  Shown beside the status when present. */
   target_version: string | null

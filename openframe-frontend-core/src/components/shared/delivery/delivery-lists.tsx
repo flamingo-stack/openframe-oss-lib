@@ -39,11 +39,6 @@ const DEFAULT_COMPLETED_ENDPOINT = '/api/delivery/completed';
 const DEFAULT_IN_PROGRESS_ENDPOINT = '/api/delivery/in-progress';
 const DEFAULT_SEARCH_PARAM_KEY = 'search';
 const DEFAULT_TASK_TYPE_PARAM_KEY = 'task_type';
-/** URL param the linked-delivery card on a ticket appends when it
- *  deep-links into this page (e.g. `/bug-fixes-and-enhancements?focus=86ad4e022`).
- *  When present we scroll the matching `DeliveryRow` into view + briefly
- *  highlight it. Hardcoded — the ticket lib references this name too. */
-const FOCUS_PARAM_KEY = 'focus';
 
 export interface DeliveryListsProps {
   /** GET endpoint for the "Recently Completed" bucket. Default
@@ -77,26 +72,6 @@ export function DeliveryLists({
   // Get filter state from URL
   const searchQuery = searchParams.get(searchParamKey) || '';
   const taskTypeFilter = searchParams.get(taskTypeParamKey) || 'all';
-  // `?focus=<external_id>` — set by the linked-delivery card on a
-  // ticket. Once the matching row mounts, scroll it into view + flash.
-  const focusId = searchParams.get(FOCUS_PARAM_KEY) || null;
-
-  // Scroll-into-view + highlight pulse once both buckets have arrived
-  // and a focused row is mounted. Animation duration is controlled by
-  // `ring-2 ring-ods-accent ring-inset` (held while `focusId === id`).
-  useEffect(() => {
-    if (!focusId || isLoading) return;
-    // Two RAFs — one for the row to mount, one for the layout pass to
-    // settle the row's position before measuring. `scrollIntoView` with
-    // `block: 'start'` lands the matched row at the top of the
-    // viewport so the user immediately sees the highlight ring.
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const el = document.getElementById(`delivery-${focusId}`);
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
-    });
-  }, [focusId, isLoading]);
 
   useEffect(() => {
     async function fetchDeliveryData() {
@@ -203,7 +178,6 @@ export function DeliveryLists({
           <DeliveryTable
             items={filteredCompleted}
             isLoading={isLoading}
-            focusId={focusId}
           />
         </div>
       )}
@@ -217,7 +191,6 @@ export function DeliveryLists({
           <DeliveryTable
             items={filteredInProgress}
             isLoading={isLoading}
-            focusId={focusId}
           />
         </div>
       )}

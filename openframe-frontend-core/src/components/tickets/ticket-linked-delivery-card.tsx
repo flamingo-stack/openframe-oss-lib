@@ -5,22 +5,16 @@
  * linked to a HubSpot ticket as a single `<DeliveryRow />` (the same
  * primitive `/bug-fixes-and-enhancements` uses for its row tiles).
  *
- * Visual parity is the point: when a customer sees this card on their
- * ticket, it looks exactly like the row they'll land on after clicking
- * — same title placement, same status + task-type badges, same density.
+ * Navigation is unified with the chat-inline delivery card: both go
+ * through `buildDevSectionUrl('delivery', external_id)`, composed
+ * server-side and shipped on `clickup.delivery_href`. The URL carries
+ * `?search=<external_id>` so the landing list filters to that exact
+ * task (the canonical "deep-link to a specific delivery row" mechanism
+ * already in place for chat).
  *
- * Click behavior: navigates to
- * `/bug-fixes-and-enhancements?focus=<external_id>`. `DeliveryLists`
- * reads the `focus` param and smooth-scrolls + briefly highlights the
- * matched row. Customer never leaves OpenFrame for ClickUp.
- *
- * Why a thin wrapper over `<DeliveryRow />`:
- *   - Single source of truth for delivery row presentation.
- *   - Adapts the ticket-side `TicketClickupSummary` to the shared
- *     `DeliveryItem` wire shape exactly once, here.
- *   - Adds the bordered card chrome (`rounded` + `border`) so the row
- *     reads as a standalone tile inside the ticket drawer, while the
- *     standard list view keeps the seamless table look.
+ * Soft-nav happens via the env-aware `next/link` shim that the host
+ * registers — back-button restores /tickets with React state intact
+ * (no skeleton flash, no TanStack-Query cache loss).
  */
 
 import { DeliveryRow } from '../shared/delivery/delivery-row'
@@ -29,27 +23,13 @@ import type { TicketClickupSummary } from './types'
 
 export interface TicketLinkedDeliveryCardProps {
   clickup: TicketClickupSummary
-  /** Target URL for the inline navigation. Defaults to
-   *  `/bug-fixes-and-enhancements?focus=<external_id>`; embedders can
-   *  override (e.g. a third-party app hosting the lib that surfaces its
-   *  delivery list at a different route). */
-  deliveryHref?: (externalId: string) => string
   className?: string
 }
 
-const DEFAULT_DELIVERY_HREF = (externalId: string) =>
-  `/bug-fixes-and-enhancements?focus=${encodeURIComponent(externalId)}`
-
 export function TicketLinkedDeliveryCard({
   clickup,
-  deliveryHref = DEFAULT_DELIVERY_HREF,
   className,
 }: TicketLinkedDeliveryCardProps) {
-  // Map the compact ticket-side projection to the canonical
-  // `DeliveryItem` shape. Null-safe — every `DeliveryRow` field has a
-  // sensible fallback when the underlying clickup_task row is missing
-  // data (e.g. a task with no description still renders, just without
-  // the description line).
   const item: DeliveryItem = {
     id: clickup.external_id,
     title: clickup.title ?? 'Linked delivery task',
@@ -71,7 +51,7 @@ export function TicketLinkedDeliveryCard({
     >
       <DeliveryRow
         item={item}
-        href={deliveryHref(clickup.external_id)}
+        href={clickup.delivery_href}
         caption="Linked delivery"
       />
     </div>
