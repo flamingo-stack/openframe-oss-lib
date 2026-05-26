@@ -5,23 +5,12 @@ import type { NatsClient, NatsStatus } from './nats'
 import {
   acquireClient,
   releaseClient,
+  startConnectionLifecycle,
   type AcquireClientOptions,
-  type SharedConnection,
+  type NatsReconnectionBackoff,
 } from './shared-connection'
 
-const DEFAULT_RETRY = {
-  INITIAL_DELAY_MS: 1000,
-  MAX_DELAY_MS: 30_000,
-  MULTIPLIER: 2,
-} as const
-
-export interface NatsReconnectionBackoff {
-  fastRetries?: number
-  fastRetryDelayMs?: number
-  initialDelayMs?: number
-  maxDelayMs?: number
-  multiplier?: number
-}
+export type { NatsReconnectionBackoff } from './shared-connection'
 
 export interface NatsProviderProps {
   children: React.ReactNode
@@ -100,106 +89,30 @@ export function NatsProvider({
       heldUrlRef.current = null
     }
 
-    const conn: SharedConnection = acquireClient(wsUrl, clientConfigRef.current)
-    const ownerToken = {}
-    if (!conn.retryOwner) conn.retryOwner = ownerToken
+    const conn = acquireClient(wsUrl, clientConfigRef.current)
     heldUrlRef.current = wsUrl
     setClient(conn.client)
     setStatus(conn.client.isConnected() ? 'connected' : 'connecting')
 
-    let closed = false
-    let retryAttempt = 0
-
-    function scheduleRetry() {
-      if (closed) return
-      // Opportunistically claim ownership if vacant — covers the case where the previous owner
-      // unmounted while we're still alive. Without this, a released owner leaves retry stuck.
-      if (!conn.retryOwner) conn.retryOwner = ownerToken
-      if (conn.retryOwner !== ownerToken) return
-      if (conn.retryTimer) {
-        clearTimeout(conn.retryTimer)
-        conn.retryTimer = null
-      }
-
-      const cfg = reconnectionBackoffRef.current ?? {}
-      const fastRetries = cfg.fastRetries ?? 0
-      const fastDelay = cfg.fastRetryDelayMs ?? DEFAULT_RETRY.INITIAL_DELAY_MS
-      const baseDelay = cfg.initialDelayMs ?? DEFAULT_RETRY.INITIAL_DELAY_MS
-      const maxDelay = cfg.maxDelayMs ?? DEFAULT_RETRY.MAX_DELAY_MS
-      const multiplier = cfg.multiplier ?? DEFAULT_RETRY.MULTIPLIER
-
-      const delay =
-        retryAttempt < fastRetries
-          ? fastDelay
-          : Math.min(baseDelay * multiplier ** (retryAttempt - fastRetries), maxDelay)
-      const jitteredDelay = delay * (0.5 + Math.random() * 0.5)
-      retryAttempt++
-
-      conn.retryTimer = setTimeout(async () => {
-        conn.retryTimer = null
-        if (closed) return
-
-        try {
-          await onBeforeReconnectRef.current?.()
-        } catch {
-          // continue regardless of token-refresh outcome
+    const lifecycle = startConnectionLifecycle({
+      conn,
+      wsUrl,
+      onBeforeReconnect: () => onBeforeReconnectRef.current?.(),
+      backoff: reconnectionBackoffRef.current,
+      getFreshUrl: () => getWsUrlRef.current(),
+      onStatusChange: (newStatus) => {
+        setStatus(newStatus)
+        if (newStatus === 'connected') {
+          if (hadConnectionBeforeRef.current) {
+            setReconnectionCount((c) => c + 1)
+          }
+          hadConnectionBeforeRef.current = true
         }
-        if (closed) return
-
-        const freshUrl = getWsUrlRef.current()
-        if (freshUrl !== wsUrl) return
-
-        try {
-          conn.connectPromise = null
-          conn.connectPromise = conn.client.connect()
-          await conn.connectPromise
-          if (!closed) retryAttempt = 0
-        } catch {
-          conn.connectPromise = null
-          if (!closed) scheduleRetry()
-        }
-      }, jitteredDelay)
-    }
-
-    const unsubStatus = conn.client.onStatus((evt) => {
-      if (closed) return
-      setStatus(evt.status)
-      if (evt.status === 'connected') {
-        if (hadConnectionBeforeRef.current) {
-          setReconnectionCount((c) => c + 1)
-        }
-        hadConnectionBeforeRef.current = true
-        retryAttempt = 0
-      }
-      if (evt.status === 'closed' || evt.status === 'disconnected') {
-        scheduleRetry()
-      }
+      },
     })
 
-    void (async () => {
-      try {
-        conn.connectPromise ||= conn.client.connect()
-        await conn.connectPromise
-        if (!closed) {
-          hadConnectionBeforeRef.current = true
-          setStatus('connected')
-        }
-      } catch {
-        conn.connectPromise = null
-        if (!closed) scheduleRetry()
-      }
-    })()
-
     return () => {
-      closed = true
-      unsubStatus()
-      if (conn.retryTimer) {
-        clearTimeout(conn.retryTimer)
-        conn.retryTimer = null
-      }
-      if (conn.retryOwner === ownerToken) {
-        conn.retryOwner = null
-      }
+      lifecycle.stop()
       if (heldUrlRef.current) {
         releaseClient(heldUrlRef.current)
         heldUrlRef.current = null

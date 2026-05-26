@@ -4,8 +4,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   acquireClient as acquireSharedClient,
   releaseClient as releaseSharedClient,
-  getSharedConnectionFor,
+  startConnectionLifecycle,
   type NatsClient,
+  type NatsStatus,
   type NatsSubscriptionHandle,
   type SharedConnection,
 } from '../../../nats'
@@ -14,7 +15,6 @@ import {
   type NatsMessageType,
   type UseNatsDialogSubscriptionOptions,
   type UseNatsDialogSubscriptionReturn,
-  NETWORK_CONFIG,
 } from '../types'
 
 /**
@@ -90,15 +90,12 @@ export function useNatsDialogSubscription({
         name: clientConfig.name ?? 'openframe-frontend',
         user: clientConfig.user ?? 'machine',
         pass: clientConfig.pass ?? '',
-        connectTimeoutMs: NETWORK_CONFIG.CONNECT_TIMEOUT_MS,
-        pingIntervalMs: NETWORK_CONFIG.PING_INTERVAL_MS,
-        maxPingOut: NETWORK_CONFIG.MAX_PING_OUT,
       }),
     [clientConfig],
   )
 
   const releaseClient = useCallback((url: string) => {
-    releaseSharedClient(url, { delayMs: NETWORK_CONFIG.SHARED_CLOSE_DELAY_MS })
+    releaseSharedClient(url)
   }, [])
 
   // Store the current WebSocket URL to prevent unnecessary reconnections
@@ -133,139 +130,11 @@ export function useNatsDialogSubscription({
     currentWsUrlRef.current = wsUrl
     const sharedConn = acquireClient(wsUrl)
     const client = sharedConn.client
-    const ownerToken = {}
-    if (!sharedConn.retryOwner) sharedConn.retryOwner = ownerToken
 
     clientRef.current = client
-    setIsConnected(false)
+    setIsConnected(client.isConnected())
 
-    let closed = false
-    let retryAttempt = 0
-
-    function scheduleRetry() {
-      if (closed) return
-      if (getSharedConnectionFor(wsUrl) !== sharedConn) return
-      if (!sharedConn.retryOwner) sharedConn.retryOwner = ownerToken
-      if (sharedConn.retryOwner !== ownerToken) return
-
-      if (sharedConn.retryTimer) {
-        clearTimeout(sharedConn.retryTimer)
-        sharedConn.retryTimer = null
-      }
-
-      const cfg = reconnectionBackoffRef.current ?? {}
-      const fastRetries = cfg.fastRetries ?? 0
-      const fastDelay = cfg.fastRetryDelayMs ?? NETWORK_CONFIG.RETRY_INITIAL_DELAY_MS
-      const baseDelay = cfg.initialDelayMs ?? NETWORK_CONFIG.RETRY_INITIAL_DELAY_MS
-      const maxDelay = cfg.maxDelayMs ?? NETWORK_CONFIG.RETRY_MAX_DELAY_MS
-      const multiplier = cfg.multiplier ?? NETWORK_CONFIG.RETRY_BACKOFF_MULTIPLIER
-
-      const delay = retryAttempt < fastRetries
-        ? fastDelay
-        : Math.min(baseDelay * (multiplier ** (retryAttempt - fastRetries)), maxDelay)
-      const jitteredDelay = delay * (0.5 + Math.random() * 0.5)
-      retryAttempt++
-
-      sharedConn.retryTimer = setTimeout(async () => {
-        sharedConn.retryTimer = null
-        if (closed) return
-        if (getSharedConnectionFor(wsUrl) !== sharedConn) return
-
-        try {
-          await onBeforeReconnectRef.current?.()
-        } catch {
-          // Token refresh failed; still try to reconnect
-        }
-
-        if (closed) return
-        if (getSharedConnectionFor(wsUrl) !== sharedConn) return
-
-        const freshUrl = getNatsWsUrlRef.current()
-        if (freshUrl !== wsUrl) return
-
-        try {
-          sharedConn.connectPromise = null
-          sharedConn.connectPromise = client.connect()
-          await sharedConn.connectPromise
-          if (!closed && getSharedConnectionFor(wsUrl) === sharedConn) {
-            retryAttempt = 0
-            setIsConnected(true)
-          }
-        } catch {
-          sharedConn.connectPromise = null
-          if (!closed && getSharedConnectionFor(wsUrl) === sharedConn) {
-            scheduleRetry()
-          }
-        }
-      }, jitteredDelay)
-    }
-
-    const unsubscribeStatus = client.onStatus((event) => {
-      const connected = event.status === 'connected'
-      const disconnected = ['closed', 'disconnected', 'error'].includes(event.status)
-      if (connected) {
-        setIsConnected(true)
-        if (hadConnectionBeforeRef.current) {
-          setReconnectionCount(c => c + 1)
-        }
-        hadConnectionBeforeRef.current = true
-        retryAttempt = 0
-        onConnectRef.current?.()
-      }
-      if (disconnected) {
-        setIsConnected(false)
-        setIsSubscribed(false)
-        
-        subscriptionRefs.current.forEach((sub) => {
-          try {
-            sub?.unsubscribe()
-          } catch {
-            // ignore
-          }
-        })
-        subscriptionRefs.current.clear()
-        lastSubscribedDialogIdRef.current = null
-        abortControllerRef.current?.abort()
-        abortControllerRef.current = null
-
-        onDisconnectRef.current?.()
-        scheduleRetry()
-      }
-    })
-
-    ;(async () => {
-      try {
-        sharedConn.connectPromise ||= client.connect()
-        await sharedConn.connectPromise
-        if (!closed) {
-          setIsConnected(true)
-          hadConnectionBeforeRef.current = true
-        }
-      } catch {
-        sharedConn.connectPromise = null
-        if (!closed) {
-          setIsConnected(false)
-          onDisconnectRef.current?.()
-          scheduleRetry()
-        }
-      }
-    })()
-
-    return () => {
-      closed = true
-      setIsConnected(false)
-      setIsSubscribed(false)
-      unsubscribeStatus()
-
-      if (sharedConn.retryTimer) {
-        clearTimeout(sharedConn.retryTimer)
-        sharedConn.retryTimer = null
-      }
-      if (sharedConn.retryOwner === ownerToken) {
-        sharedConn.retryOwner = null
-      }
-
-      // Unsubscribe all subscriptions
+    const tearDownSubscriptions = () => {
       subscriptionRefs.current.forEach((sub) => {
         try {
           sub?.unsubscribe()
@@ -275,6 +144,45 @@ export function useNatsDialogSubscription({
       })
       subscriptionRefs.current.clear()
       lastSubscribedDialogIdRef.current = null
+      abortControllerRef.current?.abort()
+      abortControllerRef.current = null
+    }
+
+    // This hook treats 'error' as a disconnect (pre-existing behaviour); JetStream's
+    // hook does not — it skips retry on protocol errors.
+    const isDisconnectStatus = (status: NatsStatus) =>
+      status === 'closed' || status === 'disconnected' || status === 'error'
+
+    const lifecycle = startConnectionLifecycle({
+      conn: sharedConn,
+      wsUrl,
+      onBeforeReconnect: () => onBeforeReconnectRef.current?.(),
+      backoff: reconnectionBackoffRef.current,
+      getFreshUrl: () => getNatsWsUrlRef.current(),
+      shouldRetryOn: isDisconnectStatus,
+      onStatusChange: (status) => {
+        if (status === 'connected') {
+          setIsConnected(true)
+          if (hadConnectionBeforeRef.current) {
+            setReconnectionCount((c) => c + 1)
+          }
+          hadConnectionBeforeRef.current = true
+          onConnectRef.current?.()
+        }
+        if (isDisconnectStatus(status)) {
+          setIsConnected(false)
+          setIsSubscribed(false)
+          tearDownSubscriptions()
+          onDisconnectRef.current?.()
+        }
+      },
+    })
+
+    return () => {
+      lifecycle.stop()
+      setIsConnected(false)
+      setIsSubscribed(false)
+      tearDownSubscriptions()
 
       if (clientRef.current && currentWsUrlRef.current) {
         releaseClient(currentWsUrlRef.current)
