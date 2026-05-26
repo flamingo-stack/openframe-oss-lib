@@ -25,12 +25,15 @@ import { useState } from 'react'
 import { Button } from './../ui/button'
 import { Textarea } from './../ui/textarea'
 import {
-  ModalV2,
-  ModalV2Content,
-  ModalV2Footer,
-  ModalV2Header,
-  ModalV2Title,
-} from './../ui/modal-v2'
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './../ui/alert-dialog'
 import {
   ChatAttachmentAddButton,
   ChatAttachmentChipStrip,
@@ -456,9 +459,10 @@ function OpenActions({
           <div className="flex items-center gap-2">
             <Button
               type="button"
-              variant="destructive"
+              variant="transparent"
               onClick={() => setCloseDialogOpen(true)}
               disabled={disabled}
+              className="bg-ods-error hover:bg-ods-error-hover text-white border-transparent"
             >
               Close ticket
             </Button>
@@ -474,40 +478,47 @@ function OpenActions({
         </div>
       </div>
 
-      <ModalV2 isOpen={closeDialogOpen} onClose={() => setCloseDialogOpen(false)}>
-        <ModalV2Header>
-          <ModalV2Title>Close this ticket?</ModalV2Title>
-          <p className="text-sm text-ods-text-secondary mt-1">
-            Add an optional resolution note. You can reopen the ticket later if
-            needed.
-          </p>
-        </ModalV2Header>
-        <ModalV2Content>
+      {/* Destructive-confirm — canonical pattern from
+          `components/admin/doc-orchestrator-dashboard.tsx:471`.
+          AlertDialog (NOT ModalV2) is the lib's standard for
+          destructive confirmations; bg-ods-error is the canonical
+          destructive button color. */}
+      <AlertDialog open={closeDialogOpen} onOpenChange={setCloseDialogOpen}>
+        <AlertDialogContent className="bg-ods-card border-ods-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-ods-text-primary font-['DM_Sans'] text-[20px] font-semibold">
+              Close this ticket?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-ods-text-secondary font-['DM_Sans'] text-[14px]">
+              Add an optional resolution note below. You can reopen the ticket
+              later if needed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
           <Textarea
             value={resolution}
             onChange={(e) => setResolution(e.target.value)}
             placeholder="Resolution (optional)"
             rows={3}
             maxLength={TICKET_TEXT_MAX_CHARS}
+            className="mt-2"
           />
-        </ModalV2Content>
-        <ModalV2Footer>
-          <Button
-            type="button"
-            variant="transparent"
-            onClick={() => setCloseDialogOpen(false)}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={() => void confirmClose()}
-          >
-            Close ticket
-          </Button>
-        </ModalV2Footer>
-      </ModalV2>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={busy}
+              className="bg-transparent border-ods-border text-ods-text-primary hover:bg-ods-border"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void confirmClose()}
+              disabled={busy}
+              className="bg-ods-error hover:bg-ods-error-hover text-white"
+            >
+              Close ticket
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -121,16 +121,11 @@ export interface ConversationCardRowProps {
    *  `<TicketAttachmentsList>` so the chip styling, file-icon picker
    *  and download button match every other attachments surface. */
   attachments?: TicketAttachment[];
-  /** Author bucket — drives the same avatar accent the chat panel
-   *  uses (see `chat-message-enhanced.tsx#getAvatarProps`):
-   *    - `current-user` → `bg-ods-flamingo-pink` (matches chat header
-   *      + the customer's own chat-message avatar)
-   *    - `support`      → no accent fill (initials on the default
-   *      `bg-ods-bg`), so support replies recede visually next to the
-   *      customer's accented turn
-   *  No new visual treatment is introduced here — both variants are
-   *  pre-existing `<SquareAvatar>` configurations already used by the
-   *  chat panel and chat header. */
+  /** Author bucket — kept for semantic markup + future styling needs.
+   *  Does NOT drive avatar color anymore: the avatar always renders
+   *  with the canonical `<SquareAvatar>` defaults (ODS palette,
+   *  derived by the component itself). Adding bespoke bg-color
+   *  overrides per role drifted from the ODS theme and was reverted. */
   variant?: 'current-user' | 'support';
 }
 
@@ -154,19 +149,21 @@ export function ConversationCardRow({
       className="border-b border-ods-border last:border-b-0 p-[12px] md:p-[16px] flex gap-[12px] md:gap-[16px] w-full"
       aria-label={`${author}${relativeTime ? ` · ${relativeTime}` : ''}`}
     >
-      {/* Avatar — canonical chat primitive. `size="sm"` (32px) +
-          `variant="round"` mirrors `chat-message-enhanced.tsx` (the
-          2025-2026 inline-chat-avatar standard per MD3 / Apple HIG).
-          The pink accent for the current user matches the chat
-          header's `bg-ods-flamingo-pink` treatment for the signed-in
-          customer — same token, same shape, same component. */}
+      {/* Avatar — canonical `<SquareAvatar>` with NO className override.
+          Color, border, and fallback styling all come from the ODS
+          theme defaults (`bg-ods-bg` + `border-ods-border` +
+          `text-ods-text-primary`). Per-role bespoke colors
+          (bg-ods-flamingo-pink for customer / bg-ods-flamingo-cyan
+          for support) were tried + reverted — they drifted from the
+          standard theme and broke parity with other surfaces that
+          use SquareAvatar without overrides (assignee-dropdown,
+          ticket-info-section). */}
       <SquareAvatar
         src={avatarSrc}
         alt={author}
         fallback={author}
         size="sm"
         variant="round"
-        className={variant === 'current-user' ? 'bg-ods-flamingo-pink' : ''}
       />
 
       <div className="flex-1 min-w-0 flex flex-col gap-[8px] md:gap-[12px]">
