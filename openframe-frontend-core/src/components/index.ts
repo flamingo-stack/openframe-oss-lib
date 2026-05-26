@@ -65,6 +65,14 @@ export * from './shared/onboarding'
 // Product Release components
 export * from './shared/product-release'
 
+// Dev-center shared components (Roadmap / Delivery / DevSectionView chrome)
+export * from './shared/dev-section'
+export * from './shared/roadmap'
+export * from './shared/delivery'
+
+// Legal-document shared component (privacy policy, terms of service)
+export * from './shared/legal-document'
+
 // Detail Page Skeleton
 export { DetailPageSkeleton, type DetailPageSkeletonProps } from './shared/detail-page-skeleton'
 

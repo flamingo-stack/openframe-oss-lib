@@ -8,8 +8,19 @@ export {
   type VideoDisplaySectionProps,
   type MarkdownRendererProps,
   type RoadmapItem,
-  type DeliveryResponse,
-  type RoadmapSectionProps,
-  type DeliverySectionProps
 } from './release-detail-page'
+// NOTE: `RoadmapSectionProps` / `DeliverySectionProps` (the injectable-
+// component slot types for ReleaseDetailPage) are intentionally NOT
+// re-exported from this barrel — they collide with the prop types of
+// the concrete `<RoadmapGrid>` / `<DeliverySection>` components in
+// `./shared/{roadmap,delivery}` (TS2308 ambiguous re-export at the
+// top-level `components/index.ts` barrel). The slot types remain
+// internal to `release-detail-page.tsx`; consumers needing them can
+// import directly from
+// `@flamingo-stack/openframe-frontend-core/components/shared/product-release/release-detail-page`.
+// DeliveryResponse re-sourced from the canonical types module so the
+// public deep-import path `@flamingo-stack/openframe-frontend-core/components`
+// keeps resolving (hub's components/releases/release-detail-page.tsx
+// imports it through this barrel).
+export type { DeliveryResponse } from '../../../types/delivery'
 export { ReleaseDetailSkeleton } from './release-detail-skeleton'
