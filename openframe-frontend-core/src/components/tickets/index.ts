@@ -17,7 +17,6 @@ export { HelpCenterCard, type HelpCenterCardProps } from './help-center-card'
 export {
   HelpCenterCreateForm,
   type HelpCenterCreateFormProps,
-  type HelpCenterCreateFormInput,
 } from './help-center-create-form'
 export { useTicketsList } from './hooks/use-tickets-list'
 export {

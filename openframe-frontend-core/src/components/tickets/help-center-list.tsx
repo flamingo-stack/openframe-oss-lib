@@ -171,9 +171,16 @@ function HelpCenterListAuthed({
   const hasActiveFilters = search !== '' || (status !== '' && status !== 'all')
   const hasResults = merged.length > 0
 
+  // Form is the canonical lib `<ContactForm>` (NOT a new ticket-specific
+  // form) — we hide every contact-only field, supply the customer's
+  // identity from `useChatIdentity` so Zod's name+email validators
+  // pass, slot a Subject `<Input>` into the new `extraTopField`
+  // position, and forward submission through `actions.submitTicket`.
+  // Same primitives, same wrapper styling, same visual treatment as
+  // every other primary form in the app.
   const form = (
     <HelpCenterCreateForm
-      onSubmit={actions.submitTicket}
+      actions={actions}
       supportSystemDown={supportSystemDown}
     />
   )
