@@ -36,9 +36,15 @@ import {
   ChatAttachmentChipStrip,
 } from './../chat/chat-attachment-bar'
 import { useChatAttachments } from './../chat/hooks/use-chat-attachments'
+import { useChatIdentity } from './../chat/hooks/use-chat-identity'
 import { formatRelativeTime } from './../../utils/date-utils'
-import { cn } from './../../utils/cn'
+import { EmptyState } from './../empty-state'
+import { ConversationCardRow } from './../shared/dev-section/dev-card-row'
+import type { TicketAttachment } from './../ui/ticket-attachments-list'
 import { useTicketEngagements } from './hooks/use-ticket-engagements'
+import type {
+  TicketEngagementFile,
+} from './hooks/use-ticket-engagements'
 import type { AnyTicket } from './types'
 import { isOptimistic, TICKET_TEXT_MAX_CHARS } from './types'
 
@@ -149,19 +155,29 @@ function MetadataRow({
 }
 
 /**
- * Render the ticket conversation as a chronological timeline of
- * message bubbles. Top: the original ticket description (`ticket.body`).
- * Below: every Note engagement attached to the ticket via the new
- * `useTicketEngagements` hook — each with its own attachments rendered
- * as file chips.
+ * Render the ticket conversation as a chronological list of
+ * `<ConversationCardRow>` cards inside a single bordered container.
+ *
+ * Top: the original ticket description (`ticket.body`). Below: every
+ * Note engagement attached to the ticket via `useTicketEngagements` —
+ * each with its own attachments rendered through the shared
+ * `<TicketAttachmentsList>` (no more 📎-emoji chips).
  *
  * Legacy tickets whose old comments STILL live inside `ticket.body`
  * (joined by ` --- `) split on that delimiter so the historical
- * conversation doesn't get lost during the transition.
+ * conversation surfaces correctly during the transition.
+ *
+ * Scroll behavior — INTENTIONALLY NONE. The drawer grows with the
+ * conversation; the page scrolls. The previous `max-h-96 overflow-y-auto`
+ * created two competing scroll surfaces (inner + page) which felt
+ * janky on long threads and hid the composer on short ones. 2026
+ * helpdesk best practice (UXPin / Coveo research) is a single
+ * threaded surface that flows with the page.
  */
 const TURN_SEPARATOR_RE = /\s+---\s+/g
 
 function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
+  const identity = useChatIdentity()
   // Optimistic placeholders don't have a real external_id yet — skip
   // the engagement fetch until the real ticket lands.
   const externalId = isOptimistic(ticket) ? null : ticket.external_id
@@ -171,116 +187,92 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
     ? ticket.body.split(TURN_SEPARATOR_RE).map((t) => t.trim()).filter(Boolean)
     : []
 
+  const customerName = identity.user?.name || identity.user?.email || 'You'
+  const customerAvatar = identity.user?.avatarUrl ?? undefined
+
   if (bodyTurns.length === 0 && engagements.length === 0 && !isLoading) {
     return (
-      <p className="text-sm text-ods-text-secondary italic">
-        (No conversation yet.)
-      </p>
+      <EmptyState
+        type="generic"
+        title="No conversation yet"
+        description="Reply below to start the thread with the support team."
+        showCTA={false}
+      />
     )
   }
 
   return (
-    <div className="flex flex-col gap-2 max-h-96 overflow-y-auto">
+    <div className="bg-ods-card border border-ods-border rounded-[6px] overflow-hidden w-full">
+      {/* Customer-authored description + any legacy `---`-joined
+          comments. Original message gets a special role label; legacy
+          updates get "Update N" or "Resolution". Timestamp matches the
+          ticket's creation time when available. */}
       {bodyTurns.map((turn, i) => {
         const isResolution = turn.startsWith('[Resolution]')
-        const label = i === 0 ? 'Original message' : isResolution ? 'Resolution' : `Update ${i}`
+        const role =
+          i === 0 ? 'Original message' : isResolution ? 'Resolution' : `Update ${i}`
         const text = isResolution ? turn.replace(/^\[Resolution\]\s*/, '') : turn
+        // Body turns don't carry per-turn timestamps — `ticket.body` is
+        // a single content field that HubSpot appends to. The role
+        // label ("Original message" / "Update N" / "Resolution") plus
+        // the Note engagements below it carry enough chronological
+        // context that omitting a timestamp here keeps the row honest.
         return (
-          <TimelineBubble
+          <ConversationCardRow
             key={`body-${i}-${turn.slice(0, 24)}`}
-            label={label}
-            text={text}
-            attachments={[]}
+            author={customerName}
+            role={role}
+            avatarSrc={customerAvatar}
+            body={text}
+            variant="current-user"
           />
         )
       })}
 
+      {/* Note engagements — every reply not authored by the customer
+          is treated as "Support team" since the engagement payload
+          doesn't carry an authoritative display name yet. Engagement
+          attachments map 1:1 to the shared `TicketAttachment` shape
+          so the renderer is identical to every other lib surface. */}
       {engagements.map((eng) => (
-        <TimelineBubble
+        <ConversationCardRow
           key={eng.id}
-          label={formatEngagementLabel(eng.createdAt)}
-          text={eng.body ?? ''}
-          attachments={eng.attachments}
+          author="Support team"
+          role="Reply"
+          timestamp={eng.createdAt}
+          body={eng.body ?? ''}
+          attachments={mapEngagementAttachments(eng.attachments)}
+          variant="support"
         />
       ))}
 
       {isLoading && (
-        <p className="text-xs text-ods-text-secondary italic px-1">Loading conversation…</p>
-      )}
-    </div>
-  )
-}
-
-function formatEngagementLabel(createdAt: string): string {
-  if (!createdAt) return 'Update'
-  const date = new Date(createdAt)
-  if (Number.isNaN(date.getTime())) return 'Update'
-  return formatRelativeTime(date)
-}
-
-interface TimelineBubbleProps {
-  label: string
-  text: string
-  attachments: import('./hooks/use-ticket-engagements').TicketEngagementFile[]
-}
-
-function TimelineBubble({ label, text, attachments }: TimelineBubbleProps) {
-  const hasText = text.trim().length > 0
-  const hasAttachments = attachments.length > 0
-  if (!hasText && !hasAttachments) return null
-  return (
-    <div className="rounded-md border border-ods-border bg-ods-bg p-3">
-      <p className="text-[10px] font-medium text-ods-text-secondary uppercase tracking-wider mb-1">
-        {label}
-      </p>
-      {hasText && (
-        <p className="text-sm text-ods-text-primary whitespace-pre-wrap break-words">{text}</p>
-      )}
-      {hasAttachments && (
-        <div className={cn('flex flex-wrap gap-2', hasText && 'mt-2')}>
-          {attachments.map((f) => (
-            <AttachmentChip key={f.id} file={f} />
-          ))}
+        <div className="p-[12px] md:p-[16px] border-t border-ods-border">
+          <p className="text-h6 text-ods-text-secondary uppercase tracking-[-0.28px]">
+            Loading conversation…
+          </p>
         </div>
       )}
     </div>
   )
 }
 
-function AttachmentChip({
-  file,
-}: {
-  file: import('./hooks/use-ticket-engagements').TicketEngagementFile
-}) {
-  const name = file.name ?? `file-${file.id}`
-  const sizeLabel = file.size ? formatBytes(file.size) : null
-  const className =
-    'inline-flex items-center gap-2 rounded-md border border-ods-border bg-ods-card px-2 py-1 text-xs text-ods-text-primary max-w-full'
-  const inner = (
-    <>
-      <span className="text-ods-text-secondary shrink-0">📎</span>
-      <span className="truncate">{name}</span>
-      {sizeLabel && <span className="text-ods-text-secondary shrink-0">{sizeLabel}</span>}
-    </>
-  )
-  if (file.url) {
-    return (
-      <a
-        href={file.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={cn(className, 'hover:bg-ods-bg-hover')}
-        title={name}
-      >
-        {inner}
-      </a>
-    )
-  }
-  return (
-    <span className={className} title={name}>
-      {inner}
-    </span>
-  )
+/** Map the engagement file shape to the lib's canonical
+ *  `TicketAttachment` so we can hand it straight to
+ *  `<TicketAttachmentsList>`. Engagement `url` becomes a
+ *  window.open-style download click; missing names degrade to
+ *  `file-<id>` so the chip never renders an empty label. */
+function mapEngagementAttachments(
+  files: TicketEngagementFile[],
+): TicketAttachment[] {
+  return files.map((f) => ({
+    id: f.id,
+    fileName: f.name ?? `file-${f.id}`,
+    fileSize: f.size ? formatBytes(f.size) : '',
+    onDownload: f.url
+      ? () => window.open(f.url!, '_blank', 'noopener,noreferrer')
+      : undefined,
+  }))
 }
 
 function formatBytes(size: number): string {
