@@ -37,12 +37,27 @@ export const defaultHelpCategoryOptions = [
 // public form schema, every admin update schema, every HubSpot push
 // validator MUST reference this so validation rules cannot drift
 // across boundaries.
+//
+// Host validation parses the URL and checks the hostname suffix so an
+// adversarial input like `https://evil.com/linkedin.com/x` is rejected
+// (substring match would have accepted it — CodeQL alert
+// "Incomplete URL substring sanitization").
 export const LinkedInUrlSchema = z
   .string()
   .url({ message: 'Please enter a valid LinkedIn URL' })
-  .refine((url) => url.includes('linkedin.com'), {
-    message: 'Please enter a valid LinkedIn profile URL',
-  })
+  .refine(
+    (url) => {
+      try {
+        const host = new URL(url).hostname.toLowerCase()
+        return host === 'linkedin.com' || host.endsWith('.linkedin.com')
+      } catch {
+        return false
+      }
+    },
+    {
+      message: 'Please enter a valid LinkedIn profile URL',
+    },
+  )
   .optional()
   .or(z.literal(''));
 

@@ -150,7 +150,11 @@ export function TicketDetailDrawer({
  * helpdesk best practice (UXPin / Coveo research) is a single
  * threaded surface that flows with the page.
  */
-const TURN_SEPARATOR_RE = /\s+---\s+/g
+// Bounded quantifiers (`{1,16}`) protect against the polynomial-time
+// backtracking class CodeQL flags for unbounded `\s+` on user input.
+// 16 chars of leading/trailing whitespace around `---` is far more
+// than any composed ticket body needs, so no real input is rejected.
+const TURN_SEPARATOR_RE = /[\s]{1,16}---[\s]{1,16}/g
 
 function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
   const identity = useChatIdentity()
