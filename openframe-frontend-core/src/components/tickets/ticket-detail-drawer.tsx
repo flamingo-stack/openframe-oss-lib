@@ -261,9 +261,25 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
               the generic "Support team" treatment. */}
       {engagements.map((eng) => {
         const isCustomer = eng.authorRole === 'customer'
+        // Own-reply detection:
+        //   PRIMARY: viewer's session email is in `ticket.customer_emails`
+        //     (the ticket is THEIRS — the viewer IS the customer).
+        //     HubSpot's Conversations API on Custom Channels leaves
+        //     `sender_email` null on every customer message, so a
+        //     per-message email comparison can't fire. The ticket-
+        //     level membership is the only signal that survives.
+        //   SECONDARY: per-message sender match — Email-channel rows
+        //     where `sender_email` IS populated, or future channels
+        //     where HubSpot exposes per-message sender info.
+        // Either path qualifies the bubble for LIVE chat-identity
+        // rendering (name + avatar from chat-auth headers).
         const isOwnReply =
-          isCustomer && !!eng.authorId && !!identity.user?.email &&
-          eng.authorId.toLowerCase() === identity.user.email.toLowerCase()
+          isCustomer &&
+          (isViewerTheCustomer ||
+            (!!eng.authorId &&
+              !!identity.user?.email &&
+              eng.authorId.toLowerCase() ===
+                identity.user.email.toLowerCase()))
 
         let author: string
         let avatarSrc: string | undefined
