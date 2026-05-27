@@ -32,19 +32,23 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useControllableState } from '@radix-ui/react-use-controllable-state'
-import * as Dialog from '@radix-ui/react-dialog'
+import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { usePreventScroll } from '@react-aria/overlays'
 import { isIOS } from '@react-aria/utils'
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
 import { FileText, MessageSquare } from 'lucide-react'
 
 import { Button } from '../ui/button'
-import { Card } from '../ui/card'
+import { Drawer, DrawerContent } from '../ui/drawer'
 import { HoverDropdown, type HoverDropdownItem } from '../ui/hover-dropdown'
 import { MingoIcon } from '../icons'
+import { Chevron01LeftIcon } from '../icons-v2-generated/arrows/chevron-01-left-icon'
+import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon'
 
-import { ChatHeader, ChatFooter } from './chat-container'
+import { ChatFooter } from './chat-container'
 import { ChatInput } from './chat-input'
+import { MingoOnboardingCard } from './mingo-onboarding-card'
+import { MingoOnboardingCardSkeleton } from './mingo-onboarding-card-skeleton'
 import { ChatMessageList } from './chat-message-list'
 import { ModelDisplay } from './model-display'
 import { SourceActionButton } from './source-action-button'
@@ -78,8 +82,8 @@ import { resolveHrefForRuntime } from './utils/chat-nav-resolution'
 import { ChatPanelContext, type ChatPanelHandle } from './chat-panel-context'
 import { resolveSourceRowCTA } from './utils/source-row-cta'
 import { chatChipClass } from './utils/chip-styles'
-import { CHIP_ACTION_BUTTON_CLASS } from './utils/chip-action-class'
 import { getIconComponent } from './utils/icon-registry'
+import { resolveOnboardingIcon } from './utils/onboarding-icons'
 import { getSourceIconName } from './utils/source-icons'
 import { formatSingularLookupInvocation } from './utils/slash-dispatch-utils'
 
@@ -178,6 +182,29 @@ const formatRelativePath = (p: string): string =>
  * retrieved sources instead of zero chips. Mirrors Perplexity's behavior.
  */
 const FALLBACK_TOP_RETRIEVED = 3
+
+/**
+ * Per-row width palette for the empty-state skeleton stack. Cycled
+ * by index so each render is deterministic (no jitter between
+ * loading frames) and the stack reads like a real, irregular list:
+ *
+ *   - titles vary from short ("Webinars") to long ("OpenFrame Pull Requests")
+ *   - slashes vary from `/docs` to `/getting-started`
+ *   - one row collapses to a single-line description to mimic the
+ *     short-copy entries returned by `/api/docs/commands`.
+ */
+const SKELETON_ROW_VARIANTS: ReadonlyArray<{
+  titleWidth: string
+  slashWidth: string
+  descriptionLines: 1 | 2
+}> = [
+  { titleWidth: 'w-32', slashWidth: 'w-20', descriptionLines: 2 },
+  { titleWidth: 'w-28', slashWidth: 'w-16', descriptionLines: 2 },
+  { titleWidth: 'w-40', slashWidth: 'w-24', descriptionLines: 2 },
+  { titleWidth: 'w-44', slashWidth: 'w-28', descriptionLines: 2 },
+  { titleWidth: 'w-36', slashWidth: 'w-24', descriptionLines: 1 },
+  { titleWidth: 'w-24', slashWidth: 'w-16', descriptionLines: 2 },
+]
 
 // =============================================================================
 // Slash-command dispatch
@@ -525,7 +552,6 @@ function EmbeddableChatInner({
   chipBasePlatform,
   enabledRagTableIds = null,
   emptyStateGreeting = null,
-  suggestedQueries = null,
   open,
   onOpenChange,
   defaultOpen,
@@ -659,13 +685,6 @@ function EmbeddableChatInner({
     }),
     [commandsUrl],
   )
-
-  // After the open animation finishes we clear the CSS `transform` so
-  // `position: fixed` descendants escape the panel's containing block.
-  const [animationRest, setAnimationRest] = useState(false)
-  useEffect(() => {
-    if (!isOpen) setAnimationRest(false)
-  }, [isOpen])
 
   // Greeting first-name comes from the SERVER-resolved identity (single
   // source of truth — never a client-injected runtime field). Resolution
@@ -934,9 +953,8 @@ function EmbeddableChatInner({
         </div>
       )}
 
-      <Dialog.Root open={isOpen} onOpenChange={(o) => !o && handleClose()}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="mingo-chat-overlay fixed inset-0 z-[9997] bg-black/50 md:bg-black/20" />
+      <Drawer open={isOpen} onOpenChange={(o: boolean) => !o && handleClose()}>
+        <ChatPanelContext.Provider value={chatPanelHandle}>
           {/*
             Panel-level handle for descendants (inline cards via
             `ChatCardNavWrap`, markdown-body links via
@@ -944,68 +962,94 @@ function EmbeddableChatInner({
             navigation. Same-tab clicks fire `closeChat`; new-tab clicks
             leave the panel open while the new tab loads.
           */}
-          <ChatPanelContext.Provider value={chatPanelHandle}>
-          <Dialog.Content
+          <DrawerContent
+            side="right"
+            flush
+            resizable
+            minSize={480}
+            maxSize={1280}
+            defaultSize={640}
+            storageKey="mingo-chat-width"
+            resizeAriaLabel="Resize chat panel"
+            overlayClassName="mingo-chat-overlay md:bg-black/20"
             aria-describedby={undefined}
-            onAnimationEnd={(e) => {
-              if (e.currentTarget === e.target && isOpen) setAnimationRest(true)
-            }}
-            style={animationRest ? { transform: 'none', animation: 'none' } : undefined}
             className="
-              mingo-chat-content
-              fixed z-[9998] flex flex-col bg-ods-bg
+              mingo-chat-content !bg-ods-bg shadow-2xl
               focus:outline-none focus-visible:outline-none
-              inset-0 h-[100dvh] max-h-[100dvh] shadow-2xl
-              md:inset-y-0 md:right-0 md:left-auto md:h-full md:max-h-none md:w-[clamp(480px,50vw,720px)] md:max-w-none md:rounded-l-2xl md:border-l md:border-ods-border
+              w-screen md:w-auto
             "
           >
             <VisuallyHidden>
-              <Dialog.Title>{sourceLabel} AI Assistant</Dialog.Title>
+              <DialogPrimitive.Title>{sourceLabel} AI Assistant</DialogPrimitive.Title>
             </VisuallyHidden>
 
             <div className="flex h-full flex-col overflow-hidden">
-              <div className="flex-shrink-0 px-5 pt-4">
-                <ChatHeader
-                  userName="Mingo AI"
-                  userTitle={`${sourceLabel} Assistant`}
-                  userIcon={<MingoIcon className="h-6 w-6" color="white" />}
-                  onNewChat={handleNewChat}
-                  onClose={handleClose}
-                  showNewChat={hasMessages}
-                  connectionStatus="connected"
-                  fullWidth
-                  className="!rounded-xl"
-                />
-                {showModeToggle ? (
-                  <div
-                    role="radiogroup"
-                    aria-label="Chat mode"
-                    className="mt-3 inline-flex rounded-lg border border-ods-border bg-ods-bg-secondary p-0.5"
-                  >
-                    {(['mingo', 'guide'] as ChatMode[]).map((m) => {
-                      const isActive = activeMode === m
-                      const label = m === 'mingo' ? 'Mingo' : 'Guide'
-                      return (
-                        <button
-                          key={m}
-                          type="button"
-                          role="radio"
-                          aria-checked={isActive}
-                          onClick={() => handleActiveModeChange(m)}
-                          className={
-                            'px-3 py-1 text-sm rounded-md transition-colors ' +
-                            (isActive
-                              ? 'bg-ods-accent text-ods-text-on-accent'
-                              : 'text-ods-text-secondary hover:text-ods-text-primary')
-                          }
-                        >
-                          {label}
-                        </button>
-                      )
-                    })}
-                  </div>
-                ) : null}
+              {/* Figma node 7363:205930 — top-navigation. Title intentionally
+                  omitted; a chevron-left + "New Chat" back-style affordance
+                  appears on the left when a conversation is active
+                  (hasMessages) and resets the chat. Close on the right.
+                  Left-borders act as 1px cell dividers. */}
+              <div className="flex-shrink-0 flex h-14 w-full overflow-hidden border-b border-ods-border bg-ods-card">
+                <div className="flex flex-1 min-w-0 items-center gap-2 px-4 py-3">
+                  {hasMessages ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleNewChat}
+                        aria-label="Start a new chat"
+                        className="inline-flex shrink-0 items-center justify-center size-8 -ml-1 rounded-md text-ods-text-secondary transition-colors hover:bg-ods-bg-hover hover:text-ods-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent"
+                      >
+                        <Chevron01LeftIcon size={20} />
+                      </button>
+                      <span className="truncate text-h3 text-ods-text-primary">
+                        New Chat
+                      </span>
+                    </>
+                  ) : (
+                    <p className="truncate text-h4 text-ods-text-secondary">
+                      Start a conversation
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  className="flex size-14 shrink-0 items-center justify-center border-l border-ods-border text-ods-text-primary transition-colors hover:bg-ods-bg-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent"
+                  aria-label="Close"
+                >
+                  <XmarkIcon className="text-ods-text-secondary" size={24} />
+                </button>
               </div>
+
+              {showModeToggle ? (
+                <div
+                  role="radiogroup"
+                  aria-label="Chat mode"
+                  className="flex-shrink-0 mx-5 mt-3 inline-flex rounded-lg border border-ods-border bg-ods-bg-secondary p-0.5 self-start"
+                >
+                  {(['mingo', 'guide'] as ChatMode[]).map((m) => {
+                    const isActive = activeMode === m
+                    const label = m === 'mingo' ? 'Mingo' : 'Guide'
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        role="radio"
+                        aria-checked={isActive}
+                        onClick={() => handleActiveModeChange(m)}
+                        className={
+                          'px-3 py-1 text-sm rounded-md transition-colors ' +
+                          (isActive
+                            ? 'bg-ods-accent text-ods-text-on-accent'
+                            : 'text-ods-text-secondary hover:text-ods-text-primary')
+                        }
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : null}
 
               <div
                 ref={galleryPanelRef}
@@ -1041,110 +1085,72 @@ function EmbeddableChatInner({
                       )}
                   </div>
                 ) : (
-                  <div className="flex-1 flex flex-col items-center pt-8 pb-6 overflow-y-auto -mt-4">
-                    <div className="text-center max-w-md w-full mb-8">
+                  <div className="flex-1 flex flex-col min-h-0">
+                    {/* Figma node 7363:206278 — data-placeholder: logo + greeting.
+                        Pinned at the top (flex-shrink-0); the card list below
+                        owns its own scroll so the greeting stays visible while
+                        users browse the commands. */}
+                    <div className="flex-shrink-0 flex flex-col items-center justify-center gap-6 p-6 w-full text-center">
                       <MingoIcon
-                        className="mx-auto mb-4 h-10 w-10"
-                        color="var(--ods-accent)"
+                        className="h-12 w-12"
+                        color="white"
+                        eyesColor="var(--ods-flamingo-cyan-base)"
+                        cornerColor="var(--ods-flamingo-cyan-base)"
                       />
-                      <p
-                        className="text-2xl font-semibold text-ods-text-primary mb-2 tracking-[-0.02em]"
-                        style={{ fontFamily: 'var(--font-h1-family)' }}
-                      >
-                        {userName ? `Hey ${userName}, I'm Mingo` : "Hey, I'm Mingo"}
-                      </p>
-                      <p className="text-ods-text-secondary text-sm leading-relaxed">
-                        {greetingText}
-                      </p>
+                      <div className="flex flex-col gap-1 w-full">
+                        <p className="text-h4 text-ods-text-primary">
+                          {userName ? `Hey ${userName}, I'm Mingo` : "Hey, I'm Mingo"}
+                        </p>
+                        <p className="text-h6 text-ods-text-secondary whitespace-pre-line">
+                          {greetingText}
+                        </p>
+                      </div>
                     </div>
 
-                    {suggestedQueries && suggestedQueries.length > 0 && (
-                      <div className="w-full mb-8">
-                        <p className="text-xs text-ods-text-secondary mb-3 px-1">
-                          Try asking:
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {suggestedQueries.map((q) => (
-                            <button
-                              key={q}
-                              type="button"
-                              onClick={() => handleSend(q)}
-                              className="rounded-full border border-ods-border bg-ods-bg-secondary px-3 py-1.5 text-sm text-ods-text-primary hover:border-ods-accent hover:bg-ods-bg-hover transition-colors"
-                            >
-                              {q}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
+                    {/* Figma node 7363:205938 — single-column slash-command list.
+                        The list container has no own bg (inherits the darker
+                        `ods-bg` from the drawer panel); each card has the
+                        lighter `ods-card` to pop on the dark surface.
+                        `flex-1 min-h-0 overflow-y-auto` makes the LIST the
+                        scroll target — the rounded-md frame stays visible
+                        while inner cards scroll past it. */}
                     {(chipCommands.length > 0 || !commandsLoaded) && (
-                      <div className="w-full">
-                        <p className="text-xs text-ods-text-secondary mb-3 px-1">
-                          I can help you with:
-                        </p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {!commandsLoaded &&
-                            chipCommands.length === 0 &&
-                            Array.from({ length: 4 }).map((_, i) => (
-                              <Card
-                                key={`chip-skeleton-${i}`}
-                                className="flex items-start gap-3 px-4 py-3 bg-ods-card border-ods-border shadow-none animate-pulse"
-                              >
-                                <div className="h-5 w-5 mt-0.5 shrink-0 rounded bg-ods-bg" />
-                                <div className="min-w-0 flex-1 flex flex-col gap-2">
-                                  <div className="h-4 w-1/2 rounded bg-ods-bg" />
-                                  <div className="h-3 w-3/4 rounded bg-ods-bg/60" />
-                                </div>
-                              </Card>
-                            ))}
-                          {chipCommands.map((cmd) => {
-                            const Icon = getIconComponent(cmd.iconName)
-                            const cmdId = cmd.id
-                            const label = cmd.label ?? `/${cmdId}`
-                            return (
-                              <Card
-                                key={cmdId}
-                                className="flex flex-col gap-2 px-4 py-3 bg-ods-card border-ods-border shadow-none hover:border-ods-accent/50 transition-colors"
-                              >
-                                <div className="flex items-start gap-3">
-                                  <Icon className="h-5 w-5 mt-0.5 shrink-0 text-ods-text-primary" />
-                                  <div className="text-sm font-medium text-ods-text-primary truncate flex-1 min-w-0">
-                                    {label}
-                                  </div>
-                                  <span className="font-mono text-[11px] text-ods-text-muted shrink-0 mt-0.5 max-w-[40%] truncate">
-                                    /{cmdId}
-                                  </span>
-                                </div>
-                                {cmd.description && (
-                                  <p className="text-xs text-ods-text-muted leading-snug line-clamp-2">
-                                    {cmd.description}
-                                  </p>
-                                )}
-                                <div className="flex flex-wrap items-center gap-1.5 -mb-0.5">
-                                  {cmd.actions.map((action) => (
-                                    <button
-                                      key={action.id}
-                                      type="button"
-                                      onClick={() =>
-                                        dispatchSlashCommandAction(
-                                          action.id,
-                                          cmdId,
-                                          chatInputRef,
-                                        )
-                                      }
-                                      aria-label={`${action.label} ${label}`}
-                                      title={`${action.label} ${label}`}
-                                      className={CHIP_ACTION_BUTTON_CLASS}
-                                    >
-                                      {action.label}
-                                    </button>
-                                  ))}
-                                </div>
-                              </Card>
-                            )
-                          })}
-                        </div>
+                      <div className="mx-4 mb-4 flex-1 min-h-0 overflow-y-auto rounded-md border border-ods-border">
+                        {!commandsLoaded &&
+                          chipCommands.length === 0 &&
+                          SKELETON_ROW_VARIANTS.map((variant, i) => (
+                            <MingoOnboardingCardSkeleton
+                              key={`chip-skeleton-${i}`}
+                              titleWidth={variant.titleWidth}
+                              slashWidth={variant.slashWidth}
+                              descriptionLines={variant.descriptionLines}
+                            />
+                          ))}
+                        {chipCommands.map((cmd) => {
+                          const Icon = resolveOnboardingIcon(cmd.iconName)
+                          const cmdId = cmd.id
+                          const label = cmd.label ?? `/${cmdId}`
+                          const cardActions = cmd.actions.map((action) => ({
+                            id: action.id,
+                            label: action.label,
+                            onClick: () =>
+                              dispatchSlashCommandAction(
+                                action.id,
+                                cmdId,
+                                chatInputRef,
+                              ),
+                          }))
+                          return (
+                            <MingoOnboardingCard
+                              key={cmdId}
+                              icon={<Icon size={16} />}
+                              title={label}
+                              slashCommand={`/${cmdId}`}
+                              description={cmd.description}
+                              actions={cardActions}
+                            />
+                          )
+                        })}
                       </div>
                     )}
                   </div>
@@ -1157,8 +1163,11 @@ function EmbeddableChatInner({
                 disabled={chatLoading}
               />
 
+              {/* Figma node 7363:205952 — footer area on the lighter
+                  `ods-card` surface to contrast with the darker body
+                  (`ods-bg`) above. */}
               <div
-                className="flex-shrink-0 px-5 pb-4 flex flex-col gap-1"
+                className="flex-shrink-0 px-5 pt-3 pb-4 flex flex-col gap-2 bg-ods-card border-t border-ods-border"
                 style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
               >
                 <ChatFooter className="!p-0" fullWidth>
@@ -1181,16 +1190,20 @@ function EmbeddableChatInner({
                 </ChatFooter>
 
                 <div className="flex items-center gap-2 w-full">
-                  <ChatAttachmentAddButton
+                  {attachmentsEnabled && activeMode === 'guide' && (
                     // Attachments are Guide-only: the NATS agent backend
                     // doesn't accept them, so the add-button is hidden in
                     // Mingo mode regardless of the identity endpoint's
-                    // capability flag.
-                    attachmentsEnabled={attachmentsEnabled && activeMode === 'guide'}
-                    attachmentsCount={stagedAttachments.length}
-                    onAddFiles={addAttachmentFiles}
-                    disabled={chatLoading}
-                  />
+                    // capability flag. Skipping the render entirely (not
+                    // just the icon) collapses the otherwise-invisible 28px
+                    // placeholder slot the component leaves for layout.
+                    <ChatAttachmentAddButton
+                      attachmentsEnabled
+                      attachmentsCount={stagedAttachments.length}
+                      onAddFiles={addAttachmentFiles}
+                      disabled={chatLoading}
+                    />
+                  )}
                   <div className="flex-1 min-w-0">
                     <ModelDisplay
                       provider={currentProvider ?? 'anthropic'}
@@ -1211,10 +1224,9 @@ function EmbeddableChatInner({
               </div>
             </div>
             {galleryModal}
-          </Dialog.Content>
-          </ChatPanelContext.Provider>
-        </Dialog.Portal>
-      </Dialog.Root>
+          </DrawerContent>
+        </ChatPanelContext.Provider>
+      </Drawer>
     </>
   )
 }

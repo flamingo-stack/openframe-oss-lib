@@ -1,13 +1,14 @@
-"use client"
+'use client'
 
-import type { MouseEvent } from "react"
-import { cn } from "../../utils/cn"
-import { Card } from "../ui/card"
+import type { KeyboardEvent } from 'react'
+import { cn } from '../../utils/cn'
+import { MingoOnboardingCard } from './mingo-onboarding-card'
+import { resolveOnboardingIcon } from './utils/onboarding-icons'
 import type {
   SlashCommandActionId,
   SlashCommandSourceMeta,
   SlashCommandSummary,
-} from "./types"
+} from './types'
 
 interface SlashCommandSuggestionsProps {
   /** Filtered command list to render. Empty list → component renders null. */
@@ -21,9 +22,11 @@ interface SlashCommandSuggestionsProps {
    *  The host typically maps this to "Search-mode pre-fill" (setValue
    *  `/<cmd> ` with cursor at end). */
   onSelect: (cmd: SlashCommandSummary) => void
-  /** Optional source-icon resolver. Looks up `primarySourceId` on a
-   *  command summary and returns an icon + label so the row carries the
-   *  same visual identity as the empty-state chip for that source. */
+  /** Legacy `primarySourceId` → icon resolver. Used as a FALLBACK only
+   *  when `cmd.iconName` is missing. Newer command summaries carry
+   *  `iconName` directly and route through `resolveOnboardingIcon` so
+   *  the dropdown row uses the same icon registry as the empty-state
+   *  onboarding cards. */
   resolveSourceIcon?: (sourceId: string) => SlashCommandSourceMeta | undefined
   /** Generic action handler — fires when the user clicks any of the
    *  command's action buttons. The action's id discriminates the
@@ -37,25 +40,29 @@ interface SlashCommandSuggestionsProps {
 /**
  * Slash-command autocomplete dropdown.
  *
- * Each row is a card-shaped option with three regions:
- *   - LEFT: source icon (from `resolveSourceIcon`, when available)
- *   - MIDDLE: source label + slash id + argument hint + description (2-line clamp)
- *   - RIGHT: one button per `cmd.actions[i]`, in declaration order. Buttons
- *     render labels server-resolved; no client-side label fallback.
+ * Visually mirrors the empty-state onboarding list: each row is rendered
+ * via `MingoOnboardingCard` (Figma node `7363:205939`) so the dropdown
+ * and the empty-state share one card design. Rows are stacked inside a
+ * `rounded-md` container whose `overflow-hidden` clips each card's
+ * `border-b` divider into a clean 1-px frame.
  *
- * Clicking the row body fires `onSelect` (the host typically maps this to
- * Search-mode pre-fill so the user can refine). Clicking an action button
- * fires `onAction(cmd, actionId)` and stops propagation so the row click
- * doesn't double-fire.
+ * Icon resolution priority:
+ *   1. `cmd.iconName` → `resolveOnboardingIcon` (production path —
+ *      matches the keys returned by `/api/docs/commands`).
+ *   2. `cmd.primarySourceId` → consumer-provided `resolveSourceIcon`
+ *      (legacy fallback for command feeds without `iconName`).
+ *   3. `FileIcon` (default inside `resolveOnboardingIcon`).
+ *
+ * Clicking the row body fires `onSelect` (the host typically maps this
+ * to Search-mode pre-fill so the user can refine). Clicking an action
+ * button fires `onAction(cmd, actionId)` — the card's action buttons
+ * already `stopPropagation` so the row click doesn't double-fire.
  *
  * Accessibility: the outer container is `role="menu"`; each row is
- * `role="menuitem"` with `aria-current` for the highlighted row. We use
- * menu (not listbox) because ARIA 1.2 forbids interactive descendants
- * inside `role="option"`, and our rows host inline action buttons. The
- * action buttons are real `<button>` elements with `aria-label`s, but
- * `tabIndex={-1}` keeps them out of Tab order — Tab dismisses the popup
- * as standard combobox UX expects, while click + arrow-key highlight
- * still work for mouse and keyboard users.
+ * `role="menuitem"` with `aria-current` for the highlighted row. The
+ * menu (not listbox) is used because ARIA 1.2 forbids interactive
+ * descendants inside `role="option"`, and our rows host inline action
+ * buttons.
  */
 export function SlashCommandSuggestions({
   commands,
@@ -68,124 +75,87 @@ export function SlashCommandSuggestions({
 }: SlashCommandSuggestionsProps) {
   if (commands.length === 0) return null
   return (
-    <Card
+    <div
       role="menu"
       aria-label="Slash command suggestions"
       className={cn(
-        "absolute bottom-full mb-2 left-0 right-0 max-h-96 overflow-auto",
-        "bg-ods-card text-ods-text-primary border-ods-border",
-        "z-50 p-1 flex flex-col gap-0.5",
+        'absolute bottom-full mb-2 left-0 right-0 z-50 max-h-96 overflow-y-auto',
+        'rounded-md border border-ods-border bg-ods-card shadow-lg',
         className,
       )}
     >
       {commands.map((cmd, idx) => {
-        const meta = cmd.primarySourceId && resolveSourceIcon
-          ? resolveSourceIcon(cmd.primarySourceId)
-          : undefined
-        const Icon = meta?.Icon
-        // Display label priority:
-        //   1. `cmd.label` — the DB-projected per-command label (e.g.
-        //      "My Tickets", "OpenFrame Commits"). Same field that
-        //      drives the empty-state chip title — single source of
-        //      truth so the dropdown row and the chip never drift.
-        //   2. `meta.label` — fallback from `resolveSourceIcon` for
-        //      legacy command summaries that don't carry a `label`.
-        const sourceLabel = cmd.label ?? meta?.label
+        const Icon = resolveOnboardingIcon(cmd.iconName)
+        // Legacy resolver runs ONLY when `iconName` is missing — otherwise
+        // the v2 registry above is authoritative.
+        const legacyMeta =
+          !cmd.iconName && cmd.primarySourceId && resolveSourceIcon
+            ? resolveSourceIcon(cmd.primarySourceId)
+            : undefined
+        const LegacyIcon = legacyMeta?.Icon
+        // Display label priority — single source of truth, same field
+        // that drives the empty-state chip title so the dropdown row
+        // and the chip never drift:
+        //   1. `cmd.label` — DB-projected per-command label.
+        //   2. `legacyMeta.label` — legacy resolver fallback.
+        //   3. `cmd.id` — raw slug, last-resort identifier.
+        const title = cmd.label ?? legacyMeta?.label ?? cmd.id
         const isHighlighted = idx === highlightedIdx
+        // `/cmd [arg-hint]` rendered in the slashCommand slot so the
+        // card's existing right-rail typography (h6 / secondary text)
+        // applies uniformly to both segments.
+        const slashLabel = cmd.argumentHint
+          ? `/${cmd.id} ${cmd.argumentHint}`
+          : `/${cmd.id}`
+        const cardActions =
+          onAction && cmd.actions.length > 0
+            ? cmd.actions.map((action) => ({
+                id: action.id,
+                label: action.label,
+                onClick: (e: React.MouseEvent<HTMLButtonElement>) => {
+                  e.stopPropagation()
+                  onAction(cmd, action.id)
+                },
+              }))
+            : undefined
         return (
           <div
             key={cmd.id}
             role="menuitem"
-            aria-current={isHighlighted ? "true" : undefined}
+            aria-current={isHighlighted ? 'true' : undefined}
+            tabIndex={-1}
             onMouseEnter={() => onHover(idx)}
             onClick={() => onSelect(cmd)}
-            className={cn(
-              "flex items-start gap-3 rounded-md px-3 py-2 cursor-pointer transition-colors",
-              "border border-transparent",
-              isHighlighted
-                ? "bg-ods-card-hover"
-                : "bg-transparent hover:bg-ods-card-hover",
-            )}
+            onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => {
+              // Enter/Space activate; arrow keys are owned by the
+              // parent input (which manages `highlightedIdx`).
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                onSelect(cmd)
+              }
+            }}
+            className="cursor-pointer outline-none"
           >
-            {Icon && (
-              <Icon className="h-5 w-5 mt-0.5 shrink-0 text-ods-text-primary" />
-            )}
-            <div className="min-w-0 flex-1">
-              <div className="flex items-baseline gap-2 flex-wrap">
-                {sourceLabel && (
-                  <span className="text-sm font-medium text-ods-text-primary">
-                    {sourceLabel}
-                  </span>
-                )}
-                <span className="font-mono text-xs text-ods-text-muted">
-                  /{cmd.id}
-                </span>
-                {cmd.argumentHint && (
-                  <span className="font-mono text-xs text-ods-text-muted">
-                    {cmd.argumentHint}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-ods-text-secondary leading-snug line-clamp-2 mt-0.5">
-                {cmd.description}
-              </p>
-            </div>
-            {onAction && cmd.actions.length > 0 && (
-              <div className="flex gap-1 shrink-0 ml-2">
-                {cmd.actions.map((action) => (
-                  <SuggestionActionButton
-                    key={action.id}
-                    label={action.label}
-                    ariaLabel={`${action.label} ${cmd.id}`}
-                    title={`${action.label} ${cmd.id}`}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onAction(cmd, action.id)
-                    }}
-                  />
-                ))}
-              </div>
-            )}
+            <MingoOnboardingCard
+              icon={
+                LegacyIcon ? (
+                  <LegacyIcon className="size-4" />
+                ) : (
+                  <Icon size={16} />
+                )
+              }
+              title={title}
+              slashCommand={slashLabel}
+              description={cmd.description}
+              actions={cardActions}
+              className={cn(
+                'transition-colors',
+                isHighlighted && 'bg-ods-bg-hover',
+              )}
+            />
           </div>
         )
       })}
-    </Card>
-  )
-}
-
-/**
- * Per-row action button. Shared styling hoisted so all action buttons
- * stay visually synced. ODS tokens throughout; intentionally smaller
- * than UI-Kit `<Button size="small">` because these are chip-density
- * action buttons inside a compact dropdown row.
- */
-function SuggestionActionButton({
-  label,
-  ariaLabel,
-  title,
-  onClick,
-}: {
-  label: string
-  ariaLabel: string
-  title: string
-  onClick: (e: MouseEvent<HTMLButtonElement>) => void
-}) {
-  return (
-    <button
-      type="button"
-      tabIndex={-1}
-      aria-label={ariaLabel}
-      title={title}
-      onClick={onClick}
-      className={cn(
-        "text-[11px] font-medium text-ods-text-secondary",
-        "hover:text-ods-text-primary",
-        "bg-transparent hover:bg-ods-card border border-ods-border rounded-md",
-        "px-2 py-0.5 transition-colors",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus",
-      )}
-    >
-      {label}
-    </button>
+    </div>
   )
 }
