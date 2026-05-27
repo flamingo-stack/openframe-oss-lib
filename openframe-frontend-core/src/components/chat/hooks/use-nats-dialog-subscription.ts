@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   acquireClient as acquireSharedClient,
   releaseClient as releaseSharedClient,
@@ -74,19 +74,10 @@ export function useNatsDialogSubscription({
     reconnectionBackoffRef.current = reconnectionBackoff
   }, [reconnectionBackoff])
 
-  const acquireClient = useCallback(
-    (url: string): SharedConnection =>
-      acquireSharedClient(url, {
-        name: clientConfig.name ?? 'openframe-frontend',
-        user: clientConfig.user ?? 'machine',
-        pass: clientConfig.pass ?? '',
-      }),
-    [clientConfig],
-  )
-
-  const releaseClient = useCallback((url: string) => {
-    releaseSharedClient(url)
-  }, [])
+  const clientConfigRef = useRef(clientConfig)
+  useEffect(() => {
+    clientConfigRef.current = clientConfig
+  }, [clientConfig])
 
   const currentWsUrlRef = useRef<string>('')
 
@@ -100,7 +91,7 @@ export function useNatsDialogSubscription({
   useEffect(() => {
     if (!enabled || !wsUrl) {
       if (currentWsUrlRef.current && clientRef.current) {
-        releaseClient(currentWsUrlRef.current)
+        releaseSharedClient(currentWsUrlRef.current)
         clientRef.current = null
         currentWsUrlRef.current = ''
         setIsConnected(false)
@@ -114,13 +105,18 @@ export function useNatsDialogSubscription({
     }
 
     if (currentWsUrlRef.current && currentWsUrlRef.current !== wsUrl && clientRef.current) {
-      releaseClient(currentWsUrlRef.current)
+      releaseSharedClient(currentWsUrlRef.current)
       clientRef.current = null
       setIsConnected(false)
     }
 
     currentWsUrlRef.current = wsUrl
-    const sharedConn = acquireClient(wsUrl)
+    const cfg = clientConfigRef.current
+    const sharedConn = acquireSharedClient(wsUrl, {
+      name: cfg.name ?? 'openframe-frontend',
+      user: cfg.user ?? 'machine',
+      pass: cfg.pass ?? '',
+    })
     const client = sharedConn.client
 
     clientRef.current = client
@@ -177,12 +173,12 @@ export function useNatsDialogSubscription({
       tearDownSubscriptions()
 
       if (clientRef.current && currentWsUrlRef.current) {
-        releaseClient(currentWsUrlRef.current)
+        releaseSharedClient(currentWsUrlRef.current)
         clientRef.current = null
         currentWsUrlRef.current = ''
       }
     }
-  }, [enabled, wsUrl, acquireClient, releaseClient])
+  }, [enabled, wsUrl])
 
   const topicsKey = topics.join(',')
   const lastSubscribedDialogIdRef = useRef<string | null>(null)

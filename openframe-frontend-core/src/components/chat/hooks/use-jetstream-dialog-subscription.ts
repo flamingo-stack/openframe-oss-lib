@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   acquireClient as acquireSharedClient,
   releaseClient as releaseSharedClient,
@@ -101,19 +101,10 @@ export function useJetStreamDialogSubscription({
 
   const hadConnectionBeforeRef = useRef(false)
 
-  const acquireClient = useCallback(
-    (url: string): SharedConnection =>
-      acquireSharedClient(url, {
-        name: clientConfig.name ?? 'openframe-frontend-jetstream',
-        user: clientConfig.user ?? 'machine',
-        pass: clientConfig.pass ?? '',
-      }),
-    [clientConfig],
-  )
-
-  const releaseClient = useCallback((url: string) => {
-    releaseSharedClient(url)
-  }, [])
+  const clientConfigRef = useRef(clientConfig)
+  useEffect(() => {
+    clientConfigRef.current = clientConfig
+  }, [clientConfig])
 
   const currentWsUrlRef = useRef<string>('')
 
@@ -126,7 +117,7 @@ export function useJetStreamDialogSubscription({
   useEffect(() => {
     if (!enabled || !wsUrl) {
       if (currentWsUrlRef.current && clientRef.current) {
-        releaseClient(currentWsUrlRef.current)
+        releaseSharedClient(currentWsUrlRef.current)
         clientRef.current = null
         currentWsUrlRef.current = ''
         setIsConnected(false)
@@ -147,13 +138,18 @@ export function useJetStreamDialogSubscription({
       currentWsUrlRef.current !== wsUrl &&
       clientRef.current
     ) {
-      releaseClient(currentWsUrlRef.current)
+      releaseSharedClient(currentWsUrlRef.current)
       clientRef.current = null
       setIsConnected(false)
     }
 
     currentWsUrlRef.current = wsUrl
-    const sharedConn = acquireClient(wsUrl)
+    const cfg = clientConfigRef.current
+    const sharedConn = acquireSharedClient(wsUrl, {
+      name: cfg.name ?? 'openframe-frontend-jetstream',
+      user: cfg.user ?? 'machine',
+      pass: cfg.pass ?? '',
+    })
     const client = sharedConn.client
 
     clientRef.current = client
@@ -210,12 +206,12 @@ export function useJetStreamDialogSubscription({
       tearDownSubscription()
 
       if (clientRef.current && currentWsUrlRef.current) {
-        releaseClient(currentWsUrlRef.current)
+        releaseSharedClient(currentWsUrlRef.current)
         clientRef.current = null
         currentWsUrlRef.current = ''
       }
     }
-  }, [enabled, wsUrl, acquireClient, releaseClient])
+  }, [enabled, wsUrl])
 
   // Subscription lifecycle: (re)create the ephemeral JetStream consumer whenever
   // we transition into a connected state for a dialog, and whenever the dialog

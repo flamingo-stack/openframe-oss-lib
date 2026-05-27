@@ -25,7 +25,6 @@ export default defineConfig([
   // No "use client" needed; treeshake enabled to reduce bundle size.
   {
     entry: {
-      'nats/index': 'src/nats/index.ts',
       'types/index': 'src/types/index.ts',
       'types/navigation': 'src/types/navigation.ts',
       'types/announcement': 'src/types/announcement.ts',
@@ -51,6 +50,7 @@ export default defineConfig([
   {
     entry: {
       'index': 'src/index.ts',
+      'nats/index': 'src/nats/index.ts',
       'components/index': 'src/components/index.ts',
       'components/ui/index': 'src/components/ui/index.ts',
       'components/chat/index': 'src/components/chat/index.ts',
