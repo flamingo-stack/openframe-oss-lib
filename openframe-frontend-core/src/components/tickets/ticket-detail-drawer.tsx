@@ -167,8 +167,31 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
     ? ticket.body.split(TURN_SEPARATOR_RE).map((t) => t.trim()).filter(Boolean)
     : []
 
-  const customerName = identity.user?.name || identity.user?.email || 'You'
-  const customerAvatar = identity.user?.avatarUrl ?? undefined
+  // Customer name resolution precedence:
+  //   1. LIVE chat identity (`identity.user.name`) — when the viewer
+  //      is the ticket's own customer. Always fresh.
+  //   2. Mirror's `customer_name` — the HubSpot contact's display
+  //      name, captured by the ticket sync. Falls back here when the
+  //      viewer is NOT the customer (admin browsing / multi-contact
+  //      second viewer) so the customer bubble still shows the real
+  //      person's name instead of "Customer" generic.
+  //   3. Session email — last resort.
+  //   4. "You" — anonymous viewer.
+  const sessionEmailLower = identity.user?.email?.trim().toLowerCase() ?? null
+  const isViewerTheCustomer =
+    !!sessionEmailLower &&
+    ticket.customer_emails.some((e) => e.trim().toLowerCase() === sessionEmailLower)
+  const viewerName = identity.user?.name?.trim() || null
+  const ticketCustomerName = ticket.customer_name?.trim() || null
+  const customerName =
+    (isViewerTheCustomer ? viewerName : null) ||
+    ticketCustomerName ||
+    viewerName ||
+    identity.user?.email ||
+    'You'
+  const customerAvatar = isViewerTheCustomer
+    ? identity.user?.avatarUrl ?? undefined
+    : undefined
 
   if (bodyTurns.length === 0 && engagements.length === 0) {
     // No content yet — distinguish loading from empty so the user
@@ -249,12 +272,18 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
           author = identity.user?.name?.trim() || customerName
           avatarSrc = identity.user?.avatarUrl ?? undefined
         } else if (isCustomer) {
-          // Cross-customer edge case: ticket has messages from a
-          // different customer email (rare — multi-contact tickets
-          // via HubSpot CC/BCC). Render the GENERIC "Customer" label,
-          // NEVER the raw email or name — that would leak another
-          // customer's identity into this customer's view.
-          author = 'Customer'
+          // Customer bubble whose sender email isn't the current
+          // session viewer. Two sub-cases:
+          //   (a) Same customer as the ticket but viewed by an admin
+          //       (or no sender_email on the engagement at all — the
+          //       Conversations API leaves it null on Custom Channels).
+          //       Use `ticket.customer_name` from the mirror — that's
+          //       the canonical HubSpot contact name for THIS ticket.
+          //   (b) Multi-contact ticket (CC/BCC) — a different customer
+          //       email appears here. We fall back to the same
+          //       `ticket.customer_name` rather than leak the second
+          //       contact's address; close enough for the rare case.
+          author = ticketCustomerName || 'Customer'
           avatarSrc = undefined
         } else if (eng.authorName && eng.authorAvatarUrl) {
           // Resolved Flamingo employee — server matched the HubSpot

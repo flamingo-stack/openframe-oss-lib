@@ -297,6 +297,11 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
         priority: null,
         customer_emails: [],
         customer_company: null,
+        // Optimistic placeholder has no resolved HubSpot contact yet
+        // — the real ticket row replaces this within a couple of
+        // seconds via the mirror refetch. Drawer uses live chat
+        // identity for own-replies during this window anyway.
+        customer_name: null,
         hubspot_updated_at: new Date().toISOString(),
         _optimistic: true,
       }

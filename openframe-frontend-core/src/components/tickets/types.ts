@@ -44,6 +44,13 @@ export interface TicketData {
   priority: string | null
   customer_emails: string[]
   customer_company: string | null
+  /** HubSpot contact's display name. Drives the customer attribution
+   *  on the drawer when the viewer is NOT the customer themselves
+   *  (admin browsing / multi-contact second viewer). Conversations
+   *  API messages don't carry per-message sender info on Custom
+   *  Channels, so this is the only reliable source for "what's the
+   *  customer's name." */
+  customer_name: string | null
   hubspot_updated_at: string
 }
 
