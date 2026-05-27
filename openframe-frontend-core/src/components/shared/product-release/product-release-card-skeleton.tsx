@@ -45,7 +45,7 @@ export function ProductReleaseCardSkeleton({ className, size = 'lg' }: ProductRe
             individual placeholder heights underrun the loaded card's
             min-h reservations and the page jumps on resolve. */}
         <div className="flex flex-col md:flex-row gap-4 md:gap-6">
-          <div className="w-full md:w-[256px] aspect-[16/9] bg-ods-border rounded-lg flex-shrink-0" />
+          <div className="w-full md:w-[256px] aspect-[1200/630] bg-ods-border rounded-lg flex-shrink-0" />
           <div className="flex-1 min-w-0 flex flex-col">
             {/* Version pill — mirrors `flex items-center gap-3 mb-3` in
                 the loaded card. The loaded `<span text-lg>` renders at

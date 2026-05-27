@@ -130,8 +130,8 @@ function VendorCardContent({ showActions, showMetadata }: { showActions: boolean
 function BlogCardContent({ showActions, showMetadata }: { showActions: boolean; showMetadata: boolean }) {
   return (
     <>
-      {/* Image Section - 16:9 aspect ratio container */}
-      <div className="blog-card-image-container relative w-full aspect-[16/9] overflow-hidden bg-[#161616]">
+      {/* Image Section — OG 1200×630 aspect (matches blog-card.tsx loaded state) */}
+      <div className="blog-card-image-container relative w-full aspect-[1200/630] overflow-hidden bg-[#161616]">
         <MediaSkeleton.CardImage />
       </div>
       

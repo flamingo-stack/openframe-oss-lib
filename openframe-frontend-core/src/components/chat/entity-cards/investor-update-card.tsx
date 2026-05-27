@@ -62,7 +62,7 @@ export function InvestorUpdateCardSkeleton({ size = 'default' }: { size?: 'defau
   }
   return (
     <div className="bg-ods-card border border-ods-border rounded-lg overflow-hidden h-full animate-pulse">
-      <div className="aspect-[16/9] bg-ods-bg" />
+      <div className="aspect-[1200/630] bg-ods-bg" />
       <div className="p-4 space-y-3">
         <div className="h-5 w-3/4 bg-ods-bg rounded" />
         <div className="h-3 w-full bg-ods-bg/60 rounded" />

@@ -63,7 +63,7 @@ export function OnboardingGuideCardSkeleton({ size = 'default' }: { size?: 'cata
     return (
       <div className="bg-ods-system-greys-black border border-ods-border rounded-lg overflow-hidden flex flex-col p-6 gap-4 animate-pulse">
         <div className="flex flex-col md:flex-row gap-4 md:gap-6">
-          <div className="w-full md:w-[256px] aspect-[16/9] bg-ods-border rounded-lg flex-shrink-0" />
+          <div className="w-full md:w-[256px] aspect-[1200/630] bg-ods-border rounded-lg flex-shrink-0" />
           <div className="flex-1 min-w-0 flex flex-col">
             <div className="min-h-[60px] md:min-h-[72px] flex flex-col gap-1.5 justify-start mb-3">
               <div className="h-[25px] md:h-[30px] w-3/4 bg-ods-border rounded" />
@@ -169,7 +169,7 @@ export function OnboardingGuideCard({ guide, href, target, rel, placeholderUrl, 
         <div className="flex flex-col p-6 gap-4">
           <div className="flex flex-col md:flex-row gap-4 md:gap-6">
             <div className="w-full md:w-[256px] flex-shrink-0">
-              <div className="relative rounded-lg overflow-hidden w-full aspect-[16/9] bg-ods-bg">
+              <div className="relative rounded-lg overflow-hidden w-full aspect-[1200/630] bg-ods-bg">
                 {coverImage ? (
                   <Image
                     src={coverImage}

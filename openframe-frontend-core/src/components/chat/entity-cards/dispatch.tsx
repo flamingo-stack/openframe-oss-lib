@@ -117,6 +117,15 @@ export interface ChatCardDispatchExtras {
   buildProductReleaseCardProps?: (
     release: any,
   ) => Omit<ProductReleaseCardProps, 'size' | 'title' | 'summary' | 'version' | 'anchorProps'>
+  /** Build a branded OG placeholder URL from an entity title. Compact chat-
+   *  inline cards (`size='sm'` for blog/case-study/customer-interview/
+   *  investor-update/onboarding-guide) pass the result as `placeholderUrl`
+   *  so the card's image slot renders the OG fallback instead of an empty
+   *  span when the entity has no `featured_image`. Hub callers wire
+   *  `buildOgPlaceholderUrl` from `lib/utils/entity-image.ts`. Optional —
+   *  when omitted, the compact cards keep the existing empty-slot
+   *  behavior. */
+  buildOgPlaceholderUrl?: (title: string) => string | null
 }
 
 /** Per-card render options threaded through from the chat shell. */
@@ -676,6 +685,7 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
         size="sm"
         href={chatRef.url ?? ''}
         targetPlatform={chatRef.targetPlatform ?? null}
+        placeholderUrl={opts?.extras?.buildOgPlaceholderUrl?.(item?.title ?? '') ?? null}
         {...newTabAnchorAttrs(opts.isNewTab)}
         hasEmbeddedVideo={chatRef.metadata?.hasEmbeddedVideo === true}
       />
@@ -692,6 +702,7 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
         size="sm"
         href={chatRef.url ?? ''}
         targetPlatform={chatRef.targetPlatform ?? null}
+        placeholderUrl={opts?.extras?.buildOgPlaceholderUrl?.(item?.title ?? '') ?? null}
         {...newTabAnchorAttrs(opts.isNewTab)}
       />
     ),
@@ -707,6 +718,7 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
         size="sm"
         href={chatRef.url ?? ''}
         targetPlatform={chatRef.targetPlatform ?? null}
+        placeholderUrl={opts?.extras?.buildOgPlaceholderUrl?.(item?.title ?? '') ?? null}
         {...newTabAnchorAttrs(opts.isNewTab)}
       />
     ),
@@ -747,6 +759,7 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
         size="sm"
         href={chatRef.url ?? ''}
         targetPlatform={chatRef.targetPlatform ?? null}
+        placeholderUrl={opts?.extras?.buildOgPlaceholderUrl?.(item?.title ?? '') ?? null}
         {...newTabAnchorAttrs(opts.isNewTab)}
       />
     ),
@@ -763,6 +776,7 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
         size="sm"
         href={chatRef.url ?? ''}
         targetPlatform={chatRef.targetPlatform ?? null}
+        placeholderUrl={opts?.extras?.buildOgPlaceholderUrl?.(item?.title ?? '') ?? null}
         {...newTabAnchorAttrs(opts.isNewTab)}
       />
     ),

@@ -7,7 +7,7 @@ import org.springframework.data.cassandra.core.CassandraOperations;
 import org.springframework.stereotype.Component;
 
 @Component
-@ConditionalOnProperty(name = "spring.data.cassandra.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "spring.data.cassandra.enabled", havingValue = "true")
 public class CassandraHealthIndicator implements HealthIndicator {
 
     private final CassandraOperations cassandraOperations;
