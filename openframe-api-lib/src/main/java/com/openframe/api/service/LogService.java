@@ -14,6 +14,7 @@ import com.openframe.data.pinot.repository.PinotLogRepository;
 import com.openframe.data.service.TenantIdProvider;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -26,6 +27,7 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 @AllArgsConstructor
+@ConditionalOnProperty(name = "spring.data.cassandra.enabled", havingValue = "true")
 public class LogService {
 
     private final PinotLogRepository pinotLogRepository;
