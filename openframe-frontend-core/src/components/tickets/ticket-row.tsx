@@ -70,18 +70,29 @@ export function TicketRow({
   // hidden — the user has to scroll manually to see what they just
   // opened.
   //
-  // Uses smooth-scroll + `block: 'start'` so the tile lands at the top
-  // edge. Two RAFs let the Collapsible's height animation start before
-  // we measure the row position, otherwise the scroll lands at the
-  // pre-expansion position.
+  // The critical case is SWITCHING expansions: when card B is clicked
+  // while card A is already open, A collapses + B expands SIMULTANEOUSLY.
+  // The Collapsible animation is ~200ms; during that window B's
+  // bounding-box Y position keeps shifting as A's height shrinks above
+  // it. A naive two-RAF wait (~32ms) measures B's position mid-animation
+  // and lands the scroll at the wrong spot — typically with B too far
+  // down the viewport because A still had height when we measured.
+  //
+  // Fix: schedule the scroll AFTER the typical Collapsible animation
+  // duration (250ms — Radix's default is 200ms, +50ms safety margin so
+  // even slightly-slower runs land correctly). Smooth-scroll + `block:
+  // 'start'` puts the tile at the top edge of the viewport.
+  //
+  // Always-cleared timer prevents a leaked scroll firing after rapid
+  // open→close→open cycles. The dependency array re-runs the effect
+  // on every expansion change, so the timer is fresh each time.
   const rowRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
     if (!expanded || optimistic) return
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        rowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      })
-    })
+    const t = setTimeout(() => {
+      rowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 250)
+    return () => clearTimeout(t)
   }, [expanded, optimistic])
 
   const tileData: ChatTicketItemData = {
