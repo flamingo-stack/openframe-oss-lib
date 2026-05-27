@@ -7,7 +7,7 @@
 
 import { AppleLogoIcon } from '../components/icons-v2-generated/brand-logos/apple-logo-icon'
 import { LinuxLogoIcon } from '../components/icons-v2-generated/brand-logos/linux-logo-icon'
-import { WindowsLogoIcon } from '../components/icons-v2-generated/brand-logos/windows-logo-icon'
+import { WindowsLogoGreyIcon } from '../components/icons-v2-generated/brand-logos/windows-logo-grey-icon'
 import React from 'react'
 import type { OSPlatformId } from '../utils/os-platforms'
 
@@ -48,7 +48,7 @@ export const OS_TYPES: OSTypeDefinition[] = [
     id: OSTypeValues.WINDOWS,
     label: 'Windows',
     value: OSTypeValues.WINDOWS,
-    icon: WindowsLogoIcon,
+    icon: WindowsLogoGreyIcon,
     platformId: 'windows',
     aliases: ['windows', 'win32', 'win64', 'win']  // 'win' last since it's shortest
   },

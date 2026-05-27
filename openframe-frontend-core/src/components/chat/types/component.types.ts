@@ -62,6 +62,15 @@ export interface ChatHeaderProps extends HTMLAttributes<HTMLDivElement> {
    * for legacy consumers.
    */
   fullWidth?: boolean
+  /**
+   * Drop the default card chrome (bg, border, shadow, ring, rounded) so
+   * the header blends with its container. Use when the host shell is
+   * already a floating card and the header would otherwise look
+   * card-in-card (e.g. inside a `Drawer` with `flush`).
+   *
+   * Default `false` — preserves the existing card look.
+   */
+  bare?: boolean
 }
 
 // ========== Connection Indicator Props ==========

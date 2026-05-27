@@ -36,7 +36,7 @@ export function SlackLogoIcon({
       <path
         fill="#ECB22E"
         fillRule="evenodd"
-        d="M14.666 22a2 2 0 1 0 0-4h-2v2c0 1.103.895 1.998 2 2m0-5.334H20a2 2 0 0 0 0-4h-5.333a2 2 0 0 0 0 4Z"
+        d="M14.666 22a2 2 0 1 0 0-4h-2v2c0 1.103.895 1.998 2 2m0-5.334H20a2 2 0 0 0 0-4h-5.333a2 2 0 0 0 0 4"
         clipRule="evenodd"
       />
       <path
