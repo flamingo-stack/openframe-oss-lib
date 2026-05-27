@@ -27,14 +27,18 @@ public class GcsPresignedUrlService {
     private final Storage storage;
     private final String bucketName;
     private final String prefix;
+    private final boolean prefixEnabled;
 
     public GcsPresignedUrlService(
             @Value("${storage.s3.bucket}") String bucketName,
-            @Value("${storage.s3.prefix:}") String prefix) {
+            @Value("${storage.s3.prefix:}") String prefix,
+            @Value("${storage.s3.prefix-enabled:false}") boolean prefixEnabled) {
         this.bucketName = bucketName;
         this.prefix = prefix;
+        this.prefixEnabled = prefixEnabled;
         this.storage = StorageOptions.getDefaultInstance().getService();
-        log.info("GcsPresignedUrlService initialized for bucket: {}, prefix: '{}'", bucketName, prefix);
+        log.info("GcsPresignedUrlService initialized for bucket: {}, prefix: '{}', prefixEnabled: {}",
+                bucketName, prefix, prefixEnabled);
     }
 
     public String generateUploadUrl(String path, String contentType, Duration expiration) {
@@ -94,7 +98,7 @@ public class GcsPresignedUrlService {
     }
 
     private String withPrefix(String path) {
-        if (prefix == null || prefix.isBlank()) {
+        if (!prefixEnabled || prefix == null || prefix.isBlank()) {
             return path;
         }
         return prefix + "/" + path;
