@@ -1,0 +1,568 @@
+'use client'
+
+/**
+ * All 5 ticket write actions funnel through one helper:
+ * `executeTicketAction()`, which POSTs to `/api/chat/agent/ticket-action`
+ * — a single-roundtrip endpoint that runs the SAME `ChatToolHandler.execute`
+ * the chat agent's `confirm-tool` route uses (same ACL re-bind, same audit
+ * row, same HubSpot REST call). The only difference is REST shape: the
+ * chat path needs `propose → confirm-tool` because the LLM emits a
+ * `tool_use` the user must approve in a proposal card. The /tickets form
+ * has no approval step (the user already clicked "Open ticket" / "Send"),
+ * so the two-step is pure overhead — we collapse to one POST + JSON.
+ *
+ * Reuses every existing piece:
+ *   - `embedAuthedFetch` for the bearer/act-as headers (same auth as chat).
+ *   - TanStack-Query `invalidateQueries` for refetch.
+ *
+ * Single-flight + serialization:
+ *   - Form-level `formInFlight` ref drops second submits while one is
+ *     in flight.
+ *   - Per-row `Set<ticket_id>` mutex prevents fan-out on the same row.
+ *   - `mutationQueue` serializes ALL mutations through a depth=1 queue
+ *     so 10× "Close" doesn't stampede the server's auth-write 60/min
+ *     rate-limit.
+ *
+ * Mirror-sync retry: on `result.mirror_synced === false`, the helper
+ * schedules 3s/6s/12s refetches (30s wall-clock cap). If the placeholder
+ * is still present after the last attempt, it's removed and the parent
+ * surfaces an inline "Couldn't confirm — Reload" affordance.
+ */
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { embedAuthedFetch } from '../../../utils/embed-authed-fetch'
+import type { ChatAttachment } from '../../chat/utils/chat-attachment-markdown'
+import {
+  type AnyTicket,
+  type MappedTicketActionError,
+  type OptimisticTicket,
+  type TicketActionErrorCode,
+  type TicketData,
+  TOAST_COPY,
+} from '../types'
+
+const TICKET_ACTION_ENDPOINT = '/api/chat/agent/ticket-action'
+
+/** 3 attempts × backoff (cumulative ~21s wall-clock). After this we
+ *  drop the optimistic row and ask the user to reload. */
+const MIRROR_SYNC_BACKOFF_MS = [3_000, 6_000, 12_000] as const
+
+type ToolName = 'create_ticket' | 'update_ticket'
+
+/** Wire shape returned by the new `/api/chat/agent/ticket-action` endpoint.
+ *  Flat — no decision-frame wrapping — because there's no LLM approval
+ *  loop on the form path. Mirrors `ExecuteResult` from
+ *  `chat-source-strategy.ts` plus `{ ok, ticket_id }` at the top so
+ *  callers don't need to know about the underlying `id` field. */
+interface TicketActionResponse {
+  ok?: boolean
+  ticket_id?: string
+  status?: string | null
+  mirror_synced?: boolean
+  raw?: unknown
+  error?: string
+  code?: string
+}
+
+interface SubmitTicketInput {
+  subject: string
+  content: string
+  attachments?: ChatAttachment[]
+}
+
+interface UpdateTicketArgs {
+  ticket_id: string
+  status?: 'OPEN' | 'CLOSED'
+  content_addendum?: string
+  resolution?: string
+  attachments?: ChatAttachment[]
+}
+
+export interface UseTicketActionsOptions {
+  /** Called when the parent should prepend an optimistic placeholder
+   *  to the local cache. Implementer mutates the QueryClient cache
+   *  directly so the row appears before the server roundtrip. */
+  prependOptimistic: (placeholder: OptimisticTicket) => void
+  /** Called when the optimistic placeholder should be removed
+   *  (mirror-sync failure, or replacement after real ticket arrives). */
+  removeOptimistic: (placeholderId: string) => void
+  /** Called when a ticket should be removed from the cache without
+   *  a refetch (TICKET_NOT_FOUND). */
+  removeTicketFromCache: (ticketId: string) => void
+  /** Toast helper from `@flamingo-stack/openframe-frontend-core/hooks`.
+   *  Passed in so the lib doesn't import the toast singleton itself
+   *  (test-friendly). */
+  toast: (input: { title: string; description?: string; variant?: 'success' | 'destructive' | 'default' }) => void
+  /** Called when a 412 HUBSPOT_DISCONNECTED arrives so the parent can
+   *  flip its `supportSystemDown` flag. */
+  onSupportSystemDown: () => void
+}
+
+/**
+ * Identity bundle used by every row action: the LOCAL mirror UUID
+ * (drives the React-side mutex + optimistic cache removal) AND the
+ * HubSpot ticket id (`external_id` — drives the server call, the only
+ * id HubSpot REST recognizes). Decoupling these is mandatory: passing
+ * the UUID to HubSpot gets you a 404 "Object not found. objectId are
+ * usually numeric"; passing the external id to the React-side mutex
+ * breaks per-row disable when the cache differs.
+ */
+export interface TicketRef {
+  id: string
+  external_id: string
+}
+
+export interface UseTicketActionsReturn {
+  submitTicket: (input: SubmitTicketInput) => Promise<boolean>
+  /** Single combined "reply" action — text + optional attachments
+   *  delivered as ONE HubSpot Note engagement (one bubble in the
+   *  timeline). Server creates a merged note when both are present. */
+  sendMessage: (ticket: TicketRef, text: string, attachments: ChatAttachment[]) => Promise<boolean>
+  closeTicket: (ticket: TicketRef, resolution?: string) => Promise<boolean>
+  reopenTicket: (ticket: TicketRef) => Promise<boolean>
+  /** `true` while the form-level submit is in flight. */
+  isSubmittingForm: boolean
+  /** Per-row in-flight set (read-only). UI uses `isRowBusy(localId)`. */
+  isRowBusy: (localId: string) => boolean
+}
+
+export function useTicketActions(options: UseTicketActionsOptions): UseTicketActionsReturn {
+  const queryClient = useQueryClient()
+  const { prependOptimistic, removeOptimistic, removeTicketFromCache, toast, onSupportSystemDown } = options
+
+  // Form-level single-flight uses BOTH a ref (for synchronous guarding
+  // inside `submitTicket`, since React state setters are async) and a
+  // state mirror (for UI disable / loading prop). Two rapid clicks in
+  // the same tick would otherwise both see state==false and fan out
+  // duplicate propose calls.
+  const formInFlightRef = useRef(false)
+  const [isSubmittingForm, setIsSubmittingForm] = useState(false)
+
+  // Per-row mutex — same split: ref for synchronous has/add/delete,
+  // state for the `isRowBusy` selector that drives row disable.
+  const busyRowsRef = useRef<Set<string>>(new Set())
+  const [busyRows, setBusyRows] = useState<Set<string>>(() => new Set())
+  const setRowBusy = useCallback((id: string, busy: boolean) => {
+    if (busy) busyRowsRef.current.add(id)
+    else busyRowsRef.current.delete(id)
+    // Mirror to state (new Set so React notices). Render-only side.
+    setBusyRows(new Set(busyRowsRef.current))
+  }, [])
+  const isRowBusy = useCallback((id: string) => busyRows.has(id), [busyRows])
+
+  // Mirror-sync watcher controllers tracked by placeholder id so we can
+  // abort prior watchers when a new submit lands AND so unmount cleans
+  // them up without leaking setState calls. Single source of truth for
+  // active watchers — never duplicate-schedule.
+  const watcherControllersRef = useRef<Map<string, AbortController>>(new Map())
+  useEffect(() => {
+    return () => {
+      // Component unmount — abort every live watcher so setState calls
+      // inside the scheduler don't fire on an unmounted component.
+      for (const controller of watcherControllersRef.current.values()) {
+        controller.abort()
+      }
+      watcherControllersRef.current.clear()
+    }
+  }, [])
+
+  // Single-flight queue (depth=1). Subsequent calls await the prior
+  // promise. Local backoff timers and SSE drains run inside the queued
+  // closure so the second user click waits for the first to fully
+  // resolve before issuing its own propose call. This is the
+  // server-stampede defense.
+  const queueRef = useRef<Promise<unknown>>(Promise.resolve())
+  const enqueue = useCallback(<T,>(work: () => Promise<T>): Promise<T> => {
+    const next = queueRef.current.then(work, work)
+    // Swallow rejection from the prior step so a single failure doesn't
+    // poison every subsequent enqueue.
+    queueRef.current = next.catch(() => undefined)
+    return next
+  }, [])
+
+  const executeTicketAction = useCallback(
+    async (toolName: ToolName, args: Record<string, unknown>): Promise<TicketActionResponse> => {
+      const res = await embedAuthedFetch(TICKET_ACTION_ENDPOINT, {
+        method: 'POST',
+        body: JSON.stringify({ tool_name: toolName, args }),
+      })
+      // Server returns JSON for both success and failure — no SSE on this
+      // route. Parse once, branch on `res.ok`.
+      const body = (await res.json().catch(() => ({}))) as TicketActionResponse
+      if (!res.ok) {
+        const code = resolveErrorCode(body.code, res.status)
+        const message = body.error || `${toolName} failed (${res.status})`
+        throw new TicketActionFailure(code, message, res)
+      }
+      return body
+    },
+    [],
+  )
+
+  // Mirror-sync watcher — backoff refetches when the post-create mirror
+  // upsert fails. Tracked in `watcherControllersRef` so unmount aborts
+  // every live scheduler and a duplicate submit for the same placeholder
+  // replaces the prior controller cleanly (no orphaned schedulers).
+  //
+  // `expectedTicketId` is the external_id the server returned from
+  // create_ticket. After each invalidation refetch lands, if any cache
+  // slot now contains a ticket with that id, the placeholder is dropped
+  // immediately — preventing the duplicate-row window where placeholder
+  // + real row both render until the 30s cap fires.
+  const watchMirrorSync = useCallback(
+    (placeholderId: string, expectedTicketId: string | undefined) => {
+      const prior = watcherControllersRef.current.get(placeholderId)
+      if (prior) prior.abort()
+      const controller = new AbortController()
+      watcherControllersRef.current.set(placeholderId, controller)
+      const schedule = async () => {
+        try {
+          for (let i = 0; i < MIRROR_SYNC_BACKOFF_MS.length; i++) {
+            if (controller.signal.aborted) return
+            await new Promise<void>((resolve) => {
+              const t = setTimeout(resolve, MIRROR_SYNC_BACKOFF_MS[i])
+              controller.signal.addEventListener(
+                'abort',
+                () => {
+                  clearTimeout(t)
+                  resolve()
+                },
+                { once: true },
+              )
+            })
+            if (controller.signal.aborted) return
+            await queryClient.invalidateQueries({ queryKey: ['tickets'] })
+            // If the real ticket landed during this refetch, drop the
+            // placeholder + stop scheduling — no duplicate-row window.
+            if (expectedTicketId && cacheContainsTicket(queryClient, expectedTicketId)) {
+              removeOptimistic(placeholderId)
+              return
+            }
+          }
+          // Last-resort cleanup — placeholder didn't get replaced.
+          if (!controller.signal.aborted) {
+            removeOptimistic(placeholderId)
+            toast({
+              title: "Couldn't confirm ticket",
+              description: "If the ticket doesn't appear shortly, please contact support.",
+              variant: 'destructive',
+            })
+          }
+        } finally {
+          // Self-deregister on natural completion or abort so the map
+          // doesn't accrete dead controllers across many submits.
+          if (watcherControllersRef.current.get(placeholderId) === controller) {
+            watcherControllersRef.current.delete(placeholderId)
+          }
+        }
+      }
+      void schedule()
+    },
+    [queryClient, removeOptimistic, toast],
+  )
+
+  const surfaceError = useCallback(
+    (err: unknown, action: string): MappedTicketActionError => {
+      const mapped = mapTicketActionError(err)
+      if (mapped.supportSystemDown) onSupportSystemDown()
+      toast({
+        title: `Could not ${action}`,
+        description: mapped.message,
+        variant: 'destructive',
+      })
+      return mapped
+    },
+    [toast, onSupportSystemDown],
+  )
+
+  const submitTicket = useCallback(
+    async (input: SubmitTicketInput): Promise<boolean> => {
+      // Synchronous ref guard — closes the same-tick double-click race
+      // that the state-only guard couldn't (setIsSubmittingForm is async).
+      if (formInFlightRef.current) return false
+      formInFlightRef.current = true
+      setIsSubmittingForm(true)
+      const placeholderId = `temp-${cryptoRandomId()}`
+      const placeholder: OptimisticTicket = {
+        id: placeholderId,
+        external_id: 'Pending sync…',
+        subject: input.subject.trim(),
+        preview: input.content.trim().slice(0, 400),
+        body: input.content.trim(),
+        status: 'OPEN',
+        pipeline_stage_label: 'New',
+        clickup_task_id: null,
+        clickup: null,
+        priority: null,
+        customer_emails: [],
+        customer_company: null,
+        hubspot_updated_at: new Date().toISOString(),
+        _optimistic: true,
+      }
+      prependOptimistic(placeholder)
+      try {
+        return await enqueue(async () => {
+          const result = await executeTicketAction('create_ticket', {
+            subject: input.subject.trim(),
+            content: input.content.trim(),
+            ...(input.attachments?.length ? { attachments: input.attachments } : {}),
+          })
+          if (result.mirror_synced === false) {
+            toast(TOAST_COPY.open_mirror_pending)
+            watchMirrorSync(placeholderId, result.ticket_id)
+          } else {
+            toast(TOAST_COPY.open_success)
+            // Invalidate FIRST so the refetch lands before the
+            // placeholder is removed — prevents a one-tick flash of
+            // EmptyState when the prior cache was empty.
+            await queryClient.invalidateQueries({ queryKey: ['tickets'] })
+            removeOptimistic(placeholderId)
+          }
+          return true
+        })
+      } catch (err) {
+        removeOptimistic(placeholderId)
+        surfaceError(err, 'open ticket')
+        return false
+      } finally {
+        formInFlightRef.current = false
+        setIsSubmittingForm(false)
+      }
+    },
+    [
+      enqueue,
+      executeTicketAction,
+      prependOptimistic,
+      removeOptimistic,
+      queryClient,
+      toast,
+      watchMirrorSync,
+      surfaceError,
+    ],
+  )
+
+  const updateTicket = useCallback(
+    async (
+      ticket: TicketRef,
+      serverArgs: Omit<UpdateTicketArgs, 'ticket_id'>,
+      successCopy: { title: string; description?: string },
+      action: string,
+    ): Promise<boolean> => {
+      // Mutex keyed on the LOCAL mirror id (stable across the React tree
+      // + matches the cache row's `id` for optimistic removal). Server
+      // arg uses `external_id` — HubSpot's only-numeric ticket id.
+      if (busyRowsRef.current.has(ticket.id)) return false
+      setRowBusy(ticket.id, true)
+      try {
+        return await enqueue(async () => {
+          await executeTicketAction('update_ticket', {
+            ...serverArgs,
+            ticket_id: ticket.external_id,
+          } as unknown as Record<string, unknown>)
+          toast(successCopy)
+          // Invalidate BOTH ticket list (status / pipeline may have
+          // changed) AND engagements (comments + attachments produce a
+          // new Note that the timeline must pick up).
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['tickets'] }),
+            queryClient.invalidateQueries({ queryKey: ['ticket-engagements'] }),
+          ])
+          return true
+        })
+      } catch (err) {
+        const mapped = surfaceError(err, action)
+        if (mapped.removeRowFromCache) {
+          removeTicketFromCache(ticket.id)
+        }
+        return false
+      } finally {
+        setRowBusy(ticket.id, false)
+      }
+    },
+    // `busyRowsRef` is read via .current — needs no dep entry. `busyRows`
+    // state isn't read inside this callback (only by `isRowBusy` selector
+    // outside), so listing it would churn the closure on every flag flip
+    // and cascade-recreate addNote/closeTicket/etc.
+    [setRowBusy, enqueue, executeTicketAction, queryClient, toast, surfaceError, removeTicketFromCache],
+  )
+
+  const sendMessage = useCallback(
+    (ticket: TicketRef, text: string, attachments: ChatAttachment[]) => {
+      const trimmed = text.trim()
+      const hasText = trimmed.length > 0
+      const hasFiles = attachments.length > 0
+      if (!hasText && !hasFiles) return Promise.resolve(false)
+      return updateTicket(
+        ticket,
+        {
+          ...(hasText ? { content_addendum: trimmed } : {}),
+          ...(hasFiles ? { attachments } : {}),
+        },
+        TOAST_COPY.comment_success,
+        'send message',
+      )
+    },
+    [updateTicket],
+  )
+
+  const closeTicket = useCallback(
+    (ticket: TicketRef, resolution?: string) =>
+      updateTicket(
+        ticket,
+        {
+          status: 'CLOSED',
+          ...(resolution?.trim() ? { resolution: resolution.trim() } : {}),
+        },
+        TOAST_COPY.close_success,
+        'close ticket',
+      ),
+    [updateTicket],
+  )
+
+  const reopenTicket = useCallback(
+    (ticket: TicketRef) =>
+      updateTicket(ticket, { status: 'OPEN' }, TOAST_COPY.reopen_success, 'reopen ticket'),
+    [updateTicket],
+  )
+
+  return useMemo<UseTicketActionsReturn>(
+    () => ({
+      submitTicket,
+      sendMessage,
+      closeTicket,
+      reopenTicket,
+      isSubmittingForm,
+      isRowBusy,
+    }),
+    [submitTicket, sendMessage, closeTicket, reopenTicket, isSubmittingForm, isRowBusy],
+  )
+}
+
+/** Exported so unit tests can construct an instance to exercise the
+ *  per-code branches of `mapTicketActionError`. Not part of the public
+ *  surface — kept out of `tickets/index.ts`. */
+export class TicketActionFailure extends Error {
+  code: TicketActionErrorCode
+  response?: Response
+  constructor(code: TicketActionErrorCode, message: string, response?: Response) {
+    super(message)
+    this.code = code
+    this.response = response
+  }
+}
+
+/**
+ * Translate a server error envelope into user-facing copy. Exported so
+ * a future chat refactor can adopt the same translation table.
+ */
+export function mapTicketActionError(err: unknown): MappedTicketActionError {
+  if (err instanceof TicketActionFailure) {
+    switch (err.code) {
+      case 'PROPOSAL_NOT_CLAIMABLE':
+        return {
+          code: err.code,
+          message: 'This action was already processed.',
+          supportSystemDown: false,
+          removeRowFromCache: false,
+        }
+      case 'TICKET_NOT_FOUND':
+        return {
+          code: err.code,
+          message: 'This ticket is no longer available.',
+          supportSystemDown: false,
+          removeRowFromCache: true,
+        }
+      case 'TICKET_OWNERSHIP_DENIED':
+        return {
+          code: err.code,
+          message: 'You can only act on tickets you opened.',
+          supportSystemDown: false,
+          removeRowFromCache: false,
+        }
+      case 'HUBSPOT_DISCONNECTED':
+        return {
+          code: err.code,
+          message: 'Support system temporarily unavailable.',
+          supportSystemDown: true,
+          removeRowFromCache: false,
+        }
+      case 'RATE_LIMITED': {
+        const retryAfterRaw = err.response?.headers.get('Retry-After')
+        const retryAfterSeconds = retryAfterRaw ? parseInt(retryAfterRaw, 10) : undefined
+        return {
+          code: err.code,
+          message: retryAfterSeconds
+            ? `Too many actions. Try again in ${retryAfterSeconds}s.`
+            : 'Too many actions. Try again shortly.',
+          supportSystemDown: false,
+          removeRowFromCache: false,
+          ...(retryAfterSeconds ? { retryAfterSeconds } : {}),
+        }
+      }
+      case 'INVALID_TOOL_ARGS':
+        return {
+          code: err.code,
+          message: 'Your input was rejected. Please review and try again.',
+          supportSystemDown: false,
+          removeRowFromCache: false,
+        }
+      default:
+        return {
+          code: 'UNKNOWN',
+          message: err.message || 'Something went wrong. Please try again.',
+          supportSystemDown: false,
+          removeRowFromCache: false,
+        }
+    }
+  }
+  return {
+    code: 'UNKNOWN',
+    message: err instanceof Error ? err.message : 'Something went wrong. Please try again.',
+    supportSystemDown: false,
+    removeRowFromCache: false,
+  }
+}
+
+/** Small id generator that doesn't require pulling in nanoid as a new
+ *  dep. Sufficient for client-only optimistic ids. */
+function cryptoRandomId(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID()
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+/** True iff any ['tickets', …] cache slot contains a ticket whose
+ *  HubSpot id (external_id) matches the target. Used by the mirror-sync
+ *  watcher to detect "the real row just arrived" and drop the placeholder
+ *  early instead of waiting for the 30s timeout. */
+function cacheContainsTicket(
+  queryClient: ReturnType<typeof useQueryClient>,
+  expectedTicketId: string,
+): boolean {
+  const entries = queryClient.getQueriesData<TicketData[] | undefined>({ queryKey: ['tickets'] })
+  for (const [, data] of entries) {
+    if (Array.isArray(data) && data.some((t) => t.external_id === expectedTicketId)) {
+      return true
+    }
+  }
+  return false
+}
+
+/** Resolve the canonical error code from the server's body + HTTP status.
+ *  Body code wins when present; status-derived code is the fallback so a
+ *  bare 429/412 (no body code) still maps cleanly through the user-facing
+ *  branches. */
+function resolveErrorCode(
+  bodyCode: string | undefined,
+  status: number,
+): TicketActionErrorCode {
+  if (bodyCode) return bodyCode as TicketActionErrorCode
+  if (status === 429) return 'RATE_LIMITED'
+  if (status === 412) return 'HUBSPOT_DISCONNECTED'
+  return 'UNKNOWN'
+}
+
+// Re-export so callers can narrow the type when needed.
+export type { AnyTicket, OptimisticTicket }

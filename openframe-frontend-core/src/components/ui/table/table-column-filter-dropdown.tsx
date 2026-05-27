@@ -2,7 +2,7 @@
 
 import { cn } from '../../../utils/cn'
 import { FiltersDropdown, type FilterSection } from '../../features'
-import { Filter02Icon } from '@/components/icons-v2-generated'
+import { Filter02Icon } from '../../icons-v2-generated'
 import type { FilterOption, TableFilters } from './types'
 
 /** @deprecated Use `DataTableColumnFilter` from `data-table` instead. */

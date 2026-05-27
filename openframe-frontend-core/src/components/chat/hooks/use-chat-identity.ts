@@ -3,10 +3,10 @@
 /**
  * Chat-identity capability hook.
  *
- * Surfaces the `{authTier, source, attachmentsEnabled}` bag for the
- * CURRENT chat session so client code can gate UI elements (today: the
- * `+` attachment button) on chat-side identity tiers WITHOUT sending a
- * chat message first.
+ * Surfaces the `{authTier, source, attachmentsEnabled, user}` bag for
+ * the CURRENT chat session so client code can gate UI elements
+ * (attachment button, drawer composer, /tickets gate) on chat-side
+ * identity tiers WITHOUT sending a chat message first.
  *
  * Server-side parity: the route at `/api/chat/identity` runs the same
  * 3-tier `requireChatAuth` chain the chat itself uses.
@@ -14,20 +14,18 @@
  * `authTier !== 'anon' AND isSelfScopedSource(source)` — single
  * source of truth, consumers don't combine the fields themselves.
  *
- * Implementation: plain `useEffect` + `useState` (NOT `useQuery`).
- * Rationale:
- *   - Single consumer (`ChatAttachmentAddButton`), so react-query's
- *     dedup / cross-component cache benefit is zero.
- *   - The hook needs to re-fetch every time bearer-proxy creds change
- *     in localStorage. With react-query, this required a contrived
- *     `queryKey` that re-evaluated `getChatProxyAuth()` on every
- *     render — a layout-shift trap when HMR replaced the module
- *     mid-session (cache preserved across module reload but the
- *     queryKey computation lagged). Plain `useEffect` with the
- *     proxy email as a dep refetches reliably.
- *   - `chatAuthedFetch` carries the bearer-act-as headers so
- *     `/whoami`-authenticated admins resolve as `bearer-act-as` and
- *     get `attachmentsEnabled: true`.
+ * **Implementation: plain `useEffect` + `useState`. NO CLIENT-SIDE
+ * CACHE.** Every consumer that needs identity gets it DRILLED IN
+ * from a parent that already gates on `identity.user?.email` — the
+ * tickets surface uses this pattern in `HelpCenterListAuthed` /
+ * `TicketCenterAuthed` / `HelpCenterCreateForm`. A previous attempt
+ * to layer TanStack Query on this hook was reverted because:
+ *   1. Client caches drift from server truth (empty-state flashes,
+ *      stale identity across credential rotations)
+ *   2. Drilling identity through props is the explicit data-flow
+ *      pattern the rest of the lib uses
+ *   3. The fetch is cheap and short — no perf justification for a
+ *      cache layer
  *
  * Endpoint URL: read from `useRequiredChatRuntime().endpoints.chatIdentityUrl`
  * so embedded apps with their own reverse-proxy topology can override.
@@ -62,9 +60,7 @@ export interface ChatIdentityResponse {
     /** Optional first name supplied by the identity webservice.
      *  When set, the chat greeting renders `Hey ${firstName}, I'm Mingo`.
      *  When absent (null/undefined/empty), the greeting falls back to
-     *  the no-name variant `Hey, I'm Mingo`. The chat panel does NOT
-     *  derive `firstName` from `name.split(' ')[0]` anymore — this is
-     *  the dedicated authoritative source from the identity webservice. */
+     *  the no-name variant `Hey, I'm Mingo`. */
     firstName?: string | null
     /** Optional last name. Currently unused by chat UI; surfaced for
      *  embedders that want to display the full name elsewhere. */
