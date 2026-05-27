@@ -245,8 +245,12 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
           author = identity.user?.name?.trim() || customerName
           avatarSrc = identity.user?.avatarUrl ?? undefined
         } else if (isCustomer) {
-          // Cross-customer edge case (shouldn't happen on /tickets).
-          author = eng.authorName ?? eng.authorEmail ?? eng.authorId ?? customerName
+          // Cross-customer edge case: ticket has messages from a
+          // different customer email (rare — multi-contact tickets
+          // via HubSpot CC/BCC). Render the GENERIC "Customer" label,
+          // NEVER the raw email or name — that would leak another
+          // customer's identity into this customer's view.
+          author = 'Customer'
           avatarSrc = undefined
         } else if (eng.authorName) {
           // Resolved Flamingo employee — server matched the HubSpot
