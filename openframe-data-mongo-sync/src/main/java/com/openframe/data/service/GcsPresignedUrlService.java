@@ -26,15 +26,20 @@ public class GcsPresignedUrlService {
 
     private final Storage storage;
     private final String bucketName;
+    private final String prefix;
 
-    public GcsPresignedUrlService(@Value("${storage.s3.bucket}") String bucketName) {
+    public GcsPresignedUrlService(
+            @Value("${storage.s3.bucket}") String bucketName,
+            @Value("${storage.s3.prefix:}") String prefix) {
         this.bucketName = bucketName;
+        this.prefix = prefix;
         this.storage = StorageOptions.getDefaultInstance().getService();
-        log.info("GcsPresignedUrlService initialized for bucket: {}", bucketName);
+        log.info("GcsPresignedUrlService initialized for bucket: {}, prefix: '{}'", bucketName, prefix);
     }
 
     public String generateUploadUrl(String path, String contentType, Duration expiration) {
-        BlobInfo blobInfo = BlobInfo.newBuilder(bucketName, path)
+        String fullPath = withPrefix(path);
+        BlobInfo blobInfo = BlobInfo.newBuilder(bucketName, fullPath)
                 .setContentType(contentType)
                 .build();
 
@@ -47,12 +52,13 @@ public class GcsPresignedUrlService {
                 Storage.SignUrlOption.withV4Signature()
         ).toString();
 
-        log.debug("Generated upload URL for path: {}", path);
+        log.debug("Generated upload URL for path: {}", fullPath);
         return url;
     }
 
     public String generateDownloadUrl(String path, Duration expiration) {
-        BlobInfo blobInfo = BlobInfo.newBuilder(bucketName, path).build();
+        String fullPath = withPrefix(path);
+        BlobInfo blobInfo = BlobInfo.newBuilder(bucketName, fullPath).build();
 
         String url = storage.signUrl(
                 blobInfo,
@@ -62,27 +68,35 @@ public class GcsPresignedUrlService {
                 Storage.SignUrlOption.withV4Signature()
         ).toString();
 
-        log.debug("Generated download URL for path: {}", path);
+        log.debug("Generated download URL for path: {}", fullPath);
         return url;
     }
 
     public void deleteFile(String path) {
-        boolean deleted = storage.delete(BlobId.of(bucketName, path));
+        String fullPath = withPrefix(path);
+        boolean deleted = storage.delete(BlobId.of(bucketName, fullPath));
         if (deleted) {
-            log.debug("File deleted: {}", path);
+            log.debug("File deleted: {}", fullPath);
         } else {
-            log.warn("File not found for deletion: {}", path);
+            log.warn("File not found for deletion: {}", fullPath);
         }
     }
 
     public void moveFile(String sourcePath, String destPath) {
-        BlobId sourceId = BlobId.of(bucketName, sourcePath);
-        BlobId targetId = BlobId.of(bucketName, destPath);
+        BlobId sourceId = BlobId.of(bucketName, withPrefix(sourcePath));
+        BlobId targetId = BlobId.of(bucketName, withPrefix(destPath));
 
         Storage.CopyRequest copyRequest = Storage.CopyRequest.of(sourceId, targetId);
         storage.copy(copyRequest);
         storage.delete(sourceId);
 
-        log.debug("File moved: {} -> {}", sourcePath, destPath);
+        log.debug("File moved: {} -> {}", sourceId.getName(), targetId.getName());
+    }
+
+    private String withPrefix(String path) {
+        if (prefix == null || prefix.isBlank()) {
+            return path;
+        }
+        return prefix + "/" + path;
     }
 }
