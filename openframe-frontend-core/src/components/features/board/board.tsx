@@ -17,7 +17,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core'
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
-import { useHorizontalScrollbar } from '@/hooks/ui/use-horizontal-scrollbar'
+import { useHorizontalScrollbar } from '../../../hooks/ui/use-horizontal-scrollbar'
 import { cn } from '../../../utils/cn'
 import { BoardColumn } from './board-column'
 import { TicketCard } from './ticket-card'

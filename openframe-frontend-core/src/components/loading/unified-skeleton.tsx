@@ -204,14 +204,15 @@ export const MediaSkeleton = {
   },
   
   /**
-   * Card image skeleton (16:9 aspect ratio)
+   * Card image skeleton (1200×630 OG aspect — matches entity-cards default
+   * so loading state never causes a height shift when card data arrives)
    */
   CardImage: ({ className, ...props }: Omit<UnifiedSkeletonProps, 'variant'>) => (
-    <UnifiedSkeleton 
-      variant="default" 
-      className={cn("aspect-[16/9] w-full", className)} 
+    <UnifiedSkeleton
+      variant="default"
+      className={cn("aspect-[1200/630] w-full", className)}
       aria-label="Loading image"
-      {...props} 
+      {...props}
     />
   ),
   

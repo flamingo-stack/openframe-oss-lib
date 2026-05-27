@@ -7,3 +7,4 @@
 // than reviving a separate component.
 export { DeliveryLists, type DeliveryListsProps } from './delivery-lists';
 export { DeliveryTable } from './delivery-table';
+export { DeliveryRow, type DeliveryRowProps } from './delivery-row';

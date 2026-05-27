@@ -83,7 +83,7 @@ export function BlogCardSkeleton({ size = 'default' }: { size?: 'default' | 'sm'
   }
   return (
     <article className="group bg-ods-card border border-ods-border rounded-lg overflow-hidden h-full flex flex-col animate-pulse">
-      <div className="aspect-[16/9] bg-ods-bg" />
+      <div className="aspect-[1200/630] bg-ods-bg" />
       <div className="p-4 flex flex-col flex-grow space-y-3">
         <div className="h-5 w-3/4 bg-ods-bg rounded" />
         <div className="h-5 w-1/2 bg-ods-bg rounded" />
@@ -187,7 +187,7 @@ export function BlogCard({
         className="flex flex-col h-full focus:outline-none"
         aria-label={`Read article: ${post.title}`}
       >
-        <div className="relative w-full aspect-[16/9] overflow-hidden bg-ods-bg">
+        <div className="relative w-full aspect-[1200/630] overflow-hidden bg-ods-bg">
           {displayImage ? (
             <Image
               src={displayImage}

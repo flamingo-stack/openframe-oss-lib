@@ -112,6 +112,32 @@ export {
   getSourceLabel,
 } from './source-icons'
 
+// Embed-surface auth — generic across chat AND ticket center (and any
+// future embedded React component that needs to identify as the proxied
+// customer). Wire headers / env vars / storage key are unchanged
+// (`X-Chat-*`, `CHAT_PROXY_SECRET`, `chat.proxy-auth.v1`) — those are
+// server / deployment contracts. The CLIENT-side rename frees non-chat
+// surfaces from importing a chat-prefixed symbol. Old chat-prefixed
+// aliases are kept as @deprecated re-exports at
+// `components/chat/utils/chat-authed-fetch.ts` + `chat-proxy-auth-storage.ts`.
+export { embedAuthedFetch } from './embed-authed-fetch'
+export {
+  type EmbedProxyAuth,
+  getEmbedProxyAuth,
+  setEmbedProxyAuth,
+  clearEmbedProxyAuth,
+  getPersistedProxyEmail,
+  applyProxyAuth,
+} from './embed-proxy-auth-storage'
+
+// SSE leading-frame reader for the chat-agent `confirm-tool` route.
+// Used by the ticket center to drain the single `decision_resolved`
+// frame the server emits when `messages: []` is in the request body.
+export {
+  readLeadingDecisionFrame,
+  type DecisionResolvedFrame,
+} from './sse-decision-frame'
+
 // Pure text/wire helpers that originated under components/chat/utils/
 // but are needed by SERVER-SIDE hub callers (doc-chat-utils,
 // hubspot-files-utils, rag-mappers). Re-exporting through utils/ keeps

@@ -46,7 +46,15 @@ const SquareAvatar = React.memo(React.forwardRef<HTMLDivElement, SquareAvatarPro
         {...props}
       >
         <div className={cn(
-          'flex items-center justify-center text-xs font-medium text-ods-text-secondary',
+          // Initials use `text-ods-text-primary` so they stay readable
+          // both on the default `bg-ods-bg` AND on accent-fill backgrounds
+          // (`bg-ods-flamingo-pink` for the current user, `bg-ods-flamingo-cyan`
+          // for Mingo). With `text-ods-text-secondary` (#888) on a pink fill
+          // (#F357BB) the initials clocked ~2.0:1 contrast — failing WCAG AA
+          // and visually rendering as a blank colored dot. Primary text
+          // (#fafafa) on the same pink yields ~3.5:1 (AA Large) and on the
+          // dark default bg yields ~15:1.
+          'flex items-center justify-center text-xs font-medium text-ods-text-primary',
           src && 'hidden'
         )}>
           {getFirstLastInitials(fallback || alt) || '?'}
