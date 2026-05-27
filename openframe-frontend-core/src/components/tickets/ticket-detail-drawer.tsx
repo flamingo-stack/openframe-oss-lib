@@ -252,14 +252,23 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
           // customer's identity into this customer's view.
           author = 'Customer'
           avatarSrc = undefined
-        } else if (eng.authorName) {
+        } else if (eng.authorName && eng.authorAvatarUrl) {
           // Resolved Flamingo employee — server matched the HubSpot
-          // owner's email against `profiles`. Render their actual
-          // name + avatar.
+          // owner's email against `profiles` AND has an avatar to
+          // prove it. Avatar presence IS the trust signal: only
+          // owner-resolved employees carry one; raw HubSpot
+          // `sender_name` (bots, integrations, system actors,
+          // unmatched humans) carries name without avatar and gets
+          // the generic "Support team" treatment so we never
+          // attribute a customer-facing bubble to a bot string
+          // ("HubSpot Bot", "Slack Integration", etc.).
           author = eng.authorName
-          avatarSrc = eng.authorAvatarUrl ?? undefined
+          avatarSrc = eng.authorAvatarUrl
         } else {
-          // Unmatched / unknown HubSpot owner — generic fallback.
+          // Unmatched / unknown / bot / integration / system actor —
+          // generic fallback. Customer doesn't need to see internal
+          // tool branding (which has the customer "talking to" a bot
+          // string instead of a person).
           author = 'Support team'
           avatarSrc = undefined
         }
