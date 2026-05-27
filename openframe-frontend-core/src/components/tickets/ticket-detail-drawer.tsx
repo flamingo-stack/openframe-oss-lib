@@ -212,9 +212,16 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
   return (
     <div className="bg-ods-card border border-ods-border rounded-[6px] overflow-hidden w-full">
       {/* Customer-authored description + any legacy `---`-joined
-          comments. Original message gets a special role label; legacy
-          updates get "Update N" or "Resolution". Timestamp matches the
-          ticket's creation time when available. */}
+          comments. Always rendered ABOVE the engagement timeline as
+          "Original message" because the server's intake-burst filter
+          (see `filterCustomerVisibleTimeline` in
+          `hubspot-conversations-utils.ts`) drops the customer's first
+          message from engagements when it was part of the HubSpot
+          Custom Channel bot intake — bodyTurns IS the canonical
+          original for those tickets. For tickets created without bot
+          intake (admin-created, email channel) bodyTurns shows the
+          manually-entered description and engagements show subsequent
+          replies — same flow, no duplication. */}
       {bodyTurns.map((turn, i) => {
         const isResolution = turn.startsWith('[Resolution]')
         const role =
@@ -315,11 +322,19 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
           avatarSrc = undefined
         }
 
+        // Role label: every engagement is a customer-visible
+        // Conversations message (customer ↔ agent on the Custom
+        // Channel). There are no internal Notes on this surface
+        // anymore — the read path explicitly filters them. So
+        // "Reply" for BOTH sides. The previous "Note" label for
+        // support bubbles was a legacy artifact from when Notes
+        // were rendered and made customers think their support
+        // engineer was leaving internal comments on their ticket.
         return (
           <ConversationCardRow
             key={eng.id}
             author={author}
-            role={isCustomer ? 'Reply' : 'Note'}
+            role="Reply"
             avatarSrc={avatarSrc}
             timestamp={eng.createdAt}
             body={stripAttachmentsPreamble(eng.body ?? '')}
