@@ -1,493 +1,400 @@
-# First Steps with OpenFrame OSS Libraries
+# First Steps with OpenFrame OSS Lib
 
-Now that you have OpenFrame OSS Libraries running, let's explore the key features and get you started with the essential operations. This guide covers the first 5 things you should do after installation to understand the platform's capabilities.
+Now that you have OpenFrame OSS Lib installed, let's explore the core features and patterns you'll use every day.
 
-## 1. Explore the GraphQL API
+## Your First 5 Tasks
 
-The GraphQL API is your primary interface for querying and manipulating data. Let's start with the GraphQL playground.
+After completing the [Quick Start](quick-start.md), these are the first 5 things you should do to get familiar with the library.
 
-### Access GraphQL Playground
+### 1. Understand the Two Core Modules
 
-Navigate to: `http://localhost:8080/graphiql`
-
-### Discover the Schema
-
-First, explore what's available:
-
-```graphql
-query IntrospectionQuery {
-  __schema {
-    queryType {
-      fields {
-        name
-        description
-        type {
-          name
-        }
-      }
-    }
-  }
-}
-```
-
-### Try Your First Queries
-
-**Query Organizations:**
-```graphql
-query GetOrganizations {
-  organizations(first: 10) {
-    edges {
-      node {
-        id
-        name
-        contactInformation {
-          email
-          phone
-        }
-        createdAt
-        updatedAt
-      }
-    }
-    pageInfo {
-      hasNextPage
-      hasPreviousPage
-      startCursor
-      endCursor
-    }
-  }
-}
-```
-
-**Query Devices (if any exist):**
-```graphql
-query GetDevices {
-  devices(first: 5) {
-    edges {
-      node {
-        id
-        hostname
-        deviceType
-        deviceStatus
-        organization {
-          name
-        }
-        tags {
-          name
-          value
-        }
-      }
-    }
-  }
-}
-```
-
-**Query Logs with Filtering:**
-```graphql
-query GetLogs($filter: LogFilterInput) {
-  logs(first: 10, filter: $filter) {
-    edges {
-      node {
-        id
-        message
-        severity
-        timestamp
-        source
-        organization {
-          name
-        }
-      }
-    }
-  }
-}
-```
-
-With variables:
-```json
-{
-  "filter": {
-    "severities": ["ERROR", "WARNING"]
-  }
-}
-```
-
-## 2. Understand Multi-Tenant Authentication
-
-OpenFrame OSS Libraries is built with multi-tenancy at its core. Let's explore the authentication system.
-
-### OAuth2/OIDC Discovery
-
-Check the OpenID Connect configuration:
-
-```bash
-curl http://localhost:8080/.well-known/openid-configuration | jq
-```
-
-**Key endpoints you'll see:**
-- `authorization_endpoint` - Start OAuth flows
-- `token_endpoint` - Exchange codes for tokens
-- `userinfo_endpoint` - Get user information
-- `jwks_uri` - Public keys for JWT verification
-
-### Test Token Validation
-
-The system uses JWT tokens for authentication. Each tenant has its own issuer and key pair.
-
-```bash
-# Example of a protected endpoint (will return 401 without proper authentication)
-curl -v http://localhost:8080/api/users
-```
-
-### Create Test Users and Organizations
-
-Use the REST API to create test data:
-
-```bash
-# Create an organization
-curl -X POST http://localhost:8080/api/organizations \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Acme IT Services",
-    "contactInformation": {
-      "email": "admin@acmeit.com",
-      "phone": "+1-555-0199",
-      "website": "https://acmeit.com"
-    },
-    "address": {
-      "street": "123 Tech Street",
-      "city": "San Francisco",
-      "state": "CA",
-      "zipCode": "94105",
-      "country": "US"
-    }
-  }'
-```
-
-## 3. Configure Your First Integration
-
-OpenFrame OSS Libraries supports integration with popular MSP tools like Fleet MDM and TacticalRMM.
-
-### Understanding Tool Types
-
-The system supports these tool types:
-
-```mermaid
-flowchart LR
-    Tools[Integrated Tools] --> Fleet[Fleet MDM]
-    Tools --> Tactical[TacticalRMM]
-    Tools --> Mesh[MeshCentral]
-    Tools --> Custom[Custom Tools]
-    
-    Fleet --> Devices[Device Management]
-    Tactical --> RMM[Remote Monitoring]
-    Mesh --> Remote[Remote Access]
-    Custom --> API[API Integration]
-```
-
-### Check Available Tool Endpoints
-
-```graphql
-query GetToolsInfo {
-  tools(first: 10) {
-    edges {
-      node {
-        id
-        toolType
-        name
-        connectionStatus
-        toolCredentials {
-          username
-        }
-        toolUrls {
-          type
-          url
-        }
-      }
-    }
-  }
-}
-```
-
-### Tool Connection Status
-
-Monitor tool connections:
-
-```graphql
-query ToolConnectionStatus {
-  tools {
-    edges {
-      node {
-        name
-        connectionStatus
-        lastConnected
-        organization {
-          name
-        }
-      }
-    }
-  }
-}
-```
-
-## 4. Explore Event-Driven Architecture
-
-OpenFrame OSS Libraries is built around event-driven patterns. Let's examine the event system.
-
-### Query Recent Events
-
-```graphql
-query RecentEvents {
-  events(first: 20, orderBy: {field: TIMESTAMP, direction: DESC}) {
-    edges {
-      node {
-        id
-        type
-        source
-        timestamp
-        message
-        metadata
-        organization {
-          name
-        }
-      }
-    }
-  }
-}
-```
-
-### Event Types and Sources
-
-The system processes various event types:
-
-| Event Type | Source | Description |
-|------------|--------|-------------|
-| `DEVICE_CONNECTED` | Client Agent | Device comes online |
-| `DEVICE_DISCONNECTED` | Client Agent | Device goes offline |
-| `TOOL_INSTALLED` | Tool Agent | New tool installed |
-| `LOG_ENTRY` | Various | Log message created |
-| `ALERT_TRIGGERED` | Monitoring | Alert condition met |
-| `SCRIPT_EXECUTED` | RMM Tool | Script execution result |
-
-### Create Test Events
-
-```bash
-# Simulate a device connection event via the API
-curl -X POST http://localhost:8080/api/events \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "DEVICE_CONNECTED",
-    "source": "test-agent",
-    "message": "Device laptop-001 connected",
-    "metadata": {
-      "deviceId": "laptop-001",
-      "ipAddress": "192.168.1.100"
-    }
-  }'
-```
-
-## 5. Set Up API Keys for External Access
-
-For external integrations, you'll need API keys. Let's create and manage them.
-
-### Create an API Key
-
-```bash
-# This requires authentication in a real scenario
-curl -X POST http://localhost:8080/api/api-keys \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "External Integration Key",
-    "description": "API key for third-party tool integration",
-    "permissions": ["READ_DEVICES", "READ_EVENTS", "WRITE_EVENTS"]
-  }'
-```
-
-### Understanding API Key Types
-
-The system supports different API key types:
+OpenFrame OSS Lib is organized into two logical modules:
 
 ```mermaid
 flowchart TD
-    ApiKeys[API Keys] --> UserKeys[User-Scoped Keys]
-    ApiKeys --> OrgKeys[Organization Keys]
-    ApiKeys --> SystemKeys[System Keys]
+    OSS["OpenFrame OSS Lib"] --> Module1["Module 1: Core DTOs"]
+    OSS --> Module2["Module 2: Filtering DTOs"]
     
-    UserKeys --> ReadWrite[Read/Write Access]
-    OrgKeys --> TenantAccess[Tenant-Scoped Access]
-    SystemKeys --> AdminAccess[Administrative Access]
+    Module1 --> QueryResult["GenericQueryResult<T>"]
+    Module1 --> CountedResult["CountedGenericQueryResult<T>"]
+    Module1 --> LogEvent["LogEvent"]
+    Module1 --> LogDetails["LogDetails"]
+    Module1 --> LogFilterCriteria["LogFilterCriteria"]
+    
+    Module2 --> AuditFiltering["Audit Filtering"]
+    Module2 --> DeviceFiltering["Device Filtering"]
+    
+    AuditFiltering --> LogFilters["LogFilters"]
+    AuditFiltering --> OrgFilterOption["OrganizationFilterOption"]
+    
+    DeviceFiltering --> DeviceFilterCriteria["DeviceFilterCriteria"] 
+    DeviceFiltering --> DeviceFilters["DeviceFilters"]
+    DeviceFiltering --> DeviceFilterOption["DeviceFilterOption"]
+    
+    classDef module1 fill:#e1f5fe
+    classDef module2 fill:#f3e5f5
+    class QueryResult,CountedResult,LogEvent,LogDetails,LogFilterCriteria module1
+    class LogFilters,OrgFilterOption,DeviceFilterCriteria,DeviceFilters,DeviceFilterOption module2
 ```
 
-### Test API Key Authentication
+**Module 1** provides the foundation: pagination, query results, and core audit DTOs.  
+**Module 2** provides advanced filtering capabilities for both audit and device data.
 
-```bash
-# Use the API key in subsequent requests
-curl -H "Authorization: Bearer your-api-key-here" \
-     http://localhost:8080/api/devices
-```
+### 2. Create Your First Paginated Response
 
-### Monitor API Key Usage
+The most common pattern you'll use is `GenericQueryResult<T>` for paginated API responses:
 
-```graphql
-query ApiKeyStats {
-  me {
-    apiKeys {
-      id
-      name
-      lastUsed
-      requestCount
-      permissions
+**Create `examples/PaginationExample.java`:**
+```java
+import com.openframe.api.dto.GenericQueryResult;
+import com.openframe.api.dto.shared.PageInfo;
+import java.util.Arrays;
+import java.util.List;
+
+public class PaginationExample {
+    
+    public GenericQueryResult<String> getUserList(int page, int size) {
+        // Simulate database results
+        List<String> users = Arrays.asList(
+            "alice@example.com",
+            "bob@example.com", 
+            "charlie@example.com"
+        );
+        
+        // Create pagination metadata
+        PageInfo pageInfo = PageInfo.builder()
+            .pageNumber(page)
+            .pageSize(size)
+            .totalElements(100)
+            .totalPages(34)
+            .build();
+            
+        // Return standardized response
+        return GenericQueryResult.<String>builder()
+            .items(users)
+            .pageInfo(pageInfo)
+            .build();
     }
-  }
+    
+    public static void main(String[] args) {
+        PaginationExample example = new PaginationExample();
+        GenericQueryResult<String> result = example.getUserList(1, 3);
+        
+        System.out.println("Page: " + result.getPageInfo().getPageNumber());
+        System.out.println("Items: " + result.getItems().size());
+        System.out.println("Total: " + result.getPageInfo().getTotalElements());
+    }
 }
 ```
 
-## Common Configuration Tasks
-
-### Configure SSO (Optional)
-
-Set up Single Sign-On with Google or Microsoft:
-
+**Run the example:**
 ```bash
-curl -X POST http://localhost:8080/api/sso-config \
-  -H "Content-Type: application/json" \
-  -d '{
-    "provider": "GOOGLE",
-    "clientId": "your-google-client-id",
-    "clientSecret": "your-google-client-secret",
-    "enabled": true,
-    "autoProvision": true,
-    "allowedDomains": ["yourdomain.com"]
-  }'
+cd examples
+javac -cp "~/.m2/repository/com/openframe/api/openframe-api-lib/1.0-SNAPSHOT/*" PaginationExample.java
+java -cp ".:~/.m2/repository/com/openframe/api/openframe-api-lib/1.0-SNAPSHOT/*" PaginationExample
 ```
 
-### Set Up User Invitations
+### 3. Implement Filtered Counting
 
-Invite team members:
+`CountedGenericQueryResult<T>` extends basic pagination with filtered totals:
 
-```bash
-curl -X POST http://localhost:8080/api/invitations \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "teammate@yourcompany.com",
-    "role": "USER",
-    "message": "Welcome to our OpenFrame instance!"
-  }'
-```
+**Create `examples/FilteredCountExample.java`:**
+```java
+import com.openframe.api.dto.CountedGenericQueryResult;
+import com.openframe.api.dto.audit.LogEvent;
+import com.openframe.api.dto.audit.LogFilterCriteria;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.List;
 
-### Configure Logging Levels
-
-Adjust logging for debugging:
-
-```yaml
-# application.yml
-logging:
-  level:
-    com.openframe: DEBUG
-    com.openframe.stream: TRACE  # For event processing details
-    com.openframe.security: DEBUG  # For auth debugging
-```
-
-## Monitoring Your Setup
-
-### Check Service Health
-
-```bash
-# Main health check
-curl http://localhost:8080/health
-
-# Extended health information
-curl http://localhost:8080/actuator/health
-```
-
-### Monitor Database Connections
-
-```bash
-# MongoDB status
-mongosh --eval "db.runCommand({serverStatus: 1}).connections"
-
-# Redis status
-redis-cli info clients
-```
-
-### Review Application Logs
-
-```bash
-# Follow Spring Boot logs
-tail -f logs/application.log
-
-# Check for specific errors
-grep ERROR logs/application.log
-```
-
-## Performance Testing
-
-### Generate Sample Data
-
-Create test organizations, devices, and events to explore performance:
-
-```bash
-#!/bin/bash
-# create-sample-data.sh
-
-for i in {1..10}; do
-  curl -X POST http://localhost:8080/api/organizations \
-    -H "Content-Type: application/json" \
-    -d "{
-      \"name\": \"Test Org ${i}\",
-      \"contactInformation\": {
-        \"email\": \"admin${i}@testorg.com\"
-      }
-    }"
-done
-```
-
-### Test GraphQL Query Performance
-
-```graphql
-query LoadTest {
-  organizations(first: 100) {
-    edges {
-      node {
-        id
-        name
-        devices(first: 10) {
-          edges {
-            node {
-              id
-              hostname
-              deviceStatus
-            }
-          }
-        }
-      }
+public class FilteredCountExample {
+    
+    public CountedGenericQueryResult<LogEvent> getAuditLogs(LogFilterCriteria criteria) {
+        // Simulate filtered audit events
+        List<LogEvent> events = Arrays.asList(
+            LogEvent.builder()
+                .id("evt_001")
+                .summary("User login successful")
+                .eventType("AUTHENTICATION")
+                .severity("INFO")
+                .timestamp(LocalDateTime.now())
+                .build(),
+            LogEvent.builder()
+                .id("evt_002") 
+                .summary("Failed password attempt")
+                .eventType("AUTHENTICATION")
+                .severity("WARN")
+                .timestamp(LocalDateTime.now())
+                .build()
+        );
+        
+        // Return with filtered count (showing 2 of 1,247 total matching)
+        return CountedGenericQueryResult.<LogEvent>builder()
+            .items(events)                    // Current page items
+            .filteredCount(1247)              // Total matching filter
+            .pageInfo(buildPageInfo())        // Pagination metadata
+            .build();
     }
-  }
+    
+    public static void main(String[] args) {
+        FilteredCountExample example = new FilteredCountExample();
+        
+        LogFilterCriteria criteria = LogFilterCriteria.builder()
+            .startDate(LocalDate.now().minusDays(7))
+            .endDate(LocalDate.now())
+            .eventTypes(Arrays.asList("AUTHENTICATION"))
+            .build();
+            
+        CountedGenericQueryResult<LogEvent> result = example.getAuditLogs(criteria);
+        
+        System.out.println("Events on page: " + result.getItems().size());
+        System.out.println("Total matching filter: " + result.getFilteredCount());
+        System.out.println("First event: " + result.getItems().get(0).getSummary());
+    }
 }
 ```
+
+### 4. Explore Filtering Patterns
+
+OpenFrame uses sophisticated filtering patterns for both audit logs and devices:
+
+**Audit Log Filtering Example:**
+```java
+import com.openframe.api.dto.audit.LogFilterCriteria;
+import com.openframe.api.dto.audit.LogFilters;
+import com.openframe.api.dto.audit.OrganizationFilterOption;
+import java.time.LocalDate;
+import java.util.Arrays;
+
+public class AuditFilterExample {
+    
+    public LogFilters buildAuditFilterOptions() {
+        // Organization filter options (for dropdowns)
+        List<OrganizationFilterOption> orgOptions = Arrays.asList(
+            OrganizationFilterOption.builder()
+                .organizationId("org_123")
+                .organizationName("Acme Corp")
+                .count(45)  // Number of audit logs for this org
+                .build(),
+            OrganizationFilterOption.builder()
+                .organizationId("org_456") 
+                .organizationName("Beta Inc")
+                .count(23)
+                .build()
+        );
+        
+        return LogFilters.builder()
+            .organizationOptions(orgOptions)
+            .eventTypes(Arrays.asList("AUTHENTICATION", "DATA_EXPORT", "CONFIGURATION"))
+            .severities(Arrays.asList("INFO", "WARN", "ERROR", "CRITICAL"))
+            .build();
+    }
+    
+    public LogFilterCriteria buildFilterCriteria() {
+        return LogFilterCriteria.builder()
+            .startDate(LocalDate.now().minusDays(30))
+            .endDate(LocalDate.now())
+            .eventTypes(Arrays.asList("AUTHENTICATION", "DATA_EXPORT"))
+            .severities(Arrays.asList("WARN", "ERROR"))
+            .organizationIds(Arrays.asList("org_123"))
+            .build();
+    }
+}
+```
+
+### 5. Set Up Your IDE for Productive Development
+
+Configure your IDE to work efficiently with OpenFrame OSS Lib:
+
+#### IntelliJ IDEA Setup
+
+1. **Import the project:**
+   ```bash
+   # Open IntelliJ IDEA
+   File → Open → Select openframe-oss-lib directory
+   ```
+
+2. **Configure Lombok:**
+   - `File → Settings → Plugins → Install "Lombok Plugin"`
+   - `File → Settings → Build → Compiler → Annotation Processors → Enable annotation processing`
+
+3. **Set up code style:**
+   ```bash
+   # Import code style settings if available
+   File → Settings → Editor → Code Style → Import Scheme
+   ```
+
+4. **Enable auto-import:**
+   - `File → Settings → Editor → General → Auto Import`
+   - Check "Add unambiguous imports on the fly"
+
+#### Eclipse Setup
+
+1. **Import as Maven project:**
+   ```bash
+   File → Import → Existing Maven Projects → Select openframe-oss-lib
+   ```
+
+2. **Install Lombok:**
+   ```bash
+   # Download lombok.jar and run installer
+   java -jar lombok.jar
+   # Follow installation wizard
+   ```
+
+#### VS Code Setup
+
+1. **Open project:**
+   ```bash
+   code openframe-oss-lib
+   ```
+
+2. **Install extensions:**
+   ```bash
+   # Install Java extension pack (includes Lombok support)
+   code --install-extension vscjava.vscode-java-pack
+   ```
+
+## Key Patterns You'll Use Daily
+
+### Pattern 1: Building Query Results
+
+```java
+// Always use the builder pattern
+GenericQueryResult<MyDTO> result = GenericQueryResult.<MyDTO>builder()
+    .items(dataList)
+    .pageInfo(pageInfo)
+    .build();
+
+// For filtered results, add filteredCount
+CountedGenericQueryResult<MyDTO> countedResult = 
+    CountedGenericQueryResult.<MyDTO>builder()
+        .items(dataList)
+        .pageInfo(pageInfo) 
+        .filteredCount(totalMatching)
+        .build();
+```
+
+### Pattern 2: Defining Filter Criteria
+
+```java
+// Build comprehensive filter criteria
+LogFilterCriteria criteria = LogFilterCriteria.builder()
+    .startDate(LocalDate.now().minusDays(30))
+    .endDate(LocalDate.now())
+    .eventTypes(Arrays.asList("AUTHENTICATION", "DATA_EXPORT"))
+    .organizationIds(Arrays.asList("org_123", "org_456"))
+    .deviceId("device_789")
+    .build();
+```
+
+### Pattern 3: Creating Filter Options
+
+```java
+// Build filter options for UI dropdowns
+DeviceFilters deviceFilterOptions = DeviceFilters.builder()
+    .deviceTypes(Arrays.asList("LAPTOP", "MOBILE", "SERVER"))
+    .organizationOptions(orgOptions)
+    .statusOptions(Arrays.asList("ACTIVE", "INACTIVE", "MAINTENANCE"))
+    .build();
+```
+
+## Common Configuration
+
+### Maven Settings
+
+Add this to your project's `pom.xml`:
+
+```xml
+<properties>
+    <lombok.version>1.18.28</lombok.version>
+    <jackson.version>2.15.2</jackson.version>
+</properties>
+
+<dependencies>
+    <!-- OpenFrame OSS Lib -->
+    <dependency>
+        <groupId>com.openframe.api</groupId>
+        <artifactId>openframe-api-lib</artifactId>
+        <version>1.0-SNAPSHOT</version>
+    </dependency>
+    
+    <!-- Lombok for annotation processing -->
+    <dependency>
+        <groupId>org.projectlombok</groupId>
+        <artifactId>lombok</artifactId>
+        <version>${lombok.version}</version>
+        <scope>provided</scope>
+    </dependency>
+</dependencies>
+```
+
+### Spring Boot Integration
+
+If using Spring Boot, configure JSON serialization:
+
+```java
+@Configuration
+public class JsonConfig {
+    
+    @Bean
+    @Primary
+    public ObjectMapper objectMapper() {
+        return new ObjectMapper()
+            .registerModule(new JavaTimeModule())
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    }
+}
+```
+
+## Explore Real Examples
+
+Check out these directories in your cloned repository:
+
+```bash
+# View actual DTO implementations
+find openframe-api-lib/src/main/java -name "*.java" | xargs ls -la
+
+# Study the test files (if available)
+find . -name "*Test.java" | head -5
+
+# Look at POM configuration
+cat openframe-api-lib/pom.xml
+```
+
+## Where to Get Help
+
+When you need assistance:
+
+| Resource | Purpose | Link |
+|----------|---------|------|
+| **Architecture Docs** | Understand design patterns | [Module 1](../reference/architecture/module_1/module_1.md), [Module 2](../reference/architecture/module_2/module_2.md) |
+| **Community Slack** | Ask questions, get help | [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) |
+| **Source Code** | See implementation details | Browse the `openframe-api-lib/src` directory |
+| **Maven Central** | Find version information | Search for "openframe-api" |
 
 ## Next Steps
 
-You're now familiar with the core capabilities of OpenFrame OSS Libraries! Here's where to go next:
+Now that you understand the basics:
 
-### **Development Path**
-- **[Development Environment Setup](../development/setup/environment.md)** - Configure your IDE and tools
-- **[Local Development Guide](../development/setup/local-development.md)** - Best practices for development
-- **[Architecture Overview](../development/architecture/README.md)** - Understand the system design
+1. **Study the Architecture** - Read the detailed [architecture documentation](../reference/architecture/README.md)
+2. **Build a Real API** - Create a service using these DTOs  
+3. **Contribute Back** - Check the development documentation for contribution guidelines
+4. **Join the Community** - Connect with other OpenFrame developers
 
-### **Integration Path**
-- **[API Documentation](./reference/architecture/api-service-core-controllers-and-graphql/api-service-core-controllers-and-graphql.md)** - Complete API reference
-- **[Security Guidelines](../development/security/README.md)** - Authentication and authorization
-- **[External API Guide](./reference/architecture/external-api-service-core/external-api-service-core.md)** - Third-party integrations
+## Summary
 
-### **Operations Path**
-- **[Testing Guide](../development/testing/README.md)** - Testing strategies and tools
-- **[Contributing Guidelines](../development/contributing/guidelines.md)** - How to contribute back
+You've now learned the essential patterns for working with OpenFrame OSS Lib:
 
-## Getting Help
+✅ **Two-module structure** - Core DTOs (Module 1) and Filtering (Module 2)  
+✅ **Pagination patterns** - `GenericQueryResult<T>` and `CountedGenericQueryResult<T>`  
+✅ **Filtering workflows** - Criteria inputs and filter option outputs  
+✅ **IDE configuration** - Lombok setup and productivity features  
+✅ **Common patterns** - Builder pattern usage and best practices  
 
-- **Community**: Join our [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
-- **Documentation**: Browse the complete [reference docs](./reference/architecture/)
-- **Issues**: Report problems on [GitHub](https://github.com/flamingo-stack/openframe-oss-lib/issues)
+These foundations will serve you well as you build scalable, type-safe APIs for the OpenFrame platform.
 
 ---
 
-*Congratulations! You've taken your first steps with OpenFrame OSS Libraries. The platform is now ready for serious development and integration work.*
+*🚀 You're now ready to build production-quality APIs using OpenFrame OSS Lib! The standardized DTOs will ensure your services integrate seamlessly with the broader OpenFrame ecosystem.*

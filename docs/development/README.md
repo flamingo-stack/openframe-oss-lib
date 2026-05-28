@@ -1,311 +1,306 @@
 # Development Documentation
 
-Welcome to the OpenFrame OSS Libraries development documentation. This section provides comprehensive guidance for developers working on, with, or extending the OpenFrame backend infrastructure.
-
-## Overview
-
-The development documentation is organized into focused areas covering everything from initial setup to advanced architecture patterns. Whether you're contributing to the core libraries or building integrations, you'll find the information you need here.
+Welcome to the OpenFrame OSS Lib development section. This documentation covers everything you need to contribute to, extend, or integrate with the OpenFrame platform's core DTO library.
 
 ## Quick Navigation
 
-### **Getting Started**
-- **[Environment Setup](setup/environment.md)** - IDE, tools, and development environment configuration
-- **[Local Development](setup/local-development.md)** - Running and debugging the platform locally
+### Setup & Environment
+- [**Environment Setup**](setup/environment.md) - IDE configuration, tools, and development environment
+- [**Local Development**](setup/local-development.md) - Clone, build, and run locally with hot reload
 
-### **Understanding the Platform**
-- **[Architecture Overview](architecture/README.md)** - System design, patterns, and module relationships
-- **[Security Guidelines](security/README.md)** - Authentication, authorization, and security best practices
+### Architecture & Design
+- [**Architecture Overview**](architecture/README.md) - High-level design, components, and data flow
+- **Reference Documentation** - Detailed module documentation:
+  - [Architecture Overview](../reference/architecture/README.md) 
+  - [Module 1: Core DTOs](../reference/architecture/module_1/module_1.md)
+  - [Module 2: Filtering DTOs](../reference/architecture/module_2/module_2.md)
 
-### **Quality & Testing**
-- **[Testing Overview](testing/README.md)** - Testing strategies, tools, and writing effective tests
+### Quality & Testing
+- [**Security Best Practices**](security/README.md) - Authentication, authorization, and data protection
+- [**Testing Overview**](testing/README.md) - Test structure, running tests, and writing new tests
 
-### **Contributing**
-- **[Contributing Guidelines](contributing/guidelines.md)** - Code style, PR process, and contribution workflow
+### Contributing
+- [**Contributing Guidelines**](contributing/guidelines.md) - Code style, PR process, and review checklist
 
-## Architecture at a Glance
+## Development Workflow Overview
 
-OpenFrame OSS Libraries follows a modular, event-driven architecture:
+OpenFrame OSS Lib follows a streamlined development workflow designed for both internal team members and external contributors:
 
 ```mermaid
 flowchart TD
-    Dev[Developer] --> IDE[Development Environment]
-    IDE --> Code[Source Code]
+    Setup[Environment Setup] --> Clone[Clone Repository]
+    Clone --> Build[Build & Test]
+    Build --> Develop[Local Development]
+    Develop --> Test[Write Tests]
+    Test --> Review[Code Review]
+    Review --> Merge[Merge to Main]
     
-    Code --> Core[Core Services]
-    Code --> API[API Layer]
-    Code --> Security[Security Layer]
-    Code --> Data[Data Layer]
+    Develop --> Security{Security Review}
+    Security -->|Pass| Test
+    Security -->|Fail| Develop
     
-    Core --> Gateway[Gateway Service]
-    Core --> Management[Management Service]
+    classDef setup fill:#e3f2fd
+    classDef dev fill:#f3e5f5
+    classDef quality fill:#e8f5e8
     
-    API --> REST[REST Controllers]
-    API --> GraphQL[GraphQL API]
-    
-    Security --> OAuth[OAuth2 Server]
-    Security --> JWT[JWT Security]
-    
-    Data --> Mongo[MongoDB]
-    Data --> Kafka[Kafka Streams]
-    Data --> Redis[Redis Cache]
+    class Setup,Clone setup
+    class Build,Develop dev
+    class Test,Security,Review,Merge quality
 ```
 
-## Development Principles
+## Key Development Principles
 
-### **Multi-Tenant by Design**
-Every component considers tenant isolation, from data access to security contexts.
+### 1. Contract-First Design
+All DTOs are designed as **API contracts first**, independent of specific implementations:
 
-### **Event-Driven Architecture**  
-Services communicate through well-defined events, enabling scalability and decoupling.
+```java
+// ✅ Good: Generic, reusable contract
+public class CountedGenericQueryResult<T> extends GenericQueryResult<T> {
+    private int filteredCount;
+}
 
-### **Security First**
-Authentication and authorization are built into every layer, never bolted on afterward.
+// ❌ Avoid: Implementation-specific details
+public class MySQLCountedQueryResult extends GenericQueryResult<T> {
+    private String sqlQuery; // Implementation detail
+}
+```
 
-### **Observability**
-Comprehensive logging, metrics, and tracing for production-ready operations.
+### 2. Lombok-Driven Development
+Minimize boilerplate with consistent Lombok patterns:
 
-### **Extensibility**
-Plugin points and processor interfaces allow customization without core changes.
+```java
+@Data
+@Builder
+@NoArgsConstructor  
+@AllArgsConstructor
+public class LogEvent {
+    private String id;
+    private String summary;
+    // Lombok generates getters, setters, builder, constructors
+}
+```
 
-## Key Technologies
+### 3. Multi-Tenant Awareness
+All filtering DTOs support organization-scoped queries:
 
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| **Java** | 21 | Runtime platform with modern language features |
-| **Spring Boot** | 3.3.0 | Application framework and dependency injection |
-| **Spring Security** | 6.x | Authentication and authorization |
-| **Spring Authorization Server** | 1.3.1 | OAuth2/OIDC compliance |
-| **Netflix DGS** | 9.0.3 | GraphQL implementation |
-| **MongoDB** | 5.0+ | Primary operational database |
-| **Apache Kafka** | 2.8+ | Event streaming and messaging |
-| **Redis** | 6.0+ | Caching and session storage |
-| **Maven** | 3.6+ | Build and dependency management |
+```java
+@Data
+@Builder
+public class LogFilterCriteria {
+    private List<String> organizationIds;  // Multi-tenant filtering
+    private String deviceId;               // Device-scoped queries
+    // ... other criteria
+}
+```
 
-## Module Structure
+## Project Structure
 
-The repository is organized into service-core modules:
-
-### **API & Contracts**
 ```text
-openframe-api-lib/                  # Shared DTOs and services
-openframe-api-service-core/         # REST + GraphQL orchestration
-openframe-external-api-service-core/ # Stable external APIs
+openframe-oss-lib/
+├── 📁 openframe-api-lib/          # Main library module
+│   ├── 📁 src/main/java/
+│   │   └── 📁 com/openframe/api/dto/
+│   │       ├── 📄 GenericQueryResult.java
+│   │       ├── 📄 CountedGenericQueryResult.java
+│   │       ├── 📁 audit/           # Module 1: Audit DTOs
+│   │       │   ├── 📄 LogEvent.java
+│   │       │   ├── 📄 LogDetails.java
+│   │       │   ├── 📄 LogFilterCriteria.java
+│   │       │   ├── 📄 LogFilters.java          # Module 2
+│   │       │   └── 📄 OrganizationFilterOption.java
+│   │       └── 📁 device/          # Module 2: Device DTOs  
+│   │           ├── 📄 DeviceFilterCriteria.java
+│   │           ├── 📄 DeviceFilters.java
+│   │           └── 📄 DeviceFilterOption.java
+│   └── 📄 pom.xml                 # Module dependencies
+├── 📄 pom.xml                     # Root project configuration
+└── 📁 docs/                       # Documentation
+    ├── 📁 getting-started/
+    ├── 📁 development/
+    └── 📁 reference/
 ```
-
-### **Security & Identity**
-```text
-openframe-authorization-service-core/ # OAuth2/OIDC server
-openframe-security-core/             # JWT and authentication
-openframe-gateway-service-core/      # Reactive gateway
-```
-
-### **Data & Infrastructure**
-```text
-openframe-data-mongo/               # MongoDB models and repos
-openframe-data/                     # Analytics and time-series
-openframe-data-kafka/               # Kafka messaging
-openframe-data-redis/               # Caching infrastructure
-```
-
-### **Processing & Management**
-```text
-openframe-stream-service-core/      # Event processing
-openframe-management-service-core/  # Automation and scheduling
-openframe-client-core/              # Agent management
-```
-
-## Development Workflow
-
-### 1. **Environment Setup**
-Start with [Environment Setup](setup/environment.md) to configure your IDE and development tools.
-
-### 2. **Local Development**
-Follow [Local Development](setup/local-development.md) for running services locally with hot reloading.
-
-### 3. **Understanding Architecture**
-Review [Architecture Overview](architecture/README.md) to understand component relationships and data flows.
-
-### 4. **Security Implementation**
-Study [Security Guidelines](security/README.md) for implementing secure, tenant-aware features.
-
-### 5. **Testing Strategy**
-Use [Testing Overview](testing/README.md) to write comprehensive, reliable tests.
-
-### 6. **Contributing Back**
-Follow [Contributing Guidelines](contributing/guidelines.md) for code style and PR processes.
 
 ## Common Development Tasks
 
-### **Adding a New REST Endpoint**
+### Adding a New DTO
 
-```java
-@RestController
-@RequestMapping("/api/my-feature")
-@RequiredArgsConstructor
-public class MyFeatureController {
-    
-    private final MyFeatureService service;
-    
-    @GetMapping
-    public ResponseEntity<List<MyFeature>> list(
-        @AuthenticationPrincipal AuthPrincipal principal
-    ) {
-        List<MyFeature> features = service.findByTenant(principal.getTenantId());
-        return ResponseEntity.ok(features);
-    }
-}
-```
-
-### **Creating a GraphQL Data Fetcher**
-
-```java
-@DgsComponent
-public class MyFeatureDataFetcher {
-    
-    @DgsQuery
-    public Connection<MyFeature> myFeatures(
-        @InputArgument Integer first,
-        @InputArgument String after,
-        @DgsContext DgsRequestData requestData
-    ) {
-        String tenantId = extractTenantId(requestData);
-        // Implement pagination and filtering
-    }
-}
-```
-
-### **Adding Event Processing**
-
-```java
-@Component
-@RequiredArgsConstructor
-public class MyEventHandler {
-    
-    @EventListener
-    public void handleMyEvent(MyCustomEvent event) {
-        // Process the event
-        log.info("Processing event: {}", event);
-    }
-    
-    @KafkaListener(topics = "my-topic")
-    public void handleKafkaMessage(MyMessage message) {
-        // Handle Kafka events
-    }
-}
-```
-
-### **Implementing Custom Security**
-
-```java
-@Component
-public class MySecurityProcessor implements AuthorizationProcessor {
-    
-    @Override
-    public boolean hasPermission(AuthPrincipal principal, String resource, String action) {
-        // Custom authorization logic
-        return checkCustomPermission(principal, resource, action);
-    }
-}
-```
-
-## Best Practices
-
-### **Code Organization**
-- Keep controllers thin - delegate to services
-- Use DTOs for API boundaries
-- Implement proper exception handling
-- Follow REST and GraphQL conventions
-
-### **Security Considerations**
-- Always validate tenant access
-- Use `@AuthenticationPrincipal` for user context
-- Sanitize inputs and validate permissions
-- Implement proper CORS policies
-
-### **Performance Optimization**
-- Use appropriate caching strategies
-- Implement efficient database queries
-- Consider async processing for heavy operations
-- Monitor and profile critical paths
-
-### **Testing Approach**
-- Write unit tests for business logic
-- Create integration tests for APIs
-- Use test containers for database tests
-- Mock external dependencies appropriately
-
-## Debugging and Troubleshooting
-
-### **Common Issues**
-
-**Multi-tenant context not set**
-```java
-// Ensure tenant context is available
-@WithTenantContext
-public class MyService {
-    // Service methods automatically have tenant context
-}
-```
-
-**JWT validation failures**
-```yaml
-# Check issuer configuration
-logging:
-  level:
-    com.openframe.security: DEBUG
-```
-
-**Database connection issues**
 ```bash
-# Verify MongoDB connection
-mongosh --eval "db.adminCommand('ping')"
+# 1. Create the DTO class
+touch openframe-api-lib/src/main/java/com/openframe/api/dto/MyNewDTO.java
+
+# 2. Follow the standard pattern
+cat > MyNewDTO.java << 'EOF'
+package com.openframe.api.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor  
+public class MyNewDTO {
+    private String id;
+    private String name;
+}
+EOF
+
+# 3. Build and test
+mvn clean compile test
 ```
 
-### **Development Tools**
+### Running Local Tests
 
-**Hot Reloading with Spring DevTools**
+```bash
+# Run all tests
+mvn test
+
+# Run specific test class
+mvn test -Dtest=MyDTOTest
+
+# Run with verbose output
+mvn test -X
+
+# Generate test reports
+mvn surefire-report:report
+```
+
+### Building for Distribution
+
+```bash
+# Clean build
+mvn clean compile
+
+# Package JAR
+mvn package
+
+# Install to local repository
+mvn install
+
+# Deploy to repository (maintainers only)
+mvn deploy
+```
+
+## Integration Points
+
+### With OpenFrame Platform Services
+
+OpenFrame OSS Lib integrates with these platform components:
+
+| Component | Integration Point | Documentation |
+|-----------|-------------------|---------------|
+| **API Gateway** | Standardized response formats | [Architecture Docs](../reference/architecture/README.md) |
+| **Audit Service** | `LogEvent`, `LogDetails`, `LogFilters` | [Module 1](../reference/architecture/module_1/module_1.md) |
+| **Device Service** | `DeviceFilterCriteria`, `DeviceFilters` | [Module 2](../reference/architecture/module_2/module_2.md) |
+| **Frontend Apps** | JSON serialization of all DTOs | [First Steps](../getting-started/first-steps.md) |
+
+### With External Systems
+
+```java
+// Example: External system integration
+@RestController
+public class ExternalAPIController {
+    
+    @PostMapping("/external/devices")
+    public CountedGenericQueryResult<DeviceInfo> getDevices(
+        @RequestBody DeviceFilterCriteria criteria) {
+        
+        // Convert to external system format
+        ExternalDeviceQuery query = converter.toExternal(criteria);
+        
+        // Call external system
+        ExternalDeviceResponse response = externalService.query(query);
+        
+        // Convert back to OpenFrame DTOs
+        return converter.fromExternal(response);
+    }
+}
+```
+
+## Development Environment Variations
+
+### For Core Team Members
+
+```bash
+# Full repository access
+git clone git@github.com:openframe/openframe-oss-lib.git
+
+# Direct push access to feature branches
+git checkout -b feature/new-dto-type
+git push origin feature/new-dto-type
+```
+
+### For External Contributors
+
+```bash
+# Fork-based workflow
+gh repo fork openframe/openframe-oss-lib
+git clone git@github.com:YOUR_USERNAME/openframe-oss-lib.git
+
+# Create PR to main repository
+git checkout -b feature/my-contribution
+# ... make changes ...
+gh pr create --title "Add new DTO for X" --body "Description"
+```
+
+### For API Consumers
+
 ```xml
+<!-- Add dependency to your project -->
 <dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-devtools</artifactId>
-    <scope>runtime</scope>
+    <groupId>com.openframe.api</groupId>
+    <artifactId>openframe-api-lib</artifactId>
+    <version>1.0.0</version>
 </dependency>
 ```
 
-**GraphQL Schema Inspection**
+## Documentation Standards
+
+All development contributions should include:
+
+- **JavaDoc** for public APIs
+- **Unit tests** for new DTOs
+- **Integration examples** for complex patterns  
+- **Architectural decision records** for design changes
+
+Example JavaDoc:
+```java
+/**
+ * Represents a paginated query result with filtered count information.
+ * 
+ * <p>This DTO extends {@link GenericQueryResult} to include the total number 
+ * of records matching the applied filter criteria, enabling accurate pagination 
+ * displays in client applications.
+ * 
+ * @param <T> the type of items in the result set
+ * @since 1.0.0
+ * @see GenericQueryResult
+ * @see LogFilterCriteria
+ */
+@Data
+public class CountedGenericQueryResult<T> extends GenericQueryResult<T> {
+    // ...
+}
 ```
-http://localhost:8080/graphiql
-```
 
-**Actuator Health Endpoints**
-```
-http://localhost:8080/actuator/health
-http://localhost:8080/actuator/info
-```
+## Getting Started
 
-## Learning Resources
+Ready to contribute? Start here:
 
-### **Spring Boot**
-- [Spring Boot Reference](https://docs.spring.io/spring-boot/docs/current/reference/htmlsingle/)
-- [Spring Security Reference](https://docs.spring.io/spring-security/reference/)
+1. [**Environment Setup**](setup/environment.md) - Configure your development environment
+2. [**Local Development**](setup/local-development.md) - Get the code running locally
+3. [**Architecture Overview**](architecture/README.md) - Understand the design principles
+4. [**Contributing Guidelines**](contributing/guidelines.md) - Learn the contribution process
 
-### **GraphQL**
-- [Netflix DGS Documentation](https://netflix.github.io/dgs/)
-- [GraphQL Best Practices](https://graphql.org/learn/best-practices/)
+## Community
 
-### **Event-Driven Architecture**
-- [Spring Kafka Reference](https://docs.spring.io/spring-kafka/docs/current/reference/html/)
-- [Event Sourcing Patterns](https://microservices.io/patterns/data/event-sourcing.html)
-
-## Getting Help
-
-### **Community Support**
-- **OpenMSP Slack**: [Join the community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
-- **GitHub Issues**: [Report bugs and request features](https://github.com/flamingo-stack/openframe-oss-lib/issues)
-
-### **Development Team**
-For questions specific to development processes, reach out through the OpenMSP Slack community in the `#development` channel.
+- **Slack**: [OpenMSP Community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) - Get help and discuss development
+- **GitHub**: [Repository Issues](https://github.com/openframe/openframe-oss-lib/issues) - Report bugs and request features  
+- **Platform**: [OpenFrame](https://openframe.ai) - See the DTOs in action
+- **Company**: [Flamingo](https://flamingo.run) - Learn about the broader MSP platform
 
 ---
 
-*Ready to contribute to the future of open-source MSP tooling? Start with the [Environment Setup](setup/environment.md) guide and join our growing community of developers.*
+*This library powers the entire OpenFrame platform by providing consistent, type-safe data contracts. Your contributions help make AI-powered MSP solutions accessible to everyone.*

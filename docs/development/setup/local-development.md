@@ -1,639 +1,601 @@
 # Local Development Guide
 
-This guide covers running OpenFrame OSS Libraries locally for development, including hot reloading, debugging, and testing workflows. You'll learn how to efficiently develop, test, and iterate on the platform.
+This guide covers everything you need to know for developing OpenFrame OSS Lib locally, including cloning, building, testing, and iterative development workflows.
 
-## Development Prerequisites
+## Quick Start for Local Development
 
-Before starting local development, ensure you have completed:
+```bash
+# 1. Clone the repository
+git clone https://github.com/openframe/openframe-oss-lib.git
+cd openframe-oss-lib
 
-1. **[Prerequisites](../../getting-started/prerequisites.md)** - System requirements and tools
-2. **[Environment Setup](environment.md)** - IDE and development tools configuration
+# 2. Build the project
+./mvnw clean compile
+
+# 3. Run tests
+./mvnw test
+
+# 4. Install to local Maven repository
+./mvnw install
+
+# 5. Start development
+# Open in your IDE and start coding!
+```
 
 ## Repository Setup
 
-### Clone and Initial Setup
+### Cloning the Repository
 
 ```bash
-# Clone the repository
-git clone https://github.com/flamingo-stack/openframe-oss-lib.git
+# For core team members (direct access)
+git clone git@github.com:openframe/openframe-oss-lib.git
+
+# For external contributors (fork-based)
+gh repo fork openframe/openframe-oss-lib --clone=true
+
+# Navigate to project
 cd openframe-oss-lib
-
-# Create development branch
-git checkout -b feature/your-feature-name
-
-# Install dependencies
-mvn clean install -DskipTests
 ```
 
-### Development Environment Configuration
-
-Create `application-development.yml` in `src/main/resources/`:
-
-```yaml
-spring:
-  profiles:
-    active: development
-    
-  # Development Database Settings
-  data:
-    mongodb:
-      uri: mongodb://localhost:27017/openframe_dev
-      
-  data:
-    redis:
-      host: localhost
-      port: 6379
-      
-  # Kafka Development Configuration
-  kafka:
-    bootstrap-servers: localhost:9092
-    consumer:
-      group-id: openframe-dev
-      auto-offset-reset: latest
-    producer:
-      retries: 1
-      
-# Development Security Settings
-openframe:
-  security:
-    jwt:
-      secret: development-jwt-secret-minimum-32-characters
-    oauth:
-      encryption-key: development-encryption-key-32-chars!
-      
-# Enable detailed logging
-logging:
-  level:
-    com.openframe: DEBUG
-    org.springframework.security: DEBUG
-    org.springframework.kafka: INFO
-    org.mongodb.driver: INFO
-    redis.clients.jedis: INFO
-    
-# Development server settings
-server:
-  port: 8080
-  error:
-    include-stacktrace: always
-    include-message: always
-    
-# Actuator endpoints for development
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics,env,beans,conditions
-  endpoint:
-    health:
-      show-details: always
-```
-
-## Starting the Development Environment
-
-### 1. Start Infrastructure Services
-
-Use Docker Compose for development dependencies:
-
-```bash
-# Start all required services
-docker-compose -f docker-compose.dev.yml up -d
-
-# Verify services are running
-docker-compose ps
-```
-
-Expected output:
-```text
-Name                Command               State                    Ports                  
----------------------------------------------------------------------------------------------
-mongodb       docker-entrypoint.sh mongod    Up      0.0.0.0:27017->27017/tcp             
-redis         docker-entrypoint.sh redis ... Up      0.0.0.0:6379->6379/tcp               
-kafka         /etc/confluent/docker/run      Up      0.0.0.0:9092->9092/tcp               
-zookeeper     /etc/confluent/docker/run      Up      2181/tcp, 2888/tcp, 3888/tcp         
-```
-
-### 2. Run the Application
-
-#### Option A: Maven Spring Boot Plugin (Recommended)
-
-```bash
-# Navigate to the main service module
-cd openframe-api-service-core
-
-# Run with development profile
-mvn spring-boot:run -Dspring-boot.run.profiles=development
-```
-
-#### Option B: IDE Run Configuration
-
-**IntelliJ IDEA:**
-1. Open `ApiServiceApplication.java`
-2. Right-click → **Run 'ApiServiceApplication'**
-3. Edit configuration:
-   - **Program arguments**: `--spring.profiles.active=development`
-   - **VM options**: `-Xmx2g -Dfile.encoding=UTF-8`
-
-**VS Code:**
-Create `.vscode/launch.json`:
-```json
-{
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "type": "java",
-            "name": "OpenFrame API Service",
-            "request": "launch",
-            "mainClass": "com.openframe.api.ApiServiceApplication",
-            "projectName": "openframe-api-service-core",
-            "args": "--spring.profiles.active=development",
-            "vmArgs": "-Xmx2g"
-        }
-    ]
-}
-```
-
-#### Option C: Command Line JAR
-
-```bash
-# Build the application
-mvn clean package -DskipTests
-
-# Run the built JAR
-java -jar openframe-api-service-core/target/openframe-api-service-core-*.jar \
-     --spring.profiles.active=development
-```
-
-### 3. Verify Application Startup
-
-Check the application logs for successful startup:
+### Project Structure Overview
 
 ```text
-  ____                   _____                          
- / __ \                 |  __ \                         
-| |  | |_ __   ___ _ __ | |__) |_ __ __ _ _ __ ___   ___ 
-| |  | | '_ \ / _ \ '_ \|  _  /| '__/ _` | '_ ` _ \ / _ \
-| |__| | |_) |  __/ | | | | \ \| | | (_| | | | | | |  __/
- \____/| .__/ \___|_| |_|_|  \_\_|  \__,_|_| |_| |_|\___|
-       | |                                               
-       |_|                                               
-
-OpenFrame API Service Core v5.32.0
-Started ApiServiceApplication in 15.234 seconds (process running for 16.789)
+openframe-oss-lib/
+├── 📄 .gitignore                    # Git ignore patterns
+├── 📄 .mvn/                         # Maven wrapper configuration
+├── 📄 mvnw                          # Maven wrapper script (Unix)
+├── 📄 mvnw.cmd                      # Maven wrapper script (Windows)
+├── 📄 pom.xml                       # Root project configuration
+├── 📁 openframe-api-lib/            # Main library module
+│   ├── 📄 pom.xml                   # Module configuration
+│   └── 📁 src/
+│       ├── 📁 main/java/            # Production source code
+│       │   └── 📁 com/openframe/api/dto/
+│       │       ├── 📄 GenericQueryResult.java
+│       │       ├── 📄 CountedGenericQueryResult.java
+│       │       ├── 📁 audit/        # Audit-related DTOs
+│       │       └── 📁 device/       # Device-related DTOs
+│       └── 📁 test/java/            # Test source code (if present)
+├── 📁 docs/                         # Documentation
+└── 📁 .github/                      # GitHub workflows and templates
 ```
 
-Test endpoints:
+### Initial Verification
+
 ```bash
-# Health check
-curl http://localhost:8080/health
+# Verify Java and Maven are working
+java -version
+./mvnw --version
 
-# GraphQL playground
-open http://localhost:8080/graphiql
+# Check project structure
+find . -name "*.java" | head -10
 
-# Actuator info
-curl http://localhost:8080/actuator/health
+# Verify all dependencies can be resolved
+./mvnw dependency:resolve
 ```
 
-## Hot Reloading and Live Development
+## Build System
 
-### Enable Spring Boot DevTools
+### Maven Wrapper Usage
 
-DevTools is included in the development dependencies. It provides:
+Always use the Maven wrapper (`./mvnw`) for consistency:
 
-- **Automatic restarts** when classpath changes
-- **Live reload** for static resources
-- **Enhanced development experience**
+```bash
+# Build project
+./mvnw clean compile
 
-### IDE-Specific Hot Reloading
+# Run tests
+./mvnw test
+
+# Package JAR
+./mvnw package
+
+# Install to local repository
+./mvnw install
+
+# Clean all build artifacts
+./mvnw clean
+```
+
+### Common Build Commands
+
+```bash
+# Full clean build with tests
+./mvnw clean test
+
+# Quick compilation without tests
+./mvnw compile -DskipTests
+
+# Build and install locally
+./mvnw clean install
+
+# Generate project reports
+./mvnw site
+
+# Check for dependency updates
+./mvnw versions:display-dependency-updates
+```
+
+### Build Profiles
+
+Configure different build profiles in `pom.xml`:
+
+```xml
+<profiles>
+    <!-- Development profile (default) -->
+    <profile>
+        <id>dev</id>
+        <activation>
+            <activeByDefault>true</activeByDefault>
+        </activation>
+        <properties>
+            <skipTests>false</skipTests>
+            <maven.javadoc.skip>true</maven.javadoc.skip>
+        </properties>
+    </profile>
+    
+    <!-- Production profile -->
+    <profile>
+        <id>prod</id>
+        <properties>
+            <skipTests>false</skipTests>
+            <maven.javadoc.skip>false</maven.javadoc.skip>
+        </properties>
+    </profile>
+    
+    <!-- Fast development profile -->
+    <profile>
+        <id>fast</id>
+        <properties>
+            <skipTests>true</skipTests>
+            <maven.test.skip>true</maven.test.skip>
+        </properties>
+    </profile>
+</profiles>
+```
+
+Use profiles:
+```bash
+# Fast build without tests
+./mvnw clean compile -Pfast
+
+# Production build with all checks
+./mvnw clean package -Pprod
+```
+
+## Development Workflow
+
+### Setting Up Your Feature Branch
+
+```bash
+# Update main branch
+git checkout main
+git pull origin main
+
+# Create feature branch
+git checkout -b feature/add-new-dto-type
+```
+
+### Iterative Development
+
+```bash
+# Edit source files in your IDE
+# src/main/java/com/openframe/api/dto/NewDTO.java
+
+# Quick compile check
+./mvnw compile
+
+# Run specific tests
+./mvnw test -Dtest=NewDTOTest
+
+# Run all tests
+./mvnw test
+
+# Format code (if formatter configured)
+./mvnw spotless:apply
+```
+
+### Hot Reload Development
+
+For rapid development cycles:
+
+```bash
+# Terminal 1: Watch for changes and auto-compile
+while inotifywait -r src/; do ./mvnw compile; done
+
+# Terminal 2: Run tests continuously
+./mvnw test -Dmaven.test.failure.ignore=true -Dtest="**/*Test" -Dsurefire.rerunFailingTestsCount=1
+```
+
+### IDE Integration
 
 #### IntelliJ IDEA
 
-1. **Enable automatic compilation:**
-   - **File → Settings → Build, Execution, Deployment → Compiler**
-   - Check "Build project automatically"
+```bash
+# Open project
+idea .
 
-2. **Enable auto-make in running applications:**
-   - **Help → Find Action** → Search for "Registry"
-   - Find `compiler.automake.allow.when.app.running`
-   - Enable the option
+# Or open specific module
+idea openframe-api-lib/
+```
 
-3. **Restart trigger:**
-   - Make code changes
-   - Application restarts automatically within 2-3 seconds
+**Useful IntelliJ shortcuts:**
+- `Ctrl+Shift+F10` - Run current test
+- `Ctrl+F9` - Build project
+- `Alt+Shift+F10` - Run configuration
+- `Ctrl+Shift+R` - Replace in path
+
+#### Eclipse
+
+```bash
+# Import as existing Maven project
+File > Import > Existing Maven Projects > Browse to openframe-oss-lib
+```
 
 #### VS Code
 
-Hot reloading works automatically with the Java Extension Pack when:
-- Files are saved (Ctrl+S / Cmd+S)
-- Auto-save is enabled
+```bash
+# Open in VS Code
+code .
 
-### Testing Hot Reloading
-
-Make a simple change to test hot reloading:
-
-```java
-// In HealthController.java
-@GetMapping("/health")
-public ResponseEntity<Map<String, String>> health() {
-    Map<String, String> status = new HashMap<>();
-    status.put("status", "OK");
-    status.put("timestamp", Instant.now().toString());
-    status.put("version", "DEV-BUILD"); // Add this line
-    return ResponseEntity.ok(status);
-}
+# Or open specific module
+code openframe-api-lib/
 ```
 
-Save the file and observe the console:
+## Running Tests
+
+### Test Structure
+
 ```text
-2024-01-15 10:30:45.123  INFO 12345 --- [  restartedMain] o.s.b.d.a.OptionalLiveReloadServer : LiveReload server is running on port 35729
-2024-01-15 10:30:45.456  INFO 12345 --- [  restartedMain] c.o.api.ApiServiceApplication : Started ApiServiceApplication in 2.345 seconds
+src/test/java/
+├── 📁 com/openframe/api/dto/
+│   ├── 📄 GenericQueryResultTest.java
+│   ├── 📄 CountedGenericQueryResultTest.java
+│   ├── 📁 audit/
+│   │   ├── 📄 LogEventTest.java
+│   │   └── 📄 LogFilterCriteriaTest.java
+│   └── 📁 device/
+│       ├── 📄 DeviceFilterCriteriaTest.java
+│       └── 📄 DeviceFiltersTest.java
+└── 📁 integration/
+    └── 📄 DTOSerializationTest.java
 ```
 
-Test the change:
-```bash
-curl http://localhost:8080/health
-# Should include the new "version" field
-```
-
-## Development Debugging
-
-### Debug Configuration
-
-#### IntelliJ IDEA Debug
-
-1. **Set breakpoints** in your code
-2. **Run → Debug 'ApiServiceApplication'**
-3. Or use the debug icon next to the run configuration
-
-#### Remote Debugging
-
-For debugging in complex scenarios:
+### Running Tests
 
 ```bash
-# Run with debug options
-mvn spring-boot:run -Dspring-boot.run.jvmArguments="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5005"
+# All tests
+./mvnw test
+
+# Specific test class
+./mvnw test -Dtest=LogEventTest
+
+# Test pattern
+./mvnw test -Dtest="*Filter*Test"
+
+# Integration tests only
+./mvnw test -Dtest="**/*IntegrationTest"
+
+# Skip integration tests  
+./mvnw test -DexcludeGroups="integration"
+
+# Run tests with detailed output
+./mvnw test -X
+
+# Generate test reports
+./mvnw surefire-report:report
+open target/site/surefire-report.html
 ```
 
-Configure remote debug in IDE:
-- **Host**: `localhost`
-- **Port**: `5005`
+### Writing New Tests
 
-### Database Debugging
+Example test for a new DTO:
 
-#### MongoDB Queries
+```java
+package com.openframe.api.dto;
 
-Enable MongoDB query logging:
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
+import static org.junit.jupiter.api.Assertions.*;
 
-```yaml
-logging:
-  level:
-    org.springframework.data.mongodb.core: DEBUG
-```
-
-Use MongoDB Compass or command line:
-```bash
-mongosh "mongodb://localhost:27017/openframe_dev"
-db.organizations.find().pretty()
-```
-
-#### Redis Operations
-
-Monitor Redis commands:
-```bash
-# Monitor all commands
-redis-cli monitor
-
-# Check specific keys
-redis-cli keys "*session*"
-```
-
-#### Kafka Message Debugging
-
-Monitor Kafka topics:
-```bash
-# List topics
-kafka-topics.sh --bootstrap-server localhost:9092 --list
-
-# Consume messages
-kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic openframe-events --from-beginning
-```
-
-## Testing During Development
-
-### Unit Tests
-
-Run unit tests for specific modules:
-
-```bash
-# Run all tests
-mvn test
-
-# Run tests for specific module
-mvn test -pl openframe-api-service-core
-
-# Run specific test class
-mvn test -Dtest=OrganizationServiceTest
-
-# Run specific test method
-mvn test -Dtest=OrganizationServiceTest#shouldCreateOrganization
-```
-
-### Integration Tests
-
-Run integration tests with embedded databases:
-
-```bash
-# Run integration tests
-mvn verify -P integration-tests
-
-# Run with test containers
-mvn verify -Dspring.profiles.active=test
-```
-
-### API Testing During Development
-
-#### GraphQL Testing
-
-Use the built-in GraphQL playground:
-
-1. Navigate to `http://localhost:8080/graphiql`
-2. Try sample queries:
-
-```graphql
-query GetOrganizations {
-  organizations(first: 5) {
-    edges {
-      node {
-        id
-        name
-        contactInformation {
-          email
-        }
-      }
+class MyNewDTOTest {
+    
+    @Test
+    @DisplayName("Should build DTO with all required fields")
+    void shouldBuildDTOWithAllFields() {
+        // Given
+        String expectedId = "test_123";
+        String expectedName = "Test Name";
+        
+        // When
+        MyNewDTO dto = MyNewDTO.builder()
+            .id(expectedId)
+            .name(expectedName)
+            .build();
+        
+        // Then
+        assertNotNull(dto);
+        assertEquals(expectedId, dto.getId());
+        assertEquals(expectedName, dto.getName());
     }
-  }
-}
-```
-
-#### REST API Testing
-
-**IntelliJ HTTP Client:**
-
-Create `dev-tests.http`:
-```http
-### Health Check
-GET http://localhost:8080/health
-
-### Create Organization
-POST http://localhost:8080/api/organizations
-Content-Type: application/json
-
-{
-  "name": "Dev Test Org",
-  "contactInformation": {
-    "email": "test@dev.com"
-  }
-}
-
-### GraphQL Query
-POST http://localhost:8080/graphql
-Content-Type: application/json
-
-{
-  "query": "{ organizations(first: 1) { edges { node { id name } } } }"
-}
-```
-
-**curl Scripts:**
-
-Create `scripts/dev-api-tests.sh`:
-```bash
-#!/bin/bash
-
-BASE_URL="http://localhost:8080"
-
-echo "Testing Health Endpoint..."
-curl -s "${BASE_URL}/health" | jq
-
-echo "Testing GraphQL..."
-curl -s -X POST "${BASE_URL}/graphql" \
-  -H "Content-Type: application/json" \
-  -d '{"query": "{ __schema { queryType { name } } }"}' | jq
-
-echo "Testing Organizations API..."
-curl -s "${BASE_URL}/api/organizations" | jq
-```
-
-## Common Development Workflows
-
-### Adding a New Feature
-
-1. **Create feature branch:**
-```bash
-git checkout -b feature/new-awesome-feature
-```
-
-2. **Write failing tests first (TDD):**
-```java
-@Test
-void shouldProcessAwesomeFeature() {
-    // Arrange
-    var input = new AwesomeFeatureRequest("test");
     
-    // Act & Assert
-    assertThat(service.processAwesome(input))
-        .isNotNull()
-        .hasFieldOrPropertyWithValue("status", "processed");
-}
-```
-
-3. **Implement the feature:**
-```java
-@Service
-@RequiredArgsConstructor
-public class AwesomeFeatureService {
+    @Test
+    @DisplayName("Should handle null values gracefully")
+    void shouldHandleNullValues() {
+        // When/Then - should not throw exceptions
+        assertDoesNotThrow(() -> {
+            MyNewDTO dto = MyNewDTO.builder().build();
+            assertNull(dto.getId());
+            assertNull(dto.getName());
+        });
+    }
     
-    public AwesomeFeatureResponse processAwesome(AwesomeFeatureRequest request) {
-        // Implementation
-        return new AwesomeFeatureResponse("processed");
+    @Test  
+    @DisplayName("Should support JSON serialization")
+    void shouldSerializeToJson() throws Exception {
+        // Given
+        MyNewDTO dto = MyNewDTO.builder()
+            .id("test_123")
+            .name("Test Name")
+            .build();
+        
+        ObjectMapper mapper = new ObjectMapper();
+        
+        // When
+        String json = mapper.writeValueAsString(dto);
+        MyNewDTO deserialized = mapper.readValue(json, MyNewDTO.class);
+        
+        // Then
+        assertEquals(dto.getId(), deserialized.getId());
+        assertEquals(dto.getName(), deserialized.getName());
     }
 }
 ```
 
-4. **Test locally:**
-```bash
-mvn test -Dtest=AwesomeFeatureServiceTest
-```
+## Debug Configuration
 
-5. **Integration testing:**
-```bash
-# Start dev environment and test manually
-curl -X POST http://localhost:8080/api/awesome-features \
-  -H "Content-Type: application/json" \
-  -d '{"name": "test feature"}'
-```
+### IntelliJ IDEA Debug Setup
 
-### Debugging Database Issues
+1. **Create Run Configuration:**
+   ```text
+   Run > Edit Configurations > + > Application
+   Main class: com.example.TestApp
+   VM options: -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5005
+   ```
 
-1. **Enable query logging:**
-```yaml
-logging:
-  level:
-    com.openframe.data: TRACE
-    org.springframework.data.mongodb.core.MongoTemplate: DEBUG
-```
+2. **Remote Debug Configuration:**
+   ```text
+   Run > Edit Configurations > + > Remote JVM Debug
+   Host: localhost
+   Port: 5005
+   ```
 
-2. **Use MongoDB Compass to inspect data**
-
-3. **Check Redis cache:**
-```bash
-redis-cli keys "*"
-redis-cli get "cache:organizations:123"
-```
-
-### Performance Testing During Development
-
-1. **Enable JVM metrics:**
-```yaml
-management:
-  metrics:
-    enable:
-      jvm: true
-      process: true
-      http: true
-```
-
-2. **Load testing with basic tools:**
-```bash
-# Simple load test
-ab -n 1000 -c 10 http://localhost:8080/health
-
-# GraphQL load test
-echo '{"query":"{ __schema { types { name } } }"}' > query.json
-ab -n 100 -c 5 -p query.json -T application/json http://localhost:8080/graphql
-```
-
-## Troubleshooting Development Issues
-
-### Application Won't Start
-
-**Common causes and solutions:**
-
-1. **Port conflicts:**
-```bash
-# Check what's using port 8080
-lsof -i :8080
-kill -9 <PID>
-
-# Or change port
---server.port=8081
-```
-
-2. **Database connection issues:**
-```bash
-# Check services
-docker-compose ps
-
-# Restart services
-docker-compose restart mongodb redis
-```
-
-3. **Maven dependency conflicts:**
-```bash
-# Check for conflicts
-mvn dependency:tree | grep -i conflict
-
-# Force refresh
-mvn clean install -U
-```
-
-### Hot Reload Not Working
-
-1. **Verify DevTools is on classpath**
-2. **Check IDE auto-compilation settings**
-3. **Restart with clean build:**
-```bash
-mvn clean compile
-```
-
-### Memory Issues During Development
+### Maven Debug
 
 ```bash
-# Increase JVM memory
-export MAVEN_OPTS="-Xmx4g -XX:MaxMetaspaceSize=1g"
+# Debug tests
+./mvnw test -Dmaven.surefire.debug
 
-# Or in IDE run configuration:
--Xmx2g -XX:MaxMetaspaceSize=512m
+# Debug with custom port
+./mvnw test -Dmaven.surefire.debug="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8000"
+
+# Debug specific test
+./mvnw test -Dtest=LogEventTest -Dmaven.surefire.debug
 ```
 
-### Database State Issues
+## Code Quality Tools
+
+### Formatting and Style
 
 ```bash
-# Reset development database
-docker-compose down -v
-docker-compose up -d
+# Check code formatting (if configured)
+./mvnw spotless:check
 
-# Or reset specific service
-docker-compose restart mongodb
-mongosh --eval "db.dropDatabase()" openframe_dev
+# Apply automatic formatting
+./mvnw spotless:apply
+
+# Check style violations
+./mvnw checkstyle:check
+
+# Generate checkstyle report
+./mvnw checkstyle:checkstyle
 ```
 
-## Development Best Practices
-
-### Code Quality Checks
-
-Run before committing:
+### Static Analysis
 
 ```bash
-# Full build with tests
-mvn clean verify
+# Run SpotBugs analysis
+./mvnw spotbugs:check
 
-# Code style check
-mvn checkstyle:check
+# Generate SpotBugs report
+./mvnw spotbugs:spotbugs
 
-# Security analysis
-mvn spotbugs:check
+# PMD analysis
+./mvnw pmd:check
+
+# Generate PMD report  
+./mvnw pmd:pmd
 ```
 
-### Git Workflow
+## Dependency Management
+
+### Viewing Dependencies
 
 ```bash
-# Before starting work
-git pull origin main
-git checkout -b feature/your-feature
+# Dependency tree
+./mvnw dependency:tree
 
-# Regular commits
+# Dependency analysis
+./mvnw dependency:analyze
+
+# Check for dependency conflicts
+./mvnw dependency:tree -Dverbose
+
+# Find specific dependency usage
+./mvnw dependency:tree -Dincludes=org.projectlombok:lombok
+```
+
+### Updating Dependencies
+
+```bash
+# Check for updates
+./mvnw versions:display-dependency-updates
+
+# Update to latest versions (be careful!)
+./mvnw versions:use-latest-versions
+
+# Update specific dependency
+./mvnw versions:use-latest-versions -Dincludes=org.junit.jupiter:*
+```
+
+## Local Integration Testing
+
+### Testing with Local Projects
+
+```bash
+# Install current development version
+./mvnw install
+
+# Use in another local project
+# Add to other project's pom.xml:
+```
+
+```xml
+<dependency>
+    <groupId>com.openframe.api</groupId>
+    <artifactId>openframe-api-lib</artifactId>
+    <version>1.0-SNAPSHOT</version>
+</dependency>
+```
+
+### JSON Serialization Testing
+
+Create `integration-test.java`:
+```java
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.openframe.api.dto.*;
+
+public class SerializationTest {
+    public static void main(String[] args) throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        
+        // Test serialization
+        LogEvent event = LogEvent.builder()
+            .id("test_001")
+            .summary("Test event")
+            .eventType("TEST")
+            .build();
+            
+        String json = mapper.writeValueAsString(event);
+        System.out.println("Serialized: " + json);
+        
+        LogEvent deserialized = mapper.readValue(json, LogEvent.class);
+        System.out.println("Deserialized: " + deserialized);
+    }
+}
+```
+
+```bash
+# Compile and run
+./mvnw exec:java -Dexec.mainClass="SerializationTest"
+```
+
+## Performance Monitoring
+
+### Build Performance
+
+```bash
+# Profile Maven build
+./mvnw clean compile -X | grep "Total time"
+
+# Parallel builds (faster for multi-module projects)
+./mvnw clean compile -T 1C  # 1 thread per CPU core
+
+# Offline builds (skip dependency checks)
+./mvnw clean compile -o
+```
+
+### Memory Usage Monitoring
+
+```bash
+# Monitor JVM during development
+export MAVEN_OPTS="-Xmx2048m -XX:+PrintGCDetails -XX:+PrintGCTimeStamps"
+./mvnw clean test
+```
+
+## Troubleshooting Local Development
+
+### Common Issues
+
+**Maven wrapper not executable:**
+```bash
+chmod +x mvnw
+./mvnw --version
+```
+
+**IDE not recognizing changes:**
+```bash
+# Force refresh in IDE
+# IntelliJ: File > Reload Gradle Project / Reimport Maven
+# Eclipse: Right-click project > Refresh > Gradle > Refresh Gradle Project
+```
+
+**Lombok not working:**
+```bash
+# Verify annotation processing enabled in IDE
+# Check Lombok plugin installed
+# Restart IDE after Lombok installation
+```
+
+**Port conflicts during testing:**
+```bash
+# Change test ports if needed
+./mvnw test -Dtest.port=8081
+```
+
+**Out of memory errors:**
+```bash
+export MAVEN_OPTS="-Xmx4096m -XX:MaxMetaspaceSize=1024m"
+./mvnw clean test
+```
+
+### Getting Help
+
+- **Build Issues**: Check Maven output with `-X` flag for detailed logs
+- **IDE Problems**: Verify IDE plugins are installed and up to date
+- **Test Failures**: Run individual tests to isolate issues
+- **Community Support**: [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
+
+## Commit and Push Changes
+
+```bash
+# Stage changes
 git add .
-git commit -m "feat: implement awesome feature"
 
-# Before pushing
-mvn clean verify
-git push origin feature/your-feature
+# Commit with descriptive message
+git commit -m "Add new DTO for device configuration
+
+- Create DeviceConfigDTO with validation
+- Add builder pattern and Lombok annotations  
+- Include comprehensive test coverage
+- Update documentation"
+
+# Push to your feature branch
+git push origin feature/add-new-dto-type
+
+# Create pull request (if you have permissions)
+gh pr create --title "Add DeviceConfigDTO" --body "Implements new device configuration DTO with validation and tests"
 ```
-
-### Environment Isolation
-
-Keep development isolated:
-
-- Use `openframe_dev` database name
-- Use development-specific cache keys
-- Use separate Kafka consumer groups
-- Use development profiles consistently
 
 ## Next Steps
 
-With local development running smoothly:
+With your local development environment working:
 
-1. **[Architecture Overview](../architecture/README.md)** - Understand the system design
-2. **[Security Guidelines](../security/README.md)** - Implement secure features
-3. **[Testing Guide](../testing/README.md)** - Write comprehensive tests
-4. **[Contributing Guidelines](../contributing/guidelines.md)** - Follow project conventions
-
-## Getting Help
-
-- **OpenMSP Slack**: [Development channel](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
-- **GitHub Issues**: Report development problems
-- **Stack Overflow**: Tag questions with `openframe`
+1. [**Architecture Overview**](../architecture/README.md) - Understand the codebase design
+2. [**Security Guidelines**](../security/README.md) - Learn security best practices
+3. [**Testing Guide**](../testing/README.md) - Master the testing strategies
+4. [**Contributing Guidelines**](../contributing/guidelines.md) - Learn the contribution workflow
 
 ---
 
-*Your local development environment is now configured for productive OpenFrame OSS Libraries development!*
+*Local development should feel smooth and productive. If you encounter friction in any of these workflows, please let us know so we can improve the developer experience.*

@@ -1,366 +1,303 @@
 # Quick Start Guide
 
-Get OpenFrame OSS Libraries up and running in just 5 minutes! This guide walks you through cloning, building, and running the core services with minimal configuration.
+Get OpenFrame OSS Lib up and running in 5 minutes with this streamlined guide.
+
+[![OpenFrame Product Walkthrough (Beta Access)](https://img.youtube.com/vi/awc-yAnkhIo/maxresdefault.jpg)](https://www.youtube.com/watch?v=awc-yAnkhIo)
 
 ## TL;DR - 5-Minute Setup
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/flamingo-stack/openframe-oss-lib.git
+git clone https://github.com/openframe/openframe-oss-lib.git
 cd openframe-oss-lib
 
-# 2. Start dependencies with Docker
-docker-compose up -d
+# 2. Build the project
+mvn clean compile
 
-# 3. Build the project
-mvn clean install -DskipTests
+# 3. Run tests
+mvn test
 
-# 4. Run a sample service
-cd openframe-api-service-core
-mvn spring-boot:run
+# 4. Install to local repository
+mvn install
 ```
 
-## Step-by-Step Setup
+That's it! The library is now ready for use in your projects.
+
+## Step-by-Step Walkthrough
 
 ### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/flamingo-stack/openframe-oss-lib.git
+# Clone from GitHub
+git clone https://github.com/openframe/openframe-oss-lib.git
+
+# Navigate to project directory
 cd openframe-oss-lib
+
+# Verify project structure
+ls -la
 ```
 
-**What you get:**
-- Complete OpenFrame OSS Libraries source code
-- Multi-module Maven project structure
-- Sample configurations and documentation
-
-### Step 2: Start Infrastructure Dependencies
-
-Create a `docker-compose.yml` file for quick dependency setup:
-
-```yaml
-version: '3.8'
-services:
-  mongodb:
-    image: mongo:7-jammy
-    ports:
-      - "27017:27017"
-    environment:
-      - MONGO_INITDB_DATABASE=openframe
-    volumes:
-      - mongo_data:/data/db
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    command: redis-server --appendonly yes
-    volumes:
-      - redis_data:/data
-
-  zookeeper:
-    image: confluentinc/cp-zookeeper:latest
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-
-  kafka:
-    image: confluentinc/cp-kafka:latest
-    depends_on:
-      - zookeeper
-    ports:
-      - "9092:9092"
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-
-volumes:
-  mongo_data:
-  redis_data:
+Expected output:
+```text
+drwxr-xr-x  openframe-api-lib/
+-rw-r--r--  pom.xml
+-rw-r--r--  README.md
 ```
 
-Start the services:
+### Step 2: Verify Prerequisites
 
 ```bash
-docker-compose up -d
-```
+# Check Java version (8+ required)
+java -version
 
-**Verification:**
-```bash
-# Check all services are running
-docker-compose ps
+# Check Maven version (3.6+ required)  
+mvn -version
 
-# Test connections
-mongosh --eval "db.adminCommand('ping')"
-redis-cli ping
+# Verify project structure
+find . -name "*.java" | head -5
 ```
 
 ### Step 3: Build the Project
 
-Build all modules with Maven:
-
 ```bash
-mvn clean install -DskipTests
-```
+# Clean and compile
+mvn clean compile
 
-**Expected output:**
-```text
-[INFO] Reactor Summary for OpenFrame OSS Libraries:
-[INFO] 
-[INFO] openframe-core ..................................... SUCCESS
-[INFO] openframe-data-mongo ............................... SUCCESS
-[INFO] openframe-api-lib .................................. SUCCESS
-[INFO] openframe-security-core ............................ SUCCESS
-[INFO] openframe-api-service-core ......................... SUCCESS
-[INFO] ... (other modules)
+# Expected output indicates successful compilation
+[INFO] ------------------------------------------------------------------------
 [INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
 ```
 
-> **Note**: We skip tests initially to speed up the first build. Run tests later with `mvn test`.
-
-### Step 4: Configure Environment
-
-Create an `application.yml` file in your working directory:
-
-```yaml
-# Basic configuration for quick start
-spring:
-  profiles:
-    active: development
-  
-  # MongoDB Configuration
-  data:
-    mongodb:
-      uri: mongodb://localhost:27017/openframe
-  
-  # Redis Configuration
-  data:
-    redis:
-      host: localhost
-      port: 6379
-  
-  # Kafka Configuration
-  kafka:
-    bootstrap-servers: localhost:9092
-    
-# Security Configuration
-openframe:
-  security:
-    jwt:
-      secret: development-secret-key-change-in-production
-  oauth:
-    encryption-key: dev-key-32-chars-long-minimum!!
-
-# Server Configuration
-server:
-  port: 8080
-
-# Logging
-logging:
-  level:
-    com.openframe: DEBUG
-    org.springframework.security: DEBUG
-```
-
-### Step 5: Run the API Service
-
-Start the main API service:
+### Step 4: Run Tests
 
 ```bash
-cd openframe-api-service-core
-mvn spring-boot:run
+# Execute all tests
+mvn test
+
+# Or run tests with verbose output
+mvn test -X
 ```
 
-**Expected startup logs:**
+### Step 5: Install to Local Repository
+
+```bash
+# Install to local Maven repository (~/.m2/repository)
+mvn install
+
+# Verify installation
+ls ~/.m2/repository/com/openframe/api/
+```
+
+## Project Structure Overview
+
+After cloning, you'll see this structure:
+
 ```text
-  ____                   _____                          
- / __ \                 |  __ \                         
-| |  | |_ __   ___ _ __ | |__) |_ __ __ _ _ __ ___   ___ 
-| |  | | '_ \ / _ \ '_ \|  _  /| '__/ _` | '_ ` _ \ / _ \
-| |__| | |_) |  __/ | | | | \ \| | | (_| | | | | | |  __/
- \____/| .__/ \___|_| |_|_|  \_\_|  \__,_|_| |_| |_|\___|
-       | |                                               
-       |_|                                               
-
-OpenFrame API Service Core v5.32.0
-Started ApiServiceApplication in 12.34 seconds
+openframe-oss-lib/
+├── pom.xml                                    # Maven configuration
+├── openframe-api-lib/
+│   └── src/main/java/com/openframe/api/dto/
+│       ├── GenericQueryResult.java            # Module 1: Generic pagination
+│       ├── CountedGenericQueryResult.java     # Module 1: Filtered pagination
+│       ├── audit/
+│       │   ├── LogEvent.java                  # Module 1: Audit summaries
+│       │   ├── LogDetails.java               # Module 1: Detailed logs
+│       │   ├── LogFilterCriteria.java        # Module 1: Audit filtering
+│       │   ├── LogFilters.java               # Module 2: Audit filter options
+│       │   └── OrganizationFilterOption.java # Module 2: Org filter options
+│       └── device/
+│           ├── DeviceFilterCriteria.java     # Module 2: Device filter input
+│           ├── DeviceFilters.java            # Module 2: Device filter options
+│           └── DeviceFilterOption.java       # Module 2: Device faceted filters
 ```
 
-The service will be available at `http://localhost:8080`.
+## Hello World Example
 
-## Verify Your Installation
+Create a simple example to test the DTOs:
 
-### Test the Health Endpoint
+### Create Test Class
 
-```bash
-curl http://localhost:8080/health
-```
+Create `src/test/java/QuickStartTest.java`:
 
-**Expected response:**
-```json
-{
-  "status": "OK"
+```java
+import com.openframe.api.dto.GenericQueryResult;
+import com.openframe.api.dto.CountedGenericQueryResult;
+import com.openframe.api.dto.audit.LogEvent;
+import org.junit.Test;
+import java.util.Arrays;
+import java.util.List;
+
+public class QuickStartTest {
+    
+    @Test
+    public void testBasicQueryResult() {
+        // Create sample data
+        List<String> items = Arrays.asList("item1", "item2", "item3");
+        
+        // Build generic query result
+        GenericQueryResult<String> result = GenericQueryResult.<String>builder()
+            .items(items)
+            .build();
+            
+        // Verify
+        assert result.getItems().size() == 3;
+        System.out.println("✅ Basic query result works!");
+    }
+    
+    @Test 
+    public void testCountedQueryResult() {
+        // Create sample audit events
+        List<LogEvent> events = Arrays.asList(
+            LogEvent.builder().summary("User login").build(),
+            LogEvent.builder().summary("Data export").build()
+        );
+        
+        // Build counted result
+        CountedGenericQueryResult<LogEvent> result = 
+            CountedGenericQueryResult.<LogEvent>builder()
+                .items(events)
+                .filteredCount(25) // Total matching filter
+                .build();
+        
+        // Verify
+        assert result.getItems().size() == 2;
+        assert result.getFilteredCount() == 25;
+        System.out.println("✅ Counted query result works!");
+    }
 }
 ```
 
-### Explore the GraphQL Schema
+### Run the Test
 
-Visit the GraphQL Playground:
-```
-http://localhost:8080/graphiql
+```bash
+# Run your test
+mvn test -Dtest=QuickStartTest
+
+# Expected output
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0
+✅ Basic query result works!
+✅ Counted query result works!
 ```
 
-Try a sample query:
-```graphql
-query {
-  __schema {
-    types {
-      name
-      description
+## Using in Your Project
+
+### Add Maven Dependency
+
+After running `mvn install`, add to your project's `pom.xml`:
+
+```xml
+<dependency>
+    <groupId>com.openframe.api</groupId>
+    <artifactId>openframe-api-lib</artifactId>
+    <version>1.0-SNAPSHOT</version>
+</dependency>
+```
+
+### Basic Usage Example
+
+```java
+// In your service class
+@Service
+public class AuditService {
+    
+    public CountedGenericQueryResult<LogEvent> getAuditLogs(
+        LogFilterCriteria criteria) {
+        
+        // Apply your business logic here
+        List<LogEvent> events = repository.findFilteredLogs(criteria);
+        int totalCount = repository.countFilteredLogs(criteria);
+        
+        // Return standardized response
+        return CountedGenericQueryResult.<LogEvent>builder()
+            .items(events)
+            .filteredCount(totalCount)
+            .pageInfo(buildPageInfo(criteria))
+            .build();
     }
-  }
 }
 ```
 
-### Test Authentication Setup
+### Controller Example
 
-Check the OAuth2 configuration endpoint:
-```bash
-curl http://localhost:8080/.well-known/openid-configuration
-```
-
-You should see a JSON response with OAuth2/OIDC discovery information.
-
-## Available Endpoints
-
-With the API service running, you have access to:
-
-| Endpoint | Type | Description |
-|----------|------|-------------|
-| `/health` | REST | Service health check |
-| `/graphql` | GraphQL | Main data API |
-| `/graphiql` | Web UI | GraphQL playground |
-| `/api/users` | REST | User management |
-| `/api/organizations` | REST | Organization management |
-| `/oauth/token` | OAuth2 | Token endpoint |
-| `/.well-known/openid-configuration` | OIDC | Discovery document |
-
-## What's Running?
-
-After completing the quick start, you have:
-
-### **Infrastructure Services**
-- ✅ MongoDB (port 27017) - Primary database
-- ✅ Redis (port 6379) - Caching and sessions  
-- ✅ Kafka (port 9092) - Event streaming
-- ✅ Zookeeper (port 2181) - Kafka coordination
-
-### **OpenFrame Services**
-- ✅ API Service Core (port 8080) - Main application API
-- ✅ OAuth2 Authorization Server - Multi-tenant authentication
-- ✅ GraphQL API - Efficient data queries
-- ✅ REST APIs - Administrative operations
-
-## Sample Data Operations
-
-### Create an Organization
-
-```bash
-curl -X POST http://localhost:8080/api/organizations \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Sample MSP",
-    "contactInformation": {
-      "email": "admin@samplemsp.com",
-      "phone": "+1-555-0123"
+```java
+// In your REST controller
+@RestController
+@RequestMapping("/api/audit")
+public class AuditController {
+    
+    @PostMapping("/logs")
+    public CountedGenericQueryResult<LogEvent> getAuditLogs(
+        @RequestBody LogFilterCriteria criteria) {
+        
+        return auditService.getAuditLogs(criteria);
     }
-  }'
+}
 ```
 
-### Query via GraphQL
+## Expected Results
 
+After completing this quick start:
+
+✅ **Project builds successfully** without compilation errors  
+✅ **All tests pass** confirming DTOs work correctly  
+✅ **Library installed locally** ready for use in other projects  
+✅ **Basic examples work** demonstrating pagination and filtering  
+
+## Common First-Time Issues
+
+### Build Fails with Lombok Errors
+
+**Problem**: Compilation errors about missing getters/setters
 ```bash
-curl -X POST http://localhost:8080/graphql \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "query { organizations { edges { node { id name } } } }"
-  }'
+# Solution: Ensure your IDE has Lombok support
+# IntelliJ: Install Lombok plugin + enable annotation processing  
+# Eclipse: Run lombok.jar installer
 ```
 
-## Performance Tips
+### Tests Don't Run
 
-For better development performance:
-
+**Problem**: `mvn test` shows no tests executed
 ```bash
-# Use parallel builds
-mvn clean install -T 4
-
-# Skip non-essential plugins
-mvn clean install -DskipTests -Dcheckstyle.skip
-
-# Increase Maven memory
-export MAVEN_OPTS="-Xmx4g -XX:MaxMetaspaceSize=512m"
+# Solution: Ensure test classes follow naming convention
+# Test files must end with Test.java, Tests.java, or TestCase.java
 ```
 
-## Troubleshooting
+### Maven Dependencies Not Found
 
-### Build Issues
-
-**"Java version not supported"**
+**Problem**: Cannot resolve OpenFrame dependencies
 ```bash
-java -version  # Ensure Java 21+
-echo $JAVA_HOME  # Verify JAVA_HOME
+# Solution: Ensure you have access to required repositories
+mvn dependency:resolve
 ```
 
-**"Tests failing"**
-```bash
-# Skip tests initially
-mvn clean install -DskipTests
-```
+## What You've Accomplished
 
-### Connection Issues
+In just 5 minutes, you've:
 
-**MongoDB connection refused**
-```bash
-# Check Docker container
-docker-compose ps
-docker-compose logs mongodb
-```
-
-**Port conflicts**
-```bash
-# Check what's using the ports
-lsof -i :8080
-lsof -i :27017
-```
-
-### Memory Issues
-
-**OutOfMemoryError during build**
-```bash
-export MAVEN_OPTS="-Xmx4g -XX:MaxMetaspaceSize=1g"
-```
+1. **Cloned** the OpenFrame OSS Lib repository
+2. **Built** the entire project from source
+3. **Tested** that all DTOs work correctly  
+4. **Installed** the library to your local Maven repository
+5. **Created** a working example using the core DTOs
 
 ## Next Steps
 
-Congratulations! You now have OpenFrame OSS Libraries running locally. 
+Now that you have OpenFrame OSS Lib working:
 
-Continue your journey:
+- [**First Steps**](first-steps.md) - Explore the core features and patterns
+- **Architecture Deep Dive** - Review the [Module 1](../reference/architecture/module_1/module_1.md) and [Module 2](../reference/architecture/module_2/module_2.md) documentation
+- **Join the Community** - Connect with other developers on [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
 
-1. **[First Steps Guide](first-steps.md)** - Explore key features and capabilities
-2. **[Development Setup](../development/setup/local-development.md)** - Configure your development environment
-3. **[Architecture Overview](../development/architecture/README.md)** - Understand the system design
+## Need Help?
 
-## Getting Help
+If you encounter any issues:
 
-If you encounter issues:
-
-- Check our [OpenMSP Slack Community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
-- Review the [Prerequisites](prerequisites.md) guide
-- Browse the [GitHub Issues](https://github.com/flamingo-stack/openframe-oss-lib/issues)
+1. **Check Prerequisites** - Ensure Java 8+ and Maven 3.6+ are installed
+2. **Review Error Messages** - Maven provides detailed compilation errors
+3. **Ask for Help** - Join our [Slack community](https://join.slack.com/t/openmsp/shared_invoke/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) for support
 
 ---
 
-*Happy coding! You're now ready to explore the full power of OpenFrame OSS Libraries.*
+*🎉 Congratulations! You now have a working OpenFrame OSS Lib installation. The library provides the foundation for building scalable, type-safe APIs across the entire OpenFrame platform.*

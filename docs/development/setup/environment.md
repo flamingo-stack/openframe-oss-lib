@@ -1,143 +1,183 @@
 # Development Environment Setup
 
-This guide helps you configure the optimal development environment for working with OpenFrame OSS Libraries. We'll cover IDE setup, development tools, extensions, and productivity enhancements.
+This guide will help you set up a productive development environment for OpenFrame OSS Lib, optimized for Java development with Lombok, Maven, and modern IDE features.
 
 ## IDE Recommendations
 
-### IntelliJ IDEA Ultimate (Recommended)
+### IntelliJ IDEA (Recommended)
 
-**Why IntelliJ IDEA?**
-- Excellent Spring Boot integration
-- Superior Maven support
-- Built-in database tools
-- Advanced debugging capabilities
-- Great GraphQL support
+IntelliJ IDEA provides the best experience for OpenFrame OSS Lib development.
 
 #### Installation
 
-**Option 1: Direct Download**
-- Download from [JetBrains website](https://www.jetbrains.com/idea/)
-- Choose Ultimate edition for full Spring Boot support
-
-**Option 2: JetBrains Toolbox (Recommended)**
 ```bash
-# Download and install JetBrains Toolbox
-# Manage all JetBrains tools from one place
+# macOS with Homebrew
+brew install --cask intellij-idea
+
+# Ubuntu/Debian with Snap
+sudo snap install intellij-idea-community --classic
+
+# Windows with Chocolatey  
+choco install intellij-idea-community
 ```
 
-#### Essential IntelliJ Plugins
+#### Required Plugins
 
-Install these plugins via **File → Settings → Plugins**:
+Install these essential plugins:
 
-| Plugin | Purpose |
-|--------|---------|
-| **Spring Boot** | Spring Boot application support (usually pre-installed) |
-| **Lombok** | Code generation and annotations |
-| **GraphQL** | GraphQL schema and query support |
-| **Database Tools and SQL** | MongoDB, Redis, and SQL support |
-| **Docker** | Container management |
-| **Maven Helper** | Advanced Maven operations |
-| **SonarLint** | Code quality analysis |
-| **GitToolBox** | Enhanced Git integration |
-| **Rainbow Brackets** | Code readability |
-| **Key Promoter X** | Learn keyboard shortcuts |
+1. **Lombok Plugin**
+   - `File > Settings > Plugins > Marketplace`
+   - Search "Lombok" and install
+   - Restart IntelliJ IDEA
 
-#### IntelliJ Configuration
+2. **Maven Helper**
+   - Dependency analysis and conflict resolution
+   - Right-click POM files for enhanced features
 
-**Java SDK Setup:**
-1. **File → Project Structure → SDKs**
-2. Add JDK 21 if not detected
-3. Set project SDK to Java 21
+3. **SonarLint** (Optional but recommended)
+   - Code quality analysis
+   - Real-time feedback on code issues
 
-**Maven Configuration:**
-1. **File → Settings → Build → Build Tools → Maven**
-2. Set Maven home directory (if custom installation)
-3. Enable "Import Maven projects automatically"
-4. Set JVM options: `-Xmx4g -XX:MaxMetaspaceSize=512m`
+#### Configuration
 
-**Spring Boot Run Configuration:**
-1. **Run → Edit Configurations → Add New → Spring Boot**
-2. Main class: `com.openframe.api.ApiServiceApplication`
-3. Working directory: `$MODULE_WORKING_DIR$`
-4. VM options: `-Xmx2g -Dspring.profiles.active=development`
-
-### Visual Studio Code (Alternative)
-
-For developers who prefer VS Code:
-
-#### Required Extensions
-
-```bash
-# Install via VS Code Extensions marketplace
+**Enable Annotation Processing:**
+```text
+File > Settings > Build, Execution, Deployment > Compiler > Annotation Processors
+☑️ Enable annotation processing
+☑️ Obtain processors from project classpath
 ```
 
-| Extension | Purpose |
-|-----------|---------|
-| **Extension Pack for Java** | Complete Java development |
-| **Spring Boot Extension Pack** | Spring Boot support |
-| **GraphQL** | GraphQL syntax highlighting |
-| **Docker** | Container support |
-| **REST Client** | API testing |
-| **Lombok Annotations Support** | Lombok integration |
+**Configure Code Style:**
+```bash
+# Import OpenFrame code style (if available)
+File > Settings > Editor > Code Style > Java > Import Scheme
+# Or configure manually:
+# - Indent: 4 spaces
+# - Line length: 120 characters  
+# - Import order: java.*, javax.*, org.*, com.*
+```
 
-#### VS Code Settings
+**Set up Auto Import:**
+```text
+File > Settings > Editor > General > Auto Import
+☑️ Add unambiguous imports on the fly
+☑️ Optimize imports on the fly
+```
+
+### Eclipse IDE
+
+Eclipse is well-supported for OpenFrame OSS Lib development.
+
+#### Installation
+
+```bash
+# Download Eclipse IDE for Java Developers
+# https://www.eclipse.org/downloads/packages/
+
+# Ubuntu/Debian
+sudo apt install eclipse
+
+# macOS with Homebrew
+brew install --cask eclipse-java
+```
+
+#### Lombok Setup
+
+Eclipse requires manual Lombok installation:
+
+```bash
+# Download lombok.jar
+wget https://projectlombok.org/downloads/lombok.jar
+
+# Run installer
+java -jar lombok.jar
+# Follow GUI installer to patch Eclipse
+
+# Or manual installation:
+# 1. Copy lombok.jar to your Eclipse directory
+# 2. Edit eclipse.ini and add: -javaagent:lombok.jar
+```
+
+#### Required Plugins
+
+1. **M2Eclipse** (Usually pre-installed)
+   - Maven integration for Eclipse
+   - `Help > Eclipse Marketplace > Search "Maven"`
+
+2. **EGit** (Usually pre-installed)  
+   - Git integration
+   - Native Eclipse Git support
+
+#### Configuration
+
+**Configure Maven:**
+```text
+Window > Preferences > Maven
+☑️ Download Artifact Sources
+☑️ Download Artifact JavaDoc
+```
+
+**Set up Code Formatting:**
+```text
+Window > Preferences > Java > Code Style > Formatter
+# Import formatter profile or configure:
+# - Tab policy: Spaces only
+# - Indentation size: 4
+# - Maximum line width: 120
+```
+
+### VS Code (Lightweight Option)
+
+For a lightweight development experience:
+
+#### Installation & Extensions
+
+```bash
+# Install VS Code
+# https://code.visualstudio.com/download
+
+# Install Java extension pack
+code --install-extension vscjava.vscode-java-pack
+
+# Additional helpful extensions  
+code --install-extension gabrielbb.vscode-lombok
+code --install-extension redhat.java
+code --install-extension vscjava.vscode-maven
+```
+
+#### Configuration
 
 Create `.vscode/settings.json`:
-
 ```json
 {
-    "java.home": "/path/to/java-21",
-    "java.configuration.runtimes": [
-        {
-            "name": "JavaSE-21",
-            "path": "/path/to/java-21"
-        }
-    ],
-    "spring-boot.ls.java.home": "/path/to/java-21",
+    "java.configuration.updateBuildConfiguration": "automatic",
     "java.compile.nullAnalysis.mode": "automatic",
-    "java.configuration.maven.userSettings": "~/.m2/settings.xml",
-    "files.exclude": {
-        "**/target": true,
-        "**/.mvn": true
-    }
+    "java.format.settings.url": "./eclipse-formatter.xml",
+    "maven.executable.path": "/usr/local/bin/mvn",
+    "lombok.jar.path": "~/.m2/repository/org/projectlombok/lombok/1.18.28/lombok-1.18.28.jar"
 }
 ```
-
-### Eclipse with Spring Tools
-
-For Eclipse users:
-
-#### Installation
-1. Download Eclipse IDE for Enterprise Java Developers
-2. Install Spring Tools 4 from Eclipse Marketplace
-
-#### Essential Eclipse Plugins
-- Spring Tools 4
-- Lombok
-- Maven Integration (m2e)
-- MongoDB support
 
 ## Required Development Tools
 
 ### Maven Configuration
 
-Create or update `~/.m2/settings.xml`:
+#### Global Settings
 
+Create `~/.m2/settings.xml`:
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
           xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 
-                             http://maven.apache.org/xsd/settings-1.0.0.xsd">
-    
-    <localRepository>~/.m2/repository</localRepository>
+                              http://maven.apache.org/xsd/settings-1.0.0.xsd">
     
     <profiles>
         <profile>
             <id>openframe-dev</id>
             <properties>
-                <maven.compiler.source>21</maven.compiler.source>
-                <maven.compiler.target>21</maven.compiler.target>
+                <maven.compiler.source>11</maven.compiler.source>
+                <maven.compiler.target>11</maven.compiler.target>
                 <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
             </properties>
         </profile>
@@ -149,418 +189,305 @@ Create or update `~/.m2/settings.xml`:
 </settings>
 ```
 
+#### Maven Wrapper
+
+Use the Maven wrapper for consistent builds:
+```bash
+# Generate wrapper (if not present)
+mvn -N io.takari:maven:wrapper
+
+# Use wrapper instead of global Maven
+./mvnw clean compile
+./mvnw test
+./mvnw install
+```
+
 ### Git Configuration
 
-Configure Git for the project:
+#### Global Git Setup
 
 ```bash
-# Set up Git user (if not already done)
+# Set your identity
 git config --global user.name "Your Name"
-git config --global user.email "your.email@company.com"
+git config --global user.email "your.email@example.com"
 
-# Configure line endings (important for cross-platform)
+# Set default branch name
+git config --global init.defaultBranch main
+
+# Enable helpful settings
 git config --global core.autocrlf input
-
-# Set up useful aliases
-git config --global alias.st status
-git config --global alias.co checkout
-git config --global alias.br branch
-git config --global alias.lg "log --oneline --graph --decorate"
+git config --global core.safecrlf true
+git config --global pull.rebase false
 ```
 
-## Database Tools
+#### OpenFrame-Specific Git Hooks
 
-### MongoDB Management
-
-**Option 1: MongoDB Compass (Recommended)**
-```bash
-# Download from MongoDB website
-# Provides GUI for MongoDB operations
-```
-
-**Option 2: Command Line Tools**
-```bash
-# MongoDB Shell
-mongosh
-
-# Sample connection test
-mongosh "mongodb://localhost:27017/openframe"
-```
-
-**IntelliJ Database Plugin:**
-1. **View → Tool Windows → Database**
-2. Add MongoDB data source
-3. Connection URL: `mongodb://localhost:27017/openframe`
-
-### Redis Management
-
-**Option 1: RedisInsight**
-```bash
-# Download from Redis website
-# Free GUI tool for Redis
-```
-
-**Option 2: Command Line**
-```bash
-# Redis CLI
-redis-cli
-
-# Test connection
-redis-cli ping
-```
-
-### Kafka Management
-
-**Option 1: Kafka UI (Docker)**
-```yaml
-# docker-compose.kafka-ui.yml
-version: '3.8'
-services:
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    ports:
-      - "8090:8080"
-    environment:
-      KAFKA_CLUSTERS_0_NAME: local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: localhost:9092
-```
-
-**Option 2: Command Line Tools**
-```bash
-# List topics
-kafka-topics.sh --bootstrap-server localhost:9092 --list
-
-# Consume messages
-kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic your-topic
-```
-
-## Development Environment Variables
-
-Create a `.env` file in your project root:
-
-```bash
-# Database Configuration
-MONGODB_URI=mongodb://localhost:27017/openframe
-REDIS_URL=redis://localhost:6379
-KAFKA_BOOTSTRAP_SERVERS=localhost:9092
-
-# Optional Analytics Databases
-CASSANDRA_CONTACT_POINTS=localhost:9042
-PINOT_BROKER_URL=http://localhost:8099
-
-# Security Configuration (Development Only)
-JWT_SECRET=development-secret-key-32-chars-min
-OAUTH_ENCRYPTION_KEY=dev-encryption-key-32-chars-long!
-
-# External Services
-NATS_URL=nats://localhost:4222
-
-# Logging Configuration
-LOG_LEVEL=DEBUG
-SQL_LOGGING=true
-
-# Development Flags
-SPRING_PROFILES_ACTIVE=development
-MAVEN_OPTS=-Xmx4g -XX:MaxMetaspaceSize=512m
-```
-
-Load environment variables:
-
-```bash
-# For bash/zsh
-source .env
-
-# Or use direnv for automatic loading
-echo "source .env" > .envrc
-direnv allow
-```
-
-## Code Quality Tools
-
-### SonarLint Integration
-
-**IntelliJ:**
-1. Install SonarLint plugin
-2. **File → Settings → Tools → SonarLint**
-3. Connect to SonarQube server (if available)
-
-**VS Code:**
-```bash
-# Install SonarLint extension
-# Configure via VS Code settings
-```
-
-### Checkstyle Configuration
-
-The project includes Checkstyle rules. Configure your IDE:
-
-**IntelliJ:**
-1. Install CheckStyle-IDEA plugin
-2. **File → Settings → Tools → Checkstyle**
-3. Add configuration file: `config/checkstyle/checkstyle.xml`
-
-### SpotBugs Integration
-
-**Maven Plugin (already configured):**
-```bash
-# Run SpotBugs analysis
-mvn spotbugs:check
-```
-
-**IDE Integration:**
-- IntelliJ: SpotBugs plugin
-- Eclipse: SpotBugs plugin from marketplace
-
-## Docker Development Environment
-
-### Docker Compose for Dependencies
-
-Create `docker-compose.dev.yml`:
-
-```yaml
-version: '3.8'
-services:
-  mongodb:
-    image: mongo:7-jammy
-    ports:
-      - "27017:27017"
-    environment:
-      MONGO_INITDB_DATABASE: openframe
-    volumes:
-      - mongo_dev_data:/data/db
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    command: redis-server --appendonly yes
-    volumes:
-      - redis_dev_data:/data
-
-  zookeeper:
-    image: confluentinc/cp-zookeeper:latest
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-
-  kafka:
-    image: confluentinc/cp-kafka:latest
-    depends_on:
-      - zookeeper
-    ports:
-      - "9092:9092"
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-
-  nats:
-    image: nats:latest
-    ports:
-      - "4222:4222"
-      - "8222:8222"
-    command: "--jetstream --store_dir=/data"
-    volumes:
-      - nats_dev_data:/data
-
-volumes:
-  mongo_dev_data:
-  redis_dev_data:
-  nats_dev_data:
-```
-
-### Development Scripts
-
-Create helper scripts in `scripts/` directory:
-
-**`scripts/start-dev-env.sh`:**
+Create `.git/hooks/pre-commit`:
 ```bash
 #!/bin/bash
-echo "Starting development environment..."
-docker-compose -f docker-compose.dev.yml up -d
-echo "Development services started!"
-echo "MongoDB: localhost:27017"
-echo "Redis: localhost:6379"
-echo "Kafka: localhost:9092"
-echo "NATS: localhost:4222"
+# Pre-commit hook for code quality
+
+echo "Running pre-commit checks..."
+
+# Check code formatting
+if ! ./mvnw spotless:check > /dev/null 2>&1; then
+    echo "❌ Code formatting issues detected. Run: ./mvnw spotless:apply"
+    exit 1
+fi
+
+# Run tests
+if ! ./mvnw test > /dev/null 2>&1; then
+    echo "❌ Tests failed. Fix failing tests before committing."
+    exit 1
+fi
+
+echo "✅ Pre-commit checks passed!"
 ```
 
-**`scripts/stop-dev-env.sh`:**
+Make it executable:
 ```bash
-#!/bin/bash
-echo "Stopping development environment..."
-docker-compose -f docker-compose.dev.yml down
-echo "Development services stopped!"
+chmod +x .git/hooks/pre-commit
 ```
 
-**`scripts/reset-dev-data.sh`:**
+## Environment Variables
+
+### Required Environment Variables
+
+Add these to your shell profile (`.bashrc`, `.zshrc`, etc.):
+
 ```bash
-#!/bin/bash
-echo "Resetting development data..."
-docker-compose -f docker-compose.dev.yml down -v
-docker-compose -f docker-compose.dev.yml up -d
-echo "Development data reset complete!"
+# Java Development
+export JAVA_HOME="/path/to/java/installation"
+export MAVEN_HOME="/path/to/maven/installation"
+export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
+
+# Maven optimization
+export MAVEN_OPTS="-Xmx2048m -XX:MaxMetaspaceSize=512m -XX:+TieredCompilation"
+
+# OpenFrame Development
+export OPENFRAME_DEV_MODE=true
+export OPENFRAME_LOG_LEVEL=DEBUG
+
+# IDE-specific (optional)
+export IDEA_JDK="$JAVA_HOME"
+export ECLIPSE_HOME="/path/to/eclipse"
 ```
 
-Make scripts executable:
-```bash
-chmod +x scripts/*.sh
+### Windows Environment Variables
+
+Set via System Properties > Advanced > Environment Variables:
+
+```text
+JAVA_HOME = C:\Program Files\Java\jdk-17
+MAVEN_HOME = C:\apache-maven-3.9.5
+PATH = %JAVA_HOME%\bin;%MAVEN_HOME%\bin;%PATH%
+MAVEN_OPTS = -Xmx2048m -XX:MaxMetaspaceSize=512m
 ```
 
-## Productivity Enhancements
+## Development Dependencies
 
-### Hot Reloading Setup
+### Core Dependencies
 
-Add Spring Boot DevTools to your development profile:
+Your development environment should have access to these:
 
 ```xml
-<!-- In relevant module pom.xml -->
+<!-- In your IDE's classpath or global Maven repository -->
+<dependencies>
+    <!-- Lombok for annotation processing -->
+    <dependency>
+        <groupId>org.projectlombok</groupId>
+        <artifactId>lombok</artifactId>
+        <version>1.18.28</version>
+        <scope>provided</scope>
+    </dependency>
+    
+    <!-- Jackson for JSON processing -->
+    <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-databind</artifactId>
+        <version>2.15.2</version>
+    </dependency>
+    
+    <!-- JUnit for testing -->
+    <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter</artifactId>
+        <version>5.10.0</version>
+        <scope>test</scope>
+    </dependency>
+</dependencies>
+```
+
+### Optional Development Tools
+
+```bash
+# Code quality and formatting
+brew install spotless  # or equivalent for your OS
+
+# API testing
+brew install httpie    # HTTP client
+brew install postman   # GUI API testing
+
+# Database tools (if working with persistence layers)
+brew install dbeaver   # Database IDE
+```
+
+## Editor Extensions and Plugins
+
+### IntelliJ IDEA Productivity Plugins
+
+1. **Rainbow Brackets** - Visual bracket matching
+2. **GitToolBox** - Enhanced Git integration
+3. **Maven Helper** - Dependency analysis
+4. **CheckStyle-IDEA** - Code style validation
+5. **Swagger** - API documentation support
+
+### VS Code Java Extensions
+
+```bash
+# Essential Java development
+code --install-extension vscjava.vscode-java-pack
+
+# Code quality
+code --install-extension sonarsource.sonarlint-vscode
+code --install-extension esbenp.prettier-vscode
+
+# Git integration  
+code --install-extension eamodio.gitlens
+code --install-extension mhutchie.git-graph
+
+# API development
+code --install-extension 42Crunch.vscode-openapi
+code --install-extension humao.rest-client
+```
+
+## Database Tools (Optional)
+
+If you're working on integration testing with databases:
+
+### DBeaver (Universal Database Tool)
+
+```bash
+# Installation
+brew install --cask dbeaver-community  # macOS
+sudo snap install dbeaver-ce           # Ubuntu
+choco install dbeaver                   # Windows
+```
+
+### H2 Database (For Testing)
+
+```xml
+<!-- Add to test dependencies -->
 <dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-devtools</artifactId>
-    <scope>runtime</scope>
-    <optional>true</optional>
+    <groupId>com.h2database</groupId>
+    <artifactId>h2</artifactId>
+    <version>2.1.214</version>
+    <scope>test</scope>
 </dependency>
 ```
 
-**IntelliJ Configuration:**
-1. **File → Settings → Build → Compiler**
-2. Enable "Build project automatically"
-3. **Help → Find Action → Registry**
-4. Enable `compiler.automake.allow.when.app.running`
+## Performance Optimization
 
-### Debug Configurations
+### JVM Tuning for Development
 
-**IntelliJ Remote Debug:**
-1. **Run → Edit Configurations → Add → Remote JVM Debug**
-2. Host: `localhost`, Port: `5005`
-3. Command line args: `-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005`
+Add to your IDE's JVM options:
 
-**Spring Boot Debug Run Configuration:**
-```
-VM options: -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5005
-```
-
-### API Testing Tools
-
-**IntelliJ HTTP Client:**
-Create `api-tests.http`:
-
-```http
-### Test Health Endpoint
-GET http://localhost:8080/health
-
-### GraphQL Query
-POST http://localhost:8080/graphql
-Content-Type: application/json
-
-{
-  "query": "query { __schema { types { name } } }"
-}
-
-### REST API Test
-GET http://localhost:8080/api/organizations
-Authorization: Bearer {{token}}
-```
-
-**Alternative Tools:**
-- **Postman** - Feature-rich API testing
-- **Insomnia** - Simple REST/GraphQL client
-- **curl** - Command-line testing
-
-## Performance Monitoring
-
-### JVM Monitoring
-
-**IntelliJ Profiler:**
-1. **Run → Profile** instead of Run
-2. Monitor memory, CPU, and thread usage
-
-**External Tools:**
-- **VisualVM** - Free JVM profiler
-- **JProfiler** - Commercial profiler
-- **async-profiler** - Low-overhead profiler
-
-### Application Monitoring
-
-Enable Spring Boot Actuator endpoints:
-
-```yaml
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics,prometheus
-  endpoint:
-    health:
-      show-details: always
-```
-
-Access monitoring endpoints:
-- Health: `http://localhost:8080/actuator/health`
-- Metrics: `http://localhost:8080/actuator/metrics`
-- Info: `http://localhost:8080/actuator/info`
-
-## Troubleshooting Common Issues
-
-### IDE Performance Issues
-
-**IntelliJ Memory Settings:**
-1. **Help → Edit Custom VM Options**
-2. Add/modify:
-```
--Xmx4g
--XX:MaxMetaspaceSize=1g
+**IntelliJ IDEA:**
+```text
+# idea.vmoptions or idea64.vmoptions
+-Xmx4096m
 -XX:+UseG1GC
+-XX:+UseCompressedOops
+-Dfile.encoding=UTF-8
 ```
 
-**Large Project Indexing:**
-1. **File → Invalidate Caches and Restart**
-2. Exclude build directories: **File → Settings → Directories**
+**Eclipse:**
+```text
+# eclipse.ini
+-vmargs
+-Xmx2048m
+-XX:+UseG1GC
+-XX:MaxMetaspaceSize=512m
+```
 
-### Build Issues
+### Maven Performance
 
-**Maven Dependency Problems:**
 ```bash
-# Clear local repository
-rm -rf ~/.m2/repository
-mvn clean install
+# Use parallel builds
+alias mvnp='mvn -T 1C'  # 1 thread per CPU core
+
+# Skip tests during development iterations
+alias mvnf='mvn clean compile -DskipTests'
+
+# Quick install to local repository
+alias mvni='mvn install -DskipTests'
 ```
 
-**OutOfMemoryError:**
+## Verification Checklist
+
+Verify your environment is properly configured:
+
 ```bash
-export MAVEN_OPTS="-Xmx4g -XX:MaxMetaspaceSize=1g"
-mvn clean install
+# Java and build tools
+java -version                    # Should show Java 8+
+mvn --version                    # Should show Maven 3.6+
+git --version                    # Should show Git 2.20+
+
+# Environment variables
+echo $JAVA_HOME                  # Should point to JDK
+echo $MAVEN_HOME                 # Should point to Maven (if manually installed)
+
+# IDE verification
+# Open the OpenFrame OSS Lib project
+# Lombok annotations should not show errors
+# Maven dependencies should resolve
+# Tests should run and pass
 ```
 
-### Database Connection Issues
+## Troubleshooting
 
-**MongoDB Connection:**
+### Common Environment Issues
+
+**Lombok not working in IDE:**
 ```bash
-# Check if MongoDB is running
-docker ps | grep mongo
-mongosh --eval "db.adminCommand('ping')"
+# Verify Lombok plugin installed and annotation processing enabled
+# For Eclipse, ensure lombok.jar is in Eclipse directory
+# For IntelliJ, check File > Settings > Annotation Processors
 ```
 
-**Redis Connection:**
+**Maven dependencies not resolving:**
 ```bash
-# Check Redis status
-redis-cli ping
+# Clear Maven cache
+rm -rf ~/.m2/repository/com/openframe
+mvn clean compile
+
+# Force update
+mvn clean compile -U
 ```
+
+**IDE performance issues:**
+```bash
+# Increase IDE memory allocation
+# IntelliJ: idea.vmoptions
+# Eclipse: eclipse.ini
+# VS Code: increase Node.js memory limit
+```
+
+### Getting Help
+
+- **IDE Issues**: Check IDE-specific documentation and community forums
+- **Maven Problems**: Visit [Maven Troubleshooting Guide](https://maven.apache.org/guides/mini/guide-ide-eclipse.html)
+- **Lombok Issues**: See [Project Lombok Setup](https://projectlombok.org/setup/overview)
+- **OpenFrame Questions**: Join [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
 
 ## Next Steps
 
-With your development environment configured:
+With your environment configured:
 
-1. **[Local Development Guide](local-development.md)** - Learn to run and debug the application
-2. **[Architecture Overview](../architecture/README.md)** - Understand the system design
-3. **[Contributing Guidelines](../contributing/guidelines.md)** - Follow project conventions
-
-## Getting Help
-
-- **OpenMSP Slack**: [Join the community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) `#development` channel
-- **GitHub Issues**: Report environment setup problems
+1. [**Local Development Guide**](local-development.md) - Clone, build, and run the project
+2. [**Architecture Overview**](../architecture/README.md) - Understand the codebase structure  
+3. [**Contributing Guidelines**](../contributing/guidelines.md) - Learn the development workflow
 
 ---
 
-*Your development environment is now ready for OpenFrame OSS Libraries development. Happy coding!*
+*A well-configured development environment is the foundation for productive OpenFrame OSS Lib development. Take time to set up these tools properly - it will save hours later.*

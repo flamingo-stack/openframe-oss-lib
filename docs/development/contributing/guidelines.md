@@ -1,838 +1,479 @@
 # Contributing Guidelines
 
-Welcome to OpenFrame OSS Libraries! We're excited to have you contribute to the future of open-source MSP tooling. This guide covers everything you need to know to make meaningful contributions to the project.
+Welcome to OpenFrame OSS Lib! This guide outlines how to contribute effectively to the project, including code style, branch naming, PR process, and review checklist.
 
-## Quick Start for Contributors
+## Getting Started
 
-### 1. Fork and Clone
+### Before You Contribute
 
-```bash
-# Fork the repository on GitHub
-# Then clone your fork
-git clone https://github.com/YOUR_USERNAME/openframe-oss-lib.git
-cd openframe-oss-lib
+1. **Join the Community**: Connect with other contributors on [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
+2. **Understand the Architecture**: Review the [Architecture Overview](../architecture/README.md)
+3. **Set Up Your Environment**: Follow the [Environment Setup Guide](../setup/environment.md)
+4. **Read the Testing Guide**: Understand our [Testing Standards](../testing/README.md)
 
-# Add upstream remote
-git remote add upstream https://github.com/flamingo-stack/openframe-oss-lib.git
-```
+### Types of Contributions
 
-### 2. Set Up Development Environment
+We welcome several types of contributions:
 
-```bash
-# Install dependencies and build
-mvn clean install
-
-# Start development services
-docker-compose -f docker-compose.dev.yml up -d
-
-# Run the application
-cd openframe-api-service-core
-mvn spring-boot:run -Dspring-boot.run.profiles=development
-```
-
-### 3. Create Feature Branch
-
-```bash
-# Always create a new branch for your work
-git checkout -b feature/your-feature-name
-
-# Keep your branch up to date
-git fetch upstream
-git rebase upstream/main
-```
+| Contribution Type | Description | Approval Required |
+|------------------|-------------|-------------------|
+| **Bug Fixes** | Fix issues in existing DTOs | Code review |
+| **New DTOs** | Add new data transfer objects | Architecture review + code review |
+| **Documentation** | Improve docs and examples | Documentation review |
+| **Test Coverage** | Add or improve tests | Code review |
+| **Performance** | Optimize serialization or memory usage | Performance review + code review |
+| **Security** | Security improvements | Security review + code review |
 
 ## Code Style and Conventions
 
-### Java Code Standards
+### Java Code Style
 
-**Follow Google Java Style Guide with these project-specific adaptations:**
+OpenFrame OSS Lib follows **Google Java Style** with some specific adaptations:
 
 ```java
-// ✅ GOOD: Proper class structure
-@RestController
-@RequestMapping("/api/organizations")
-@RequiredArgsConstructor
-@Validated
-@Slf4j
-public class OrganizationController {
+// ✅ Good: Proper formatting and style
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ExampleDTO {
     
-    private final OrganizationService organizationService;
-    private final OrganizationMapper organizationMapper;
+    private String id;
+    private String organizationId;
+    private List<String> eventTypes;
+    private LocalDateTime timestamp;
     
-    @GetMapping
-    public ResponseEntity<Page<OrganizationResponse>> list(
-        @AuthenticationPrincipal AuthPrincipal principal,
-        @RequestParam(defaultValue = "0") int page,
-        @RequestParam(defaultValue = "20") int size
-    ) {
-        log.debug("Listing organizations for tenant: {}", principal.getTenantId());
-        
-        Pageable pageable = PageRequest.of(page, size);
-        Page<Organization> organizations = organizationService.findByTenant(
-            principal.getTenantId(), 
-            pageable
-        );
-        
-        Page<OrganizationResponse> response = organizations.map(organizationMapper::toResponse);
-        return ResponseEntity.ok(response);
+    /**
+     * Validates that the DTO contains required fields.
+     * 
+     * @throws ValidationException if required fields are missing
+     */
+    public void validate() {
+        if (id == null || id.trim().isEmpty()) {
+            throw new ValidationException("ID is required");
+        }
+        if (organizationId == null || organizationId.trim().isEmpty()) {
+            throw new ValidationException("Organization ID is required");
+        }
     }
+}
+```
+
+#### Key Style Guidelines
+
+1. **Indentation**: 4 spaces (no tabs)
+2. **Line Length**: 120 characters maximum
+3. **Braces**: Opening brace on same line
+4. **Naming**: CamelCase for classes, camelCase for fields/methods
+5. **JavaDoc**: Required for all public APIs
+6. **Imports**: Organize imports (java.*, javax.*, org.*, com.*)
+
+### Lombok Conventions
+
+Follow consistent Lombok patterns across all DTOs:
+
+```java
+// ✅ Standard DTO pattern
+@Data                    // Generates getters, setters, toString, equals, hashCode
+@Builder                 // Generates builder pattern
+@NoArgsConstructor       // Default constructor for Jackson/JPA
+@AllArgsConstructor      // Constructor with all arguments
+public class StandardDTO {
+    
+    // Fields in logical order:
+    // 1. Identifiers (id, organizationId)
+    // 2. Primary data (name, description, etc.)
+    // 3. Metadata (timestamps, status)
+    // 4. Relationships (foreign keys, references)
+    
+    private String id;
+    private String organizationId;
+    private String name;
+    private String description;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private String status;
+    private List<String> relatedIds;
 }
 ```
 
 ### Naming Conventions
 
-| Type | Convention | Example |
-|------|------------|---------|
-| **Classes** | PascalCase | `OrganizationService`, `UserController` |
-| **Methods** | camelCase | `findByTenant()`, `createOrganization()` |
-| **Variables** | camelCase | `organizationId`, `tenantContext` |
-| **Constants** | UPPER_SNAKE_CASE | `MAX_PAGE_SIZE`, `DEFAULT_TIMEOUT` |
-| **Packages** | lowercase | `com.openframe.api.service` |
+#### Class Names
 
-### Method Naming Patterns
+- **DTOs**: Descriptive noun + "DTO" suffix (optional for this project)
+  ```java
+  LogEvent              // ✅ Clear and concise
+  AuditLogEvent         // ✅ More specific if needed
+  DeviceFilterCriteria  // ✅ Describes purpose clearly
+  ```
 
-```java
-// ✅ Repository methods
-public interface OrganizationRepository {
-    List<Organization> findByTenantId(String tenantId);
-    Optional<Organization> findByTenantIdAndId(String tenantId, String id);
-    boolean existsByTenantIdAndName(String tenantId, String name);
-    void deleteByTenantIdAndId(String tenantId, String id);
-}
+#### Field Names
 
-// ✅ Service methods
-@Service
-public class OrganizationService {
-    public Organization create(CreateOrganizationRequest request, String tenantId) { }
-    public Organization update(String id, UpdateOrganizationRequest request, String tenantId) { }
-    public void delete(String id, String tenantId) { }
-    public Optional<Organization> findById(String id, String tenantId) { }
-    public Page<Organization> findByTenant(String tenantId, Pageable pageable) { }
-}
+- **IDs**: Always end with "Id"
+  ```java
+  private String id;             // Primary identifier
+  private String organizationId; // Organization reference
+  private String deviceId;       // Device reference
+  ```
 
-// ✅ Controller methods
-@RestController
-public class OrganizationController {
-    @PostMapping public ResponseEntity<OrganizationResponse> create(...) { }
-    @PutMapping("/{id}") public ResponseEntity<OrganizationResponse> update(...) { }
-    @DeleteMapping("/{id}") public ResponseEntity<Void> delete(...) { }
-    @GetMapping("/{id}") public ResponseEntity<OrganizationResponse> get(...) { }
-    @GetMapping public ResponseEntity<Page<OrganizationResponse>> list(...) { }
-}
-```
+- **Collections**: Plural nouns
+  ```java
+  private List<String> eventTypes;      // ✅ Plural
+  private List<String> organizationIds; // ✅ Plural
+  private String eventType;             // ✅ Singular for single value
+  ```
 
-### Code Formatting
+- **Timestamps**: Descriptive with clear intent
+  ```java
+  private LocalDateTime createdAt;    // ✅ Clear intent
+  private LocalDateTime updatedAt;    // ✅ Clear intent
+  private LocalDateTime timestamp;    // ✅ OK for general timestamps
+  ```
 
-**IDE Configuration:**
+#### Method Names
 
-**IntelliJ IDEA:**
-1. **File → Settings → Editor → Code Style → Java**
-2. Import scheme: `config/ide/intellij-code-style.xml`
-3. Or manually configure:
-   - Indentation: 4 spaces
-   - Line length: 100 characters
-   - Import organization: `java.*`, `javax.*`, then all others
+- **Validation**: Start with "validate" or "is"
+  ```java
+  public void validateCriteria() { }
+  public boolean isValid() { }
+  public boolean hasRequiredFields() { }
+  ```
 
-**Eclipse:**
-1. **Window → Preferences → Java → Code Style → Formatter**
-2. Import profile: `config/ide/eclipse-formatter.xml`
+- **Conversion**: Descriptive conversion intent
+  ```java
+  public ExternalFormat toExternalFormat() { }
+  public static InternalDTO fromExternalFormat(ExternalFormat external) { }
+  ```
 
-### Documentation Standards
-
-#### JavaDoc Requirements
-
-Document all public APIs:
-
-```java
-/**
- * Service for managing organizations within a multi-tenant environment.
- * 
- * <p>This service provides CRUD operations for organizations while ensuring
- * proper tenant isolation and security constraints.
- *
- * @author OpenFrame Team
- * @since 5.32.0
- */
-@Service
-@RequiredArgsConstructor
-public class OrganizationService {
-    
-    /**
-     * Creates a new organization for the specified tenant.
-     *
-     * @param request the organization creation request containing name and contact info
-     * @param tenantId the tenant ID to associate with the organization
-     * @return the created organization with generated ID and timestamps
-     * @throws OrganizationNameConflictException if an organization with the same name 
-     *         already exists for the tenant
-     * @throws IllegalArgumentException if request or tenantId is null or invalid
-     */
-    public Organization create(CreateOrganizationRequest request, String tenantId) {
-        // Implementation
-    }
-}
-```
-
-#### Comment Guidelines
-
-```java
-// ✅ GOOD: Explain why, not what
-@Service
-public class UserService {
-    
-    public User updateUser(String userId, UpdateUserRequest request) {
-        // Prevent users from modifying their own admin status to avoid privilege escalation
-        if (request.getIsAdmin() != null) {
-            throw new SecurityException("Cannot modify admin status");
-        }
-        
-        // Use optimistic locking to prevent concurrent modification issues
-        User existingUser = userRepository.findByIdWithLock(userId)
-            .orElseThrow(() -> new UserNotFoundException(userId));
-            
-        return userRepository.save(existingUser);
-    }
-}
-
-// ❌ BAD: Obvious comments
-public User updateUser(String userId, UpdateUserRequest request) {
-    // Check if request is not null
-    if (request == null) {
-        throw new IllegalArgumentException("Request cannot be null");
-    }
-    
-    // Find user by ID
-    User user = userRepository.findById(userId);
-    
-    // Save user
-    return userRepository.save(user);
-}
-```
-
-## Git Workflow and Branch Management
+## Branch Naming and Git Workflow
 
 ### Branch Naming Convention
 
+Use descriptive branch names that indicate the type of change:
+
 ```bash
 # Feature branches
-git checkout -b feature/add-organization-search
-git checkout -b feature/implement-sso-google
+feature/add-device-configuration-dto
+feature/improve-audit-filtering
+feature/add-validation-annotations
 
-# Bug fix branches
-git checkout -b bugfix/fix-tenant-isolation-issue
-git checkout -b bugfix/resolve-jwt-validation-error
+# Bug fix branches  
+bugfix/fix-serialization-null-values
+bugfix/correct-timestamp-timezone-handling
+bugfix/resolve-builder-inheritance-issue
 
-# Documentation branches  
-git checkout -b docs/update-api-documentation
-git checkout -b docs/add-deployment-guide
+# Documentation branches
+docs/update-architecture-diagrams
+docs/add-serialization-examples
+docs/improve-getting-started-guide
 
-# Refactoring branches
-git checkout -b refactor/extract-security-service
-git checkout -b refactor/optimize-database-queries
+# Performance branches
+perf/optimize-json-serialization
+perf/reduce-memory-allocation
+perf/improve-query-performance
 ```
 
-### Commit Message Format
+### Git Commit Message Format
 
 Follow **Conventional Commits** specification:
 
 ```bash
-# Format: type(scope): description
-# 
-# type: feat, fix, docs, style, refactor, test, chore
-# scope: module or area of change (optional)
-# description: imperative, present tense
+# Format: <type>(<scope>): <description>
 
 # Examples:
-git commit -m "feat(auth): add support for Google SSO integration"
-git commit -m "fix(security): resolve tenant isolation vulnerability in organization API"
-git commit -m "docs(api): update GraphQL schema documentation"
-git commit -m "refactor(service): extract common pagination logic"
-git commit -m "test(integration): add comprehensive organization controller tests"
-git commit -m "chore(deps): upgrade Spring Boot to 3.3.1"
+feat(audit): add LogDetails DTO for detailed audit events
+fix(device): resolve null pointer in DeviceFilterCriteria validation
+docs(readme): update installation instructions
+test(integration): add JSON serialization tests for all DTOs
+refactor(builder): improve builder pattern consistency
+perf(serialization): optimize Jackson performance for large result sets
 ```
 
-**Commit Message Guidelines:**
+#### Commit Types
+
+| Type | Description | When to Use |
+|------|-------------|-------------|
+| `feat` | New feature | Adding new DTOs or functionality |
+| `fix` | Bug fix | Fixing issues in existing code |
+| `docs` | Documentation | Documentation changes only |
+| `test` | Tests | Adding or modifying tests |
+| `refactor` | Code refactoring | Improving code without changing functionality |
+| `perf` | Performance | Performance improvements |
+| `style` | Code style | Formatting, missing semicolons, etc. |
+| `ci` | CI/CD | Changes to build/CI configuration |
+
+### Git Workflow
+
+#### For Core Team Members
 
 ```bash
-# ✅ GOOD: Clear, specific, imperative
-feat(organizations): add search functionality with filters
-fix(auth): prevent JWT token validation bypass 
-docs(readme): add development setup instructions
-test(service): add unit tests for organization service
+# 1. Update main branch
+git checkout main
+git pull origin main
 
-# ❌ BAD: Vague, past tense, too generic
-Fixed bug
-Updated code
-Changed some files
-WIP
+# 2. Create feature branch
+git checkout -b feature/add-new-dto
+
+# 3. Make changes and commit
+git add .
+git commit -m "feat(dto): add DeviceConfigurationDTO for device settings"
+
+# 4. Push and create PR
+git push origin feature/add-new-dto
+gh pr create --title "Add DeviceConfigurationDTO" --body "Implements new DTO for device configuration management"
+
+# 5. After PR approval and merge
+git checkout main
+git pull origin main
+git branch -d feature/add-new-dto
 ```
 
-### Pull Request Process
-
-#### 1. Before Creating PR
+#### For External Contributors
 
 ```bash
-# Ensure your branch is up to date
+# 1. Fork the repository
+gh repo fork openframe/openframe-oss-lib --clone=true
+cd openframe-oss-lib
+
+# 2. Add upstream remote
+git remote add upstream https://github.com/openframe/openframe-oss-lib.git
+
+# 3. Create feature branch
+git checkout -b feature/my-contribution
+
+# 4. Make changes and commit
+git add .
+git commit -m "feat(audit): add severity enum for better type safety"
+
+# 5. Push to your fork
+git push origin feature/my-contribution
+
+# 6. Create PR to upstream
+gh pr create --repo openframe/openframe-oss-lib --title "Add severity enum" --body "Improves type safety for audit log severity levels"
+
+# 7. Keep fork updated
 git fetch upstream
-git rebase upstream/main
-
-# Run all tests
-mvn clean verify
-
-# Check code style
-mvn checkstyle:check
-
-# Run security analysis
-mvn spotbugs:check
+git checkout main
+git merge upstream/main
+git push origin main
 ```
 
-#### 2. Create Pull Request
+## Pull Request Process
 
-**PR Title Format:**
-```
-feat(auth): implement Google SSO integration
-fix(security): resolve tenant data leakage in API endpoints
-docs(development): add testing guidelines and best practices
-```
+### PR Requirements
 
-**PR Description Template:**
+Every PR must include:
+
+- [ ] **Clear Description**: What changes were made and why
+- [ ] **Test Coverage**: Tests for new functionality or bug fixes
+- [ ] **Documentation**: Updates to docs if needed
+- [ ] **No Breaking Changes**: Unless explicitly discussed and approved
+- [ ] **Passing CI**: All tests and checks must pass
+
+### PR Template
+
+Use this template for your PRs:
+
 ```markdown
 ## Description
-Brief description of what this PR accomplishes.
+
+Brief description of what this PR does.
 
 ## Type of Change
+
 - [ ] Bug fix (non-breaking change which fixes an issue)
-- [ ] New feature (non-breaking change which adds functionality)  
-- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
+- [ ] New feature (non-breaking change which adds functionality)
+- [ ] Breaking change (fix or feature that would cause existing functionality to change)
 - [ ] Documentation update
+- [ ] Test coverage improvement
+
+## Changes Made
+
+- Added/Modified: List specific changes
+- Fixed: List bugs fixed
+- Updated: List documentation or tests updated
 
 ## Testing
-- [ ] Unit tests added/updated
-- [ ] Integration tests added/updated
-- [ ] Manual testing completed
-- [ ] All existing tests pass
 
-## Security Considerations
-- [ ] Changes reviewed for security implications
-- [ ] Tenant isolation maintained
-- [ ] Input validation implemented
-- [ ] Authentication/authorization properly handled
+- [ ] Added unit tests for new functionality
+- [ ] All existing tests pass
+- [ ] Manual testing performed
+- [ ] Integration tests added if applicable
 
 ## Checklist
-- [ ] Code follows project style guidelines
-- [ ] Self-review completed
-- [ ] Documentation updated (if needed)
-- [ ] No breaking changes without proper migration path
-- [ ] Performance impact considered
+
+- [ ] My code follows the project's style guidelines
+- [ ] I have performed a self-review of my code
+- [ ] I have commented my code, particularly in hard-to-understand areas
+- [ ] I have made corresponding changes to the documentation
+- [ ] My changes generate no new warnings
+- [ ] I have added tests that prove my fix is effective or that my feature works
+- [ ] New and existing unit tests pass locally with my changes
 
 ## Related Issues
-Fixes #123
-Relates to #456
+
+Closes #(issue number)
 ```
 
-#### 3. PR Review Process
+### Review Process
 
-**For Contributors:**
-- Address all review comments promptly
-- Keep discussions focused and professional
-- Update documentation if requested
-- Ensure CI passes before requesting re-review
-
-**For Reviewers:**
-- Provide constructive feedback
-- Focus on code quality, security, and maintainability
-- Test the changes locally when needed
-- Approve when satisfied with the implementation
-
-### Code Review Guidelines
-
-#### What to Look For
-
-**Security and Safety:**
-```java
-// ✅ Review: Proper tenant isolation
-@GetMapping("/api/organizations/{id}")
-public Organization getOrganization(
-    @PathVariable String id,
-    @AuthenticationPrincipal AuthPrincipal principal
-) {
-    return organizationService.findById(id, principal.getTenantId());
-}
-
-// ❌ Flag: Missing tenant isolation
-@GetMapping("/api/organizations/{id}")
-public Organization getOrganization(@PathVariable String id) {
-    return organizationService.findById(id);  // Could access other tenants!
-}
-```
-
-**Code Quality:**
-```java
-// ✅ Review: Clear, maintainable code
-public Optional<Organization> findByNameAndTenant(String name, String tenantId) {
-    validateInput(name, tenantId);
-    return repository.findByTenantIdAndName(tenantId, name);
-}
-
-// ❌ Flag: Hard to understand, missing validation
-public Optional<Organization> findByNameAndTenant(String name, String tenantId) {
-    return repository.findByTenantIdAndName(tenantId != null ? tenantId : "", name == null ? "" : name.trim());
-}
-```
-
-**Performance:**
-```java
-// ✅ Review: Efficient database query
-public Page<Organization> findByTenantWithDevices(String tenantId, Pageable pageable) {
-    return repository.findByTenantIdWithDevices(tenantId, pageable);
-}
-
-// ❌ Flag: N+1 query problem
-public List<Organization> findByTenantWithDevices(String tenantId) {
-    List<Organization> orgs = repository.findByTenantId(tenantId);
-    orgs.forEach(org -> org.setDevices(deviceRepository.findByOrganizationId(org.getId())));
-    return orgs;
-}
-```
-
-#### Review Checklist
-
-- [ ] **Security**: Tenant isolation, input validation, proper authentication
-- [ ] **Correctness**: Logic is sound, edge cases handled
-- [ ] **Performance**: No obvious performance issues, efficient queries
-- [ ] **Maintainability**: Code is readable, well-structured, documented
-- [ ] **Testing**: Adequate test coverage, tests are meaningful
-- [ ] **Breaking Changes**: Proper migration path if breaking existing APIs
-
-## Testing Requirements
-
-### Test Coverage Standards
-
-**Minimum Coverage Requirements:**
-- **Unit Tests**: 80% line coverage, 75% branch coverage
-- **Integration Tests**: Cover all API endpoints and critical flows
-- **Security Tests**: Verify authentication, authorization, and tenant isolation
-
-### Required Tests for New Features
-
-```java
-// 1. Unit Tests - Test business logic in isolation
-@ExtendWith(MockitoExtension.class)
-class OrganizationServiceTest {
+```mermaid
+flowchart TD
+    PR[Create PR] --> AutoChecks[Automated Checks]
+    AutoChecks --> ChecksPassing{All Checks Pass?}
+    ChecksPassing -->|No| FixIssues[Fix Issues]
+    FixIssues --> AutoChecks
+    ChecksPassing -->|Yes| CodeReview[Code Review]
     
-    @Test
-    @DisplayName("Should create organization with valid data")
-    void shouldCreateOrganizationWithValidData() {
-        // Test implementation
-    }
+    CodeReview --> ReviewType{Review Type}
+    ReviewType -->|Simple Change| SingleReviewer[1 Reviewer Required]
+    ReviewType -->|Complex Change| MultipleReviewers[2+ Reviewers Required]
+    ReviewType -->|Breaking Change| ArchitecturalReview[Architectural Review]
     
-    @Test
-    @DisplayName("Should throw exception when organization name already exists")
-    void shouldThrowExceptionWhenNameExists() {
-        // Test implementation  
-    }
-}
-
-// 2. Integration Tests - Test full request/response cycle
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class OrganizationControllerIntegrationTest {
+    SingleReviewer --> Approved{Approved?}
+    MultipleReviewers --> Approved
+    ArchitecturalReview --> Approved
     
-    @Test
-    @DisplayName("Should create organization via REST API")
-    void shouldCreateOrganizationViaRestApi() {
-        // Test implementation
-    }
-}
-
-// 3. Security Tests - Verify security requirements
-@SpringBootTest
-class OrganizationSecurityTest {
+    Approved -->|No| RequestChanges[Request Changes]
+    RequestChanges --> MakeChanges[Make Requested Changes]
+    MakeChanges --> CodeReview
     
-    @Test
-    @DisplayName("Should enforce tenant isolation")
-    void shouldEnforceTenantIsolation() {
-        // Test implementation
-    }
-}
+    Approved -->|Yes| Merge[Merge to Main]
+    
+    classDef process fill:#e3f2fd
+    classDef decision fill:#fff3e0
+    classDef action fill:#e8f5e8
+    classDef final fill:#fce4ec
+    
+    class PR,AutoChecks,CodeReview,SingleReviewer,MultipleReviewers,ArchitecturalReview process
+    class ChecksPassing,ReviewType,Approved decision
+    class FixIssues,RequestChanges,MakeChanges action
+    class Merge final
 ```
 
-### Test Data Management
+## Review Checklist
 
-Use builders for maintainable test data:
+### For Reviewers
 
-```java
-public class OrganizationTestDataBuilder {
-    private String tenantId = "default-tenant";
-    private String name = "Test Organization";
-    
-    public static OrganizationTestDataBuilder anOrganization() {
-        return new OrganizationTestDataBuilder();
-    }
-    
-    public OrganizationTestDataBuilder withTenantId(String tenantId) {
-        this.tenantId = tenantId;
-        return this;
-    }
-    
-    public Organization build() {
-        return Organization.builder()
-            .tenantId(tenantId)
-            .name(name)
-            .build();
-    }
-}
+Use this checklist when reviewing PRs:
 
-// Usage in tests
-@Test
-void testMethod() {
-    Organization org = anOrganization()
-        .withTenantId("tenant-123")
-        .withName("Custom Name")
-        .build();
-    // Use org in test
-}
-```
+#### Code Quality
+- [ ] **Code Style**: Follows project style guidelines
+- [ ] **Lombok Usage**: Consistent annotation patterns
+- [ ] **Naming**: Clear, descriptive names for classes and fields
+- [ ] **Documentation**: JavaDoc for public APIs
+- [ ] **Error Handling**: Appropriate exception handling
 
-## Documentation Requirements
+#### Architecture Compliance
+- [ ] **Contract-First**: DTOs are implementation-agnostic
+- [ ] **Multi-Tenancy**: Organization scoping where appropriate
+- [ ] **Type Safety**: Proper use of generics and enums
+- [ ] **Builder Pattern**: Consistent Lombok builder usage
+- [ ] **Serialization**: Jackson-compatible structures
 
-### Code Documentation
+#### Security Review
+- [ ] **No Sensitive Data**: No passwords, tokens, or credentials in DTOs
+- [ ] **Input Validation**: Appropriate validation annotations
+- [ ] **Organization Isolation**: Proper tenant scoping
+- [ ] **Data Exposure**: No accidental information leakage
 
-**Required Documentation:**
-- All public classes and interfaces
-- All public methods with parameters and return values
-- Complex business logic and algorithms
-- Security-related code
-- Configuration and setup instructions
+#### Testing
+- [ ] **Test Coverage**: Adequate test coverage (minimum 85%)
+- [ ] **Test Quality**: Well-written, descriptive tests
+- [ ] **Edge Cases**: Tests cover boundary conditions
+- [ ] **Serialization Tests**: JSON serialization/deserialization tested
+- [ ] **Integration Tests**: Where appropriate
 
-### API Documentation
+#### Documentation
+- [ ] **README Updates**: If new functionality added
+- [ ] **Architecture Docs**: If architectural changes made
+- [ ] **Examples**: Code examples for new DTOs
+- [ ] **Breaking Changes**: Documented if any
 
-Update API documentation for:
-- New REST endpoints
-- New GraphQL queries/mutations
-- Changes to existing APIs
-- New DTOs or data models
+### For Contributors
 
-### User Documentation
+Before submitting a PR:
 
-Update user-facing documentation for:
-- New features that affect end users
-- Changes to configuration
-- New deployment requirements
-- Breaking changes and migration guides
-
-## Performance Considerations
-
-### Database Queries
-
-```java
-// ✅ GOOD: Efficient pagination with proper indexing
-public Page<Organization> findByTenantId(String tenantId, Pageable pageable) {
-    return repository.findByTenantId(tenantId, pageable);
-}
-
-// ✅ GOOD: Use projection for list views
-public List<OrganizationSummary> findSummariesByTenantId(String tenantId) {
-    return repository.findSummariesByTenantId(tenantId, OrganizationSummary.class);
-}
-
-// ❌ BAD: Loading all data without pagination
-public List<Organization> getAllOrganizations(String tenantId) {
-    return repository.findByTenantId(tenantId);  // Could be thousands of records
-}
-```
-
-### Caching Strategy
-
-```java
-@Service
-public class OrganizationService {
-    
-    // ✅ GOOD: Cache frequently accessed, rarely changed data
-    @Cacheable(value = "organizations", key = "#tenantId + ':' + #id")
-    public Optional<Organization> findById(String id, String tenantId) {
-        return repository.findByTenantIdAndId(tenantId, id);
-    }
-    
-    // ✅ GOOD: Evict cache on updates
-    @CacheEvict(value = "organizations", key = "#tenantId + ':' + #id")
-    public Organization update(String id, UpdateOrganizationRequest request, String tenantId) {
-        // Update logic
-    }
-}
-```
-
-### Memory Management
-
-```java
-// ✅ GOOD: Process large datasets in chunks
-public void processAllOrganizations(String tenantId) {
-    Pageable pageable = PageRequest.of(0, 100);
-    Page<Organization> page;
-    
-    do {
-        page = repository.findByTenantId(tenantId, pageable);
-        page.getContent().forEach(this::processOrganization);
-        pageable = pageable.next();
-    } while (page.hasNext());
-}
-
-// ❌ BAD: Loading everything into memory
-public void processAllOrganizations(String tenantId) {
-    List<Organization> allOrgs = repository.findByTenantId(tenantId);  // OOM risk
-    allOrgs.forEach(this::processOrganization);
-}
-```
-
-## Security Requirements
-
-### Input Validation
-
-```java
-// ✅ GOOD: Comprehensive validation
-@PostMapping
-public ResponseEntity<OrganizationResponse> create(
-    @Valid @RequestBody CreateOrganizationRequest request,
-    @AuthenticationPrincipal AuthPrincipal principal
-) {
-    // Additional business rule validation
-    if (organizationService.existsByName(request.getName(), principal.getTenantId())) {
-        throw new OrganizationNameConflictException(request.getName());
-    }
-    
-    Organization org = organizationService.create(request, principal.getTenantId());
-    return ResponseEntity.status(HttpStatus.CREATED).body(mapper.toResponse(org));
-}
-```
-
-### Error Handling
-
-```java
-// ✅ GOOD: Don't leak sensitive information
-@ExceptionHandler(OrganizationNotFoundException.class)
-public ResponseEntity<ErrorResponse> handleOrganizationNotFound(
-    OrganizationNotFoundException ex
-) {
-    // Don't expose whether organization exists in different tenant
-    ErrorResponse error = ErrorResponse.builder()
-        .code("ORGANIZATION_NOT_FOUND")
-        .message("Organization not found")
-        .timestamp(Instant.now())
-        .build();
-    
-    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
-}
-
-// ❌ BAD: Information leakage
-@ExceptionHandler(OrganizationNotFoundException.class)
-public ResponseEntity<ErrorResponse> handleOrganizationNotFound(
-    OrganizationNotFoundException ex
-) {
-    // This could reveal information about other tenants
-    return ResponseEntity.status(HttpStatus.NOT_FOUND)
-        .body(new ErrorResponse("Organization " + ex.getId() + " not found"));
-}
-```
-
-## Common Pitfalls to Avoid
-
-### 1. Tenant Data Leakage
-
-```java
-// ❌ WRONG: Can access any tenant's data
-@GetMapping("/{id}")
-public Organization get(@PathVariable String id) {
-    return repository.findById(id).orElseThrow();
-}
-
-// ✅ CORRECT: Enforces tenant isolation
-@GetMapping("/{id}")
-public Organization get(
-    @PathVariable String id,
-    @AuthenticationPrincipal AuthPrincipal principal
-) {
-    return repository.findByTenantIdAndId(principal.getTenantId(), id)
-        .orElseThrow(() -> new OrganizationNotFoundException(id));
-}
-```
-
-### 2. N+1 Query Problems
-
-```java
-// ❌ WRONG: Causes N+1 queries
-public List<OrganizationWithDevices> getOrganizationsWithDevices(String tenantId) {
-    List<Organization> orgs = repository.findByTenantId(tenantId);
-    return orgs.stream()
-        .map(org -> new OrganizationWithDevices(org, deviceRepository.findByOrganizationId(org.getId())))
-        .collect(Collectors.toList());
-}
-
-// ✅ CORRECT: Single query with join
-public List<OrganizationWithDevices> getOrganizationsWithDevices(String tenantId) {
-    return repository.findByTenantIdWithDevices(tenantId);
-}
-```
-
-### 3. Missing Input Validation
-
-```java
-// ❌ WRONG: No validation
-@PostMapping
-public Organization create(@RequestBody CreateOrganizationRequest request) {
-    return service.create(request);
-}
-
-// ✅ CORRECT: Proper validation
-@PostMapping
-public ResponseEntity<Organization> create(
-    @Valid @RequestBody CreateOrganizationRequest request,
-    @AuthenticationPrincipal AuthPrincipal principal
-) {
-    Organization org = service.create(request, principal.getTenantId());
-    return ResponseEntity.status(HttpStatus.CREATED).body(org);
-}
-```
+- [ ] **Self Review**: Thoroughly review your own code
+- [ ] **Run Tests**: All tests pass locally
+- [ ] **Check Coverage**: Coverage meets minimum requirements
+- [ ] **Update Documentation**: Relevant docs updated
+- [ ] **Clean Commits**: Commit history is clean and descriptive
+- [ ] **No TODOs**: Remove temporary comments and TODOs
 
 ## Release Process
 
-### Version Management
+### Version Numbering
 
-OpenFrame OSS Libraries uses semantic versioning:
+OpenFrame OSS Lib follows **Semantic Versioning** (SemVer):
 
-- **Major** (5.x.x): Breaking changes
-- **Minor** (x.32.x): New features, backward compatible
-- **Patch** (x.x.1): Bug fixes, backward compatible
+```
+MAJOR.MINOR.PATCH
 
-### Contributing to Releases
-
-1. **Feature Development**: Target next minor version
-2. **Bug Fixes**: Can target patch releases
-3. **Breaking Changes**: Require major version bump
-4. **Documentation**: Can be updated in any release
-
-### Migration Guides
-
-For breaking changes, provide migration documentation:
-
-```markdown
-# Migration Guide: v5.x to v6.0
-
-## Breaking Changes
-
-### Authentication API Changes
-- `AuthPrincipal.getUser()` → `AuthPrincipal.getUserId()`
-- `AuthPrincipal.getTenant()` → `AuthPrincipal.getTenantId()`
-
-**Before:**
-```java
-String userId = principal.getUser().getId();
+1.0.0 -> Initial release
+1.0.1 -> Patch: Bug fixes
+1.1.0 -> Minor: New DTOs, backward-compatible changes  
+2.0.0 -> Major: Breaking changes
 ```
 
-**After:**
-```java
-String userId = principal.getUserId();
-```
+### Release Checklist
 
-## Deprecation Timeline
-- v5.30.0: Methods marked as @Deprecated
-- v5.32.0: Deprecation warnings in logs
-- v6.0.0: Deprecated methods removed
-```
+For maintainers preparing releases:
+
+- [ ] **All Tests Pass**: Full test suite passes
+- [ ] **Documentation Updated**: All docs reflect new features
+- [ ] **CHANGELOG Updated**: Changes documented
+- [ ] **Version Bumped**: POM version updated
+- [ ] **Tag Created**: Git tag for release
+- [ ] **Artifacts Published**: Maven artifacts deployed
+- [ ] **Release Notes**: GitHub release with notes
 
 ## Community Guidelines
 
+### Code of Conduct
+
+- **Be Respectful**: Treat all contributors with respect
+- **Be Constructive**: Provide helpful, actionable feedback
+- **Be Collaborative**: Work together to improve the project
+- **Be Patient**: Everyone is learning and contributing their best
+
 ### Communication
 
-- **Be Respectful**: Treat all community members with respect
-- **Be Constructive**: Provide helpful feedback and suggestions
-- **Be Patient**: Remember that everyone is learning and contributing in their own time
-- **Ask Questions**: Don't hesitate to ask for help or clarification
+- **GitHub Issues**: For bug reports and feature requests
+- **GitHub Discussions**: For questions and general discussion
+- **OpenMSP Slack**: For real-time chat and collaboration
+- **PR Comments**: For code-specific discussion
 
-### Where to Get Help
+### Getting Help
 
-1. **[OpenMSP Slack Community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)** - Primary communication channel
-   - `#general` - General discussions
-   - `#development` - Development questions
-   - `#help` - Getting help with issues
+If you need help:
 
-2. **GitHub Issues** - Bug reports and feature requests
-3. **GitHub Discussions** - Longer form discussions and RFCs
-
-### Reporting Issues
-
-**Bug Reports:**
-```markdown
-## Bug Report
-
-**Description**
-A clear description of the bug.
-
-**Steps to Reproduce**
-1. Step 1
-2. Step 2
-3. Step 3
-
-**Expected Behavior** 
-What should have happened.
-
-**Actual Behavior**
-What actually happened.
-
-**Environment**
-- OS: [e.g. Ubuntu 20.04]
-- Java Version: [e.g. OpenJDK 21]
-- Application Version: [e.g. 5.32.0]
-
-**Additional Context**
-Any other relevant information.
-```
-
-**Feature Requests:**
-```markdown
-## Feature Request
-
-**Problem Statement**
-What problem does this feature solve?
-
-**Proposed Solution**
-How would you like this problem to be solved?
-
-**Alternatives Considered**
-What other approaches have you considered?
-
-**Additional Context**
-Any other relevant information or examples.
-```
+1. **Check Documentation**: Start with existing docs
+2. **Search Issues**: Look for similar problems
+3. **Ask in Slack**: Get help from the community
+4. **Create Issue**: If you find a bug or have a feature request
 
 ## Recognition
 
-Contributors are recognized in several ways:
+Contributors will be recognized in:
 
-- **Contributors List**: Updated in README.md
-- **Release Notes**: Contributors credited for their changes
-- **Community Spotlights**: Featured in community communications
-- **Maintainer Path**: Opportunity to become a maintainer
+- **Contributors List**: GitHub contributors page
+- **Release Notes**: Acknowledgment in release notes
+- **Hall of Fame**: Special recognition for significant contributions
 
-## Getting Started Checklist
+## Summary
 
-Before making your first contribution:
+Contributing to OpenFrame OSS Lib:
 
-- [ ] Read this contributing guide thoroughly
-- [ ] Set up your development environment
-- [ ] Join the OpenMSP Slack community
-- [ ] Look for issues labeled `good first issue` or `help wanted`
-- [ ] Fork the repository and create a feature branch
-- [ ] Make a small test contribution (documentation fix, small bug fix)
-- [ ] Submit your first pull request
+1. **Follow Style Guidelines**: Consistent code style and naming
+2. **Use Proper Git Workflow**: Descriptive branches and conventional commits
+3. **Write Comprehensive Tests**: Meet coverage requirements
+4. **Document Changes**: Keep documentation up-to-date
+5. **Collaborate Effectively**: Use PR process and reviews constructively
 
-## Next Steps
-
-Ready to contribute? Here's what to do:
-
-1. **Join the Community**: [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
-2. **Find an Issue**: Browse [GitHub Issues](https://github.com/flamingo-stack/openframe-oss-lib/issues)
-3. **Start Small**: Look for `good first issue` labels
-4. **Ask Questions**: Don't hesitate to ask for help in Slack
+Your contributions help make OpenFrame OSS Lib better for everyone in the OpenFrame ecosystem!
 
 ---
 
-*Thank you for contributing to OpenFrame OSS Libraries! Your contributions help build the future of open-source MSP tooling.*
+*Thank you for contributing to OpenFrame OSS Lib! Your work helps power the entire OpenFrame platform and makes AI-driven MSP solutions accessible to organizations worldwide.*

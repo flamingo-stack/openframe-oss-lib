@@ -1,1128 +1,901 @@
 # Testing Overview
 
-OpenFrame OSS Libraries employs comprehensive testing strategies to ensure reliability, security, and maintainability. This guide covers testing approaches, tools, best practices, and how to write effective tests for the platform.
+OpenFrame OSS Lib maintains high code quality through comprehensive testing strategies. This guide covers the testing structure, how to run tests, write new tests, and meet coverage requirements.
 
 ## Testing Philosophy
 
-### Testing Pyramid
-
-OpenFrame follows the testing pyramid principle with emphasis on fast, reliable tests:
+OpenFrame OSS Lib follows a **test-driven development (TDD) approach** with multiple testing layers:
 
 ```mermaid
-graph TD
+flowchart TD
     subgraph "Testing Pyramid"
-        E2E[End-to-End Tests<br/>5-10%]
-        Integration[Integration Tests<br/>20-30%]
-        Unit[Unit Tests<br/>60-70%]
-        Static[Static Analysis<br/>Continuous]
+        UnitTests["Unit Tests<br/>Fast, Isolated, Many"]
+        IntegrationTests["Integration Tests<br/>Component Interaction"]
+        ContractTests["Contract Tests<br/>API Compatibility"]
+        EndToEndTests["E2E Tests<br/>Full System Validation"]
     end
     
-    E2E --> Integration
-    Integration --> Unit
-    Unit --> Static
+    UnitTests --> IntegrationTests
+    IntegrationTests --> ContractTests
+    ContractTests --> EndToEndTests
     
-    subgraph "Characteristics"
-        E2E_Char[Slow, Expensive, High Confidence]
-        Int_Char[Medium Speed, Medium Cost, Good Coverage]
-        Unit_Char[Fast, Cheap, High Volume]
-        Static_Char[Instant, No Runtime, Early Detection]
-    end
+    classDef unit fill:#e8f5e8,stroke:#4caf50
+    classDef integration fill:#e3f2fd,stroke:#2196f3
+    classDef contract fill:#fff3e0,stroke:#ff9800
+    classDef e2e fill:#fce4ec,stroke:#e91e63
     
-    E2E -.-> E2E_Char
-    Integration -.-> Int_Char
-    Unit -.-> Unit_Char
-    Static -.-> Static_Char
+    class UnitTests unit
+    class IntegrationTests integration
+    class ContractTests contract
+    class EndToEndTests e2e
 ```
 
-### Testing Principles
+## Test Structure and Organization
 
-1. **Fast Feedback Loop** - Tests should run quickly in development
-2. **Reliable and Deterministic** - Tests produce consistent results
-3. **Independent** - Tests don't depend on each other or external state
-4. **Comprehensive Coverage** - Critical paths and edge cases covered
-5. **Clear and Maintainable** - Tests serve as documentation
+### Directory Layout
 
-## Testing Stack and Tools
+```text
+openframe-oss-lib/
+├── openframe-api-lib/
+│   └── src/
+│       ├── main/java/com/openframe/api/dto/     # Production code
+│       └── test/java/                           # Test code
+│           ├── com/openframe/api/dto/           # Unit tests
+│           │   ├── GenericQueryResultTest.java
+│           │   ├── CountedGenericQueryResultTest.java
+│           │   ├── audit/
+│           │   │   ├── LogEventTest.java
+│           │   │   ├── LogDetailsTest.java
+│           │   │   ├── LogFilterCriteriaTest.java
+│           │   │   └── LogFiltersTest.java
+│           │   └── device/
+│           │       ├── DeviceFilterCriteriaTest.java
+│           │       ├── DeviceFiltersTest.java
+│           │       └── DeviceFilterOptionTest.java
+│           ├── integration/                     # Integration tests
+│           │   ├── JsonSerializationTest.java
+│           │   ├── LombokIntegrationTest.java
+│           │   └── ValidationIntegrationTest.java
+│           └── contracts/                       # Contract tests
+│               ├── AuditApiContractTest.java
+│               └── DeviceApiContractTest.java
+├── test-utils/                                  # Shared test utilities
+│   ├── TestDataFactory.java
+│   ├── JsonTestUtils.java
+│   └── AssertionHelpers.java
+└── docs/
+    └── testing/
+        ├── README.md                           # This document
+        ├── unit-testing-guide.md
+        ├── integration-testing-guide.md
+        └── test-data-management.md
+```
 
-### Core Testing Framework
+### Test Naming Convention
 
-| Tool | Purpose | Version |
-|------|---------|---------|
-| **JUnit 5** | Unit testing framework | 5.9+ |
-| **Spring Boot Test** | Integration testing | 3.3.0 |
-| **Mockito** | Mocking framework | 5.3+ |
-| **TestContainers** | Integration with real databases | 1.19+ |
-| **WireMock** | HTTP service mocking | 3.0+ |
-| **AssertJ** | Fluent assertions | 3.24+ |
-| **RestAssured** | API testing | 5.3+ |
+Follow clear, descriptive test naming:
+
+```java
+// ✅ Good: Descriptive test names
+@Test
+@DisplayName("Should build LogEvent with all required fields")
+void shouldBuildLogEventWithAllRequiredFields() { }
+
+@Test
+@DisplayName("Should throw exception when organizationIds is null")
+void shouldThrowExceptionWhenOrganizationIdsIsNull() { }
+
+@Test
+@DisplayName("Should serialize to JSON and deserialize correctly")
+void shouldSerializeToJsonAndDeserializeCorrectly() { }
+
+// ❌ Avoid: Unclear test names
+@Test
+void testLogEvent() { }
+
+@Test
+void test1() { }
+```
+
+## Running Tests
+
+### Basic Test Execution
+
+```bash
+# Run all tests
+./mvnw test
+
+# Run specific test class
+./mvnw test -Dtest=LogEventTest
+
+# Run tests matching pattern
+./mvnw test -Dtest="*Filter*Test"
+
+# Run specific test method
+./mvnw test -Dtest=LogEventTest#shouldBuildLogEventWithAllRequiredFields
+
+# Run integration tests only
+./mvnw test -Dtest="**/*IntegrationTest"
+```
 
 ### Test Configuration
 
-**Maven Dependencies:**
+Configure test execution in `pom.xml`:
+
 ```xml
-<dependencies>
-    <!-- Core testing -->
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-test</artifactId>
-        <scope>test</scope>
-    </dependency>
-    
-    <!-- TestContainers for integration tests -->
-    <dependency>
-        <groupId>org.testcontainers</groupId>
-        <artifactId>junit-jupiter</artifactId>
-        <scope>test</scope>
-    </dependency>
-    <dependency>
-        <groupId>org.testcontainers</groupId>
-        <artifactId>mongodb</artifactId>
-        <scope>test</scope>
-    </dependency>
-    
-    <!-- API testing -->
-    <dependency>
-        <groupId>io.rest-assured</groupId>
-        <artifactId>rest-assured</artifactId>
-        <scope>test</scope>
-    </dependency>
-    
-    <!-- GraphQL testing -->
-    <dependency>
-        <groupId>com.netflix.graphql.dgs</groupId>
-        <artifactId>graphql-dgs-spring-boot-starter-test</artifactId>
-        <scope>test</scope>
-    </dependency>
-</dependencies>
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-surefire-plugin</artifactId>
+    <version>3.0.0</version>
+    <configuration>
+        <!-- Include/exclude patterns -->
+        <includes>
+            <include>**/*Test.java</include>
+            <include>**/*Tests.java</include>
+            <include>**/*TestCase.java</include>
+        </includes>
+        
+        <!-- Test groups -->
+        <groups>unit,integration</groups>
+        
+        <!-- Parallel execution -->
+        <parallel>methods</parallel>
+        <threadCount>4</threadCount>
+        
+        <!-- System properties for tests -->
+        <systemPropertyVariables>
+            <test.environment>local</test.environment>
+            <json.pretty.print>true</json.pretty.print>
+        </systemPropertyVariables>
+    </configuration>
+</plugin>
+```
+
+### Coverage Reports
+
+Generate and view coverage reports:
+
+```bash
+# Run tests with coverage
+./mvnw test jacoco:report
+
+# View coverage report
+open target/site/jacoco/index.html
+
+# Coverage with specific threshold
+./mvnw verify -Djacoco.percentage.minimum=80
 ```
 
 ## Unit Testing
 
-### Service Layer Testing
+### Standard Unit Test Structure
 
-Test business logic in isolation:
+Every DTO should have comprehensive unit tests:
 
 ```java
-@ExtendWith(MockitoExtension.class)
-class OrganizationServiceTest {
+package com.openframe.api.dto.audit;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.EnumSource;
+
+import java.time.LocalDateTime;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
+
+class LogEventTest {
     
-    @Mock
-    private OrganizationRepository repository;
-    
-    @Mock
-    private EventPublisher eventPublisher;
-    
-    @InjectMocks
-    private OrganizationService organizationService;
-    
-    @Test
-    @DisplayName("Should create organization with valid data")
-    void shouldCreateOrganizationWithValidData() {
-        // Given
-        String tenantId = "tenant-123";
-        CreateOrganizationRequest request = CreateOrganizationRequest.builder()
-            .name("Acme IT Services")
-            .contactInformation(ContactInformationDto.builder()
-                .email("admin@acmeit.com")
-                .phone("+1-555-0123")
-                .build())
-            .build();
+    @Nested
+    @DisplayName("LogEvent Builder Tests")
+    class BuilderTests {
         
-        Organization expectedOrg = Organization.builder()
-            .id("org-456")
-            .tenantId(tenantId)
-            .name("Acme IT Services")
-            .build();
+        @Test
+        @DisplayName("Should build LogEvent with all required fields")
+        void shouldBuildLogEventWithAllRequiredFields() {
+            // Given
+            String expectedId = "evt_123";
+            String expectedSummary = "User login successful";
+            String expectedEventType = "AUTHENTICATION";
+            String expectedSeverity = "INFO";
+            LocalDateTime expectedTimestamp = LocalDateTime.now();
+            String expectedOrganizationId = "org_456";
+            
+            // When
+            LogEvent logEvent = LogEvent.builder()
+                .id(expectedId)
+                .summary(expectedSummary)
+                .eventType(expectedEventType)
+                .severity(expectedSeverity)
+                .timestamp(expectedTimestamp)
+                .organizationId(expectedOrganizationId)
+                .build();
+                
+            // Then
+            assertThat(logEvent).isNotNull();
+            assertThat(logEvent.getId()).isEqualTo(expectedId);
+            assertThat(logEvent.getSummary()).isEqualTo(expectedSummary);
+            assertThat(logEvent.getEventType()).isEqualTo(expectedEventType);
+            assertThat(logEvent.getSeverity()).isEqualTo(expectedSeverity);
+            assertThat(logEvent.getTimestamp()).isEqualTo(expectedTimestamp);
+            assertThat(logEvent.getOrganizationId()).isEqualTo(expectedOrganizationId);
+        }
         
-        when(repository.save(any(Organization.class))).thenReturn(expectedOrg);
-        
-        // When
-        Organization result = organizationService.create(request, tenantId);
-        
-        // Then
-        assertThat(result)
-            .isNotNull()
-            .hasFieldOrPropertyWithValue("name", "Acme IT Services")
-            .hasFieldOrPropertyWithValue("tenantId", tenantId);
-        
-        verify(repository).save(argThat(org -> 
-            org.getName().equals("Acme IT Services") &&
-            org.getTenantId().equals(tenantId)
-        ));
-        
-        verify(eventPublisher).publishEvent(any(OrganizationCreatedEvent.class));
+        @Test
+        @DisplayName("Should build LogEvent with minimal required fields")
+        void shouldBuildLogEventWithMinimalFields() {
+            // When
+            LogEvent logEvent = LogEvent.builder()
+                .id("minimal_123")
+                .summary("Minimal event")
+                .build();
+                
+            // Then
+            assertThat(logEvent).isNotNull();
+            assertThat(logEvent.getId()).isEqualTo("minimal_123");
+            assertThat(logEvent.getSummary()).isEqualTo("Minimal event");
+            assertThat(logEvent.getEventType()).isNull();
+            assertThat(logEvent.getSeverity()).isNull();
+        }
     }
     
-    @Test
-    @DisplayName("Should throw exception when organization name is taken")
-    void shouldThrowExceptionWhenNameIsTaken() {
-        // Given
-        String tenantId = "tenant-123";
-        CreateOrganizationRequest request = CreateOrganizationRequest.builder()
-            .name("Existing Org")
-            .build();
+    @Nested
+    @DisplayName("LogEvent Validation Tests")
+    class ValidationTests {
         
-        when(repository.existsByTenantIdAndName(tenantId, "Existing Org"))
-            .thenReturn(true);
+        @ParameterizedTest
+        @ValueSource(strings = {"", " ", "   "})
+        @DisplayName("Should handle empty and whitespace-only strings")
+        void shouldHandleEmptyAndWhitespaceStrings(String input) {
+            // When/Then - should not throw exceptions
+            assertDoesNotThrow(() -> {
+                LogEvent logEvent = LogEvent.builder()
+                    .id(input)
+                    .summary(input)
+                    .eventType(input)
+                    .build();
+                    
+                // Verify fields are set as provided (no automatic trimming)
+                assertThat(logEvent.getId()).isEqualTo(input);
+                assertThat(logEvent.getSummary()).isEqualTo(input);
+                assertThat(logEvent.getEventType()).isEqualTo(input);
+            });
+        }
         
-        // When & Then
-        assertThatThrownBy(() -> organizationService.create(request, tenantId))
-            .isInstanceOf(OrganizationNameConflictException.class)
-            .hasMessage("Organization name 'Existing Org' already exists");
-        
-        verify(repository, never()).save(any());
-        verify(eventPublisher, never()).publishEvent(any());
+        @Test
+        @DisplayName("Should handle null values gracefully")
+        void shouldHandleNullValuesGracefully() {
+            // When/Then - should not throw exceptions
+            assertDoesNotThrow(() -> {
+                LogEvent logEvent = LogEvent.builder()
+                    .id(null)
+                    .summary(null)
+                    .eventType(null)
+                    .severity(null)
+                    .timestamp(null)
+                    .build();
+                    
+                assertThat(logEvent).isNotNull();
+                assertThat(logEvent.getId()).isNull();
+                assertThat(logEvent.getSummary()).isNull();
+            });
+        }
     }
     
-    @Test
-    @DisplayName("Should enforce tenant isolation when finding organizations")
-    void shouldEnforceTenantIsolationWhenFinding() {
-        // Given
-        String tenantId = "tenant-123";
-        List<Organization> expectedOrgs = List.of(
-            Organization.builder().tenantId(tenantId).name("Org 1").build(),
-            Organization.builder().tenantId(tenantId).name("Org 2").build()
-        );
+    @Nested
+    @DisplayName("LogEvent Equality and HashCode Tests")
+    class EqualityTests {
         
-        when(repository.findByTenantId(tenantId)).thenReturn(expectedOrgs);
+        @Test
+        @DisplayName("Should be equal when all fields match")
+        void shouldBeEqualWhenAllFieldsMatch() {
+            // Given
+            LocalDateTime timestamp = LocalDateTime.now();
+            
+            LogEvent event1 = LogEvent.builder()
+                .id("evt_123")
+                .summary("Test event")
+                .eventType("TEST")
+                .timestamp(timestamp)
+                .build();
+                
+            LogEvent event2 = LogEvent.builder()
+                .id("evt_123")
+                .summary("Test event")
+                .eventType("TEST")
+                .timestamp(timestamp)
+                .build();
+                
+            // When/Then
+            assertThat(event1).isEqualTo(event2);
+            assertThat(event1.hashCode()).isEqualTo(event2.hashCode());
+        }
         
-        // When
-        List<Organization> result = organizationService.findByTenant(tenantId);
-        
-        // Then
-        assertThat(result)
-            .hasSize(2)
-            .allSatisfy(org -> assertThat(org.getTenantId()).isEqualTo(tenantId));
-        
-        verify(repository).findByTenantId(tenantId);
+        @Test
+        @DisplayName("Should not be equal when IDs differ")
+        void shouldNotBeEqualWhenIdsDiffer() {
+            // Given
+            LogEvent event1 = LogEvent.builder().id("evt_123").build();
+            LogEvent event2 = LogEvent.builder().id("evt_456").build();
+            
+            // When/Then
+            assertThat(event1).isNotEqualTo(event2);
+        }
     }
 }
 ```
 
-### Repository Layer Testing
+### Testing Builder Patterns
 
-Test data access with `@DataMongoTest`:
+Test Lombok-generated builders thoroughly:
 
 ```java
-@DataMongoTest
-@TestPropertySource(properties = {
-    "spring.data.mongodb.database=test_openframe",
-    "logging.level.org.springframework.data.mongodb.core=DEBUG"
-})
-class OrganizationRepositoryTest {
-    
-    @Autowired
-    private TestEntityManager entityManager;
-    
-    @Autowired
-    private OrganizationRepository repository;
-    
-    @Test
-    @DisplayName("Should find organizations by tenant ID")
-    void shouldFindOrganizationsByTenantId() {
-        // Given
-        String tenantId = "tenant-123";
-        Organization org1 = Organization.builder()
-            .tenantId(tenantId)
-            .name("Org 1")
-            .build();
-        Organization org2 = Organization.builder()
-            .tenantId(tenantId)
-            .name("Org 2")
-            .build();
-        Organization org3 = Organization.builder()
-            .tenantId("other-tenant")
-            .name("Other Org")
-            .build();
+@Test
+@DisplayName("Should chain builder methods correctly")
+void shouldChainBuilderMethodsCorrectly() {
+    // Given/When - fluent builder pattern
+    CountedGenericQueryResult<String> result = CountedGenericQueryResult.<String>builder()
+        .items(Arrays.asList("item1", "item2", "item3"))
+        .filteredCount(150)
+        .pageInfo(PageInfo.builder()
+            .pageNumber(1)
+            .pageSize(3)
+            .totalElements(150)
+            .build())
+        .build();
         
-        repository.saveAll(List.of(org1, org2, org3));
+    // Then - verify builder worked correctly
+    assertThat(result.getItems()).hasSize(3);
+    assertThat(result.getFilteredCount()).isEqualTo(150);
+    assertThat(result.getPageInfo().getTotalElements()).isEqualTo(150);
+}
+
+@Test
+@DisplayName("Should create new instance from existing with toBuilder")
+void shouldCreateNewInstanceFromExistingWithToBuilder() {
+    // Given
+    LogEvent original = LogEvent.builder()
+        .id("evt_123")
+        .summary("Original summary")
+        .eventType("ORIGINAL")
+        .build();
         
-        // When
-        List<Organization> result = repository.findByTenantId(tenantId);
+    // When - modify using toBuilder
+    LogEvent modified = original.toBuilder()
+        .summary("Modified summary")
+        .eventType("MODIFIED")
+        .build();
         
-        // Then
-        assertThat(result)
-            .hasSize(2)
-            .extracting(Organization::getName)
-            .containsExactlyInAnyOrder("Org 1", "Org 2");
+    // Then - original unchanged, new instance created
+    assertThat(original.getSummary()).isEqualTo("Original summary");
+    assertThat(original.getEventType()).isEqualTo("ORIGINAL");
+    
+    assertThat(modified.getId()).isEqualTo("evt_123");  // Preserved
+    assertThat(modified.getSummary()).isEqualTo("Modified summary");  // Modified
+    assertThat(modified.getEventType()).isEqualTo("MODIFIED");  // Modified
+}
+```
+
+### Test Data Factory Pattern
+
+Create reusable test data factories:
+
+```java
+// test-utils/TestDataFactory.java
+public class TestDataFactory {
+    
+    public static LogEvent createValidLogEvent() {
+        return LogEvent.builder()
+            .id("evt_" + UUID.randomUUID().toString().substring(0, 8))
+            .summary("Test audit event")
+            .eventType("TEST")
+            .severity("INFO")
+            .timestamp(LocalDateTime.now())
+            .organizationId("org_test")
+            .build();
     }
     
-    @Test
-    @DisplayName("Should check if organization name exists within tenant")
-    void shouldCheckNameExistenceWithinTenant() {
-        // Given
-        String tenantId = "tenant-123";
-        Organization existingOrg = Organization.builder()
-            .tenantId(tenantId)
-            .name("Existing Org")
+    public static LogEvent createLogEventWithType(String eventType) {
+        return createValidLogEvent().toBuilder()
+            .eventType(eventType)
             .build();
-        repository.save(existingOrg);
-        
-        // When & Then
-        assertThat(repository.existsByTenantIdAndName(tenantId, "Existing Org"))
-            .isTrue();
-        
-        assertThat(repository.existsByTenantIdAndName("other-tenant", "Existing Org"))
-            .isFalse();
-        
-        assertThat(repository.existsByTenantIdAndName(tenantId, "Non-existing Org"))
-            .isFalse();
     }
     
-    @Test
-    @DisplayName("Should find organizations with pagination")
-    void shouldFindOrganizationsWithPagination() {
-        // Given
-        String tenantId = "tenant-123";
-        List<Organization> orgs = IntStream.range(0, 15)
-            .mapToObj(i -> Organization.builder()
-                .tenantId(tenantId)
-                .name("Org " + i)
+    public static LogFilterCriteria createValidFilterCriteria() {
+        return LogFilterCriteria.builder()
+            .startDate(LocalDate.now().minusDays(7))
+            .endDate(LocalDate.now())
+            .organizationIds(Arrays.asList("org_test"))
+            .eventTypes(Arrays.asList("TEST", "AUTHENTICATION"))
+            .build();
+    }
+    
+    public static <T> GenericQueryResult<T> createValidQueryResult(List<T> items) {
+        return GenericQueryResult.<T>builder()
+            .items(items)
+            .pageInfo(PageInfo.builder()
+                .pageNumber(0)
+                .pageSize(items.size())
+                .totalElements(items.size())
+                .totalPages(1)
                 .build())
-            .collect(Collectors.toList());
-        
-        repository.saveAll(orgs);
-        
-        // When
-        Pageable pageable = PageRequest.of(0, 10);
-        Page<Organization> result = repository.findByTenantId(tenantId, pageable);
-        
-        // Then
-        assertThat(result)
-            .hasSize(10)
-            .satisfies(page -> {
-                assertThat(page.getTotalElements()).isEqualTo(15);
-                assertThat(page.getTotalPages()).isEqualTo(2);
-                assertThat(page.hasNext()).isTrue();
-            });
+            .build();
     }
 }
 ```
 
 ## Integration Testing
 
-### Controller Integration Tests
+### JSON Serialization Tests
 
-Test full request/response cycle:
+Test Jackson serialization/deserialization:
 
 ```java
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@TestPropertySource(properties = "spring.profiles.active=test")
-@Testcontainers
-class OrganizationControllerIntegrationTest {
+package integration;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.openframe.api.dto.audit.LogEvent;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.time.LocalDateTime;
+
+import static org.assertj.core.api.Assertions.*;
+
+class JsonSerializationTest {
     
-    @Container
-    static MongoDBContainer mongoDBContainer = new MongoDBContainer("mongo:7-jammy")
-            .withExposedPorts(27017);
-    
-    @Container
-    static GenericContainer<?> redisContainer = new GenericContainer<>("redis:7-alpine")
-            .withExposedPorts(6379);
-    
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.data.mongodb.uri", mongoDBContainer::getReplicationSetUrl);
-        registry.add("spring.data.redis.host", redisContainer::getHost);
-        registry.add("spring.data.redis.port", () -> redisContainer.getMappedPort(6379));
-    }
-    
-    @Autowired
-    private TestRestTemplate restTemplate;
-    
-    @Autowired
-    private OrganizationRepository repository;
-    
-    private String authToken;
-    private String tenantId = "test-tenant";
+    private ObjectMapper objectMapper;
     
     @BeforeEach
-    void setup() {
-        // Generate test JWT token
-        authToken = generateTestToken(tenantId, "test-user", List.of("ADMIN"));
-        
-        // Clean database
-        repository.deleteAll();
+    void setUp() {
+        objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
+        objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
     
     @Test
-    @DisplayName("Should create organization via REST API")
-    void shouldCreateOrganizationViaRestApi() {
+    @DisplayName("Should serialize LogEvent to JSON correctly")
+    void shouldSerializeLogEventToJsonCorrectly() throws Exception {
         // Given
-        CreateOrganizationRequest request = CreateOrganizationRequest.builder()
-            .name("Test Organization")
-            .contactInformation(ContactInformationDto.builder()
-                .email("admin@testorg.com")
-                .phone("+1-555-0123")
-                .build())
+        LocalDateTime timestamp = LocalDateTime.of(2024, 1, 15, 10, 30, 45);
+        LogEvent logEvent = LogEvent.builder()
+            .id("evt_test_123")
+            .summary("Test serialization")
+            .eventType("SERIALIZATION_TEST")
+            .severity("INFO")
+            .timestamp(timestamp)
+            .organizationId("org_test")
             .build();
-        
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(authToken);
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        
-        HttpEntity<CreateOrganizationRequest> entity = new HttpEntity<>(request, headers);
-        
+            
         // When
-        ResponseEntity<OrganizationResponse> response = restTemplate.exchange(
-            "/api/organizations",
-            HttpMethod.POST,
-            entity,
-            OrganizationResponse.class
-        );
+        String json = objectMapper.writeValueAsString(logEvent);
         
         // Then
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(response.getBody())
-            .isNotNull()
-            .satisfies(org -> {
-                assertThat(org.getName()).isEqualTo("Test Organization");
-                assertThat(org.getContactInformation().getEmail()).isEqualTo("admin@testorg.com");
-                assertThat(org.getId()).isNotNull();
-            });
-        
-        // Verify in database
-        Optional<Organization> savedOrg = repository.findById(response.getBody().getId());
-        assertThat(savedOrg)
-            .isPresent()
-            .get()
-            .satisfies(org -> {
-                assertThat(org.getTenantId()).isEqualTo(tenantId);
-                assertThat(org.getName()).isEqualTo("Test Organization");
-            });
+        assertThat(json).contains("\"id\":\"evt_test_123\"");
+        assertThat(json).contains("\"summary\":\"Test serialization\"");
+        assertThat(json).contains("\"eventType\":\"SERIALIZATION_TEST\"");
+        assertThat(json).contains("\"severity\":\"INFO\"");
+        assertThat(json).contains("\"organizationId\":\"org_test\"");
+        assertThat(json).contains("\"timestamp\":\"2024-01-15T10:30:45\"");
     }
     
     @Test
-    @DisplayName("Should return 401 for requests without authentication")
-    void shouldReturn401ForUnauthenticatedRequests() {
+    @DisplayName("Should deserialize JSON to LogEvent correctly")
+    void shouldDeserializeJsonToLogEventCorrectly() throws Exception {
         // Given
-        CreateOrganizationRequest request = CreateOrganizationRequest.builder()
-            .name("Test Org")
-            .build();
-        
+        String json = """
+            {
+                "id": "evt_test_456",
+                "summary": "Test deserialization",
+                "eventType": "DESERIALIZATION_TEST",
+                "severity": "WARN",
+                "timestamp": "2024-01-15T10:30:45",
+                "organizationId": "org_test"
+            }
+            """;
+            
         // When
-        ResponseEntity<String> response = restTemplate.postForEntity(
-            "/api/organizations",
-            request,
-            String.class
-        );
+        LogEvent logEvent = objectMapper.readValue(json, LogEvent.class);
         
         // Then
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(logEvent.getId()).isEqualTo("evt_test_456");
+        assertThat(logEvent.getSummary()).isEqualTo("Test deserialization");
+        assertThat(logEvent.getEventType()).isEqualTo("DESERIALIZATION_TEST");
+        assertThat(logEvent.getSeverity()).isEqualTo("WARN");
+        assertThat(logEvent.getOrganizationId()).isEqualTo("org_test");
+        assertThat(logEvent.getTimestamp()).isEqualTo(LocalDateTime.of(2024, 1, 15, 10, 30, 45));
     }
     
     @Test
-    @DisplayName("Should enforce tenant isolation")
-    void shouldEnforceTenantIsolation() {
-        // Given - Create organization for tenant 1
-        Organization org1 = Organization.builder()
-            .tenantId("tenant-1")
-            .name("Tenant 1 Org")
-            .build();
-        repository.save(org1);
-        
-        // Create auth token for tenant 2
-        String tenant2Token = generateTestToken("tenant-2", "user-2", List.of("USER"));
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(tenant2Token);
-        
-        // When - Try to access organization from different tenant
-        ResponseEntity<String> response = restTemplate.exchange(
-            "/api/organizations/" + org1.getId(),
-            HttpMethod.GET,
-            new HttpEntity<>(headers),
-            String.class
-        );
+    @DisplayName("Should handle missing optional fields during deserialization")
+    void shouldHandleMissingOptionalFieldsDuringDeserialization() throws Exception {
+        // Given - JSON with only required fields
+        String json = """
+            {
+                "id": "evt_minimal",
+                "summary": "Minimal event"
+            }
+            """;
+            
+        // When
+        LogEvent logEvent = objectMapper.readValue(json, LogEvent.class);
         
         // Then
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-    }
-    
-    private String generateTestToken(String tenantId, String userId, List<String> roles) {
-        // Implementation would create valid JWT for testing
-        return jwtTestUtils.createToken(tenantId, userId, roles);
+        assertThat(logEvent.getId()).isEqualTo("evt_minimal");
+        assertThat(logEvent.getSummary()).isEqualTo("Minimal event");
+        assertThat(logEvent.getEventType()).isNull();
+        assertThat(logEvent.getSeverity()).isNull();
+        assertThat(logEvent.getTimestamp()).isNull();
     }
 }
 ```
 
-### GraphQL Integration Tests
+### Lombok Integration Tests
 
-Test GraphQL queries and mutations:
+Test that Lombok annotations work correctly:
 
 ```java
-@SpringBootTest
-@DgsIntegrationTest
-@TestPropertySource(properties = "spring.profiles.active=test")
-class OrganizationGraphQLIntegrationTest {
+package integration;
+
+import com.openframe.api.dto.CountedGenericQueryResult;
+import com.openframe.api.dto.GenericQueryResult;
+import org.junit.jupiter.api.Test;
+
+import java.lang.reflect.Method;
+import java.util.Arrays;
+
+import static org.assertj.core.api.Assertions.*;
+
+class LombokIntegrationTest {
     
-    @Autowired
-    private DgsQueryExecutor dgsQueryExecutor;
+    @Test
+    @DisplayName("Should generate getter methods for all fields")
+    void shouldGenerateGetterMethodsForAllFields() {
+        // Given
+        Class<LogEvent> clazz = LogEvent.class;
+        
+        // When/Then - verify Lombok generated getters
+        assertThat(clazz).hasDeclaredMethods(
+            "getId", "getSummary", "getEventType", 
+            "getSeverity", "getTimestamp", "getOrganizationId"
+        );
+    }
     
-    @Autowired
-    private OrganizationRepository repository;
+    @Test
+    @DisplayName("Should generate setter methods for all fields")
+    void shouldGenerateSetterMethodsForAllFields() {
+        // Given
+        Class<LogEvent> clazz = LogEvent.class;
+        
+        // When/Then - verify Lombok generated setters
+        assertThat(clazz).hasDeclaredMethods(
+            "setId", "setSummary", "setEventType",
+            "setSeverity", "setTimestamp", "setOrganizationId"
+        );
+    }
     
-    @MockBean
-    private AuthPrincipal authPrincipal;
+    @Test
+    @DisplayName("Should generate builder pattern methods")
+    void shouldGenerateBuilderPatternMethods() {
+        // Given
+        Class<LogEvent> clazz = LogEvent.class;
+        
+        // When/Then - verify Lombok generated builder methods
+        assertThat(clazz).hasDeclaredMethods("builder");
+        
+        // Verify builder class exists
+        Class<?>[] innerClasses = clazz.getDeclaredClasses();
+        boolean hasBuilderClass = Arrays.stream(innerClasses)
+            .anyMatch(c -> c.getSimpleName().contains("Builder"));
+        assertThat(hasBuilderClass).isTrue();
+    }
+    
+    @Test
+    @DisplayName("Should generate toString method")
+    void shouldGenerateToStringMethod() throws Exception {
+        // Given
+        LogEvent logEvent = LogEvent.builder()
+            .id("evt_test")
+            .summary("Test toString")
+            .build();
+            
+        // When
+        String toString = logEvent.toString();
+        
+        // Then - verify Lombok generated toString includes field values
+        assertThat(toString).contains("LogEvent(");
+        assertThat(toString).contains("id=evt_test");
+        assertThat(toString).contains("summary=Test toString");
+    }
+    
+    @Test
+    @DisplayName("Should generate equals and hashCode methods")
+    void shouldGenerateEqualsAndHashCodeMethods() {
+        // Given
+        LogEvent event1 = LogEvent.builder().id("evt_123").summary("Test").build();
+        LogEvent event2 = LogEvent.builder().id("evt_123").summary("Test").build();
+        LogEvent event3 = LogEvent.builder().id("evt_456").summary("Different").build();
+        
+        // When/Then - verify Lombok generated equals
+        assertThat(event1).isEqualTo(event2);
+        assertThat(event1).isNotEqualTo(event3);
+        
+        // Verify hashCode consistency
+        assertThat(event1.hashCode()).isEqualTo(event2.hashCode());
+        assertThat(event1.hashCode()).isNotEqualTo(event3.hashCode());
+    }
+}
+```
+
+## Coverage Requirements
+
+### Coverage Targets
+
+OpenFrame OSS Lib maintains strict coverage requirements:
+
+| Coverage Type | Minimum Requirement | Target |
+|---------------|---------------------|--------|
+| **Line Coverage** | 85% | 95% |
+| **Branch Coverage** | 80% | 90% |
+| **Method Coverage** | 90% | 100% |
+| **Class Coverage** | 90% | 100% |
+
+### JaCoCo Configuration
+
+Configure coverage in `pom.xml`:
+
+```xml
+<plugin>
+    <groupId>org.jacoco</groupId>
+    <artifactId>jacoco-maven-plugin</artifactId>
+    <version>0.8.8</version>
+    <executions>
+        <execution>
+            <goals>
+                <goal>prepare-agent</goal>
+            </goals>
+        </execution>
+        <execution>
+            <id>report</id>
+            <phase>test</phase>
+            <goals>
+                <goal>report</goal>
+            </goals>
+        </execution>
+        <execution>
+            <id>check</id>
+            <goals>
+                <goal>check</goal>
+            </goals>
+            <configuration>
+                <rules>
+                    <rule>
+                        <element>BUNDLE</element>
+                        <limits>
+                            <limit>
+                                <counter>LINE</counter>
+                                <value>COVEREDRATIO</value>
+                                <minimum>0.85</minimum>
+                            </limit>
+                            <limit>
+                                <counter>BRANCH</counter>
+                                <value>COVEREDRATIO</value>
+                                <minimum>0.80</minimum>
+                            </limit>
+                        </limits>
+                    </rule>
+                </rules>
+            </configuration>
+        </execution>
+    </executions>
+</plugin>
+```
+
+### Coverage Exclusions
+
+Exclude generated code and utility classes:
+
+```xml
+<configuration>
+    <excludes>
+        <exclude>**/*Builder.class</exclude>
+        <exclude>**/*$$serializer.class</exclude>
+        <exclude>**/package-info.class</exclude>
+    </excludes>
+</configuration>
+```
+
+## Writing New Tests
+
+### Test Class Template
+
+Use this template for new test classes:
+
+```java
+package com.openframe.api.dto.your.package;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
+
+@DisplayName("YourDTO Tests")
+class YourDTOTest {
+    
+    private YourDTO validDTO;
     
     @BeforeEach
-    void setup() {
-        when(authPrincipal.getTenantId()).thenReturn("test-tenant");
-        when(authPrincipal.getUserId()).thenReturn("test-user");
-        
-        repository.deleteAll();
+    void setUp() {
+        validDTO = TestDataFactory.createValidYourDTO();
     }
     
-    @Test
-    @DisplayName("Should query organizations via GraphQL")
-    void shouldQueryOrganizationsViaGraphQL() {
-        // Given
-        String tenantId = "test-tenant";
-        List<Organization> organizations = List.of(
-            Organization.builder()
-                .tenantId(tenantId)
-                .name("Org 1")
-                .contactInformation(ContactInformation.builder()
-                    .email("admin1@org1.com")
-                    .build())
-                .build(),
-            Organization.builder()
-                .tenantId(tenantId)
-                .name("Org 2")
-                .contactInformation(ContactInformation.builder()
-                    .email("admin2@org2.com")
-                    .build())
-                .build()
-        );
-        repository.saveAll(organizations);
+    @Nested
+    @DisplayName("Builder Pattern Tests")
+    class BuilderTests {
         
-        // When
-        String query = """
-            query GetOrganizations($first: Int) {
-                organizations(first: $first) {
-                    edges {
-                        node {
-                            id
-                            name
-                            contactInformation {
-                                email
-                            }
-                        }
-                    }
-                    pageInfo {
-                        hasNextPage
-                        hasPreviousPage
-                    }
-                }
-            }
-            """;
-        
-        Map<String, Object> variables = Map.of("first", 10);
-        
-        ExecutionResult result = dgsQueryExecutor.execute(query, variables);
-        
-        // Then
-        assertThat(result.getErrors()).isEmpty();
-        
-        List<Map<String, Object>> edges = JsonPath.read(result.getData(), "$.organizations.edges");
-        assertThat(edges).hasSize(2);
-        
-        List<String> names = JsonPath.read(result.getData(), "$.organizations.edges[*].node.name");
-        assertThat(names).containsExactlyInAnyOrder("Org 1", "Org 2");
-    }
-    
-    @Test
-    @DisplayName("Should create organization via GraphQL mutation")
-    void shouldCreateOrganizationViaGraphQLMutation() {
-        // Given
-        String mutation = """
-            mutation CreateOrganization($input: CreateOrganizationInput!) {
-                createOrganization(input: $input) {
-                    id
-                    name
-                    contactInformation {
-                        email
-                        phone
-                    }
-                }
-            }
-            """;
-        
-        Map<String, Object> variables = Map.of(
-            "input", Map.of(
-                "name", "GraphQL Test Org",
-                "contactInformation", Map.of(
-                    "email", "admin@graphqltest.com",
-                    "phone", "+1-555-0199"
-                )
-            )
-        );
-        
-        // When
-        ExecutionResult result = dgsQueryExecutor.execute(mutation, variables);
-        
-        // Then
-        assertThat(result.getErrors()).isEmpty();
-        
-        String orgId = JsonPath.read(result.getData(), "$.createOrganization.id");
-        String orgName = JsonPath.read(result.getData(), "$.createOrganization.name");
-        String email = JsonPath.read(result.getData(), "$.createOrganization.contactInformation.email");
-        
-        assertThat(orgId).isNotNull();
-        assertThat(orgName).isEqualTo("GraphQL Test Org");
-        assertThat(email).isEqualTo("admin@graphqltest.com");
-        
-        // Verify in database
-        Optional<Organization> savedOrg = repository.findById(orgId);
-        assertThat(savedOrg).isPresent();
-    }
-}
-```
-
-## Security Testing
-
-### Authentication and Authorization Tests
-
-```java
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@TestPropertySource(properties = "spring.profiles.active=test")
-class SecurityIntegrationTest {
-    
-    @Autowired
-    private TestRestTemplate restTemplate;
-    
-    @Test
-    @DisplayName("Should reject requests without valid JWT token")
-    void shouldRejectRequestsWithoutValidJWT() {
-        // When
-        ResponseEntity<String> response = restTemplate.getForEntity(
-            "/api/organizations",
-            String.class
-        );
-        
-        // Then
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-    }
-    
-    @Test
-    @DisplayName("Should reject requests with expired JWT token")
-    void shouldRejectRequestsWithExpiredJWT() {
-        // Given
-        String expiredToken = createExpiredJwtToken();
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(expiredToken);
-        
-        // When
-        ResponseEntity<String> response = restTemplate.exchange(
-            "/api/organizations",
-            HttpMethod.GET,
-            new HttpEntity<>(headers),
-            String.class
-        );
-        
-        // Then
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-    }
-    
-    @Test
-    @DisplayName("Should enforce role-based access control")
-    void shouldEnforceRoleBasedAccessControl() {
-        // Given
-        String userToken = createJwtToken("tenant-1", "user-1", List.of("USER"));
-        String adminToken = createJwtToken("tenant-1", "admin-1", List.of("ADMIN"));
-        
-        // User should be able to read
-        HttpHeaders userHeaders = new HttpHeaders();
-        userHeaders.setBearerAuth(userToken);
-        
-        ResponseEntity<String> userReadResponse = restTemplate.exchange(
-            "/api/organizations",
-            HttpMethod.GET,
-            new HttpEntity<>(userHeaders),
-            String.class
-        );
-        assertThat(userReadResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        
-        // User should NOT be able to delete
-        ResponseEntity<String> userDeleteResponse = restTemplate.exchange(
-            "/api/users/some-user-id",
-            HttpMethod.DELETE,
-            new HttpEntity<>(userHeaders),
-            String.class
-        );
-        assertThat(userDeleteResponse.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-        
-        // Admin should be able to delete
-        HttpHeaders adminHeaders = new HttpHeaders();
-        adminHeaders.setBearerAuth(adminToken);
-        
-        ResponseEntity<String> adminDeleteResponse = restTemplate.exchange(
-            "/api/users/some-user-id",
-            HttpMethod.DELETE,
-            new HttpEntity<>(adminHeaders),
-            String.class
-        );
-        assertThat(adminDeleteResponse.getStatusCode()).isIn(
-            HttpStatus.NO_CONTENT, HttpStatus.NOT_FOUND
-        );
-    }
-}
-```
-
-## Performance Testing
-
-### Load Testing with JUnit
-
-```java
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@TestPropertySource(properties = {
-    "spring.profiles.active=test",
-    "logging.level.com.openframe=WARN"  // Reduce log noise
-})
-class PerformanceTest {
-    
-    @Autowired
-    private TestRestTemplate restTemplate;
-    
-    @Test
-    @DisplayName("Should handle concurrent requests efficiently")
-    void shouldHandleConcurrentRequestsEfficiently() throws InterruptedException {
-        // Given
-        int threadCount = 10;
-        int requestsPerThread = 20;
-        CountDownLatch latch = new CountDownLatch(threadCount);
-        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
-        
-        List<Long> responseTimes = Collections.synchronizedList(new ArrayList<>());
-        AtomicInteger successCount = new AtomicInteger();
-        AtomicInteger errorCount = new AtomicInteger();
-        
-        String authToken = createValidJwtToken();
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(authToken);
-        
-        // When
-        for (int i = 0; i < threadCount; i++) {
-            executor.submit(() -> {
-                try {
-                    for (int j = 0; j < requestsPerThread; j++) {
-                        long startTime = System.currentTimeMillis();
-                        
-                        ResponseEntity<String> response = restTemplate.exchange(
-                            "/api/organizations",
-                            HttpMethod.GET,
-                            new HttpEntity<>(headers),
-                            String.class
-                        );
-                        
-                        long responseTime = System.currentTimeMillis() - startTime;
-                        responseTimes.add(responseTime);
-                        
-                        if (response.getStatusCode().is2xxSuccessful()) {
-                            successCount.incrementAndGet();
-                        } else {
-                            errorCount.incrementAndGet();
-                        }
-                    }
-                } finally {
-                    latch.countDown();
-                }
-            });
+        @Test
+        @DisplayName("Should build DTO with all required fields")
+        void shouldBuildDTOWithAllRequiredFields() {
+            // Test builder functionality
         }
         
-        latch.await(30, TimeUnit.SECONDS);
-        executor.shutdown();
+        @Test
+        @DisplayName("Should use toBuilder to create modified copy")
+        void shouldUseToBuilderToCreateModifiedCopy() {
+            // Test toBuilder functionality
+        }
+    }
+    
+    @Nested
+    @DisplayName("Validation Tests")
+    class ValidationTests {
         
-        // Then
-        int totalRequests = threadCount * requestsPerThread;
-        double successRate = (double) successCount.get() / totalRequests * 100;
-        double avgResponseTime = responseTimes.stream()
-            .mapToLong(Long::longValue)
-            .average()
-            .orElse(0);
-        long maxResponseTime = responseTimes.stream()
-            .mapToLong(Long::longValue)
-            .max()
-            .orElse(0);
+        @ParameterizedTest
+        @ValueSource(strings = {"", " ", "   "})
+        @DisplayName("Should handle empty string inputs")
+        void shouldHandleEmptyStringInputs(String input) {
+            // Test validation logic
+        }
         
-        System.out.printf("Performance Results:%n");
-        System.out.printf("  Total Requests: %d%n", totalRequests);
-        System.out.printf("  Success Rate: %.2f%%%n", successRate);
-        System.out.printf("  Average Response Time: %.2f ms%n", avgResponseTime);
-        System.out.printf("  Max Response Time: %d ms%n", maxResponseTime);
+        @Test
+        @DisplayName("Should handle null values gracefully")
+        void shouldHandleNullValuesGracefully() {
+            // Test null handling
+        }
+    }
+    
+    @Nested
+    @DisplayName("Serialization Tests")
+    class SerializationTests {
         
-        // Assertions
-        assertThat(successRate).isGreaterThan(95.0);
-        assertThat(avgResponseTime).isLessThan(500.0);  // 500ms average
-        assertThat(maxResponseTime).isLessThan(2000);   // 2s max
+        @Test
+        @DisplayName("Should serialize to JSON correctly")
+        void shouldSerializeToJsonCorrectly() {
+            // Test JSON serialization
+        }
+        
+        @Test
+        @DisplayName("Should deserialize from JSON correctly") 
+        void shouldDeserializeFromJsonCorrectly() {
+            // Test JSON deserialization
+        }
     }
 }
 ```
 
-## Test Data Management
+### Test Coverage Strategy
 
-### Test Data Builders
+Ensure comprehensive coverage:
 
-Use the builder pattern for maintainable test data:
+1. **Happy Path Testing**: Test normal operation with valid inputs
+2. **Edge Case Testing**: Test boundary conditions and edge cases
+3. **Error Handling**: Test exception scenarios and error conditions
+4. **Null Safety**: Test all nullable fields and parameters
+5. **Serialization**: Test JSON serialization and deserialization
+6. **Builder Pattern**: Test all builder methods and combinations
 
-```java
-public class OrganizationTestDataBuilder {
-    
-    private String id;
-    private String tenantId = "default-tenant";
-    private String name = "Test Organization";
-    private ContactInformation contactInformation;
-    private Address address;
-    private Instant createdAt = Instant.now();
-    
-    public static OrganizationTestDataBuilder anOrganization() {
-        return new OrganizationTestDataBuilder();
-    }
-    
-    public OrganizationTestDataBuilder withId(String id) {
-        this.id = id;
-        return this;
-    }
-    
-    public OrganizationTestDataBuilder withTenantId(String tenantId) {
-        this.tenantId = tenantId;
-        return this;
-    }
-    
-    public OrganizationTestDataBuilder withName(String name) {
-        this.name = name;
-        return this;
-    }
-    
-    public OrganizationTestDataBuilder withContactInfo(String email, String phone) {
-        this.contactInformation = ContactInformation.builder()
-            .email(email)
-            .phone(phone)
-            .build();
-        return this;
-    }
-    
-    public Organization build() {
-        return Organization.builder()
-            .id(id)
-            .tenantId(tenantId)
-            .name(name)
-            .contactInformation(contactInformation != null ? 
-                contactInformation : 
-                ContactInformation.builder()
-                    .email("test@example.com")
-                    .phone("+1-555-0123")
-                    .build())
-            .address(address)
-            .createdAt(createdAt)
-            .build();
-    }
-}
+## Continuous Integration
 
-// Usage in tests
-@Test
-void testOrganizationCreation() {
-    Organization org = anOrganization()
-        .withTenantId("tenant-123")
-        .withName("Custom Org Name")
-        .withContactInfo("custom@email.com", "+1-555-9999")
-        .build();
-    
-    // Test with the organization
-}
-```
+### GitHub Actions Configuration
 
-### Database Test Configuration
-
-Configure test databases appropriately:
-
-```yaml
-# application-test.yml
-spring:
-  profiles:
-    active: test
-    
-  data:
-    mongodb:
-      database: test_openframe_${random.uuid}
-      
-  data:
-    redis:
-      database: 15  # Use dedicated test database
-      
-  kafka:
-    bootstrap-servers: ${embedded.kafka.brokers:localhost:9092}
-    
-# Disable external services in tests
-openframe:
-  external:
-    enabled: false
-    
-logging:
-  level:
-    com.openframe: DEBUG
-    org.testcontainers: INFO
-    org.springframework.test: INFO
-```
-
-## Test Organization and Best Practices
-
-### Test Structure
-
-Organize tests consistently:
-
-```text
-src/test/java/
-├── com/openframe/api/
-│   ├── controller/
-│   │   ├── OrganizationControllerTest.java
-│   │   └── UserControllerIntegrationTest.java
-│   ├── service/
-│   │   ├── OrganizationServiceTest.java
-│   │   └── UserServiceTest.java
-│   ├── repository/
-│   │   └── OrganizationRepositoryTest.java
-│   └── integration/
-│       ├── SecurityIntegrationTest.java
-│       └── GraphQLIntegrationTest.java
-└── testdata/
-    ├── builders/
-    │   ├── OrganizationTestDataBuilder.java
-    │   └── UserTestDataBuilder.java
-    └── fixtures/
-        ├── organizations.json
-        └── users.json
-```
-
-### Test Naming Conventions
-
-Use descriptive test names:
-
-```java
-// ✅ GOOD: Describes what should happen
-@Test
-@DisplayName("Should create organization when valid data is provided")
-void shouldCreateOrganizationWhenValidDataIsProvided() { }
-
-@Test
-@DisplayName("Should throw OrganizationNotFoundException when organization does not exist")
-void shouldThrowOrganizationNotFoundExceptionWhenOrganizationDoesNotExist() { }
-
-// ❌ BAD: Generic or unclear names
-@Test
-void testCreateOrganization() { }
-
-@Test
-void test1() { }
-```
-
-### Assertion Best Practices
-
-Use fluent assertions for clarity:
-
-```java
-// ✅ GOOD: Fluent and descriptive
-assertThat(result)
-    .isNotNull()
-    .hasFieldOrPropertyWithValue("name", "Expected Name")
-    .extracting(Organization::getContactInformation)
-    .satisfies(contact -> {
-        assertThat(contact.getEmail()).isEqualTo("test@example.com");
-        assertThat(contact.getPhone()).isNotBlank();
-    });
-
-// ✅ GOOD: Testing collections
-assertThat(organizations)
-    .hasSize(3)
-    .extracting(Organization::getName)
-    .containsExactlyInAnyOrder("Org 1", "Org 2", "Org 3");
-
-// ❌ BAD: Multiple assertions that can be combined
-assertNotNull(result);
-assertEquals("Expected Name", result.getName());
-assertEquals("test@example.com", result.getContactInformation().getEmail());
-```
-
-## Running Tests
-
-### Maven Test Execution
-
-```bash
-# Run all tests
-mvn test
-
-# Run specific test class
-mvn test -Dtest=OrganizationServiceTest
-
-# Run specific test method
-mvn test -Dtest=OrganizationServiceTest#shouldCreateOrganizationWithValidData
-
-# Run integration tests
-mvn verify -P integration-tests
-
-# Run tests with coverage
-mvn test jacoco:report
-
-# Run tests in parallel
-mvn test -T 4
-
-# Skip tests (for build only)
-mvn install -DskipTests
-```
-
-### IDE Test Execution
-
-**IntelliJ IDEA:**
-- Right-click test class/method → Run
-- Use Ctrl+Shift+F10 (Windows) / Cmd+Shift+R (Mac)
-- View results in dedicated test runner window
-
-**VS Code:**
-- Click play button next to test methods
-- Use Java Test Runner extension
-- View results in integrated terminal
-
-### Continuous Integration
-
-Configure test execution in CI pipeline:
+Test execution in CI/CD:
 
 ```yaml
 # .github/workflows/test.yml
 name: Tests
+
 on: [push, pull_request]
 
 jobs:
   test:
     runs-on: ubuntu-latest
     
-    services:
-      mongodb:
-        image: mongo:7-jammy
-        ports:
-          - 27017:27017
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-    
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup JDK 21
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-          
-      - name: Cache Maven dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.m2/repository
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          
-      - name: Run tests
-        run: mvn clean verify -P integration-tests
+    - uses: actions/checkout@v3
+    
+    - name: Set up JDK 11
+      uses: actions/setup-java@v3
+      with:
+        java-version: '11'
+        distribution: 'temurin'
         
-      - name: Upload coverage reports
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./target/site/jacoco/jacoco.xml
+    - name: Cache Maven dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        
+    - name: Run tests
+      run: ./mvnw clean test
+      
+    - name: Generate coverage report
+      run: ./mvnw jacoco:report
+      
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        files: target/site/jacoco/jacoco.xml
+        
+    - name: Check coverage thresholds
+      run: ./mvnw jacoco:check
 ```
 
-## Test Coverage and Quality
+## Test Performance and Optimization
 
-### Coverage Requirements
+### Fast Test Execution
 
-Maintain high test coverage:
-
-```xml
-<!-- In pom.xml -->
-<plugin>
-    <groupId>org.jacoco</groupId>
-    <artifactId>jacoco-maven-plugin</artifactId>
-    <configuration>
-        <rules>
-            <rule>
-                <element>BUNDLE</element>
-                <limits>
-                    <limit>
-                        <counter>LINE</counter>
-                        <value>COVEREDRATIO</value>
-                        <minimum>0.80</minimum> <!-- 80% line coverage -->
-                    </limit>
-                    <limit>
-                        <counter>BRANCH</counter>
-                        <value>COVEREDRATIO</value>
-                        <minimum>0.75</minimum> <!-- 75% branch coverage -->
-                    </limit>
-                </limits>
-            </rule>
-        </rules>
-    </configuration>
-</plugin>
-```
-
-### Test Quality Metrics
-
-Monitor these test quality indicators:
-
-| Metric | Target | Purpose |
-|--------|--------|---------|
-| **Line Coverage** | 80%+ | Code execution coverage |
-| **Branch Coverage** | 75%+ | Decision path coverage |
-| **Test Success Rate** | 99%+ | Test reliability |
-| **Test Execution Time** | <5 min | Fast feedback |
-| **Test Maintainability** | Subjective | Code quality in tests |
-
-## Troubleshooting Common Test Issues
-
-### TestContainer Issues
+Optimize test performance:
 
 ```bash
-# Docker not running
-sudo systemctl start docker
+# Parallel test execution
+./mvnw test -T 1C
 
-# TestContainer image pull failures
-docker pull mongo:7-jammy
-docker pull redis:7-alpine
+# Run only fast tests during development
+./mvnw test -Dgroups="unit,fast"
+
+# Skip slow integration tests
+./mvnw test -DexcludeGroups="integration,slow"
 ```
 
-### Maven Test Issues
+### Test Categorization
 
-```bash
-# Clean test state
-mvn clean test
-
-# Skip flaky tests temporarily
-mvn test -Dtest='!FlakyTest'
-
-# Increase memory for tests
-export MAVEN_OPTS="-Xmx2g -XX:MaxMetaspaceSize=512m"
-```
-
-### Database State Issues
+Use JUnit 5 tags to categorize tests:
 
 ```java
-// Clean database between tests
-@BeforeEach
-void cleanDatabase() {
-    mongoTemplate.getDb().drop();
-    redisTemplate.getConnectionFactory().getConnection().flushAll();
+@Tag("unit")
+@Tag("fast")
+class LogEventTest {
+    // Unit tests
+}
+
+@Tag("integration") 
+@Tag("slow")
+class JsonSerializationTest {
+    // Integration tests
 }
 ```
 
-## Next Steps
+## Summary
 
-With comprehensive testing in place:
+OpenFrame OSS Lib maintains high quality through:
 
-1. **[Contributing Guidelines](../contributing/guidelines.md)** - Follow testing standards when contributing
-2. **[Architecture Overview](../architecture/README.md)** - Understand what to test
-3. **[Security Guidelines](../security/README.md)** - Test security implementations
+- **Comprehensive Unit Tests**: Every DTO has thorough test coverage
+- **Integration Testing**: JSON serialization and Lombok integration verified
+- **Coverage Requirements**: Strict minimum coverage thresholds enforced
+- **Test Organization**: Clear structure with descriptive naming conventions
+- **Continuous Integration**: Automated testing on every commit and PR
 
-## Getting Help
-
-- **Testing Questions**: Ask in [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) `#testing` channel
-- **Test Failures**: Check CI logs and test reports
-- **Best Practices**: Review existing test implementations in the codebase
+Following these testing practices ensures that OpenFrame OSS Lib remains reliable, maintainable, and ready for production use across the entire OpenFrame platform.
 
 ---
 
-*Good tests are the foundation of reliable software. By following these guidelines, you contribute to the stability and quality of OpenFrame OSS Libraries.*
+*Quality code starts with quality tests. OpenFrame OSS Lib's comprehensive testing strategy ensures that every DTO works correctly and integrates seamlessly with the broader platform ecosystem.*
