@@ -51,7 +51,28 @@ export interface TicketData {
    *  Channels, so this is the only reliable source for "what's the
    *  customer's name." */
   customer_name: string | null
+  /** HubSpot owner id of the agent assigned to this ticket. Carried as
+   *  raw id for debugging; rendering goes through `assignedOwner`. Null
+   *  when unassigned. */
+  assigned_to: string | null
+  /** Resolved assigned-owner profile — name + email + avatar. Populated
+   *  server-side via `attachOwnerProfiles` which joins through the
+   *  `hubspot_owners` mirror to `profiles` by email. Drives the
+   *  "Assigned to" attribution in the drawer header. Null when
+   *  unassigned OR the owner couldn't be resolved (rare — only when
+   *  the agent was deleted from HubSpot between the ticket update and
+   *  the next owners reconcile). */
+  assignedOwner: TicketAssignedOwner | null
   hubspot_updated_at: string
+}
+
+/** Resolved profile of a ticket's assigned agent — surfaced in the
+ *  drawer header. Subset of the server's `MirroredOwnerProfile`
+ *  trimmed to just the rendering fields. */
+export interface TicketAssignedOwner {
+  name: string | null
+  email: string | null
+  avatarUrl: string | null
 }
 
 /** Compact projection of a linked ClickUp task — matches the server's
@@ -122,6 +143,13 @@ export function isOptimistic(t: AnyTicket): t is OptimisticTicket {
  * Stable server-side error codes the ticket-action helpers route
  * through `mapTicketActionError`. Anything else is treated as a generic
  * server error.
+ *
+ * Reply-specific codes (`HUBSPOT_5XX` / `HUBSPOT_400_VALIDATION` /
+ * `HUBSPOT_404_THREAD` / `HUBSPOT_REPLY_UNKNOWN`) drive the drawer
+ * banner that appears above the composer when a customer reply fails.
+ * Distinct from `HUBSPOT_DISCONNECTED` (whole-system) and
+ * `TICKET_NOT_FOUND` (terminal-row) — the reply codes are per-attempt
+ * + retryable except for `HUBSPOT_404_THREAD`.
  */
 export type TicketActionErrorCode =
   | 'PROPOSAL_NOT_CLAIMABLE'
@@ -130,6 +158,10 @@ export type TicketActionErrorCode =
   | 'HUBSPOT_DISCONNECTED'
   | 'RATE_LIMITED'
   | 'INVALID_TOOL_ARGS'
+  | 'HUBSPOT_5XX'
+  | 'HUBSPOT_400_VALIDATION'
+  | 'HUBSPOT_404_THREAD'
+  | 'HUBSPOT_REPLY_UNKNOWN'
   | 'UNKNOWN'
 
 export interface MappedTicketActionError {

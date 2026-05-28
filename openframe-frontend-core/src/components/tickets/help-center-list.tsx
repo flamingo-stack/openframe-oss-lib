@@ -285,6 +285,8 @@ function HelpCenterListAuthed({
                   onClose={actions.closeTicket}
                   onReopen={actions.reopenTicket}
                   onActionCollapsed={() => setExpandedTicketId(null)}
+                  replyError={actions.replyErrorFor(ticket.external_id)}
+                  onClearReplyError={() => actions.clearReplyError(ticket.external_id)}
                 />
               ))}
             </div>

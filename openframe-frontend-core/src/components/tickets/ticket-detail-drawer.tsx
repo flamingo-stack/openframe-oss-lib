@@ -46,12 +46,17 @@ import {
   ConversationCardRowSkeletonList,
 } from './../shared/dev-section/dev-card-row'
 import type { TicketAttachment } from './../ui/ticket-attachments-list'
+import { SquareAvatar } from './../ui/square-avatar'
 import { useTicketEngagements } from './hooks/use-ticket-engagements'
 import type {
   TicketEngagementFile,
 } from './hooks/use-ticket-engagements'
 import { TicketLinkedDeliveryCard } from './ticket-linked-delivery-card'
-import type { AnyTicket } from './types'
+import type {
+  AnyTicket,
+  TicketAssignedOwner,
+  MappedTicketActionError,
+} from './types'
 import { isOptimistic, TICKET_TEXT_MAX_CHARS } from './types'
 
 /** Identity bundle threaded through the action callbacks: local mirror
@@ -76,6 +81,15 @@ export interface TicketDetailDrawerProps {
   /** Called after a successful close/reopen so the parent can collapse
    *  the drawer (status flipped — current action set is now stale). */
   onActionCollapsed: () => void
+  /** Persisted reply-failure surface — when non-null the drawer renders
+   *  an inline banner above the composer with the mapped copy + a
+   *  dismiss control. Distinct from the transient toast; the banner
+   *  stays visible so the customer can locate the failed draft after
+   *  the toast disappears. Cleared on the next successful send. */
+  replyError?: MappedTicketActionError | null
+  /** Dismiss-X handler for the banner. Parent calls
+   *  `actions.clearReplyError(ticket.external_id)`. */
+  onClearReplyError?: () => void
 }
 
 export function TicketDetailDrawer({
@@ -86,10 +100,19 @@ export function TicketDetailDrawer({
   onClose,
   onReopen,
   onActionCollapsed,
+  replyError,
+  onClearReplyError,
 }: TicketDetailDrawerProps) {
   const isClosed = (ticket.status ?? '').toUpperCase() === 'CLOSED'
   return (
     <div className="bg-ods-card border-t border-ods-border px-4 py-4 flex flex-col gap-4">
+      {/* Assignee header — surfaces who's looking at this ticket on the
+          support side. Populated server-side via `attachOwnerProfiles`;
+          falls back to "Unassigned" when no agent is assigned OR when
+          the owner couldn't be resolved (deleted between ticket update
+          + next owners reconcile). */}
+      <AssignedAgentRow assignedOwner={ticket.assignedOwner} />
+
       {/* Linked ClickUp delivery — rendered only when the server's
           `attachClickupTasks` step populated `ticket.clickup`. Customer
           tickets with no linked task skip this entirely. The card itself
@@ -107,6 +130,19 @@ export function TicketDetailDrawer({
       </div>
 
       <div className="border-t border-ods-border pt-4">
+        {/* Reply-failure banner — populated by `useTicketActions` when
+            the last sendMessage attempt for THIS ticket failed with a
+            reply-specific code. Rendered above the composer/reopen so
+            the customer sees it in context of their failed draft. Open
+            (composer) actions still allow Retry; the closed (reopen)
+            state still shows the banner because the user might have
+            tried to reply to a then-closing ticket. */}
+        {replyError && (
+          <ReplyFailureBanner
+            error={replyError}
+            onDismiss={onClearReplyError ?? (() => undefined)}
+          />
+        )}
         {isClosed ? (
           <ReopenAction
             ticketRef={{ id: ticket.id, external_id: ticket.external_id }}
@@ -559,6 +595,98 @@ function OpenActions({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  )
+}
+
+/**
+ * Persistent banner above the drawer composer/actions when the most
+ * recent customer reply failed with a reply-specific code (HUBSPOT_5XX
+ * / 400 / 404 / UNKNOWN). The transient toast already fired at the
+ * moment of failure; this banner stays until the next successful send
+ * OR the user dismisses it explicitly. Wording is sourced from
+ * `mapTicketActionError` so a future copy update lives in one place.
+ *
+ * 404_THREAD is the only terminal code in the set — the banner copy
+ * reads "open a new ticket" and Retry would just re-fail. We still
+ * render a Dismiss control instead of hiding Retry so the visual shape
+ * is uniform; the parent's composer continues to function for any
+ * non-thread-deletion reply path.
+ */
+function ReplyFailureBanner({
+  error,
+  onDismiss,
+}: {
+  error: MappedTicketActionError
+  onDismiss: () => void
+}) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="mb-3 flex items-start gap-3 rounded-md border border-ods-attention-red-error bg-ods-attention-red-error-secondary px-3 py-2 text-sm text-ods-attention-red-error"
+    >
+      <span className="font-medium leading-snug">{error.message}</span>
+      <Button
+        type="button"
+        variant="transparent"
+        onClick={onDismiss}
+        aria-label="Dismiss reply failure"
+        className="ml-auto px-2 py-0.5 text-xs font-medium uppercase tracking-wider text-ods-attention-red-error hover:bg-ods-attention-red-error/10 border-transparent"
+      >
+        Dismiss
+      </Button>
+    </div>
+  )
+}
+
+/**
+ * Compact "Assigned to" row at the top of the drawer. Surfaces the
+ * support-side agent — name + avatar — so the customer knows who's
+ * looking at their ticket. Renders "Unassigned" when the ticket has no
+ * `hubspot_owner_id` OR when the owner couldn't be resolved against
+ * the mirror (deleted between ticket update + next reconcile).
+ *
+ * Avatar comes from the canonical `<SquareAvatar variant="round">` so
+ * it picks up the initials-fallback + image-proxy behavior used
+ * everywhere else in the lib (matches the dev-section message-bubble
+ * avatars). No bespoke avatar markup.
+ */
+function AssignedAgentRow({
+  assignedOwner,
+}: {
+  assignedOwner: TicketAssignedOwner | null
+}) {
+  // Display label precedence:
+  //   1. `name` from the mirror (employee match OR HubSpot's first+last)
+  //   2. `email` local-part — covers HubSpot owners that exist but have
+  //      no name (rare but real; the ticket IS assigned and rendering
+  //      "Unassigned" would be misleading)
+  //   3. "Unassigned" — only when the ticket has no `assigned_to` OR
+  //      the owner couldn't be resolved against the mirror at all
+  const trimmedName = assignedOwner?.name?.trim() || null
+  const emailFallback = assignedOwner?.email?.trim() || null
+  const displayLabel =
+    trimmedName ?? (emailFallback ? emailFallback.split('@')[0] : null)
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <span className="text-ods-text-secondary uppercase tracking-wider font-medium">
+        Assigned to
+      </span>
+      {displayLabel ? (
+        <span className="flex items-center gap-1.5 text-ods-text-primary font-medium">
+          <SquareAvatar
+            size="sm"
+            variant="round"
+            src={assignedOwner?.avatarUrl ?? undefined}
+            alt={displayLabel}
+            fallback={displayLabel}
+          />
+          {displayLabel}
+        </span>
+      ) : (
+        <span className="text-ods-text-secondary italic">Unassigned</span>
+      )}
     </div>
   )
 }
