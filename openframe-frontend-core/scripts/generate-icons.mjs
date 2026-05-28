@@ -157,18 +157,55 @@ function processGeneratedCategory(categoryPath, originalNames) {
 }
 
 // Main execution
-console.log('Generating icons from icons-v2...\n');
+//
+// CLI:
+//   node scripts/generate-icons.mjs                # regenerate every category
+//   node scripts/generate-icons.mjs <category>     # regenerate one category only
+//
+// `<category>` is the subfolder name under `src/components/icons-v2/`
+// (e.g. `brand-logos`, `arrows`). The single-category form is a scoped
+// rebuild — it does NOT wipe the whole output dir, only the matching
+// subfolder, so unrelated categories on disk survive. The root
+// `index.ts` is rebuilt from what's actually present in OUTPUT_DIR
+// after the run (not from the source listing), so missing categories
+// stay missing and added categories get picked up automatically.
+const targetCategory = process.argv[2];
 
-// Clean output directory
-if (existsSync(OUTPUT_DIR)) {
-  execSync(`rm -rf "${OUTPUT_DIR}"`, { cwd: rootDir });
+const allCategories = getCategories();
+let categoriesToProcess;
+if (targetCategory) {
+  if (!allCategories.includes(targetCategory)) {
+    console.error(
+      `Unknown category: "${targetCategory}".\n` +
+      `Available: ${allCategories.join(', ')}`
+    );
+    process.exit(1);
+  }
+  categoriesToProcess = [targetCategory];
+  console.log(`Generating icons for category "${targetCategory}"...\n`);
+
+  // Scoped wipe — only the matching output subfolder, so other
+  // categories on disk are preserved across single-category runs.
+  const targetOutputPath = join(OUTPUT_DIR, targetCategory);
+  if (existsSync(targetOutputPath)) {
+    execSync(`rm -rf "${targetOutputPath}"`, { cwd: rootDir });
+  }
+  mkdirSync(OUTPUT_DIR, { recursive: true });
+} else {
+  categoriesToProcess = allCategories;
+  console.log('Generating icons from icons-v2...\n');
+
+  // Full rebuild — wipe everything so removed source categories don't
+  // leave stale output behind.
+  if (existsSync(OUTPUT_DIR)) {
+    execSync(`rm -rf "${OUTPUT_DIR}"`, { cwd: rootDir });
+  }
+  mkdirSync(OUTPUT_DIR, { recursive: true });
 }
-mkdirSync(OUTPUT_DIR, { recursive: true });
 
-const categories = getCategories();
 let totalIcons = 0;
 
-for (const category of categories) {
+for (const category of categoriesToProcess) {
   const inputPath = join(ICONS_V2_DIR, category);
   const outputPath = join(OUTPUT_DIR, category);
 
@@ -193,9 +230,17 @@ for (const category of categories) {
   }
 }
 
-// Generate root index.ts
-const categoryExports = categories
-  .filter((cat) => existsSync(join(OUTPUT_DIR, cat, 'index.ts')))
+// Regenerate root index.ts from what's actually on disk in OUTPUT_DIR
+// (not from the source listing) so single-category runs preserve any
+// categories that already exist in OUTPUT_DIR but weren't touched.
+const presentCategories = readdirSync(OUTPUT_DIR).filter(
+  (item) =>
+    statSync(join(OUTPUT_DIR, item)).isDirectory() &&
+    existsSync(join(OUTPUT_DIR, item, 'index.ts'))
+);
+presentCategories.sort();
+
+const categoryExports = presentCategories
   .map((cat) => `export * from './${cat}';`)
   .join('\n');
 
