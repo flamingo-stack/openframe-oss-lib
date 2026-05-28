@@ -103,25 +103,11 @@ class ScriptServiceTest {
     }
 
     @Test
-    @DisplayName("create: rejects input that contains a secret env var because the secret pipeline is not yet implemented")
-    void create_whenInputHasSecretEnvVar_throwsIllegalArgument() {
+    @DisplayName("create: env vars (including secret ones) are persisted as supplied — secrets are stored in plaintext until the secret-management story lands")
+    void create_whenInputHasEnvVars_persistsThemThroughTheMapper() {
         createInput.setEnvVars(List.of(
+                ScriptEnvVarDto.builder().name("LOG_LEVEL").value("INFO").secret(false).build(),
                 ScriptEnvVarDto.builder().name("API_TOKEN").value("xyz").secret(true).build()
-        ));
-
-        assertThatThrownBy(() -> scriptService.create(TENANT_ID, createInput))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Secret environment variables");
-
-        verifyNoInteractions(scriptRepository);
-        verifyNoInteractions(scriptMapper);
-    }
-
-    @Test
-    @DisplayName("create: accepts input with non-secret env vars and does not trigger the rejection guard")
-    void create_whenInputHasOnlyNonSecretEnvVars_isAccepted() {
-        createInput.setEnvVars(List.of(
-                ScriptEnvVarDto.builder().name("LOG_LEVEL").value("INFO").secret(false).build()
         ));
         Script mapped = new Script();
         Script saved = new Script();
@@ -272,19 +258,6 @@ class ScriptServiceTest {
         scriptService.update(TENANT_ID, SCRIPT_ID, updateInput);
 
         verify(scriptRepository, never()).existsByTenantIdAndNameAndIdNot(any(), any(), any());
-    }
-
-    @Test
-    @DisplayName("update: rejects input that contains a secret env var before touching the repository")
-    void update_whenInputHasSecretEnvVar_throwsIllegalArgument() {
-        updateInput.setEnvVars(List.of(
-                ScriptEnvVarDto.builder().name("TOKEN").value("xyz").secret(true).build()
-        ));
-
-        assertThatThrownBy(() -> scriptService.update(TENANT_ID, SCRIPT_ID, updateInput))
-                .isInstanceOf(IllegalArgumentException.class);
-
-        verifyNoInteractions(scriptRepository);
     }
 
     // ---------- delete ----------

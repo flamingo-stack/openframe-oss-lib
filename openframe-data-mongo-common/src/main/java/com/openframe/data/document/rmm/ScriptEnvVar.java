@@ -26,15 +26,16 @@ public class ScriptEnvVar {
     private String name;
 
     /**
-     * Variable value. For {@link #secret} variables this will eventually be
-     * ciphertext rather than plaintext.
+     * <p>TODO: when {@link #secret} is {@code true} this will eventually be
+     * ciphertext. Until the secret-management story lands, secret values are
+     * stored in plaintext.
      */
     private String value;
 
     /**
-     * Whether the {@link #value} is sensitive (passwords, API keys, tokens).
-     * Sensitive variables are subject to encryption at rest, masked display
-     * in the UI, and redaction in audit logs.
+     * <p>TODO: until the secret-management story (encryption at rest +
+     * secure delivery to agents) lands, secret values are written to MongoDB
+     * in plaintext.
      */
     private boolean secret;
 }

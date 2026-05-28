@@ -9,8 +9,7 @@ import lombok.NoArgsConstructor;
 /**
  * Symmetric DTO for a script environment variable — used both for input
  * (create/update) and for output (response). The shape is intentionally
- * identical in both directions; once secret-management lands, the mapper
- * will mask {@link #value} on output when {@link #secret} is {@code true}.
+ * identical in both directions.
  */
 @Data
 @Builder
@@ -24,9 +23,11 @@ public class ScriptEnvVarDto {
     private String value;
 
     /**
-     * Whether {@link #value} is sensitive. The service layer currently rejects
-     * {@code true} until encryption at rest and secure delivery to agents are
-     * implemented.
+     * Whether {@link #value} is sensitive (passwords, API keys, tokens).
+     *
+     * <p>TODO: until the secret-management story (encryption at rest +
+     * secure delivery to agents) lands, secret values are stored in plaintext.
+     * UI / logs / audit are responsible for masking and redaction in the meantime.
      */
     private boolean secret;
 }

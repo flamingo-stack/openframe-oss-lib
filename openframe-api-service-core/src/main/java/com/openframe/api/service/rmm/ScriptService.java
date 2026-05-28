@@ -1,7 +1,6 @@
 package com.openframe.api.service.rmm;
 
 import com.openframe.api.dto.script.CreateScriptInput;
-import com.openframe.api.dto.script.ScriptEnvVarDto;
 import com.openframe.api.dto.script.ScriptPageResponse;
 import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.script.UpdateScriptInput;
@@ -17,8 +16,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-
 /**
  * Application-level operations on RMM scripts.
  *
@@ -29,11 +26,8 @@ import java.util.List;
  *
  * <p>Reads and writes go through {@link ScriptRepository} (every call is
  * tenant-scoped). All document &harr; DTO translation is delegated to
- * {@link ScriptMapper}. This service is responsible for:
- * <ul>
- *   <li>uniqueness validation on name (create + update)</li>
- *   <li>rejecting secret env vars until the secret pipeline lands</li>
- * </ul>
+ * {@link ScriptMapper}. This service enforces name uniqueness within the
+ * tenant on create / update.
  */
 @Slf4j
 @Service
@@ -50,8 +44,6 @@ public class ScriptService {
      *         in the tenant.
      */
     public ScriptResponse create(String tenantId, CreateScriptInput input) {
-        rejectSecretEnvVars(input.getEnvVars());
-
         if (scriptRepository.existsByTenantIdAndName(tenantId, input.getName())) {
             throw new ConflictException(
                     "Script with name '" + input.getName() + "' already exists in this tenant");
@@ -92,8 +84,6 @@ public class ScriptService {
      *         script in the same tenant.
      */
     public ScriptResponse update(String tenantId, String id, UpdateScriptInput input) {
-        rejectSecretEnvVars(input.getEnvVars());
-
         Script existing = loadOrThrow(tenantId, id);
 
         if (input.getName() != null
@@ -126,23 +116,5 @@ public class ScriptService {
     private Script loadOrThrow(String tenantId, String id) {
         return scriptRepository.findByTenantIdAndId(tenantId, id)
                 .orElseThrow(() -> new NotFoundException("Script not found: " + id));
-    }
-
-    /**
-     * Until secret-management (encryption + secure delivery) is implemented we
-     * refuse to accept env vars flagged as secret rather than silently storing
-     * plaintext "secrets" in MongoDB.
-     */
-    private void rejectSecretEnvVars(List<ScriptEnvVarDto> envVars) {
-        if (envVars == null) {
-            return;
-        }
-        boolean hasSecret = envVars.stream().anyMatch(ScriptEnvVarDto::isSecret);
-        if (hasSecret) {
-            throw new IllegalArgumentException(
-                    "Secret environment variables are not yet supported. "
-                            + "Set secret=false or omit the variable until the "
-                            + "secret-management story lands.");
-        }
     }
 }
