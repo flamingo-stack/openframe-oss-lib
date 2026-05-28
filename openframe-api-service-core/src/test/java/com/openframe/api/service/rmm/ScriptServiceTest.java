@@ -1,10 +1,11 @@
 package com.openframe.api.service.rmm;
 
+import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.script.CreateScriptInput;
 import com.openframe.api.dto.script.ScriptEnvVarDto;
-import com.openframe.api.dto.script.ScriptPageResponse;
 import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.script.UpdateScriptInput;
+import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.mapper.ScriptMapper;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
@@ -15,14 +16,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Optional;
@@ -153,22 +149,106 @@ class ScriptServiceTest {
     // ---------- list ----------
 
     @Test
-    @DisplayName("list: delegates to the repository with the correct Pageable and returns the mapped page response")
-    void list_delegatesToRepoWithPageable() {
-        Page<Script> page = new PageImpl<>(List.of(new Script()));
-        ScriptPageResponse pageResponse = ScriptPageResponse.builder().build();
-        when(scriptRepository.findAllByTenantId(eq(TENANT_ID), any(Pageable.class))).thenReturn(page);
-        when(scriptMapper.toPageResponse(page)).thenReturn(pageResponse);
+    @DisplayName("list: forward pagination — fetches limit+1 rows, drops the extra, marks hasNextPage=true and hasPreviousPage=false on the first page")
+    void list_forwardFirstPage_dropsSentinelAndReportsHasNext() {
+        Script s1 = new Script();
+        s1.setId("id-1");
+        Script s2 = new Script();
+        s2.setId("id-2");
+        Script s3 = new Script();
+        s3.setId("id-3");
+        CursorPaginationCriteria criteria = CursorPaginationCriteria.builder()
+                .limit(2).cursor(null).backward(false).build();
 
-        ScriptPageResponse result = scriptService.list(TENANT_ID, 2, 50);
+        when(scriptRepository.findPageForTenant(eq(TENANT_ID), eq(null), eq(false), eq(3)))
+                .thenReturn(List.of(s1, s2, s3));
+        when(scriptMapper.toResponse(s1)).thenReturn(ScriptResponse.builder().id("id-1").build());
+        when(scriptMapper.toResponse(s2)).thenReturn(ScriptResponse.builder().id("id-2").build());
 
-        assertThat(result).isSameAs(pageResponse);
-        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        verify(scriptRepository).findAllByTenantId(eq(TENANT_ID), pageableCaptor.capture());
-        Pageable captured = pageableCaptor.getValue();
-        assertThat(captured.getPageNumber()).isEqualTo(2);
-        assertThat(captured.getPageSize()).isEqualTo(50);
-        assertThat(captured).isEqualTo(PageRequest.of(2, 50));
+        GenericQueryResult<ScriptResponse> result = scriptService.list(TENANT_ID, criteria);
+
+        assertThat(result.getItems()).extracting(ScriptResponse::getId).containsExactly("id-1", "id-2");
+        assertThat(result.getPageInfo().isHasNextPage()).isTrue();
+        assertThat(result.getPageInfo().isHasPreviousPage()).isFalse();
+        assertThat(result.getPageInfo().getStartCursor()).isNotBlank();
+        assertThat(result.getPageInfo().getEndCursor()).isNotBlank();
+        verify(scriptMapper, never()).toResponse(s3);
+    }
+
+    @Test
+    @DisplayName("list: forward pagination — last page (no sentinel returned) → hasNextPage=false, hasPreviousPage reflects the supplied cursor")
+    void list_forwardLastPage_hasNoNext() {
+        Script s1 = new Script();
+        s1.setId("id-1");
+        CursorPaginationCriteria criteria = CursorPaginationCriteria.builder()
+                .limit(10).cursor("decoded-cursor").backward(false).build();
+
+        when(scriptRepository.findPageForTenant(eq(TENANT_ID), eq("decoded-cursor"), eq(false), eq(11)))
+                .thenReturn(List.of(s1));
+        when(scriptMapper.toResponse(s1)).thenReturn(ScriptResponse.builder().id("id-1").build());
+
+        GenericQueryResult<ScriptResponse> result = scriptService.list(TENANT_ID, criteria);
+
+        assertThat(result.getItems()).hasSize(1);
+        assertThat(result.getPageInfo().isHasNextPage()).isFalse();
+        assertThat(result.getPageInfo().isHasPreviousPage()).isTrue();
+    }
+
+    @Test
+    @DisplayName("list: backward pagination — items are reversed so the page is still displayed newest-first, and hasMore maps to hasPreviousPage")
+    void list_backwardPagination_reversesItemsAndFlipsHasMore() {
+        Script s1 = new Script();
+        s1.setId("id-1");
+        Script s2 = new Script();
+        s2.setId("id-2");
+        Script s3 = new Script();
+        s3.setId("id-3");
+        CursorPaginationCriteria criteria = CursorPaginationCriteria.builder()
+                .limit(2).cursor("decoded-cursor").backward(true).build();
+
+        // repo returns ASC (oldest-first) when backward: [s1, s2, s3] = +1 sentinel
+        when(scriptRepository.findPageForTenant(eq(TENANT_ID), eq("decoded-cursor"), eq(true), eq(3)))
+                .thenReturn(List.of(s1, s2, s3));
+        when(scriptMapper.toResponse(any(Script.class)))
+                .thenAnswer(inv -> ScriptResponse.builder().id(((Script) inv.getArgument(0)).getId()).build());
+
+        GenericQueryResult<ScriptResponse> result = scriptService.list(TENANT_ID, criteria);
+
+        // After sentinel-drop + reverse: page should be newest-first [id-2, id-1]
+        assertThat(result.getItems()).extracting(ScriptResponse::getId).containsExactly("id-2", "id-1");
+        assertThat(result.getPageInfo().isHasPreviousPage()).isTrue();
+        assertThat(result.getPageInfo().isHasNextPage()).isTrue();   // we paged with a cursor → there's a next
+    }
+
+    @Test
+    @DisplayName("list: empty result — both cursors null, hasNextPage/hasPreviousPage reflect lack of data")
+    void list_emptyResult_returnsEmptyPageInfo() {
+        CursorPaginationCriteria criteria = CursorPaginationCriteria.builder()
+                .limit(20).cursor(null).backward(false).build();
+        when(scriptRepository.findPageForTenant(eq(TENANT_ID), eq(null), eq(false), eq(21)))
+                .thenReturn(List.of());
+
+        GenericQueryResult<ScriptResponse> result = scriptService.list(TENANT_ID, criteria);
+
+        assertThat(result.getItems()).isEmpty();
+        assertThat(result.getPageInfo().getStartCursor()).isNull();
+        assertThat(result.getPageInfo().getEndCursor()).isNull();
+        assertThat(result.getPageInfo().isHasNextPage()).isFalse();
+        assertThat(result.getPageInfo().isHasPreviousPage()).isFalse();
+    }
+
+    @Test
+    @DisplayName("list: page size is normalised — pagination.normalize() is applied before fetching (default size if not supplied)")
+    void list_normalisesPaginationCriteria() {
+        CursorPaginationCriteria raw = CursorPaginationCriteria.builder()
+                .limit(null).cursor(null).backward(false).build();
+        when(scriptRepository.findPageForTenant(eq(TENANT_ID), eq(null), eq(false),
+                eq(CursorPaginationCriteria.DEFAULT_PAGE_SIZE + 1))).thenReturn(List.of());
+
+        scriptService.list(TENANT_ID, raw);
+
+        verify(scriptRepository).findPageForTenant(eq(TENANT_ID), eq(null), eq(false),
+                eq(CursorPaginationCriteria.DEFAULT_PAGE_SIZE + 1));
     }
 
     // ---------- update ----------

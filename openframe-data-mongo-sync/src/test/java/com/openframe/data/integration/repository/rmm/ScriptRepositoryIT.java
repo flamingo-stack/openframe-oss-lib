@@ -13,10 +13,10 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.mongodb.core.MongoTemplate;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -78,25 +78,75 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
         assertThat(result).isEmpty();
     }
 
-    // ---------- list + pagination ----------
+    // ---------- cursor pagination ----------
 
     @Test
-    @DisplayName("Given mixed-tenant data, when findAllByTenantId is paginated, then only the queried tenant's documents appear in the page")
-    void findAllByTenantId_returnsOnlyOwnTenant_paginated() {
-        for (int i = 0; i < 5; i++) {
-            scriptRepository.save(newScript(TENANT_A, "a-" + i));
-        }
-        for (int i = 0; i < 3; i++) {
-            scriptRepository.save(newScript(TENANT_B, "b-" + i));
-        }
+    @DisplayName("Given several scripts in a tenant and no cursor, when findPageForTenant runs, then they come back newest-first by _id")
+    void findPageForTenant_noCursor_returnsNewestFirst() {
+        List<Script> seeded = seedSequentialForTenant(TENANT_A, 5);
 
-        Page<Script> firstPage = scriptRepository.findAllByTenantId(TENANT_A, PageRequest.of(0, 3));
-        Page<Script> secondPage = scriptRepository.findAllByTenantId(TENANT_A, PageRequest.of(1, 3));
+        List<Script> page = scriptRepository.findPageForTenant(TENANT_A, null, false, 10);
 
-        assertThat(firstPage.getTotalElements()).isEqualTo(5);
-        assertThat(firstPage.getContent()).hasSize(3);
-        assertThat(secondPage.getContent()).hasSize(2);
-        assertThat(firstPage.getContent()).allSatisfy(s -> assertThat(s.getTenantId()).isEqualTo(TENANT_A));
+        assertThat(page).hasSize(5);
+        assertThat(page.get(0).getId()).isEqualTo(seeded.get(4).getId());
+        assertThat(page.get(4).getId()).isEqualTo(seeded.get(0).getId());
+    }
+
+    @Test
+    @DisplayName("Given a forward cursor, when findPageForTenant runs, then only rows with _id older than the cursor are returned (newest-first)")
+    void findPageForTenant_forwardCursor_returnsOlderRows() {
+        List<Script> seeded = seedSequentialForTenant(TENANT_A, 5);
+        String cursor = seeded.get(2).getId();
+
+        List<Script> page = scriptRepository.findPageForTenant(TENANT_A, cursor, false, 10);
+
+        assertThat(page).extracting(Script::getId)
+                .containsExactly(seeded.get(1).getId(), seeded.get(0).getId());
+    }
+
+    @Test
+    @DisplayName("Given a backward cursor, when findPageForTenant runs, then rows with _id newer than the cursor are returned in ASC order (caller reverses for display)")
+    void findPageForTenant_backwardCursor_returnsNewerRowsAscending() {
+        List<Script> seeded = seedSequentialForTenant(TENANT_A, 5);
+        String cursor = seeded.get(2).getId();
+
+        List<Script> page = scriptRepository.findPageForTenant(TENANT_A, cursor, true, 10);
+
+        assertThat(page).extracting(Script::getId)
+                .containsExactly(seeded.get(3).getId(), seeded.get(4).getId());
+    }
+
+    @Test
+    @DisplayName("Given mixed-tenant data, when findPageForTenant runs for one tenant, then only that tenant's rows are returned")
+    void findPageForTenant_isolatesByTenant() {
+        seedSequentialForTenant(TENANT_A, 3);
+        seedSequentialForTenant(TENANT_B, 3);
+
+        List<Script> aPage = scriptRepository.findPageForTenant(TENANT_A, null, false, 10);
+
+        assertThat(aPage).hasSize(3);
+        assertThat(aPage).allSatisfy(s -> assertThat(s.getTenantId()).isEqualTo(TENANT_A));
+    }
+
+    @Test
+    @DisplayName("Given more rows than the limit, when findPageForTenant runs with that limit, then exactly limit rows are returned (the limit is honoured)")
+    void findPageForTenant_respectsLimit() {
+        seedSequentialForTenant(TENANT_A, 5);
+
+        List<Script> page = scriptRepository.findPageForTenant(TENANT_A, null, false, 2);
+
+        assertThat(page).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("Given an invalid (non-ObjectId) cursor, when findPageForTenant runs, then it gracefully falls back to the first page rather than throwing")
+    void findPageForTenant_invalidCursor_fallsBackToFirstPage() {
+        List<Script> seeded = seedSequentialForTenant(TENANT_A, 3);
+
+        List<Script> page = scriptRepository.findPageForTenant(TENANT_A, "not-an-objectid", false, 10);
+
+        assertThat(page).hasSize(3);
+        assertThat(page.get(0).getId()).isEqualTo(seeded.get(2).getId());
     }
 
     // ---------- exists checks ----------
@@ -194,5 +244,19 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
                 .shell(ScriptShell.POWERSHELL)
                 .scriptBody("echo " + name)
                 .build();
+    }
+
+    /**
+     * Seed N scripts for the tenant, saving them one-by-one so each gets a
+     * monotonically increasing {@code ObjectId}. The returned list is in
+     * insertion order, so {@code seeded.get(0)} is the oldest and
+     * {@code seeded.get(N-1)} is the newest.
+     */
+    private List<Script> seedSequentialForTenant(String tenantId, int count) {
+        List<Script> saved = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            saved.add(scriptRepository.save(newScript(tenantId, tenantId + "-" + i)));
+        }
+        return saved;
     }
 }

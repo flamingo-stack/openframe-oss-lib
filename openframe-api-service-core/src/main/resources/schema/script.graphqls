@@ -7,8 +7,8 @@ extend type Query {
     """Get a single script by id within the current tenant."""
     script(id: ID!): Script
 
-    """Paginated list of scripts within the current tenant."""
-    scripts(page: Int, size: Int): ScriptPage!
+    """Cursor-paginated list of scripts within the current tenant (Relay Connection Spec). Default order is newest-first."""
+    scripts(first: Int, after: String, last: Int, before: String): ScriptConnection!
 }
 
 extend type Mutation {
@@ -58,13 +58,14 @@ type ScriptEnvVar {
     secret: Boolean!
 }
 
-type ScriptPage {
-    items: [Script!]!
-    page: Int!
-    size: Int!
-    totalElements: Long!
-    totalPages: Int!
-    hasNext: Boolean!
+type ScriptConnection {
+    edges: [ScriptEdge!]!
+    pageInfo: PageInfo!
+}
+
+type ScriptEdge {
+    node: Script!
+    cursor: String!
 }
 
 input CreateScriptInput {

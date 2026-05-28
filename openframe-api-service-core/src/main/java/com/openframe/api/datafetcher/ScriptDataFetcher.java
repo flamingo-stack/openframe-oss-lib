@@ -4,10 +4,15 @@ import com.netflix.graphql.dgs.DgsComponent;
 import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
+import com.openframe.api.dto.GenericConnection;
+import com.openframe.api.dto.GenericEdge;
+import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.script.CreateScriptInput;
-import com.openframe.api.dto.script.ScriptPageResponse;
 import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.script.UpdateScriptInput;
+import com.openframe.api.dto.shared.ConnectionArgs;
+import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.mapper.ScriptMapper;
 import com.openframe.api.service.rmm.ScriptService;
 import com.openframe.core.exception.UnauthorizedException;
 import com.openframe.security.authentication.AuthPrincipal;
@@ -38,10 +43,8 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 public class ScriptDataFetcher {
 
-    private static final int DEFAULT_PAGE = 0;
-    private static final int DEFAULT_PAGE_SIZE = 20;
-
     private final ScriptService scriptService;
+    private final ScriptMapper scriptMapper;
 
     @DgsQuery
     public ScriptResponse script(@InputArgument @NotBlank String id) {
@@ -49,13 +52,18 @@ public class ScriptDataFetcher {
     }
 
     @DgsQuery
-    public ScriptPageResponse scripts(
-            @InputArgument Integer page,
-            @InputArgument Integer size) {
-        return scriptService.list(
-                currentTenantId(),
-                page == null ? DEFAULT_PAGE : page,
-                size == null ? DEFAULT_PAGE_SIZE : size);
+    public GenericConnection<GenericEdge<ScriptResponse>> scripts(
+            @InputArgument Integer first,
+            @InputArgument String after,
+            @InputArgument Integer last,
+            @InputArgument String before) {
+
+        ConnectionArgs args = ConnectionArgs.builder()
+                .first(first).after(after).last(last).before(before)
+                .build();
+        CursorPaginationCriteria pagination = scriptMapper.toCursorPaginationCriteria(args);
+        GenericQueryResult<ScriptResponse> result = scriptService.list(currentTenantId(), pagination);
+        return scriptMapper.toConnection(result);
     }
 
     @DgsMutation

@@ -1,14 +1,18 @@
 package com.openframe.api.mapper;
 
+import com.openframe.api.dto.GenericConnection;
+import com.openframe.api.dto.GenericEdge;
+import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.script.CreateScriptInput;
 import com.openframe.api.dto.script.ScriptEnvVarDto;
-import com.openframe.api.dto.script.ScriptPageResponse;
 import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.script.UpdateScriptInput;
+import com.openframe.api.dto.shared.ConnectionArgs;
+import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.data.document.rmm.Script;
 import com.openframe.data.document.rmm.ScriptEnvVar;
 import com.openframe.data.document.rmm.ScriptPlatform;
-import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -84,14 +88,22 @@ public class ScriptMapper {
                 .build();
     }
 
-    public ScriptPageResponse toPageResponse(Page<Script> page) {
-        return ScriptPageResponse.builder()
-                .items(page.getContent().stream().map(this::toResponse).toList())
-                .page(page.getNumber())
-                .size(page.getSize())
-                .totalElements(page.getTotalElements())
-                .totalPages(page.getTotalPages())
-                .hasNext(page.hasNext())
+    public CursorPaginationCriteria toCursorPaginationCriteria(ConnectionArgs args) {
+        return CursorPaginationCriteria.fromConnectionArgs(args);
+    }
+
+    public GenericConnection<GenericEdge<ScriptResponse>> toConnection(
+            GenericQueryResult<ScriptResponse> result) {
+        List<GenericEdge<ScriptResponse>> edges = result.getItems().stream()
+                .map(view -> GenericEdge.<ScriptResponse>builder()
+                        .node(view)
+                        .cursor(CursorCodec.encode(view.getId()))
+                        .build())
+                .toList();
+
+        return GenericConnection.<GenericEdge<ScriptResponse>>builder()
+                .edges(edges)
+                .pageInfo(result.getPageInfo())
                 .build();
     }
 

@@ -1,9 +1,12 @@
 package com.openframe.api.service.rmm;
 
+import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.script.CreateScriptInput;
-import com.openframe.api.dto.script.ScriptPageResponse;
 import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.script.UpdateScriptInput;
+import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.mapper.ScriptMapper;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
@@ -11,10 +14,9 @@ import com.openframe.data.document.rmm.Script;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 /**
  * Application-level operations on RMM scripts.
@@ -67,12 +69,32 @@ public class ScriptService {
     }
 
     /**
-     * Paginated list of all scripts in the tenant.
+     * Cursor-paginated list of scripts in the tenant.
+     *
+     * <p>Default order is newest-first (by {@code _id} desc). Uses the standard
+     * "fetch limit + 1" trick to detect {@code hasNextPage} / {@code hasPreviousPage}
+     * without an extra count query.
      */
-    public ScriptPageResponse list(String tenantId, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size);
-        Page<Script> result = scriptRepository.findAllByTenantId(tenantId, pageable);
-        return scriptMapper.toPageResponse(result);
+    public GenericQueryResult<ScriptResponse> list(String tenantId, CursorPaginationCriteria pagination) {
+        CursorPaginationCriteria normalized = pagination.normalize();
+        int limit = normalized.getLimit();
+
+        List<Script> page = scriptRepository.findPageForTenant(
+                tenantId, normalized.getCursor(), normalized.isBackward(), limit + 1);
+
+        boolean hasMore = page.size() > limit;
+        List<Script> items = hasMore ? page.subList(0, limit) : page;
+
+        if (normalized.isBackward()) {
+            items = items.reversed();
+        }
+
+        List<ScriptResponse> views = items.stream().map(scriptMapper::toResponse).toList();
+
+        return GenericQueryResult.<ScriptResponse>builder()
+                .items(views)
+                .pageInfo(buildPageInfo(views, hasMore, normalized))
+                .build();
     }
 
     /**
@@ -116,5 +138,21 @@ public class ScriptService {
     private Script loadOrThrow(String tenantId, String id) {
         return scriptRepository.findByTenantIdAndId(tenantId, id)
                 .orElseThrow(() -> new NotFoundException("Script not found: " + id));
+    }
+
+    private static PageInfo buildPageInfo(List<ScriptResponse> items, boolean hasMore,
+                                          CursorPaginationCriteria criteria) {
+        String startCursor = items.isEmpty() ? null : CursorCodec.encode(items.getFirst().getId());
+        String endCursor = items.isEmpty() ? null : CursorCodec.encode(items.getLast().getId());
+
+        boolean hasNextPage = criteria.isBackward() ? criteria.hasCursor() : hasMore;
+        boolean hasPreviousPage = criteria.isBackward() ? hasMore : criteria.hasCursor();
+
+        return PageInfo.builder()
+                .hasNextPage(hasNextPage)
+                .hasPreviousPage(hasPreviousPage)
+                .startCursor(startCursor)
+                .endCursor(endCursor)
+                .build();
     }
 }
