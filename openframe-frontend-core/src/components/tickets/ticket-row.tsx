@@ -70,28 +70,46 @@ export function TicketRow({
   // hidden — the user has to scroll manually to see what they just
   // opened.
   //
-  // The critical case is SWITCHING expansions: when card B is clicked
-  // while card A is already open, A collapses + B expands SIMULTANEOUSLY.
-  // The Collapsible animation is ~200ms; during that window B's
-  // bounding-box Y position keeps shifting as A's height shrinks above
-  // it. A naive two-RAF wait (~32ms) measures B's position mid-animation
-  // and lands the scroll at the wrong spot — typically with B too far
-  // down the viewport because A still had height when we measured.
+  // Uses the canonical project scroll pattern (matches `scrollToContent`
+  // in `hooks/use-document-tree.ts` + the comparison page + pagination):
   //
-  // Fix: schedule the scroll AFTER the typical Collapsible animation
-  // duration (250ms — Radix's default is 200ms, +50ms safety margin so
-  // even slightly-slower runs land correctly). Smooth-scroll + `block:
-  // 'start'` puts the tile at the top edge of the viewport.
+  //     const top = el.getBoundingClientRect().top + window.scrollY - headerOffset
+  //     window.scrollTo({ top, behavior: 'smooth' })
   //
-  // Always-cleared timer prevents a leaked scroll firing after rapid
-  // open→close→open cycles. The dependency array re-runs the effect
-  // on every expansion change, so the timer is fresh each time.
+  // Two reasons we use `window.scrollTo` + a pre-computed target
+  // instead of `scrollIntoView({ block: 'start' })`:
+  //
+  //   1. SETTLED ANIMATION. `scrollIntoView` re-targets continuously as
+  //      the page layout shifts (the previous card is mid-collapse, the
+  //      new drawer is mid-expand). The smooth animation visibly jitters
+  //      because its destination keeps moving. Committing to a single
+  //      pixel value with `window.scrollTo` lets the browser run a clean,
+  //      undisturbed animation to that exact spot.
+  //
+  //   2. STICKY-HEADER OFFSET. `scrollIntoView({block:'start'})` puts
+  //      the element flush against the viewport top — but the page has
+  //      a sticky nav header above it. The card lands hidden behind the
+  //      header. The canonical project pattern subtracts a header offset
+  //      so the tile lands just BELOW the chrome.
+  //
+  // Timing: wait ~200ms for the Radix Collapsible animation to settle
+  // before measuring, otherwise we'd capture B's position while A is
+  // still collapsing above it and land too far down. 200ms is the
+  // Collapsible default + a tight safety margin. The cleanup timer
+  // prevents a leaked scroll firing after rapid open→close→open.
   const rowRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
     if (!expanded || optimistic) return
     const t = setTimeout(() => {
-      rowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 250)
+      const el = rowRef.current
+      if (!el) return
+      // 80px matches `hooks/use-document-tree.ts:15` — the canonical
+      // sticky-header offset across the hub. If the /tickets page ever
+      // grows a different chrome height, this is the one knob to tune.
+      const HEADER_OFFSET = 80
+      const top = el.getBoundingClientRect().top + window.scrollY - HEADER_OFFSET
+      window.scrollTo({ top, behavior: 'smooth' })
+    }, 200)
     return () => clearTimeout(t)
   }, [expanded, optimistic])
 
