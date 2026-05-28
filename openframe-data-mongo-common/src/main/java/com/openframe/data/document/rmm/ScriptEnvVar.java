@@ -1,6 +1,5 @@
 package com.openframe.data.document.rmm;
 
-import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -24,7 +23,6 @@ public class ScriptEnvVar {
     /**
      * Variable name as exported on the agent.
      */
-    @NotBlank
     private String name;
 
     /**

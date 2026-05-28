@@ -1,7 +1,5 @@
 package com.openframe.data.document.rmm;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -42,14 +40,12 @@ public class Script {
      * Tenant that owns this script. All queries must be scoped by this field
      * to enforce multi-tenant isolation.
      */
-    @NotBlank
     private String tenantId;
 
     /**
      * Human-readable script name. Must be unique within the tenant (enforced
      * by the compound index on {@code (tenantId, name)}).
      */
-    @NotBlank
     private String name;
 
     /**
@@ -60,7 +56,6 @@ public class Script {
     /**
      * Shell interpreter to use on the agent (PowerShell, CMD, Bash, Python).
      */
-    @NotNull
     private ScriptShell shell;
 
     /**
@@ -68,7 +63,6 @@ public class Script {
      * {@link #shell}. Stored inline regardless of size for now; a future
      * iteration may offload large bodies to object storage.
      */
-    @NotBlank
     private String scriptBody;
 
     /**
