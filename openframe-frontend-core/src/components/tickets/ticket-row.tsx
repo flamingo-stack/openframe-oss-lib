@@ -18,7 +18,7 @@
  *      rendered only when this row is the expanded one.
  */
 
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useRef } from 'react'
 import {
   Collapsible,
   CollapsibleContent,
@@ -64,84 +64,19 @@ export function TicketRow({
   // arrived yet, so action targets would be undefined.
   const optimistic = isOptimistic(ticket)
 
-  // Scroll-on-click — fires on EVERY click of the row tile, including
-  // the click that re-targets an already-expanded row (the same UX
-  // useUnifiedNav's same-URL re-scroll branch implements for nav
-  // buttons: same target → still re-scroll).
+  // Scroll the clicked card to the top of the viewport. Every click
+  // scrolls — first-click expansion, same-row re-click, cross-row
+  // switch. The clicked card lands at the top. Period.
   //
-  // The tricky case is cross-row expansion: clicking row B while row
-  // A above is currently expanded. A collapses (Radix 200ms animation,
-  // ~400px of drawer height disappears) WHILE B expands (its own 200ms
-  // drawer animation). During those ~200ms B's bounding-box Y position
-  // shifts upward as A's drawer shrinks above it. A naive
-  // `setTimeout(200, scrollIntoView)` measures B mid-shift and lands
-  // the page scroll at a coordinate that's wrong by the time the
-  // animations settle — B ends up above the viewport.
-  //
-  // Fix: poll `document.body.scrollHeight` on every animation frame
-  // and only scroll once height has been stable for 3 frames (~50ms).
-  // RAF-polling is preferable to a longer setTimeout because (a) it
-  // adapts to whatever the animation duration actually is (theme
-  // tweaks, slower devices), and (b) it lets the scroll fire AS SOON
-  // as layout settles rather than always waiting a fixed amount.
-  //
-  // Safety bail-out at 600ms — if some other DOM mutation keeps the
-  // body height changing forever (live-updating cards, etc.), we
-  // still fire a scroll at the 600ms mark so the user isn't left
-  // stranded.
-  //
-  // Native pattern: `scrollIntoView({ behavior:'smooth', block:'start' })`
-  // + `scroll-mt-24` (Tailwind `scroll-margin-top: 6rem`) on the
-  // row's outer div so the tile lands BELOW the sticky page chrome.
-  // `behavior:'smooth'` is set explicitly so the animation works
-  // even when the consumer hasn't applied the global
-  // `html { scroll-behavior: smooth }` CSS rule.
+  // `behavior: 'smooth'` + `scroll-mt-24` on the row's outer div
+  // (Tailwind `scroll-margin-top: 6rem`) keep the tile just below
+  // the sticky chrome. The browser's smooth-scroll engine handles
+  // the animation natively.
   const rowRef = useRef<HTMLDivElement | null>(null)
-  const scrollWhenStable = useCallback(() => {
-    if (typeof window === 'undefined') return
-    let lastHeight = document.body.scrollHeight
-    let stableFrames = 0
-    let cancelled = false
-    const SAFETY_BAIL_MS = 600
-    const STABLE_FRAMES_REQUIRED = 3
-    const bail = setTimeout(() => {
-      if (cancelled) return
-      cancelled = true
-      rowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, SAFETY_BAIL_MS)
-    const tick = () => {
-      if (cancelled) return
-      const currentHeight = document.body.scrollHeight
-      if (currentHeight === lastHeight) {
-        stableFrames++
-        if (stableFrames >= STABLE_FRAMES_REQUIRED) {
-          cancelled = true
-          clearTimeout(bail)
-          rowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-          return
-        }
-      } else {
-        stableFrames = 0
-        lastHeight = currentHeight
-      }
-      requestAnimationFrame(tick)
-    }
-    requestAnimationFrame(tick)
-  }, [])
-
   const handleClick = useCallback(() => {
     onToggle(ticket.id)
-    scrollWhenStable()
-  }, [onToggle, ticket.id, scrollWhenStable])
-
-  // Cross-row expansion driven by NON-CLICK state changes (a future
-  // URL-driven ticket id from a deep link, or a "next ticket"
-  // keyboard shortcut). The click path covers user-initiated changes;
-  // this effect covers programmatic state changes.
-  useEffect(() => {
-    if (!expanded || optimistic) return
-    scrollWhenStable()
-  }, [expanded, optimistic, scrollWhenStable])
+    rowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [onToggle, ticket.id])
 
   const tileData: ChatTicketItemData = {
     id: ticket.id,
