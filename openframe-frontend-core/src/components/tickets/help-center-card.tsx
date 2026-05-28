@@ -28,9 +28,21 @@ import {
 import type { AnyTicket } from './types'
 import { isOptimistic } from './types'
 
-/** `scroll-mt-24` (Tailwind `scroll-margin-top: 6rem`) on the outer
- *  wrapper offsets for the sticky page chrome. The 96px below matches
- *  it for the explicit `window.scrollTo` path. */
+/** Sticky page-chrome offset, applied two ways from this ONE constant:
+ *
+ *   1. As `scrollMarginTop` inline style on the wrapper — so any
+ *      anchor-driven or `scrollIntoView()`-driven scroll (browser
+ *      `#hash` navigation, Tab-focus into the card) lands BELOW the
+ *      sticky header.
+ *   2. As `headerOffset` passed to `scrollElementIntoView(...)` — for
+ *      the click-to-expand `window.scrollTo` path, which pre-computes
+ *      its target pixel and ignores CSS `scroll-margin-top`.
+ *
+ *  Single source of truth: change 96 here and BOTH paths follow. The
+ *  previous code combined a `scroll-mt-24` (=96px) Tailwind class
+ *  with this constant — two declarations, one comment binding them,
+ *  drift hazard. Now there's nothing to keep in sync.
+ */
 const STICKY_HEADER_OFFSET_PX = 96
 
 export interface HelpCenterCardProps {
@@ -134,7 +146,8 @@ export function HelpCenterCard({
   return (
     <div
       ref={rowRef}
-      className={`scroll-mt-24 border-b border-ods-border last:border-b-0 ${optimistic ? 'opacity-60' : ''}`}
+      style={{ scrollMarginTop: STICKY_HEADER_OFFSET_PX }}
+      className={`border-b border-ods-border last:border-b-0 ${optimistic ? 'opacity-60' : ''}`}
       aria-busy={optimistic || undefined}
     >
       <button
