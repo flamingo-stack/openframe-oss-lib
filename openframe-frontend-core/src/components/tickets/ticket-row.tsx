@@ -18,7 +18,7 @@
  *      rendered only when this row is the expanded one.
  */
 
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import {
   Collapsible,
   CollapsibleContent,
@@ -64,29 +64,50 @@ export function TicketRow({
   // arrived yet, so action targets would be undefined.
   const optimistic = isOptimistic(ticket)
 
-  // Scroll the row's summary tile to the top of the viewport when the
-  // user expands it. Without this, expanding a row near the bottom of
-  // the viewport leaves most of the drawer (timeline + composer)
-  // hidden — the user has to scroll manually to see what they just
-  // opened.
+  // Scroll-on-click — fires on EVERY click of the row tile, including
+  // the click that re-targets an already-expanded row (the same UX
+  // useUnifiedNav's same-URL re-scroll branch implements for nav
+  // buttons: same target → still re-scroll). Without this, clicking
+  // an already-expanded row was a silent no-op + the user had to
+  // scroll up manually to see the drawer they just "opened".
   //
-  // Pure-native pattern: `scrollIntoView({ block: 'start' })` paired
-  // with `scroll-mt-24` (Tailwind `scroll-margin-top: 6rem`) on the
-  // row's outer div so the tile lands BELOW the sticky page chrome.
-  // The hub's global `html { scroll-behavior: smooth }` rule (see
-  // `app/globals.css`) animates the transition — no JS easing, no
-  // pre-computed pixel target, no helper function. Same platform
-  // primitive that handles URL hash anchors does the work here.
+  // Native pattern: `scrollIntoView({ behavior:'smooth', block:'start' })`
+  // paired with `scroll-mt-24` (Tailwind `scroll-margin-top: 6rem`)
+  // on the row's outer div so the tile lands BELOW the sticky page
+  // chrome. `behavior: 'smooth'` is set explicitly here so the
+  // animation works even when the consumer hasn't set the global
+  // `html { scroll-behavior: smooth }` CSS rule.
   //
   // The `setTimeout(200ms)` waits for the Radix Collapsible expand
   // animation to settle before measuring the target — otherwise the
   // browser would smooth-scroll to a moving destination as the row
   // grows in height. 200ms matches Radix's default duration.
   const rowRef = useRef<HTMLDivElement | null>(null)
+  const handleClick = useCallback(() => {
+    onToggle(ticket.id)
+    // Schedule the scroll AFTER React commits the state change (so
+    // the row's bounding box reflects the post-toggle layout). The
+    // setTimeout's 200ms also covers the Radix expand animation.
+    setTimeout(() => {
+      rowRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    }, 200)
+  }, [onToggle, ticket.id])
+
+  // Cross-row expansion: when another component (e.g. URL-driven
+  // ticket id from a deep link, a future "next ticket" keyboard
+  // shortcut) updates `expanded` WITHOUT a click on this row, still
+  // pull this row into the viewport. The handleClick path covers the
+  // click case; this effect covers the programmatic case.
   useEffect(() => {
     if (!expanded || optimistic) return
     const t = setTimeout(() => {
-      rowRef.current?.scrollIntoView({ block: 'start' })
+      rowRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
     }, 200)
     return () => clearTimeout(t)
   }, [expanded, optimistic])
@@ -126,7 +147,7 @@ export function TicketRow({
       >
       <ChatTicketItem
         ticket={tileData}
-        onClick={optimistic ? undefined : onToggle}
+        onClick={optimistic ? undefined : handleClick}
         aria-expanded={expanded && !optimistic}
         aria-controls={`ticket-drawer-${ticket.id}`}
       />
