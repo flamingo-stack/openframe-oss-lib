@@ -1,0 +1,6 @@
+flowchart LR
+    Controller["REST or GraphQL Controller"] --> Service["Core Service"]
+    Service --> DomainModel["Domain Model"]
+    Service --> Processor["Processor Interface"]
+    Processor --> DefaultImpl["Default Implementation"]
+    Processor --> CustomImpl["Custom Implementation (Optional)"]

@@ -1,0 +1,8 @@
+flowchart TD
+    Request["User Update Request"] --> Load["Load User from Repository"]
+    Load --> Check{"User Exists?"}
+    Check -->|"No"| Error["Throw IllegalArgumentException"]
+    Check -->|"Yes"| Modify["Apply Field Updates"]
+    Modify --> Save["Save via UserRepository"]
+    Save --> PostProcess["UserProcessor.postProcessUserUpdated()"]
+    PostProcess --> Response["Return UserResponse"]

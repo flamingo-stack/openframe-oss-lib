@@ -1,0 +1,10 @@
+flowchart TD
+    ListUsers["listUsers()"] --> FetchPage["UserRepository.findAll()"]
+    FetchPage --> MapResponse["UserMapper.toResponse()"]
+    MapResponse --> PostProcess["UserProcessor.postProcessUserGet()"]
+
+    DeleteUser["softDeleteUser()"] --> ValidateSelf["Prevent Self Delete"]
+    ValidateSelf --> ValidateOwner["Prevent OWNER Delete"]
+    ValidateOwner --> MarkDeleted["Set Status DELETED"]
+    MarkDeleted --> SaveUser["UserRepository.save()"]
+    SaveUser --> PostDelete["UserProcessor.postProcessUserDeleted()"]

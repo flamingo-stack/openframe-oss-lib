@@ -1,0 +1,11 @@
+flowchart TD
+    Request["SSOConfigRequest"] --> Normalize["Normalize Domains"]
+    Normalize --> GenericCheck["validateGenericPublicDomain()"]
+    GenericCheck --> ExistsCheck["validateExists()"]
+    ExistsCheck --> Decision{"Auto Provision?"}
+    Decision -->|"No"| Save["Save Config"]
+    Decision -->|"Yes"| RequireDomain["Require At Least One Domain"]
+    RequireDomain --> MicrosoftCheck{"Microsoft?"}
+    MicrosoftCheck -->|"Yes"| RequireTenant["Require msTenantId"]
+    MicrosoftCheck -->|"No"| Save
+    RequireTenant --> Save

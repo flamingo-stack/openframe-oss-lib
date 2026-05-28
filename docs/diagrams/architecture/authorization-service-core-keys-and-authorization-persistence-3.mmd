@@ -1,0 +1,11 @@
+flowchart TD
+    Request["Request RSAKey for Tenant"] --> CheckActive["Check Active Key Count"]
+    CheckActive --> Found{"Active Key Exists?"}
+    Found -->|"Yes"| LoadDoc["Load TenantKey Document"]
+    Found -->|"No"| Create["Generate New Key"]
+    Create --> Encrypt["Encrypt Private PEM"]
+    Encrypt --> Save["Save TenantKey"]
+    Save --> LoadDoc
+    LoadDoc --> Parse["Parse PEM to RSA Keys"]
+    Parse --> BuildJwk["Build Nimbus RSAKey"]
+    BuildJwk --> Return["Return RSAKey"]

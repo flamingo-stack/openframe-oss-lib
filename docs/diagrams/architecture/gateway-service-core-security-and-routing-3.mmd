@@ -1,0 +1,10 @@
+flowchart TD
+    Req["/external-api/**"] --> CheckKey["Check X-API-Key Header"]
+    CheckKey --> Valid{"Valid Key?"}
+    Valid -->|No| Reject401["Return 401"]
+    Valid -->|Yes| RateCheck["RateLimitService.isAllowed"]
+    RateCheck --> Allowed{"Allowed?"}
+    Allowed -->|No| Reject429["Return 429 + Retry-After"]
+    Allowed -->|Yes| AddHeaders["Add RateLimit Headers"]
+    AddHeaders --> AddContext["Inject X-User-Id + X-Api-Key-Id"]
+    AddContext --> Forward["Forward to External API"]

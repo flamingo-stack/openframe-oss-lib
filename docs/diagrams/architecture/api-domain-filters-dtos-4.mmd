@@ -1,0 +1,4 @@
+flowchart LR
+    Organization["Organization (Mongo Document)"] --> OrganizationResponse["OrganizationResponse DTO"]
+    OrganizationResponse --> RestAPI["REST API"]
+    OrganizationResponse --> GraphQL["GraphQL API"]

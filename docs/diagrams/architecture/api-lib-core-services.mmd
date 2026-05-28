@@ -1,0 +1,7 @@
+flowchart TD
+    Controllers["REST Controllers"] --> Services["Api Lib Core Services"]
+    DataFetchers["GraphQL Data Fetchers"] --> Services
+    Services --> Repositories["Mongo Repositories"]
+    Repositories --> MongoDB[("MongoDB")]
+
+    Services --> Processors["Domain Processors"]

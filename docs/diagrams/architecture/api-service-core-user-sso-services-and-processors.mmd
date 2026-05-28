@@ -1,0 +1,18 @@
+flowchart TD
+    Controller["REST / GraphQL Controllers"] --> UserService["UserService"]
+    Controller --> SSOService["SSOConfigService"]
+
+    UserService --> UserRepo["UserRepository"]
+    UserService --> UserProcessor["UserProcessor"]
+
+    SSOService --> SSORepo["SSOConfigRepository"]
+    SSOService --> Encryption["EncryptionService"]
+    SSOService --> DomainValidation["DomainValidationService"]
+    SSOService --> SSOProcessor["SSOConfigProcessor"]
+
+    subgraph processors_layer["Post-Processing Layer"]
+        UserProcessor --> DefaultUserProcessor["DefaultUserProcessor"]
+        SSOProcessor --> DefaultSSOProcessor["DefaultSSOConfigProcessor"]
+        InvitationProcessor --> DefaultInvitationProcessor["DefaultInvitationProcessor"]
+        AgentSecretProcessor --> DefaultAgentProcessor["DefaultAgentRegistrationSecretProcessor"]
+    end

@@ -1,0 +1,5 @@
+flowchart TD
+    UserDoc["User Document"] --> UserRepo["BaseUserRepository"]
+    UserRepo --> EmailLookup["Email-Based Lookup"]
+    UserRepo --> StatusCheck["Status Validation"]
+    StatusCheck --> Security["Authentication & Access Control"]

@@ -1,0 +1,11 @@
+flowchart LR
+    Client["GraphQL Client"] --> Schema["GraphQL Schema"]
+    Schema --> DataFetchers["DGS DataFetchers"]
+    DataFetchers --> Mappers["GraphQL Mappers"]
+    DataFetchers --> Services["Application Services"]
+    Services --> Repositories["Mongo / Pinot / Cassandra Repositories"]
+
+    DataFetchers --> DataLoaders["DataLoaders (Batching)"]
+    DataLoaders --> Services
+
+    DataFetchers --> Security["SecurityContext + JWT"]

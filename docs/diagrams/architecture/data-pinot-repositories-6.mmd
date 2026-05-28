@@ -1,0 +1,9 @@
+flowchart LR
+    Client["UI / API Request"] --> ApiService["API Service"]
+    ApiService --> LogRepo["PinotClientLogRepository"]
+    LogRepo --> PinotBroker["Pinot Broker"]
+    PinotBroker --> PinotServer["Pinot Servers"]
+    PinotServer --> PinotBroker
+    PinotBroker --> LogRepo
+    LogRepo --> ApiService
+    ApiService --> Client

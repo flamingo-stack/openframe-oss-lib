@@ -1,7 +1,0 @@
-flowchart TD
-    App["Application Service"] --> Sync["RedisTemplate"]
-    App --> Reactive["ReactiveRedisTemplate"]
-    Sync --> Conn["RedisConnectionFactory"]
-    Reactive --> RConn["ReactiveRedisConnectionFactory"]
-    Conn --> Redis[("Redis")]
-    RConn --> Redis

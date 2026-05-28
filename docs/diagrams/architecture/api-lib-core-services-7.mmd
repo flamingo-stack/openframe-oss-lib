@@ -1,0 +1,13 @@
+flowchart TD
+    Client["GraphQL Client"] --> DataFetcher["MachineDataFetcher"]
+    DataFetcher --> AgentLoader["InstalledAgentDataLoader"]
+    DataFetcher --> ToolLoader["ToolConnectionDataLoader"]
+
+    AgentLoader --> AgentService["InstalledAgentService"]
+    ToolLoader --> ToolService["ToolConnectionService"]
+
+    AgentService --> AgentRepo["InstalledAgentRepository"]
+    ToolService --> ToolRepo["ToolConnectionRepository"]
+
+    AgentRepo --> Mongo[("MongoDB")]
+    ToolRepo --> Mongo

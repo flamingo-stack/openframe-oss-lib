@@ -2,385 +2,350 @@
 
 ## Overview
 
-The **Security Core And Oauth Bff** module provides the foundational security primitives and OAuth2 Backend-for-Frontend (BFF) capabilities for the OpenFrame platform. It is responsible for:
+The **Security Core And Oauth Bff** module provides the foundational security building blocks for the OpenFrame platform. It combines:
 
-- JWT key management, encoding, and decoding
-- PKCE utilities for secure OAuth2 flows
-- Centralized security constants
-- OAuth2 login, callback, refresh, and logout orchestration
-- Secure cookie handling for browser-based authentication
-- Development ticket exchange for local/dev workflows
+- JWT encoding and decoding infrastructure
+- RSA key configuration and loading
+- PKCE (Proof Key for Code Exchange) utilities
+- OAuth2 Backend-for-Frontend (BFF) endpoints
+- Redirect resolution and state management
 
-This module acts as the bridge between:
-
-- The Authorization Server (see `authorization-service-core`)
-- The Gateway layer (see `gateway-service-core`)
-- Browser-based frontend applications
-
-It encapsulates both **cryptographic primitives** (JWT, PKCE) and **BFF orchestration logic** for OAuth2 flows.
+This module acts as the bridge between the platform’s Authorization Server, Gateway, and frontend clients. It centralizes token handling, cookie management, and OAuth flows while remaining configurable and extensible.
 
 ---
 
-## High-Level Architecture
+## Architectural Role in the Platform
+
+At runtime, Security Core And Oauth Bff sits between:
+
+- Frontend clients (browser-based applications)
+- The Authorization Server
+- The Gateway layer
+
+It is responsible for:
+
+- Initiating OAuth2 authorization flows
+- Managing PKCE and state
+- Exchanging authorization codes for tokens
+- Storing tokens securely in HTTP-only cookies
+- Refreshing and revoking tokens
+- Providing JWT encoder/decoder beans for internal services
+
+### High-Level Architecture
 
 ```mermaid
 flowchart LR
-    Browser["Browser Client"] -->|"GET /oauth/login"| BffController["OAuthBffController"]
-    BffController -->|"Build authorize URL"| AuthServer["Authorization Server"]
-    AuthServer -->|"Authorization Code"| BffController
-    BffController -->|"Token Exchange"| AuthServer
-    BffController -->|"Set Auth Cookies"| Browser
+    Browser["Browser Client"] -->|"GET /oauth/login"| Bff["OAuth BFF Controller"]
+    Bff -->|"Redirect to authorize"| AuthServer["Authorization Server"]
+    AuthServer -->|"Callback with code"| Bff
+    Bff -->|"Exchange code for tokens"| AuthServer
+    Bff -->|"Set HttpOnly Cookies"| Browser
 
-    BffController --> JwtSecurity["JwtSecurityConfig"]
-    JwtSecurity --> JwtEncoder["JwtEncoder"]
-    JwtSecurity --> JwtDecoder["JwtDecoder"]
-
-    BffController --> PKCE["PKCEUtils"]
-    BffController --> DevStore["OAuthDevTicketStore"]
+    Browser -->|"API calls with cookies"| Gateway["Gateway Service"]
+    Gateway -->|"Validate JWT"| JwtDecoder["JwtDecoder Bean"]
 ```
 
-### Core Responsibilities
-
-1. **JWT Infrastructure** – Key loading, encoding, and decoding.
-2. **PKCE Support** – Secure OAuth2 authorization code flow.
-3. **OAuth BFF Flow Management** – Login, callback, refresh, logout.
-4. **Secure Cookie Management** – Token transport via HTTP-only cookies.
-5. **Development Utilities** – Dev ticket exchange for debugging and local testing.
-
 ---
 
-## Internal Components
+## Core Components
 
-The module is logically divided into two areas:
+### 1. JwtSecurityConfig
 
-### 1. Security Core
+**Class:** `JwtSecurityConfig`
 
-Provides cryptographic primitives and shared security utilities.
+This Spring configuration class provides the core JWT infrastructure:
 
-| Component | Responsibility |
-|------------|----------------|
-| `JwtSecurityConfig` | Configures `JwtEncoder` and `JwtDecoder` beans |
-| `JwtConfig` | Loads RSA public/private keys and JWT properties |
-| `SecurityConstants` | Shared token/header/cookie constants |
-| `PKCEUtils` | PKCE state, verifier, challenge generation |
+- `JwtEncoder` bean using `NimbusJwtEncoder`
+- `JwtDecoder` bean using `NimbusJwtDecoder`
+- RSA-based signing and verification
 
----
+#### Responsibilities
 
-### 2. OAuth BFF Layer
+- Build a JWK set from configured RSA keys
+- Expose a `JwtEncoder` for signing tokens
+- Expose a `JwtDecoder` for validating tokens
 
-Implements the OAuth2 browser-based flow orchestration.
-
-| Component | Responsibility |
-|------------|----------------|
-| `OAuthBffController` | REST endpoints for login, callback, refresh, logout |
-| `InMemoryOAuthDevTicketStore` | Temporary dev ticket store |
-| `DefaultRedirectTargetResolver` | Determines safe redirect target |
-| `NoopForwardedHeadersContributor` | Default no-op forwarded headers strategy |
-
----
-
-# Security Core
-
-## JWT Configuration
-
-### JwtSecurityConfig
-
-Registers Spring Security JWT infrastructure:
-
-- `JwtEncoder` using `NimbusJwtEncoder`
-- `JwtDecoder` using `NimbusJwtDecoder`
-- Backed by RSA keys from `JwtConfig`
+### JWT Bean Configuration Flow
 
 ```mermaid
 flowchart TD
-    JwtSecurityConfig -->|"loads"| JwtConfig
-    JwtConfig -->|"loadPublicKey()"| PublicKey["RSAPublicKey"]
+    JwtConfig["JwtConfig"] -->|"loadPublicKey()"| PublicKey["RSAPublicKey"]
     JwtConfig -->|"loadPrivateKey()"| PrivateKey["RSAPrivateKey"]
-    JwtSecurityConfig --> Encoder["NimbusJwtEncoder"]
-    JwtSecurityConfig --> Decoder["NimbusJwtDecoder"]
+
+    PublicKey --> RsaKey["RSAKey Builder"]
+    PrivateKey --> RsaKey
+
+    RsaKey --> JwkSet["JWKSet"]
+    JwkSet --> JwtEncoder["NimbusJwtEncoder"]
+
+    PublicKey --> JwtDecoder["NimbusJwtDecoder"]
 ```
 
-### JwtConfig
+This design ensures:
 
-Configured via Spring Boot properties:
-
-```text
-jwt.public-key.value
-jwt.private-key.value
-jwt.issuer
-jwt.audience
-```
-
-Responsibilities:
-
-- Strip PEM headers
-- Base64 decode key material
-- Generate `RSAPrivateKey` using `PKCS8EncodedKeySpec`
-- Provide `RSAPublicKey`
-
-This ensures the platform can:
-
-- Issue signed JWTs
-- Validate inbound JWTs
-- Maintain consistent issuer/audience validation
+- Strong asymmetric cryptography (RSA)
+- Compatibility with Spring Security OAuth2 Resource Server
+- Clean separation of configuration and usage
 
 ---
 
-## PKCE Utilities
+### 2. JwtConfig
 
-### PKCEUtils
+**Class:** `JwtConfig`
 
-Implements RFC 7636 (Proof Key for Code Exchange).
+`JwtConfig` is a Spring `@ConfigurationProperties` service that binds properties under the `jwt` prefix.
 
-Functions:
+#### Properties
 
-- `generateState()` – 128-bit CSRF protection value
-- `generateCodeVerifier()` – 256-bit random verifier
-- `generateCodeChallenge()` – SHA-256 hash of verifier
-- Base64URL encoding (no padding)
+- `publicKey`
+- `privateKey`
+- `issuer`
+- `audience`
+
+#### Key Responsibilities
+
+- Load RSA public key
+- Parse and decode PEM-encoded private key
+- Produce `RSAPublicKey` and `RSAPrivateKey` instances
+
+The private key loading process:
 
 ```mermaid
 flowchart TD
-    Verifier["Code Verifier"] -->|"SHA-256"| Hash["Hash Bytes"]
-    Hash -->|"Base64URL"| Challenge["Code Challenge"]
+    PemString["PEM Private Key"] --> StripHeaders["Remove BEGIN/END markers"]
+    StripHeaders --> Base64Decode["Base64 Decode"]
+    Base64Decode --> KeySpec["PKCS8EncodedKeySpec"]
+    KeySpec --> KeyFactory["KeyFactory RSA"]
+    KeyFactory --> RsaPrivate["RSAPrivateKey"]
 ```
 
-Security guarantees:
-
-- Prevents authorization code interception
-- Protects against CSRF
-- Eliminates reliance on client secrets in public clients
+This encapsulation prevents direct cryptographic handling throughout the codebase and centralizes key logic.
 
 ---
 
-## Security Constants
+### 3. SecurityConstants
 
-`SecurityConstants` centralizes:
+**Class:** `SecurityConstants`
 
-- `ACCESS_TOKEN`
-- `REFRESH_TOKEN`
-- `ACCESS_TOKEN_HEADER`
-- `REFRESH_TOKEN_HEADER`
-- `AUTHORIZATION_QUERY_PARAM`
+Defines standardized names used across OAuth flows:
 
-This avoids duplication and ensures consistent header/cookie naming across gateway and services.
+- `authorization` query parameter
+- `access_token`
+- `refresh_token`
+- `Access-Token` header
+- `Refresh-Token` header
 
----
+This prevents string duplication and ensures consistent token propagation between:
 
-# OAuth BFF Layer
-
-The OAuth BFF pattern keeps tokens out of browser storage and instead stores them in secure HTTP-only cookies.
-
-## OAuthBffController
-
-Enabled via:
-
-```text
-openframe.gateway.oauth.enable=true
-```
-
-Base path:
-
-```text
-/oauth
-```
-
-### Endpoints
-
-| Endpoint | Purpose |
-|----------|----------|
-| `GET /login` | Start OAuth2 authorization flow |
-| `GET /continue` | Continue flow after SSO finalization |
-| `GET /callback` | Handle authorization code exchange |
-| `POST /refresh` | Refresh access token |
-| `GET /logout` | Revoke refresh token + clear cookies |
-| `GET /dev-exchange` | Development ticket exchange |
+- BFF controller
+- Cookie service
+- Gateway filters
 
 ---
 
-## OAuth Login Flow
+### 4. PKCEUtils
+
+**Class:** `PKCEUtils`
+
+Utility class implementing PKCE for secure OAuth2 Authorization Code flows.
+
+#### Provided Methods
+
+- `generateState()` – 128-bit random value
+- `generateCodeVerifier()` – 256-bit random value
+- `generateCodeChallenge()` – SHA-256 based challenge
+- `urlEncode()` – Safe redirect parameter encoding
+
+### PKCE Flow
+
+```mermaid
+flowchart TD
+    Verifier["Code Verifier (random 32 bytes)"] --> Hash["SHA-256"]
+    Hash --> Challenge["Base64URL Encode"]
+
+    Challenge -->|"Sent to Authorization Server"| AuthServer["Authorization Server"]
+    Verifier -->|"Stored by BFF"| BffStore["State JWT / Cookie"]
+```
+
+This ensures:
+
+- Protection against authorization code interception
+- CSRF mitigation via state parameter
+- Strong cryptographic randomness via `SecureRandom`
+
+---
+
+## OAuth Backend-For-Frontend (BFF)
+
+### OAuthBffController
+
+**Class:** `OAuthBffController`
+
+This is the central HTTP interface for browser-based authentication.
+
+It is conditionally enabled via:
+
+- `openframe.gateway.oauth.enable=true`
+
+### Exposed Endpoints
+
+| Endpoint | Method | Purpose |
+|-----------|--------|----------|
+| `/oauth/login` | GET | Start OAuth flow |
+| `/oauth/continue` | GET | Continue flow without clearing session |
+| `/oauth/callback` | GET | Handle authorization code |
+| `/oauth/refresh` | POST | Refresh tokens |
+| `/oauth/logout` | GET | Revoke refresh token and clear cookies |
+| `/oauth/dev-exchange` | GET | Exchange development ticket |
+
+---
+
+## End-to-End Login Flow
 
 ```mermaid
 sequenceDiagram
     participant Browser
-    participant BFF as "OAuthBffController"
-    participant Auth as "Authorization Server"
+    participant BFF as OAuth BFF Controller
+    participant Auth as Authorization Server
 
     Browser->>BFF: GET /oauth/login
-    BFF->>Auth: Redirect with state + PKCE challenge
-    Auth->>Browser: Redirect with code
-    Browser->>BFF: GET /oauth/callback
+    BFF->>Auth: Redirect with state and PKCE challenge
+    Auth->>Browser: Login UI
+    Auth->>BFF: Callback with code and state
     BFF->>Auth: Exchange code for tokens
-    BFF->>Browser: Set cookies + redirect
+    Auth->>BFF: Access and Refresh tokens
+    BFF->>Browser: Set HttpOnly cookies and redirect
 ```
 
-### Key Security Steps
+### Key Mechanics
 
-1. Generate `state` (CSRF protection).
-2. Generate PKCE `code_verifier` + `code_challenge`.
-3. Store state in secure cookie (TTL configurable).
-4. Validate state on callback.
-5. Exchange authorization code for tokens.
-6. Set HTTP-only auth cookies.
-7. Clear state cookie.
+1. State is signed as a JWT.
+2. State cookie is stored with configurable TTL.
+3. Tokens are returned as HTTP-only cookies.
+4. Optional development ticket injection.
+5. Errors redirect to configured error URL.
 
 ---
 
-## Token Refresh
+## Token Refresh Flow
 
-`POST /oauth/refresh`
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant BFF
+    participant Auth as Authorization Server
 
-Behavior:
+    Browser->>BFF: POST /oauth/refresh
+    BFF->>Auth: Refresh token request
+    Auth->>BFF: New tokens
+    BFF->>Browser: Set new cookies
+```
 
-- Reads refresh token from:
-  - Cookie (`refresh_token`)
-  - Header (`Refresh-Token`)
-- Calls OAuth service to refresh
-- Sets new cookies
-- Returns `401` if invalid
+Features:
 
-Supports both:
-
-- Tenant-aware refresh
-- Lookup-based refresh
+- Supports refresh via cookie or header
+- Supports tenant-based lookup
+- Returns 401 if token missing or invalid
 
 ---
 
 ## Logout Flow
 
-`GET /oauth/logout`
-
-Steps:
-
-1. Clear auth cookies.
-2. Revoke refresh token.
-3. Return `204 No Content`.
-
-Ensures both client and server state are invalidated.
-
----
-
-## Development Ticket Mode
-
-Enabled via:
-
-```text
-openframe.gateway.oauth.dev-ticket-enabled=true
-```
-
-Purpose:
-
-- Allow token retrieval via one-time dev tickets
-- Useful for local frontend debugging
-
-### InMemoryOAuthDevTicketStore
-
-- Stores `TokenResponse` in `ConcurrentHashMap`
-- Generates UUID ticket
-- `consumeTicket()` removes entry (one-time use)
-
 ```mermaid
-flowchart TD
-    Tokens["TokenResponse"] --> Create["createTicket()"]
-    Create --> Store["ConcurrentHashMap"]
-    Store --> Consume["consumeTicket()"]
+sequenceDiagram
+    participant Browser
+    participant BFF
+    participant Auth as Authorization Server
+
+    Browser->>BFF: GET /oauth/logout
+    BFF->>Auth: Revoke refresh token
+    BFF->>Browser: Clear auth cookies
 ```
 
-In production, this can be replaced with a distributed store implementation.
+Logout ensures:
+
+- Refresh token revocation
+- Cookie invalidation
+- Stateless cleanup
 
 ---
 
-## Redirect Target Resolution
+## Redirect Resolution
 
 ### DefaultRedirectTargetResolver
 
-Determines safe redirect target using priority:
+Provides fallback redirect resolution logic:
 
-1. Explicit `redirectTo` parameter
-2. `Referer` header
-3. `/` fallback
-
-This prevents null or unsafe redirect handling while remaining flexible.
-
----
-
-## Forwarded Headers Strategy
-
-### NoopForwardedHeadersContributor
-
-Default no-op implementation.
-
-Allows customization for:
-
-- Reverse proxy environments
-- X-Forwarded-* header propagation
-- Custom gateway setups
-
-A custom `ForwardedHeadersContributor` can override this behavior.
-
----
-
-# Integration With Other Modules
-
-Security Core And Oauth Bff integrates closely with:
-
-- `authorization-service-core` – Token issuance and OAuth authorization server
-- `gateway-service-core` – Edge authentication and JWT validation
-- `mongo-persistence-layer` – OAuth client and token persistence
-- `api-service-core-controllers-and-graphql` – Secured business APIs
-
-This module does not persist tokens itself; it delegates issuance and revocation to the authorization layer.
-
----
-
-# Security Model Summary
+1. Use explicit `redirectTo` parameter if provided
+2. Fallback to `Referer` header
+3. Default to `/`
 
 ```mermaid
 flowchart TD
-    Browser["Browser"] -->|"Auth Request"| BFF["Security Core And Oauth Bff"]
-    BFF -->|"Code Exchange"| AuthServer["Authorization Service"]
-    AuthServer -->|"JWT Issued"| BFF
-    BFF -->|"HTTP Only Cookies"| Browser
-    Browser -->|"Requests with Cookies"| Gateway["Gateway Service"]
-    Gateway -->|"Validate JWT"| Resource["API Services"]
+    Requested["Requested redirectTo"] -->|"Has value"| UseRequested["Use requested value"]
+    Requested -->|"Empty"| RefererCheck["Check Referer header"]
+    RefererCheck -->|"Present"| UseReferer["Use Referer"]
+    RefererCheck -->|"Missing"| DefaultRoot["Use /"]
 ```
 
-### Key Principles
-
-- ✅ No tokens in localStorage
-- ✅ HTTP-only secure cookies
-- ✅ PKCE enforced
-- ✅ CSRF protection via state
-- ✅ Refresh token rotation support
-- ✅ Tenant-aware flows
-- ✅ Pluggable header and redirect strategies
+This allows safe continuation after login without tight frontend coupling.
 
 ---
 
-# Configuration Summary
+## Security Design Principles
+
+Security Core And Oauth Bff follows these principles:
+
+- **Asymmetric cryptography** for JWT signing
+- **Short-lived state tokens** for CSRF prevention
+- **PKCE enforcement** for public clients
+- **HttpOnly cookie storage** for tokens
+- **Tenant-aware flows**
+- **Reactive non-blocking controllers** using Project Reactor
+
+---
+
+## Configuration Overview
+
+### JWT Properties
 
 ```text
-jwt.public-key.value
-jwt.private-key.value
-jwt.issuer
-jwt.audience
+jwt.publicKey.value=<PEM_PUBLIC_KEY>
+jwt.privateKey.value=<PEM_PRIVATE_KEY>
+jwt.issuer=openframe
+jwt.audience=openframe-api
+```
 
-openframe.gateway.oauth.enable
-openframe.gateway.oauth.state-cookie-ttl-seconds
-openframe.gateway.oauth.dev-ticket-enabled
+### OAuth BFF Properties
+
+```text
+openframe.gateway.oauth.enable=true
+openframe.gateway.oauth.state-cookie-ttl-seconds=180
+openframe.gateway.oauth.dev-ticket-enabled=true
+openframe.auth.error-url=/auth/error
 ```
 
 ---
 
-# Conclusion
+## Extension Points
 
-The **Security Core And Oauth Bff** module provides the cryptographic backbone and browser-safe OAuth orchestration required for a secure, multi-tenant, modern SaaS platform.
+Security Core And Oauth Bff is designed to be extended:
 
-It cleanly separates:
+- Replace `RedirectTargetResolver`
+- Customize cookie behavior via `CookieService`
+- Extend `OAuthBffService`
+- Plug in alternative key loading mechanisms
 
-- Token issuance (Authorization Service)
-- Token validation (Gateway)
-- Browser flow orchestration (BFF)
-- Cryptographic key management (Security Core)
+---
 
-By combining PKCE, JWT infrastructure, cookie-based token storage, and flexible redirect handling, this module ensures OpenFrame’s authentication model remains secure, extensible, and production-ready.
+## Summary
+
+The **Security Core And Oauth Bff** module provides:
+
+- JWT cryptographic infrastructure
+- OAuth2 BFF endpoints
+- PKCE and CSRF protection
+- Token refresh and revocation logic
+- Redirect safety and cookie management
+
+It is a foundational module that secures the entire OpenFrame request lifecycle, enabling multi-tenant, OAuth2-compliant, and browser-safe authentication flows.

@@ -1,0 +1,4 @@
+flowchart LR
+    DomainService["DomainValidationService"] --> Interface["DomainExistenceValidator"]
+    Interface --> DefaultImpl["DefaultDomainExistenceValidator"]
+    Interface --> CustomImpl["SaaS Override Implementation"]

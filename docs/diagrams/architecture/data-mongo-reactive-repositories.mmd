@@ -1,0 +1,12 @@
+flowchart TD
+    App["Application Context"] --> Config["MongoReactiveConfig"]
+    Config -->|"@EnableReactiveMongoRepositories"| Scan["Reactive Repository Scan"]
+
+    Scan --> OAuthRepo["ReactiveOAuthClientRepository"]
+    Scan --> UserRepo["ReactiveUserRepository"]
+
+    OAuthRepo --> OAuthClient["OAuthClient Document"]
+    UserRepo --> UserDoc["User Document"]
+
+    OAuthClient --> MongoDB[("MongoDB")]
+    UserDoc --> MongoDB

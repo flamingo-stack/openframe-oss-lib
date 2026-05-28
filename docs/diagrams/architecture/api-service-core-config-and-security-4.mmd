@@ -1,0 +1,7 @@
+flowchart TD
+    Startup["Application Startup"] --> LoadProps["Read OAuth Properties"]
+    LoadProps --> QueryRepo["Find Client by ID"]
+    QueryRepo -->|"Exists"| CompareSecret["Compare Secrets"]
+    CompareSecret -->|"Different"| UpdateSecret["Update and Save"]
+    CompareSecret -->|"Same"| Skip["No Action"]
+    QueryRepo -->|"Missing"| CreateClient["Create OAuthClient"]
