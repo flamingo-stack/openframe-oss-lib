@@ -15,8 +15,10 @@
  * is a SIBLING of the toggle button, not nested inside it.
  */
 
+import { useCallback, useRef } from 'react'
 import { StatusBadge, type StatusBadgeProps } from '../ui'
 import { formatRelativeTime } from '../../utils/date-utils'
+import { scrollElementIntoView } from '../../utils/scroll-into-view'
 import { getStatusColorScheme } from '../chat/utils/agent-status-message'
 import { DevCardRowContent } from '../shared/dev-section/dev-card-row'
 import {
@@ -25,6 +27,23 @@ import {
 } from './ticket-detail-drawer'
 import type { AnyTicket } from './types'
 import { isOptimistic } from './types'
+
+/** Sticky page-chrome offset, applied two ways from this ONE constant:
+ *
+ *   1. As `scrollMarginTop` inline style on the wrapper — so any
+ *      anchor-driven or `scrollIntoView()`-driven scroll (browser
+ *      `#hash` navigation, Tab-focus into the card) lands BELOW the
+ *      sticky header.
+ *   2. As `headerOffset` passed to `scrollElementIntoView(...)` — for
+ *      the click-to-expand `window.scrollTo` path, which pre-computes
+ *      its target pixel and ignores CSS `scroll-margin-top`.
+ *
+ *  Single source of truth: change 96 here and BOTH paths follow. The
+ *  previous code combined a `scroll-mt-24` (=96px) Tailwind class
+ *  with this constant — two declarations, one comment binding them,
+ *  drift hazard. Now there's nothing to keep in sync.
+ */
+const STICKY_HEADER_OFFSET_PX = 96
 
 export interface HelpCenterCardProps {
   ticket: AnyTicket
@@ -72,6 +91,39 @@ export function HelpCenterCard({
   const isExpandable = !optimistic
   const isExpanded = expanded && isExpandable
 
+  // Scroll-on-click — delegates to the canonical `scrollElementIntoView`
+  // helper with a cross-row layout-shift `adjustTargetY` callback. The
+  // helper owns the smooth-scroll mechanics + sticky-chrome offset; we
+  // pass the consumer-specific knowledge ("a sibling drawer above me
+  // is about to collapse — subtract its height from the target Y").
+  //
+  // Cross-row gotcha: if ANOTHER row above this one is currently
+  // expanded, its drawer collapses simultaneously with our toggle.
+  // The collapse shrinks the page above our row → our final Y is
+  // HIGHER than the current `rect.top`. By pre-subtracting the
+  // collapsing drawer's height we land at the post-shift position
+  // cleanly, without scrollIntoView's mid-animation drift.
+  const rowRef = useRef<HTMLDivElement | null>(null)
+  const handleClick = useCallback(() => {
+    onToggle(ticket.id)
+    scrollElementIntoView(rowRef.current, {
+      headerOffset: STICKY_HEADER_OFFSET_PX,
+      adjustTargetY: (raw) => {
+        if (!rowRef.current) return raw
+        const expandedDrawer = document.querySelector(
+          'div[id^="help-center-drawer-"]',
+        )
+        if (!(expandedDrawer instanceof HTMLElement)) return raw
+        const drawerRect = expandedDrawer.getBoundingClientRect()
+        const myRect = rowRef.current.getBoundingClientRect()
+        // Only adjust when the drawer is ABOVE us. Drawers below us
+        // don't shift our position when they collapse.
+        if (drawerRect.bottom > myRect.top) return raw
+        return raw - drawerRect.height
+      },
+    })
+  }, [onToggle, ticket.id])
+
   const rightBadges = (
     <>
       <StatusBadge
@@ -93,12 +145,14 @@ export function HelpCenterCard({
 
   return (
     <div
+      ref={rowRef}
+      style={{ scrollMarginTop: STICKY_HEADER_OFFSET_PX }}
       className={`border-b border-ods-border last:border-b-0 ${optimistic ? 'opacity-60' : ''}`}
       aria-busy={optimistic || undefined}
     >
       <button
         type="button"
-        onClick={isExpandable ? () => onToggle(ticket.id) : undefined}
+        onClick={isExpandable ? handleClick : undefined}
         disabled={!isExpandable}
         aria-expanded={isExpandable ? isExpanded : undefined}
         aria-controls={isExpanded ? `help-center-drawer-${ticket.id}` : undefined}

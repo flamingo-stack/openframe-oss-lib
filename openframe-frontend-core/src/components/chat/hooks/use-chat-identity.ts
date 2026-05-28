@@ -8,8 +8,9 @@
  * (attachment button, drawer composer, /tickets gate) on chat-side
  * identity tiers WITHOUT sending a chat message first.
  *
- * Server-side parity: the route at `/api/chat/identity` runs the same
- * 3-tier `requireChatAuth` chain the chat itself uses.
+ * Server-side parity: the host's identity endpoint (hub default
+ * `/api/auth/identity`, override via `runtime.endpoints.identityUrl`)
+ * runs the same 3-tier `requireChatAuth` chain the chat itself uses.
  * `attachmentsEnabled` is computed server-side as
  * `authTier !== 'anon' AND isSelfScopedSource(source)` — single
  * source of truth, consumers don't combine the fields themselves.
@@ -27,7 +28,7 @@
  *   3. The fetch is cheap and short — no perf justification for a
  *      cache layer
  *
- * Endpoint URL: read from `useRequiredChatRuntime().endpoints.chatIdentityUrl`
+ * Endpoint URL: read from `useRequiredChatRuntime().endpoints.identityUrl`
  * so embedded apps with their own reverse-proxy topology can override.
  */
 
@@ -37,9 +38,9 @@ import { chatAuthedFetch } from '../utils/chat-authed-fetch'
 import { getChatProxyAuth } from '../utils/chat-proxy-auth-storage'
 
 /**
- * Wire-shape for the `/api/chat/identity` route response. Mirrors
- * the hub's `ChatIdentityResponse` (in `app/api/chat/identity/route.ts`)
- * — kept in sync there. Lib-side declaration so the chat panel can
+ * Wire-shape for the identity route response. Mirrors the hub's
+ * `ChatIdentityResponse` (in `app/api/auth/identity/route.ts`) —
+ * kept in sync there. Lib-side declaration so the chat panel can
  * compile without depending on hub-internal types.
  */
 export interface ChatIdentityResponse {
@@ -87,7 +88,7 @@ const ANON_DEFAULTS: ChatIdentityResponse = {
 
 export function useChatIdentity(): ChatIdentitySurface {
   const runtime = useRequiredChatRuntime()
-  const url = runtime.endpoints.chatIdentityUrl
+  const url = runtime.endpoints.identityUrl
   // `getChatProxyAuth()` reads localStorage every render. If the user
   // pastes bearer creds mid-session (via the `/debug` creds bar),
   // their email arrives here and the effect's dep changes → refetch.

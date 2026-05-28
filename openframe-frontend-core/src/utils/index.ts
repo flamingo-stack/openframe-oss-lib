@@ -200,3 +200,15 @@ export { fetchPriorityProp, type FetchPriorityValue } from './fetch-priority'
 // server-safe (no JSX, no contexts/* imports); imported by route-page
 // `metadata` exports + the shared `<DevSectionView>` chrome.
 export * from './dev-sections'
+
+// Canonical "smooth scroll element into view with sticky-chrome
+// offset" helper. Single source of truth across the lib + hub for
+// pre-computed-target scrolling — see `scroll-into-view.ts` for the
+// rationale (TL;DR: window.scrollTo({top, behavior:'smooth'}) with a
+// pre-computed pixel value avoids the mid-animation jitter that
+// `element.scrollIntoView()` produces when layout shifts during the
+// scroll).
+export {
+  type ScrollElementIntoViewOptions,
+  scrollElementIntoView,
+} from './scroll-into-view'

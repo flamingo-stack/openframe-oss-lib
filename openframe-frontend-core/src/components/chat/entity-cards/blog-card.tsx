@@ -19,6 +19,7 @@
  */
 
 import React, { useState } from 'react'
+import { Eye } from 'lucide-react'
 import Image from '../../../embed-shims/next-image'
 import { StatusBadge } from '../../ui/status-badge'
 import { cn } from '../../../utils/cn'
@@ -235,22 +236,30 @@ export function BlogCard({
             </p>
           </div>
 
-          {/* Footer: author + date (simplified — no hub BlogMeta dep). */}
-          <div className="mt-auto flex items-center gap-2 text-sm text-ods-text-secondary">
-            {post.author_avatar ? (
-              <Image
-                src={post.author_avatar}
-                alt={post.author_name || ''}
-                width={32}
-                height={32}
-                className="rounded-full"
-                unoptimized
-              />
-            ) : null}
-            <span className="truncate">
-              {post.author_name || 'Anonymous'}
-              {dateStr ? <> · {dateStr}</> : null}
-            </span>
+          <div className="mt-auto flex items-center justify-between gap-2 text-sm text-ods-text-secondary">
+            <div className="flex items-center gap-2 min-w-0">
+              {post.author_avatar ? (
+                <Image
+                  src={post.author_avatar}
+                  alt={post.author_name || ''}
+                  width={32}
+                  height={32}
+                  className="rounded-full shrink-0"
+                  unoptimized
+                />
+              ) : null}
+              <span className="truncate">
+                {post.author_name || 'Anonymous'}
+                {dateStr ? <> · {dateStr}</> : null}
+              </span>
+            </div>
+            <div
+              className="flex items-center gap-1 shrink-0"
+              aria-label={`View count: ${(post.view_count ?? 0).toLocaleString('en-US')} views`}
+            >
+              <Eye className="w-4 h-4 shrink-0" />
+              <span>{(post.view_count ?? 0).toLocaleString('en-US')}</span>
+            </div>
           </div>
         </div>
       </a>
