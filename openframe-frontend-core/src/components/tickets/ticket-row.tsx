@@ -28,7 +28,6 @@ import {
   type ChatTicketItemData,
 } from '../chat/entity-cards/chat-ticket-item'
 import { formatRelativeTime } from '../../utils/date-utils'
-import { scrollToAnchor } from '../../utils/scroll-to-anchor'
 import {
   TicketDetailDrawer,
   type TicketDetailDrawerProps,
@@ -71,18 +70,25 @@ export function TicketRow({
   // hidden — the user has to scroll manually to see what they just
   // opened.
   //
-  // Delegates to the canonical `scrollToAnchor` helper (single source of
-  // truth across the lib + hub for "smooth scroll to element, account
-  // for sticky header"). The `delay: 200` option waits for the Radix
-  // Collapsible animation to settle BEFORE measuring the target,
-  // otherwise we'd capture B's position while the previous card is
-  // still collapsing above it and land too far down. The helper's
-  // pre-computed pixel target also keeps the smooth animation from
-  // jittering as layout shifts mid-flight.
+  // Pure-native pattern: `scrollIntoView({ block: 'start' })` paired
+  // with `scroll-mt-24` (Tailwind `scroll-margin-top: 6rem`) on the
+  // row's outer div so the tile lands BELOW the sticky page chrome.
+  // The hub's global `html { scroll-behavior: smooth }` rule (see
+  // `app/globals.css`) animates the transition — no JS easing, no
+  // pre-computed pixel target, no helper function. Same platform
+  // primitive that handles URL hash anchors does the work here.
+  //
+  // The `setTimeout(200ms)` waits for the Radix Collapsible expand
+  // animation to settle before measuring the target — otherwise the
+  // browser would smooth-scroll to a moving destination as the row
+  // grows in height. 200ms matches Radix's default duration.
   const rowRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
     if (!expanded || optimistic) return
-    scrollToAnchor(rowRef.current, { delay: 200 })
+    const t = setTimeout(() => {
+      rowRef.current?.scrollIntoView({ block: 'start' })
+    }, 200)
+    return () => clearTimeout(t)
   }, [expanded, optimistic])
 
   const tileData: ChatTicketItemData = {
@@ -113,7 +119,7 @@ export function TicketRow({
   }
 
   return (
-    <div ref={rowRef} className="scroll-mt-4">
+    <div ref={rowRef} className="scroll-mt-24">
       <Collapsible
         open={expanded && !optimistic}
         className="border-b border-ods-border last:border-b-0"
