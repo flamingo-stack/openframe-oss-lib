@@ -42,9 +42,11 @@ public class CustomNotificationRepositoryImpl implements CustomNotificationRepos
     @Override
     public NotificationPage findPageForRecipient(String recipientId, RecipientType recipientType,
                                                  Boolean readFilter, String search,
-                                                 String cursor, boolean backward, int limit) {
+                                                 String cursor, boolean backward,
+                                                 Sort.Direction direction, int limit) {
+        Sort.Direction effective = effectiveDirection(direction, backward);
         LinkedHashMap<String, ReadStatus> idsToStatus = fetchReadStates(
-                recipientId, recipientType, readFilter, search, cursor, backward, limit);
+                recipientId, recipientType, readFilter, search, cursor, effective, limit);
         if (idsToStatus.isEmpty()) {
             return NotificationPage.of(List.of());
         }
@@ -53,16 +55,17 @@ public class CustomNotificationRepositoryImpl implements CustomNotificationRepos
 
     private LinkedHashMap<String, ReadStatus> fetchReadStates(String recipientId, RecipientType recipientType,
                                                               Boolean readFilter, String search,
-                                                              String cursor, boolean backward, int limit) {
+                                                              String cursor, Sort.Direction effectiveDirection,
+                                                              int limit) {
         Criteria criteria = Criteria.where(FIELD_RECIPIENT_ID).is(recipientId)
                 .and(FIELD_RECIPIENT_TYPE).is(recipientType);
         applyStatusFilter(criteria, readFilter);
-        applyCursor(criteria, cursor, backward);
+        applyCursor(criteria, cursor, effectiveDirection);
         applySearch(criteria, search);
 
         Query query = new Query(criteria);
         query.fields().include(FIELD_NOTIFICATION_ID).include(FIELD_STATUS);
-        query.with(Sort.by(backward ? Sort.Direction.ASC : Sort.Direction.DESC, FIELD_NOTIFICATION_ID));
+        query.with(Sort.by(effectiveDirection, FIELD_NOTIFICATION_ID));
         query.limit(limit);
 
         List<NotificationReadState> rows = mongoTemplate.find(query, NotificationReadState.class);
@@ -71,6 +74,14 @@ public class CustomNotificationRepositoryImpl implements CustomNotificationRepos
             ordered.put(row.getNotificationId(), row.getStatus());
         }
         return ordered;
+    }
+
+    private static Sort.Direction effectiveDirection(Sort.Direction requested, boolean backward) {
+        Sort.Direction safe = requested != null ? requested : Sort.Direction.DESC;
+        if (!backward) {
+            return safe;
+        }
+        return safe == Sort.Direction.DESC ? Sort.Direction.ASC : Sort.Direction.DESC;
     }
 
     private List<NotificationWithStatus> fetchNotificationsPreservingOrder(LinkedHashMap<String, ReadStatus> idsToStatus) {
@@ -111,14 +122,14 @@ public class CustomNotificationRepositoryImpl implements CustomNotificationRepos
         }
     }
 
-    private static void applyCursor(Criteria criteria, String cursor, boolean backward) {
+    private static void applyCursor(Criteria criteria, String cursor, Sort.Direction effectiveDirection) {
         if (isBlank(cursor)) {
             return;
         }
-        if (backward) {
-            criteria.and(FIELD_NOTIFICATION_ID).gt(cursor);
-        } else {
+        if (effectiveDirection == Sort.Direction.DESC) {
             criteria.and(FIELD_NOTIFICATION_ID).lt(cursor);
+        } else {
+            criteria.and(FIELD_NOTIFICATION_ID).gt(cursor);
         }
     }
 

@@ -4,6 +4,8 @@ import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.notification.NotificationFilter;
 import com.openframe.api.dto.notification.NotificationView;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.dto.shared.SortDirection;
+import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.integration.BaseMongoIntegrationTest;
 import com.openframe.api.integration.support.NotificationFixtures;
 import com.openframe.api.integration.support.ServiceIntegrationTestApplication;
@@ -180,5 +182,59 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         readStateService.deleteNotification(ALICE, U, n.getId());
 
         assertThat(notificationService.list(ALICE, U, NotificationFilter.EMPTY, page10()).getItems()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Given three notifications and sort=ASC, when list is called, then items come back oldest-first — explicit override of the default DESC")
+    void sort_asc_returns_oldest_first() {
+        List<String> seededIds = seedFive("evt-", 3);
+
+        GenericQueryResult<NotificationView> result = notificationService.list(
+                ALICE, U, NotificationFilter.EMPTY, page10(),
+                SortInput.builder().direction(SortDirection.ASC).build());
+
+        assertThat(result.getItems()).extracting(NotificationView::id)
+                .containsExactly(seededIds.get(0), seededIds.get(1), seededIds.get(2));
+    }
+
+    @Test
+    @DisplayName("Given sort=null, when list is called via the 5-arg overload, then items come back newest-first — backward-compatible default")
+    void sort_null_defaults_to_desc() {
+        List<String> seededIds = seedFive("evt-", 3);
+
+        GenericQueryResult<NotificationView> result = notificationService.list(
+                ALICE, U, NotificationFilter.EMPTY, page10(), null);
+
+        assertThat(result.getItems()).extracting(NotificationView::id)
+                .containsExactly(seededIds.get(2), seededIds.get(1), seededIds.get(0));
+    }
+
+    @Test
+    @DisplayName("Given sort with an unsupported field but direction=ASC, when list is called, then the unknown field is ignored (warn) and ASC direction is still honored")
+    void sort_invalid_field_falls_back_to_direction_only() {
+        List<String> seededIds = seedFive("evt-", 3);
+
+        GenericQueryResult<NotificationView> result = notificationService.list(
+                ALICE, U, NotificationFilter.EMPTY, page10(),
+                SortInput.builder().field("severity").direction(SortDirection.ASC).build());
+
+        assertThat(result.getItems()).extracting(NotificationView::id)
+                .containsExactly(seededIds.get(0), seededIds.get(1), seededIds.get(2));
+    }
+
+    private List<String> seedFive(String titlePrefix, int count) {
+        List<String> ids = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            Notification n = mongoTemplate.save(NotificationFixtures.basic(titlePrefix + i));
+            readStateService.createForAudience(n.getId(), NotificationCategory.TICKETS, n.getTitle(),
+                    U, Set.of(ALICE));
+            ids.add(n.getId());
+            try {
+                Thread.sleep(2);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        return ids;
     }
 }
