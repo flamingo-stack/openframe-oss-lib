@@ -65,7 +65,7 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
   ({ className, userName = 'Grace "Fae" Meadows', userTitle = "Your Personal Assistant", userAvatar, userIcon, onSettingsClick, onNewChat, onClose, onBack, showNewChat = false, connectionStatus = 'disconnected', serverUrl = null, headerActions, ticketInfo, fullWidth = false, bare = false, ...props }, ref) => {
     const cardClasses = bare
       ? ""
-      : "rounded-md bg-ods-card shadow-[0_18px_48px_rgba(0,0,0,0.45)] border border-ods-border ring-1 ring-black/20"
+      : "rounded-md bg-ods-card border border-ods-border"
     return (
       <div
         ref={ref}
