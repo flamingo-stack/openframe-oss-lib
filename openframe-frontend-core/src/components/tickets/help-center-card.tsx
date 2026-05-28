@@ -15,6 +15,7 @@
  * is a SIBLING of the toggle button, not nested inside it.
  */
 
+import { useCallback, useRef } from 'react'
 import { StatusBadge, type StatusBadgeProps } from '../ui'
 import { formatRelativeTime } from '../../utils/date-utils'
 import { getStatusColorScheme } from '../chat/utils/agent-status-message'
@@ -72,6 +73,53 @@ export function HelpCenterCard({
   const isExpandable = !optimistic
   const isExpanded = expanded && isExpandable
 
+  // Scroll the clicked card to the top of the viewport on every click.
+  //
+  // Cross-row gotcha: if ANOTHER row above this one is currently
+  // expanded, its drawer is about to collapse simultaneously with
+  // our toggle. The collapse shrinks the page above our row, so our
+  // row's final position is HIGHER than its current `rect.top`. If
+  // we call `scrollIntoView({behavior:'smooth'})` synchronously, the
+  // browser commits to scrolling to a Y that's based on our CURRENT
+  // position — but by the time the smooth-scroll completes, our row
+  // has shifted up by the collapsed drawer's height, and we end up
+  // above the viewport.
+  //
+  // Fix: pre-compute the FINAL target Y by subtracting the
+  // soon-to-collapse drawer's height from our current top. We look
+  // up the currently-expanded sibling's drawer (`#help-center-drawer-{id}`)
+  // and check whether it's above us in the layout. If yes, its
+  // height will disappear → our row will shift up by that amount →
+  // we subtract it from the target Y. `window.scrollTo({top, behavior:'smooth'})`
+  // commits to that single pixel value and the browser animates
+  // there cleanly, independent of the collapse animation.
+  //
+  // `scroll-mt-24` on the outer div = 96px chrome offset so the tile
+  // lands just below the sticky page header.
+  const rowRef = useRef<HTMLDivElement | null>(null)
+  const handleClick = useCallback(() => {
+    if (!rowRef.current) {
+      onToggle(ticket.id)
+      return
+    }
+    const myRect = rowRef.current.getBoundingClientRect()
+    // Drawer-above adjustment: if there's a currently-expanded row
+    // ABOVE us, its drawer is about to collapse — pre-subtract its
+    // height from our target Y so we land at the FINAL position.
+    let drawerHeightAbove = 0
+    const expandedDrawer = document.querySelector('div[id^="help-center-drawer-"]')
+    if (expandedDrawer instanceof HTMLElement) {
+      const drawerRect = expandedDrawer.getBoundingClientRect()
+      if (drawerRect.bottom <= myRect.top) {
+        drawerHeightAbove = drawerRect.height
+      }
+    }
+    const HEADER_OFFSET = 96 // matches `scroll-mt-24` (6rem)
+    const targetY = myRect.top + window.scrollY - HEADER_OFFSET - drawerHeightAbove
+    onToggle(ticket.id)
+    window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' })
+  }, [onToggle, ticket.id])
+
   const rightBadges = (
     <>
       <StatusBadge
@@ -93,12 +141,13 @@ export function HelpCenterCard({
 
   return (
     <div
-      className={`border-b border-ods-border last:border-b-0 ${optimistic ? 'opacity-60' : ''}`}
+      ref={rowRef}
+      className={`scroll-mt-24 border-b border-ods-border last:border-b-0 ${optimistic ? 'opacity-60' : ''}`}
       aria-busy={optimistic || undefined}
     >
       <button
         type="button"
-        onClick={isExpandable ? () => onToggle(ticket.id) : undefined}
+        onClick={isExpandable ? handleClick : undefined}
         disabled={!isExpandable}
         aria-expanded={isExpandable ? isExpanded : undefined}
         aria-controls={isExpanded ? `help-center-drawer-${ticket.id}` : undefined}

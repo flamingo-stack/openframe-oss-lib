@@ -264,7 +264,15 @@ function HelpCenterListAuthed({
               />
             )
           ) : (
-            <div className="bg-ods-card border border-ods-border rounded-[6px] overflow-hidden w-full">
+            // `overflow-clip` (NOT `overflow-hidden`) — both visually
+            // clip the rounded corners, but `hidden` makes the element
+            // a "scroll container" per CSSOM spec, which causes
+            // `scrollIntoView` calls inside (`<HelpCenterCard>` click
+            // handlers) to try scrolling THIS div (can't, overflow
+            // hidden) instead of bubbling up to the window. `clip`
+            // keeps the visual clip but NOT the scroll-container
+            // status, so click-to-scroll actually moves the page.
+            <div className="bg-ods-card border border-ods-border rounded-[6px] overflow-clip w-full">
               {merged.map((ticket) => (
                 <HelpCenterCard
                   key={ticket.id}
