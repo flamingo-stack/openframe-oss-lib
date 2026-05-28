@@ -38,7 +38,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class ScriptServiceImplTest {
+class ScriptServiceTest {
 
     private static final String TENANT_ID = "tenant-1";
     private static final String OTHER_TENANT_ID = "tenant-2";
@@ -51,7 +51,7 @@ class ScriptServiceImplTest {
     private ScriptMapper scriptMapper;
 
     @InjectMocks
-    private ScriptServiceImpl scriptService;
+    private ScriptService scriptService;
 
     private CreateScriptInput createInput;
     private UpdateScriptInput updateInput;
