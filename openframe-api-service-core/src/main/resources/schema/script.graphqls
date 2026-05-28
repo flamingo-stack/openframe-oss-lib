@@ -1,0 +1,98 @@
+# GraphQL schema for RMM Script CRUD.
+#
+# Tenant scoping is implicit — the resolver extracts the tenant from the
+# authenticated principal, so clients never specify or see tenantId.
+
+extend type Query {
+    """Get a single script by id within the current tenant."""
+    script(id: ID!): Script
+
+    """Paginated list of scripts within the current tenant."""
+    scripts(page: Int, size: Int): ScriptPage!
+}
+
+extend type Mutation {
+    """Create a new script. Returns the created script with its server-assigned id."""
+    createScript(input: CreateScriptInput!): Script!
+
+    """Apply a partial update to an existing script (PATCH semantics — only non-null fields are applied)."""
+    updateScript(id: ID!, input: UpdateScriptInput!): Script!
+
+    """Permanently delete a script. Returns true on success (also true if the script does not exist)."""
+    deleteScript(id: ID!): Boolean!
+}
+
+enum ScriptShell {
+    POWERSHELL
+    CMD
+    BASH
+    PYTHON
+    NUSHELL
+    SHELL
+}
+
+enum ScriptPlatform {
+    WINDOWS
+    LINUX
+    MACOS
+}
+
+type Script {
+    id: ID!
+    name: String!
+    description: String
+    shell: ScriptShell!
+    scriptBody: String!
+    tag: String
+    supportedPlatforms: [ScriptPlatform!]
+    defaultTimeoutSeconds: Int
+    defaultArgs: [String!]
+    envVars: [ScriptEnvVar!]
+    createdAt: Instant
+    updatedAt: Instant
+}
+
+type ScriptEnvVar {
+    name: String!
+    value: String
+    secret: Boolean!
+}
+
+type ScriptPage {
+    items: [Script!]!
+    page: Int!
+    size: Int!
+    totalElements: Long!
+    totalPages: Int!
+    hasNext: Boolean!
+}
+
+input CreateScriptInput {
+    name: String!
+    description: String
+    shell: ScriptShell!
+    scriptBody: String!
+    tag: String
+    supportedPlatforms: [ScriptPlatform!]
+    defaultTimeoutSeconds: Int
+    defaultArgs: [String!]
+    envVars: [ScriptEnvVarInput!]
+}
+
+input UpdateScriptInput {
+    name: String
+    description: String
+    shell: ScriptShell
+    scriptBody: String
+    tag: String
+    supportedPlatforms: [ScriptPlatform!]
+    defaultTimeoutSeconds: Int
+    defaultArgs: [String!]
+    envVars: [ScriptEnvVarInput!]
+}
+
+input ScriptEnvVarInput {
+    name: String!
+    value: String
+    secret: Boolean!
+}

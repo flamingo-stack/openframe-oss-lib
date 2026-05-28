@@ -12,8 +12,6 @@ import com.openframe.api.dto.script.UpdateScriptInput;
  * resolver or REST controller) is responsible for extracting {@code tenantId}
  * from the authenticated principal and passing it in. This keeps the service
  * layer free of security-context coupling and makes it trivially unit-testable.
- *
- * <p>Soft delete is the default removal semantics — see {@link #delete(String, String)}.
  */
 public interface ScriptService {
 
@@ -34,8 +32,7 @@ public interface ScriptService {
     ScriptResponse get(String tenantId, String id);
 
     /**
-     * Paginated list of all scripts in the tenant, including soft-deleted
-     * ones. Status-based filtering will be added when the UI requires it.
+     * Paginated list of all scripts in the tenant.
      */
     ScriptPageResponse list(String tenantId, int page, int size);
 
@@ -51,15 +48,9 @@ public interface ScriptService {
     ScriptResponse update(String tenantId, String id, UpdateScriptInput input);
 
     /**
-     * Soft-delete a script: status is transitioned to {@code DELETED} and
-     * {@code statusChangedAt} is set, but the document itself remains so that
-     * historic execution records continue to resolve.
-     *
-     * <p>Hard delete (physical removal) is intentionally not exposed here yet —
-     * the repository supports it for future admin / tenant-cleanup tooling.
-     *
-     * @throws com.openframe.core.exception.NotFoundException if the script
-     *         does not exist in the tenant.
+     * Permanently remove a script from the tenant. Idempotent: a no-op when
+     * the script does not exist in this tenant (the call simply logs and
+     * returns).
      */
     void delete(String tenantId, String id);
 }

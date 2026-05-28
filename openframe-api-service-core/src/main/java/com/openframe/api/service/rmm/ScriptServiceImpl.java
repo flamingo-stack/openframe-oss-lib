@@ -28,7 +28,6 @@ import java.util.List;
  * <ul>
  *   <li>uniqueness validation on name (create + update)</li>
  *   <li>rejecting secret env vars until the secret pipeline lands</li>
- *   <li>soft-delete bookkeeping (status + statusChangedAt)</li>
  * </ul>
  */
 @Slf4j
@@ -88,8 +87,12 @@ public class ScriptServiceImpl implements ScriptService {
 
     @Override
     public void delete(String tenantId, String id) {
-        scriptRepository.deleteByTenantIdAndId(tenantId, id);
-        log.info("Soft-deleted script id={} tenantId={}", id, tenantId);
+        long removed = scriptRepository.deleteByTenantIdAndId(tenantId, id);
+        if (removed == 0) {
+            log.debug("Delete script id={} tenantId={} — nothing removed (not found)", id, tenantId);
+        } else {
+            log.info("Deleted script id={} tenantId={}", id, tenantId);
+        }
     }
 
     private Script loadOrThrow(String tenantId, String id) {
