@@ -1,0 +1,5 @@
+flowchart TD
+    Startup --> Initializers
+    Initializers --> StreamsReady
+    StreamsReady --> Schedulers
+    Schedulers --> ExternalSystems

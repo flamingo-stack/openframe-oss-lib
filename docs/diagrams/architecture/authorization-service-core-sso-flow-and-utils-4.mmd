@@ -1,0 +1,8 @@
+flowchart TD
+    Cookie["Registration Cookie"] --> Decode["Decode Tenant Payload"]
+    Oidc["OIDC User"] --> Email["Resolve Email"]
+    Decode --> Validate["Validate Tenant Name and Domain"]
+    Email --> BuildReq["Build TenantRegistrationRequest"]
+    Validate --> BuildReq
+    BuildReq --> Register["TenantRegistrationService.registerTenant"]
+    Register --> Redirect["Clear Cookie and Redirect"]

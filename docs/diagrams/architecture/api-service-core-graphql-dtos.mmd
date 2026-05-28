@@ -1,0 +1,7 @@
+flowchart TD
+    Client["GraphQL Client"] --> Schema["GraphQL Schema"]
+    Schema --> DataFetcher["GraphQL Data Fetchers"]
+    DataFetcher --> Dtos["Api Service Core Graphql Dtos"]
+    Dtos --> Services["Core Services"]
+    Services --> Repositories["Mongo Repositories"]
+    Repositories --> Database[("Database")]

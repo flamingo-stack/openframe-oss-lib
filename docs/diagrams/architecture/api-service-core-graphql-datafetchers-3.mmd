@@ -1,0 +1,8 @@
+flowchart LR
+    Query["devices query"] --> DeviceFetcher
+    DeviceFetcher --> DeviceService
+    DeviceFetcher --> MachineNode["Machine"]
+    MachineNode -->|"tags"| TagLoader
+    MachineNode -->|"installedAgents"| AgentLoader
+    TagLoader --> TagService
+    AgentLoader --> InstalledAgentService

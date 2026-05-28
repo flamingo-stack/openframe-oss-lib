@@ -1,0 +1,15 @@
+flowchart TD
+    Client["Client / Browser / Agent"] --> Gateway["Gateway Service Core"]
+    Gateway --> ExternalAPI["External API Service"]
+    Gateway --> ApiCore["API Service Core"]
+
+    ApiCore --> Authz["Authorization Service Core"]
+    ApiCore --> Stream["Stream Service Core"]
+    ApiCore --> Management["Management Service Core"]
+
+    Authz --> Mongo["MongoDB"]
+    ApiCore --> Mongo
+    Stream --> Kafka["Kafka"]
+    Stream --> Pinot["Pinot"]
+    ApiCore --> Redis["Redis"]
+    Management --> NATS["NATS"]

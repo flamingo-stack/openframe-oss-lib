@@ -1,0 +1,10 @@
+sequenceDiagram
+    participant Browser
+    participant BFF
+    participant AuthServer
+
+    Browser->>BFF: GET /oauth/login
+    BFF->>AuthServer: Redirect with PKCE
+    AuthServer->>BFF: Callback with code
+    BFF->>AuthServer: Exchange code
+    BFF->>Browser: Set cookies

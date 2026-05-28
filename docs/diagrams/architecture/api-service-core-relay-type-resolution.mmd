@@ -1,0 +1,14 @@
+flowchart TD
+    Client["GraphQL Client"] --> Query["GraphQL Query"]
+    Query --> DGS["DGS Runtime"]
+    DGS --> Resolver["Type Resolver"]
+    Resolver --> DomainObj["Domain Object"]
+    DomainObj --> GraphQLType["GraphQL Type Name"]
+
+    subgraph relay_layer["Relay Type Resolution Layer"]
+        Resolver
+    end
+
+    subgraph domain_layer["Mongo Domain Model"]
+        DomainObj
+    end

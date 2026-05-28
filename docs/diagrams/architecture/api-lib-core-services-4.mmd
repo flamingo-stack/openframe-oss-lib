@@ -1,0 +1,5 @@
+flowchart TD
+    API["API Layer"] --> TicketService["TicketQueryService"]
+    TicketService --> QueryFilter["TicketQueryFilter"]
+    TicketService --> Repo["TicketRepository"]
+    Repo --> Mongo[("MongoDB")]

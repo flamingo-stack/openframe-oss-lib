@@ -1,0 +1,5 @@
+flowchart TD
+    Persist["Persist Notification"] --> Durable["Durable Storage"]
+    Durable --> RealTime["Real-Time Publish"]
+
+    RealTime -->|"failure"| CatchUp["Client Catch-Up via API"]

@@ -1,0 +1,7 @@
+flowchart TD
+    Browser --> AuthController["Auth Controllers"]
+    AuthController --> TenantContext["TenantContextFilter"]
+    TenantContext --> AuthServer["AuthorizationServerConfig"]
+    AuthServer --> TenantKeyService["TenantKeyService"]
+    TenantKeyService --> Mongo
+    AuthServer --> JWT["Signed JWT"]

@@ -1,0 +1,9 @@
+sequenceDiagram
+    participant Browser
+    participant BFF
+    participant Auth as Authorization Server
+
+    Browser->>BFF: POST /oauth/refresh
+    BFF->>Auth: Refresh token request
+    Auth->>BFF: New tokens
+    BFF->>Browser: Set new cookies

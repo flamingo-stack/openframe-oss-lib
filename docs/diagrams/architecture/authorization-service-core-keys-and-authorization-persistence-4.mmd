@@ -1,0 +1,5 @@
+flowchart TD
+    SaveCall["Save Authorization"] --> ExtractPkce["Extract PKCE Parameters"]
+    ExtractPkce --> MapEntity["Map to Mongo Entity"]
+    MapEntity --> Persist["Save to Mongo"]
+    Persist --> Verify["Debug Verify PKCE"]

@@ -1,0 +1,5 @@
+flowchart TD
+    ConfigProps[KafkaTopicProperties] --> AdminBean[KafkaAdmin]
+    AdminBean --> TopicBuilder
+    TopicBuilder --> NewTopic
+    NewTopic --> KafkaCluster

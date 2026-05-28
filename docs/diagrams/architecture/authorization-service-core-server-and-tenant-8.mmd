@@ -1,0 +1,9 @@
+flowchart TD
+    Step1["Incoming Request"] --> Step2["TenantContextFilter Resolves Tenant"]
+    Step2 --> Step3{{"OAuth2 Endpoint?"}}
+    Step3 -->|"Yes"| Step4["AuthorizationServerConfig"]
+    Step3 -->|"No"| Step5["SecurityConfig"]
+    Step4 --> Step6["JWT Issued with Tenant Claims"]
+    Step5 --> Step7["Authenticated Session or SSO"]
+    Step6 --> EndNode["Response"]
+    Step7 --> EndNode

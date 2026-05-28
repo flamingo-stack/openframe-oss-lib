@@ -1,0 +1,5 @@
+flowchart LR
+    AppService[Application Service] --> KafkaInfra[Data Kafka Configuration And Retry]
+    KafkaInfra --> KafkaCluster[Kafka Cluster]
+    KafkaCluster --> StreamService[Stream Service Core]
+    KafkaCluster --> OtherConsumers[Other Consumers]

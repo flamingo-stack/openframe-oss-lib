@@ -1,0 +1,5 @@
+flowchart TD
+    Tick["Scheduled Tick"] --> ClientCheck["Check Client PublishState"]
+    ClientCheck --> RetryClient["Publish If Needed"]
+    Tick --> AgentCheck["Check Tool Agents"]
+    AgentCheck --> RetryAgent["Publish If Needed"]

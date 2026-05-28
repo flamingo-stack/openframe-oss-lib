@@ -1,0 +1,4 @@
+flowchart TD
+    Tenant["Tenant Document"] --> TenantRepo["BaseTenantRepository"]
+    TenantRepo --> DomainLookup["Domain-Based Resolution"]
+    DomainLookup --> AuthLayer["Authorization & SSO"]

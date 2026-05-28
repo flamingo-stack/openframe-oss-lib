@@ -1,0 +1,5 @@
+flowchart TD
+    Admin["Admin"] --> Controller["SSOConfigController"]
+    Controller --> Service["SSOConfigService"]
+    Service --> Strategy["Provider Strategy"]
+    Strategy --> Provider["Google / Microsoft"]
