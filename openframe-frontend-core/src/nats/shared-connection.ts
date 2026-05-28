@@ -185,8 +185,6 @@ export function startConnectionLifecycle(options: ConnectionLifecycleOptions): C
   function scheduleRetry() {
     if (closed) return
     if (getSharedConnectionFor(wsUrl) !== conn) return
-    // Opportunistically claim ownership if vacant — covers the case where a previous
-    // owner unmounted while we're still alive.
     if (!conn.retryOwner) conn.retryOwner = ownerToken
     if (conn.retryOwner !== ownerToken) return
 
@@ -254,10 +252,6 @@ export function startConnectionLifecycle(options: ConnectionLifecycleOptions): C
     }
   })
 
-  // If the client was already connected when we attached, the status loop won't emit a
-  // fresh 'connected' event — synthesize one so a late-attaching consumer learns about
-  // the live connection (otherwise its onConnect/hadConnectionBefore stays unset and
-  // gates like "did we ever connect" stay false until the first reconnect cycle).
   if (conn.client.isConnected()) {
     emitSynthetic('connected')
   }
@@ -269,9 +263,7 @@ export function startConnectionLifecycle(options: ConnectionLifecycleOptions): C
     } catch {
       conn.connectPromise = null
       if (closed) return
-      // The underlying client emits 'connecting' before throwing but never 'closed' on
-      // initial-connect rejection — without this synthetic event the consumer would not
-      // learn about the failure (no onDisconnect, no isConnected=false transition).
+
       emitSynthetic('disconnected')
       scheduleRetry()
     }

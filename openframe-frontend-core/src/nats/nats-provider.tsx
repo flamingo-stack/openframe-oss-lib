@@ -16,7 +16,7 @@ export interface NatsProviderProps {
   children: React.ReactNode
   /** Return the current NATS WebSocket URL (or null when not yet available, e.g. unauthenticated). */
   getWsUrl: () => string | null
-  /** Called before each reconnect attempt; use to refresh auth tokens. */
+  /** Called before each reconnect attempt. */
   onBeforeReconnect?: () => Promise<void> | void
   clientConfig?: AcquireClientOptions
   reconnectionBackoff?: NatsReconnectionBackoff

@@ -13,7 +13,6 @@ export interface Notification {
   read?: boolean
   settled?: boolean
   severity?: NotificationSeverity
-  /** Free-form category tag (e.g. backend NotificationCategory enum value). */
   category?: string
   meta?: Record<string, unknown>
 }

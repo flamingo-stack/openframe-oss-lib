@@ -43,10 +43,6 @@ export interface NotificationsProviderProps {
   defaultShowPopups?: boolean
   onShowPopupsChange?: (value: boolean) => void
   onHistoryClick?: () => void
-  /**
-   * Persistence callbacks fired after the local reducer applies a change.
-   * Local state always updates first (optimistic); callbacks decide how to persist.
-   */
   actions?: NotificationsActions
 }
 
@@ -66,9 +62,7 @@ function mergeNotification(base: Notification, incoming: Notification): Notifica
     const value = incoming[key]
     if (value !== undefined) (out as unknown as Record<string, unknown>)[key] = value
   }
-  // Preserve locally-applied terminal flags: addNotification/upsertNotification normalize
-  // read to false on every dispatch, so a defined `read: false` from a live event must not
-  // downgrade a notification the user already marked read.
+
   out.read = (incoming.read ?? false) || (base.read ?? false) || false
   out.settled = (incoming.settled ?? false) || (base.settled ?? false) || false
   return out
@@ -80,7 +74,6 @@ function reducer(state: Notification[], action: Action): Notification[] {
       const existing = state.find((n) => n.id === action.notification.id)
       if (existing) {
         const merged = mergeNotification(existing, action.notification)
-        // Bubble the (re-)added notification to the top so live events surface in the drawer.
         return [merged, ...state.filter((n) => n.id !== action.notification.id)]
       }
       const next = [action.notification, ...state]
@@ -90,8 +83,6 @@ function reducer(state: Notification[], action: Action): Notification[] {
       const existing = state.find((n) => n.id === action.notification.id)
       if (existing) {
         const merged = mergeNotification(existing, action.notification)
-        // Stable position for upsert — used to reconcile authoritative server data without
-        // reordering the list out from under the user.
         return state.map((n) => (n.id === action.notification.id ? merged : n))
       }
       const next = [action.notification, ...state]
