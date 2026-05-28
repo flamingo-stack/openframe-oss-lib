@@ -1,0 +1,5 @@
+flowchart TB
+    UI["Frontend / Client"] --> API["API Layer"]
+    API --> Module1["Module 1 DTOs"]
+    API --> Module2["Module 2 Filter & Option DTOs"]
+    Module1 --> Storage["Persistence Layer"]

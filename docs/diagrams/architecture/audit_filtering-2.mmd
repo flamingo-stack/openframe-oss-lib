@@ -1,0 +1,5 @@
+flowchart LR
+    LogFilters["LogFilters"] --> OrgOption["OrganizationFilterOption"]
+    LogFilters --> Criteria["LogFilterCriteria"]
+    Criteria --> LogEvent["LogEvent"]
+    LogEvent --> LogDetails["LogDetails"]

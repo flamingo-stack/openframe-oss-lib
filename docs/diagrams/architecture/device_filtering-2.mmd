@@ -1,0 +1,7 @@
+flowchart TD
+    A["DeviceFilterCriteria"] --> B["Device Query Execution"]
+    B --> C["Filtered Device List"]
+    C --> D["Aggregation Logic"]
+    D --> E["DeviceFilterOption Lists"]
+    E --> F["DeviceFilters"]
+    F --> G["API Response"]

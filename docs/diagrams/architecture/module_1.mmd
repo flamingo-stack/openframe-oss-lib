@@ -1,0 +1,10 @@
+flowchart TD
+    Controller["API Controller"] --> Service["Application Service"]
+    Service --> Repository["Repository Layer"]
+
+    Repository --> QueryResult["GenericQueryResult<T>"]
+    QueryResult --> CountedResult["CountedGenericQueryResult<T>"]
+
+    Service --> LogEventDTO["LogEvent"]
+    Service --> LogDetailsDTO["LogDetails"]
+    Controller --> LogFilter["LogFilterCriteria"]

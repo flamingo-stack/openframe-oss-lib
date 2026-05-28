@@ -1,0 +1,6 @@
+flowchart TD
+    UI["Audit Dashboard UI"] --> FilterDTO["LogFilters"]
+    FilterDTO --> Criteria["LogFilterCriteria"]
+    Criteria --> Service["Audit Query Service"]
+    Service --> Repository["Audit Log Repository"]
+    Repository --> Result["CountedGenericQueryResult<LogEvent>"]

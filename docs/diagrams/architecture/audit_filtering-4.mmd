@@ -1,0 +1,6 @@
+flowchart TD
+    Request["Incoming Log Query"] --> OrgCheck{"Organizations Selected?"}
+    OrgCheck -->|"Yes"| Scoped["Apply Organization WHERE Clause"]
+    OrgCheck -->|"No"| DefaultScope["Apply User Default Organization"]
+    Scoped --> Execute["Execute Query"]
+    DefaultScope --> Execute

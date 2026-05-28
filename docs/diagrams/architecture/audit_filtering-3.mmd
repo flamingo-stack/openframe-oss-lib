@@ -1,0 +1,11 @@
+sequenceDiagram
+    participant User
+    participant UI
+    participant Service
+    participant Database
+
+    User->>UI: Select toolTypes, severities, organizations
+    UI->>Service: Submit LogFilters
+    Service->>Database: Execute filtered query
+    Database-->>Service: Return matching LogEvent rows
+    Service-->>UI: Return CountedGenericQueryResult

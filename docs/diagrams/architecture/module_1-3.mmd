@@ -1,0 +1,6 @@
+flowchart LR
+    LogStore["Audit Log Storage"] --> SummaryQuery["Summary Query"]
+    LogStore --> DetailsQuery["Details Query"]
+
+    SummaryQuery --> LogEventDTO["LogEvent"]
+    DetailsQuery --> LogDetailsDTO["LogDetails"]

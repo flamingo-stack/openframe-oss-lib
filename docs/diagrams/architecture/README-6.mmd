@@ -1,10 +1,12 @@
-flowchart LR
-    Api["API Layer"] --> Mongo
-    Api --> Redis
-    Api --> Pinot
+sequenceDiagram
+    participant Client
+    participant API as "API Controller"
+    participant Service as "Filtering Service"
+    participant DB as "Database"
 
-    Stream --> Cassandra
-    Stream --> Kafka
-
-    Management --> Pinot
-    Management --> Kafka
+    Client->>API: Submit Filter Criteria DTO
+    API->>Service: Pass criteria
+    Service->>DB: Execute filtered query
+    DB->>Service: Return records + counts
+    Service->>API: Wrap with Query Result DTO
+    API->>Client: JSON response

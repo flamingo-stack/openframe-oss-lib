@@ -1,0 +1,6 @@
+flowchart TD
+    Client["Client Application"] --> Controller["Log Controller"]
+    Controller --> Criteria["LogFilterCriteria"]
+    Criteria --> Service["Log Service"]
+    Service --> QueryEngine["Query Engine"]
+    QueryEngine --> Result["CountedGenericQueryResult<LogEvent>"]

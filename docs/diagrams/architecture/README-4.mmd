@@ -1,12 +1,6 @@
-flowchart TD
-    Agent["Endpoint Agent"] --> Auth["AgentAuthController"]
-    Agent --> Register["AgentController"]
-    Agent --> NATS["NATS Events"]
+flowchart LR
+    LogStorage["Audit Log Storage"] --> SummaryQuery["Summary Query"]
+    LogStorage --> DetailsQuery["Details Query"]
 
-    NATS --> Installed["InstalledAgentListener"]
-    NATS --> ToolConn["ToolConnectionListener"]
-    NATS --> Heartbeat["MachineHeartbeatListener"]
-
-    Installed --> Mongo
-    ToolConn --> Mongo
-    Heartbeat --> Mongo
+    SummaryQuery --> LogEventDTO["LogEvent"]
+    DetailsQuery --> LogDetailsDTO["LogDetails"]

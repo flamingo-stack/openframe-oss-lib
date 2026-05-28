@@ -1,0 +1,12 @@
+sequenceDiagram
+    participant Client
+    participant API as "API Controller"
+    participant Service as "Filtering Service"
+    participant DB as "Database"
+
+    Client->>API: POST /devices/filter with DeviceFilterCriteria
+    API->>Service: Pass criteria DTO
+    Service->>DB: Query with filters
+    DB->>Service: Return filtered records + counts
+    Service->>API: Return DeviceFilters + results
+    API->>Client: JSON response

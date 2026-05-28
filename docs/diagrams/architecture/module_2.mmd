@@ -1,0 +1,7 @@
+flowchart LR
+    Client["Frontend Client"] -->|"Filter Request"| ApiLayer["API Controller"]
+    ApiLayer -->|"Uses"| Module2["Module 2 DTOs"]
+    Module2 -->|"Passed to"| ServiceLayer["Filtering Service"]
+    ServiceLayer -->|"Queries"| DataLayer[("Database")]
+    ServiceLayer -->|"Returns results"| ApiLayer
+    ApiLayer -->|"Wraps with results"| Client

@@ -1,0 +1,7 @@
+flowchart LR
+    Client["Frontend Client"] -->|"DeviceFilterCriteria"| Controller["Device Controller"]
+    Controller -->|"Apply Filters"| Service["Device Service"]
+    Service -->|"Query"| Repository["Device Repository"]
+    Repository -->|"Results"| Service
+    Service -->|"DeviceFilters + Devices"| Controller
+    Controller -->|"Response"| Client

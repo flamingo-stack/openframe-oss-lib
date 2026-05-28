@@ -1,0 +1,7 @@
+flowchart LR
+    Status["Status Facet"] --> Combined["Combined Query"]
+    Type["Device Type Facet"] --> Combined
+    OS["OS Facet"] --> Combined
+    Org["Organization Facet"] --> Combined
+    Tags["Tag Facet"] --> Combined
+    Combined --> Result["Filtered Devices"]

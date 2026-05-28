@@ -1,27 +1,15 @@
 flowchart TD
-    Client["Browser / External System"] --> Gateway["Gateway Service Core"]
-    Agent["Client Agent"] --> Gateway
+    Client["Frontend / API Consumer"] --> Controller["API Controller"]
+    Controller --> Service["Application Service"]
+    Service --> Repository["Repository Layer"]
 
-    Gateway --> Auth["Authorization Service Core"]
-    Gateway --> Api["API Service Core"]
-    Gateway --> External["External API Service Core"]
+    Repository --> QueryResult["GenericQueryResult<T>"]
+    QueryResult --> CountedResult["CountedGenericQueryResult<T>"]
 
-    Api --> Contracts["API Lib Contracts"]
-    External --> Contracts
+    Controller --> FilterCriteria["Filter Criteria DTOs"]
+    Service --> FilterOptions["Filter Option DTOs"]
 
-    Api --> Mongo["Mongo Persistence Layer"]
-    Api --> DataCore["Data Platform Core"]
-
-    DataCore --> Cassandra["Cassandra"]
-    DataCore --> Pinot["Apache Pinot"]
-    DataCore --> Kafka["Kafka Messaging Layer"]
-    DataCore --> Redis["Redis Caching Layer"]
-
-    Kafka --> Stream["Stream Processing Service Core"]
-    Stream --> Cassandra
-    Stream --> Kafka
-
-    Management["Management Service Core"] --> Kafka
-    Management --> Pinot
-    Management --> Mongo
-    Management --> NATS["NATS Streams"]
+    FilterCriteria --> Service
+    Service --> CountedResult
+    CountedResult --> Controller
+    Controller --> Client

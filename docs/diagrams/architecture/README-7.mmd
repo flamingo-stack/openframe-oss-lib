@@ -1,0 +1,8 @@
+flowchart TB
+    UI["Frontend Applications"] --> API["OpenFrame API"]
+    API --> Module1["Module 1 DTOs"]
+    API --> Module2["Module 2 DTOs"]
+
+    Module2 --> Module1
+    Module1 --> Services["Business Services"]
+    Services --> Database["Persistence Layer"]
