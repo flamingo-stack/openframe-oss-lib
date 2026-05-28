@@ -18,6 +18,7 @@
 import { useCallback, useRef } from 'react'
 import { StatusBadge, type StatusBadgeProps } from '../ui'
 import { formatRelativeTime } from '../../utils/date-utils'
+import { scrollElementIntoView } from '../../utils/scroll-into-view'
 import { getStatusColorScheme } from '../chat/utils/agent-status-message'
 import { DevCardRowContent } from '../shared/dev-section/dev-card-row'
 import {
@@ -26,6 +27,11 @@ import {
 } from './ticket-detail-drawer'
 import type { AnyTicket } from './types'
 import { isOptimistic } from './types'
+
+/** `scroll-mt-24` (Tailwind `scroll-margin-top: 6rem`) on the outer
+ *  wrapper offsets for the sticky page chrome. The 96px below matches
+ *  it for the explicit `window.scrollTo` path. */
+const STICKY_HEADER_OFFSET_PX = 96
 
 export interface HelpCenterCardProps {
   ticket: AnyTicket
@@ -73,51 +79,37 @@ export function HelpCenterCard({
   const isExpandable = !optimistic
   const isExpanded = expanded && isExpandable
 
-  // Scroll the clicked card to the top of the viewport on every click.
+  // Scroll-on-click — delegates to the canonical `scrollElementIntoView`
+  // helper with a cross-row layout-shift `adjustTargetY` callback. The
+  // helper owns the smooth-scroll mechanics + sticky-chrome offset; we
+  // pass the consumer-specific knowledge ("a sibling drawer above me
+  // is about to collapse — subtract its height from the target Y").
   //
   // Cross-row gotcha: if ANOTHER row above this one is currently
-  // expanded, its drawer is about to collapse simultaneously with
-  // our toggle. The collapse shrinks the page above our row, so our
-  // row's final position is HIGHER than its current `rect.top`. If
-  // we call `scrollIntoView({behavior:'smooth'})` synchronously, the
-  // browser commits to scrolling to a Y that's based on our CURRENT
-  // position — but by the time the smooth-scroll completes, our row
-  // has shifted up by the collapsed drawer's height, and we end up
-  // above the viewport.
-  //
-  // Fix: pre-compute the FINAL target Y by subtracting the
-  // soon-to-collapse drawer's height from our current top. We look
-  // up the currently-expanded sibling's drawer (`#help-center-drawer-{id}`)
-  // and check whether it's above us in the layout. If yes, its
-  // height will disappear → our row will shift up by that amount →
-  // we subtract it from the target Y. `window.scrollTo({top, behavior:'smooth'})`
-  // commits to that single pixel value and the browser animates
-  // there cleanly, independent of the collapse animation.
-  //
-  // `scroll-mt-24` on the outer div = 96px chrome offset so the tile
-  // lands just below the sticky page header.
+  // expanded, its drawer collapses simultaneously with our toggle.
+  // The collapse shrinks the page above our row → our final Y is
+  // HIGHER than the current `rect.top`. By pre-subtracting the
+  // collapsing drawer's height we land at the post-shift position
+  // cleanly, without scrollIntoView's mid-animation drift.
   const rowRef = useRef<HTMLDivElement | null>(null)
   const handleClick = useCallback(() => {
-    if (!rowRef.current) {
-      onToggle(ticket.id)
-      return
-    }
-    const myRect = rowRef.current.getBoundingClientRect()
-    // Drawer-above adjustment: if there's a currently-expanded row
-    // ABOVE us, its drawer is about to collapse — pre-subtract its
-    // height from our target Y so we land at the FINAL position.
-    let drawerHeightAbove = 0
-    const expandedDrawer = document.querySelector('div[id^="help-center-drawer-"]')
-    if (expandedDrawer instanceof HTMLElement) {
-      const drawerRect = expandedDrawer.getBoundingClientRect()
-      if (drawerRect.bottom <= myRect.top) {
-        drawerHeightAbove = drawerRect.height
-      }
-    }
-    const HEADER_OFFSET = 96 // matches `scroll-mt-24` (6rem)
-    const targetY = myRect.top + window.scrollY - HEADER_OFFSET - drawerHeightAbove
     onToggle(ticket.id)
-    window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' })
+    scrollElementIntoView(rowRef.current, {
+      headerOffset: STICKY_HEADER_OFFSET_PX,
+      adjustTargetY: (raw) => {
+        if (!rowRef.current) return raw
+        const expandedDrawer = document.querySelector(
+          'div[id^="help-center-drawer-"]',
+        )
+        if (!(expandedDrawer instanceof HTMLElement)) return raw
+        const drawerRect = expandedDrawer.getBoundingClientRect()
+        const myRect = rowRef.current.getBoundingClientRect()
+        // Only adjust when the drawer is ABOVE us. Drawers below us
+        // don't shift our position when they collapse.
+        if (drawerRect.bottom > myRect.top) return raw
+        return raw - drawerRect.height
+      },
+    })
   }, [onToggle, ticket.id])
 
   const rightBadges = (
