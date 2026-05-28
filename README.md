@@ -10,246 +10,284 @@
   <a href="LICENSE.md"><img alt="License" src="https://img.shields.io/badge/LICENSE-FLAMINGO%20AI%20Unified%20v1.0-%23FFC109?style=for-the-badge&labelColor=white"></a>
 </p>
 
-# OpenFrame OSS Libraries
+# OpenFrame OSS Lib
 
-**The complete backend foundation for AI-powered MSP platforms.** OpenFrame OSS Libraries provides all shared libraries and service cores needed to build scalable, multi-tenant, event-driven IT management infrastructure that powers the OpenFrame ecosystem.
+The foundational **API DTO library** for the OpenFrame platform - an AI-powered MSP platform that replaces expensive proprietary software with open-source alternatives enhanced by intelligent automation.
 
-[![OpenFrame v0.5.2: Live Demo of AI-Powered IT Management for MSPs](https://img.youtube.com/vi/a45pzxtg27k/maxresdefault.jpg)](https://www.youtube.com/watch?v=a45pzxtg27k)
+OpenFrame OSS Lib provides the **strongly typed, reusable contract layer** that standardizes communication between API controllers, service layers, persistence layers, and frontend clients across the entire OpenFrame ecosystem.
 
-## 🚀 What is OpenFrame OSS Lib?
+[![Watch What's New in OpenFrame 0.7.8](https://img.youtube.com/vi/BQAjDB4ED2Y/maxresdefault.jpg)](https://www.youtube.com/watch?v=BQAjDB4ED2Y)
 
-OpenFrame OSS Libraries is the **core backend runtime stack** that enables organizations to build production-ready MSP platforms with modern architecture patterns. It serves as the foundation for [OpenFrame](https://openframe.ai) – Flamingo's unified platform that replaces expensive proprietary software with open-source alternatives enhanced by intelligent automation.
+## Features
 
-**Key Capabilities:**
-- **Multi-tenant architecture** supporting thousands of MSP organizations
-- **Event-driven processing** with real-time data enrichment and normalization  
-- **AI-ready infrastructure** for intelligent automation and insights
-- **Enterprise-grade security** with OAuth2/OIDC compliance
-- **Scalable data platform** combining MongoDB, Cassandra, Redis, and Apache Pinot
+- **🔧 Type Safety** - Strongly typed DTOs with Lombok annotations for compile-time validation
+- **🔄 Generic Abstractions** - Reusable pagination and query result patterns across all endpoints
+- **🎯 Count-Aware Filtering** - Enhanced pagination with filtered totals for large datasets
+- **📊 Comprehensive Audit Logging** - Summary and detailed audit log representations
+- **🔍 Dynamic Filtering** - Faceted search and UI-driven filtering for audit logs and device inventory
+- **🏢 Multi-Tenant Support** - Organization-scoped filtering and tenant isolation
+- **📋 Contract-First Design** - API-first approach independent of implementation details
+- **⚡ Performance Optimized** - Lightweight DTOs designed for efficient serialization
 
-## ✨ Features
+## Quick Start
 
-### 🏗️ **Modular Service-Core Architecture**
-Built as a collection of focused service modules, each handling specific responsibilities like authentication, data persistence, event processing, and external integrations.
+Get up and running in just 5 minutes:
 
-### 🔐 **Enterprise Security**
-- Multi-tenant OAuth2 Authorization Server with per-tenant key pairs
-- JWT-based authentication with secure token management
-- API key management for external integrations
-- Role-based access control (RBAC) with fine-grained permissions
-- Reactive edge gateway with advanced security controls
+```bash
+# Clone the repository
+git clone https://github.com/openframe/openframe-oss-lib.git
+cd openframe-oss-lib
 
-### 📊 **Unified Data Platform**  
-- **MongoDB** for operational data storage and real-time state
-- **Apache Pinot** for real-time analytics and OLAP queries
-- **Cassandra** for audit log storage and time-series data
-- **Redis** for caching, session management, and distributed locking
+# Build and install
+mvn clean compile test install
+```
 
-### ⚡ **Event-Driven Architecture**
-- **Kafka messaging backbone** for reliable event processing
-- **NATS streams** for real-time agent communication
-- **Debezium CDC** for data synchronization across systems
-- **Stream processing engine** for data enrichment and normalization
+### Basic Usage
 
-### 🤖 **Client Agent Orchestration**
-- Agent registration and lifecycle management
-- Tool integration with popular MSP platforms
-- Real-time heartbeat monitoring and health checks
-- Automated deployment and version management
+```java
+// Generic paginated results
+GenericQueryResult<LogEvent> auditResults = GenericQueryResult.<LogEvent>builder()
+    .items(logEvents)
+    .pageInfo(pageInfo)
+    .build();
 
-### 🌐 **Comprehensive API Layer**
-- **REST APIs** for administrative operations and CRUD workflows
-- **GraphQL APIs** for efficient data querying and real-time updates
-- **External APIs** for third-party integrations and webhooks
-- **WebSocket support** for real-time communication
+// Count-aware filtered results
+CountedGenericQueryResult<LogEvent> filteredResults = 
+    CountedGenericQueryResult.<LogEvent>builder()
+        .items(logEvents)
+        .filteredCount(totalMatchingFilter)
+        .pageInfo(pageInfo)
+        .build();
 
-## 🏛️ Architecture Overview
+// Structured filtering
+LogFilterCriteria criteria = LogFilterCriteria.builder()
+    .startDate(LocalDate.now().minusDays(30))
+    .eventTypes(List.of("LOGIN", "EXPORT"))
+    .organizationIds(List.of("org-123"))
+    .build();
+```
 
-OpenFrame OSS Lib implements a layered, event-driven, multi-tenant architecture designed for horizontal scalability:
+## Technology Stack
+
+- **Java 8+** - Core language and runtime
+- **Maven** - Build and dependency management
+- **Lombok** - Annotation processing for boilerplate reduction
+- **Jackson** - JSON serialization/deserialization
+- **JUnit** - Testing framework
+- **SLF4J** - Logging abstraction
+
+## Architecture
+
+OpenFrame OSS Lib sits at the contract boundary between clients and backend services:
 
 ```mermaid
 flowchart TD
-    Client["Browser / External System"] --> Gateway["Gateway Service Core"]
-    Agent["Client Agent"] --> Gateway
-
-    Gateway --> Auth["Authorization Service Core"]
-    Gateway --> Api["API Service Core"]
-    Gateway --> External["External API Service Core"]
-
-    Api --> Contracts["API Lib Contracts"]
-    External --> Contracts
-
-    Api --> Mongo["Mongo Persistence Layer"]
-    Api --> DataCore["Data Platform Core"]
-
-    DataCore --> Cassandra["Cassandra"]
-    DataCore --> Pinot["Apache Pinot"]
-    DataCore --> Kafka["Kafka Messaging Layer"]
-    DataCore --> Redis["Redis Caching Layer"]
-
-    Kafka --> Stream["Stream Processing Service Core"]
-    Stream --> Cassandra
-    Stream --> Kafka
-
-    Management["Management Service Core"] --> Kafka
-    Management --> Pinot
-    Management --> Mongo
-    Management --> NATS["NATS Streams"]
+    Frontend["Frontend Applications<br/>Mingo AI • Fae"] --> API["API Controllers"]
+    API --> Service["Application Services"]  
+    Service --> Repository["Repository Layer"]
+    
+    Repository --> QueryResult["GenericQueryResult&lt;T&gt;"]
+    QueryResult --> CountedResult["CountedGenericQueryResult&lt;T&gt;"]
+    
+    API --> FilterCriteria["Filter Criteria DTOs<br/>Module 2"]
+    Service --> FilterOptions["Filter Option DTOs<br/>Module 2"]
+    
+    FilterCriteria --> Service
+    Service --> CountedResult
+    CountedResult --> API
+    API --> Frontend
+    
+    subgraph "OpenFrame OSS Lib"
+        Module1["Module 1<br/>Query Results & Audit Core"]
+        Module2["Module 2<br/>Audit & Device Filtering"]
+    end
+    
+    QueryResult -.-> Module1
+    CountedResult -.-> Module1
+    FilterCriteria -.-> Module2
+    FilterOptions -.-> Module2
+    
+    classDef frontend fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef api fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef dto fill:#FFC008,stroke:#333,stroke-width:2px,color:#000
+    classDef service fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    
+    class Frontend frontend
+    class API api
+    class QueryResult,CountedResult,FilterCriteria,FilterOptions dto
+    class Service,Repository service
 ```
 
-### **Architectural Characteristics**
-- ✅ **Multi-tenant by design** – Complete tenant isolation at all layers
-- ✅ **OAuth2 + OIDC compliant** – Enterprise identity and access management  
-- ✅ **Reactive edge gateway** – High-throughput request routing
-- ✅ **Event-driven processing** – Kafka + Debezium for reliable data flows
-- ✅ **Real-time enrichment** – Stream processing for intelligent data transformation
-- ✅ **Analytical storage** – Pinot + Cassandra for reporting and insights
-- ✅ **Distributed coordination** – Redis-backed locking and caching
+### Core Modules
 
-## 🏗️ Core Modules
+**Module 1 - Query Results & Audit Core:**
+- `GenericQueryResult<T>` - Standardized paginated response wrapper
+- `CountedGenericQueryResult<T>` - Count-aware filtered results
+- `LogEvent` & `LogDetails` - Audit log representations
+- `LogFilterCriteria` - Structured audit filtering
 
-### **API & Contracts**
-| Module | Purpose |
-|--------|---------|
-| **api-lib-contracts-and-services** | Shared DTOs, filters, mappers, and reusable services |
-| **api-service-core-controllers-and-graphql** | REST + GraphQL API orchestration layer |
+**Module 2 - Advanced Filtering:**
+- **Audit Filtering** - `LogFilters`, `OrganizationFilterOption`
+- **Device Filtering** - `DeviceFilterCriteria`, `DeviceFilters`, `DeviceFilterOption`
 
-### **Security & Identity**  
-| Module | Purpose |
-|--------|---------|
-| **authorization-service-core** | Multi-tenant OAuth2/OIDC Authorization Server |
-| **security-core-and-oauth-bff** | JWT infrastructure + OAuth BFF authentication flow |
-| **gateway-service-core** | Reactive edge gateway with JWT + API key validation |
+## Repository Structure
 
-### **Data & Infrastructure**
-| Module | Purpose |  
-|--------|---------|
-| **mongo-persistence-layer** | MongoDB document models + repositories |
-| **data-platform-core** | Cassandra + Pinot configuration + analytics repositories |
-| **kafka-messaging-layer** | Multi-tenant Kafka infrastructure and CDC models |
-| **redis-caching-layer** | Redis caching + tenant-aware key management |
+```text
+openframe-oss-lib/
+├── pom.xml                                    # Maven configuration
+├── openframe-api-lib/
+│   └── src/main/java/com/openframe/api/dto/
+│       ├── GenericQueryResult.java            # Module 1: Generic pagination
+│       ├── CountedGenericQueryResult.java     # Module 1: Filtered pagination  
+│       ├── audit/
+│       │   ├── LogEvent.java                  # Module 1: Audit summaries
+│       │   ├── LogDetails.java               # Module 1: Detailed logs
+│       │   ├── LogFilterCriteria.java        # Module 1: Audit filtering
+│       │   ├── LogFilters.java               # Module 2: Audit filter options
+│       │   └── OrganizationFilterOption.java # Module 2: Org filter options
+│       └── device/
+│           ├── DeviceFilterCriteria.java     # Module 2: Device filter input
+│           ├── DeviceFilters.java            # Module 2: Device filter options
+│           └── DeviceFilterOption.java       # Module 2: Device faceted filters
+```
 
-### **Processing & Integration**
-| Module | Purpose |
-|--------|---------|  
-| **stream-processing-service-core** | CDC ingestion, data enrichment, and normalization |
-| **management-service-core** | Connector automation, Pinot deployment, scheduled operations |
-| **client-agent-service-core** | Agent registration, lifecycle management, NATS listeners |
-| **external-api-service-core** | Stable REST API layer for external system integration |
+## Design Principles
 
-## 🚀 Quick Start
+### 1. Contract-First DTO Layer
+Defines shared contracts independent of database models, framework implementations, or business logic.
 
-Get OpenFrame OSS Libraries running in 5 minutes:
+### 2. Generic & Reusable Abstractions
+- `GenericQueryResult<T>` avoids duplication across endpoints
+- Strong typing ensures consistent API behavior
+- DTO separation prevents domain leakage
+
+### 3. Separation of Criteria and Options
+- **Filter Criteria** - Input DTOs for client requests
+- **Filter Options** - Output DTOs for dynamic UI generation and faceted search
+
+### 4. Multi-Tenant Awareness
+Organization scoping ensures tenant isolation across audit and device domains via `OrganizationFilterOption` and organization-based criteria fields.
+
+## How It Powers OpenFrame
+
+```mermaid
+flowchart TB
+    subgraph "OpenFrame Platform"
+        UI["🤖 Mingo AI (Technicians)<br/>🧚‍♀️ Fae (Clients)"] 
+        Gateway["OpenFrame Gateway"]
+        Services["Core Services<br/>Audit • Device • User • Org"]
+        Database["Persistence Layer"]
+    end
+    
+    UI --> Gateway
+    Gateway --> OSSLIB["📦 OpenFrame OSS Lib<br/>Contract Layer"]
+    OSSLIB --> Services
+    Services --> Database
+    
+    classDef ai fill:#e1bee7,stroke:#8e24aa,stroke-width:2px
+    classDef gateway fill:#fff3e0,stroke:#f57c00,stroke-width:2px  
+    classDef lib fill:#FFC008,stroke:#333,stroke-width:2px,color:#000
+    classDef services fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    classDef data fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    
+    class UI ai
+    class Gateway gateway
+    class OSSLIB lib
+    class Services services
+    class Database data
+```
+
+OpenFrame OSS Lib acts as the **shared API contract foundation** ensuring:
+- ✅ Predictable response structures across all services
+- ✅ Strong typing and compile-time validation
+- ✅ Clean separation of concerns between layers
+- ✅ Scalable filtering patterns for complex queries
+- ✅ Consistent pagination and result wrapping
+
+## Getting Started
 
 ### Prerequisites
-- **Java 21+** (OpenJDK recommended)
-- **Maven 3.6+** for dependency management  
-- **Docker & Docker Compose** for infrastructure services
-- **8GB RAM minimum** (16GB recommended)
+- Java 8 or higher
+- Maven 3.6 or higher
 
 ### Installation
 
-```bash
-# 1. Clone the repository
-git clone https://github.com/flamingo-stack/openframe-oss-lib.git
-cd openframe-oss-lib
+Add to your project's `pom.xml`:
 
-# 2. Start infrastructure services with Docker
-docker-compose up -d
-
-# 3. Build all modules
-mvn clean install -DskipTests
-
-# 4. Run the main API service
-cd openframe-api-service-core
-mvn spring-boot:run
+```xml
+<dependency>
+    <groupId>com.openframe.api</groupId>
+    <artifactId>openframe-api-lib</artifactId>
+    <version>1.0-SNAPSHOT</version>
+</dependency>
 ```
 
-### Verification
+### Example Usage
 
-```bash
-# Test the health endpoint
-curl http://localhost:8080/health
-
-# Explore GraphQL schema
-open http://localhost:8080/graphiql
-
-# Check OAuth2 configuration
-curl http://localhost:8080/.well-known/openid-configuration
+```java
+@RestController
+@RequestMapping("/api/audit")
+public class AuditController {
+    
+    @PostMapping("/logs")
+    public CountedGenericQueryResult<LogEvent> getAuditLogs(
+        @RequestBody LogFilterCriteria criteria) {
+        
+        // Service applies business logic and returns standardized response
+        List<LogEvent> events = auditService.findFilteredLogs(criteria);
+        int totalCount = auditService.countFilteredLogs(criteria);
+        
+        return CountedGenericQueryResult.<LogEvent>builder()
+            .items(events)
+            .filteredCount(totalCount)
+            .pageInfo(buildPageInfo(criteria))
+            .build();
+    }
+}
 ```
 
-**🎉 Success!** You now have a running OpenFrame OSS backend with:
-- MongoDB (port 27017) - Primary database
-- Redis (port 6379) - Caching and sessions
-- Kafka (port 9092) - Event streaming  
-- API Service (port 8080) - Main application API
+Response format:
+```json
+{
+  "items": [...],           
+  "pageInfo": {
+    "page": 1,
+    "size": 20,
+    "totalPages": 15
+  },        
+  "filteredCount": 1247     
+}
+```
 
-## 🛠️ Technology Stack
+## Documentation
 
-| Component | Technology | Purpose |
-|-----------|------------|---------|
-| **Runtime** | Java 21 | Modern language features, performance |
-| **Framework** | Spring Boot 3.3.0 | Application framework, dependency injection |
-| **Security** | Spring Authorization Server 1.3.1 | OAuth2/OIDC implementation |
-| **Database** | MongoDB, Cassandra, Redis, Pinot | Multi-modal data storage |
-| **Messaging** | Apache Kafka, NATS | Event streaming, real-time communication |
-| **API** | Netflix DGS 9.0.3 | GraphQL implementation |
-| **Build** | Maven 3.x | Dependency management, multi-module builds |
+📚 See the [Documentation](./docs/README.md) for comprehensive guides:
 
-## 📚 Documentation
+- **Getting Started** - Quick setup and first steps
+- **Reference Documentation** - Detailed API and architecture docs  
+- **Development Guide** - Contributing and development workflow
 
-📚 See the **[Documentation](./docs/README.md)** for comprehensive guides including:
+## Community & Support
 
-- **[Getting Started](./docs/README.md#getting-started)** - Installation, setup, and first steps
-- **[Development](./docs/README.md#development)** - Local development setup and workflows  
-- **[Reference](./docs/README.md#reference)** - Technical architecture and API documentation
-- **[Contributing](./CONTRIBUTING.md)** - Guidelines for contributing to the project
+- 💬 **Community**: Join our [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) for discussions and support
+- 🌐 **Platform**: Learn more about [OpenFrame](https://openframe.ai)
+- 🏢 **Company**: Powered by [Flamingo](https://flamingo.run) - AI-driven MSP solutions
 
-### External Resources
+## Contributing
 
-The **OpenFrame CLI** tool for self-hosting deployment is maintained separately:
-- **Repository**: [flamingo-stack/openframe-cli](https://github.com/flamingo-stack/openframe-cli)
-- **Documentation**: [CLI Documentation](https://github.com/flamingo-stack/openframe-cli/blob/main/docs/README.md)
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on:
 
-## 🎯 Who Should Use This?
+- Code style and conventions
+- Branch naming and commit messages
+- Pull request process
+- Review checklist
 
-### **MSP Platform Developers**
-Build and customize OpenFrame-powered MSP solutions with comprehensive backend services, APIs, and event-driven architecture.
+## License
 
-### **Enterprise IT Teams**  
-Deploy secure, scalable IT management infrastructure with modern authentication, multi-tenancy, and real-time analytics.
-
-### **Integration Partners**
-Connect existing tools and workflows using standardized REST/GraphQL APIs and event-driven interfaces.
-
-### **Open Source Contributors**
-Contribute to the evolution of open-source MSP tooling and AI-driven automation infrastructure.
-
-## 🌟 Key Benefits
-
-- **⚡ Fast Development** - Pre-built service cores eliminate months of foundation work
-- **🔒 Enterprise Security** - Production-ready OAuth2/OIDC with multi-tenant isolation
-- **📈 Horizontally Scalable** - Event-driven architecture scales to handle millions of events
-- **🔌 Integration Ready** - Standard APIs and webhooks for seamless tool integration
-- **🤖 AI-Optimized** - Data platform designed for machine learning and automation
-- **💰 Cost-Effective** - Replace expensive proprietary solutions with open-source alternatives
-
-## 🤝 Community & Support
-
-- **💬 Slack Community**: [OpenMSP Community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) - Primary communication channel
-- **🐛 Issues**: [GitHub Issues](https://github.com/flamingo-stack/openframe-oss-lib/issues) - Bug reports and feature requests  
-- **📖 Website**: [OpenFrame Documentation](https://www.flamingo.run/openframe) - Official documentation
-- **🎥 Demos**: [OpenFrame YouTube Channel](https://www.youtube.com/@openframe) - Product demos and tutorials
-
-## 📺 Learn More
-
-[![OpenFrame Preview Webinar](https://img.youtube.com/vi/bINdW0CQbvY/maxresdefault.jpg)](https://www.youtube.com/watch?v=bINdW0CQbvY)
-
-## 📄 License
-
-This project is licensed under the [Flamingo AI Unified License v1.0](LICENSE.md).
+This project is licensed under the Flamingo AI Unified License v1.0. See [LICENSE.md](LICENSE.md) for details.
 
 ---
+
 <div align="center">
   Built with 💛 by the <a href="https://www.flamingo.run/about"><b>Flamingo</b></a> team
 </div>
