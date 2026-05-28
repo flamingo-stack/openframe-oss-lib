@@ -28,6 +28,7 @@ import {
   type ChatTicketItemData,
 } from '../chat/entity-cards/chat-ticket-item'
 import { formatRelativeTime } from '../../utils/date-utils'
+import { scrollToAnchor } from '../../utils/scroll-to-anchor'
 import {
   TicketDetailDrawer,
   type TicketDetailDrawerProps,
@@ -70,47 +71,18 @@ export function TicketRow({
   // hidden — the user has to scroll manually to see what they just
   // opened.
   //
-  // Uses the canonical project scroll pattern (matches `scrollToContent`
-  // in `hooks/use-document-tree.ts` + the comparison page + pagination):
-  //
-  //     const top = el.getBoundingClientRect().top + window.scrollY - headerOffset
-  //     window.scrollTo({ top, behavior: 'smooth' })
-  //
-  // Two reasons we use `window.scrollTo` + a pre-computed target
-  // instead of `scrollIntoView({ block: 'start' })`:
-  //
-  //   1. SETTLED ANIMATION. `scrollIntoView` re-targets continuously as
-  //      the page layout shifts (the previous card is mid-collapse, the
-  //      new drawer is mid-expand). The smooth animation visibly jitters
-  //      because its destination keeps moving. Committing to a single
-  //      pixel value with `window.scrollTo` lets the browser run a clean,
-  //      undisturbed animation to that exact spot.
-  //
-  //   2. STICKY-HEADER OFFSET. `scrollIntoView({block:'start'})` puts
-  //      the element flush against the viewport top — but the page has
-  //      a sticky nav header above it. The card lands hidden behind the
-  //      header. The canonical project pattern subtracts a header offset
-  //      so the tile lands just BELOW the chrome.
-  //
-  // Timing: wait ~200ms for the Radix Collapsible animation to settle
-  // before measuring, otherwise we'd capture B's position while A is
-  // still collapsing above it and land too far down. 200ms is the
-  // Collapsible default + a tight safety margin. The cleanup timer
-  // prevents a leaked scroll firing after rapid open→close→open.
+  // Delegates to the canonical `scrollToAnchor` helper (single source of
+  // truth across the lib + hub for "smooth scroll to element, account
+  // for sticky header"). The `delay: 200` option waits for the Radix
+  // Collapsible animation to settle BEFORE measuring the target,
+  // otherwise we'd capture B's position while the previous card is
+  // still collapsing above it and land too far down. The helper's
+  // pre-computed pixel target also keeps the smooth animation from
+  // jittering as layout shifts mid-flight.
   const rowRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
     if (!expanded || optimistic) return
-    const t = setTimeout(() => {
-      const el = rowRef.current
-      if (!el) return
-      // 80px matches `hooks/use-document-tree.ts:15` — the canonical
-      // sticky-header offset across the hub. If the /tickets page ever
-      // grows a different chrome height, this is the one knob to tune.
-      const HEADER_OFFSET = 80
-      const top = el.getBoundingClientRect().top + window.scrollY - HEADER_OFFSET
-      window.scrollTo({ top, behavior: 'smooth' })
-    }, 200)
-    return () => clearTimeout(t)
+    scrollToAnchor(rowRef.current, { delay: 200 })
   }, [expanded, optimistic])
 
   const tileData: ChatTicketItemData = {

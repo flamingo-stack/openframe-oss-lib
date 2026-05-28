@@ -11,8 +11,12 @@ export interface FooterWaitlistButtonProps {
 
 /**
  * Small wrapper around JoinWaitlistButton for use inside the footer.
- * Provides a default click handler that scrolls/focuses the wait-list form
- * if the user is already on /waitlist; otherwise navigates to it.
+ * Default handler smooth-scrolls to the TOP of /waitlist (showing the
+ * "Introducing OpenFrame" hero) when the user is already on the page,
+ * otherwise navigates to /waitlist (no hash). The form lives in-flow
+ * below the hero — visible after a normal page load. The hero is the
+ * marketing payload; landing the user there beats dumping them
+ * mid-page on the form.
  */
 export function FooterWaitlistButton({ className }: FooterWaitlistButtonProps) {
   const router = useRouter();
@@ -20,17 +24,18 @@ export function FooterWaitlistButton({ className }: FooterWaitlistButtonProps) {
 
   const handleClick = useCallback(() => {
     if (pathname?.startsWith('/waitlist')) {
-      const anchor = document.getElementById('waitlist-form');
-      if (anchor) {
-        anchor.scrollIntoView({ behavior: 'smooth', block: 'center' } as any);
-        setTimeout(() => {
-          const input = anchor.querySelector('input[type="email"]') as HTMLInputElement | null;
-          input?.focus();
-        }, 400);
-        return;
-      }
+      // Same-page click — smooth-scroll back to the hero. Focus the
+      // form input after the scroll completes for keyboard ergonomics.
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setTimeout(() => {
+        const input = document.querySelector('#waitlist-form input[type="email"]') as HTMLInputElement | null;
+        input?.focus();
+      }, 600);
+      return;
     }
-    router.push('/waitlist#waitlist-form');
+    // Cross-page nav without the legacy `#waitlist-form` hash —
+    // page's own useEffect pins scroll to top, hero renders first.
+    router.push('/waitlist');
   }, [pathname, router]);
 
   return (

@@ -200,3 +200,14 @@ export { fetchPriorityProp, type FetchPriorityValue } from './fetch-priority'
 // server-safe (no JSX, no contexts/* imports); imported by route-page
 // `metadata` exports + the shared `<DevSectionView>` chrome.
 export * from './dev-sections'
+
+// Canonical smooth-scroll-to-anchor helper. ONE implementation across
+// the hub + lib instead of the previous ~10 copy-paste sites with
+// diverging header offsets and inconsistent scrollIntoView/scrollTo
+// choices. See `scroll-to-anchor.ts` for the rationale.
+export {
+  DEFAULT_HEADER_OFFSET,
+  type ScrollToAnchorOptions,
+  scrollToAnchor,
+  scrollToHashOnMount,
+} from './scroll-to-anchor'
