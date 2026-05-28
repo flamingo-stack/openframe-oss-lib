@@ -67,18 +67,32 @@ export function TicketRow({
 
   // Scroll the clicked card to the top of the viewport. Every click
   // scrolls — first-click expansion, same-row re-click, cross-row
-  // switch. The clicked card lands at the top. Period.
+  // switch. The clicked card lands at the top.
   //
-  // `behavior: 'smooth'` + `scroll-mt-24` on the row's outer div
-  // (Tailwind `scroll-margin-top: 6rem`) keep the tile just below
-  // the sticky chrome. The browser's smooth-scroll engine handles
-  // the animation natively.
+  // Cross-row gotcha: if ANOTHER row above this one is currently
+  // expanded, its drawer is about to collapse simultaneously with our
+  // toggle. We pre-subtract its height from the target Y so the
+  // smooth-scroll lands at the FINAL post-collapse position cleanly.
+  // Same pattern as `<HelpCenterCard>` — the only diff is the drawer
+  // id prefix (`ticket-drawer-` vs `help-center-drawer-`).
   const rowRef = useRef<HTMLDivElement | null>(null)
   const handleClick = useCallback(() => {
     onToggle(ticket.id)
-    // Canonical scroll helper — same path the unified-nav + help-center-card
-    // use. `scroll-mt-24` on the outer div provides the chrome offset.
-    scrollElementIntoView(rowRef.current)
+    scrollElementIntoView(rowRef.current, {
+      adjustTargetY: (raw) => {
+        if (!rowRef.current) return raw
+        const expandedDrawer = document.querySelector(
+          'div[id^="ticket-drawer-"]',
+        )
+        if (!(expandedDrawer instanceof HTMLElement)) return raw
+        const drawerRect = expandedDrawer.getBoundingClientRect()
+        const myRect = rowRef.current.getBoundingClientRect()
+        // Only adjust when the drawer is ABOVE us. Drawers below
+        // don't shift our position when they collapse.
+        if (drawerRect.bottom > myRect.top) return raw
+        return raw - drawerRect.height
+      },
+    })
   }, [onToggle, ticket.id])
 
   const tileData: ChatTicketItemData = {
