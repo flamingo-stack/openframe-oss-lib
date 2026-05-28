@@ -1,0 +1,6 @@
+flowchart LR
+    Client["Client Request"] --> Filter["LogFilterCriteria"]
+    Filter --> Service["Log Service"]
+    Service --> Query["Query Builder"]
+    Query --> DataStore["Audit Data Store"]
+    DataStore --> Result["GenericQueryResult<LogEvent>"]

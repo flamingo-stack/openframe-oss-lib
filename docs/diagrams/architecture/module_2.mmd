@@ -1,0 +1,7 @@
+flowchart LR
+    Client["Client UI"] -->|"sends filter criteria"| Controller["API Controller"]
+    Controller -->|"DeviceFilterCriteria / LogFilters"| Service["Service Layer"]
+    Service -->|"query with filters"| Repository["Repository Layer"]
+    Repository -->|"filtered data"| Service
+    Service -->|"DeviceFilters / LogFilters"| Controller
+    Controller -->|"JSON response"| Client

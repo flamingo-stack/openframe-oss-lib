@@ -1,0 +1,13 @@
+flowchart LR
+    Client["API Client"] --> Controller["REST Controller"]
+    Controller --> Service["Service Layer"]
+    Service --> Repository["Repository / Data Source"]
+
+    Repository --> QueryResult["GenericQueryResult<T>"]
+    QueryResult --> CountedResult["CountedGenericQueryResult<T>"]
+
+    Service --> LogEvent["LogEvent"]
+    Service --> LogDetails["LogDetails"]
+    Service --> LogFilter["LogFilterCriteria"]
+
+    LogFilter --> Repository

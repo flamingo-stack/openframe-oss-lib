@@ -6,7 +6,7 @@ sequenceDiagram
 
     Client->>Controller: GET /logs with filters
     Controller->>Service: LogFilterCriteria
-    Service->>Repository: Apply filters
+    Service->>Repository: Apply filters and pagination
     Repository->>Service: List<LogEvent> + counts
     Service->>Controller: CountedGenericQueryResult<LogEvent>
     Controller->>Client: JSON response

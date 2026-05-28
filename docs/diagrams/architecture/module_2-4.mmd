@@ -1,5 +1,5 @@
 flowchart LR
-    Service["Device Service"] --> DeviceFiltersNode["DeviceFilters"]
+    Service["Device Service"] -->|"aggregates counts"| DeviceFiltersNode["DeviceFilters"]
     DeviceFiltersNode --> StatusOpts["Status Options"]
     DeviceFiltersNode --> TypeOpts["Device Type Options"]
     DeviceFiltersNode --> OSOpts["OS Options"]

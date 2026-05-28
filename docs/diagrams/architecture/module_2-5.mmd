@@ -5,9 +5,9 @@ sequenceDiagram
     participant Repository
 
     Client->>Controller: Submit DeviceFilterCriteria
-    Controller->>Service: Forward criteria
-    Service->>Repository: Execute filtered query
+    Controller->>Service: Validate and forward criteria
+    Service->>Repository: Query with filters
     Repository->>Service: Return filtered devices
-    Service->>Service: Aggregate counts
-    Service->>Controller: DeviceFilters + results
+    Service->>Service: Aggregate filter counts
+    Service->>Controller: Return DeviceFilters and results
     Controller->>Client: JSON response

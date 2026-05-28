@@ -1,0 +1,5 @@
+flowchart LR
+    Filters["Module 2 Filter Criteria"] --> Query["Backend Query Execution"]
+    Query --> Aggregation["Count Aggregation"]
+    Aggregation --> Results["Module 1 Result Envelopes"]
+    Results --> Client["Client UI"]
