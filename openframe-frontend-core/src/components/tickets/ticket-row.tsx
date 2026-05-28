@@ -28,6 +28,7 @@ import {
   type ChatTicketItemData,
 } from '../chat/entity-cards/chat-ticket-item'
 import { formatRelativeTime } from '../../utils/date-utils'
+import { scrollElementIntoView } from '../../utils/scroll-into-view'
 import {
   TicketDetailDrawer,
   type TicketDetailDrawerProps,
@@ -75,7 +76,9 @@ export function TicketRow({
   const rowRef = useRef<HTMLDivElement | null>(null)
   const handleClick = useCallback(() => {
     onToggle(ticket.id)
-    rowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    // Canonical scroll helper — same path the unified-nav + help-center-card
+    // use. `scroll-mt-24` on the outer div provides the chrome offset.
+    scrollElementIntoView(rowRef.current)
   }, [onToggle, ticket.id])
 
   const tileData: ChatTicketItemData = {
