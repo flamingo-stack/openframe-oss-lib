@@ -18,7 +18,7 @@
  *      rendered only when this row is the expanded one.
  */
 
-import { useEffect, useRef } from 'react'
+import { useCallback, useRef } from 'react'
 import {
   Collapsible,
   CollapsibleContent,
@@ -28,6 +28,7 @@ import {
   type ChatTicketItemData,
 } from '../chat/entity-cards/chat-ticket-item'
 import { formatRelativeTime } from '../../utils/date-utils'
+import { scrollElementIntoView } from '../../utils/scroll-into-view'
 import {
   TicketDetailDrawer,
   type TicketDetailDrawerProps,
@@ -64,25 +65,35 @@ export function TicketRow({
   // arrived yet, so action targets would be undefined.
   const optimistic = isOptimistic(ticket)
 
-  // Scroll the row's summary tile to the top of the viewport when the
-  // user expands it. Without this, expanding a row near the bottom of
-  // the viewport leaves most of the drawer (timeline + composer)
-  // hidden — the user has to scroll manually to see what they just
-  // opened.
+  // Scroll the clicked card to the top of the viewport. Every click
+  // scrolls — first-click expansion, same-row re-click, cross-row
+  // switch. The clicked card lands at the top.
   //
-  // Uses smooth-scroll + `block: 'start'` so the tile lands at the top
-  // edge. Two RAFs let the Collapsible's height animation start before
-  // we measure the row position, otherwise the scroll lands at the
-  // pre-expansion position.
+  // Cross-row gotcha: if ANOTHER row above this one is currently
+  // expanded, its drawer is about to collapse simultaneously with our
+  // toggle. We pre-subtract its height from the target Y so the
+  // smooth-scroll lands at the FINAL post-collapse position cleanly.
+  // Same pattern as `<HelpCenterCard>` — the only diff is the drawer
+  // id prefix (`ticket-drawer-` vs `help-center-drawer-`).
   const rowRef = useRef<HTMLDivElement | null>(null)
-  useEffect(() => {
-    if (!expanded || optimistic) return
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        rowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      })
+  const handleClick = useCallback(() => {
+    onToggle(ticket.id)
+    scrollElementIntoView(rowRef.current, {
+      adjustTargetY: (raw) => {
+        if (!rowRef.current) return raw
+        const expandedDrawer = document.querySelector(
+          'div[id^="ticket-drawer-"]',
+        )
+        if (!(expandedDrawer instanceof HTMLElement)) return raw
+        const drawerRect = expandedDrawer.getBoundingClientRect()
+        const myRect = rowRef.current.getBoundingClientRect()
+        // Only adjust when the drawer is ABOVE us. Drawers below
+        // don't shift our position when they collapse.
+        if (drawerRect.bottom > myRect.top) return raw
+        return raw - drawerRect.height
+      },
     })
-  }, [expanded, optimistic])
+  }, [onToggle, ticket.id])
 
   const tileData: ChatTicketItemData = {
     id: ticket.id,
@@ -112,14 +123,14 @@ export function TicketRow({
   }
 
   return (
-    <div ref={rowRef} className="scroll-mt-4">
+    <div ref={rowRef} className="scroll-mt-24">
       <Collapsible
         open={expanded && !optimistic}
         className="border-b border-ods-border last:border-b-0"
       >
       <ChatTicketItem
         ticket={tileData}
-        onClick={optimistic ? undefined : onToggle}
+        onClick={optimistic ? undefined : handleClick}
         aria-expanded={expanded && !optimistic}
         aria-controls={`ticket-drawer-${ticket.id}`}
       />

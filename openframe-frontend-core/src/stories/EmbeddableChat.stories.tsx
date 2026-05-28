@@ -35,7 +35,7 @@ function createMockRuntime(): ChatRuntime {
       buildListUrl: () => null,
       attachmentUploadUrl: '/__story__/upload',
       attachmentViewUrlPrefix: '/__story__/view/',
-      chatIdentityUrl: '/__story__/identity',
+      identityUrl: '/__story__/identity',
     },
     navigation: {
       mode: 'embed',

@@ -62,12 +62,15 @@ export interface ChatRuntime {
      *      relative `/api/storage/view/chat-attachments/` is sufficient
      *      (same-origin); embedders supply an absolute hub URL so the
      *      browser can fetch cross-origin.
-     *    - `chatIdentityUrl` — GET endpoint the `useChatIdentity` hook
+     *    - `identityUrl` — GET endpoint the `useChatIdentity` hook
      *      hits to learn the `{authTier, source, attachmentsEnabled}`
-     *      capability bag for the current session. */
+     *      capability bag for the current session. Used beyond chat
+     *      (tickets / contact form / any embedded surface that needs
+     *      to identify the proxied customer), so the name has no
+     *      "chat" prefix even though the consuming hook still does. */
     attachmentUploadUrl: string
     attachmentViewUrlPrefix: string
-    chatIdentityUrl: string
+    identityUrl: string
     /** Optional URL prefix for the image proxy (`<prefix>?url=<external>`).
      *  When unset, lib's `getProxiedImageUrl` returns the original URL
      *  unchanged. Hub default: '/api/image-proxy'. Embedders that don't
