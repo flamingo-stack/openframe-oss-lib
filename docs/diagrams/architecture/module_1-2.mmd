@@ -1,0 +1,5 @@
+flowchart LR
+    Query["Database Query"] --> Items["List<T>"]
+    Query --> PageInfoNode["PageInfo"]
+    Items --> Result["GenericQueryResult<T>"]
+    PageInfoNode --> Result

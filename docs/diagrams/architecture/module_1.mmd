@@ -1,0 +1,8 @@
+flowchart TD
+    Client["API Client"] --> Controller["REST Controller"]
+    Controller --> Service["Application Service"]
+    Service --> QueryResult["GenericQueryResult<T>"]
+    Service --> CountedResult["CountedGenericQueryResult<T>"]
+    Service --> LogEvent["LogEvent"]
+    Service --> LogDetails["LogDetails"]
+    Controller --> Response["HTTP JSON Response"]

@@ -1,0 +1,15 @@
+flowchart TD
+    Request["Device List Request"] --> Criteria["DeviceFilterCriteria"]
+    Criteria --> StatusFilter["Filter by Status"]
+    Criteria --> TypeFilter["Filter by Device Type"]
+    Criteria --> OSFilter["Filter by OS"]
+    Criteria --> OrgFilter["Filter by Organization"]
+    Criteria --> TagFilter["Filter by Tags"]
+
+    StatusFilter --> Query["Composed Database Query"]
+    TypeFilter --> Query
+    OSFilter --> Query
+    OrgFilter --> Query
+    TagFilter --> Query
+
+    Query --> Result["Filtered Device Set"]

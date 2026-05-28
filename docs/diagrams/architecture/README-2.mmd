@@ -1,12 +1,19 @@
-sequenceDiagram
-    participant Browser
-    participant Gateway
-    participant Auth as Authorization Service
-    participant Api as API Service
+flowchart TD
+    Client["API Client"]
+    Controller["REST Controller"]
+    Service["Application Service"]
 
-    Browser->>Gateway: Request
-    Gateway->>Auth: Validate JWT (issuer-based)
-    Auth-->>Gateway: Validated
-    Gateway->>Api: Forward request
-    Api-->>Gateway: Response
-    Gateway-->>Browser: Response
+    Criteria["LogFilterCriteria"]
+    Event["LogEvent"]
+    Details["LogDetails"]
+    Result["GenericQueryResult<T>"]
+    Counted["CountedGenericQueryResult<T>"]
+
+    Client --> Controller
+    Controller --> Criteria
+    Controller --> Service
+    Service --> Event
+    Service --> Details
+    Event --> Result
+    Result --> Counted
+    Controller --> Client

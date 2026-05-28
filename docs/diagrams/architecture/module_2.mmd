@@ -1,0 +1,19 @@
+flowchart LR
+    UI["Frontend UI"] -->|"Filter Criteria JSON"| API["REST Controller"]
+    API -->|"Maps to"| DeviceCriteria["DeviceFilterCriteria"]
+    API -->|"Maps to"| LogFilters["LogFilters"]
+
+    DeviceCriteria --> Service["Device Service"]
+    LogFilters --> AuditService["Audit Service"]
+
+    Service --> Repo["Device Repository"]
+    AuditService --> AuditRepo["Audit Repository"]
+
+    Repo --> DB[("Database")]
+    AuditRepo --> DB
+
+    Repo -->|"Aggregations"| DeviceFiltersDTO["DeviceFilters"]
+    AuditRepo -->|"Aggregations"| LogFiltersDTO["LogFilters"]
+
+    DeviceFiltersDTO --> UI
+    LogFiltersDTO --> UI

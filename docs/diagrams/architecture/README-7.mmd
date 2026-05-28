@@ -1,0 +1,12 @@
+sequenceDiagram
+    participant Client
+    participant Controller
+    participant Service
+    participant Repository
+
+    Client->>Controller: Submit LogFilterCriteria
+    Controller->>Service: Pass criteria
+    Service->>Repository: Query with filters
+    Repository-->>Service: Logs + total count
+    Service-->>Controller: CountedGenericQueryResult<LogEvent>
+    Controller-->>Client: JSON response

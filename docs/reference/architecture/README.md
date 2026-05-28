@@ -1,322 +1,445 @@
-# OpenFrame OSS Lib – Repository Overview
+# openframe-oss-lib
 
-The **`openframe-oss-lib`** repository is the core backend foundation of the OpenFrame platform. It provides all shared libraries and service cores required to run a multi-tenant, event-driven, AI-ready MSP infrastructure.
+## Overview
 
-It includes:
+`openframe-oss-lib` is the **core API DTO library** of the OpenFrame ecosystem. It defines the standardized data contracts used across services in the Flamingo / OpenFrame stack.
 
-- API contracts and DTOs
-- REST + GraphQL API layers
-- Multi-tenant OAuth2 Authorization Server
-- Reactive Gateway
-- Mongo, Cassandra, Pinot, Redis infrastructure layers
-- Kafka messaging backbone
-- Stream processing engine
-- Client agent orchestration
-- External integration APIs
-- Cluster management and automation services
+The repository provides:
 
-This repository forms the **backend runtime stack** for OpenFrame and OpenFrame-powered MSP deployments.
+- ✅ Generic paginated query result wrappers  
+- ✅ Count-aware result containers  
+- ✅ Audit log summary and detail models  
+- ✅ Structured filtering contracts for logs and devices  
+- ✅ Faceted filtering option models with counts  
+
+It acts as a **shared contract layer** between:
+
+- REST controllers  
+- Service layers  
+- Repositories  
+- Frontend clients  
+- Audit and monitoring subsystems  
+
+The library contains **no business logic** and **no persistence logic**. It strictly defines structured DTOs to ensure consistency across services.
 
 ---
 
-# 1. High-Level Architecture
+# Repository Structure
 
-At a system level, `openframe-oss-lib` implements a layered, event-driven, multi-tenant architecture.
+```text
+openframe-oss-lib
+└── openframe-api-lib
+    └── src/main/java/com/openframe/api/dto
+        ├── CountedGenericQueryResult
+        ├── GenericQueryResult
+        ├── audit
+        │   ├── LogDetails
+        │   ├── LogEvent
+        │   ├── LogFilterCriteria
+        │   ├── LogFilters
+        │   └── OrganizationFilterOption
+        └── device
+            ├── DeviceFilterCriteria
+            ├── DeviceFilterOption
+            └── DeviceFilters
+```
+
+The repository is logically divided into:
+
+- **Module 1** → Core query wrappers + audit log DTOs  
+- **Module 2** → Filtering DTOs and faceted filtering models  
+
+---
+
+# End-to-End Architecture
+
+`openframe-oss-lib` sits in the **API Contract Layer** between controllers and services.
+
+## High-Level Layered Architecture
 
 ```mermaid
 flowchart TD
-    Client["Browser / External System"] --> Gateway["Gateway Service Core"]
-    Agent["Client Agent"] --> Gateway
+    Client["Frontend / API Client"]
+    Controller["REST Controller"]
+    Service["Application Service"]
+    Repository["Repository Layer"]
+    Database[("Database")]
 
-    Gateway --> Auth["Authorization Service Core"]
-    Gateway --> Api["API Service Core"]
-    Gateway --> External["External API Service Core"]
+    DTOs["openframe-oss-lib DTO Contracts"]
 
-    Api --> Contracts["API Lib Contracts"]
-    External --> Contracts
-
-    Api --> Mongo["Mongo Persistence Layer"]
-    Api --> DataCore["Data Platform Core"]
-
-    DataCore --> Cassandra["Cassandra"]
-    DataCore --> Pinot["Apache Pinot"]
-    DataCore --> Kafka["Kafka Messaging Layer"]
-    DataCore --> Redis["Redis Caching Layer"]
-
-    Kafka --> Stream["Stream Processing Service Core"]
-    Stream --> Cassandra
-    Stream --> Kafka
-
-    Management["Management Service Core"] --> Kafka
-    Management --> Pinot
-    Management --> Mongo
-    Management --> NATS["NATS Streams"]
+    Client --> Controller
+    Controller --> DTOs
+    Controller --> Service
+    Service --> Repository
+    Repository --> Database
+    Service --> DTOs
+    Controller --> Client
 ```
 
-### Architectural Characteristics
+### Architectural Role
 
-- ✅ Multi-tenant by design  
-- ✅ OAuth2 + OIDC compliant  
-- ✅ Reactive edge gateway  
-- ✅ Event-driven (Kafka + Debezium)  
-- ✅ Real-time enrichment via Stream Processing  
-- ✅ Analytical storage (Pinot + Cassandra)  
-- ✅ Redis-backed distributed locking  
-- ✅ Modular service-core architecture  
+- Controllers deserialize request JSON into DTOs
+- Services use filter DTOs to build queries
+- Results are wrapped using generic result containers
+- Responses are serialized back to JSON
+- Frontend relies on consistent DTO structures
 
 ---
 
-# 2. Repository Structure
-
-The repository is organized into **service-core and infrastructure modules**, each with a clearly defined responsibility.
-
-## Core API & Contracts
-
-| Module | Purpose |
-|--------|----------|
-| `api-lib-contracts-and-services` | Shared DTOs, filters, mappers, reusable services |
-| `api-service-core-controllers-and-graphql` | REST + GraphQL API orchestration |
+# Module Overview
 
 ---
 
-## Security & Identity
+# Module 1 – Core Query & Audit DTOs
 
-| Module | Purpose |
-|--------|----------|
-| `authorization-service-core` | Multi-tenant OAuth2 / OIDC Authorization Server |
-| `security-core-and-oauth-bff` | JWT infrastructure + OAuth BFF flow |
-| `gateway-service-core` | Reactive edge gateway with JWT + API key auth |
+## Purpose
 
----
+Module 1 defines foundational DTOs for:
 
-## Data & Infrastructure
+- Generic paginated query responses
+- Count-aware result sets
+- Audit log summaries
+- Audit log details
+- Log filtering criteria
 
-| Module | Purpose |
-|--------|----------|
-| `mongo-persistence-layer` | Mongo document models + repositories |
-| `data-platform-core` | Cassandra + Pinot configuration + analytics repos |
-| `kafka-messaging-layer` | Multi-tenant Kafka infrastructure |
-| `redis-caching-layer` | Redis caching + tenant-aware key management |
+It standardizes how results and logs are represented across services.
 
 ---
 
-## Event & Stream Processing
-
-| Module | Purpose |
-|--------|----------|
-| `stream-processing-service-core` | CDC ingestion, enrichment, normalization |
-| `management-service-core` | Connector automation, Pinot deployment, scheduled jobs |
-
----
-
-## Agent & External Integration
-
-| Module | Purpose |
-|--------|----------|
-| `client-agent-service-core` | Agent registration + lifecycle + NATS listeners |
-| `external-api-service-core` | Stable REST API for external integrations |
-
----
-
-# 3. End-to-End Identity Flow
-
-Authentication and authorization are centralized and tenant-aware.
-
-```mermaid
-sequenceDiagram
-    participant Browser
-    participant Gateway
-    participant Auth as Authorization Service
-    participant Api as API Service
-
-    Browser->>Gateway: Request
-    Gateway->>Auth: Validate JWT (issuer-based)
-    Auth-->>Gateway: Validated
-    Gateway->>Api: Forward request
-    Api-->>Gateway: Response
-    Gateway-->>Browser: Response
-```
-
-### Key Components
-
-- `authorization-service-core` → Issues per-tenant RSA-signed JWTs  
-- `security-core-and-oauth-bff` → Handles PKCE + cookie-based login  
-- `gateway-service-core` → Multi-issuer JWT validation  
-- `mongo-persistence-layer` → Stores users, OAuth clients, tokens  
-
----
-
-# 4. End-to-End Event Processing Flow
-
-Integrated tools emit CDC events that are normalized and enriched.
+## Module 1 Architecture
 
 ```mermaid
 flowchart TD
-    ToolDB["Integrated Tool Database"] --> Debezium
-    Debezium --> KafkaInbound["Kafka Inbound Topic"]
-    KafkaInbound --> Stream["Stream Processing Core"]
-    Stream --> Enrichment["Metadata Enrichment"]
-    Enrichment --> Cassandra["Cassandra Audit Storage"]
-    Enrichment --> KafkaOut["Normalized Kafka Topic"]
+    Client["API Client"]
+    Controller["REST Controller"]
+    Service["Application Service"]
+
+    Criteria["LogFilterCriteria"]
+    Event["LogEvent"]
+    Details["LogDetails"]
+    Result["GenericQueryResult<T>"]
+    Counted["CountedGenericQueryResult<T>"]
+
+    Client --> Controller
+    Controller --> Criteria
+    Controller --> Service
+    Service --> Event
+    Service --> Details
+    Event --> Result
+    Result --> Counted
+    Controller --> Client
 ```
-
-### Key Modules
-
-- `kafka-messaging-layer` → Producer/consumer infrastructure  
-- `stream-processing-service-core` → Deserialization + normalization  
-- `data-platform-core` → Analytical query repos  
-- `mongo-persistence-layer` → Machine & organization metadata  
 
 ---
 
-# 5. Agent Lifecycle Architecture
+## Core Components (Module 1)
 
-Client agents integrate via HTTP and NATS.
+### 1. GenericQueryResult<T>
+
+- Wraps `List<T>`
+- Includes pagination metadata
+- Used across all list endpoints
+
+### 2. CountedGenericQueryResult<T>
+
+- Extends `GenericQueryResult<T>`
+- Adds `filteredCount`
+- Used for filtered search APIs
 
 ```mermaid
-flowchart TD
-    Agent["Endpoint Agent"] --> Auth["AgentAuthController"]
-    Agent --> Register["AgentController"]
-    Agent --> NATS["NATS Events"]
+classDiagram
+    class GenericQueryResult~T~ {
+        List~T~ items
+        PageInfo pageInfo
+    }
 
-    NATS --> Installed["InstalledAgentListener"]
-    NATS --> ToolConn["ToolConnectionListener"]
-    NATS --> Heartbeat["MachineHeartbeatListener"]
+    class CountedGenericQueryResult~T~ {
+        int filteredCount
+    }
 
-    Installed --> Mongo
-    ToolConn --> Mongo
-    Heartbeat --> Mongo
+    GenericQueryResult <|-- CountedGenericQueryResult
 ```
-
-### Key Module
-
-`client-agent-service-core`
-
-Responsibilities:
-
-- OAuth-based agent auth
-- Machine registration
-- Tool ID normalization
-- NATS event processing
-- Heartbeat tracking
 
 ---
 
-# 6. Infrastructure Automation & Control Plane
+### 3. LogEvent
 
-The Management Service Core ensures the system is self-initializing.
+Lightweight log summary optimized for:
 
-```mermaid
-flowchart TD
-    Startup["Application Ready"] --> PinotInit["Deploy Pinot Schemas"]
-    Startup --> NatsInit["Create NATS Streams"]
-    Startup --> DebeziumInit["Initialize Connectors"]
-    Startup --> AgentInit["Initialize Agents"]
-    Startup --> Schedulers["Start Scheduled Jobs"]
-```
-
-### Key Responsibilities
-
-- Pinot schema deployment
-- Debezium connector orchestration
-- Tool post-save hooks
-- Version update propagation
-- Distributed scheduled jobs (Redis + ShedLock)
-
-Module: `management-service-core`
+- Search results
+- Timeline views
+- High-volume pagination
 
 ---
 
-# 7. Data Platform Layering
+### 4. LogDetails
+
+Expanded log representation containing:
+
+- Full message
+- Additional metadata
+- Extended context
 
 ```mermaid
 flowchart LR
-    Api["API Layer"] --> Mongo
-    Api --> Redis
-    Api --> Pinot
-
-    Stream --> Cassandra
-    Stream --> Kafka
-
-    Management --> Pinot
-    Management --> Kafka
+    Summary["LogEvent"] --> Detail["LogDetails"]
+    Detail --> Message["message"]
+    Detail --> Extra["details"]
 ```
 
-### Storage Responsibilities
+---
 
-- **Mongo** → Operational data  
-- **Cassandra** → Time-series audit logs  
-- **Pinot** → Analytical queries  
-- **Redis** → Caching + distributed locks  
-- **Kafka** → Event backbone  
+### 5. LogFilterCriteria
+
+Defines structured log filtering options:
+
+- Date ranges
+- Event types
+- Tool types
+- Severity
+- Organization scope
+- Device scope
+
+Used as request input for log search endpoints.
 
 ---
 
-# 8. Core Module Documentation References
+# Module 2 – Filtering & Faceted Search DTOs
 
-Below are the core modules and their documentation anchors within the repository:
+## Purpose
 
-- `api-lib-contracts-and-services` → DTOs, filters, shared services
-- `api-service-core-controllers-and-graphql` → REST + GraphQL layer
-- `authorization-service-core` → OAuth2 + OIDC multi-tenant IdP
-- `client-agent-service-core` → Agent lifecycle + NATS ingestion
-- `data-platform-core` → Cassandra, Pinot, analytics repos
-- `mongo-persistence-layer` → Documents + repositories
-- `kafka-messaging-layer` → Kafka infra + CDC models
-- `redis-caching-layer` → Cache manager + tenant keys
-- `security-core-and-oauth-bff` → JWT infra + OAuth BFF
-- `gateway-service-core` → Reactive ingress + API key auth
-- `external-api-service-core` → Stable REST integration layer
-- `management-service-core` → Cluster automation
-- `stream-processing-service-core` → Event normalization engine
+Module 2 defines the filtering backbone for:
 
-Each module is self-contained, dependency-scoped, and designed for reuse across OpenFrame deployments.
+- Audit logs
+- Managed devices
+
+It separates:
+
+- ✅ Filter criteria (input DTOs)
+- ✅ Filter options (output DTOs with counts)
 
 ---
 
-# 9. Design Principles of openframe-oss-lib
+## Module 2 Architecture
 
-1. **Modular Service-Core Architecture**  
-   Each domain capability lives in a dedicated service module.
+```mermaid
+flowchart LR
+    UI["Frontend UI"]
 
-2. **Multi-Tenant First**  
-   Tenant isolation enforced at:
-   - JWT issuer level
-   - Database layer
-   - Cache key prefixing
-   - Kafka application IDs
+    DeviceCriteria["DeviceFilterCriteria"]
+    LogFilters["LogFilters"]
 
-3. **Event-Driven by Default**  
-   Kafka + Debezium power asynchronous processing.
+    Service["Application Service"]
+    Repo["Repository"]
+    DB[("Database")]
 
-4. **Analytics-Optimized**  
-   Pinot + Cassandra separate operational and analytical workloads.
+    DeviceFilters["DeviceFilters"]
+    DeviceOption["DeviceFilterOption"]
+    OrgOption["OrganizationFilterOption"]
 
-5. **Reactive Edge**  
-   Gateway built on Spring WebFlux for high throughput.
+    UI --> DeviceCriteria
+    UI --> LogFilters
 
-6. **Self-Healing Infrastructure**  
-   Management service automates connectors, schemas, streams.
+    DeviceCriteria --> Service
+    LogFilters --> Service
+
+    Service --> Repo
+    Repo --> DB
+
+    Repo --> DeviceFilters
+    DeviceFilters --> DeviceOption
+    DeviceFilters --> OrgOption
+
+    Service --> UI
+```
 
 ---
 
-# 10. Summary
+## Core Components (Module 2)
 
-The **`openframe-oss-lib`** repository is the complete backend foundation of the OpenFrame ecosystem.
+### 1. LogFilters
+
+Defines multi-value filtering for audit logs:
+
+- Tool types
+- Event types
+- Severities
+- Organizations
+
+Extends filtering capabilities introduced in Module 1.
+
+---
+
+### 2. OrganizationFilterOption
+
+Represents:
+
+- Organization ID
+- Organization name
+
+Optimized for UI dropdown rendering without additional lookups.
+
+---
+
+### 3. DeviceFilterCriteria
+
+Defines filtering constraints for device queries:
+
+- DeviceStatus (enum)
+- DeviceType (enum)
+- OS types
+- Organization IDs
+- Tag keys
+- Tag values
+
+Enables composable, type-safe filtering.
+
+---
+
+### 4. DeviceFilterOption
+
+Represents a single filter bucket:
+
+- `value`
+- `label`
+- `count`
+
+Used for faceted filtering interfaces.
+
+---
+
+### 5. DeviceFilters
+
+Aggregated filter response containing:
+
+- Status buckets
+- Device type buckets
+- OS buckets
+- Organization buckets
+- Tag buckets
+- `filteredCount`
+
+Supports real-time faceted search.
+
+---
+
+## Faceted Filtering Flow
+
+```mermaid
+flowchart TD
+    Request["Device List Request"]
+    Criteria["DeviceFilterCriteria"]
+    Query["Database Query"]
+    Aggregation["Aggregation Pipelines"]
+    Devices["Filtered Devices"]
+    Filters["DeviceFilters"]
+
+    Request --> Criteria
+    Criteria --> Query
+    Query --> Devices
+    Query --> Aggregation
+    Aggregation --> Filters
+```
+
+This enables:
+
+- Dynamic filter recalculation
+- Dashboard-style filtering
+- Efficient server-side aggregation
+
+---
+
+# End-to-End Example: Filtered Log Search
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Controller
+    participant Service
+    participant Repository
+
+    Client->>Controller: Submit LogFilterCriteria
+    Controller->>Service: Pass criteria
+    Service->>Repository: Query with filters
+    Repository-->>Service: Logs + total count
+    Service-->>Controller: CountedGenericQueryResult<LogEvent>
+    Controller-->>Client: JSON response
+```
+
+---
+
+# Design Principles
+
+## 1. Pure DTO Layer
+
+- No business logic  
+- No persistence logic  
+- No framework coupling  
+
+## 2. Generic Reusability
+
+`GenericQueryResult<T>` ensures reusable pagination patterns across domains.
+
+## 3. Summary vs Detail Separation
+
+- `LogEvent` for lists
+- `LogDetails` for deep inspection
+
+Improves performance and reduces payload size.
+
+## 4. Faceted Search Pattern
+
+Module 2 enables:
+
+- Multi-dimensional filtering
+- Aggregated counts
+- UI-aligned filter structures
+
+## 5. Strong Typing
+
+- Enum-based device filtering
+- Structured organization filtering
+- Explicit separation of criteria vs options
+
+---
+
+# Core Module Documentation References
+
+- **Module 1** → Core Query & Audit DTOs  
+  - `GenericQueryResult`
+  - `CountedGenericQueryResult`
+  - `LogEvent`
+  - `LogDetails`
+  - `LogFilterCriteria`
+
+- **Module 2** → Filtering & Faceted Search DTOs  
+  - `LogFilters`
+  - `OrganizationFilterOption`
+  - `DeviceFilterCriteria`
+  - `DeviceFilterOption`
+  - `DeviceFilters`
+
+Module 2 builds directly on the result-wrapping structures defined in Module 1.
+
+---
+
+# Summary
+
+`openframe-oss-lib` is the **contract foundation** of the OpenFrame platform.
 
 It provides:
 
-- Secure multi-tenant identity infrastructure  
-- Reactive gateway ingress  
-- REST + GraphQL API orchestration  
-- Real-time CDC stream processing  
-- Scalable analytics storage  
-- Agent lifecycle orchestration  
-- Infrastructure automation and control plane  
-- Kafka-driven event backbone  
+- Standardized query result wrappers
+- Audit log modeling
+- Strongly-typed filtering contracts
+- Faceted filter option modeling
+- Consistent API response structures
 
-Together, these modules implement a production-grade, horizontally scalable, event-driven MSP backend platform.
+By centralizing DTO definitions in a dedicated repository, OpenFrame ensures:
 
----
+- Clean API boundaries  
+- Cross-service consistency  
+- Reusable filtering architecture  
+- Scalable contract evolution  
 
-**End of Overview – openframe-oss-lib**
+This repository forms the **structural backbone of the OpenFrame API layer**.

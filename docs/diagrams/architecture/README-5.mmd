@@ -1,6 +1,28 @@
-flowchart TD
-    Startup["Application Ready"] --> PinotInit["Deploy Pinot Schemas"]
-    Startup --> NatsInit["Create NATS Streams"]
-    Startup --> DebeziumInit["Initialize Connectors"]
-    Startup --> AgentInit["Initialize Agents"]
-    Startup --> Schedulers["Start Scheduled Jobs"]
+flowchart LR
+    UI["Frontend UI"]
+
+    DeviceCriteria["DeviceFilterCriteria"]
+    LogFilters["LogFilters"]
+
+    Service["Application Service"]
+    Repo["Repository"]
+    DB[("Database")]
+
+    DeviceFilters["DeviceFilters"]
+    DeviceOption["DeviceFilterOption"]
+    OrgOption["OrganizationFilterOption"]
+
+    UI --> DeviceCriteria
+    UI --> LogFilters
+
+    DeviceCriteria --> Service
+    LogFilters --> Service
+
+    Service --> Repo
+    Repo --> DB
+
+    Repo --> DeviceFilters
+    DeviceFilters --> DeviceOption
+    DeviceFilters --> OrgOption
+
+    Service --> UI

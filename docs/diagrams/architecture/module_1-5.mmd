@@ -1,0 +1,4 @@
+flowchart LR
+    ClientFilter["LogFilterCriteria"] --> ServiceLayer["Audit Service"]
+    ServiceLayer --> QueryBuilder["Query Builder"]
+    QueryBuilder --> Database["Log Storage"]

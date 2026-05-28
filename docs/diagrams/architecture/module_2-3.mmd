@@ -1,0 +1,17 @@
+flowchart LR
+    Criteria["DeviceFilterCriteria"] --> Service["Device Service"]
+    Service --> Query["Database Query"]
+
+    Query --> Devices["Filtered Devices"]
+    Query --> Aggregations["Aggregation Pipelines"]
+
+    Aggregations --> StatusOptions["DeviceFilterOption Statuses"]
+    Aggregations --> TypeOptions["DeviceFilterOption Types"]
+    Aggregations --> OSOptions["DeviceFilterOption OS"]
+
+    StatusOptions --> Filters["DeviceFilters"]
+    TypeOptions --> Filters
+    OSOptions --> Filters
+
+    Devices --> Response["API Response"]
+    Filters --> Response
