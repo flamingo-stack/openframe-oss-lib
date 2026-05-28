@@ -9,6 +9,8 @@ interface NotificationsContextValue {
   isOpen: boolean
   showPopups: boolean
   addNotification: (input: AddNotificationInput) => string
+  upsertNotification: (input: AddNotificationInput & { id: string }) => string
+  setNotifications: (list: Notification[]) => void
   markRead: (id: string) => void
   markAllRead: () => void
   markSettled: (id: string) => void
@@ -23,6 +25,17 @@ interface NotificationsContextValue {
 
 const NotificationsContext = React.createContext<NotificationsContextValue | null>(null)
 
+export interface NotificationsActions {
+  /** Called after the local reducer marks an item read; persist server-side. */
+  onMarkRead?: (id: string) => void | Promise<void>
+  /** Called after the local reducer marks all read; persist server-side. */
+  onMarkAllRead?: () => void | Promise<void>
+  /** Called after the local reducer removes an item; persist server-side. */
+  onRemove?: (id: string) => void | Promise<void>
+  /** Called after the local reducer marks an item settled; optional persistence. */
+  onMarkSettled?: (id: string) => void | Promise<void>
+}
+
 export interface NotificationsProviderProps {
   children: React.ReactNode
   initialNotifications?: Notification[]
@@ -30,21 +43,62 @@ export interface NotificationsProviderProps {
   defaultShowPopups?: boolean
   onShowPopupsChange?: (value: boolean) => void
   onHistoryClick?: () => void
+  actions?: NotificationsActions
 }
 
 type Action =
   | { type: 'add'; notification: Notification; max: number }
+  | { type: 'upsert'; notification: Notification; max: number }
+  | { type: 'set'; notifications: Notification[] }
   | { type: 'markRead'; id: string }
   | { type: 'markAllRead' }
   | { type: 'markSettled'; id: string }
   | { type: 'remove'; id: string }
   | { type: 'clear' }
 
+function mergeNotification(base: Notification, incoming: Notification): Notification {
+  const out: Notification = { ...base }
+  for (const key of Object.keys(incoming) as (keyof Notification)[]) {
+    const value = incoming[key]
+    if (value !== undefined) (out as unknown as Record<string, unknown>)[key] = value
+  }
+
+  out.read = (incoming.read ?? false) || (base.read ?? false) || false
+  out.settled = (incoming.settled ?? false) || (base.settled ?? false) || false
+  return out
+}
+
 function reducer(state: Notification[], action: Action): Notification[] {
   switch (action.type) {
     case 'add': {
-      const next = [action.notification, ...state.filter((n) => n.id !== action.notification.id)]
+      const existing = state.find((n) => n.id === action.notification.id)
+      if (existing) {
+        const merged = mergeNotification(existing, action.notification)
+        return [merged, ...state.filter((n) => n.id !== action.notification.id)]
+      }
+      const next = [action.notification, ...state]
       return next.length > action.max ? next.slice(0, action.max) : next
+    }
+    case 'upsert': {
+      const existing = state.find((n) => n.id === action.notification.id)
+      if (existing) {
+        const merged = mergeNotification(existing, action.notification)
+        return state.map((n) => (n.id === action.notification.id ? merged : n))
+      }
+      const next = [action.notification, ...state]
+      return next.length > action.max ? next.slice(0, action.max) : next
+    }
+    case 'set': {
+      const existingById = new Map(state.map((n) => [n.id, n]))
+      return action.notifications.map((incoming) => {
+        const existing = existingById.get(incoming.id)
+        if (!existing) return incoming
+        return {
+          ...incoming,
+          read: incoming.read || existing.read,
+          settled: incoming.settled || existing.settled,
+        }
+      })
     }
     case 'markRead':
       return state.map((n) => (n.id === action.id ? { ...n, read: true } : n))
@@ -75,10 +129,16 @@ export function NotificationsProvider({
   defaultShowPopups = true,
   onShowPopupsChange,
   onHistoryClick,
+  actions,
 }: NotificationsProviderProps) {
   const [notifications, dispatch] = React.useReducer(reducer, initialNotifications)
   const [isOpen, setIsOpen] = React.useState(false)
   const [showPopups, setShowPopupsState] = React.useState(defaultShowPopups)
+
+  const actionsRef = React.useRef(actions)
+  React.useEffect(() => {
+    actionsRef.current = actions
+  }, [actions])
 
   const addNotification = React.useCallback(
     (input: AddNotificationInput) => {
@@ -87,7 +147,7 @@ export function NotificationsProvider({
         ...input,
         id,
         createdAt: input.createdAt ?? Date.now(),
-        read: false,
+        read: input.read ?? false,
       }
       dispatch({ type: 'add', notification, max: maxNotifications })
       return id
@@ -95,10 +155,44 @@ export function NotificationsProvider({
     [maxNotifications],
   )
 
-  const markRead = React.useCallback((id: string) => dispatch({ type: 'markRead', id }), [])
-  const markAllRead = React.useCallback(() => dispatch({ type: 'markAllRead' }), [])
-  const markSettled = React.useCallback((id: string) => dispatch({ type: 'markSettled', id }), [])
-  const remove = React.useCallback((id: string) => dispatch({ type: 'remove', id }), [])
+  const upsertNotification = React.useCallback(
+    (input: AddNotificationInput & { id: string }) => {
+      const notification: Notification = {
+        ...input,
+        id: input.id,
+        createdAt: input.createdAt ?? Date.now(),
+        read: input.read ?? false,
+      }
+      dispatch({ type: 'upsert', notification, max: maxNotifications })
+      return input.id
+    },
+    [maxNotifications],
+  )
+
+  const setNotifications = React.useCallback((list: Notification[]) => {
+    dispatch({ type: 'set', notifications: list })
+  }, [])
+
+  const markRead = React.useCallback((id: string) => {
+    dispatch({ type: 'markRead', id })
+    void actionsRef.current?.onMarkRead?.(id)
+  }, [])
+
+  const markAllRead = React.useCallback(() => {
+    dispatch({ type: 'markAllRead' })
+    void actionsRef.current?.onMarkAllRead?.()
+  }, [])
+
+  const markSettled = React.useCallback((id: string) => {
+    dispatch({ type: 'markSettled', id })
+    void actionsRef.current?.onMarkSettled?.(id)
+  }, [])
+
+  const remove = React.useCallback((id: string) => {
+    dispatch({ type: 'remove', id })
+    void actionsRef.current?.onRemove?.(id)
+  }, [])
+
   const clear = React.useCallback(() => dispatch({ type: 'clear' }), [])
 
   const open = React.useCallback(() => setIsOpen(true), [])
@@ -125,6 +219,8 @@ export function NotificationsProvider({
       isOpen,
       showPopups,
       addNotification,
+      upsertNotification,
+      setNotifications,
       markRead,
       markAllRead,
       markSettled,
@@ -142,6 +238,8 @@ export function NotificationsProvider({
       isOpen,
       showPopups,
       addNotification,
+      upsertNotification,
+      setNotifications,
       markRead,
       markAllRead,
       markSettled,

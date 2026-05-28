@@ -1,35 +1,22 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { createNatsClient, type NatsClient, type NatsSubscriptionHandle } from '../../../nats'
+import { useEffect, useRef, useState } from 'react'
+import {
+  acquireClient as acquireSharedClient,
+  releaseClient as releaseSharedClient,
+  startConnectionLifecycle,
+  type NatsClient,
+  type NatsStatus,
+  type NatsSubscriptionHandle,
+  type SharedConnection,
+} from '../../../nats'
 import {
   type NatsConnectionSource,
   type NatsMessageType,
   type UseNatsDialogSubscriptionOptions,
   type UseNatsDialogSubscriptionReturn,
-  NETWORK_CONFIG,
 } from '../types'
 
-type SharedConnection = {
-  wsUrl: string
-  client: NatsClient
-  connectPromise: Promise<void> | null
-  refCount: number
-  closeTimer: ReturnType<typeof setTimeout> | null
-  retryTimer: ReturnType<typeof setTimeout> | null
-}
-
-let shared: SharedConnection | null = null
-
-/**
- * Hook for managing NATS dialog subscriptions.
- * 
- * This hook handles:
- * - Connecting to NATS WebSocket
- * - Subscribing to dialog topics (message and/or admin-message)
- * - Reconnection and error handling
- * - Shared connection management
- */
 export function useNatsDialogSubscription({
   enabled,
   dialogId,
@@ -49,8 +36,7 @@ export function useNatsDialogSubscription({
   
   const clientRef = useRef<NatsClient | null>(null)
   const subscriptionRefs = useRef<Map<NatsMessageType, NatsSubscriptionHandle | null>>(new Map())
-  
-  // Stable refs for callbacks
+
   const onEventRef = useRef(onEvent)
   useEffect(() => {
     onEventRef.current = onEvent
@@ -88,66 +74,24 @@ export function useNatsDialogSubscription({
     reconnectionBackoffRef.current = reconnectionBackoff
   }, [reconnectionBackoff])
 
-  const acquireClient = useCallback((url: string): SharedConnection => {
-    if (shared?.wsUrl !== url) {
-      // Close existing connection if URL changed
-      if (shared) {
-        shared.closeTimer && clearTimeout(shared.closeTimer)
-        const old = shared
-        shared = null
-        void old.client.close().catch(() => {})
-      }
-      
-      const { name = 'openframe-frontend', user = 'machine', pass = '' } = clientConfig
-      
-      const client = createNatsClient({
-        servers: url,
-        name,
-        user,
-        pass,
-        connectTimeoutMs: NETWORK_CONFIG.CONNECT_TIMEOUT_MS,
-        reconnect: false,
-        pingIntervalMs: NETWORK_CONFIG.PING_INTERVAL_MS,
-        maxPingOut: NETWORK_CONFIG.MAX_PING_OUT,
-      })
-      shared = { wsUrl: url, client, connectPromise: null, refCount: 0, closeTimer: null, retryTimer: null }
-    }
-
-    shared.refCount += 1
-    shared.closeTimer && clearTimeout(shared.closeTimer)
-    shared.closeTimer = null
-    return shared
+  const clientConfigRef = useRef(clientConfig)
+  useEffect(() => {
+    clientConfigRef.current = clientConfig
   }, [clientConfig])
 
-  const releaseClient = useCallback((url: string) => {
-    if (!shared || shared.wsUrl !== url) return
-    
-    shared.refCount = Math.max(0, shared.refCount - 1)
-    if (shared.refCount > 0) return
-
-    shared.closeTimer = setTimeout(() => {
-      const s = shared
-      shared = null
-      if (s) {
-        if (s.retryTimer) {
-          clearTimeout(s.retryTimer)
-          s.retryTimer = null
-        }
-        void s.client.close().catch(() => {})
-      }
-    }, NETWORK_CONFIG.SHARED_CLOSE_DELAY_MS)
-  }, [])
-
-  // Store the current WebSocket URL to prevent unnecessary reconnections
   const currentWsUrlRef = useRef<string>('')
-  
-  // Connection effect
+
+  // Resolve the URL synchronously each render so the effect's dep is the URL string
+  // itself, not the (often inline-allocated) getNatsWsUrl callback identity. Without
+  // this the effect re-runs on every render that produces a new callback identity —
+  // e.g. every silent token rotation when `useNatsAppConfig` rebuilds getWsUrl —
+  // tearing the WS down and reacquiring even though the resolved URL hasn't changed.
+  const wsUrl = getNatsWsUrl()
+
   useEffect(() => {
-    const wsUrl = getNatsWsUrl()
     if (!enabled || !wsUrl) {
-      // Clean up if disabled or no URL
       if (currentWsUrlRef.current && clientRef.current) {
-        releaseClient(currentWsUrlRef.current)
+        releaseSharedClient(currentWsUrlRef.current)
         clientRef.current = null
         currentWsUrlRef.current = ''
         setIsConnected(false)
@@ -160,142 +104,25 @@ export function useNatsDialogSubscription({
       return
     }
 
-    // Clean up existing connection if URL changed
     if (currentWsUrlRef.current && currentWsUrlRef.current !== wsUrl && clientRef.current) {
-      releaseClient(currentWsUrlRef.current)
+      releaseSharedClient(currentWsUrlRef.current)
       clientRef.current = null
       setIsConnected(false)
     }
 
     currentWsUrlRef.current = wsUrl
-    const sharedConn = acquireClient(wsUrl)
+    const cfg = clientConfigRef.current
+    const sharedConn = acquireSharedClient(wsUrl, {
+      name: cfg.name ?? 'openframe-frontend',
+      user: cfg.user ?? 'machine',
+      pass: cfg.pass ?? '',
+    })
     const client = sharedConn.client
 
     clientRef.current = client
-    setIsConnected(false)
+    setIsConnected(client.isConnected())
 
-    let closed = false
-    let retryAttempt = 0
-
-    function scheduleRetry() {
-      if (closed) return
-      if (shared !== sharedConn) return
-
-      if (sharedConn.retryTimer) {
-        clearTimeout(sharedConn.retryTimer)
-        sharedConn.retryTimer = null
-      }
-
-      const cfg = reconnectionBackoffRef.current ?? {}
-      const fastRetries = cfg.fastRetries ?? 0
-      const fastDelay = cfg.fastRetryDelayMs ?? NETWORK_CONFIG.RETRY_INITIAL_DELAY_MS
-      const baseDelay = cfg.initialDelayMs ?? NETWORK_CONFIG.RETRY_INITIAL_DELAY_MS
-      const maxDelay = cfg.maxDelayMs ?? NETWORK_CONFIG.RETRY_MAX_DELAY_MS
-      const multiplier = cfg.multiplier ?? NETWORK_CONFIG.RETRY_BACKOFF_MULTIPLIER
-
-      const delay = retryAttempt < fastRetries
-        ? fastDelay
-        : Math.min(baseDelay * (multiplier ** (retryAttempt - fastRetries)), maxDelay)
-      const jitteredDelay = delay * (0.5 + Math.random() * 0.5)
-      retryAttempt++
-
-      sharedConn.retryTimer = setTimeout(async () => {
-        sharedConn.retryTimer = null
-        if (closed) return
-        if (shared !== sharedConn) return
-
-        try {
-          await onBeforeReconnectRef.current?.()
-        } catch {
-          // Token refresh failed; still try to reconnect
-        }
-
-        if (closed) return
-        if (shared !== sharedConn) return
-
-        const freshUrl = getNatsWsUrlRef.current()
-        if (freshUrl !== wsUrl) return
-
-        try {
-          sharedConn.connectPromise = null
-          sharedConn.connectPromise = client.connect()
-          await sharedConn.connectPromise
-          if (!closed && shared === sharedConn) {
-            retryAttempt = 0
-            setIsConnected(true)
-          }
-        } catch {
-          sharedConn.connectPromise = null
-          if (!closed && shared === sharedConn) {
-            scheduleRetry()
-          }
-        }
-      }, jitteredDelay)
-    }
-
-    const unsubscribeStatus = client.onStatus((event) => {
-      const connected = event.status === 'connected'
-      const disconnected = ['closed', 'disconnected', 'error'].includes(event.status)
-      if (connected) {
-        setIsConnected(true)
-        if (hadConnectionBeforeRef.current) {
-          setReconnectionCount(c => c + 1)
-        }
-        hadConnectionBeforeRef.current = true
-        retryAttempt = 0
-        onConnectRef.current?.()
-      }
-      if (disconnected) {
-        setIsConnected(false)
-        setIsSubscribed(false)
-        
-        subscriptionRefs.current.forEach((sub) => {
-          try {
-            sub?.unsubscribe()
-          } catch {
-            // ignore
-          }
-        })
-        subscriptionRefs.current.clear()
-        lastSubscribedDialogIdRef.current = null
-        abortControllerRef.current?.abort()
-        abortControllerRef.current = null
-
-        onDisconnectRef.current?.()
-        scheduleRetry()
-      }
-    })
-
-    ;(async () => {
-      try {
-        sharedConn.connectPromise ||= client.connect()
-        await sharedConn.connectPromise
-        if (!closed) {
-          setIsConnected(true)
-          hadConnectionBeforeRef.current = true
-        }
-      } catch {
-        sharedConn.connectPromise = null
-        if (!closed) {
-          setIsConnected(false)
-          onDisconnectRef.current?.()
-          scheduleRetry()
-        }
-      }
-    })()
-
-    return () => {
-      closed = true
-      setIsConnected(false)
-      setIsSubscribed(false)
-      unsubscribeStatus()
-
-      if (sharedConn.retryTimer) {
-        clearTimeout(sharedConn.retryTimer)
-        sharedConn.retryTimer = null
-      }
-
-      // Unsubscribe all subscriptions
+    const tearDownSubscriptions = () => {
       subscriptionRefs.current.forEach((sub) => {
         try {
           sub?.unsubscribe()
@@ -305,14 +132,53 @@ export function useNatsDialogSubscription({
       })
       subscriptionRefs.current.clear()
       lastSubscribedDialogIdRef.current = null
+      abortControllerRef.current?.abort()
+      abortControllerRef.current = null
+    }
+
+    // This hook treats 'error' as a disconnect (pre-existing behaviour); JetStream's
+    // hook does not — it skips retry on protocol errors.
+    const isDisconnectStatus = (status: NatsStatus) =>
+      status === 'closed' || status === 'disconnected' || status === 'error'
+
+    const lifecycle = startConnectionLifecycle({
+      conn: sharedConn,
+      wsUrl,
+      onBeforeReconnect: () => onBeforeReconnectRef.current?.(),
+      backoff: reconnectionBackoffRef.current,
+      getFreshUrl: () => getNatsWsUrlRef.current(),
+      shouldRetryOn: isDisconnectStatus,
+      onStatusChange: (status) => {
+        if (status === 'connected') {
+          setIsConnected(true)
+          if (hadConnectionBeforeRef.current) {
+            setReconnectionCount((c) => c + 1)
+          }
+          hadConnectionBeforeRef.current = true
+          onConnectRef.current?.()
+        }
+        if (isDisconnectStatus(status)) {
+          setIsConnected(false)
+          setIsSubscribed(false)
+          tearDownSubscriptions()
+          onDisconnectRef.current?.()
+        }
+      },
+    })
+
+    return () => {
+      lifecycle.stop()
+      setIsConnected(false)
+      setIsSubscribed(false)
+      tearDownSubscriptions()
 
       if (clientRef.current && currentWsUrlRef.current) {
-        releaseClient(currentWsUrlRef.current)
+        releaseSharedClient(currentWsUrlRef.current)
         clientRef.current = null
         currentWsUrlRef.current = ''
       }
     }
-  }, [enabled, getNatsWsUrl, acquireClient, releaseClient])
+  }, [enabled, wsUrl])
 
   const topicsKey = topics.join(',')
   const lastSubscribedDialogIdRef = useRef<string | null>(null)
@@ -322,16 +188,13 @@ export function useNatsDialogSubscription({
     isConnectedRef.current = isConnected
   }, [isConnected])
 
-  // Track subscription state separately from dialog changes
   const currentDialogIdRef = useRef<string | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
-  
-  // Handle dialog changes and subscription lifecycle
+
   useEffect(() => {
     currentDialogIdRef.current = dialogId
-    
+
     if (!enabled || !dialogId) {
-      // Clean up if disabled or no dialog
       if (subscriptionRefs.current.size > 0) {
         setIsSubscribed(false)
         subscriptionRefs.current.forEach((sub) => {
@@ -357,7 +220,6 @@ export function useNatsDialogSubscription({
       return
     }
     
-    // Clean up any existing subscriptions before creating new ones
     if (subscriptionRefs.current.size > 0) {
       subscriptionRefs.current.forEach((sub) => {
         try {
@@ -369,8 +231,7 @@ export function useNatsDialogSubscription({
       subscriptionRefs.current.clear()
       abortControllerRef.current?.abort()
     }
-    
-    // Create new abort controller for this subscription set
+
     abortControllerRef.current = new AbortController()
     const abort = abortControllerRef.current
 
@@ -397,7 +258,6 @@ export function useNatsDialogSubscription({
         }
       }
       
-      // Subscribe to all configured topics
       topics.forEach((topic) => {
         const subscription = client.subscribeBytes(
           `chat.${dialogId}.${topic}`,
@@ -431,8 +291,7 @@ export function useNatsDialogSubscription({
       abortControllerRef.current = null
     }
   }, [enabled, dialogId, topicsKey, topics])
-  
-  // Separate effect to handle connection state changes
+
   useEffect(() => {
     if (!enabled || !currentDialogIdRef.current || !isConnected) {
       return
@@ -461,7 +320,6 @@ export function useNatsDialogSubscription({
         }
       }
       
-      // Subscribe to all configured topics
       topics.forEach((topic) => {
         const subscription = client.subscribeBytes(
           `chat.${dialogId}.${topic}`,
@@ -475,7 +333,6 @@ export function useNatsDialogSubscription({
       setIsSubscribed(true)
       onSubscribedRef.current?.()
     } else if (subscriptionRefs.current.size > 0) {
-      // We have subscriptions, just update the state
       setIsSubscribed(true)
     }
   }, [isConnected, enabled, topics, topicsKey])

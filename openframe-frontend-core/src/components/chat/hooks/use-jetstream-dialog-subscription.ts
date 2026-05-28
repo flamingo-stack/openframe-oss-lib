@@ -1,27 +1,18 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
-  createNatsClient,
+  acquireClient as acquireSharedClient,
+  releaseClient as releaseSharedClient,
+  startConnectionLifecycle,
   type JetStreamSubscriptionHandle,
   type NatsClient,
+  type SharedConnection,
 } from '../../../nats'
 import {
   type UseJetStreamDialogSubscriptionOptions,
   type UseJetStreamDialogSubscriptionReturn,
-  NETWORK_CONFIG,
 } from '../types'
-
-type SharedConnection = {
-  wsUrl: string
-  client: NatsClient
-  connectPromise: Promise<void> | null
-  refCount: number
-  closeTimer: ReturnType<typeof setTimeout> | null
-  retryTimer: ReturnType<typeof setTimeout> | null
-}
-
-let shared: SharedConnection | null = null
 
 const DEFAULT_INACTIVE_THRESHOLD_MS = 5 * 60_000
 const DEFAULT_STREAM_NAME = 'CHAT_CHUNKS'
@@ -110,75 +101,23 @@ export function useJetStreamDialogSubscription({
 
   const hadConnectionBeforeRef = useRef(false)
 
-  const acquireClient = useCallback(
-    (url: string): SharedConnection => {
-      if (shared?.wsUrl !== url) {
-        if (shared) {
-          if (shared.closeTimer) clearTimeout(shared.closeTimer)
-          const old = shared
-          shared = null
-          void old.client.close().catch(() => {})
-        }
-
-        const { name = 'openframe-frontend-jetstream', user = 'machine', pass = '' } = clientConfig
-
-        const client = createNatsClient({
-          servers: url,
-          name,
-          user,
-          pass,
-          connectTimeoutMs: NETWORK_CONFIG.CONNECT_TIMEOUT_MS,
-          reconnect: false,
-          pingIntervalMs: NETWORK_CONFIG.PING_INTERVAL_MS,
-          maxPingOut: NETWORK_CONFIG.MAX_PING_OUT,
-        })
-        shared = {
-          wsUrl: url,
-          client,
-          connectPromise: null,
-          refCount: 0,
-          closeTimer: null,
-          retryTimer: null,
-        }
-      }
-
-      shared.refCount += 1
-      if (shared.closeTimer) {
-        clearTimeout(shared.closeTimer)
-        shared.closeTimer = null
-      }
-      return shared
-    },
-    [clientConfig],
-  )
-
-  const releaseClient = useCallback((url: string) => {
-    if (!shared || shared.wsUrl !== url) return
-
-    shared.refCount = Math.max(0, shared.refCount - 1)
-    if (shared.refCount > 0) return
-
-    shared.closeTimer = setTimeout(() => {
-      const s = shared
-      shared = null
-      if (s) {
-        if (s.retryTimer) {
-          clearTimeout(s.retryTimer)
-          s.retryTimer = null
-        }
-        void s.client.close().catch(() => {})
-      }
-    }, NETWORK_CONFIG.SHARED_CLOSE_DELAY_MS)
-  }, [])
+  const clientConfigRef = useRef(clientConfig)
+  useEffect(() => {
+    clientConfigRef.current = clientConfig
+  }, [clientConfig])
 
   const currentWsUrlRef = useRef<string>('')
 
-  // Connection lifecycle: acquire/release the shared client based on enabled + URL.
+  // Resolve the URL synchronously each render so the effect depends on the URL string
+  // itself, not the (often inline-allocated) getNatsWsUrl callback identity. Otherwise
+  // every silent token rotation that rebuilds getNatsWsUrl in the caller would tear
+  // the WS down and reacquire even though the resolved URL hasn't changed.
+  const wsUrl = getNatsWsUrl()
+
   useEffect(() => {
-    const wsUrl = getNatsWsUrl()
     if (!enabled || !wsUrl) {
       if (currentWsUrlRef.current && clientRef.current) {
-        releaseClient(currentWsUrlRef.current)
+        releaseSharedClient(currentWsUrlRef.current)
         clientRef.current = null
         currentWsUrlRef.current = ''
         setIsConnected(false)
@@ -199,150 +138,24 @@ export function useJetStreamDialogSubscription({
       currentWsUrlRef.current !== wsUrl &&
       clientRef.current
     ) {
-      releaseClient(currentWsUrlRef.current)
+      releaseSharedClient(currentWsUrlRef.current)
       clientRef.current = null
       setIsConnected(false)
     }
 
     currentWsUrlRef.current = wsUrl
-    const sharedConn = acquireClient(wsUrl)
+    const cfg = clientConfigRef.current
+    const sharedConn = acquireSharedClient(wsUrl, {
+      name: cfg.name ?? 'openframe-frontend-jetstream',
+      user: cfg.user ?? 'machine',
+      pass: cfg.pass ?? '',
+    })
     const client = sharedConn.client
 
     clientRef.current = client
-    setIsConnected(false)
+    setIsConnected(client.isConnected())
 
-    let closed = false
-    let retryAttempt = 0
-
-    function scheduleRetry() {
-      if (closed) return
-      if (shared !== sharedConn) return
-
-      if (sharedConn.retryTimer) {
-        clearTimeout(sharedConn.retryTimer)
-        sharedConn.retryTimer = null
-      }
-
-      const cfg = reconnectionBackoffRef.current ?? {}
-      const fastRetries = cfg.fastRetries ?? 0
-      const fastDelay = cfg.fastRetryDelayMs ?? NETWORK_CONFIG.RETRY_INITIAL_DELAY_MS
-      const baseDelay = cfg.initialDelayMs ?? NETWORK_CONFIG.RETRY_INITIAL_DELAY_MS
-      const maxDelay = cfg.maxDelayMs ?? NETWORK_CONFIG.RETRY_MAX_DELAY_MS
-      const multiplier = cfg.multiplier ?? NETWORK_CONFIG.RETRY_BACKOFF_MULTIPLIER
-
-      const delay =
-        retryAttempt < fastRetries
-          ? fastDelay
-          : Math.min(baseDelay * multiplier ** (retryAttempt - fastRetries), maxDelay)
-      const jitteredDelay = delay * (0.5 + Math.random() * 0.5)
-      retryAttempt++
-
-      sharedConn.retryTimer = setTimeout(async () => {
-        sharedConn.retryTimer = null
-        if (closed) return
-        if (shared !== sharedConn) return
-
-        try {
-          await onBeforeReconnectRef.current?.()
-        } catch {
-          // Token refresh failed; still try to reconnect.
-        }
-
-        if (closed) return
-        if (shared !== sharedConn) return
-
-        const freshUrl = getNatsWsUrlRef.current()
-        if (freshUrl !== wsUrl) return
-
-        try {
-          sharedConn.connectPromise = null
-          sharedConn.connectPromise = client.connect()
-          await sharedConn.connectPromise
-          if (!closed && shared === sharedConn) {
-            retryAttempt = 0
-            setIsConnected(true)
-          }
-        } catch {
-          sharedConn.connectPromise = null
-          if (!closed && shared === sharedConn) {
-            scheduleRetry()
-          }
-        }
-      }, jitteredDelay)
-    }
-
-    const unsubscribeStatus = client.onStatus((event) => {
-      const connected = event.status === 'connected'
-      // `error` is a protocol-level signal (e.g. -ERR Permissions Violation when
-      // CONSUMER.CREATE is denied) that does NOT close the WebSocket. Treating
-      // it as a disconnect causes scheduleRetry() to fire on every -ERR, which
-      // re-runs onBeforeReconnect (auth refresh / `/api/me`) on a loop. Real
-      // transport loss arrives separately as `disconnected` or `closed`.
-      const disconnected = event.status === 'closed' || event.status === 'disconnected'
-      if (connected) {
-        setIsConnected(true)
-        if (hadConnectionBeforeRef.current) {
-          setReconnectionCount((c) => c + 1)
-        }
-        hadConnectionBeforeRef.current = true
-        retryAttempt = 0
-        onConnectRef.current?.()
-      }
-      if (event.status === 'error') {
-        // Subscription-level failures (e.g. consumer.get rejected by JetStream
-        // ACLs) already surface to the subscribe effect via the rejected
-        // promise; log here for diagnostics and let the existing WS connection
-        // keep running.
-        console.warn('[JetStream] NATS protocol error:', event.data)
-        return
-      }
-      if (disconnected) {
-        setIsConnected(false)
-        setIsSubscribed(false)
-
-        if (subscriptionRef.current) {
-          try {
-            subscriptionRef.current.unsubscribe()
-          } catch {
-            // ignore
-          }
-          subscriptionRef.current = null
-        }
-
-        onDisconnectRef.current?.()
-        scheduleRetry()
-      }
-    })
-
-    ;(async () => {
-      try {
-        sharedConn.connectPromise ||= client.connect()
-        await sharedConn.connectPromise
-        if (!closed) {
-          setIsConnected(true)
-          hadConnectionBeforeRef.current = true
-        }
-      } catch {
-        sharedConn.connectPromise = null
-        if (!closed) {
-          setIsConnected(false)
-          onDisconnectRef.current?.()
-          scheduleRetry()
-        }
-      }
-    })()
-
-    return () => {
-      closed = true
-      setIsConnected(false)
-      setIsSubscribed(false)
-      unsubscribeStatus()
-
-      if (sharedConn.retryTimer) {
-        clearTimeout(sharedConn.retryTimer)
-        sharedConn.retryTimer = null
-      }
-
+    const tearDownSubscription = () => {
       if (subscriptionRef.current) {
         try {
           subscriptionRef.current.unsubscribe()
@@ -351,14 +164,54 @@ export function useJetStreamDialogSubscription({
         }
         subscriptionRef.current = null
       }
+    }
+
+    const lifecycle = startConnectionLifecycle({
+      conn: sharedConn,
+      wsUrl,
+      onBeforeReconnect: () => onBeforeReconnectRef.current?.(),
+      backoff: reconnectionBackoffRef.current,
+      getFreshUrl: () => getNatsWsUrlRef.current(),
+      // JetStream emits 'error' for protocol-level failures (e.g. -ERR Permissions
+      // Violation when CONSUMER.CREATE is denied) without closing the WebSocket.
+      // Retrying on 'error' would loop onBeforeReconnect on every -ERR; let the
+      // subscribe effect surface those via its own rejected promise instead.
+      shouldRetryOn: (status) => status === 'closed' || status === 'disconnected',
+      onStatusChange: (status, evt) => {
+        if (status === 'connected') {
+          setIsConnected(true)
+          if (hadConnectionBeforeRef.current) {
+            setReconnectionCount((c) => c + 1)
+          }
+          hadConnectionBeforeRef.current = true
+          onConnectRef.current?.()
+        }
+        if (status === 'error') {
+          console.warn('[JetStream] NATS protocol error:', evt.data)
+          return
+        }
+        if (status === 'closed' || status === 'disconnected') {
+          setIsConnected(false)
+          setIsSubscribed(false)
+          tearDownSubscription()
+          onDisconnectRef.current?.()
+        }
+      },
+    })
+
+    return () => {
+      lifecycle.stop()
+      setIsConnected(false)
+      setIsSubscribed(false)
+      tearDownSubscription()
 
       if (clientRef.current && currentWsUrlRef.current) {
-        releaseClient(currentWsUrlRef.current)
+        releaseSharedClient(currentWsUrlRef.current)
         clientRef.current = null
         currentWsUrlRef.current = ''
       }
     }
-  }, [enabled, getNatsWsUrl, acquireClient, releaseClient])
+  }, [enabled, wsUrl])
 
   // Subscription lifecycle: (re)create the ephemeral JetStream consumer whenever
   // we transition into a connected state for a dialog, and whenever the dialog
