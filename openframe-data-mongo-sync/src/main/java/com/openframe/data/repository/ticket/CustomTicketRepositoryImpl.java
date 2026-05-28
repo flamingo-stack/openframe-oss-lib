@@ -2,6 +2,7 @@ package com.openframe.data.repository.ticket;
 
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketStatus;
+import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
@@ -16,6 +17,7 @@ import org.springframework.data.mongodb.core.query.Update;
 
 import java.time.Instant;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -28,6 +30,8 @@ public class CustomTicketRepositoryImpl implements CustomTicketRepository {
     private static final String DEFAULT_SORT_FIELD = "_id";
 
     private static final String FIELD_STATUS = "status";
+    private static final String FIELD_STATUS_ID = "statusId";
+    private static final String FIELD_STATUS_KIND = "statusKind";
     private static final String FIELD_TICKET_NUMBER = "ticketNumber";
     private static final String FIELD_ORGANIZATION_ID = "organizationId";
     private static final String FIELD_ASSIGNED_TO = "assignedTo";
@@ -51,6 +55,7 @@ public class CustomTicketRepositoryImpl implements CustomTicketRepository {
             ID_FIELD,
             FIELD_TICKET_NUMBER,
             FIELD_STATUS,
+            FIELD_STATUS_KIND,
             FIELD_ORGANIZATION_NAME,
             FIELD_ASSIGNED_NAME,
             FIELD_DEVICE_HOSTNAME,
@@ -73,6 +78,8 @@ public class CustomTicketRepositoryImpl implements CustomTicketRepository {
 
         if (filter != null) {
             addCriteriaIfNotEmpty(query, FIELD_STATUS, filter.getStatuses());
+            addCriteriaIfNotEmpty(query, FIELD_STATUS_ID, filter.getStatusIds());
+            addCriteriaIfNotEmpty(query, FIELD_STATUS_KIND, filter.getStatusKinds());
             addCriteriaIfNotEmpty(query, FIELD_ORGANIZATION_ID, filter.getOrganizationIds());
             addCriteriaIfNotEmpty(query, FIELD_ASSIGNED_TO, filter.getAssigneeIds());
             addCriteriaIfNotEmpty(query, FIELD_DEVICE_ID, filter.getDeviceIds());
@@ -199,6 +206,7 @@ public class CustomTicketRepositoryImpl implements CustomTicketRepository {
         return switch (sortField) {
             case FIELD_TICKET_NUMBER -> ticket.getTicketNumber();
             case FIELD_STATUS -> ticket.getStatus() != null ? ticket.getStatus().name() : null;
+            case FIELD_STATUS_KIND -> ticket.getStatusKind() != null ? ticket.getStatusKind().name() : null;
             case FIELD_ORGANIZATION_NAME -> ticket.getOrganizationName();
             case FIELD_ASSIGNED_NAME -> ticket.getAssignedName();
             case FIELD_DEVICE_HOSTNAME -> ticket.getDeviceHostname();
@@ -242,6 +250,53 @@ public class CustomTicketRepositoryImpl implements CustomTicketRepository {
     }
 
     @Override
+    public Map<TicketStatusKind, Long> countTicketsByStatusKind() {
+        Aggregation aggregation = Aggregation.newAggregation(
+                Aggregation.group(FIELD_STATUS_KIND).count().as(AGG_COUNT),
+                Aggregation.project(AGG_COUNT).and(ID_FIELD).as(FIELD_STATUS_KIND)
+        );
+
+        AggregationResults<Document> results = mongoTemplate.aggregate(
+                aggregation, Ticket.class, Document.class);
+
+        Map<TicketStatusKind, Long> kindCounts = new EnumMap<>(TicketStatusKind.class);
+        for (Document doc : results.getMappedResults()) {
+            String kindStr = doc.getString(FIELD_STATUS_KIND);
+            if (kindStr != null) {
+                try {
+                    TicketStatusKind kind = TicketStatusKind.valueOf(kindStr);
+                    kindCounts.put(kind, doc.getInteger(AGG_COUNT).longValue());
+                } catch (IllegalArgumentException e) {
+                    log.warn("Unknown ticket status kind: {}", kindStr);
+                }
+            }
+        }
+
+        return kindCounts;
+    }
+
+    @Override
+    public Map<String, Long> countTicketsByStatusId() {
+        Aggregation aggregation = Aggregation.newAggregation(
+                Aggregation.group(FIELD_STATUS_ID).count().as(AGG_COUNT),
+                Aggregation.project(AGG_COUNT).and(ID_FIELD).as(FIELD_STATUS_ID)
+        );
+
+        AggregationResults<Document> results = mongoTemplate.aggregate(
+                aggregation, Ticket.class, Document.class);
+
+        Map<String, Long> statusCounts = new HashMap<>();
+        for (Document doc : results.getMappedResults()) {
+            String statusId = doc.getString(FIELD_STATUS_ID);
+            if (statusId != null) {
+                statusCounts.put(statusId, doc.getInteger(AGG_COUNT).longValue());
+            }
+        }
+
+        return statusCounts;
+    }
+
+    @Override
     public long getTotalCount() {
         return mongoTemplate.count(new Query(), Ticket.class);
     }
@@ -277,6 +332,20 @@ public class CustomTicketRepositoryImpl implements CustomTicketRepository {
 
         long modifiedCount = mongoTemplate.updateMulti(query, update, Ticket.class).getModifiedCount();
         log.debug("Bulk status update: {} -> {}, modified: {}", fromStatus, toStatus, modifiedCount);
+
+        return (int) modifiedCount;
+    }
+
+    @Override
+    public int reassignTicketsToStatus(String fromStatusId, String toStatusId, TicketStatusKind toKind) {
+        Query query = new Query(Criteria.where(FIELD_STATUS_ID).is(fromStatusId));
+        Update update = new Update()
+                .set(FIELD_STATUS_ID, toStatusId)
+                .set(FIELD_STATUS_KIND, toKind)
+                .set(FIELD_UPDATED_AT, Instant.now());
+
+        long modifiedCount = mongoTemplate.updateMulti(query, update, Ticket.class).getModifiedCount();
+        log.info("Reassigned {} tickets from statusId {} to {}", modifiedCount, fromStatusId, toStatusId);
 
         return (int) modifiedCount;
     }

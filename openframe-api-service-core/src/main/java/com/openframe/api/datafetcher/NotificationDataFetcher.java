@@ -10,6 +10,7 @@ import com.openframe.api.dto.notification.NotificationView;
 import com.openframe.api.dto.notification.UnreadCategoryCount;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLNotificationMapper;
 import com.openframe.api.service.NotificationService;
 import com.openframe.core.exception.UnauthorizedException;
@@ -57,10 +58,12 @@ public class NotificationDataFetcher {
             @InputArgument Integer first,
             @InputArgument String after,
             @InputArgument Integer last,
-            @InputArgument String before) {
+            @InputArgument String before,
+            @InputArgument SortInput sort) {
 
         Recipient r = currentRecipient();
-        log.debug("Listing notifications for {} {} (filter={}, search={})", r.type(), r.id(), filter, search);
+        log.debug("Listing notifications for {} {} (filter={}, search={}, sort={})",
+                r.type(), r.id(), filter, search, sort);
 
         ConnectionArgs args = ConnectionArgs.builder()
                 .first(first).after(after).last(last).before(before)
@@ -70,7 +73,7 @@ public class NotificationDataFetcher {
                 filter == null ? null : filter.getRead(), search);
 
         GenericQueryResult<NotificationView> result = notificationService.list(
-                r.id(), r.type(), serviceFilter, pagination);
+                r.id(), r.type(), serviceFilter, pagination, sort);
         return notificationMapper.toConnection(result);
     }
 

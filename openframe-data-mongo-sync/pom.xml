@@ -54,6 +54,12 @@
         </dependency>
 
         <dependency>
+            <groupId>com.github.pravin-raha</groupId>
+            <artifactId>lexorank4j</artifactId>
+            <version>0.1.0</version>
+        </dependency>
+
+        <dependency>
             <groupId>org.springframework.retry</groupId>
             <artifactId>spring-retry</artifactId>
         </dependency>
