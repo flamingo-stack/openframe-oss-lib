@@ -145,11 +145,18 @@ export const OPENFRAME_DEV_SECTIONS = {
       title: 'Onboarding Guides',
       description: 'Step-by-step product walkthroughs.',
     },
-    // `hero` / `search` / `filter` are intentionally inert here —
-    // /onboarding-guides is owned by OnboardingGuidesCatalogView, not
-    // DevSectionView. This entry exists ONLY to drive the homepage
-    // navigator card so all 4 cards stay in one registry.
-    hero: { title: '', description: '' },
+    hero: {
+      title: 'Getting Started',
+      description:
+        'Step-by-step walkthroughs for getting up and running with OpenFrame — from your first device deployment to advanced integrations.',
+    },
+    // `search` / `filter` are intentionally null — onboarding-guides
+    // uses a custom RAG-backed search dropdown (`useDocSearch`, not the
+    // local text filter `DevSectionView` ships) and dynamic section
+    // pills (counts vary with content, vs the static status options
+    // every other dev-center surface uses). Both controls are injected
+    // by the host via `DevSectionPage`'s `preControls` slot — same
+    // mechanism tickets uses for its "Open a new ticket" form.
     search: null,
     filter: null,
   },

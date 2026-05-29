@@ -1016,6 +1016,27 @@ export function ChatCardLoader({
     </ChatCardNavWrap>
   )
   if (entry.mode === 'no-fetch') {
+    // Synthetic-ref gate. `chat-message-enhanced.tsx` builds a minimal
+    // `{ type, id, title: cardId, url: null }` ChatRef when the LLM
+    // emits `[card://<type>:<id>]` for an id the server did NOT
+    // surface (refs map miss) — typically an LLM hallucination of a
+    // composite/invented UUID. EVERY real ref carries `sourceRepo`
+    // (set by `buildChatRefFromRow` via `config.id` AND by
+    // `synthesizeVideoRefs` via `EMBEDDED_VIDEO_SOURCE_REPO`), so a
+    // missing `sourceRepo` is a reliable synthetic-ref signal.
+    //
+    // Returning null here triggers the bare-cardId fallback span in
+    // chat-message-enhanced's `<a card://...>` override — the
+    // documented "VISIBLE breakage" behavior. Without this gate, a
+    // hallucinated marker like `[card://markdown:f18945f8-<real-uuid>]`
+    // renders a `DataRoomDocChatCard` with the generic "Document"
+    // badge AND the fake id as the title — which the user can't tell
+    // apart from a real card (the entire point of the fallback
+    // comment block in chat-message-enhanced.tsx).
+    //
+    // Fetch-mode types already handle this gracefully: a synthetic
+    // id leads to a fetch miss → `!item` → null at line ~1034.
+    if (!finalChatRef.sourceRepo) return null
     if (entry.bareInline) {
       return navWrap(entry.render(finalChatRef, renderOpts))
     }

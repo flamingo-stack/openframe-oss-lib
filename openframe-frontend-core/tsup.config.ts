@@ -55,6 +55,7 @@ export default defineConfig([
       'components/ui/index': 'src/components/ui/index.ts',
       'components/chat/index': 'src/components/chat/index.ts',
       'components/tickets/index': 'src/components/tickets/index.ts',
+      'components/onboarding-guides/index': 'src/components/onboarding-guides/index.ts',
       'components/contact/index': 'src/components/contact/index.ts',
       'components/ui/file-manager/index': 'src/components/ui/file-manager/index.ts',
       'components/features/index': 'src/components/features/index.ts',

@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * OnboardingGuideCard (pure presentation).
+ * OnboardingGuideCard (pure presentation + runtime-derived link attrs).
  *
  * Three variants:
  *   - `catalog`: rich detail card (hero + author grid) for the public catalog
@@ -9,8 +9,11 @@
  *   - `default`: horizontal step-numbered card for "More in {section}" rail.
  *   - `sm`: compact horizontal card for chat-inline rendering.
  *
- * The card writes NO click logic — callers wrap with their own anchor and
- * pass the resolved detail URL via `href`.
+ * Link semantics: the card derives `target`/`rel` from `ChatRuntime.navigation
+ * .decideNewTab` (hub-wired via `HubRuntimeProvider`) and the placeholder
+ * image from `ChatRuntime.resolvePlaceholderUrl`. Explicit `target` / `rel`
+ * / `placeholderUrl` props always WIN — chat dispatch and tests can
+ * pre-resolve. No runtime mounted → same-tab + no placeholder.
  */
 
 import React from 'react'
@@ -21,6 +24,8 @@ import { BlogImagePlaceholder } from './blog-image-placeholder'
 import { EntityAuthorCard } from './entity-author-card'
 import { formatDurationMMSS } from '../../../utils/format'
 import type { OnboardingGuide } from '../types/entities/onboarding-guide'
+import { useEntityCardLink } from './use-entity-card-link'
+import { useEntityCardPlaceholder } from './use-entity-card-placeholder'
 import {
   COMPACT_CARD_OUTER,
   COMPACT_CARD_IMAGE_SLOT,
@@ -134,7 +139,28 @@ export function OnboardingGuideCardSkeleton({ size = 'default' }: { size?: 'cata
   )
 }
 
-export function OnboardingGuideCard({ guide, href, target, rel, placeholderUrl, size = 'default', className }: OnboardingGuideCardProps) {
+export function OnboardingGuideCard({
+  guide,
+  href,
+  target: targetProp,
+  rel: relProp,
+  targetPlatform,
+  placeholderUrl: placeholderUrlProp,
+  size = 'default',
+  className,
+}: OnboardingGuideCardProps) {
+  const { target, rel } = useEntityCardLink({
+    href,
+    targetPlatform,
+    target: targetProp,
+    rel: relProp,
+  })
+  const placeholderUrl = useEntityCardPlaceholder({
+    title: guide.title,
+    placeholderUrl: placeholderUrlProp,
+    aspect: size === 'sm' ? 'square' : 'wide',
+  })
+
   if (size === 'catalog') {
     const coverImage =
       guide.featured_image ||
