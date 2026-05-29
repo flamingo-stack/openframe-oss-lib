@@ -15,6 +15,7 @@ export interface Notification {
   severity?: NotificationSeverity
   category?: string
   meta?: Record<string, unknown>
+  onClick?: () => void
 }
 
 export type AddNotificationInput =
