@@ -1,15 +1,9 @@
 package com.openframe.api.mapper;
 
-import com.openframe.api.dto.GenericConnection;
-import com.openframe.api.dto.GenericEdge;
-import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.script.CreateScriptInput;
 import com.openframe.api.dto.script.ScriptEnvVarInput;
 import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.script.UpdateScriptInput;
-import com.openframe.api.dto.shared.ConnectionArgs;
-import com.openframe.api.dto.shared.CursorCodec;
-import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.data.document.rmm.Script;
 import com.openframe.data.document.rmm.ScriptEnvVar;
 import com.openframe.data.document.rmm.ScriptPlatform;
@@ -17,6 +11,14 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+/**
+ * Pure entity &harr; DTO mapping for scripts. Lives in {@code openframe-api-lib}
+ * so it can be reused by any service that talks to the script repository,
+ * regardless of transport (GraphQL / REST / messaging).
+ *
+ * <p>GraphQL-specific concerns (cursor pagination, Relay Connection / Edge
+ * envelope) live in {@code GraphQLScriptMapper} alongside the DGS resolver.
+ */
 @Component
 public class ScriptMapper {
 
@@ -66,25 +68,6 @@ public class ScriptMapper {
                 .build();
     }
 
-    public CursorPaginationCriteria toCursorPaginationCriteria(ConnectionArgs args) {
-        return CursorPaginationCriteria.fromConnectionArgs(args);
-    }
-
-    public GenericConnection<GenericEdge<ScriptResponse>> toConnection(
-            GenericQueryResult<ScriptResponse> result) {
-        List<GenericEdge<ScriptResponse>> edges = result.getItems().stream()
-                .map(view -> GenericEdge.<ScriptResponse>builder()
-                        .node(view)
-                        .cursor(CursorCodec.encode(view.getId()))
-                        .build())
-                .toList();
-
-        return GenericConnection.<GenericEdge<ScriptResponse>>builder()
-                .edges(edges)
-                .pageInfo(result.getPageInfo())
-                .build();
-    }
-
     private List<ScriptEnvVar> mapEnvVarsToEntity(List<ScriptEnvVarInput> envVars) {
         if (envVars == null) {
             return null;
@@ -105,10 +88,7 @@ public class ScriptMapper {
         return envVars.stream()
                 .map(v -> ScriptEnvVarInput.builder()
                         .name(v.getName())
-                        // TODO: mask {@link ScriptEnvVar#getValue()} when {@code secret == true}
-                        // once secret-management (encryption at rest + secure agent delivery) lands.
-                        // Until then, secret variables are rejected on write, so no plaintext leak
-                        // can occur via this path.
+                        // TODO: mask value when secret == true once secret-management lands.
                         .value(v.getValue())
                         .secret(v.isSecret())
                         .build())

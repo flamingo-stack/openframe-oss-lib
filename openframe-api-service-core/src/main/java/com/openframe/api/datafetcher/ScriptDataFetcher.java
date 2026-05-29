@@ -12,7 +12,7 @@ import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.script.UpdateScriptInput;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
-import com.openframe.api.mapper.ScriptMapper;
+import com.openframe.api.mapper.GraphQLScriptMapper;
 import com.openframe.api.service.rmm.ScriptService;
 import com.openframe.core.exception.UnauthorizedException;
 import com.openframe.security.authentication.AuthPrincipal;
@@ -44,7 +44,7 @@ import org.springframework.validation.annotation.Validated;
 public class ScriptDataFetcher {
 
     private final ScriptService scriptService;
-    private final ScriptMapper scriptMapper;
+    private final GraphQLScriptMapper scriptMapper;
 
     @DgsQuery
     public ScriptResponse script(@InputArgument @NotBlank String id) {
