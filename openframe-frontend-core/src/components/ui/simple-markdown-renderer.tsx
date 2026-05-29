@@ -222,7 +222,21 @@ const SAFE_HTML_TAGS = new Set([
  *   3 — everything between the name and the closing `>` (attrs etc.)
  *   4 — optional `/` for void-element self-close
  */
-const TAG_LIKE_REGEX = /<(\/?)([a-zA-Z][a-zA-Z0-9-]*)([^>]*?)(\/?)>/g
+// ReDoS-safe shape: the tag-name class `[a-zA-Z0-9-]` and the rest
+// class `[^>]` both match `-`, so two adjacent quantifiers over those
+// classes (the prior `[a-zA-Z0-9-]*` + `[^>]*?`) admitted O(n²)
+// backtracking on unterminated `<A-----...` strings (CodeQL flagged
+// this as a polynomial-regex ReDoS). Anchoring the rest on a leading
+// `\s` (which CANNOT match `-`) makes the boundary unambiguous —
+// the engine can no longer redistribute dashes between captures, so
+// matching is linear-time even on attacker-controlled markdown.
+//
+// Tag shapes still covered: `<a>`, `<a/>`, `<a class="x">`,
+// `<a class="x"/>`, `</a>`, `<input type="text" />`. Whitespace
+// between tag-name and attrs is required by the HTML spec
+// (`<aclass>` is one token, not a tag), so anchoring on `\s` doesn't
+// reject any valid HTML.
+const TAG_LIKE_REGEX = /<(\/?)([a-zA-Z][a-zA-Z0-9-]*)((?:\s[^>]*?)?)(\/?)>/g
 
 function escapeUnknownHtmlTags(text: string): string {
   if (!text || text.indexOf('<') === -1) return text
