@@ -104,18 +104,12 @@ public class ScriptService {
     }
 
     /**
-     * Apply a partial update to an existing script. Only non-null fields on
-     * {@code input} are persisted (PATCH semantics).
-     *
-     * @throws NotFoundException if the script does not exist in the tenant.
-     * @throws ConflictException if the supplied name collides with another
-     *         script in the same tenant.
+     * Full replacement of an existing script (PUT semantics)
      */
     public ScriptResponse update(String tenantId, String id, UpdateScriptInput input) {
         Script existing = loadVisibleOrThrow(tenantId, id);
 
-        if (input.getName() != null
-                && !input.getName().equals(existing.getName())
+        if (!input.getName().equals(existing.getName())
                 && scriptRepository.existsByTenantIdAndNameAndIdNot(tenantId, input.getName(), id)) {
             throw new ConflictException(
                     "Script with name '" + input.getName() + "' already exists in this tenant");
@@ -132,11 +126,7 @@ public class ScriptService {
      * and stamp {@code statusChangedAt}. The document itself remains so that
      * historic execution records continue to resolve.
      *
-     * <p>Idempotent on already-deleted scripts (no-op + debug log). Hard delete
-     * (physical removal) is intentionally not exposed here — the repository
-     * supports it for future admin / tenant-cleanup tooling.
-     *
-     * @throws NotFoundException if the script id does not exist in the tenant.
+     *  @throws NotFoundException if the script id does not exist in the tenant.
      */
     public void delete(String tenantId, String id) {
         Script existing = loadOrThrow(tenantId, id);

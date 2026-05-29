@@ -35,40 +35,16 @@ public class ScriptMapper {
                 .build();
     }
 
-    /**
-     * Apply non-null fields from {@code input} onto {@code existing}. List
-     * fields are replaced wholesale (not merged) when present — supplying an
-     * empty list explicitly clears them, supplying {@code null} leaves them
-     * untouched.
-     */
     public void updateEntity(Script existing, UpdateScriptInput input) {
-        if (input.getName() != null) {
-            existing.setName(input.getName());
-        }
-        if (input.getDescription() != null) {
-            existing.setDescription(input.getDescription());
-        }
-        if (input.getShell() != null) {
-            existing.setShell(input.getShell());
-        }
-        if (input.getScriptBody() != null) {
-            existing.setScriptBody(input.getScriptBody());
-        }
-        if (input.getTag() != null) {
-            existing.setTag(input.getTag());
-        }
-        if (input.getSupportedPlatforms() != null) {
-            existing.setSupportedPlatforms(input.getSupportedPlatforms());
-        }
-        if (input.getDefaultTimeoutSeconds() != null) {
-            existing.setDefaultTimeoutSeconds(input.getDefaultTimeoutSeconds());
-        }
-        if (input.getDefaultArgs() != null) {
-            existing.setDefaultArgs(input.getDefaultArgs());
-        }
-        if (input.getEnvVars() != null) {
-            existing.setEnvVars(mapEnvVarsToEntity(input.getEnvVars()));
-        }
+        existing.setName(input.getName());
+        existing.setDescription(input.getDescription());
+        existing.setShell(input.getShell());
+        existing.setScriptBody(input.getScriptBody());
+        existing.setTag(input.getTag());
+        existing.setSupportedPlatforms(input.getSupportedPlatforms());
+        existing.setDefaultTimeoutSeconds(input.getDefaultTimeoutSeconds());
+        existing.setDefaultArgs(input.getDefaultArgs());
+        existing.setEnvVars(mapEnvVarsToEntity(input.getEnvVars()));
     }
 
     public ScriptResponse toResponse(Script entity) {

@@ -83,11 +83,16 @@ input CreateScriptInput {
     envVars: [ScriptEnvVarInput!]
 }
 
+"""
+Full-replacement (PUT) payload for an existing script. Optional fields accept
+null to clear the stored value; required fields (name, shell, scriptBody)
+mirror createScript constraints and cannot be null.
+"""
 input UpdateScriptInput {
-    name: String
+    name: String!
     description: String
-    shell: ScriptShell
-    scriptBody: String
+    shell: ScriptShell!
+    scriptBody: String!
     tag: String
     supportedPlatforms: [ScriptPlatform!]
     defaultTimeoutSeconds: Int

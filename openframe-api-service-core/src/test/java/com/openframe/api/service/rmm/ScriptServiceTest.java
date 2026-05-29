@@ -38,7 +38,6 @@ import static org.mockito.Mockito.when;
 class ScriptServiceTest {
 
     private static final String TENANT_ID = "tenant-1";
-    private static final String OTHER_TENANT_ID = "tenant-2";
     private static final String SCRIPT_ID = "65f4a8000000000000000001";
 
     @Mock
@@ -247,8 +246,8 @@ class ScriptServiceTest {
     }
 
     @Test
-    @DisplayName("update: applies the patch and returns the mapped response when the script exists")
-    void update_whenScriptExists_appliesPatch() {
+    @DisplayName("update: PUT semantics — delegates the full overwrite (including nulls) to the mapper and saves the resulting entity")
+    void update_whenScriptExists_delegatesOverwriteAndSaves() {
         Script existing = new Script();
         existing.setId(SCRIPT_ID);
         existing.setName("old");
@@ -256,6 +255,7 @@ class ScriptServiceTest {
         saved.setId(SCRIPT_ID);
         ScriptResponse response = ScriptResponse.builder().id(SCRIPT_ID).build();
 
+        updateInput.setName("old"); // unchanged name — skip uniqueness check
         updateInput.setDescription("new description");
 
         when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(existing));
@@ -299,7 +299,7 @@ class ScriptServiceTest {
     }
 
     @Test
-    @DisplayName("update: when the name is unchanged, the uniqueness check is skipped (no extra repository round-trip)")
+    @DisplayName("update: when the new name equals the existing name (null-safe), the uniqueness check is skipped — no extra repository round-trip")
     void update_keepingSameName_skipsUniquenessCheck() {
         Script existing = new Script();
         existing.setId(SCRIPT_ID);
@@ -316,13 +316,16 @@ class ScriptServiceTest {
     }
 
     @Test
-    @DisplayName("update: when the name field is null, the uniqueness check is skipped (PATCH semantics — name simply not touched)")
-    void update_whenNameIsNull_skipsUniquenessCheck() {
+    @DisplayName("update: PUT semantics — when only an optional field (description) changes, name uniqueness is not re-checked")
+    void update_renamingUnchangedOptionalFieldOnly_skipsUniquenessCheck() {
         Script existing = new Script();
         existing.setId(SCRIPT_ID);
-        existing.setName("unchanged");
-        updateInput.setName(null);
-        updateInput.setDescription("only changing the description");
+        existing.setName("stable name");
+
+        updateInput.setName("stable name");                 // name unchanged
+        updateInput.setShell(ScriptShell.POWERSHELL);
+        updateInput.setScriptBody("Restart-Service spooler");
+        updateInput.setDescription("brand new description"); // only this changes
 
         when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(existing));
         when(scriptRepository.save(existing)).thenReturn(existing);
@@ -331,6 +334,7 @@ class ScriptServiceTest {
         scriptService.update(TENANT_ID, SCRIPT_ID, updateInput);
 
         verify(scriptRepository, never()).existsByTenantIdAndNameAndIdNot(any(), any(), any());
+        verify(scriptMapper).updateEntity(existing, updateInput);
     }
 
     @Test
