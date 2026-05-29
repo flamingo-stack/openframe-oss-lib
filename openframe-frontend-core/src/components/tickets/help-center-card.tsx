@@ -55,6 +55,10 @@ export interface HelpCenterCardProps {
   onClose: TicketDetailDrawerProps['onClose']
   onReopen: TicketDetailDrawerProps['onReopen']
   onActionCollapsed: () => void
+  /** Persisted reply-failure banner — forwarded to the drawer. Parent
+   *  (`HelpCenterList`) reads via `actions.replyErrorFor(external_id)`. */
+  replyError?: TicketDetailDrawerProps['replyError']
+  onClearReplyError?: TicketDetailDrawerProps['onClearReplyError']
 }
 
 export function HelpCenterCard({
@@ -67,6 +71,8 @@ export function HelpCenterCard({
   onClose,
   onReopen,
   onActionCollapsed,
+  replyError,
+  onClearReplyError,
 }: HelpCenterCardProps) {
   const optimistic = isOptimistic(ticket)
   const rawStatus = (ticket.status ?? 'OPEN').toUpperCase()
@@ -177,6 +183,8 @@ export function HelpCenterCard({
             onClose={onClose}
             onReopen={onReopen}
             onActionCollapsed={onActionCollapsed}
+            replyError={replyError}
+            onClearReplyError={onClearReplyError}
           />
         </div>
       )}
