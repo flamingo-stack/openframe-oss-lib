@@ -2,7 +2,7 @@ package com.openframe.api.service.rmm;
 
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.script.CreateScriptInput;
-import com.openframe.api.dto.script.ScriptEnvVarDto;
+import com.openframe.api.dto.script.ScriptEnvVarInput;
 import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.script.UpdateScriptInput;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
@@ -62,8 +62,6 @@ class ScriptServiceTest {
         updateInput = new UpdateScriptInput();
     }
 
-    // ---------- create ----------
-
     @Test
     @DisplayName("create: persists the entity and returns the mapped response when the name is unique within the tenant")
     void create_whenNameUnique_persistsAndReturnsResponse() {
@@ -102,8 +100,8 @@ class ScriptServiceTest {
     @DisplayName("create: env vars (including secret ones) are persisted as supplied — secrets are stored in plaintext until the secret-management story lands")
     void create_whenInputHasEnvVars_persistsThemThroughTheMapper() {
         createInput.setEnvVars(List.of(
-                ScriptEnvVarDto.builder().name("LOG_LEVEL").value("INFO").secret(false).build(),
-                ScriptEnvVarDto.builder().name("API_TOKEN").value("xyz").secret(true).build()
+                ScriptEnvVarInput.builder().name("LOG_LEVEL").value("INFO").secret(false).build(),
+                ScriptEnvVarInput.builder().name("API_TOKEN").value("xyz").secret(true).build()
         ));
         Script mapped = new Script();
         Script saved = new Script();
@@ -117,8 +115,6 @@ class ScriptServiceTest {
 
         assertThat(result.getId()).isEqualTo(SCRIPT_ID);
     }
-
-    // ---------- get ----------
 
     @Test
     @DisplayName("get: returns the mapped response when the script exists in the tenant")
@@ -145,8 +141,6 @@ class ScriptServiceTest {
 
         verifyNoInteractions(scriptMapper);
     }
-
-    // ---------- list ----------
 
     @Test
     @DisplayName("list: forward pagination — fetches limit+1 rows, drops the extra, marks hasNextPage=true and hasPreviousPage=false on the first page")
@@ -251,8 +245,6 @@ class ScriptServiceTest {
                 eq(CursorPaginationCriteria.DEFAULT_PAGE_SIZE + 1));
     }
 
-    // ---------- update ----------
-
     @Test
     @DisplayName("update: applies the patch and returns the mapped response when the script exists")
     void update_whenScriptExists_appliesPatch() {
@@ -339,8 +331,6 @@ class ScriptServiceTest {
 
         verify(scriptRepository, never()).existsByTenantIdAndNameAndIdNot(any(), any(), any());
     }
-
-    // ---------- delete ----------
 
     @Test
     @DisplayName("delete: invokes the tenant-scoped repository delete and treats removal count == 1 as success")

@@ -15,7 +15,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ScriptEnvVarDto {
+public class ScriptEnvVarInput {
 
     @NotBlank
     private String name;

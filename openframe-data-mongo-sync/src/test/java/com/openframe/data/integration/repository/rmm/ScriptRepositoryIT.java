@@ -41,8 +41,6 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
         mongoTemplate.dropCollection(Script.class);
     }
 
-    // ---------- save + audit fields ----------
-
     @Test
     @DisplayName("Given a Script saved without timestamps, when it is persisted, then createdAt and updatedAt are populated by Mongo auditing")
     void save_populatesAuditingTimestamps() {
@@ -54,8 +52,6 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
         assertThat(saved.getCreatedAt()).isNotNull();
         assertThat(saved.getUpdatedAt()).isNotNull();
     }
-
-    // ---------- tenant isolation ----------
 
     @Test
     @DisplayName("Given two tenants with a script each, when findByTenantIdAndId is called with tenant A, then only tenant A's script is returned even if the id matches tenant B's")
@@ -77,8 +73,6 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
 
         assertThat(result).isEmpty();
     }
-
-    // ---------- cursor pagination ----------
 
     @Test
     @DisplayName("Given several scripts in a tenant and no cursor, when findPageForTenant runs, then they come back newest-first by _id")
@@ -149,8 +143,6 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
         assertThat(page.get(0).getId()).isEqualTo(seeded.get(2).getId());
     }
 
-    // ---------- exists checks ----------
-
     @Test
     @DisplayName("Given a script with name X in tenant A, when existsByTenantIdAndName is called in tenant B with the same name, then false is returned")
     void existsByTenantIdAndName_isolatesByTenant() {
@@ -180,8 +172,6 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
 
         assertThat(collides).isTrue();
     }
-
-    // ---------- delete ----------
 
     @Test
     @DisplayName("Given a script in tenant A, when deleteByTenantIdAndId is called with tenant A and that id, then 1 is returned and the document is gone")
@@ -213,8 +203,6 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
         assertThat(removed).isZero();
     }
 
-    // ---------- compound unique index ----------
-
     @Test
     @DisplayName("Given a script with name X in tenant A, when saving another script with the same (tenantId, name) pair, then Mongo rejects the second insert with a DuplicateKeyException (compound unique index)")
     void compoundUniqueIndex_enforced_OnTenantAndName() {
@@ -234,8 +222,6 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
         assertThat(scriptRepository.findByTenantIdAndName(TENANT_A, "same-name")).isPresent();
         assertThat(scriptRepository.findByTenantIdAndName(TENANT_B, "same-name")).isPresent();
     }
-
-    // ---------- helpers ----------
 
     private static Script newScript(String tenantId, String name) {
         return Script.builder()

@@ -39,5 +39,5 @@ public class CreateScriptInput {
     private List<String> defaultArgs;
 
     @Valid
-    private List<ScriptEnvVarDto> envVars;
+    private List<ScriptEnvVarInput> envVars;
 }

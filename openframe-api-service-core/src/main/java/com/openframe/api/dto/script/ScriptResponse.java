@@ -30,7 +30,7 @@ public class ScriptResponse {
 
     private Integer defaultTimeoutSeconds;
     private List<String> defaultArgs;
-    private List<ScriptEnvVarDto> envVars;
+    private List<ScriptEnvVarInput> envVars;
 
     private Instant createdAt;
     private Instant updatedAt;

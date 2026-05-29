@@ -4,7 +4,7 @@ import com.openframe.api.dto.GenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.script.CreateScriptInput;
-import com.openframe.api.dto.script.ScriptEnvVarDto;
+import com.openframe.api.dto.script.ScriptEnvVarInput;
 import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.script.UpdateScriptInput;
 import com.openframe.api.dto.shared.ConnectionArgs;
@@ -107,7 +107,7 @@ public class ScriptMapper {
                 .build();
     }
 
-    private List<ScriptEnvVar> mapEnvVarsToEntity(List<ScriptEnvVarDto> envVars) {
+    private List<ScriptEnvVar> mapEnvVarsToEntity(List<ScriptEnvVarInput> envVars) {
         if (envVars == null) {
             return null;
         }
@@ -120,12 +120,12 @@ public class ScriptMapper {
                 .toList();
     }
 
-    private List<ScriptEnvVarDto> mapEnvVarsToResponse(List<ScriptEnvVar> envVars) {
+    private List<ScriptEnvVarInput> mapEnvVarsToResponse(List<ScriptEnvVar> envVars) {
         if (envVars == null) {
             return null;
         }
         return envVars.stream()
-                .map(v -> ScriptEnvVarDto.builder()
+                .map(v -> ScriptEnvVarInput.builder()
                         .name(v.getName())
                         // TODO: mask {@link ScriptEnvVar#getValue()} when {@code secret == true}
                         // once secret-management (encryption at rest + secure agent delivery) lands.
