@@ -12,6 +12,8 @@ import React from 'react'
 import { Calendar } from 'lucide-react'
 import { AdminContentCard } from './admin-content-card'
 import { formatInvestorUpdatePeriod, type InvestorUpdate } from '../types/entities/investor-update'
+import { useEntityCardLink } from './use-entity-card-link'
+import { useEntityCardPlaceholder } from './use-entity-card-placeholder'
 import {
   COMPACT_CARD_IMAGE_SLOT,
   COMPACT_CARD_META_ROW_BOX,
@@ -73,7 +75,27 @@ export function InvestorUpdateCardSkeleton({ size = 'default' }: { size?: 'defau
   )
 }
 
-export function InvestorUpdateCard({ update, href, target, rel, placeholderUrl, size = 'default', className }: InvestorUpdateCardProps) {
+export function InvestorUpdateCard({
+  update,
+  href,
+  target: targetProp,
+  rel: relProp,
+  targetPlatform,
+  placeholderUrl: placeholderUrlProp,
+  size = 'default',
+  className,
+}: InvestorUpdateCardProps) {
+  const { target, rel } = useEntityCardLink({
+    href,
+    targetPlatform,
+    target: targetProp,
+    rel: relProp,
+  })
+  const placeholderUrl = useEntityCardPlaceholder({
+    title: update.title ?? `Update #${update.update_number ?? ''}`,
+    placeholderUrl: placeholderUrlProp,
+    aspect: size === 'sm' ? 'square' : 'wide',
+  })
   const coverImage = update.featured_image || placeholderUrl || null
 
   if (size === 'sm') {

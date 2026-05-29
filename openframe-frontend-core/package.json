@@ -48,6 +48,12 @@
       "require": "./dist/components/tickets/index.cjs",
       "default": "./dist/components/tickets/index.js"
     },
+    "./components/onboarding-guides": {
+      "types": "./dist/components/onboarding-guides/index.d.ts",
+      "import": "./dist/components/onboarding-guides/index.js",
+      "require": "./dist/components/onboarding-guides/index.cjs",
+      "default": "./dist/components/onboarding-guides/index.js"
+    },
     "./components/contact": {
       "types": "./dist/components/contact/index.d.ts",
       "import": "./dist/components/contact/index.js",

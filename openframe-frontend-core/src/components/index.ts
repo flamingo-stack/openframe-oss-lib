@@ -62,6 +62,11 @@ export * from './chat'
 // Onboarding components
 export * from './shared/onboarding'
 
+// Doc-search bar — unified RAG-search dropdown used by the data-room
+// sidebar AND the onboarding-guide catalog. Pure presentation; hosts
+// own the `useDocSearch` hook and pass results in as props.
+export * from './shared/doc-search'
+
 // Product Release components
 export * from './shared/product-release'
 
