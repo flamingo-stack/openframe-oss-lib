@@ -203,6 +203,32 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
     ? ticket.body.split(TURN_SEPARATOR_RE).map((t) => t.trim()).filter(Boolean)
     : []
 
+  // Suppress `bodyTurns[0]` ("Original message") when the engagement
+  // timeline already has a customer-authored message whose body
+  // matches it. The channel-first create path in the hub writes the
+  // customer's message body BOTH into `hubspot_tickets.content` AND
+  // into the first `hubspot_ticket_conversation_messages` row — pre-
+  // 2026-05-29 the bot-intake-burst filter on the server dropped the
+  // first-customer message from engagements, so `bodyTurns[0]` was
+  // the only render. With channel-first, the engagement survives and
+  // both surfaces render the same text. Drop the redundant
+  // "Original message" turn when we detect that overlap.
+  //
+  // Only `bodyTurns[0]` is conditional. Subsequent turns ("Update N",
+  // "[Resolution]") come from `update_ticket.content_addendum` and
+  // are NEVER customer-written, so the engagement timeline can't
+  // match them. Leave their indices intact so `Update 1` still
+  // labels as such when `bodyTurns[0]` is suppressed.
+  const customerEngagementBodies = new Set<string>(
+    engagements
+      .filter((e) => e.authorRole === 'customer')
+      .map((e) => (e.body ?? '').trim())
+      .filter(Boolean),
+  )
+  const suppressBodyTurnZero =
+    bodyTurns.length > 0 &&
+    customerEngagementBodies.has(bodyTurns[0])
+
   // Customer name resolution precedence:
   //   1. LIVE chat identity (`identity.user.name`) — when the viewer
   //      is the ticket's own customer. Always fresh.
@@ -259,6 +285,10 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
           manually-entered description and engagements show subsequent
           replies — same flow, no duplication. */}
       {bodyTurns.map((turn, i) => {
+        // Drop the redundant first turn when the engagement timeline
+        // below already renders the same customer-authored body. See
+        // `suppressBodyTurnZero` derivation above for the rationale.
+        if (i === 0 && suppressBodyTurnZero) return null
         const isResolution = turn.startsWith('[Resolution]')
         const role =
           i === 0 ? 'Original message' : isResolution ? 'Resolution' : `Update ${i}`
