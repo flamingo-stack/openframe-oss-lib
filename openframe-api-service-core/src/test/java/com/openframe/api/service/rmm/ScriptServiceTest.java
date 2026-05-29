@@ -11,6 +11,7 @@ import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.rmm.Script;
 import com.openframe.data.document.rmm.ScriptShell;
+import com.openframe.data.document.rmm.ScriptStatus;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -20,6 +21,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -28,7 +30,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -333,32 +334,75 @@ class ScriptServiceTest {
     }
 
     @Test
-    @DisplayName("delete: invokes the tenant-scoped repository delete and treats removal count == 1 as success")
-    void delete_whenRemoved_invokesRepository() {
-        when(scriptRepository.deleteByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(1L);
+    @DisplayName("get: throws NotFoundException when the script exists but has been soft-deleted (treated as not-found from the API surface)")
+    void get_whenScriptIsDeleted_throwsNotFound() {
+        Script deleted = new Script();
+        deleted.setId(SCRIPT_ID);
+        deleted.setStatus(ScriptStatus.DELETED);
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(deleted));
 
-        scriptService.delete(TENANT_ID, SCRIPT_ID);
+        assertThatThrownBy(() -> scriptService.get(TENANT_ID, SCRIPT_ID))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessageContaining(SCRIPT_ID);
 
-        verify(scriptRepository, times(1)).deleteByTenantIdAndId(TENANT_ID, SCRIPT_ID);
+        verifyNoInteractions(scriptMapper);
     }
 
     @Test
-    @DisplayName("delete: when the script does not exist (removal count == 0), the call is a no-op — no exception is thrown")
-    void delete_whenNotFound_isIdempotent() {
-        when(scriptRepository.deleteByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(0L);
+    @DisplayName("update: throws NotFoundException when the script exists but has been soft-deleted (cannot edit a deleted script)")
+    void update_whenScriptIsDeleted_throwsNotFound() {
+        Script deleted = new Script();
+        deleted.setId(SCRIPT_ID);
+        deleted.setStatus(ScriptStatus.DELETED);
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(deleted));
 
-        scriptService.delete(TENANT_ID, SCRIPT_ID);
+        assertThatThrownBy(() -> scriptService.update(TENANT_ID, SCRIPT_ID, updateInput))
+                .isInstanceOf(NotFoundException.class);
 
-        verify(scriptRepository).deleteByTenantIdAndId(TENANT_ID, SCRIPT_ID);
+        verify(scriptRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("delete: never reaches a different tenant — the call only invokes repo with the supplied tenantId")
-    void delete_doesNotCrossTenants() {
-        when(scriptRepository.deleteByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(0L);
+    @DisplayName("delete: marks the script DELETED, stamps statusChangedAt, and persists via save() — does not hard-delete")
+    void delete_whenScriptIsActive_softDeletesAndSaves() {
+        Script active = new Script();
+        active.setId(SCRIPT_ID);
+        active.setStatus(ScriptStatus.ACTIVE);
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(active));
+        when(scriptRepository.save(active)).thenReturn(active);
 
         scriptService.delete(TENANT_ID, SCRIPT_ID);
 
-        verify(scriptRepository, never()).deleteByTenantIdAndId(eq(OTHER_TENANT_ID), any());
+        assertThat(active.getStatus()).isEqualTo(ScriptStatus.DELETED);
+        assertThat(active.getStatusChangedAt()).isNotNull();
+        verify(scriptRepository).save(active);
+        verify(scriptRepository, never()).deleteByTenantIdAndId(any(), any());
+    }
+
+    @Test
+    @DisplayName("delete: when the script does not exist in the tenant, throws NotFoundException")
+    void delete_whenScriptNotFound_throwsNotFound() {
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> scriptService.delete(TENANT_ID, SCRIPT_ID))
+                .isInstanceOf(NotFoundException.class);
+
+        verify(scriptRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("delete: when the script is already soft-deleted, the call is an idempotent no-op (statusChangedAt is NOT re-stamped)")
+    void delete_whenAlreadyDeleted_isNoOp() {
+        Script alreadyDeleted = new Script();
+        alreadyDeleted.setId(SCRIPT_ID);
+        alreadyDeleted.setStatus(ScriptStatus.DELETED);
+        Instant originalDeletedAt = Instant.parse("2020-01-01T00:00:00Z");
+        alreadyDeleted.setStatusChangedAt(originalDeletedAt);
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(alreadyDeleted));
+
+        scriptService.delete(TENANT_ID, SCRIPT_ID);
+
+        assertThat(alreadyDeleted.getStatusChangedAt()).isEqualTo(originalDeletedAt);
+        verify(scriptRepository, never()).save(any());
     }
 }

@@ -2,6 +2,7 @@ package com.openframe.data.integration.repository.rmm;
 
 import com.openframe.data.document.rmm.Script;
 import com.openframe.data.document.rmm.ScriptShell;
+import com.openframe.data.document.rmm.ScriptStatus;
 import com.openframe.data.integration.BaseMongoIntegrationTest;
 import com.openframe.data.integration.support.RmmIntegrationTestApplication;
 import com.openframe.data.repository.rmm.ScriptRepository;
@@ -14,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Query;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -38,7 +40,11 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
 
     @BeforeEach
     void resetCollection() {
-        mongoTemplate.dropCollection(Script.class);
+        // Clear documents but keep indexes — dropCollection() would also drop the
+        // compound unique index, and Spring Data's auto-index-creation runs only
+        // at application startup, so subsequent saves would silently lose the
+        // unique constraint enforcement.
+        mongoTemplate.remove(new Query(), Script.class);
     }
 
     @Test
@@ -130,6 +136,23 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
         List<Script> page = scriptRepository.findPageForTenant(TENANT_A, null, false, 2);
 
         assertThat(page).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("Given a mix of ACTIVE and DELETED scripts in a tenant, when findPageForTenant runs, then DELETED scripts are excluded from the result (default list view)")
+    void findPageForTenant_excludesDeletedScripts() {
+        Script keep1 = scriptRepository.save(newScript(TENANT_A, "keep-1"));
+        Script doomed = scriptRepository.save(newScript(TENANT_A, "doomed"));
+        Script keep2 = scriptRepository.save(newScript(TENANT_A, "keep-2"));
+        // Soft-delete the middle one
+        doomed.setStatus(ScriptStatus.DELETED);
+        scriptRepository.save(doomed);
+
+        List<Script> page = scriptRepository.findPageForTenant(TENANT_A, null, false, 10);
+
+        assertThat(page).extracting(Script::getId)
+                .containsExactlyInAnyOrder(keep1.getId(), keep2.getId())
+                .doesNotContain(doomed.getId());
     }
 
     @Test

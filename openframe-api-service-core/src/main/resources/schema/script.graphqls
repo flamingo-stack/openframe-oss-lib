@@ -18,7 +18,7 @@ extend type Mutation {
     """Apply a partial update to an existing script (PATCH semantics — only non-null fields are applied)."""
     updateScript(id: ID!, input: UpdateScriptInput!): Script!
 
-    """Permanently delete a script. Returns true on success (also true if the script does not exist)."""
+    """Soft-delete a script (sets status to DELETED). Returns true on success; idempotent on already-deleted scripts. Throws if the script id is not found in the tenant."""
     deleteScript(id: ID!): Boolean!
 }
 
@@ -48,6 +48,9 @@ type Script {
     defaultTimeoutSeconds: Int
     defaultArgs: [String!]
     envVars: [ScriptEnvVar!]
+    """Lifecycle status: ACTIVE | ARCHIVED | DELETED. DELETED is a soft-delete and is hidden from default queries."""
+    status: String
+    statusChangedAt: Instant
     createdAt: Instant
     updatedAt: Instant
 }

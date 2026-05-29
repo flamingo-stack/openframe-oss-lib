@@ -8,6 +8,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
@@ -103,4 +104,18 @@ public class Script {
 
     @LastModifiedDate
     private Instant updatedAt;
+
+    /**
+     * Lifecycle status. Defaults to {@link ScriptStatus#ACTIVE}. {@code DELETED}
+     * is used as a soft-delete so that historic execution records continue to
+     * reference a valid script document.
+     */
+    @Indexed
+    @Builder.Default
+    private ScriptStatus status = ScriptStatus.ACTIVE;
+
+    /**
+     * Timestamp of the most recent {@link #status} transition.
+     */
+    private Instant statusChangedAt;
 }

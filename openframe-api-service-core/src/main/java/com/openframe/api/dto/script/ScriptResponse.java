@@ -32,6 +32,10 @@ public class ScriptResponse {
     private List<String> defaultArgs;
     private List<ScriptEnvVarInput> envVars;
 
+    /** Lifecycle status enum name (e.g. {@code ACTIVE}). */
+    private String status;
+
+    private Instant statusChangedAt;
     private Instant createdAt;
     private Instant updatedAt;
 }

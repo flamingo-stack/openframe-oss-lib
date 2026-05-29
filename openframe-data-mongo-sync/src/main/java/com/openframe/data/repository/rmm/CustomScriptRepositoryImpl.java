@@ -1,6 +1,7 @@
 package com.openframe.data.repository.rmm;
 
 import com.openframe.data.document.rmm.Script;
+import com.openframe.data.document.rmm.ScriptStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.types.ObjectId;
@@ -37,12 +38,14 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
 
     private static final String FIELD_ID = "_id";
     private static final String FIELD_TENANT_ID = "tenantId";
+    private static final String FIELD_STATUS = "status";
 
     private final MongoTemplate mongoTemplate;
 
     @Override
     public List<Script> findPageForTenant(String tenantId, String cursor, boolean backward, int limit) {
-        Criteria criteria = Criteria.where(FIELD_TENANT_ID).is(tenantId);
+        Criteria criteria = Criteria.where(FIELD_TENANT_ID).is(tenantId)
+                .and(FIELD_STATUS).ne(ScriptStatus.DELETED);
         applyCursor(criteria, cursor, backward);
 
         Query query = new Query(criteria)

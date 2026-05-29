@@ -11,11 +11,13 @@ import com.openframe.api.mapper.ScriptMapper;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.rmm.Script;
+import com.openframe.data.document.rmm.ScriptStatus;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -29,7 +31,11 @@ import java.util.List;
  * <p>Reads and writes go through {@link ScriptRepository} (every call is
  * tenant-scoped). All document &harr; DTO translation is delegated to
  * {@link ScriptMapper}. This service enforces name uniqueness within the
- * tenant on create / update.
+ * tenant on create / update, and treats {@link ScriptStatus#DELETED} as
+ * "doesn't exist" for {@link #get(String, String)} and
+ * {@link #update(String, String, UpdateScriptInput)} — soft-deleted scripts
+ * are invisible from the standard API surface but the documents remain so
+ * historic execution records keep resolving.
  */
 @Slf4j
 @Service
@@ -60,11 +66,11 @@ public class ScriptService {
     /**
      * Get a single script by id within the tenant.
      *
-     * @throws NotFoundException if the script does not exist or belongs to a
-     *         different tenant.
+     * @throws NotFoundException if the script does not exist, belongs to a
+     *         different tenant, or has been soft-deleted.
      */
     public ScriptResponse get(String tenantId, String id) {
-        Script entity = loadOrThrow(tenantId, id);
+        Script entity = loadVisibleOrThrow(tenantId, id);
         return scriptMapper.toResponse(entity);
     }
 
@@ -106,7 +112,7 @@ public class ScriptService {
      *         script in the same tenant.
      */
     public ScriptResponse update(String tenantId, String id, UpdateScriptInput input) {
-        Script existing = loadOrThrow(tenantId, id);
+        Script existing = loadVisibleOrThrow(tenantId, id);
 
         if (input.getName() != null
                 && !input.getName().equals(existing.getName())
@@ -122,22 +128,48 @@ public class ScriptService {
     }
 
     /**
-     * Permanently remove a script from the tenant. Idempotent: a no-op when
-     * the script does not exist in this tenant (the call simply logs and
-     * returns).
+     * Soft-delete a script: transition status to {@link ScriptStatus#DELETED}
+     * and stamp {@code statusChangedAt}. The document itself remains so that
+     * historic execution records continue to resolve.
+     *
+     * <p>Idempotent on already-deleted scripts (no-op + debug log). Hard delete
+     * (physical removal) is intentionally not exposed here — the repository
+     * supports it for future admin / tenant-cleanup tooling.
+     *
+     * @throws NotFoundException if the script id does not exist in the tenant.
      */
     public void delete(String tenantId, String id) {
-        long removed = scriptRepository.deleteByTenantIdAndId(tenantId, id);
-        if (removed == 0) {
-            log.debug("Delete script id={} tenantId={} — nothing removed (not found)", id, tenantId);
-        } else {
-            log.info("Deleted script id={} tenantId={}", id, tenantId);
+        Script existing = loadOrThrow(tenantId, id);
+
+        if (existing.getStatus() == ScriptStatus.DELETED) {
+            log.debug("Script id={} tenantId={} already soft-deleted, no-op", id, tenantId);
+            return;
         }
+
+        existing.setStatus(ScriptStatus.DELETED);
+        existing.setStatusChangedAt(Instant.now());
+        scriptRepository.save(existing);
+        log.info("Soft-deleted script id={} tenantId={}", id, tenantId);
     }
 
+    /** Load by id regardless of status — used by {@link #delete(String, String)}. */
     private Script loadOrThrow(String tenantId, String id) {
         return scriptRepository.findByTenantIdAndId(tenantId, id)
                 .orElseThrow(() -> new NotFoundException("Script not found: " + id));
+    }
+
+    /**
+     * Load by id, treating {@link ScriptStatus#DELETED} documents as not
+     * found. Used by {@link #get(String, String)} and
+     * {@link #update(String, String, UpdateScriptInput)} so soft-deleted
+     * scripts are invisible from the standard API surface.
+     */
+    private Script loadVisibleOrThrow(String tenantId, String id) {
+        Script script = loadOrThrow(tenantId, id);
+        if (script.getStatus() == ScriptStatus.DELETED) {
+            throw new NotFoundException("Script not found: " + id);
+        }
+        return script;
     }
 
     private static PageInfo buildPageInfo(List<ScriptResponse> items, boolean hasMore,
