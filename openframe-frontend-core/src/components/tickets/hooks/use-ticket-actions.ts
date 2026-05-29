@@ -426,13 +426,55 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
             ticket_id: ticket.external_id,
           } as unknown as Record<string, unknown>)
           toast(successCopy)
-          // Invalidate BOTH ticket list (status / pipeline may have
-          // changed) AND engagements (comments + attachments produce a
-          // new Note that the timeline must pick up).
-          await Promise.all([
-            queryClient.invalidateQueries({ queryKey: ['tickets'] }),
-            queryClient.invalidateQueries({ queryKey: ['ticket-engagements'] }),
-          ])
+
+          // OPTIMISTIC in-place row update on the tickets cache.
+          //
+          // Previously this code called
+          // `queryClient.invalidateQueries({ queryKey: ['tickets'] })`
+          // which forced a full refetch. When the user is on a
+          // filtered view (e.g. ?status=open) and CLOSES a ticket from
+          // its drawer, the refetched list excludes the now-closed
+          // row, the parent `<HelpCenterCard>` for that row unmounts,
+          // and the inline drawer dies with it — user-facing bug
+          // "close button refreshes the whole page and dismisses the
+          // ticket I was working on" (reported 2026-05-29).
+          //
+          // The mutation already knows what changed (status, content
+          // addendum, attachments) — apply those fields in place
+          // across every `['tickets']` cache slot. The row stays in
+          // the list with the new badge; React doesn't reconcile away
+          // the card; the drawer stays mounted and the user can
+          // continue working.
+          //
+          // Filter-mismatch trade-off: a row that no longer matches a
+          // slot's filter (e.g. CLOSED row in ?status=open cache)
+          // stays visually until next manual refetch (filter change,
+          // page nav, manual reload). Acceptable — the user opted into
+          // the action; carrying their drawer through it is more
+          // important than instantly hiding the row.
+          const statusUpdate =
+            (serverArgs as { status?: 'OPEN' | 'CLOSED' }).status ?? null
+          if (statusUpdate) {
+            queryClient.setQueriesData<TicketData[] | undefined>(
+              { queryKey: ['tickets'] },
+              (prev) => {
+                if (!prev) return prev
+                let mutated = false
+                const next = prev.map((t) => {
+                  if (t.id !== ticket.id || t.status === statusUpdate) return t
+                  mutated = true
+                  return { ...t, status: statusUpdate }
+                })
+                return mutated ? next : prev
+              },
+            )
+          }
+
+          // Engagements ALWAYS need to refetch — the addendum / new
+          // attachment / status-change-note must land in the timeline.
+          // Scoped to the engagements query only; doesn't touch the
+          // list cache.
+          await queryClient.invalidateQueries({ queryKey: ['ticket-engagements'] })
           return true
         })
       } catch (err) {
