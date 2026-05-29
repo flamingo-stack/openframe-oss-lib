@@ -1,0 +1,5 @@
+flowchart TD
+    Start["User Clicks Register with SSO"] --> Clear["Clear Auth State"]
+    Clear --> StartReg["SsoTenantRegistrationService.startRegistration()"]
+    StartReg --> Cookie["Set COOKIE_SSO_REG"]
+    Cookie --> Redirect["Redirect to IdP"]

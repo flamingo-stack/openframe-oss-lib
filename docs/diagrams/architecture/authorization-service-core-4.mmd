@@ -1,4 +1,0 @@
-flowchart TD
-    Principal["Authenticated Principal"] --> LoadUser["UserService.findActiveByEmailAndTenant"]
-    LoadUser --> Claims["Add Custom Claims"]
-    Claims --> JWT["Signed Access Token"]

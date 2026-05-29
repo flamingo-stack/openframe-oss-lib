@@ -1,8 +1,6 @@
 package com.openframe.data.document.notification;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import lombok.AllArgsConstructor;
-import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
@@ -12,11 +10,9 @@ import lombok.experimental.SuperBuilder;
         property = "type",
         visible = true,
         defaultImpl = GenericContext.class)
-@Data
 @SuperBuilder
 @NoArgsConstructor
-@AllArgsConstructor
 public abstract class NotificationContext {
 
-    private String type;
+    public abstract String getType();
 }

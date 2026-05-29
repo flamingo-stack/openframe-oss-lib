@@ -1,0 +1,5 @@
+flowchart TD
+    Requested["Requested redirectTo"] -->|"Has value"| UseRequested["Use requested value"]
+    Requested -->|"Empty"| RefererCheck["Check Referer header"]
+    RefererCheck -->|"Present"| UseReferer["Use Referer"]
+    RefererCheck -->|"Missing"| DefaultRoot["Use /"]

@@ -1,0 +1,4 @@
+flowchart LR
+    Factory["MongoDatabaseFactory"] --> Resolver["DefaultDbRefResolver"]
+    Resolver --> Converter["MappingMongoConverter"]
+    Conversions["MongoCustomConversions"] --> Converter

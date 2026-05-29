@@ -1,0 +1,4 @@
+flowchart TD
+    Generator["Secret Generation Logic"] --> Persist["Persist AgentRegistrationSecret"]
+    Persist --> ProcessorCall["postProcessSecretGenerated()"]
+    ProcessorCall --> DefaultProcessor["DefaultAgentRegistrationSecretProcessor"]

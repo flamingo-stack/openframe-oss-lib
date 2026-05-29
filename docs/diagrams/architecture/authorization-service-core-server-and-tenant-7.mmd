@@ -1,0 +1,5 @@
+flowchart LR
+    OAuthFlow["OAuth2 Login Request"] --> Repo["DynamicClientRegistrationRepository"]
+    Repo --> TenantCtx["TenantContext"]
+    TenantCtx --> DynamicSvc["DynamicClientRegistrationService"]
+    DynamicSvc --> ClientReg["ClientRegistration"]

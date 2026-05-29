@@ -14,6 +14,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.Instant;
@@ -23,6 +24,7 @@ import java.util.Optional;
 @Slf4j
 @Validated
 @AllArgsConstructor
+@ConditionalOnProperty(name = "spring.data.cassandra.enabled", havingValue = "true")
 public class LogDataFetcher {
 
     private static final Relay RELAY = new Relay();

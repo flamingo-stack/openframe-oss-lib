@@ -1,11 +1,11 @@
 'use client'
 
 import React from 'react'
-import { cn } from '@/utils'
+import { cn } from '../../utils/cn'
 import { Copy01Icon } from '../icons-v2-generated/documents'
-import { CheckIcon } from '@/components/icons-v2-generated'
-import { useCopyToClipboard } from '@/hooks'
-import { ProgressBar } from '@/components'
+import { CheckIcon } from '../icons-v2-generated'
+import { useCopyToClipboard } from '../../hooks'
+import { ProgressBar } from './progress-bar'
 
 interface InfoCardData {
   title?: string

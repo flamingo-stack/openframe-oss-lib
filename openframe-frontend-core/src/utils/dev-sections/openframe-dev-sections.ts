@@ -28,7 +28,7 @@
  *   also server-bundle, also imported by route-page `metadata` exports).
  */
 
-import { Map as MapIcon, Wrench, Rocket, GraduationCap, type LucideIcon } from 'lucide-react'
+import { Map as MapIcon, Wrench, Rocket, GraduationCap, LifeBuoy, type LucideIcon } from 'lucide-react'
 import { releaseStatusOptions } from '../../types'
 
 // Roadmap status options — `as const` preserves readonly tuple typing
@@ -45,6 +45,16 @@ export const DELIVERY_TASK_TYPE_OPTIONS = [
   { value: 'all', label: 'All' },
   { value: 'Bug', label: 'Bug-fix' },
   { value: 'Request', label: 'Enhancement' },
+] as const
+
+// Ticket status filter for the Help Center. Lowercase wire values
+// match what `/api/chat/agent/find-ticket` accepts in `body.status`
+// (the route normalizes to lowercase + allowlists 'open' | 'closed'
+// before threading into `findTicketExecutor`'s `selfStatus` scope).
+export const TICKET_STATUS_OPTIONS = [
+  { value: 'all', label: 'All' },
+  { value: 'open', label: 'Open' },
+  { value: 'closed', label: 'Closed' },
 ] as const
 
 export interface OpenframeDevSection {
@@ -135,13 +145,40 @@ export const OPENFRAME_DEV_SECTIONS = {
       title: 'Onboarding Guides',
       description: 'Step-by-step product walkthroughs.',
     },
-    // `hero` / `search` / `filter` are intentionally inert here —
-    // /onboarding-guides is owned by OnboardingGuidesCatalogView, not
-    // DevSectionView. This entry exists ONLY to drive the homepage
-    // navigator card so all 4 cards stay in one registry.
-    hero: { title: '', description: '' },
+    hero: {
+      title: 'Getting Started',
+      description:
+        'Step-by-step walkthroughs for getting up and running with OpenFrame — from your first device deployment to advanced integrations.',
+    },
+    // `search` / `filter` are intentionally null — onboarding-guides
+    // uses a custom RAG-backed search dropdown (`useDocSearch`, not the
+    // local text filter `DevSectionView` ships) and dynamic section
+    // pills (counts vary with content, vs the static status options
+    // every other dev-center surface uses). Both controls are injected
+    // by the host via `DevSectionPage`'s `preControls` slot — same
+    // mechanism tickets uses for its "Open a new ticket" form.
     search: null,
     filter: null,
+  },
+  tickets: {
+    href: '/tickets',
+    icon: LifeBuoy,
+    navigator: {
+      title: 'Help Center',
+      description: 'Open and manage your support tickets.',
+    },
+    hero: {
+      title: 'Help Center',
+      description:
+        'Open new tickets, follow up on existing ones, and track responses from the team — all in one place.',
+    },
+    search: { placeholder: 'Search your tickets...', paramKey: 'search' },
+    filter: {
+      label: 'Status',
+      paramKey: 'status',
+      defaultValue: 'all',
+      options: TICKET_STATUS_OPTIONS,
+    },
   },
 } as const satisfies Record<string, OpenframeDevSection>
 

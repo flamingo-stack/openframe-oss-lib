@@ -15,5 +15,7 @@ import lombok.experimental.SuperBuilder;
 @ToString(callSuper = true)
 public class GenericContext extends NotificationContext {
 
+    private String type;
+
     private String payload;
 }

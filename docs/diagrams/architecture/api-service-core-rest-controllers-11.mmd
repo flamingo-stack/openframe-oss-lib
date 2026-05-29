@@ -1,0 +1,4 @@
+flowchart TD
+    Request["Incoming HTTP Request"] --> Filter["JWT Filter"]
+    Filter --> Principal["AuthPrincipal"]
+    Principal --> Controller["REST Controller"]

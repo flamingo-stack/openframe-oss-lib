@@ -1,6 +1,7 @@
 'use client'
 
 import * as DialogPrimitive from '@radix-ui/react-dialog'
+import { useEffect, useRef } from 'react'
 import { BellOffIcon } from '../../icons-v2-generated/interface/bell-off-icon'
 import { ClockHistoryIcon } from '../../icons-v2-generated/date-and-time/clock-history-icon'
 import { Button } from '../../ui/button/button'
@@ -9,13 +10,15 @@ import { Switch } from '../../ui/switch'
 import { cn } from '../../../utils/cn'
 import { useOptionalNotifications } from './notifications-context'
 import { NotificationTile } from './notification-tile'
+import type { Notification } from './types'
 
 export interface NotificationDrawerProps {
   className?: string
   liveDurationMs?: number
+  loadMoreRootMargin?: string
 }
 
-export function NotificationDrawer({ className, liveDurationMs }: NotificationDrawerProps) {
+export function NotificationDrawer({ className, liveDurationMs, loadMoreRootMargin = '200px' }: NotificationDrawerProps) {
   const ctx = useOptionalNotifications()
   if (!ctx) return null
 
@@ -31,6 +34,9 @@ export function NotificationDrawer({ className, liveDurationMs }: NotificationDr
     markSettled,
     setShowPopups,
     onHistoryClick,
+    hasMore,
+    isLoadingMore,
+    loadMore,
   } = ctx
 
   const unreadNotifications = notifications.filter((n) => !n.read)
@@ -59,21 +65,16 @@ export function NotificationDrawer({ className, liveDurationMs }: NotificationDr
           </button>
         </div>
 
-        <div className="flex flex-1 flex-col gap-[var(--spacing-system-xs)] overflow-y-auto px-[var(--spacing-system-m)]">
-          {unreadNotifications.length === 0 ? (
-            <EmptyState />
-          ) : (
-            unreadNotifications.map((n) => (
-              <NotificationTile
-                key={n.id}
-                notification={n}
-                liveDurationMs={liveDurationMs}
-                onComplete={markRead}
-                onSettle={markSettled}
-              />
-            ))
-          )}
-        </div>
+        <DrawerScrollList
+          unreadNotifications={unreadNotifications}
+          liveDurationMs={liveDurationMs}
+          onComplete={markRead}
+          onSettle={markSettled}
+          hasMore={hasMore}
+          isLoadingMore={isLoadingMore}
+          loadMore={loadMore}
+          loadMoreRootMargin={loadMoreRootMargin}
+        />
 
         <div className="flex flex-col gap-[var(--spacing-system-xs)] px-[var(--spacing-system-m)] pb-[var(--spacing-system-m)]">
           <ShowNotificationsToggleRow checked={showPopups} onChange={setShowPopups} />
@@ -83,6 +84,89 @@ export function NotificationDrawer({ className, liveDurationMs }: NotificationDr
         </div>
       </DrawerContent>
     </Drawer>
+  )
+}
+
+interface DrawerScrollListProps {
+  unreadNotifications: Notification[]
+  liveDurationMs?: number
+  onComplete: (id: string) => void
+  onSettle: (id: string) => void
+  hasMore: boolean
+  isLoadingMore: boolean
+  loadMore?: () => void
+  loadMoreRootMargin: string
+}
+
+function DrawerScrollList({
+  unreadNotifications,
+  liveDurationMs,
+  onComplete,
+  onSettle,
+  hasMore,
+  isLoadingMore,
+  loadMore,
+  loadMoreRootMargin,
+}: DrawerScrollListProps) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  const loadMoreRef = useRef(loadMore)
+  loadMoreRef.current = loadMore
+
+  useEffect(() => {
+    if (!loadMore || !hasMore || isLoadingMore) return
+    const sentinel = sentinelRef.current
+    const root = scrollRef.current
+    if (!sentinel || !root) return
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0]?.isIntersecting) loadMoreRef.current?.()
+      },
+      { root, rootMargin: loadMoreRootMargin },
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMore, isLoadingMore, loadMore, loadMoreRootMargin])
+
+  const isEmpty = unreadNotifications.length === 0
+  return (
+    <div
+      ref={scrollRef}
+      className="flex flex-1 flex-col gap-[var(--spacing-system-xs)] overflow-y-auto px-[var(--spacing-system-m)]"
+    >
+      {isEmpty && !isLoadingMore ? (
+        <EmptyState />
+      ) : (
+        <>
+          {unreadNotifications.map((n) => (
+            <NotificationTile
+              key={n.id}
+              notification={n}
+              liveDurationMs={liveDurationMs}
+              onComplete={onComplete}
+              onSettle={onSettle}
+            />
+          ))}
+          {isLoadingMore && <DrawerLoadingTiles />}
+          {loadMore && hasMore && <div ref={sentinelRef} className="h-1" aria-hidden="true" />}
+        </>
+      )}
+    </div>
+  )
+}
+
+function DrawerLoadingTiles() {
+  return (
+    <>
+      <div
+        aria-hidden="true"
+        className="h-16 w-full shrink-0 animate-pulse rounded-md border border-ods-border bg-ods-card"
+      />
+      <div
+        aria-hidden="true"
+        className="h-16 w-full shrink-0 animate-pulse rounded-md border border-ods-border bg-ods-card"
+      />
+    </>
   )
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "@flamingo-stack/openframe-frontend-core",
-  "version": "0.0.105",
+  "version": "0.0.108",
   "description": "Shared design system and components for all Flamingo platforms",
   "type": "module",
   "main": "./dist/index.js",
@@ -42,6 +42,30 @@
       "require": "./dist/components/chat/index.cjs",
       "default": "./dist/components/chat/index.js"
     },
+    "./components/tickets": {
+      "types": "./dist/components/tickets/index.d.ts",
+      "import": "./dist/components/tickets/index.js",
+      "require": "./dist/components/tickets/index.cjs",
+      "default": "./dist/components/tickets/index.js"
+    },
+    "./components/onboarding-guides": {
+      "types": "./dist/components/onboarding-guides/index.d.ts",
+      "import": "./dist/components/onboarding-guides/index.js",
+      "require": "./dist/components/onboarding-guides/index.cjs",
+      "default": "./dist/components/onboarding-guides/index.js"
+    },
+    "./components/contact": {
+      "types": "./dist/components/contact/index.d.ts",
+      "import": "./dist/components/contact/index.js",
+      "require": "./dist/components/contact/index.cjs",
+      "default": "./dist/components/contact/index.js"
+    },
+    "./schemas/contact-schema": {
+      "types": "./dist/schemas/contact-schema.d.ts",
+      "import": "./dist/schemas/contact-schema.js",
+      "require": "./dist/schemas/contact-schema.cjs",
+      "default": "./dist/schemas/contact-schema.js"
+    },
     "./components/ui/file-manager": {
       "types": "./dist/components/ui/file-manager/index.d.ts",
       "import": "./dist/components/ui/file-manager/index.js",
@@ -53,6 +77,12 @@
       "import": "./dist/components/features/index.js",
       "require": "./dist/components/features/index.cjs",
       "default": "./dist/components/features/index.js"
+    },
+    "./components/features/mux-origins": {
+      "types": "./dist/components/features/mux-origins.d.ts",
+      "import": "./dist/components/features/mux-origins.js",
+      "require": "./dist/components/features/mux-origins.cjs",
+      "default": "./dist/components/features/mux-origins.js"
     },
     "./components/toast": {
       "types": "./dist/components/toast/index.d.ts",
@@ -169,10 +199,20 @@
     "build-storybook": "storybook build"
   },
   "peerDependencies": {
+    "@hookform/resolvers": "^3.0.0 || ^4.0.0 || ^5.0.0",
     "@tanstack/react-query": "^5.0.0",
     "next": "^15.0.0 || ^16.0.0",
     "react": "^18.0.0 || ^19.0.0",
-    "react-dom": "^18.0.0 || ^19.0.0"
+    "react-dom": "^18.0.0 || ^19.0.0",
+    "zod": "^3.0.0 || ^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@hookform/resolvers": {
+      "optional": true
+    },
+    "zod": {
+      "optional": true
+    }
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -181,8 +221,6 @@
     "@floating-ui/react": "^0.27.15",
     "@headlessui/react": "^2.2.9",
     "@mux/mux-player-react": "^3.13.0",
-    "@react-aria/overlays": "^3.31.0",
-    "@react-aria/utils": "^3.32.0",
     "@radix-ui/react-accordion": "^1.1.2",
     "@radix-ui/react-alert-dialog": "^1.1.14",
     "@radix-ui/react-aspect-ratio": "^1.0.3",
@@ -210,6 +248,8 @@
     "@radix-ui/react-toggle": "^1.0.3",
     "@radix-ui/react-toggle-group": "^1.0.4",
     "@radix-ui/react-tooltip": "^1.0.7",
+    "@react-aria/overlays": "^3.31.0",
+    "@react-aria/utils": "^3.32.0",
     "@tailwindcss/container-queries": "^0.1.1",
     "@tanstack/react-table": "^8.21.0",
     "@types/react-datepicker": "^6.2.0",
@@ -250,6 +290,7 @@
     "vaul": "^1.1.2"
   },
   "devDependencies": {
+    "@hookform/resolvers": "^5.4.0",
     "@storybook/nextjs-vite": "^10.1.11",
     "@svgr/cli": "^8.1.0",
     "@testing-library/jest-dom": "^6.9.1",
@@ -270,7 +311,8 @@
     "tsup": "^8.5.1",
     "typescript": "^5.8.3",
     "vite": "^7.3.1",
-    "vitest": "^4.0.16"
+    "vitest": "^4.0.16",
+    "zod": "^4.4.3"
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org",

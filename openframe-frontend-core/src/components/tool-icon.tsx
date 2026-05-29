@@ -4,9 +4,9 @@ import { OpenFrameLogo } from "./icons";
 import {
 	OsqueryLogoGreyIcon,
 	TacticalRmmLogoIcon,
-	MeshcentralLogoIcon,
-	FleetMdmLogoIcon,
-	AuthentikLogoIcon,
+	MeshcentralLogoGreyIcon,
+	FleetMdmLogoGreyIcon,
+	AuthentikLogoGreyIcon,
 } from "./icons-v2-generated";
 
 const renderOpenFrameLogo = (_size: number, className?: string) => (
@@ -19,13 +19,13 @@ const renderOpenFrameLogo = (_size: number, className?: string) => (
 );
 
 const toolIconMap: Record<ToolType, (size: number, className?: string) => React.ReactNode> = {
-	[ToolTypeValues.FLEET_MDM]: (size, className) => <FleetMdmLogoIcon size={size} className={className} />,
-	[ToolTypeValues.MESHCENTRAL]: (size, className) => <MeshcentralLogoIcon size={size} className={className} />,
+	[ToolTypeValues.FLEET_MDM]: (size, className) => <FleetMdmLogoGreyIcon size={size} className={className} />,
+	[ToolTypeValues.MESHCENTRAL]: (size, className) => <MeshcentralLogoGreyIcon size={size} className={className} />,
 	[ToolTypeValues.TACTICAL_RMM]: (size, className) => <TacticalRmmLogoIcon size={size} className={className} />,
 	[ToolTypeValues.OPENFRAME]: renderOpenFrameLogo,
 	[ToolTypeValues.OPENFRAME_CHAT]: renderOpenFrameLogo,
 	[ToolTypeValues.OPENFRAME_CLIENT]: renderOpenFrameLogo,
-	[ToolTypeValues.AUTHENTIK]: (size, className) => <AuthentikLogoIcon size={size} className={className} />,
+	[ToolTypeValues.AUTHENTIK]: (size, className) => <AuthentikLogoGreyIcon size={size} className={className} />,
 	[ToolTypeValues.OSQUERY]: (size, className) => <OsqueryLogoGreyIcon size={size} className={className} />,
 	[ToolTypeValues.SYSTEM]: () => null,
 };

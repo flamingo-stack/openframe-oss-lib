@@ -1,0 +1,4 @@
+flowchart TD
+    SpringContext["Spring Application Context"] --> CheckCustom["Custom Bean Present?"]
+    CheckCustom -->|"Yes"| UseCustom["Use Custom Implementation"]
+    CheckCustom -->|"No"| UseDefault["Use Default Implementation"]

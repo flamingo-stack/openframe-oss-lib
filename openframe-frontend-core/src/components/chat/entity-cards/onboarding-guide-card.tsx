@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * OnboardingGuideCard (pure presentation).
+ * OnboardingGuideCard (pure presentation + runtime-derived link attrs).
  *
  * Three variants:
  *   - `catalog`: rich detail card (hero + author grid) for the public catalog
@@ -9,8 +9,11 @@
  *   - `default`: horizontal step-numbered card for "More in {section}" rail.
  *   - `sm`: compact horizontal card for chat-inline rendering.
  *
- * The card writes NO click logic — callers wrap with their own anchor and
- * pass the resolved detail URL via `href`.
+ * Link semantics: the card derives `target`/`rel` from `ChatRuntime.navigation
+ * .decideNewTab` (hub-wired via `HubRuntimeProvider`) and the placeholder
+ * image from `ChatRuntime.resolvePlaceholderUrl`. Explicit `target` / `rel`
+ * / `placeholderUrl` props always WIN — chat dispatch and tests can
+ * pre-resolve. No runtime mounted → same-tab + no placeholder.
  */
 
 import React from 'react'
@@ -21,6 +24,8 @@ import { BlogImagePlaceholder } from './blog-image-placeholder'
 import { EntityAuthorCard } from './entity-author-card'
 import { formatDurationMMSS } from '../../../utils/format'
 import type { OnboardingGuide } from '../types/entities/onboarding-guide'
+import { useEntityCardLink } from './use-entity-card-link'
+import { useEntityCardPlaceholder } from './use-entity-card-placeholder'
 import {
   COMPACT_CARD_OUTER,
   COMPACT_CARD_IMAGE_SLOT,
@@ -63,7 +68,7 @@ export function OnboardingGuideCardSkeleton({ size = 'default' }: { size?: 'cata
     return (
       <div className="bg-ods-system-greys-black border border-ods-border rounded-lg overflow-hidden flex flex-col p-6 gap-4 animate-pulse">
         <div className="flex flex-col md:flex-row gap-4 md:gap-6">
-          <div className="w-full md:w-[256px] aspect-[16/9] bg-ods-border rounded-lg flex-shrink-0" />
+          <div className="w-full md:w-[256px] aspect-[1200/630] bg-ods-border rounded-lg flex-shrink-0" />
           <div className="flex-1 min-w-0 flex flex-col">
             <div className="min-h-[60px] md:min-h-[72px] flex flex-col gap-1.5 justify-start mb-3">
               <div className="h-[25px] md:h-[30px] w-3/4 bg-ods-border rounded" />
@@ -134,7 +139,28 @@ export function OnboardingGuideCardSkeleton({ size = 'default' }: { size?: 'cata
   )
 }
 
-export function OnboardingGuideCard({ guide, href, target, rel, placeholderUrl, size = 'default', className }: OnboardingGuideCardProps) {
+export function OnboardingGuideCard({
+  guide,
+  href,
+  target: targetProp,
+  rel: relProp,
+  targetPlatform,
+  placeholderUrl: placeholderUrlProp,
+  size = 'default',
+  className,
+}: OnboardingGuideCardProps) {
+  const { target, rel } = useEntityCardLink({
+    href,
+    targetPlatform,
+    target: targetProp,
+    rel: relProp,
+  })
+  const placeholderUrl = useEntityCardPlaceholder({
+    title: guide.title,
+    placeholderUrl: placeholderUrlProp,
+    aspect: size === 'sm' ? 'square' : 'wide',
+  })
+
   if (size === 'catalog') {
     const coverImage =
       guide.featured_image ||
@@ -169,7 +195,7 @@ export function OnboardingGuideCard({ guide, href, target, rel, placeholderUrl, 
         <div className="flex flex-col p-6 gap-4">
           <div className="flex flex-col md:flex-row gap-4 md:gap-6">
             <div className="w-full md:w-[256px] flex-shrink-0">
-              <div className="relative rounded-lg overflow-hidden w-full aspect-[16/9] bg-ods-bg">
+              <div className="relative rounded-lg overflow-hidden w-full aspect-[1200/630] bg-ods-bg">
                 {coverImage ? (
                   <Image
                     src={coverImage}

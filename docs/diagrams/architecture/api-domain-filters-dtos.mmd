@@ -1,0 +1,6 @@
+flowchart LR
+    Client["Client (REST or GraphQL)"] --> ApiInput["GraphQL Input / REST Request"]
+    ApiInput --> DomainFilter["Api Domain Filters Dtos"]
+    DomainFilter --> QueryLayer["Mongo Query Filters"]
+    QueryLayer --> Repository["Mongo Repositories"]
+    Repository --> Database[("MongoDB")]

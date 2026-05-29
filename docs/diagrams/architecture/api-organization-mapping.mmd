@@ -1,0 +1,23 @@
+flowchart LR
+    subgraph ApiLayer["API Layer"]
+        RestController["OrganizationController"]
+        GraphQLFetcher["OrganizationDataFetcher"]
+    end
+
+    Mapper["OrganizationMapper"]
+
+    subgraph DomainLayer["Domain & Persistence"]
+        OrgEntity["Organization Entity"]
+        MongoRepo["Mongo Repository"]
+    end
+
+    RestController -->|"Create/Update Request"| Mapper
+    GraphQLFetcher -->|"Mutation Input"| Mapper
+
+    Mapper -->|"Entity"| OrgEntity
+    OrgEntity --> MongoRepo
+
+    MongoRepo --> OrgEntity
+    OrgEntity -->|"Response DTO"| Mapper
+    Mapper -->|"OrganizationResponse"| RestController
+    Mapper -->|"GraphQL DTO"| GraphQLFetcher

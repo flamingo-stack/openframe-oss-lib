@@ -1,0 +1,7 @@
+flowchart LR
+    Gateway["Gateway Service"] -->|"JWT Forwarded"| ApiService["API Service Runtime"]
+    ApiService -->|"Uses"| ConfigModule["Api Service Core Config And Security"]
+    ApiService --> Controllers["REST Controllers"]
+    ApiService --> GraphQL["GraphQL Data Fetchers"]
+    ApiService --> Services["Domain Services"]
+    Services --> DataLayer["Mongo / Kafka / Redis"]

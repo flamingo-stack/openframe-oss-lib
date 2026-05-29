@@ -1,0 +1,12 @@
+flowchart TD
+    Client --> Gateway
+    Gateway --> OriginFilter
+    OriginFilter --> AuthHeader
+    AuthHeader --> JwtResolver
+    JwtResolver --> RoleAuth
+    RoleAuth --> RouteDecision
+    RouteDecision -->|REST| IntegrationController
+    RouteDecision -->|WebSocket| WebSocketGatewayConfig
+    IntegrationController --> UpstreamResolver
+    WebSocketGatewayConfig --> UpstreamResolver
+    UpstreamResolver --> IntegratedTool

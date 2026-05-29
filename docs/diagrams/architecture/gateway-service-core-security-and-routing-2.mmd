@@ -1,0 +1,10 @@
+flowchart TD
+    Request["Incoming Request"] --> Origin["OriginSanitizerFilter"]
+    Origin --> AuthHeader["AddAuthorizationHeaderFilter"]
+    AuthHeader --> JwtValidation["JWT Authentication"]
+    JwtValidation --> RoleCheck["Role Authorization Rules"]
+    RoleCheck --> ApiKeyCheck{"External API Path?"}
+    ApiKeyCheck -->|Yes| ApiKeyFilter["ApiKeyAuthenticationFilter"]
+    ApiKeyCheck -->|No| Continue["Continue Routing"]
+    ApiKeyFilter --> Continue
+    Continue --> Controller["Controller / Route"]

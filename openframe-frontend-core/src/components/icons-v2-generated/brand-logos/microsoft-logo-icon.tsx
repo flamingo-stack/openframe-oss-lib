@@ -22,9 +22,9 @@ export function MicrosoftLogoIcon({
       {...props}
     >
       <path fill="#F1511B" d="M11.505 11.503H2V2h9.505z" />
-      <path fill="#80CC28" d="M22 11.503h-9.505V2h9.504v9.503z" />
+      <path fill="#80CC28" d="M22 11.503h-9.505V2h9.504z" />
       <path fill="#00ADEF" d="M11.505 22H2v-9.503h9.505z" />
-      <path fill="#FBBC09" d="M22 22h-9.505v-9.503h9.504V22z" />
+      <path fill="#FBBC09" d="M22 22h-9.505v-9.503h9.504z" />
     </svg>
   );
 }

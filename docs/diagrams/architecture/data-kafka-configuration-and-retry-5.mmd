@@ -1,0 +1,10 @@
+flowchart TD
+    DebeziumMessage --> Payload
+    Payload --> Before[Before State]
+    Payload --> After[After State]
+    Payload --> Source
+    Payload --> Operation
+    Payload --> Timestamp
+    Source --> Database
+    Source --> Table
+    Source --> Connector

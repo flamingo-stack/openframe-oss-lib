@@ -17,6 +17,8 @@ import Image from '../../../embed-shims/next-image'
 import { Card } from '../../ui/card'
 import { cn } from '../../../utils/cn'
 import type { CaseStudy } from '../../../types/case-study'
+import { useEntityCardLink } from './use-entity-card-link'
+import { useEntityCardPlaceholder } from './use-entity-card-placeholder'
 import {
   COMPACT_CARD_IMAGE_SLOT,
   COMPACT_CARD_META_ROW_BOX,
@@ -71,7 +73,8 @@ export function CaseStudyCardSkeleton({ size = 'default' }: { size?: 'default' |
   }
   return (
     <div className="bg-ods-card border border-ods-border rounded-lg overflow-hidden p-6 flex flex-col gap-6 animate-pulse">
-      <div className="h-[200px] w-full rounded-sm bg-ods-bg" />
+      {/* Skeleton aspect matches the real card's image slot (OG 1200×630) */}
+      <div className="w-full aspect-[1200/630] rounded-sm bg-ods-bg" />
       <div className="h-[72px] flex flex-col gap-2">
         <div className="h-5 w-3/4 bg-ods-bg rounded" />
         <div className="h-5 w-1/2 bg-ods-bg rounded" />
@@ -87,7 +90,27 @@ export function CaseStudyCardSkeleton({ size = 'default' }: { size?: 'default' |
   )
 }
 
-export function CaseStudyCard({ study, href, target, rel, placeholderUrl, size = 'default', className }: CaseStudyCardProps) {
+export function CaseStudyCard({
+  study,
+  href,
+  target: targetProp,
+  rel: relProp,
+  targetPlatform,
+  placeholderUrl: placeholderUrlProp,
+  size = 'default',
+  className,
+}: CaseStudyCardProps) {
+  const { target, rel } = useEntityCardLink({
+    href,
+    targetPlatform,
+    target: targetProp,
+    rel: relProp,
+  })
+  const placeholderUrl = useEntityCardPlaceholder({
+    title: study.title,
+    placeholderUrl: placeholderUrlProp,
+    aspect: size === 'sm' ? 'square' : 'wide',
+  })
   const coverImage = study.featured_image || placeholderUrl || null
 
   if (size === 'sm') {
@@ -125,7 +148,13 @@ export function CaseStudyCard({ study, href, target, rel, placeholderUrl, size =
   return (
     <a href={href} target={target} rel={rel} className={cn('block h-full', className)}>
       <Card className="bg-ods-card border border-ods-border hover:border-ods-accent transition-colors p-6 flex flex-col gap-6 overflow-hidden">
-        <div className="relative h-[200px] w-full rounded-sm overflow-hidden bg-ods-bg shrink-0">
+        {/* Fixed aspect ratio matches the standard OG card source aspect
+            (1200×630 = 1.91:1), so the image fits with near-zero CSS-side
+            cropping. Subject anchoring is then a function of the source
+            image's center-66% safe zone (OG design convention) — visually
+            uniform across all cards regardless of column width. Skeleton
+            (lines 73-74) uses the same aspect for consistent layout. */}
+        <div className="relative w-full aspect-[1200/630] rounded-sm overflow-hidden bg-ods-bg shrink-0">
           {coverImage && (
             <Image
               src={coverImage}

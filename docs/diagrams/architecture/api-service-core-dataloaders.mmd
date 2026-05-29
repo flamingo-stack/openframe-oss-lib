@@ -1,0 +1,7 @@
+flowchart TD
+    Client["GraphQL Client"] --> GQL["GraphQL Data Fetchers"]
+    GQL --> DL["Api Service Core Dataloaders"]
+    DL --> Service["Domain Services"]
+    DL --> Repo["Mongo Repositories"]
+    Service --> Mongo[("MongoDB")]
+    Repo --> Mongo

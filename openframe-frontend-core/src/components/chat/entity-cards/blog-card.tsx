@@ -19,10 +19,13 @@
  */
 
 import React, { useState } from 'react'
+import { Eye } from 'lucide-react'
 import Image from '../../../embed-shims/next-image'
 import { StatusBadge } from '../../ui/status-badge'
 import { cn } from '../../../utils/cn'
 import type { BlogPostSummary } from '../../../types/blog'
+import { useEntityCardLink } from './use-entity-card-link'
+import { useEntityCardPlaceholder } from './use-entity-card-placeholder'
 import {
   COMPACT_CARD_IMAGE_SLOT,
   COMPACT_CARD_META_ROW_BOX,
@@ -83,7 +86,7 @@ export function BlogCardSkeleton({ size = 'default' }: { size?: 'default' | 'sm'
   }
   return (
     <article className="group bg-ods-card border border-ods-border rounded-lg overflow-hidden h-full flex flex-col animate-pulse">
-      <div className="aspect-[16/9] bg-ods-bg" />
+      <div className="aspect-[1200/630] bg-ods-bg" />
       <div className="p-4 flex flex-col flex-grow space-y-3">
         <div className="h-5 w-3/4 bg-ods-bg rounded" />
         <div className="h-5 w-1/2 bg-ods-bg rounded" />
@@ -101,16 +104,26 @@ export function BlogCardSkeleton({ size = 'default' }: { size?: 'default' | 'sm'
 export function BlogCard({
   post,
   href,
-
-  target,
-
-  rel,
-  placeholderUrl,
+  target: targetProp,
+  rel: relProp,
+  targetPlatform,
+  placeholderUrl: placeholderUrlProp,
   size = 'default',
   className,
   hasEmbeddedVideo = false,
   priority = false,
 }: BlogCardProps) {
+  const { target, rel } = useEntityCardLink({
+    href,
+    targetPlatform,
+    target: targetProp,
+    rel: relProp,
+  })
+  const placeholderUrl = useEntityCardPlaceholder({
+    title: post.title,
+    placeholderUrl: placeholderUrlProp,
+    aspect: size === 'sm' ? 'square' : 'wide',
+  })
   const [imageError, setImageError] = useState(false)
   const displayImage = (post.featured_image && !imageError) ? post.featured_image : placeholderUrl
 
@@ -187,7 +200,7 @@ export function BlogCard({
         className="flex flex-col h-full focus:outline-none"
         aria-label={`Read article: ${post.title}`}
       >
-        <div className="relative w-full aspect-[16/9] overflow-hidden bg-ods-bg">
+        <div className="relative w-full aspect-[1200/630] overflow-hidden bg-ods-bg">
           {displayImage ? (
             <Image
               src={displayImage}
@@ -235,22 +248,30 @@ export function BlogCard({
             </p>
           </div>
 
-          {/* Footer: author + date (simplified — no hub BlogMeta dep). */}
-          <div className="mt-auto flex items-center gap-2 text-sm text-ods-text-secondary">
-            {post.author_avatar ? (
-              <Image
-                src={post.author_avatar}
-                alt={post.author_name || ''}
-                width={32}
-                height={32}
-                className="rounded-full"
-                unoptimized
-              />
-            ) : null}
-            <span className="truncate">
-              {post.author_name || 'Anonymous'}
-              {dateStr ? <> · {dateStr}</> : null}
-            </span>
+          <div className="mt-auto flex items-center justify-between gap-2 text-sm text-ods-text-secondary">
+            <div className="flex items-center gap-2 min-w-0">
+              {post.author_avatar ? (
+                <Image
+                  src={post.author_avatar}
+                  alt={post.author_name || ''}
+                  width={32}
+                  height={32}
+                  className="rounded-full shrink-0"
+                  unoptimized
+                />
+              ) : null}
+              <span className="truncate">
+                {post.author_name || 'Anonymous'}
+                {dateStr ? <> · {dateStr}</> : null}
+              </span>
+            </div>
+            <div
+              className="flex items-center gap-1 shrink-0"
+              aria-label={`View count: ${(post.view_count ?? 0).toLocaleString('en-US')} views`}
+            >
+              <Eye className="w-4 h-4 shrink-0" />
+              <span>{(post.view_count ?? 0).toLocaleString('en-US')}</span>
+            </div>
           </div>
         </div>
       </a>

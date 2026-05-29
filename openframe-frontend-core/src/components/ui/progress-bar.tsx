@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { useMdUp } from '@/hooks';
+import { useMdUp } from '../../hooks';
 
 type ProgressBarProps = {
   progress: number; // 0–100

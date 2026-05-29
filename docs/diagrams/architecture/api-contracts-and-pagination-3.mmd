@@ -1,0 +1,6 @@
+flowchart TD
+    Client["Client"] --> Args["ConnectionArgs"]
+    Args --> Decode["CursorCodec.decode()"]
+    Decode --> Query["Repository Query with Limit"]
+    Query --> Encode["CursorCodec.encode()"]
+    Encode --> Response["Connection Response with Edges"]

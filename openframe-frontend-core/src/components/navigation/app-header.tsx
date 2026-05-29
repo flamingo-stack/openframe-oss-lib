@@ -6,7 +6,6 @@ import { cn } from '../../utils/cn'
 import { useOptionalNotifications } from '../features/notifications/notifications-context'
 import { LogOutIcon, OpenFrameLogo, OpenFrameText, UserIcon } from '../icons'
 import { BellIcon } from '../icons-v2-generated/interface/bell-icon'
-import { BellRingingIcon } from '../icons-v2-generated/interface/bell-ringing-icon'
 import { Menu01Icon, SearchIcon, XmarkIcon } from '../icons-v2-generated'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, SquareAvatar } from '../ui'
 import { HeaderButton } from './header-button'
@@ -210,20 +209,19 @@ function NotificationsHeaderButton({
   dimmedClass,
 }: NotificationsHeaderButtonProps) {
   const ctx = useOptionalNotifications()
-  const unreadCount = ctx?.unreadCount ?? fallbackUnreadCount
+  const hasUnread = (ctx?.unreadCount ?? fallbackUnreadCount) > 0
   const isActive = ctx?.isOpen ?? false
   const onClick = ctx?.toggle
-  const Icon = unreadCount > 0 ? BellRingingIcon : BellIcon
 
   return (
     <HeaderButton
       icon={
-        <div className="relative w-full h-full flex items-center justify-center">
-          <Icon className="h-4 w-4 md:w-6 md:h-6" />
-          {unreadCount > 0 && (
-            <span className="absolute top-2 right-2 bg-ods-accent text-ods-text-on-accent text-[8px] rounded-full w-3 h-3 md:w-4 md:h-4 flex items-center justify-center">
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </span>
+        <div className="relative w-4 h-4 md:w-6 md:h-6">
+          <BellIcon className="w-full h-full" />
+          {hasUnread && (
+            <span
+              className="absolute top-0 right-0 bg-ods-warning rounded-full w-1.5 h-1.5 md:w-2 md:h-2"
+            />
           )}
         </div>
       }

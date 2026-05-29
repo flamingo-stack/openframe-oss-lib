@@ -1,0 +1,14 @@
+sequenceDiagram
+    participant Browser
+    participant AuthServer as "Authorization Server"
+    participant Success as "Auth Success Handler"
+    participant Flow as "SSO Flow Handler"
+    participant Service as "Registration Service"
+
+    Browser->>AuthServer: OAuth2 Login (Google or Microsoft)
+    AuthServer->>Success: onAuthenticationSuccess
+    Success->>Success: Update lastLogin
+    Success->>Flow: Delegate to flow handler
+    Flow->>Service: Register user or tenant
+    Service->>Flow: Return tenant context
+    Flow->>Browser: Redirect to target tenant

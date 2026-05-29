@@ -1,0 +1,5 @@
+flowchart TD
+    UserController["UserController"] --> UserService["UserService"]
+    UserService --> PersistUser["Persist User"]
+    PersistUser --> ProcessorHook["postProcessUserUpdated()"]
+    ProcessorHook --> DefaultUserProcessor["DefaultUserProcessor"]

@@ -37,12 +37,19 @@ export interface DevSectionViewProps {
     icon: ReactNode;
     description: string;
   };
+  /** Optional slot rendered BETWEEN the hero and the search/filter
+   *  controls. Use this for an entry-action surface that should sit
+   *  above the list (e.g. the Help Center's "Open a new ticket" form).
+   *  The slot is wrapped in the same `gap-10` flex column so spacing
+   *  matches the surrounding chrome — callers should NOT add their
+   *  own top/bottom margin. Renders `null` (no DOM) when omitted. */
+  preControls?: ReactNode;
   /** The page-specific list body. Reads URL params written by this
    *  component (search input + filter pills). */
   children: ReactNode;
 }
 
-export function DevSectionView({ sectionKey, hero, children }: DevSectionViewProps) {
+export function DevSectionView({ sectionKey, hero, preControls, children }: DevSectionViewProps) {
   const section = OPENFRAME_DEV_SECTIONS[sectionKey];
   const router = useRouter();
   const pathname = usePathname();
@@ -101,6 +108,8 @@ export function DevSectionView({ sectionKey, hero, children }: DevSectionViewPro
           </h2>
         </div>
       )}
+
+      {preControls}
 
       {(search || filter) && (
         <div className="space-y-4">

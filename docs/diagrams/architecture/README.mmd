@@ -1,27 +1,15 @@
 flowchart TD
-    Client["Browser / External System"] --> Gateway["Gateway Service Core"]
-    Agent["Client Agent"] --> Gateway
+    Client["Client / Browser / Agent"] --> Gateway["Gateway Service Core"]
+    Gateway --> ExternalAPI["External API Service"]
+    Gateway --> ApiCore["API Service Core"]
 
-    Gateway --> Auth["Authorization Service Core"]
-    Gateway --> Api["API Service Core"]
-    Gateway --> External["External API Service Core"]
+    ApiCore --> Authz["Authorization Service Core"]
+    ApiCore --> Stream["Stream Service Core"]
+    ApiCore --> Management["Management Service Core"]
 
-    Api --> Contracts["API Lib Contracts"]
-    External --> Contracts
-
-    Api --> Mongo["Mongo Persistence Layer"]
-    Api --> DataCore["Data Platform Core"]
-
-    DataCore --> Cassandra["Cassandra"]
-    DataCore --> Pinot["Apache Pinot"]
-    DataCore --> Kafka["Kafka Messaging Layer"]
-    DataCore --> Redis["Redis Caching Layer"]
-
-    Kafka --> Stream["Stream Processing Service Core"]
-    Stream --> Cassandra
-    Stream --> Kafka
-
-    Management["Management Service Core"] --> Kafka
-    Management --> Pinot
-    Management --> Mongo
-    Management --> NATS["NATS Streams"]
+    Authz --> Mongo["MongoDB"]
+    ApiCore --> Mongo
+    Stream --> Kafka["Kafka"]
+    Stream --> Pinot["Pinot"]
+    ApiCore --> Redis["Redis"]
+    Management --> NATS["NATS"]

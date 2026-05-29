@@ -1,7 +1,4 @@
-flowchart TD
-    Client["External Client"] --> IntegrationCtrl
-    IntegrationCtrl --> RestProxy
-    RestProxy --> ToolRepo["IntegratedToolRepository"]
-    RestProxy --> UrlService["ToolUrlService"]
-    RestProxy --> Resolver["ProxyUrlResolver"]
-    Resolver --> Target["Tool API Endpoint"]
+flowchart LR
+    OrgRequest["Organization Request"] --> QueryService["OrganizationQueryService"]
+    OrgRequest --> CommandService["OrganizationCommandService"]
+    CommandService --> Validation["Archive Rules"]

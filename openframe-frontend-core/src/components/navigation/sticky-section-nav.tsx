@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { cn } from '../../utils'
+import { scrollElementIntoView } from '../../utils/scroll-into-view'
 
 export interface StickyNavSection {
   id: string
@@ -97,7 +98,10 @@ export function useSectionNavigation(
   const isScrollingFromClick = useRef(false)
   const { offset = 100 } = options || {}
 
-  // Handle click - just scroll to the element
+  // Handle click - scroll to the element via the canonical helper.
+  // The `offset` prop maps to `headerOffset` (sticky chrome above the
+  // section nav); same smooth-scroll mechanics every other anchor
+  // surface in the app uses.
   const handleSectionClick = useCallback((sectionId: string) => {
     const targetElement = document.getElementById(sectionId)
     if (!targetElement) return
@@ -106,9 +110,7 @@ export function useSectionNavigation(
     isScrollingFromClick.current = true
     setActiveSection(sectionId)
 
-    // Scroll to element
-    const top = targetElement.offsetTop - offset
-    window.scrollTo({ top, behavior: 'smooth' })
+    scrollElementIntoView(targetElement, { headerOffset: offset })
 
     // Allow scroll spy again after scroll completes
     setTimeout(() => {

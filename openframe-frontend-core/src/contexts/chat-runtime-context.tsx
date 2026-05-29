@@ -62,12 +62,15 @@ export interface ChatRuntime {
      *      relative `/api/storage/view/chat-attachments/` is sufficient
      *      (same-origin); embedders supply an absolute hub URL so the
      *      browser can fetch cross-origin.
-     *    - `chatIdentityUrl` — GET endpoint the `useChatIdentity` hook
+     *    - `identityUrl` — GET endpoint the `useChatIdentity` hook
      *      hits to learn the `{authTier, source, attachmentsEnabled}`
-     *      capability bag for the current session. */
+     *      capability bag for the current session. Used beyond chat
+     *      (tickets / contact form / any embedded surface that needs
+     *      to identify the proxied customer), so the name has no
+     *      "chat" prefix even though the consuming hook still does. */
     attachmentUploadUrl: string
     attachmentViewUrlPrefix: string
-    chatIdentityUrl: string
+    identityUrl: string
     /** Optional URL prefix for the image proxy (`<prefix>?url=<external>`).
      *  When unset, lib's `getProxiedImageUrl` returns the original URL
      *  unchanged. Hub default: '/api/image-proxy'. Embedders that don't
@@ -79,6 +82,13 @@ export interface ChatRuntime {
      *  leave it unset. Matches the `skipDomains` parameter of
      *  `getProxiedImageUrl`. */
     imageProxySkipDomains?: string[]
+    /** Supabase storage origin (e.g. `https://xyz.supabase.co`) — used
+     *  by `useVideoWarmup` to scope the `<link rel="preload" as="video">`
+     *  hint to MP4s the deployment actually hosts. Hub wires it via
+     *  `getSupabaseStorageOrigin()`; embedders without a Supabase
+     *  storage origin leave it unset (preload is then skipped; Mux/
+     *  YouTube preconnect still fires). */
+    supabaseStorageOrigin?: string
   }
   navigation: {
     /** ONE knob, two behaviors:
@@ -113,6 +123,40 @@ export interface ChatRuntime {
      *  same-origin/same-platform → same tab, else new tab. */
     decideNewTab?: (args: { href: string; targetPlatform?: string | null }) => boolean
   }
+  /** Optional OG placeholder URL builder. Returns a branded
+   *  `/api/og-placeholder?...` URL for the given title. Hub wires this
+   *  to its `buildOgPlaceholderUrl` (resolves CSS-var ODS colors to
+   *  hex via the static map). Embedders can wire any equivalent that
+   *  hits their own placeholder route — or omit, in which case entity
+   *  cards fall back to no placeholder.
+   *
+   *  Pure synchronous function — NOT a hook. Callers wrap with
+   *  `useMemo`/`useOgPlaceholder` for memoization. */
+  resolvePlaceholderUrl?: (
+    title: string,
+    options?: { site?: string; aspect?: 'wide' | 'square' },
+  ) => string
+  /** Optional content-URL composer. Returns the platform-aware href +
+   *  target-platform tuple for a content entity. Hub wires this to its
+   *  `buildContentURL(type, slug, extractPrimaryPlatform(platforms))`
+   *  pipeline so the lib catalog/detail views can derive cross-
+   *  platform hrefs without knowing the hub's platform topology
+   *  (openmsp.ai / openframe.app / flamingo.run / tmcg).
+   *
+   *  Embedders that don't host multi-platform content can wire this to
+   *  a simple `(type, slug) => ({ href: '/' + type + '/' + slug,
+   *  targetPlatform: null })` — or omit, in which case lib views fall
+   *  back to a same-origin relative path with `targetPlatform: null`.
+   *
+   *  `platforms` is the entity's flattened junction array (e.g.
+   *  `guide.onboarding_guide_platforms`) — the callback runs
+   *  `extractPrimaryPlatform` internally before dispatching to its
+   *  composer. */
+  composeContentUrl?: (
+    type: string,
+    slug: string,
+    platforms?: Array<{ name?: string }>,
+  ) => { href: string; targetPlatform: string | null }
   /** Chat source identifier — REQUIRED. Used for localStorage
    *  namespacing (`mingo-chat-<source>-v1`). Hub sets via
    *  `currentPlatform()`; embedders set explicitly.

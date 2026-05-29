@@ -1,0 +1,5 @@
+flowchart LR
+    StreamService["Stream Service Core Kafka And Handlers"] -->|"Ingest Events"| PinotCluster["Apache Pinot Cluster"]
+    MongoDB["Data Mongo Domain Model"] -->|"Transactional Data"| Services["API & Management Services"]
+    PinotCluster -->|"Analytical Queries"| PinotRepos["Data Pinot Repositories"]
+    PinotRepos -->|"Facet Counts & Logs"| Services

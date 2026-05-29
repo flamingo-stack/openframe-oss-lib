@@ -1,0 +1,8 @@
+flowchart TD
+    NodeQuery["node(id)"] --> Decode["Relay.fromGlobalId"]
+    Decode --> TypeSwitch["NodeType enum"]
+    TypeSwitch --> DeviceService
+    TypeSwitch --> OrganizationService
+    TypeSwitch --> EventService
+    TypeSwitch --> ToolService
+    TypeSwitch --> TagService

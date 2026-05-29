@@ -8,11 +8,11 @@
 
 import { Trash2 } from 'lucide-react'
 import React from 'react'
-import { cn } from '@/utils'
+import { cn } from '../../utils/cn'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
-import {PlusCircleIcon} from "@/components/icons-v2-generated";
+import { PlusCircleIcon } from '../icons-v2-generated'
 
 /**
  * Single script argument with key and value
