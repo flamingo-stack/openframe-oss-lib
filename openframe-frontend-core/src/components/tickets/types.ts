@@ -140,6 +140,29 @@ export function isOptimistic(t: AnyTicket): t is OptimisticTicket {
 }
 
 /**
+ * Shape of a single `['tickets', …]` TanStack-Query cache slot.
+ * Mirrors `FindTicketResponse` in `hooks/use-tickets-list.ts` — kept
+ * here because the cache-mutation call sites in `useTicketActions` and
+ * `<HelpCenterList>` would otherwise have to redeclare the shape inline.
+ *
+ * A 2026-05-29 prod regression (`t.map is not a function` on
+ * close/reopen) was caused by assuming the cache held a bare
+ * `TicketData[]` instead of this wrapper — every helper that calls
+ * `queryClient.setQueriesData` / `getQueriesData` on `['tickets']`
+ * MUST type the value through this shape and project / reassemble
+ * `tickets` explicitly.
+ */
+export interface TicketsCacheSlot {
+  tickets?: TicketData[]
+  count?: number
+  totalCount?: number
+  page?: number
+  pageSize?: number
+  totalPages?: number
+  scope?: 'self' | 'all'
+}
+
+/**
  * Stable server-side error codes the ticket-action helpers route
  * through `mapTicketActionError`. Anything else is treated as a generic
  * server error.

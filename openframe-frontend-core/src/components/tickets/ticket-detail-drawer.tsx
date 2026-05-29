@@ -444,8 +444,15 @@ function ReopenAction({
   onActionCollapsed: TicketDetailDrawerProps['onActionCollapsed']
 }) {
   const handleReopen = async () => {
-    const ok = await onReopen(ticketRef)
-    if (ok) onActionCollapsed()
+    // Intentionally do NOT call `onActionCollapsed()` here. Pre-PR #1053
+    // every reopen was followed by a full list refetch which removed
+    // the (now-OPEN) row from a `?status=closed` view, so collapsing
+    // the drawer hid the disappearance flash. After #1053+#1055 the
+    // row stays in the list with the optimistic in-place status
+    // update — collapsing the drawer now actively dismisses the
+    // ticket the user is working on. Keep it mounted; the badge flip
+    // is enough feedback. (Reported 2026-05-29.)
+    void (await onReopen(ticketRef))
   }
   return (
     <div className="flex justify-end">
@@ -501,9 +508,14 @@ function OpenActions({
 
   const confirmClose = async () => {
     setCloseDialogOpen(false)
-    const ok = await onClose(ticketRef, resolution.trim() || undefined)
+    await onClose(ticketRef, resolution.trim() || undefined)
     setResolution('')
-    if (ok) onActionCollapsed()
+    // Intentionally do NOT call `onActionCollapsed()` here. See the
+    // matching comment in ReopenActions.handleReopen above — collapsing
+    // the drawer after a successful close now dismisses the ticket the
+    // user is actively working on, which is the exact UX bug PR #1053
+    // set out to fix. The optimistic in-place status update keeps the
+    // row mounted with the new badge; that's the only feedback needed.
   }
 
   return (
