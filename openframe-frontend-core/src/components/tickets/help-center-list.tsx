@@ -40,7 +40,7 @@ import { useTicketsList } from './hooks/use-tickets-list'
 import { useTicketActions } from './hooks/use-ticket-actions'
 import { HelpCenterCard } from './help-center-card'
 import { HelpCenterCreateForm, HelpCenterCreateFormSkeleton } from './help-center-create-form'
-import type { AnyTicket, OptimisticTicket, TicketData } from './types'
+import type { AnyTicket, OptimisticTicket, TicketsCacheSlot } from './types'
 import { isOptimistic } from './types'
 
 export interface HelpCenterListProps {
@@ -175,9 +175,21 @@ function HelpCenterListAuthed({
       // Every cache slot under the ['tickets'] prefix — the queryKey
       // includes search + status + page + pageSize segments so a bare
       // write would miss most slots.
-      queryClient.setQueriesData<TicketData[] | undefined>(
+      //
+      // Cache slot is `TicketsCacheSlot` (`{ tickets, count, … }`), NOT
+      // a bare `TicketData[]`. The previous version called `.filter()`
+      // directly on the object — silently crashing only on the rare
+      // TICKET_NOT_FOUND path; the prod regression that landed
+      // 2026-05-29 surfaced the same shape mismatch in the
+      // close/reopen optimistic-update path. Project, filter, reassemble.
+      queryClient.setQueriesData<TicketsCacheSlot | undefined>(
         { queryKey: ['tickets'] },
-        (prev) => (prev ?? []).filter((t) => t.id !== ticketId),
+        (prev) => {
+          if (!prev || !Array.isArray(prev.tickets)) return prev
+          const nextTickets = prev.tickets.filter((t) => t.id !== ticketId)
+          if (nextTickets.length === prev.tickets.length) return prev
+          return { ...prev, tickets: nextTickets }
+        },
       )
       setExpandedTicketId((prev) => (prev === ticketId ? null : prev))
     },

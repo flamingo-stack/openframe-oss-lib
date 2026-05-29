@@ -39,6 +39,7 @@ import {
   type OptimisticTicket,
   type TicketActionErrorCode,
   type TicketData,
+  type TicketsCacheSlot,
   TOAST_COPY,
 } from '../types'
 
@@ -455,17 +456,25 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
           const statusUpdate =
             (serverArgs as { status?: 'OPEN' | 'CLOSED' }).status ?? null
           if (statusUpdate) {
-            queryClient.setQueriesData<TicketData[] | undefined>(
+            // The `useTicketsList` query (in `use-tickets-list.ts`)
+            // returns `FindTicketResponse` — an OBJECT shape
+            // `{ tickets: TicketData[], count, page, totalPages, ... }` —
+            // NOT a bare `TicketData[]`. The previous version of this
+            // callback assumed an array and crashed at runtime with
+            // `t.map is not a function` on every close/reopen
+            // (reported 2026-05-29 in prod). Project the nested
+            // tickets array, map, and reassemble the wrapper.
+            queryClient.setQueriesData<TicketsCacheSlot | undefined>(
               { queryKey: ['tickets'] },
               (prev) => {
-                if (!prev) return prev
+                if (!prev || !Array.isArray(prev.tickets)) return prev
                 let mutated = false
-                const next = prev.map((t) => {
+                const nextTickets = prev.tickets.map((t) => {
                   if (t.id !== ticket.id || t.status === statusUpdate) return t
                   mutated = true
                   return { ...t, status: statusUpdate }
                 })
-                return mutated ? next : prev
+                return mutated ? { ...prev, tickets: nextTickets } : prev
               },
             )
           }
@@ -722,9 +731,20 @@ function cacheContainsTicket(
   queryClient: ReturnType<typeof useQueryClient>,
   expectedTicketId: string,
 ): boolean {
-  const entries = queryClient.getQueriesData<TicketData[] | undefined>({ queryKey: ['tickets'] })
+  // Cache slot is `TicketsCacheSlot` (`{ tickets, count, … }`), NOT a
+  // bare `TicketData[]`. The previous code's `Array.isArray(data)` guard
+  // silently fell through to `return false` on real responses — the
+  // post-create watcher therefore NEVER detected the real row arriving
+  // early and always waited the full timeout. Project the nested array.
+  const entries = queryClient.getQueriesData<TicketsCacheSlot | undefined>({
+    queryKey: ['tickets'],
+  })
   for (const [, data] of entries) {
-    if (Array.isArray(data) && data.some((t) => t.external_id === expectedTicketId)) {
+    if (
+      data &&
+      Array.isArray(data.tickets) &&
+      data.tickets.some((t) => t.external_id === expectedTicketId)
+    ) {
       return true
     }
   }
