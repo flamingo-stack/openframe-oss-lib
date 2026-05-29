@@ -483,7 +483,15 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
       if (ok) {
         clearReplyError(ticket.external_id)
       } else {
-        const mapped = lastUpdateErrorRef.current
+        // Line 466's `.current = null` narrows the property to literal
+        // `null`. `tsc -p tsconfig.declarations.json` (declarations
+        // build, distinct from the `tsc --noEmit` pre-step) doesn't
+        // widen that narrowing across the `await updateTicket(...)`,
+        // so the read here is typed `never`. The runtime type IS
+        // `MappedTicketActionError | null` per the useRef declaration;
+        // the assertion just tells TS to honor it instead of the stale
+        // narrowing.
+        const mapped = lastUpdateErrorRef.current as MappedTicketActionError | null
         if (mapped && REPLY_BANNER_CODES.has(mapped.code)) {
           setReplyError(ticket.external_id, mapped)
         }
