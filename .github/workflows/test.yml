@@ -49,6 +49,7 @@ jobs:
           mvn clean install \
             -am \
             -Dcompress \
+            -Dintegration.tests=true \
             --threads 2C \
             --batch-mode \
             --no-transfer-progress \
