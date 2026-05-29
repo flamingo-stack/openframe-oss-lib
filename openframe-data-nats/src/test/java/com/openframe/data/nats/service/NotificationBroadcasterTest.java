@@ -15,6 +15,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
 
@@ -162,6 +164,26 @@ class NotificationBroadcasterTest {
     }
 
     @Test
+    @DisplayName("Given the configured retention, when broadcast persists the Notification, then expireAt is stamped roughly retention-days into the future — the TTL index reaps the document after retention elapses")
+    void persisted_notification_is_stamped_with_ttl_expiry() {
+        NotificationCommand cmd = NotificationCommand.builder()
+                .title("Approval")
+                .severity(NotificationSeverity.INFO)
+                .context(genericContext("APPROVAL"))
+                .adminAudience(Set.of("admin-1"))
+                .build();
+
+        Instant before = Instant.now();
+        broadcaster.broadcast(cmd);
+
+        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository).save(captor.capture());
+        assertThat(captor.getValue().getExpireAt())
+                .isAfter(before.plus(Duration.ofDays(29)))
+                .isBefore(before.plus(Duration.ofDays(31)));
+    }
+
+    @Test
     @DisplayName("Given a command, when broadcast returns, then the returned Notification is the saved one (with id populated) — caller must rely on the persisted id, not on a builder-only object")
     void broadcast_returns_persisted_notification() {
         NotificationCommand cmd = NotificationCommand.builder()
@@ -254,6 +276,7 @@ class NotificationBroadcasterTest {
         NotificationBroadcaster bc = new NotificationBroadcaster(
                 notificationRepository, readStateService, descriptorRegistry, publisher);
         ReflectionTestUtils.setField(bc, "notificationsEnabled", notificationsEnabled);
+        ReflectionTestUtils.setField(bc, "retentionDays", 30L);
         return bc;
     }
 

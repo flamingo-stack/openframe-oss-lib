@@ -12,6 +12,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
 
@@ -28,6 +30,9 @@ public class NotificationBroadcaster {
     @Value("${openframe.features.notifications.enabled:false}")
     private boolean notificationsEnabled;
 
+    @Value("${openframe.features.notifications.retention-days:30}")
+    private long retentionDays;
+
     public Notification broadcast(NotificationCommand command) {
         if (!notificationsEnabled) {
             log.debug("Notifications feature disabled — broadcast skipped (no persistence, no NATS publish)");
@@ -38,6 +43,7 @@ public class NotificationBroadcaster {
                 .severity(command.getSeverity())
                 .title(command.getTitle())
                 .description(command.getDescription())
+                .expireAt(Instant.now().plus(Duration.ofDays(retentionDays)))
                 .context(command.getContext())
                 .build();
         Notification saved = notificationRepository.save(notification);
