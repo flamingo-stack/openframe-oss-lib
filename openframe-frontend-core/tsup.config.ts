@@ -36,6 +36,14 @@ export default defineConfig([
       // BOTH the lib's `<ContactForm>` for validation AND the hub's
       // server-side /api/contact + admin routes for payload validation.
       'schemas/contact-schema': 'src/schemas/contact-schema.ts',
+      // Mux CDN origins — string constants, no React, no browser APIs.
+      // Server-safe so hub server-side modules (mux-config, webhook
+      // handlers, URL parsers) can import without Next.js client-
+      // reference poisoning. The `'use client'` `use-video-warmup.ts`
+      // module re-exports these for backward-compat with client-side
+      // callers; new server-side callers should import from this
+      // subpath directly.
+      'components/features/mux-origins': 'src/components/features/mux-origins.ts',
     },
     format: ['esm', 'cjs'],
     dts: false,

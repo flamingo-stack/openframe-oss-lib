@@ -78,6 +78,12 @@
       "require": "./dist/components/features/index.cjs",
       "default": "./dist/components/features/index.js"
     },
+    "./components/features/mux-origins": {
+      "types": "./dist/components/features/mux-origins.d.ts",
+      "import": "./dist/components/features/mux-origins.js",
+      "require": "./dist/components/features/mux-origins.cjs",
+      "default": "./dist/components/features/mux-origins.js"
+    },
     "./components/toast": {
       "types": "./dist/components/toast/index.d.ts",
       "import": "./dist/components/toast/index.js",
