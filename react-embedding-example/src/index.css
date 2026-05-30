@@ -1,0 +1,12 @@
+/* Base layout only — all colors come from the lib's ODS tokens (imported via
+   `@flamingo-stack/openframe-frontend-core/styles` in main.tsx) and are selected
+   by `data-theme="dark"` on <html>. No hardcoded colors here. */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+}
