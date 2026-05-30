@@ -1,0 +1,35 @@
+{
+  "name": "react-embedding-example",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Reference example: embed @flamingo-stack/openframe-frontend-core chat + content surfaces in a standalone React SPA over a /content reverse proxy (mirrors the production Spring Boot proxy).",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "preview:proxy": "node --env-file=.env proxy/server.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@flamingo-stack/openframe-frontend-core": "file:../openframe-frontend-core",
+    "@tanstack/react-query": "^5",
+    "@hookform/resolvers": "^5",
+    "react": "^19",
+    "react-dom": "^19",
+    "react-router-dom": "^6",
+    "zod": "^4"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^4",
+    "autoprefixer": "^10.4",
+    "http-proxy": "^1.18",
+    "postcss": "^8.5",
+    "tailwindcss": "^3.4",
+    "typescript": "^5",
+    "vite": "^5"
+  }
+}
