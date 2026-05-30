@@ -1,5 +1,5 @@
 package com.openframe.data.document.organization;
-
+import com.openframe.data.document.TenantScoped;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -12,11 +12,9 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-
 /**
  * Organization document representing a company or entity in the system.
  * Contains business-related information such as revenue, employees, and contract details.
@@ -26,17 +24,16 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "organizations")
-public class Organization {
-
+public class Organization implements TenantScoped {
     @Id
     private String id;
-
+    @Indexed
+    private String tenantId;
     /**
      * Organization name (company name)
      */
     @Indexed
     private String name;
-
     /**
      * Unique organization identifier (generated as UUID on creation)
      * This field is immutable - cannot be changed after creation.
@@ -44,7 +41,6 @@ public class Organization {
     @NotBlank
     @Indexed(unique = true)
     private String organizationId;
-
     /**
      * Flag indicating if this is the default organization for the tenant
      */
@@ -52,53 +48,42 @@ public class Organization {
     @Indexed
     @Builder.Default
     private Boolean isDefault = false;
-
     /**
      * Business category or industry
      */
     private String category;
-
     /**
      * Total number of employees
      */
     private Integer numberOfEmployees;
-
     /**
      * Organization website URL
      */
     private String websiteUrl;
-
     /**
      * Notes or additional information about the organization
      */
     private String notes;
-
     /**
      * Contact information including contacts and addresses
      */
     private ContactInformation contactInformation;
-
     /**
      * Monthly revenue in the organization's currency
      */
     private BigDecimal monthlyRevenue;
-
     /**
      * Contract start date
      */
     private LocalDate contractStartDate;
-
     /**
      * Contract end date
      */
     private LocalDate contractEndDate;
-
     @CreatedDate
     private Instant createdAt;
-
     @LastModifiedDate
     private Instant updatedAt;
-
     /**
      * Organization status. Defaults to ACTIVE.
      * ARCHIVED - organization is hidden from normal queries but remains in the database.
@@ -109,12 +94,10 @@ public class Organization {
     @Indexed
     @Builder.Default
     private OrganizationStatus status = OrganizationStatus.ACTIVE;
-
     /**
      * Timestamp when organization status was last changed (archived or deleted)
      */
     private Instant statusChangedAt;
-
     /**
      * Check if the contract is currently active
      */
@@ -125,14 +108,12 @@ public class Organization {
             && !now.isBefore(contractStartDate)
             && !now.isAfter(contractEndDate);
     }
-
     /**
      * Check if organization is deleted (soft delete)
      */
     public boolean isDeleted() {
         return status == OrganizationStatus.DELETED;
     }
-
     /**
      * Check if organization is archived
      */
@@ -140,4 +121,3 @@ public class Organization {
         return status == OrganizationStatus.ARCHIVED;
     }
 }
-
