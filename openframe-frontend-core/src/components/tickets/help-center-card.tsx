@@ -15,7 +15,7 @@
  * is a SIBLING of the toggle button, not nested inside it.
  */
 
-import { useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { StatusBadge, type StatusBadgeProps } from '../ui'
 import { formatRelativeTime } from '../../utils/date-utils'
 import { scrollElementIntoView } from '../../utils/scroll-into-view'
@@ -97,38 +97,48 @@ export function HelpCenterCard({
   const isExpandable = !optimistic
   const isExpanded = expanded && isExpandable
 
-  // Scroll-on-click — delegates to the canonical `scrollElementIntoView`
-  // helper with a cross-row layout-shift `adjustTargetY` callback. The
-  // helper owns the smooth-scroll mechanics + sticky-chrome offset; we
-  // pass the consumer-specific knowledge ("a sibling drawer above me
-  // is about to collapse — subtract its height from the target Y").
-  //
-  // Cross-row gotcha: if ANOTHER row above this one is currently
-  // expanded, its drawer collapses simultaneously with our toggle.
-  // The collapse shrinks the page above our row → our final Y is
-  // HIGHER than the current `rect.top`. By pre-subtracting the
-  // collapsing drawer's height we land at the post-shift position
-  // cleanly, without scrollIntoView's mid-animation drift.
   const rowRef = useRef<HTMLDivElement | null>(null)
+  // Click only toggles — the scroll-to-top is deferred to the effect below.
   const handleClick = useCallback(() => {
     onToggle(ticket.id)
-    scrollElementIntoView(rowRef.current, {
-      headerOffset: STICKY_HEADER_OFFSET_PX,
-      adjustTargetY: (raw) => {
-        if (!rowRef.current) return raw
-        const expandedDrawer = document.querySelector(
-          'div[id^="help-center-drawer-"]',
-        )
-        if (!(expandedDrawer instanceof HTMLElement)) return raw
-        const drawerRect = expandedDrawer.getBoundingClientRect()
-        const myRect = rowRef.current.getBoundingClientRect()
-        // Only adjust when the drawer is ABOVE us. Drawers below us
-        // don't shift our position when they collapse.
-        if (drawerRect.bottom > myRect.top) return raw
-        return raw - drawerRect.height
-      },
-    })
   }, [onToggle, ticket.id])
+
+  // Scroll-to-top AFTER the drawer has expanded + painted — NOT synchronously
+  // in the click handler. The old approach scrolled inside `handleClick`,
+  // BEFORE React committed the expanded drawer: on the FIRST open the page
+  // wasn't yet tall enough to scroll, so `window.scrollTo` clamped to a no-op
+  // and it only appeared to "work" on a later click once the page had already
+  // grown (the bug: scroll worked on the second click, not the first).
+  //
+  // Running it in an effect keyed on `isExpanded` guarantees the drawer is in
+  // the DOM and the layout has settled, so the row's FINAL position is measured
+  // and the page can actually scroll to it. We scroll only on the
+  // collapsed→expanded transition (the `if (!isExpanded) return` guard).
+  //
+  // DOUBLE-rAF: open now flows through `?ticket=` → `router.replace()` (see
+  // `HelpCenterList.setOpenTicket`). On the CLICK path that route re-render
+  // runs CONCURRENTLY with the scroll and interrupted the in-flight smooth
+  // animation — so it felt like the smooth scroll was "lost" on click while
+  // the deep-link path (URL already set on mount, no concurrent nav) worked.
+  // Deferring two frames lets the freshly-mounted drawer + the route
+  // re-render paint first, then the smooth animation runs uninterrupted from
+  // the row's final position. Mirrors the canonical scroll-to-row defer in the
+  // hub's `useUnifiedNav.scrollToHash` (double-rAF) + lib's `DeliveryLists`.
+  useEffect(() => {
+    if (!isExpanded) return
+    let inner = 0
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => {
+        scrollElementIntoView(rowRef.current, {
+          headerOffset: STICKY_HEADER_OFFSET_PX,
+        })
+      })
+    })
+    return () => {
+      cancelAnimationFrame(outer)
+      cancelAnimationFrame(inner)
+    }
+  }, [isExpanded])
 
   const rightBadges = (
     <>

@@ -284,7 +284,10 @@ export interface SlashCommandsProp {
 }
 
 export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'onSubmit'> {
-  onSend?: (message: string) => void
+  /** Source-compatible widening: returning `false` (or a Promise resolving to
+   *  `false`) tells the input to KEEP the draft (e.g. a failed send). `void` /
+   *  `true` clears as before — preserves every existing caller's behavior. */
+  onSend?: (message: string) => void | boolean | Promise<boolean>
   onStop?: () => void | Promise<void>
   sending?: boolean
   awaitingResponse?: boolean
@@ -306,6 +309,10 @@ export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextArea
    *  primitives (no raw HTML elements) and ODS tokens for theming.
    *  Backward compat: omit to disable autocomplete entirely. */
   slashCommands?: SlashCommandsProp
+  /** When true, send is allowed with EMPTY text (e.g. an attachments-only
+   *  reply); `onSend('')` fires. Default false → today's text-required gate.
+   *  Used by the ticket reply composer so a file-only reply can send. */
+  allowEmptySend?: boolean
 }
 
 export interface ChatInputRef {
