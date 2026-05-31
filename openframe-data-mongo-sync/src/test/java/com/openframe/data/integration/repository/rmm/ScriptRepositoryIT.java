@@ -1,8 +1,10 @@
 package com.openframe.data.integration.repository.rmm;
 
 import com.openframe.data.document.rmm.Script;
+import com.openframe.data.document.rmm.ScriptPlatform;
 import com.openframe.data.document.rmm.ScriptShell;
 import com.openframe.data.document.rmm.ScriptStatus;
+import com.openframe.data.document.rmm.filter.ScriptQueryFilter;
 import com.openframe.data.integration.BaseMongoIntegrationTest;
 import com.openframe.data.integration.support.RmmIntegrationTestApplication;
 import com.openframe.data.repository.rmm.ScriptRepository;
@@ -14,6 +16,7 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
 
@@ -85,7 +88,7 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
     void findPageForTenant_noCursor_returnsNewestFirst() {
         List<Script> seeded = seedSequentialForTenant(TENANT_A, 5);
 
-        List<Script> page = scriptRepository.findPageForTenant(TENANT_A, null, false, 10);
+        List<Script> page = scriptRepository.findPageForTenant(TENANT_A, null, null, "_id", Sort.Direction.DESC, null, false, 10);
 
         assertThat(page).hasSize(5);
         assertThat(page.get(0).getId()).isEqualTo(seeded.get(4).getId());
@@ -98,7 +101,8 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
         List<Script> seeded = seedSequentialForTenant(TENANT_A, 5);
         String cursor = seeded.get(2).getId();
 
-        List<Script> page = scriptRepository.findPageForTenant(TENANT_A, cursor, false, 10);
+        List<Script> page = scriptRepository.findPageForTenant(
+                TENANT_A, null, null, "_id", Sort.Direction.DESC, cursor, false, 10);
 
         assertThat(page).extracting(Script::getId)
                 .containsExactly(seeded.get(1).getId(), seeded.get(0).getId());
@@ -110,7 +114,8 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
         List<Script> seeded = seedSequentialForTenant(TENANT_A, 5);
         String cursor = seeded.get(2).getId();
 
-        List<Script> page = scriptRepository.findPageForTenant(TENANT_A, cursor, true, 10);
+        List<Script> page = scriptRepository.findPageForTenant(
+                TENANT_A, null, null, "_id", Sort.Direction.DESC, cursor, true, 10);
 
         assertThat(page).extracting(Script::getId)
                 .containsExactly(seeded.get(3).getId(), seeded.get(4).getId());
@@ -122,7 +127,7 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
         seedSequentialForTenant(TENANT_A, 3);
         seedSequentialForTenant(TENANT_B, 3);
 
-        List<Script> aPage = scriptRepository.findPageForTenant(TENANT_A, null, false, 10);
+        List<Script> aPage = scriptRepository.findPageForTenant(TENANT_A, null, null, "_id", Sort.Direction.DESC, null, false, 10);
 
         assertThat(aPage).hasSize(3);
         assertThat(aPage).allSatisfy(s -> assertThat(s.getTenantId()).isEqualTo(TENANT_A));
@@ -133,7 +138,8 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
     void findPageForTenant_respectsLimit() {
         seedSequentialForTenant(TENANT_A, 5);
 
-        List<Script> page = scriptRepository.findPageForTenant(TENANT_A, null, false, 2);
+        List<Script> page = scriptRepository.findPageForTenant(
+                TENANT_A, null, null, "_id", Sort.Direction.DESC, null, false, 2);
 
         assertThat(page).hasSize(2);
     }
@@ -148,7 +154,7 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
         doomed.setStatus(ScriptStatus.DELETED);
         scriptRepository.save(doomed);
 
-        List<Script> page = scriptRepository.findPageForTenant(TENANT_A, null, false, 10);
+        List<Script> page = scriptRepository.findPageForTenant(TENANT_A, null, null, "_id", Sort.Direction.DESC, null, false, 10);
 
         assertThat(page).extracting(Script::getId)
                 .containsExactlyInAnyOrder(keep1.getId(), keep2.getId())
@@ -160,7 +166,8 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
     void findPageForTenant_invalidCursor_fallsBackToFirstPage() {
         List<Script> seeded = seedSequentialForTenant(TENANT_A, 3);
 
-        List<Script> page = scriptRepository.findPageForTenant(TENANT_A, "not-an-objectid", false, 10);
+        List<Script> page = scriptRepository.findPageForTenant(
+                TENANT_A, null, null, "_id", Sort.Direction.DESC, "not-an-objectid", false, 10);
 
         assertThat(page).hasSize(3);
         assertThat(page.get(0).getId()).isEqualTo(seeded.get(2).getId());
@@ -245,6 +252,111 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
         assertThat(scriptRepository.findByTenantIdAndName(TENANT_A, "same-name")).isPresent();
         assertThat(scriptRepository.findByTenantIdAndName(TENANT_B, "same-name")).isPresent();
     }
+
+    // ---------- filter / search / sort ----------
+
+    @Test
+    @DisplayName("Given scripts with mixed shells, when filter.shells = [BASH], then only BASH scripts come back (and tenant isolation still applies)")
+    void findPageForTenant_filterByShells() {
+        scriptRepository.save(Script.builder().tenantId(TENANT_A).name("ps").shell(ScriptShell.POWERSHELL).scriptBody("...").build());
+        Script bashScript = scriptRepository.save(Script.builder().tenantId(TENANT_A).name("bash").shell(ScriptShell.BASH).scriptBody("...").build());
+
+        ScriptQueryFilter filter = ScriptQueryFilter.builder().shells(List.of(ScriptShell.BASH)).build();
+        List<Script> page = scriptRepository.findPageForTenant(
+                TENANT_A, filter, null, "_id", Sort.Direction.DESC, null, false, 10);
+
+        assertThat(page).extracting(Script::getId).containsExactly(bashScript.getId());
+    }
+
+    @Test
+    @DisplayName("Given an explicit statuses filter that includes DELETED, when findPageForTenant runs, then DELETED scripts ARE returned (admin audit path)")
+    void findPageForTenant_explicitDeletedStatus_includesDeleted() {
+        Script kept = scriptRepository.save(newScript(TENANT_A, "kept"));
+        Script gone = scriptRepository.save(newScript(TENANT_A, "gone"));
+        gone.setStatus(ScriptStatus.DELETED);
+        scriptRepository.save(gone);
+
+        ScriptQueryFilter filter = ScriptQueryFilter.builder().statuses(List.of(ScriptStatus.DELETED)).build();
+        List<Script> page = scriptRepository.findPageForTenant(
+                TENANT_A, filter, null, "_id", Sort.Direction.DESC, null, false, 10);
+
+        assertThat(page).extracting(Script::getId).containsExactly(gone.getId()).doesNotContain(kept.getId());
+    }
+
+    @Test
+    @DisplayName("Given supportedPlatforms filter, when findPageForTenant runs, then scripts whose platforms list contains ANY of the requested are returned")
+    void findPageForTenant_filterByPlatform() {
+        scriptRepository.save(Script.builder().tenantId(TENANT_A).name("win-only").shell(ScriptShell.POWERSHELL)
+                .scriptBody("...").supportedPlatforms(List.of(ScriptPlatform.WINDOWS)).build());
+        Script crossPlatform = scriptRepository.save(Script.builder().tenantId(TENANT_A).name("multi").shell(ScriptShell.BASH)
+                .scriptBody("...").supportedPlatforms(List.of(ScriptPlatform.LINUX, ScriptPlatform.MACOS)).build());
+
+        ScriptQueryFilter filter = ScriptQueryFilter.builder().supportedPlatforms(List.of(ScriptPlatform.LINUX)).build();
+        List<Script> page = scriptRepository.findPageForTenant(
+                TENANT_A, filter, null, "_id", Sort.Direction.DESC, null, false, 10);
+
+        assertThat(page).extracting(Script::getId).containsExactly(crossPlatform.getId());
+    }
+
+    @Test
+    @DisplayName("Given a tag filter, when findPageForTenant runs, then case-insensitive exact match is applied")
+    void findPageForTenant_filterByTag_caseInsensitive() {
+        scriptRepository.save(Script.builder().tenantId(TENANT_A).name("a").shell(ScriptShell.BASH).scriptBody("...").tag("Maintenance").build());
+        scriptRepository.save(Script.builder().tenantId(TENANT_A).name("b").shell(ScriptShell.BASH).scriptBody("...").tag("Diagnostics").build());
+
+        ScriptQueryFilter filter = ScriptQueryFilter.builder().tag("MAINTENANCE").build();
+        List<Script> page = scriptRepository.findPageForTenant(
+                TENANT_A, filter, null, "_id", Sort.Direction.DESC, null, false, 10);
+
+        assertThat(page).extracting(Script::getName).containsExactly("a");
+    }
+
+    @Test
+    @DisplayName("Given a search string, when findPageForTenant runs, then scripts whose name contains the substring (case-insensitive) are returned")
+    void findPageForTenant_search_matchesNameSubstring() {
+        scriptRepository.save(newScript(TENANT_A, "Backup nightly"));
+        scriptRepository.save(newScript(TENANT_A, "BACKUP weekly"));
+        scriptRepository.save(newScript(TENANT_A, "Restart printer spooler"));
+
+        List<Script> page = scriptRepository.findPageForTenant(
+                TENANT_A, null, "backup", "_id", Sort.Direction.DESC, null, false, 10);
+
+        assertThat(page).extracting(Script::getName)
+                .containsExactlyInAnyOrder("Backup nightly", "BACKUP weekly");
+    }
+
+    @Test
+    @DisplayName("Given sort by name ASC, when findPageForTenant runs, then results come back alphabetically")
+    void findPageForTenant_sortByNameAsc() {
+        scriptRepository.save(newScript(TENANT_A, "zeta"));
+        scriptRepository.save(newScript(TENANT_A, "alpha"));
+        scriptRepository.save(newScript(TENANT_A, "mike"));
+
+        List<Script> page = scriptRepository.findPageForTenant(
+                TENANT_A, null, null, "name", Sort.Direction.ASC, null, false, 10);
+
+        assertThat(page).extracting(Script::getName).containsExactly("alpha", "mike", "zeta");
+    }
+
+    @Test
+    @DisplayName("isSortableField: returns true for whitelisted fields and false for arbitrary input (no SQL-injection-style fields pass through)")
+    void isSortableField_enforcesAllowlist() {
+        assertThat(scriptRepository.isSortableField("_id")).isTrue();
+        assertThat(scriptRepository.isSortableField("name")).isTrue();
+        assertThat(scriptRepository.isSortableField("createdAt")).isTrue();
+        assertThat(scriptRepository.isSortableField("updatedAt")).isTrue();
+        assertThat(scriptRepository.isSortableField("scriptBody")).isFalse();
+        assertThat(scriptRepository.isSortableField("malicious; drop_database")).isFalse();
+        assertThat(scriptRepository.isSortableField(null)).isFalse();
+    }
+
+    @Test
+    @DisplayName("getDefaultSortField: returns _id (newest-first ordering)")
+    void getDefaultSortField_isId() {
+        assertThat(scriptRepository.getDefaultSortField()).isEqualTo("_id");
+    }
+
+    // ---------- helpers ----------
 
     private static Script newScript(String tenantId, String name) {
         return Script.builder()
