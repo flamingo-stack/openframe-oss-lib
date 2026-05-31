@@ -11,9 +11,6 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @EqualsAndHashCode(callSuper = true)
 @SuperBuilder
 @NoArgsConstructor
-@CompoundIndex(
-        def = "{'tenantId': 1, 'email': 1}",
-        unique = true
-)
+@CompoundIndex(def = "{'tenantId': 1, 'email': 1}")
 public class AuthInvitation extends Invitation {
 }
