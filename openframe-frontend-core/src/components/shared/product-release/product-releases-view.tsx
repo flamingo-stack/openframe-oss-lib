@@ -1,92 +1,81 @@
 'use client'
 
 /**
- * `<ProductReleasesView />` — the shared releases LIST surface.
+ * `<ProductReleasesView />` — the shared, SELF-CONTAINED releases LIST surface.
  *
- * Lifted from the hub's `ReleasesList`
- * (`multi-platform-hub/components/releases/product-releases-tab-content.tsx`)
- * so the hub `/releases` page AND every embedder render ONE implementation
- * (the §5 "every page-level surface is a fully-shared, parameterized lib
- * component" rule). The decoupling recipe:
+ * The host configures only two things: the **api route** (`endpoint`, default
+ * `/api/releases`) and the **internal page route** for a release's detail page
+ * (via `runtime.composeContentUrl` / `basePath`). Everything else — reading the
+ * search / status / page URL params the section chrome writes, fetching the
+ * page, pagination, empty / error / loading states, card composition + nav —
+ * happens INSIDE the lib. Mirrors the `DeliveryLists` internal-fetch pattern
+ * (plain `fetch` + `useEffect`/`useState`, no react-query dependency).
  *
- *   - **data** via props (`releases` + pagination state) — the host fetches
- *     through its own endpoint/QueryClient, exactly like
- *     `OnboardingGuidesCatalogView.initialGuides`; no hard-wired hub hook.
- *   - **card props** via `buildCardProps` — defaults to the lib's
- *     `defaultBuildProductReleaseCardProps` (the `lg` card then renders
- *     em-dash placeholders for the metadata it can't derive); the hub passes
- *     its richer `buildProductReleaseCardProps` to populate Type/Status/
- *     changelog/author.
- *   - **nav** via the existing `runtime.composeContentUrl` seam +
- *     `useEntityCardLink` (target/rel) + soft-nav through
- *     `runtime.navigation.navigate` — NOT `useNavLink` / `currentPlatform`.
- *     The card keeps its existing `anchorProps` API (a real `<a href>`), so
- *     cmd/middle-click new-tab work natively and the related-content rail's
- *     use of the same card is unaffected.
- *   - **chrome** via the already-lib `EmptyState`, `PersistentPaginationWrapper`,
- *     and `ProductReleaseCardSkeleton`.
+ * SSR: pass `initialData` to hydrate the first page without a client round-trip
+ * (the hub can server-fetch); embedders omit it and the view fetches on mount.
  *
- * Controls (search + status filter) live ABOVE this view in the host's
- * section chrome; this component only consumes the resulting page of data +
- * filter flags.
+ * Card props: `buildCardProps` defaults to the lib's sm-subset builder; the hub
+ * passes its richer `buildProductReleaseCardProps` for the full lg metadata.
  */
 
 import * as React from 'react'
+import { useEffect, useRef, useState } from 'react'
 
+import { useRouter, useSearchParams, usePathname } from '../../../embed-shims'
 import { useChatRuntime } from '../../../contexts/chat-runtime-context'
-import { useRouter } from '../../../embed-shims/next-navigation'
-import type { ProductRelease } from '../../../types/product-release'
+import type { ProductRelease, ProductReleaseListResponse } from '../../../types/product-release'
 import { cn } from '../../../utils/cn'
 import { buildDefaultHref } from '../../../utils/content-href'
 import { isModifierClick } from '../../chat/utils/chat-nav-resolution'
 import { useEntityCardLink } from '../../chat/entity-cards/use-entity-card-link'
 import { defaultBuildProductReleaseCardProps } from '../../chat/entity-cards/product-release-card-defaults'
 import { EmptyState } from '../../empty-state'
+import { LoadError } from '../../ui/error-state'
 import { PersistentPaginationWrapper } from '../../persistent-pagination'
 import { ProductReleaseCard, type ProductReleaseCardProps } from './product-release-card'
 import { ProductReleaseCardSkeleton } from './product-release-card-skeleton'
 
-/** The `<ProductReleaseCard>` props the caller derives per release — the
- *  card's own data fields minus the ones this view supplies directly
- *  (title/summary/version/size/nav). `formattedDate` stays required so the
- *  spread satisfies the card's required prop. */
+const DEFAULT_ENDPOINT = '/api/releases'
+const DEFAULT_SEARCH_PARAM_KEY = 'search'
+const DEFAULT_STATUS_PARAM_KEY = 'release_status'
+const DEFAULT_PAGE_PARAM_KEY = 'page'
+
+/** The `<ProductReleaseCard>` props the caller derives per release — the card's
+ *  own data fields minus the ones this view supplies (title/summary/version/
+ *  size/nav). `formattedDate` stays required so the spread satisfies the card. */
 export type ProductReleaseCardExtras = Omit<
   ProductReleaseCardProps,
   'title' | 'summary' | 'version' | 'size' | 'anchorProps' | 'onClick' | 'className'
 >
 
 export interface ProductReleasesViewProps {
-  /** The current page of releases (host-fetched). */
-  releases: ProductRelease[]
-  isLoading?: boolean
-  /** Truthy when the fetch failed — renders the retry block. */
-  error?: boolean
-  currentPage: number
-  totalPages: number
-  onPageChange: (page: number) => void
-  /** True when a search/status filter is active → the empty state offers a
-   *  reset instead of the "nothing yet" copy. */
-  hasActiveFilters?: boolean
-  /** Clear the active filters (host owns the URL/param reset). */
-  onResetFilters?: () => void
-  /** Retry handler for the error block. Defaults to a full reload. */
-  onRetry?: () => void
-  /** Fallback detail-href prefix when `runtime.composeContentUrl` is not
-   *  wired (single-platform embedders). Default `/releases`. */
-  basePath?: string
-  /** Derive the per-card prop bundle. Defaults to the lib's sm-subset
-   *  builder; the hub passes its full lg builder via this seam. */
-  buildCardProps?: (release: ProductRelease) => ProductReleaseCardExtras
-  /** Fixed slot count → stable min-height across loading/loaded. Default 5. */
+  /** GET endpoint for the releases list (the api route). The view appends
+   *  `?limit&offset&<search>&<release_status>`. Default `/api/releases`. */
+  endpoint?: string
+  /** Optional SSR hydrate for the first page — skips the initial client fetch. */
+  initialData?: ProductReleaseListResponse
+  /** Page size → fixed slot count + offset math. Default 5. */
   itemsPerPage?: number
+  /** Fallback detail-href prefix when `runtime.composeContentUrl` is not wired
+   *  (single-platform embedders). Default `/releases`. */
+  basePath?: string
+  /** Derive the per-card prop bundle. Defaults to the lib's sm-subset builder;
+   *  the hub passes its full lg builder via this seam. */
+  buildCardProps?: (release: ProductRelease) => ProductReleaseCardExtras
+  /** URL param key for the search input. MUST match the chrome that writes it.
+   *  Default `'search'` (also the outbound query-param name). */
+  searchParamKey?: string
+  /** URL param key for the status filter. Default `'release_status'`. */
+  statusParamKey?: string
+  /** URL param key for the page number. Default `'page'`. */
+  pageParamKey?: string
   className?: string
 }
 
 /**
  * Per-row child — owns the per-release hooks (`useChatRuntime` +
- * `useEntityCardLink`) so they run at a component top level, NOT inside the
- * parent `.map()` (Rules-of-Hooks). Mirrors the hub `ReleaseRow`, but routes
- * via the runtime seam instead of the hub-only `useNavLink`.
+ * `useEntityCardLink` + `useRouter`) so they run at a component top level, NOT
+ * inside the parent `.map()` (Rules-of-Hooks).
  */
 function ReleaseRow({
   release,
@@ -98,27 +87,20 @@ function ReleaseRow({
   buildCardProps: (release: ProductRelease) => ProductReleaseCardExtras
 }) {
   const runtime = useChatRuntime()
-  // Same href-composition path as OnboardingGuidesCatalogView: the runtime
-  // composer when wired (hub topology / embedder hosted-types), else a
-  // same-origin relative href.
+  const router = useRouter()
   // Pass the HYDRATED junction (`product_release_platforms` — the release DAL
-  // flattens each platform's `name` onto it), exactly like the blog / case-study
-  // / interview grids. The hub composer reads `name` and resolves to the CURRENT
-  // platform when the release belongs to it → relative same-tab href (NOT a
-  // cross-domain new tab). `release.platforms` is NOT populated by the release
-  // DAL; the embedder composer ignores platforms entirely (hostedTypes decides).
+  // flattens each platform's `name` onto it), like the blog / case-study /
+  // interview grids. The composer reads `name` → resolves to the CURRENT
+  // platform when the release belongs to it → relative same-tab href.
   const cta = runtime?.composeContentUrl
     ? runtime.composeContentUrl('product_release', release.slug, release.product_release_platforms)
     : buildDefaultHref(basePath, release.slug)
   const { target, rel } = useEntityCardLink({ href: cta.href, targetPlatform: cta.targetPlatform })
 
-  const router = useRouter()
   const onClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     // Let the browser handle modifier / middle / new-tab clicks (shared
-    // `isModifierClick` rule) so cmd-click-new-tab keeps working on the real
-    // `<a href>`. Otherwise soft same-origin nav: the host's `navigate` (hub
-    // docNav) if wired, else the registered embed-shims router — no app-side
-    // navigation bridge required.
+    // `isModifierClick` rule). Otherwise soft same-origin nav: the host's
+    // `navigate` (hub docNav) if wired, else the registered embed-shims router.
     if (e.defaultPrevented || isModifierClick(e) || target === '_blank') return
     e.preventDefault()
     if (!runtime?.navigation?.navigate?.({ href: cta.href })) router.push(cta.href)
@@ -137,38 +119,93 @@ function ReleaseRow({
 }
 
 export function ProductReleasesView({
-  releases,
-  isLoading = false,
-  error = false,
-  currentPage,
-  totalPages,
-  onPageChange,
-  hasActiveFilters = false,
-  onResetFilters,
-  onRetry,
+  endpoint = DEFAULT_ENDPOINT,
+  initialData,
+  itemsPerPage = 5,
   basePath = '/releases',
   buildCardProps = defaultBuildProductReleaseCardProps,
-  itemsPerPage = 5,
+  searchParamKey = DEFAULT_SEARCH_PARAM_KEY,
+  statusParamKey = DEFAULT_STATUS_PARAM_KEY,
+  pageParamKey = DEFAULT_PAGE_PARAM_KEY,
   className,
-}: ProductReleasesViewProps) {
+}: ProductReleasesViewProps = {}) {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+
+  // Filter / page state from the URL (written by the section chrome above).
+  const search = searchParams.get(searchParamKey) || ''
+  const status = searchParams.get(statusParamKey) || 'all'
+  const currentPage = Math.max(1, parseInt(searchParams.get(pageParamKey) || '1', 10) || 1)
+  const offset = (currentPage - 1) * itemsPerPage
+
+  const [data, setData] = useState<ProductReleaseListResponse | null>(initialData ?? null)
+  const [isLoading, setIsLoading] = useState(!initialData)
+  const [error, setError] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
+  // Skip the very first fetch when SSR `initialData` already hydrated the view.
+  const skipFirstFetch = useRef(!!initialData)
+
+  useEffect(() => {
+    if (skipFirstFetch.current) {
+      skipFirstFetch.current = false
+      return
+    }
+    let cancelled = false
+    async function load() {
+      try {
+        setIsLoading(true)
+        setError(false)
+        const params = new URLSearchParams()
+        params.set('limit', String(itemsPerPage))
+        params.set('offset', String(offset))
+        if (search) params.set(searchParamKey, search)
+        if (status && status !== 'all') params.set(statusParamKey, status)
+        const res = await fetch(`${endpoint}?${params.toString()}`)
+        if (!res.ok) throw new Error(`Request failed (${res.status})`)
+        const json = (await res.json()) as ProductReleaseListResponse
+        if (!cancelled) setData(json)
+      } catch {
+        if (!cancelled) setError(true)
+      } finally {
+        if (!cancelled) setIsLoading(false)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [endpoint, itemsPerPage, offset, search, status, searchParamKey, statusParamKey, reloadKey])
+
+  const releases = data?.data ?? []
+  const totalCount = data?.count ?? 0
+  const totalPages = Math.ceil(totalCount / itemsPerPage)
+  const hasActiveFilters = search !== '' || status !== 'all'
   const showEmpty = !isLoading && !error && releases.length === 0
+
+  const goToPage = (page: number) => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set(pageParamKey, String(page))
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }
+  const resetFilters = () => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete(searchParamKey)
+    params.delete(statusParamKey)
+    params.delete(pageParamKey)
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }
+
+  if (error) {
+    return (
+      <div className={cn('w-full', className)}>
+        <LoadError message="Failed to load releases." onRetry={() => setReloadKey((k) => k + 1)} />
+      </div>
+    )
+  }
 
   return (
     <div className={cn('w-full flex flex-col gap-[40px]', className)}>
-      {/* Error state */}
-      {!isLoading && error && (
-        <div className="bg-ods-card border border-ods-border rounded-[6px] p-[40px] text-center">
-          <p className="text-[--ods-attention-red-error] text-lg mb-4">Failed to load releases</p>
-          <button
-            onClick={() => (onRetry ? onRetry() : typeof window !== 'undefined' && window.location.reload())}
-            className="px-6 py-2 bg-ods-accent text-ods-text-on-accent rounded-lg hover:opacity-90 transition-opacity font-['DM_Sans'] font-bold text-[16px]"
-          >
-            Retry
-          </button>
-        </div>
-      )}
-
-      {/* Fixed-height container — empty state OR fixed slots + pagination. */}
       <div className="min-h-[600px]">
         {showEmpty ? (
           <div className="h-[600px] flex items-center justify-center">
@@ -177,9 +214,9 @@ export function ProductReleasesView({
                 type="search"
                 title="No releases found"
                 description="No releases match your current filters. Try adjusting your search or status filter."
-                showCTA={!!onResetFilters}
+                showCTA
                 ctaText="Reset Filters"
-                onCtaClick={onResetFilters}
+                onCtaClick={resetFilters}
               />
             ) : (
               <EmptyState
@@ -192,41 +229,39 @@ export function ProductReleasesView({
           </div>
         ) : (
           <>
-            {/* ALWAYS render `itemsPerPage` slots — show/hide via visibility so
-                the list height is stable across loading ↔ loaded. */}
-            {!error && (
-              <div className="flex flex-col gap-6">
-                {Array.from({ length: itemsPerPage }).map((_, i) => {
-                  const release = releases[i]
-                  const hasData = !!release
-                  return (
-                    <div
-                      key={release?.id ?? `slot-${i}`}
-                      style={{ visibility: isLoading || hasData ? 'visible' : 'hidden' }}
-                    >
-                      {isLoading ? (
-                        <ProductReleaseCardSkeleton size="lg" />
-                      ) : release ? (
-                        <ReleaseRow release={release} basePath={basePath} buildCardProps={buildCardProps} />
-                      ) : (
-                        <ProductReleaseCardSkeleton size="lg" />
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+            {/* ALWAYS render `itemsPerPage` slots — visibility toggles so the
+                list height is stable across loading ↔ loaded. */}
+            <div className="flex flex-col gap-6">
+              {Array.from({ length: itemsPerPage }).map((_, i) => {
+                const release = releases[i]
+                const hasData = !!release
+                return (
+                  <div
+                    key={release?.id ?? `slot-${i}`}
+                    style={{ visibility: isLoading || hasData ? 'visible' : 'hidden' }}
+                  >
+                    {isLoading ? (
+                      <ProductReleaseCardSkeleton size="lg" />
+                    ) : release ? (
+                      <ReleaseRow release={release} basePath={basePath} buildCardProps={buildCardProps} />
+                    ) : (
+                      <ProductReleaseCardSkeleton size="lg" />
+                    )}
+                  </div>
+                )
+              })}
+            </div>
 
             {/* Pagination — always present at the bottom for consistent spacing. */}
             <div className="mt-6 md:mt-8 flex justify-center">
               {isLoading ? (
                 <div className="h-12 m-3 w-64" />
-              ) : !error && releases.length > 0 && totalPages > 1 ? (
+              ) : releases.length > 0 && totalPages > 1 ? (
                 <PersistentPaginationWrapper
                   isLoading={false}
                   currentPage={currentPage}
                   totalPages={totalPages}
-                  onPageChange={onPageChange}
+                  onPageChange={goToPage}
                   variant="blog"
                 />
               ) : (
