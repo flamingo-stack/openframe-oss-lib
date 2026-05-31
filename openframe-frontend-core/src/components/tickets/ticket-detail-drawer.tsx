@@ -21,43 +21,32 @@
  * callbacks; we don't reach into the QueryClient.
  */
 
-import { useState } from 'react'
+import { useStickToBottom } from 'use-stick-to-bottom'
 import { Button } from './../ui/button'
-import { Textarea } from './../ui/textarea'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from './../ui/alert-dialog'
-import {
-  ChatAttachmentAddButton,
-  ChatAttachmentChipStrip,
-} from './../chat/chat-attachment-bar'
-import { useChatAttachments } from './../chat/hooks/use-chat-attachments'
 import { useChatIdentity } from './../chat/hooks/use-chat-identity'
+import {
+  ChatMessageRow,
+  ChatMessageRowSkeleton,
+} from './../chat/chat-message-row'
 import { EmptyState } from './../empty-state'
 import {
-  ConversationCardRow,
-  ConversationCardRowSkeletonList,
-} from './../shared/dev-section/dev-card-row'
-import type { TicketAttachment } from './../ui/ticket-attachments-list'
+  TicketAttachmentsList,
+  type TicketAttachment,
+} from './../ui/ticket-attachments-list'
 import { SquareAvatar } from './../ui/square-avatar'
+import { formatRelativeTime } from './../../utils/date-utils'
 import { useTicketEngagements } from './hooks/use-ticket-engagements'
 import type {
   TicketEngagementFile,
 } from './hooks/use-ticket-engagements'
 import { TicketLinkedDeliveryCard } from './ticket-linked-delivery-card'
+import { TicketReplyComposer } from './ticket-reply-composer'
 import type {
   AnyTicket,
   TicketAssignedOwner,
   MappedTicketActionError,
 } from './types'
-import { isOptimistic, TICKET_TEXT_MAX_CHARS } from './types'
+import { isOptimistic, TICKET_LIVE_POLL_MS } from './types'
 
 /** Identity bundle threaded through the action callbacks: local mirror
  *  UUID + HubSpot external_id. Actions send `external_id` to HubSpot
@@ -152,13 +141,12 @@ export function TicketDetailDrawer({
             onActionCollapsed={onActionCollapsed}
           />
         ) : (
-          <OpenActions
+          <TicketReplyComposer
             ticket={ticket}
             busy={busy}
             supportSystemDown={supportSystemDown}
             onSendMessage={onSendMessage}
             onClose={onClose}
-            onActionCollapsed={onActionCollapsed}
           />
         )}
       </div>
@@ -192,12 +180,52 @@ export function TicketDetailDrawer({
 // than any composed ticket body needs, so no real input is rejected.
 const TURN_SEPARATOR_RE = /[\s]{1,16}---[\s]{1,16}/g
 
+// Slack-channel feed framing — ported from the hub's live community feed
+// (`components/slack/chat-interface.tsx`: `:62` bounded card, `:83` padding +
+// `overflow-y-auto`, `:85` `gap-4 md:gap-6` message column). Single source
+// within the ticket feed; the delivery `DevCardRowSkeletonList` keeps its own
+// (separate, untouched) frame literal. `max-h` is responsive (vs Slack's fixed
+// height).
+const TICKET_FEED_FRAME =
+  'bg-ods-card border border-ods-border rounded-[6px] overflow-y-auto w-full'
+// FIXED height for EVERY state (skeleton, content, empty) — the Slack feed uses
+// a fixed-height box too (`chat-interface.tsx:62`). Fixed (not `max-h`) is the
+// fix for the "open shows 1 message, then the container grows as engagements
+// land" jank: the feed is its final size from first paint, so loaded content
+// just fills/scrolls inside it — the box never resizes.
+const TICKET_FEED_HEIGHT = 'h-[60vh] md:h-[420px]'
+const TICKET_FEED_INNER = 'flex flex-col gap-4 md:gap-6 px-4 md:px-6 py-4 md:py-6'
+// Enough skeleton rows to fill the fixed height (avatar 40px + header + 2 body
+// lines + gap-6) so the loading state looks like a full conversation.
+const TICKET_FEED_SKELETON_ROWS = 6
+
 function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
   const identity = useChatIdentity()
   // Optimistic placeholders don't have a real external_id yet — skip
   // the engagement fetch until the real ticket lands.
   const externalId = isOptimistic(ticket) ? null : ticket.external_id
-  const { engagements, isLoading } = useTicketEngagements(externalId, !!externalId)
+  // Live conversation refresh: this panel only mounts while the drawer is
+  // open, so the constant interval is already gated to "open" (closing the
+  // drawer unmounts the panel → polling stops). New agent replies +
+  // attachments surface within one cadence without a manual refresh — the
+  // same 8s the list-level status/assignee poll uses (single source:
+  // TICKET_LIVE_POLL_MS). A background poll never flashes the skeleton
+  // (the `isLoading` guard below keys off "no data yet", not `isFetching`).
+  const { engagements, isLoading } = useTicketEngagements(
+    externalId,
+    !!externalId,
+    TICKET_LIVE_POLL_MS,
+  )
+
+  // Slack-style auto-tail (same lib mechanism `ChatMessageList` uses): jump to
+  // the newest message on open (`initial:'instant'`), smooth-scroll on a new
+  // reply. Called unconditionally here, BEFORE the empty/loading early-returns
+  // (Rules of Hooks); the refs attach ONLY to the content branch's scroll frame
+  // + column — never the cold-start skeleton (refs there would snap to skeleton
+  // height, then again to real content). This inner scroll is a SEPARATE
+  // container from `HelpCenterCard`'s page-level expand-scroll, so it never
+  // fights the "scroll to top of the ticket card" behavior.
+  const { scrollRef, contentRef } = useStickToBottom({ initial: 'instant', resize: 'smooth' })
 
   const bodyTurns = ticket.body
     ? ticket.body.split(TURN_SEPARATOR_RE).map((t) => t.trim()).filter(Boolean)
@@ -255,12 +283,31 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
     ? identity.user?.avatarUrl ?? undefined
     : undefined
 
+  // Loading takes precedence over partial content — this is the fix for the
+  // "open shows 1 message, then the rest load and the box grows" jank. The
+  // ticket BODY is available synchronously, but the engagement timeline is
+  // fetched on open (caches off → EVERY open refetches). Rendering the body
+  // alone and then appending engagements as they arrive is the pop-in/grow the
+  // user hit. Instead: show the FULL-HEIGHT skeleton until the fetch settles,
+  // THEN render the whole conversation at once. Fixed height + skeleton-first =
+  // zero reflow and no partial render. `isLoading` (not `isFetching`) is true
+  // only on a cold open with no data yet — so a background refetch after sending
+  // a reply does NOT flash the skeleton; the new row just appends.
+  if (isLoading) {
+    // NO scroll refs here — they attach only to the real-content branch (refs on
+    // the skeleton would snap-to-bottom on skeleton height, then again on content).
+    return (
+      <div className={`${TICKET_FEED_FRAME} ${TICKET_FEED_HEIGHT}`}>
+        <div className={TICKET_FEED_INNER}>
+          {Array.from({ length: TICKET_FEED_SKELETON_ROWS }, (_, i) => (
+            <ChatMessageRowSkeleton key={i} />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   if (bodyTurns.length === 0 && engagements.length === 0) {
-    // No content yet — distinguish loading from empty so the user
-    // doesn't see "No conversation yet" flash during the initial fetch.
-    if (isLoading) {
-      return <ConversationCardRowSkeletonList rows={2} />
-    }
     return (
       <EmptyState
         type="generic"
@@ -272,7 +319,8 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
   }
 
   return (
-    <div className="bg-ods-card border border-ods-border rounded-[6px] overflow-hidden w-full">
+    <div ref={scrollRef} className={`${TICKET_FEED_FRAME} ${TICKET_FEED_HEIGHT}`}>
+      <div ref={contentRef} className={TICKET_FEED_INNER}>
       {/* Customer-authored description + any legacy `---`-joined
           comments. Always rendered ABOVE the engagement timeline as
           "Original message" because the server's intake-burst filter
@@ -290,22 +338,17 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
         // `suppressBodyTurnZero` derivation above for the rationale.
         if (i === 0 && suppressBodyTurnZero) return null
         const isResolution = turn.startsWith('[Resolution]')
-        const role =
-          i === 0 ? 'Original message' : isResolution ? 'Resolution' : `Update ${i}`
         const text = isResolution ? turn.replace(/^\[Resolution\]\s*/, '') : turn
-        // Body turns don't carry per-turn timestamps — `ticket.body` is
-        // a single content field that HubSpot appends to. The role
-        // label ("Original message" / "Update N" / "Resolution") plus
-        // the Note engagements below it carry enough chronological
-        // context that omitting a timestamp here keeps the row honest.
+        // Body turns don't carry per-turn timestamps — `ticket.body` is a
+        // single content field that HubSpot appends to. They render as the
+        // customer's own messages (no role chip — the Slack-channel feed has
+        // no role labels), oldest-first above the engagement timeline.
         return (
-          <ConversationCardRow
+          <ChatMessageRow
             key={`body-${i}-${turn.slice(0, 24)}`}
-            author={customerName}
-            role={role}
-            avatarSrc={customerAvatar}
+            displayName={customerName}
+            avatarUrl={customerAvatar}
             body={text}
-            variant="current-user"
           />
         )
       })}
@@ -396,27 +439,31 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
         // support bubbles was a legacy artifact from when Notes
         // were rendered and made customers think their support
         // engineer was leaving internal comments on their ticket.
+        const engAttachments = mapEngagementAttachments(eng.attachments)
         return (
-          <ConversationCardRow
+          <ChatMessageRow
             key={eng.id}
-            author={author}
-            role="Reply"
-            avatarSrc={avatarSrc}
-            timestamp={eng.createdAt}
+            displayName={author}
+            avatarUrl={avatarSrc}
+            timeLabel={eng.createdAt ? formatRelativeTime(eng.createdAt) : null}
             body={stripAttachmentsPreamble(eng.body ?? '')}
-            attachments={mapEngagementAttachments(eng.attachments)}
-            variant={isCustomer ? 'current-user' : 'support'}
+            footer={
+              engAttachments.length > 0 ? (
+                <div className="mt-2">
+                  <TicketAttachmentsList attachments={engAttachments} size="compact" />
+                </div>
+              ) : null
+            }
           />
         )
       })}
 
-      {isLoading && (
-        // Trailing single-row skeleton when the panel already has
-        // content rendered — drawer is showing the customer's body
-        // turns + cached engagements while a background refetch is
-        // in flight. Single row keeps the placeholder modest.
-        <ConversationCardRowSkeletonList rows={1} />
-      )}
+      {/* No trailing refetch skeleton in the tailing feed: a skeleton mounted
+          inside `contentRef` on a background refetch would make the auto-tail
+          smooth-scroll to the skeleton and then again to the real row (a
+          double-jump). The smooth-tail to the appended real reply IS the
+          feedback. (Removed the former background-refetch rows={1} skeleton.) */}
+      </div>
     </div>
   )
 }
@@ -433,6 +480,11 @@ function mapEngagementAttachments(
     id: f.id,
     fileName: f.name ?? `file-${f.id}`,
     fileSize: f.size ? formatBytes(f.size) : '',
+    // Show an inline thumbnail for image attachments (the signed `url` is a
+    // viewable URL). Non-images fall back to the file-type icon. SquareAvatar
+    // degrades to initials on a broken/expired image URL.
+    thumbnailSrc:
+      f.url && (f.mime?.startsWith('image/') ?? false) ? f.url : undefined,
     onDownload: f.url
       ? () => window.open(f.url!, '_blank', 'noopener,noreferrer')
       : undefined,
@@ -486,157 +538,19 @@ function ReopenAction({
   }
   return (
     <div className="flex justify-end">
+      {/* Reopen is a secondary, reversible action — `outline` (not the filled
+          accent primary) so it reads as available without dominating the
+          closed-ticket view. */}
       <Button
         type="button"
+        variant="outline"
+        size="small"
         onClick={() => void handleReopen()}
         disabled={busy || supportSystemDown}
         loading={busy}
       >
         Reopen
       </Button>
-    </div>
-  )
-}
-
-function OpenActions({
-  ticket,
-  busy,
-  supportSystemDown,
-  onSendMessage,
-  onClose,
-  onActionCollapsed,
-}: {
-  ticket: AnyTicket
-  busy: boolean
-  supportSystemDown: boolean
-  onSendMessage: TicketDetailDrawerProps['onSendMessage']
-  onClose: TicketDetailDrawerProps['onClose']
-  onActionCollapsed: TicketDetailDrawerProps['onActionCollapsed']
-}) {
-  const [messageText, setMessageText] = useState('')
-  const [resolution, setResolution] = useState('')
-  const [closeDialogOpen, setCloseDialogOpen] = useState(false)
-
-  const attachments = useChatAttachments()
-
-  const disabled = busy || supportSystemDown
-  const ticketRef: TicketRef = { id: ticket.id, external_id: ticket.external_id }
-
-  const hasText = messageText.trim().length > 0
-  const hasReadyFiles = attachments.readyAttachments.length > 0
-  const canSend =
-    !disabled && (hasText || hasReadyFiles) && !attachments.hasInflightUploads
-
-  const sendMessage = async () => {
-    if (!canSend) return
-    const ok = await onSendMessage(ticketRef, messageText.trim(), attachments.readyAttachments)
-    if (ok) {
-      setMessageText('')
-      attachments.clear()
-    }
-  }
-
-  const confirmClose = async () => {
-    setCloseDialogOpen(false)
-    await onClose(ticketRef, resolution.trim() || undefined)
-    setResolution('')
-    // Intentionally do NOT call `onActionCollapsed()` here. See the
-    // matching comment in ReopenActions.handleReopen above — collapsing
-    // the drawer after a successful close now dismisses the ticket the
-    // user is actively working on, which is the exact UX bug PR #1053
-    // set out to fix. The optimistic in-place status update keeps the
-    // row mounted with the new badge; that's the only feedback needed.
-  }
-
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-2">
-        <Textarea
-          value={messageText}
-          onChange={(e) => setMessageText(e.target.value)}
-          placeholder="Type a reply… (attach files if needed)"
-          disabled={disabled}
-          rows={3}
-          maxLength={TICKET_TEXT_MAX_CHARS}
-        />
-        <ChatAttachmentChipStrip
-          attachments={attachments.attachments}
-          onRemove={attachments.removeAttachment}
-          disabled={disabled}
-        />
-        <div className="flex justify-between items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-2">
-            <ChatAttachmentAddButton
-              attachmentsEnabled={!supportSystemDown}
-              attachmentsCount={attachments.attachments.length}
-              onAddFiles={attachments.addFiles}
-              disabled={disabled}
-            />
-            <span className="text-xs text-ods-text-secondary">Attach files</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="transparent"
-              onClick={() => setCloseDialogOpen(true)}
-              disabled={disabled}
-              className="bg-ods-error hover:bg-ods-error-hover text-white border-transparent"
-            >
-              Close ticket
-            </Button>
-            <Button
-              type="button"
-              onClick={() => void sendMessage()}
-              disabled={!canSend}
-              loading={busy}
-            >
-              Send reply
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Destructive-confirm — canonical pattern from
-          `components/admin/doc-orchestrator-dashboard.tsx:471`.
-          AlertDialog (NOT ModalV2) is the lib's standard for
-          destructive confirmations; bg-ods-error is the canonical
-          destructive button color. */}
-      <AlertDialog open={closeDialogOpen} onOpenChange={setCloseDialogOpen}>
-        <AlertDialogContent className="bg-ods-card border-ods-border">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-ods-text-primary font-['DM_Sans'] text-[20px] font-semibold">
-              Close this ticket?
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-ods-text-secondary font-['DM_Sans'] text-[14px]">
-              Add an optional resolution note below. You can reopen the ticket
-              later if needed.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <Textarea
-            value={resolution}
-            onChange={(e) => setResolution(e.target.value)}
-            placeholder="Resolution (optional)"
-            rows={3}
-            maxLength={TICKET_TEXT_MAX_CHARS}
-            className="mt-2"
-          />
-          <AlertDialogFooter>
-            <AlertDialogCancel
-              disabled={busy}
-              className="bg-transparent border-ods-border text-ods-text-primary hover:bg-ods-border"
-            >
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => void confirmClose()}
-              disabled={busy}
-              className="bg-ods-error hover:bg-ods-error-hover text-white"
-            >
-              Close ticket
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }

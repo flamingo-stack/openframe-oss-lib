@@ -15,7 +15,7 @@
  * is a SIBLING of the toggle button, not nested inside it.
  */
 
-import { useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { StatusBadge, type StatusBadgeProps } from '../ui'
 import { formatRelativeTime } from '../../utils/date-utils'
 import { scrollElementIntoView } from '../../utils/scroll-into-view'
@@ -97,38 +97,35 @@ export function HelpCenterCard({
   const isExpandable = !optimistic
   const isExpanded = expanded && isExpandable
 
-  // Scroll-on-click — delegates to the canonical `scrollElementIntoView`
-  // helper with a cross-row layout-shift `adjustTargetY` callback. The
-  // helper owns the smooth-scroll mechanics + sticky-chrome offset; we
-  // pass the consumer-specific knowledge ("a sibling drawer above me
-  // is about to collapse — subtract its height from the target Y").
-  //
-  // Cross-row gotcha: if ANOTHER row above this one is currently
-  // expanded, its drawer collapses simultaneously with our toggle.
-  // The collapse shrinks the page above our row → our final Y is
-  // HIGHER than the current `rect.top`. By pre-subtracting the
-  // collapsing drawer's height we land at the post-shift position
-  // cleanly, without scrollIntoView's mid-animation drift.
   const rowRef = useRef<HTMLDivElement | null>(null)
+  // Click only toggles — the scroll-to-top is deferred to the effect below.
   const handleClick = useCallback(() => {
     onToggle(ticket.id)
-    scrollElementIntoView(rowRef.current, {
-      headerOffset: STICKY_HEADER_OFFSET_PX,
-      adjustTargetY: (raw) => {
-        if (!rowRef.current) return raw
-        const expandedDrawer = document.querySelector(
-          'div[id^="help-center-drawer-"]',
-        )
-        if (!(expandedDrawer instanceof HTMLElement)) return raw
-        const drawerRect = expandedDrawer.getBoundingClientRect()
-        const myRect = rowRef.current.getBoundingClientRect()
-        // Only adjust when the drawer is ABOVE us. Drawers below us
-        // don't shift our position when they collapse.
-        if (drawerRect.bottom > myRect.top) return raw
-        return raw - drawerRect.height
-      },
-    })
   }, [onToggle, ticket.id])
+
+  // Smooth-scroll the row to the top once the drawer has expanded — in an
+  // effect keyed on `isExpanded` (NOT the click handler, which runs before
+  // React commits the drawer, when the page isn't yet tall enough to scroll).
+  //
+  // The cancellation-proof motion lives in the shared `scrollElementIntoView`
+  // helper (self-driven rAF tween, instant per-frame writes, target recomputed
+  // each frame). It is immune to the browser SCROLL ANCHORING that cancelled the
+  // old native `window.scrollTo({behavior:'smooth'})` on every open after the
+  // first — the bug where smooth "only worked once" because anchoring is
+  // suppressed at scrollY=0 (first open) but aborts the native smooth scroll
+  // from any non-zero offset (every later open). See that util for the full
+  // mechanics. One leading rAF so the expanded drawer has committed its height
+  // before the first measurement; the tween then tracks the row to its resting
+  // position as the page finishes growing. Cleanup cancels on collapse/unmount.
+  useEffect(() => {
+    if (!isExpanded) return
+    const raf = requestAnimationFrame(() => {
+      scrollElementIntoView(rowRef.current, {
+        headerOffset: STICKY_HEADER_OFFSET_PX,
+      })
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [isExpanded])
 
   const rightBadges = (
     <>
