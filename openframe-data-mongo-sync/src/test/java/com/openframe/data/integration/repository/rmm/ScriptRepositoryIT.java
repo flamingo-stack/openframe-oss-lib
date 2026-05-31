@@ -253,8 +253,6 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
         assertThat(scriptRepository.findByTenantIdAndName(TENANT_B, "same-name")).isPresent();
     }
 
-    // ---------- filter / search / sort ----------
-
     @Test
     @DisplayName("Given scripts with mixed shells, when filter.shells = [BASH], then only BASH scripts come back (and tenant isolation still applies)")
     void findPageForTenant_filterByShells() {
@@ -356,7 +354,6 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
         assertThat(scriptRepository.getDefaultSortField()).isEqualTo("_id");
     }
 
-    // ---------- helpers ----------
 
     private static Script newScript(String tenantId, String name) {
         return Script.builder()
