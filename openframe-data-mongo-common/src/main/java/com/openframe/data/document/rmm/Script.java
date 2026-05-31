@@ -1,4 +1,5 @@
 package com.openframe.data.document.rmm;
+import com.openframe.data.document.TenantScoped;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -29,14 +30,14 @@ import java.util.List;
         def = "{'tenantId': 1, 'name': 1}",
         unique = true
 )
-public class Script {
+public class Script implements TenantScoped {
     @Id
     private String id;
     /**
      * Tenant that owns this script. All queries must be scoped by this field
      * to enforce multi-tenant isolation.
      */
-private String tenantId;
+    private String tenantId;
     /**
      * Human-readable script name. Must be unique within the tenant (enforced
      * by the compound index on {@code (tenantId, name)}).
