@@ -1,50 +1,36 @@
 package com.openframe.gateway.security.tenant;
 
-import com.openframe.data.service.TenantIdProvider;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * Self-hosted (OSS) fallback: accepts JWTs from a single issuer defined by
+ * openframe.security.jwt.super-tenant-id config. No DB lookup needed —
+ * single-tenant deployments have a fixed issuer URL.
+ * Activated only when no other IssuerUrlProvider bean is present (e.g. SaasIssuerUrlProvider).
+ */
 @Component
-@Slf4j
+@ConditionalOnMissingBean(value = IssuerUrlProvider.class, ignored = DefaultIssuerUrlProvider.class)
 public class DefaultIssuerUrlProvider implements IssuerUrlProvider {
-
-    private final TenantIdProvider tenantIdProvider;
 
     @Value("${openframe.security.jwt.allowed-issuer-base}")
     private String allowedIssuerBase;
 
-    @Value("${openframe.security.jwt.super-tenant-id:}")
+    @Value("${openframe.security.jwt.super-tenant-id}")
     private String superTenantId;
-
-    public DefaultIssuerUrlProvider(TenantIdProvider tenantIdProvider) {
-        this.tenantIdProvider = tenantIdProvider;
-    }
 
     @Override
     public Mono<List<String>> resolveIssuerUrls() {
-        return Mono.fromCallable(this::buildIssuerList);
+        return Mono.just(getCachedIssuerUrl());
     }
 
     @Override
     public List<String> getCachedIssuerUrl() {
-        return buildIssuerList();
-    }
-
-    private List<String> buildIssuerList() {
-        String tenantId = tenantIdProvider.getTenantId();
-        String tenantIssuer = allowedIssuerBase + "/" + tenantId;
-        List<String> list = new ArrayList<>(2);
-        list.add(tenantIssuer);
-        if (superTenantId != null && !superTenantId.isBlank()) {
-            String superIssuer = allowedIssuerBase + "/" + superTenantId;
-            if (!superIssuer.equals(tenantIssuer)) list.add(superIssuer);
-        }
-        return Collections.unmodifiableList(list);
+        return Collections.singletonList(allowedIssuerBase + "/" + superTenantId);
     }
 }
