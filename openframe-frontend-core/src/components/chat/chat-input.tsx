@@ -48,21 +48,26 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
     const prevSendingRef = useRef(sending)
     const prevAwaitingResponseRef = useRef(awaitingResponse)
 
-    const focusTextarea = useCallback((opts?: { preventScroll?: boolean }) => {
+    const focusTextarea = useCallback(() => {
       if (disabled) return
       const el = textareaRef.current
       if (!el || el.disabled) return
-      // `preventScroll` is for the autoFocus-on-mount path (e.g. the ticket
-      // reply composer, which mounts below a tall feed): focusing must NOT
-      // scroll the input into view, or it fights the card's smooth
-      // scroll-to-top on open. Every other caller focuses normally — the
-      // input is already on-screen when they fire.
-      el.focus(opts?.preventScroll ? { preventScroll: true } : undefined)
+      // ALWAYS `preventScroll`. Focusing a chat composer must never yank the
+      // viewport: in the global Ask-AI chat the input is a sticky, always-
+      // visible composer (preventScroll is a no-op there), and in the ticket
+      // reply composer the input sits BELOW a tall fixed-height feed — a
+      // scroll-on-focus there fights the card's smooth scroll-to-top when the
+      // drawer opens. This bit a specific flow: deep-link a ticket → close →
+      // reopen, then the post-state-transition refocus effect below fired a
+      // bare `focus()` AFTER the card's `window.scrollTo({behavior:'smooth'})`,
+      // scrolling the textarea into view and cancelling the smooth animation.
+      // `preventScroll` on every focus path removes the whole class of bug.
+      el.focus({ preventScroll: true })
     }, [disabled])
 
     useEffect(() => {
       if (autoFocus) {
-        focusTextarea({ preventScroll: true })
+        focusTextarea()
       }
     }, [autoFocus, focusTextarea])
 
@@ -124,7 +129,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
           requestAnimationFrame(() => {
             const el = textareaRef.current
             if (!el || disabled || el.disabled) return
-            el.focus()
+            el.focus({ preventScroll: true })
             el.setSelectionRange(next.length, next.length)
           })
         },
@@ -138,7 +143,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
           requestAnimationFrame(() => {
             const el = textareaRef.current
             if (!el) return
-            el.focus()
+            el.focus({ preventScroll: true })
             el.setSelectionRange(clamped, clamped)
           })
         },
@@ -225,7 +230,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
         requestAnimationFrame(() => {
           const el = textareaRef.current
           if (!el || el.disabled) return
-          el.focus()
+          el.focus({ preventScroll: true })
           el.setSelectionRange(next.length, next.length)
         })
       },

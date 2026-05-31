@@ -103,41 +103,28 @@ export function HelpCenterCard({
     onToggle(ticket.id)
   }, [onToggle, ticket.id])
 
-  // Scroll-to-top AFTER the drawer has expanded + painted — NOT synchronously
-  // in the click handler. The old approach scrolled inside `handleClick`,
-  // BEFORE React committed the expanded drawer: on the FIRST open the page
-  // wasn't yet tall enough to scroll, so `window.scrollTo` clamped to a no-op
-  // and it only appeared to "work" on a later click once the page had already
-  // grown (the bug: scroll worked on the second click, not the first).
+  // Smooth-scroll the row to the top once the drawer has expanded — in an
+  // effect keyed on `isExpanded` (NOT the click handler, which runs before
+  // React commits the drawer, when the page isn't yet tall enough to scroll).
   //
-  // Running it in an effect keyed on `isExpanded` guarantees the drawer is in
-  // the DOM and the layout has settled, so the row's FINAL position is measured
-  // and the page can actually scroll to it. We scroll only on the
-  // collapsed→expanded transition (the `if (!isExpanded) return` guard).
-  //
-  // DOUBLE-rAF: open now flows through `?ticket=` → `router.replace()` (see
-  // `HelpCenterList.setOpenTicket`). On the CLICK path that route re-render
-  // runs CONCURRENTLY with the scroll and interrupted the in-flight smooth
-  // animation — so it felt like the smooth scroll was "lost" on click while
-  // the deep-link path (URL already set on mount, no concurrent nav) worked.
-  // Deferring two frames lets the freshly-mounted drawer + the route
-  // re-render paint first, then the smooth animation runs uninterrupted from
-  // the row's final position. Mirrors the canonical scroll-to-row defer in the
-  // hub's `useUnifiedNav.scrollToHash` (double-rAF) + lib's `DeliveryLists`.
+  // The cancellation-proof motion lives in the shared `scrollElementIntoView`
+  // helper (self-driven rAF tween, instant per-frame writes, target recomputed
+  // each frame). It is immune to the browser SCROLL ANCHORING that cancelled the
+  // old native `window.scrollTo({behavior:'smooth'})` on every open after the
+  // first — the bug where smooth "only worked once" because anchoring is
+  // suppressed at scrollY=0 (first open) but aborts the native smooth scroll
+  // from any non-zero offset (every later open). See that util for the full
+  // mechanics. One leading rAF so the expanded drawer has committed its height
+  // before the first measurement; the tween then tracks the row to its resting
+  // position as the page finishes growing. Cleanup cancels on collapse/unmount.
   useEffect(() => {
     if (!isExpanded) return
-    let inner = 0
-    const outer = requestAnimationFrame(() => {
-      inner = requestAnimationFrame(() => {
-        scrollElementIntoView(rowRef.current, {
-          headerOffset: STICKY_HEADER_OFFSET_PX,
-        })
+    const raf = requestAnimationFrame(() => {
+      scrollElementIntoView(rowRef.current, {
+        headerOffset: STICKY_HEADER_OFFSET_PX,
       })
     })
-    return () => {
-      cancelAnimationFrame(outer)
-      cancelAnimationFrame(inner)
-    }
+    return () => cancelAnimationFrame(raf)
   }, [isExpanded])
 
   const rightBadges = (
