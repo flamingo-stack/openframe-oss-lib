@@ -7,7 +7,7 @@ import org.springframework.stereotype.Service;
 
 @Slf4j
 @Service
-@ConditionalOnMissingBean(TenantIdProvider.class)
+@ConditionalOnMissingBean(value = TenantIdProvider.class, ignored = DefaultTenantIdProvider.class)
 public class DefaultTenantIdProvider implements TenantIdProvider {
 
     @Value("${TENANT_ID:oss}")
