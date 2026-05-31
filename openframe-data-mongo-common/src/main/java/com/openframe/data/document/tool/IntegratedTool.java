@@ -1,22 +1,27 @@
 package com.openframe.data.document.tool;
-
+import com.openframe.data.document.TenantScoped;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
-
 import java.util.List;
-
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "integrated_tools")
-public class IntegratedTool {
+@CompoundIndex(name = "tenant_key_idx", def = "{'tenantId':1,'key':1}", unique = true, sparse = true)
+public class IntegratedTool implements TenantScoped {
     @Id
     private String id;
+    @Indexed
+    private String tenantId;
+    @Indexed
+    private String key;
     private String name;
     private String description;
     private String icon;
@@ -27,12 +32,10 @@ public class IntegratedTool {
     private String platformCategory;
     private boolean enabled;
     private ToolCredentials credentials;
-
     // Layer information
     private String layer;
     private Integer layerOrder;
     private String layerColor;
-
     // Monitoring configuration
     private String metricsPath;
     private String healthCheckEndpoint;

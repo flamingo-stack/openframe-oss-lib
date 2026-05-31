@@ -11,4 +11,6 @@ public interface OpenFrameClientConfigurationRepository extends MongoRepository<
 
     Optional<OpenFrameClientConfiguration> findFirstByOrderByCreatedAtDesc();
 
+    Optional<OpenFrameClientConfiguration> findByTenantId(String tenantId);
+
 }

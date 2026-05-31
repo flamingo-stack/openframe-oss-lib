@@ -1,5 +1,4 @@
 package com.openframe.data.document.rmm;
-
 /**
  * Lifecycle status of a {@link Script}.
  *
