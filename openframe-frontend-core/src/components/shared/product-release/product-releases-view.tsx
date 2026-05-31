@@ -34,6 +34,7 @@
 import * as React from 'react'
 
 import { useChatRuntime } from '../../../contexts/chat-runtime-context'
+import { useRouter } from '../../../embed-shims/next-navigation'
 import type { ProductRelease } from '../../../types/product-release'
 import { cn } from '../../../utils/cn'
 import { buildDefaultHref } from '../../../utils/content-href'
@@ -111,15 +112,16 @@ function ReleaseRow({
     : buildDefaultHref(basePath, release.slug)
   const { target, rel } = useEntityCardLink({ href: cta.href, targetPlatform: cta.targetPlatform })
 
-  const navigate = runtime?.navigation?.navigate
+  const router = useRouter()
   const onClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    // Soft-navigate through the runtime seam (hub → router.push, embedder →
-    // react-router). Let the browser handle modifier / middle / new-tab clicks
-    // (shared `isModifierClick` rule) so cmd-click-new-tab keeps working on the
-    // real `<a href>`.
-    if (e.defaultPrevented || isModifierClick(e)) return
-    if (target === '_blank') return
-    if (navigate?.({ href: cta.href })) e.preventDefault()
+    // Let the browser handle modifier / middle / new-tab clicks (shared
+    // `isModifierClick` rule) so cmd-click-new-tab keeps working on the real
+    // `<a href>`. Otherwise soft same-origin nav: the host's `navigate` (hub
+    // docNav) if wired, else the registered embed-shims router — no app-side
+    // navigation bridge required.
+    if (e.defaultPrevented || isModifierClick(e) || target === '_blank') return
+    e.preventDefault()
+    if (!runtime?.navigation?.navigate?.({ href: cta.href })) router.push(cta.href)
   }
 
   return (

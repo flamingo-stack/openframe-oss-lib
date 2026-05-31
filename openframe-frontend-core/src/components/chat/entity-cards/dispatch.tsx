@@ -31,6 +31,7 @@
 
 import React, { type ReactNode } from 'react'
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context'
+import { useRouter } from '../../../embed-shims/next-navigation'
 import type { ChatRef } from '../chat-ref.types'
 import { useChatCardItem } from '../hooks/use-chat-card-item'
 import { handleChatNavClick } from '../utils/nav-click-handler'
@@ -866,6 +867,7 @@ function ChatCardNavWrap({
   children: ReactNode
 }) {
   const runtime = useRequiredChatRuntime()
+  const router = useRouter()
   const panel = useChatPanel()
   const onClickCapture = (e: React.MouseEvent<HTMLElement>) => {
     if (!href) return
@@ -879,7 +881,7 @@ function ChatCardNavWrap({
     if (targetEl?.closest?.('button')) return
     if (!targetEl?.closest?.('a')) return
 
-    const handled = handleChatNavClick(e, runtime, { href, path, targetPlatform })
+    const handled = handleChatNavClick(e, runtime, { href, path, targetPlatform }, router.push)
     if (!handled) return
     // Modifier-clicks fall through (handled=false) without stopPropagation
     // so ancestor telemetry handlers still see the bubble.

@@ -4,7 +4,6 @@ import type { ChatRuntime, EndpointsRuntime } from '@flamingo-stack/openframe-fr
 import { buildListUrl, makeComposeContentUrl } from '@flamingo-stack/openframe-frontend-core/utils'
 import { CONTENT_PREFIX } from '../../proxy/content-prefix.mjs'
 import { EP, DEFAULT_SOURCE, HUB_PUBLIC_ORIGIN } from '../config/endpoints'
-import { navigateInApp } from './router-nav'
 
 // The content types THIS embedder hosts on its own slugged routes (see
 // app-routes.tsx). `makeComposeContentUrl` returns a relative in-app href for
@@ -29,12 +28,10 @@ export function buildChatRuntime(): ChatRuntime {
       imageProxyUrlPrefix: EP.imageProxy,
     },
     navigation: {
-      // 'host' = this app owns routing. The lib calls `navigate` for chat clicks
-      // (source chips / markdown anchors / entity-card dispatch) and the lifted
-      // ProductReleasesView rows; we route same-origin paths through react-router
-      // (in-app, no reload) and let cross-origin links fall back to the browser.
+      // 'host' = this app owns routing. react-router is registered into the lib's
+      // embed-shims (embed-router-bridge), so the lib soft-navigates through that
+      // router directly — no `navigate` callback or app-side bridge needed.
       mode: 'host',
-      navigate: ({ href }) => (href.startsWith('/') ? navigateInApp(href) : false),
     },
     resolvePlaceholderUrl: (title) => EP.ogPlaceholder(title),
     // The existing composeContentUrl seam, wired from the lib helper: relative

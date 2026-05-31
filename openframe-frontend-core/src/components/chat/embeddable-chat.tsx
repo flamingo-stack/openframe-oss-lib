@@ -58,6 +58,7 @@ import { renderChatInlineEntityCard } from './entity-cards/dispatch'
 import type { ChatCardDispatchExtras } from './entity-cards/dispatch'
 
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context'
+import { useRouter } from '../../embed-shims/next-navigation'
 import { type ChatSource, type UseSseChatAdapterOptions } from './hooks/use-sse-chat-adapter'
 import {
   useUnifiedChat,
@@ -278,6 +279,7 @@ function SourceChip({
   onDiscuss?: (ref: ChatRef) => void
 }) {
   const runtime = useRequiredChatRuntime()
+  const router = useRouter()
   // Single CTA resolver — same icon, same href chain, same ChatRef
   // synthesis the inline card and search-result paths use.
   const cta = resolveSourceRowCTA(
@@ -388,7 +390,7 @@ function SourceChip({
   // Single close model: matches `ChatCardNavWrap` for inline cards.
   const buildClickHandler = (href: string, path: string | null | undefined, targetPlatform: string | null, isNewTab: boolean) =>
     (e: React.MouseEvent<HTMLAnchorElement>) => {
-      const handled = handleChatNavClick(e, runtime, { href, path, targetPlatform })
+      const handled = handleChatNavClick(e, runtime, { href, path, targetPlatform }, router.push)
       if (handled && !isNewTab && onClose) onClose()
     }
 

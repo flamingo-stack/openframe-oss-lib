@@ -56,6 +56,13 @@ export function handleChatNavClick(
   e: NavClickEvent,
   runtime: ChatRuntime,
   { href, path, targetPlatform }: ChatNavClickInput,
+  /** Host-router fallback for same-origin soft-nav when the runtime does NOT
+   *  wire `navigation.navigate`. Pass `useRouter().push` (the embed-shims
+   *  router) from the calling component — on a host that registered its router
+   *  this soft-navigates; without one it is a full-page `window.location`.
+   *  Lets embedders skip wiring `navigation.navigate` entirely — they only
+   *  register their router once. */
+  fallbackNavigate?: (path: string) => void,
 ): boolean {
   if (!href) {
     e.preventDefault()
@@ -76,6 +83,13 @@ export function handleChatNavClick(
   }
   const handled =
     runtime.navigation.navigate?.({ href, path, targetPlatform }) ?? false
-  if (!handled) window.location.assign(stripSameOriginToPath(href))
+  if (!handled) {
+    const target = stripSameOriginToPath(href)
+    // No host `navigate` wired → route through the registered embed-shims
+    // router (soft push on a host that registered one; full-page on the bare
+    // fallback). Mirrors the `footer-waitlist-button` pattern.
+    if (fallbackNavigate) fallbackNavigate(target)
+    else window.location.assign(target)
+  }
   return true
 }
