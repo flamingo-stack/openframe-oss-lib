@@ -1,4 +1,5 @@
 'use client'
+// compact-size support added for the ticket-drawer reply composer.
 
 /**
  * Chat-attachment UI primitives.
@@ -32,7 +33,13 @@ import { useEffect, useRef, useState } from 'react'
 import { PlusIcon } from '../icons-v2-generated/signs-and-symbols/plus-icon'
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon'
 import { Button } from '../ui/button'
+import { cn } from '../../utils/cn'
 import { ANTHROPIC_SUPPORTED_IMAGE_MIME } from './utils/chat-attachment-markdown'
+
+/** Chip strip / chip density. `compact` shrinks the thumbnail, padding, text
+ *  and max-width for narrow surfaces (e.g. the ticket-drawer reply composer);
+ *  `default` is the global Ask-AI chat sizing. */
+export type ChatAttachmentSize = 'default' | 'compact'
 
 // ===========================================================================
 // CONSTANTS & TYPES — inlined from hub `lib/config/chat-attachment-config.ts`
@@ -88,6 +95,9 @@ export interface ChatAttachmentAddButtonProps {
   onAddFiles: (files: FileList | File[]) => void
   /** External disable (e.g. while chat is streaming). */
   disabled?: boolean
+  /** Density. `compact` renders a smaller 24×24 button for narrow surfaces
+   *  (ticket-drawer composer); `default` is the 28×28 global-chat button. */
+  size?: ChatAttachmentSize
 }
 
 /**
@@ -111,11 +121,16 @@ export function ChatAttachmentAddButton({
   attachmentsCount,
   onAddFiles,
   disabled = false,
+  size = 'default',
 }: ChatAttachmentAddButtonProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const compact = size === 'compact'
+  // Keep the placeholder footprint in lockstep with the real button size so
+  // there's zero layout shift when `attachmentsEnabled` resolves.
+  const boxClass = compact ? 'h-6 w-6' : 'h-7 w-7'
 
   if (!attachmentsEnabled) {
-    return <span aria-hidden="true" className="inline-block h-7 w-7 shrink-0" />
+    return <span aria-hidden="true" className={cn('inline-block shrink-0', boxClass)} />
   }
 
   const slotsAvailable = Math.max(
@@ -159,8 +174,8 @@ export function ChatAttachmentAddButton({
             ? 'Add attachments'
             : `Limit reached (${CHAT_ATTACHMENT_CONCURRENT_UPLOADS_PER_USER})`
         }
-        leftIcon={<PlusIcon className="h-4 w-4" />}
-        className="!h-7 !w-7 !p-0 shrink-0 text-ods-text-muted hover:text-ods-text-primary"
+        leftIcon={<PlusIcon className={compact ? 'h-3.5 w-3.5' : 'h-4 w-4'} />}
+        className={cn('!p-0 shrink-0 text-ods-text-muted hover:text-ods-text-primary', compact ? '!h-6 !w-6' : '!h-7 !w-7')}
       />
     </>
   )
@@ -175,6 +190,10 @@ export interface ChatAttachmentChipStripProps {
   onRemove: (id: string) => void
   /** External disable (e.g. while chat is streaming). */
   disabled?: boolean
+  /** Density. `compact` (smaller thumbnail/padding/text, narrower chips) suits
+   *  narrow surfaces like the ticket-drawer reply composer; `default` is the
+   *  global Ask-AI chat sizing. */
+  size?: ChatAttachmentSize
 }
 
 /**
@@ -186,17 +205,20 @@ export function ChatAttachmentChipStrip({
   attachments,
   onRemove,
   disabled = false,
+  size = 'default',
 }: ChatAttachmentChipStripProps) {
   if (attachments.length === 0) return null
+  const compact = size === 'compact'
   return (
-    <div className="flex-shrink-0 px-5 pb-2">
-      <div className="flex items-center gap-2 flex-wrap">
+    <div className={cn('flex-shrink-0', compact ? 'px-3 pb-1.5' : 'px-5 pb-2')}>
+      <div className={cn('flex items-center flex-wrap', compact ? 'gap-1.5' : 'gap-2')}>
         {attachments.map((att) => (
           <AttachmentChip
             key={att.id}
             attachment={att}
             onRemove={() => onRemove(att.id)}
             disabled={disabled}
+            size={size}
           />
         ))}
       </div>
@@ -212,11 +234,13 @@ interface AttachmentChipProps {
   attachment: StagedAttachment
   onRemove: () => void
   disabled: boolean
+  size?: ChatAttachmentSize
 }
 
-function AttachmentChip({ attachment, onRemove, disabled }: AttachmentChipProps) {
+function AttachmentChip({ attachment, onRemove, disabled, size = 'default' }: AttachmentChipProps) {
   const { file, status, progress, errorMessage } = attachment
   const isImage = (ANTHROPIC_SUPPORTED_IMAGE_MIME as readonly string[]).includes(file.type)
+  const compact = size === 'compact'
 
   // Inline thumbnail for images during STAGING (pre-upload-complete).
   // Local `URL.createObjectURL` blob — the user sees their image
@@ -225,19 +249,27 @@ function AttachmentChip({ attachment, onRemove, disabled }: AttachmentChipProps)
 
   return (
     <div
-      className="flex items-center gap-2 rounded-md border border-ods-border bg-ods-card px-2 py-1.5 max-w-[240px]"
+      className={cn(
+        'flex items-center rounded-md border border-ods-border bg-ods-card',
+        compact ? 'gap-1.5 px-1.5 py-1 max-w-[180px]' : 'gap-2 px-2 py-1.5 max-w-[240px]',
+      )}
       role="group"
       aria-label={`Attachment ${file.name}`}
     >
       {/* Thumbnail OR file-type initials */}
-      <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded bg-ods-bg">
+      <div
+        className={cn(
+          'relative shrink-0 overflow-hidden rounded bg-ods-bg',
+          compact ? 'h-6 w-6' : 'h-8 w-8',
+        )}
+      >
         {isImage && blobUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- blob: URLs
           //  cannot go through next/image; this is a transient pre-upload
           //  preview, NOT the chat-history render path.
           <img src={blobUrl} alt={file.name} className="h-full w-full object-cover" />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-[10px] font-mono uppercase text-ods-text-muted">
+          <div className={cn('flex h-full w-full items-center justify-center font-mono uppercase text-ods-text-muted', compact ? 'text-[9px]' : 'text-[10px]')}>
             {extLabel(file.name)}
           </div>
         )}
@@ -254,19 +286,23 @@ function AttachmentChip({ attachment, onRemove, disabled }: AttachmentChipProps)
 
       {/* Filename + status */}
       <div className="min-w-0 flex-1">
-        <div className="truncate text-xs text-ods-text-primary" title={file.name}>
+        <div className={cn('truncate text-ods-text-primary', compact ? 'text-[11px] leading-tight' : 'text-xs')} title={file.name}>
           {file.name}
         </div>
-        <div className="text-[10px] text-ods-text-muted">
-          {status === 'sniffing' && 'Checking…'}
-          {status === 'uploading' && `${progress}% · ${formatFileSize(file.size)}`}
-          {status === 'ready' && formatFileSize(file.size)}
-          {status === 'error' && (
-            <span className="text-ods-attention-red-error" title={errorMessage}>
-              {errorMessage ?? 'Upload failed'}
-            </span>
-          )}
-        </div>
+        {/* Compact mode hides the size/status sub-line for ready files to keep the
+            chip to a single line; uploading/error states still surface. */}
+        {(!compact || status !== 'ready') && (
+          <div className={cn('text-ods-text-muted', compact ? 'text-[9px] leading-tight' : 'text-[10px]')}>
+            {status === 'sniffing' && 'Checking…'}
+            {status === 'uploading' && `${progress}% · ${formatFileSize(file.size)}`}
+            {status === 'ready' && formatFileSize(file.size)}
+            {status === 'error' && (
+              <span className="text-ods-attention-red-error" title={errorMessage}>
+                {errorMessage ?? 'Upload failed'}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Remove button — UI-Kit Button with `transparent` + `small`. */}
@@ -277,8 +313,8 @@ function AttachmentChip({ attachment, onRemove, disabled }: AttachmentChipProps)
         onClick={onRemove}
         disabled={disabled}
         aria-label={`Remove ${file.name}`}
-        leftIcon={<XmarkIcon className="h-3.5 w-3.5" />}
-        className="!h-5 !w-5 !p-0 shrink-0 text-ods-text-muted hover:text-ods-text-primary"
+        leftIcon={<XmarkIcon className={compact ? 'h-3 w-3' : 'h-3.5 w-3.5'} />}
+        className={cn('!p-0 shrink-0 text-ods-text-muted hover:text-ods-text-primary', compact ? '!h-4 !w-4' : '!h-5 !w-5')}
       />
     </div>
   )

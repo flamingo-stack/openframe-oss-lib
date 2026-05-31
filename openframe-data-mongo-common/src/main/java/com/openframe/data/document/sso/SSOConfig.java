@@ -1,15 +1,23 @@
 package com.openframe.data.document.sso;
 
+import com.openframe.data.document.TenantScoped;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import java.util.List;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 @Document(collection = "sso_configs")
-public class SSOConfig {
+public class SSOConfig implements TenantScoped {
     @Id
     private String id;
+    @Indexed private String tenantId;
+
     private String provider;
     private String clientId;
     private String clientSecret;

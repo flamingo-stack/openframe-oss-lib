@@ -6,6 +6,7 @@ import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.repository.notification.CategoryCount;
 import com.openframe.data.repository.notification.NotificationReadStateRepository;
+import com.openframe.data.service.TenantIdProvider;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -27,6 +28,7 @@ import java.util.Map;
 public class NotificationReadStateService {
 
     private final NotificationReadStateRepository repository;
+    private final TenantIdProvider tenantIdProvider;
 
     public void createForAudience(@NotBlank String notificationId,
                                   @NotNull NotificationCategory category,
@@ -74,7 +76,7 @@ public class NotificationReadStateService {
 
     public Map<NotificationCategory, Long> unreadCountsByCategory(@NotBlank String recipientId,
                                                                   @NotNull RecipientType recipientType) {
-        List<CategoryCount> rows = repository.unreadCountsByCategory(recipientId, recipientType);
+        List<CategoryCount> rows = repository.unreadCountsByCategory(recipientId, recipientType, tenantIdProvider.getTenantId());
         Map<NotificationCategory, Long> counts = new EnumMap<>(NotificationCategory.class);
         for (CategoryCount row : rows) {
             if (row.category() != null) {

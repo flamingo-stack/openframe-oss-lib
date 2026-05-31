@@ -1,5 +1,5 @@
 package com.openframe.data.document.ticket;
-
+import com.openframe.data.document.TenantScoped;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -10,9 +10,7 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
-
 import java.time.Instant;
-
 /**
  * Internal notes by technicians on a ticket.
  * Separate from Dialog/Messages - simple text entries.
@@ -26,27 +24,24 @@ import java.time.Instant;
 @AllArgsConstructor
 @Document(collection = "ticket_notes")
 @CompoundIndex(name = "ticket_created", def = "{'ticketId': 1, 'createdAt': -1}")
-public class TicketNote {
+public class TicketNote implements TenantScoped {
     @Id
     private String id;
-
+    @Indexed
+    private String tenantId;
     @Indexed
     private String ticketId;
-
     /**
      * Note content (plain text or markdown).
      */
     private String content;
-
     /**
      * Author - technician who created the note (User ID).
      * Author name resolved via DataLoader.
      */
     private String authorId;
-
     @CreatedDate
     private Instant createdAt;
-
     @LastModifiedDate
     private Instant updatedAt;
 }
