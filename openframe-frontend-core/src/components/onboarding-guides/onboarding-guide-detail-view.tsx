@@ -39,7 +39,7 @@ import { OnboardingGuideCard } from '../chat/entity-cards/onboarding-guide-card'
 import { useChatRuntime } from '../../contexts/chat-runtime-context'
 import type { OnboardingGuide } from '../chat/types/entities/onboarding-guide'
 import type { VideoTeaser } from '../../types/video-processing'
-import { buildDefaultHref } from './build-default-href'
+import { buildDefaultHref } from '../../utils/content-href'
 
 export interface OnboardingGuideDetailViewProps {
   initialData: OnboardingGuide

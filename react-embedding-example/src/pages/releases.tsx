@@ -1,43 +1,61 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { ProductReleasesView } from '@flamingo-stack/openframe-frontend-core/components'
+import type { ProductReleaseListResponse } from '@flamingo-stack/openframe-frontend-core/types'
+import { EP } from '../config/endpoints'
 
 /**
- * The lib's `ReleaseDetailPage` renders a single release by slug (the host supplies
- * the `useRelease` hook + injects the roadmap/delivery sections — see release-detail.tsx).
- * There's no public "list releases" surface, so this index just routes to a slug.
+ * Props-driven releases LIST — the §5 "every page-level surface is the same
+ * shared lib component" instance. We fetch a page from /content/api/releases
+ * ourselves and hand it to the lib's `<ProductReleasesView>` (the SAME view the
+ * hub's `/releases` renders). No per-card prop builder is passed, so the view
+ * uses the lib default (`defaultBuildProductReleaseCardProps`) — embedders that
+ * want the richer lg metadata (Type/Status/changelog/author) pass their own
+ * `buildCardProps`, exactly as the hub does.
  */
+const ITEMS_PER_PAGE = 5
+
 export function ReleasesPage() {
-  const [slug, setSlug] = useState('')
-  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const currentPage = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1)
+  const offset = (currentPage - 1) * ITEMS_PER_PAGE
+
+  const releases = useQuery({
+    queryKey: ['product-releases', currentPage],
+    queryFn: async (): Promise<ProductReleaseListResponse> => {
+      const res = await fetch(`${EP.productReleases}?limit=${ITEMS_PER_PAGE}&offset=${offset}`)
+      if (!res.ok) throw new Error(`Request failed (${res.status})`)
+      return res.json()
+    },
+    // Keep the previous page visible while the next loads so the pagination
+    // control doesn't flicker out (totalPages momentarily 0) on page change.
+    placeholderData: (prev) => prev,
+  })
+
+  const totalCount = releases.data?.count ?? 0
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE)
+
+  const handlePageChange = (page: number) => {
+    const params = new URLSearchParams(searchParams)
+    params.set('page', String(page))
+    setSearchParams(params)
+  }
+
   return (
     <div className="p-6">
-      <h1 className="text-xl font-semibold text-ods-text-primary">Product releases</h1>
-      <p className="mt-2 max-w-2xl text-sm text-ods-text-secondary">
-        Enter a release slug from your hub to view it with the lib&apos;s{' '}
-        <code>ReleaseDetailPage</code> (linked roadmap items render through the injected{' '}
-        <code>RoadmapGrid</code>, pointed at <code>/content</code>).
-      </p>
-      <form
-        className="mt-4 flex gap-2"
-        onSubmit={(e) => {
-          e.preventDefault()
-          const s = slug.trim()
-          if (s) navigate(`/releases/${encodeURIComponent(s)}`)
-        }}
-      >
-        <input
-          value={slug}
-          onChange={(e) => setSlug(e.target.value)}
-          placeholder="release-slug"
-          className="w-64 rounded-md border border-ods-border bg-ods-card px-3 py-1.5 text-sm text-ods-text-primary"
-        />
-        <button
-          type="submit"
-          className="rounded-md border border-ods-border bg-ods-card px-3 py-1.5 text-sm text-ods-text-primary hover:bg-ods-bg"
-        >
-          View →
-        </button>
-      </form>
+      <h1 className="mb-4 text-xl font-semibold text-ods-text-primary">Product releases</h1>
+      <ProductReleasesView
+        releases={releases.data?.data ?? []}
+        isLoading={releases.isLoading}
+        error={releases.isError}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={handlePageChange}
+        // Soft TanStack refetch on error instead of the default full page
+        // reload — the right UX for a reverse-proxy SPA embed.
+        onRetry={() => releases.refetch()}
+        itemsPerPage={ITEMS_PER_PAGE}
+      />
     </div>
   )
 }

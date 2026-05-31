@@ -6,9 +6,8 @@ import { EP } from '../config/endpoints'
 
 /**
  * Host-supplied data hook — ReleaseDetailPage REQUIRES this so it fetches through the
- * app's QueryClient. Best-effort endpoint: adjust `EP.productReleaseBySlug` to match
- * your hub's actual single-release route. On a miss it surfaces the lib's error state
- * (no crash).
+ * app's QueryClient. Points at the hub's public single-release route
+ * (`/content/api/releases/<slug>`); a miss surfaces the lib's error state (no crash).
  */
 function useRelease(slug: string | undefined) {
   const query = useQuery({

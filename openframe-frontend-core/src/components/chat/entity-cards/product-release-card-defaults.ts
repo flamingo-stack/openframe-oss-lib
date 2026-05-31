@@ -30,9 +30,15 @@ interface DerivedSmProps {
   formattedDate: string
 }
 
-/** Pick the first usable image URL from the row's cover-candidate
- *  fields. Order mirrors the hub's `resolveReleaseCover` precedence
- *  (video thumbnail wins when a video is set, then featured/og). */
+/** Pick the first usable image URL from the row's cover-candidate fields.
+ *  This is an INTENTIONALLY SIMPLER sm-subset heuristic — it does NOT mirror the
+ *  hub's `resolveReleaseCover`: when a video URL is set this prefers
+ *  `main_video_thumbnail` (then `highlight_video_thumbnail`) over `featured_image`,
+ *  and keys `hasVideoCover` off `main_video_url`/`youtube_url` (fields the hub
+ *  helper never reads). It's the builder-less default (chat sm cards + any embedder
+ *  that doesn't pass its own `buildCardProps` to `ProductReleasesView`); hosts
+ *  wanting hub-identical covers pass their richer builder (the hub does — see
+ *  the hub's `product-release-card-props.ts` / `resolveReleaseCover`). */
 function pickCover(item: ReleaseLike): string | null {
   const hasVideo = Boolean(item.main_video_url || item.youtube_url)
   if (hasVideo) {

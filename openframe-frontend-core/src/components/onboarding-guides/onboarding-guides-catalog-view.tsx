@@ -31,7 +31,7 @@ import { FilterPillRow } from '../ui/filter-pill-row'
 import { OnboardingGuideCard } from '../chat/entity-cards/onboarding-guide-card'
 import { useChatRuntime } from '../../contexts/chat-runtime-context'
 import type { OnboardingGuide } from '../chat/types/entities/onboarding-guide'
-import { buildDefaultHref } from './build-default-href'
+import { buildDefaultHref } from '../../utils/content-href'
 
 export interface OnboardingGuidesCatalogViewProps {
   initialGuides: OnboardingGuide[]

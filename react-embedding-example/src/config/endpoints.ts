@@ -30,9 +30,9 @@ export const EP = {
   onboarding: `${CONTENT}/onboarding-guides`,
   onboardingBySlug: (slug: string) => `${CONTENT}/onboarding-guides/${slug}`,
   onboardingSections: `${CONTENT}/onboarding-guides/sections`,
-  // product releases
-  productReleases: `${CONTENT}/product-releases`,
-  productReleaseBySlug: (slug: string) => `${CONTENT}/product-releases/${slug}`,
+  // product releases (the hub's public routes are /api/releases + /api/releases/[slug])
+  productReleases: `${CONTENT}/releases`,
+  productReleaseBySlug: (slug: string) => `${CONTENT}/releases/${slug}`,
   // misc surfaces
   legal: (docType: string) => `${CONTENT}/legal/${docType}`,
   contact: `${CONTENT}/contact`,

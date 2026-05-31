@@ -212,3 +212,21 @@ export {
   type ScrollElementIntoViewOptions,
   scrollElementIntoView,
 } from './scroll-into-view'
+
+// Shared list-API URL builder — the single source for the per-type chat
+// entity-card fetch shapes. The hub's 12 RAG mapper `listApi` closures
+// delegate here (byte-parity test guards the migration); embedders wire
+// `endpoints.buildListUrl = (t, ids) => buildListUrl(t, ids, '/content')`.
+// Pure + server-safe (the hub imports it server-side from this barrel).
+export { buildListUrl } from './list-url'
+
+// Embedder-configurable content-URL composer for the existing
+// `runtime.composeContentUrl` seam — relative href for host-served types,
+// hub origin for the rest. Pure + server-safe.
+export {
+  DEFAULT_CONTENT_SUFFIXES,
+  makeComposeContentUrl,
+  buildDefaultHref,
+  type ContentHrefOptions,
+  type ComposeContentUrl,
+} from './content-href'

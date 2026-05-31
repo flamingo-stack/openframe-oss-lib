@@ -18,28 +18,15 @@ const NAV = [
 export function AppShell() {
   const navigate = useNavigate()
   // Feeds the ChatRuntime's host-mode navigate() — used by the chat's source chips / markdown
-  // anchors / entity-card dispatch, which call runtime.navigation.navigate() directly.
+  // anchors / entity-card dispatch AND the lifted ProductReleasesView rows, which all call
+  // runtime.navigation.navigate() directly.
   useEffect(() => setInAppNavigate((to) => navigate(to)), [navigate])
 
-  // Normalized in-app routing for lib surfaces that render a PLAIN `<a href="/…">` (e.g. the
-  // onboarding catalog cards, which don't go through runtime.navigation). Mirrors the click
-  // rules the chat's source chips apply internally (primary button, no modifiers, same-origin,
-  // not new-tab) and routes via react-router instead of a full page reload.
-  useEffect(() => {
-    function onDocClick(e: MouseEvent) {
-      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
-      const anchor = (e.target as HTMLElement | null)?.closest?.('a')
-      if (!anchor) return
-      const target = anchor.getAttribute('target')
-      if (target && target !== '_self') return // new-tab / external → let the browser handle it
-      const href = anchor.getAttribute('href')
-      if (!href || !href.startsWith('/')) return // only same-origin internal paths
-      e.preventDefault()
-      navigate(href)
-    }
-    document.addEventListener('click', onDocClick)
-    return () => document.removeEventListener('click', onDocClick)
-  }, [navigate])
+  // (The former document-level click interceptor for lib surfaces that rendered a PLAIN
+  // `<a href="/…">` is gone: onboarding cards now use the embed-shim `Link` (→ react-router
+  // via embed-router-bridge) and the releases list routes via runtime.navigation. Every lib
+  // surface this app mounts is now either on the embed-shim `Link` or routes through the
+  // runtime seam — no global anchor hack needed.)
   return (
     <div className="min-h-full bg-ods-bg text-ods-text-primary">
       {/* No props — reads its endpoint from EndpointsRuntime.announcementsUrl. */}
