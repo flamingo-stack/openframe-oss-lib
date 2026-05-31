@@ -210,7 +210,7 @@ class NotificationReadStateIndexUsageIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("Given a heavily seeded read_states collection, when unreadCountsByCategory aggregation runs (match recipient + status=UNREAD, group by category), then the $match stage hits recipient_category_status — no collscan during group aggregation")
     void unread_counts_by_category_uses_recipient_category_status_index() {
-        var counts = readStateRepository.unreadCountsByCategory(HOT_ADMIN, RecipientType.USER);
+        var counts = readStateRepository.unreadCountsByCategory(HOT_ADMIN, RecipientType.USER, "test-tenant");
         assertThat(counts).isNotEmpty();
 
         List<Document> pipeline = List.of(

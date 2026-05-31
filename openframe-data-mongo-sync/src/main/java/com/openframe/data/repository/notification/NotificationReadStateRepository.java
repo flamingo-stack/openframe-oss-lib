@@ -37,9 +37,10 @@ public interface NotificationReadStateRepository
     long softDeleteAllRead(String recipientId, RecipientType recipientType);
 
     @Aggregation(pipeline = {
-            "{ '$match': { 'recipientId': ?0, 'recipientType': ?1, 'status': 'UNREAD' } }",
+            "{ '$match': { 'tenantId': ?2, 'recipientId': ?0, 'recipientType': ?1, 'status': 'UNREAD' } }",
             "{ '$group': { '_id': '$category', 'count': { '$sum': 1 } } }"
     })
     List<CategoryCount> unreadCountsByCategory(@Param("recipientId") String recipientId,
-                                               @Param("recipientType") RecipientType recipientType);
+                                               @Param("recipientType") RecipientType recipientType,
+                                               @Param("tenantId") String tenantId);
 }

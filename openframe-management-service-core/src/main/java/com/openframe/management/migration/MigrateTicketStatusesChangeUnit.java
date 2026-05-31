@@ -3,6 +3,7 @@ package com.openframe.management.migration;
 import com.openframe.data.document.ticket.TicketStatusDefinition;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.seed.ticket.TicketStatusSeedCatalog;
+import com.openframe.data.service.TenantIdProvider;
 import io.mongock.api.annotations.ChangeUnit;
 import io.mongock.api.annotations.Execution;
 import io.mongock.api.annotations.RollbackExecution;
@@ -51,7 +52,7 @@ public class MigrateTicketStatusesChangeUnit {
     );
 
     @Execution
-    public void execution(MongoTemplate mongoTemplate, Environment environment) {
+    public void execution(MongoTemplate mongoTemplate, Environment environment, TenantIdProvider tenantIdProvider) {
         // TODO(lifecycle-rollout): remove flag guard + drop Environment param after rollout
         if (!environment.getProperty(LIFECYCLE_FLAG, Boolean.class, false)) {
             log.info("Migrate ticket statuses: lifecycle feature disabled; skipping");
@@ -59,8 +60,9 @@ public class MigrateTicketStatusesChangeUnit {
         }
         log.info("Migrate ticket statuses: starting");
 
+        String tenantId = tenantIdProvider.getTenantId();
         seedStatuses(mongoTemplate);
-        migrateTickets(mongoTemplate);
+        migrateTickets(mongoTemplate, tenantId);
 
         log.info("Migrate ticket statuses: complete");
     }
@@ -90,8 +92,8 @@ public class MigrateTicketStatusesChangeUnit {
         return mongoTemplate.exists(query, TicketStatusDefinition.class);
     }
 
-    private void migrateTickets(MongoTemplate mongoTemplate) {
-        List<Document> legacyTickets = findLegacyTickets(mongoTemplate);
+    private void migrateTickets(MongoTemplate mongoTemplate, String tenantId) {
+        List<Document> legacyTickets = findLegacyTickets(mongoTemplate, tenantId);
         log.info("Migrate ticket statuses: {} legacy ticket(s)", legacyTickets.size());
         int migrated = 0;
         int skipped = 0;
@@ -105,8 +107,9 @@ public class MigrateTicketStatusesChangeUnit {
         log.info("Migrate ticket statuses: migrated={} skipped={}", migrated, skipped);
     }
 
-    private List<Document> findLegacyTickets(MongoTemplate mongoTemplate) {
-        Query query = new Query(Criteria.where(FIELD_STATUS_ID).exists(false));
+    private List<Document> findLegacyTickets(MongoTemplate mongoTemplate, String tenantId) {
+        Query query = new Query(Criteria.where("tenantId").is(tenantId)
+                .and(FIELD_STATUS_ID).exists(false));
         return mongoTemplate.find(query, Document.class, COLLECTION_TICKETS);
     }
 

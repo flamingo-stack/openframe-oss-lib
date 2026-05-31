@@ -35,10 +35,52 @@ public class IntegratedToolAgentService {
         return agentRepository.findByStatus(ToolAgentStatus.ENABLED);
     }
 
+    /**
+     * Look up an agent by its human-readable key (e.g. "fleetmdm-agent").
+     * Uses the compound (tenantId, key) index to avoid conflicts across tenants.
+     */
+    public Optional<IntegratedToolAgent> findByKey(String key) {
+        return agentRepository.findByKey(key);
+    }
+
+    /**
+     * Look up an agent by its human-readable key (e.g. "fleetmdm-agent").
+     * Throws if not found.
+     */
+    public IntegratedToolAgent getByKey(String key) {
+        return agentRepository.findByKey(key)
+                .orElseThrow(() -> new IllegalStateException("No tool agent configuration found by key " + key));
+    }
+
+    /**
+     * Look up an agent by its UUID _id.
+     * Use this only when you already hold the MongoDB document UUID.
+     */
+    public Optional<IntegratedToolAgent> findByUuid(String uuid) {
+        return agentRepository.findById(uuid);
+    }
+
+    /**
+     * Look up an agent by its UUID _id.
+     * Throws if not found.
+     */
+    public IntegratedToolAgent getByUuid(String uuid) {
+        return agentRepository.findById(uuid)
+                .orElseThrow(() -> new IllegalStateException("No tool agent configuration found by id " + uuid));
+    }
+
+    /**
+     * @deprecated Use {@link #findByKey(String)} for key-based lookup or {@link #findByUuid(String)} for UUID lookup.
+     */
+    @Deprecated
     public Optional<IntegratedToolAgent> findById(String id) {
         return agentRepository.findById(id);
     }
 
+    /**
+     * @deprecated Use {@link #getByKey(String)} for key-based lookup or {@link #getByUuid(String)} for UUID lookup.
+     */
+    @Deprecated
     public IntegratedToolAgent getById(String id) {
         return agentRepository.findById(id)
                 .orElseThrow(() -> new IllegalStateException("No tool agent configuration found by id " + id));
@@ -63,8 +105,8 @@ public class IntegratedToolAgentService {
 
     @RetryOnOptimisticLockingFailure
     public void updateConfigurationFields(IntegratedToolAgentConfiguration configuration) {
-        String configurationId = configuration.getId();
-        agentRepository.findById(configurationId)
+        String configurationKey = configuration.getId();
+        agentRepository.findByKey(configurationKey)
                 .ifPresentOrElse(
                         existing -> mergeAndSave(existing, configuration),
                         () -> createFromConfiguration(configuration)
@@ -73,6 +115,7 @@ public class IntegratedToolAgentService {
 
     private void createFromConfiguration(IntegratedToolAgentConfiguration configuration) {
         IntegratedToolAgent agent = new IntegratedToolAgent();
+        // tenantId stamped automatically by TenantStampingCallback
         applyConfiguration(agent, configuration);
         if (!configuration.isReleaseVersion()) {
             agent.setVersion(configuration.getVersion());
@@ -104,7 +147,7 @@ public class IntegratedToolAgentService {
     }
 
     private void applyConfiguration(IntegratedToolAgent agent, IntegratedToolAgentConfiguration configuration) {
-        agent.setId(configuration.getId());
+        agent.setKey(configuration.getId());
         agent.setToolId(configuration.getToolId());
         agent.setReleaseVersion(configuration.isReleaseVersion());
         agent.setSessionType(configuration.getSessionType());
@@ -153,7 +196,7 @@ public class IntegratedToolAgentService {
 
     @RetryOnOptimisticLockingFailure
     public void updateReleaseAgentVersion(String id, String newVersion) {
-        IntegratedToolAgent agent = getById(id);
+        IntegratedToolAgent agent = getByUuid(id);
         boolean releaseAgent = agent.isReleaseVersion();
         if (!releaseAgent) {
             log.warn("updateReleaseAgentVersion called for non-release agent {}, skipping", id);

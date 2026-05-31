@@ -4,14 +4,8 @@ import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.repository.tool.IntegratedToolRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
 import java.util.Optional;
@@ -32,8 +26,14 @@ public class IntegratedToolService {
         return toolRepository.findByType(toolType);
     }
 
-    public Optional<IntegratedTool> getToolById(String toolId) {
-        return toolRepository.findById(toolId);
+    /** Look up by human-readable key (e.g. "fleetmdm-server"). TenantAwareMongoTemplate auto-scopes by tenantId. */
+    public Optional<IntegratedTool> getToolById(String key) {
+        return toolRepository.findByKey(key);
+    }
+
+    /** Look up by UUID _id — use only when you already hold the MongoDB document UUID. */
+    public Optional<IntegratedTool> findByUuid(String uuid) {
+        return toolRepository.findById(uuid);
     }
 
     public IntegratedTool saveTool(IntegratedTool tool) {
