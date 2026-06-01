@@ -182,8 +182,10 @@ export function OnboardingGuidesCatalogView({
   if (selfFetch && guidesRes.error) {
     return <LoadError message="Failed to load onboarding guides." onRetry={guidesRes.reload} />
   }
-  // First self-fetch in flight (no data yet) → full catalog skeleton.
-  if (selfFetch && isLoading && guides.length === 0) {
+  // Full-page skeleton ONLY on the very first load (no data has loaded yet) — a
+  // later section toggle that legitimately returns ZERO guides keeps the page
+  // chrome (search + section pills) and dims the grid via the className below.
+  if (selfFetch && guidesRes.data == null && isLoading) {
     return <OnboardingGuidesCatalogSkeleton />
   }
 
@@ -202,7 +204,7 @@ export function OnboardingGuidesCatalogView({
           </p>
         </div>
       ) : (
-        <div className={isPending ? 'opacity-60 transition-opacity space-y-10' : 'space-y-10'}>
+        <div className={isPending || isLoading ? 'opacity-60 transition-opacity space-y-10' : 'space-y-10'}>
           {grouped.map((sec) => (
             <section key={sec.section} className="space-y-4">
               <h2 className="text-h3 tracking-[-0.36px] text-ods-text-primary flex items-center gap-2">

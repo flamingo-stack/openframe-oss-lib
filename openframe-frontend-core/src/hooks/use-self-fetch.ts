@@ -13,11 +13,13 @@ export interface UseSelfFetchResult<T> {
 }
 
 /**
- * The single source for the lib's self-fetching content views
+ * The single source for the 4 self-fetching content views
  * (`ProductReleasesView`, `RoadmapView`, the onboarding catalog/detail). GETs a
  * configured `url` into component state with **plain `fetch` + `useEffect`** —
- * deliberately NO react-query, so embedders don't need a QueryClient (same
- * technology choice as the shipped `DeliveryLists`).
+ * deliberately NO react-query, so embedders don't need a QueryClient. This is
+ * the same technology choice the shipped `DeliveryLists` makes; that component
+ * predates this hook and still hand-rolls the loop (a future pass can migrate
+ * it onto a two-url variant of this hook).
  *
  * Behaviour:
  *   - `url = null` → fetching is DISABLED (controlled / SSR mode, or missing
@@ -69,8 +71,13 @@ export function useSelfFetch<T>(
         if (!res.ok) throw new Error(`Request failed (${res.status})`)
         const json = (await res.json()) as T
         if (!cancelled) setData(json)
-      } catch {
-        if (!cancelled) setError(true)
+      } catch (err) {
+        if (!cancelled) {
+          setError(true)
+          // Surface the failure for diagnosis (parity with DeliveryLists); the
+          // `error` state drives the consumer's <LoadError> retry UI.
+          console.error('useSelfFetch:', url, err)
+        }
       } finally {
         if (!cancelled) setIsLoading(false)
       }

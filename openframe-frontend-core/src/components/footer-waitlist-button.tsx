@@ -2,6 +2,7 @@
 
 import { useRouter } from '../embed-shims/next-navigation';
 import { useChatRuntime } from '../contexts/chat-runtime-context';
+import { softNavigate } from './chat/utils/chat-nav-resolution';
 import { useCallback } from 'react';
 import { OpenFrameLogo } from './icons';
 import { Button } from './ui/button';
@@ -39,15 +40,10 @@ export function FooterWaitlistButton({ className }: FooterWaitlistButtonProps) {
   const runtime = useChatRuntime();
 
   const handleClick = useCallback(() => {
-    const href = '/waitlist#top';
-    // Prefer the host's unified-nav callback (hub-wired
-    // `useUnifiedNav`). Falls back to the embed-shim's router when
-    // the host hasn't provided one.
-    if (runtime?.navigation?.navigate) {
-      const handled = runtime.navigation.navigate({ href });
-      if (handled) return;
-    }
-    router.push(href);
+    // Prefer the host's unified-nav callback (hub-wired `useUnifiedNav`); fall
+    // back to the embed-shim router. Shared `softNavigate` single-sources the
+    // decision (see chat-nav-resolution.ts).
+    softNavigate(runtime, router.push, '/waitlist#top');
   }, [router, runtime]);
 
   return (

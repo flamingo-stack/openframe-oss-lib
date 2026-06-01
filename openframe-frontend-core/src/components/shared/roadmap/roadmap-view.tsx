@@ -10,6 +10,8 @@
  * vote endpoint via `votingOptions`. Optional `initialItems` hydrates SSR.
  */
 
+import { useMemo } from 'react'
+
 import { LoadError } from '../../ui/error-state'
 import { useSelfFetch } from '../../../hooks/use-self-fetch'
 import type { RoadmapItem } from '../../chat/types/entities/roadmap-item'
@@ -39,16 +41,22 @@ export function RoadmapView({
   buildRefreshUrl,
   votingOptions,
 }: RoadmapViewProps = {}) {
+  // Memoize so the SSR `initialItems` wrapper keeps a STABLE identity — else the
+  // hook's initialData re-sync effect fires every render and clobbers the
+  // optimistic vote patch below.
+  const initialData = useMemo(() => (initialItems ? { items: initialItems } : undefined), [initialItems])
   const { data, setData, isLoading, error, reload } = useSelfFetch<{ items?: RoadmapItem[] }>(
     endpoint,
-    { initialData: initialItems ? { items: initialItems } : undefined },
+    { initialData },
   )
-  const items = data?.items ?? null
+  const items = data?.items ?? []
 
   if (error) {
     return <LoadError message="Failed to load roadmap." onRetry={reload} />
   }
-  if (isLoading || items === null) {
+  // Skeleton only while the FIRST fetch is in flight (no data yet) — a malformed
+  // body lacking `items` renders the grid (empty), never a stuck skeleton.
+  if (isLoading && !data) {
     return <RoadmapGridSkeleton showLeftMargin={showLeftMargin} />
   }
 

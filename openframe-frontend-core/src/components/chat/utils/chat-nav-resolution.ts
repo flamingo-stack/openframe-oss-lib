@@ -38,6 +38,21 @@ export function isModifierClick(e: {
   )
 }
 
+/** Soft same-origin navigate: prefer the host's `runtime.navigation.navigate`
+ *  (hub docNav swap / router.push), else fall back to the registered embed-shims
+ *  `routerPush`. Single-sources the host-navigate-else-router decision shared by
+ *  the footer waitlist button + the releases rows (chat surfaces route the same
+ *  decision through `handleChatNavClick`). Returns whether the HOST handled it. */
+export function softNavigate(
+  runtime: ChatRuntime | null | undefined,
+  routerPush: (href: string) => void,
+  href: string,
+): boolean {
+  if (runtime?.navigation?.navigate?.({ href })) return true
+  routerPush(href)
+  return false
+}
+
 /** Strip the origin from a same-origin absolute URL, returning a relative
  *  path the host's router will treat as in-app navigation. Pass-through
  *  for already-relative URLs and for cross-origin URLs. */

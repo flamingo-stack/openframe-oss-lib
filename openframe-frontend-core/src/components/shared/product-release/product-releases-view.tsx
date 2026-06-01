@@ -26,7 +26,7 @@ import { useChatRuntime } from '../../../contexts/chat-runtime-context'
 import type { ProductRelease, ProductReleaseListResponse } from '../../../types/product-release'
 import { cn } from '../../../utils/cn'
 import { buildDefaultHref } from '../../../utils/content-href'
-import { isModifierClick } from '../../chat/utils/chat-nav-resolution'
+import { isModifierClick, softNavigate } from '../../chat/utils/chat-nav-resolution'
 import { useEntityCardLink } from '../../chat/entity-cards/use-entity-card-link'
 import { defaultBuildProductReleaseCardProps } from '../../chat/entity-cards/product-release-card-defaults'
 import { EmptyState } from '../../empty-state'
@@ -103,7 +103,7 @@ function ReleaseRow({
     // `navigate` (hub docNav) if wired, else the registered embed-shims router.
     if (e.defaultPrevented || isModifierClick(e) || target === '_blank') return
     e.preventDefault()
-    if (!runtime?.navigation?.navigate?.({ href: cta.href })) router.push(cta.href)
+    softNavigate(runtime, router.push, cta.href)
   }
 
   return (
