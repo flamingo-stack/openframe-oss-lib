@@ -88,12 +88,17 @@ export function useTicketEngagements(
   const identity = useChatIdentity()
   const identityKey = identity.user?.email ?? 'anon'
 
-  const queryEnabled =
+  // "Will this ticket fetch its timeline once identity is ready?" — i.e. it's a
+  // real, non-optimistic ticket the caller enabled. INDEPENDENT of whether
+  // identity has resolved yet, so the loading state is correct from the very
+  // first render (before `useChatIdentity` settles).
+  const fetchable =
     enabled &&
-    identity.authTier !== 'anon' &&
-    !!identity.user?.email &&
     !!externalTicketId &&
     !externalTicketId.startsWith('temp-') // optimistic placeholders have no real id yet
+
+  const queryEnabled =
+    fetchable && identity.authTier !== 'anon' && !!identity.user?.email
 
   const query = useQuery({
     queryKey: ['ticket-engagements', externalTicketId, identityKey],
@@ -126,7 +131,22 @@ export function useTicketEngagements(
 
   return {
     engagements: query.data ?? [],
-    isLoading: queryEnabled && query.isLoading,
+    // Loading-state truth that prevents the "body → blink → skeleton → data"
+    // double-flash. The bug: `useChatIdentity` starts at anon defaults and
+    // resolves async, so on the first render `queryEnabled` is false and the
+    // OLD `queryEnabled && query.isLoading` returned FALSE — the panel rendered
+    // the ticket body, THEN identity resolved, the query enabled, isLoading
+    // flipped true → skeleton appeared (the blink), then data landed.
+    //
+    // Fix: for a fetchable ticket we are "loading" whenever we don't yet have
+    // the timeline to show — that includes the window while identity is still
+    // resolving (so we skeleton from the FIRST render, never the body) AND the
+    // cold query fetch (`data === undefined`). A background poll keeps
+    // `query.data` defined, so it never re-flashes the skeleton. Non-fetchable
+    // (optimistic/disabled) or a resolved-anon viewer → not loading.
+    isLoading:
+      fetchable &&
+      (identity.isLoading || (queryEnabled && query.data === undefined)),
     isFetching: query.isFetching,
     error: (query.error as Error | null) ?? null,
     refetch: () => {
