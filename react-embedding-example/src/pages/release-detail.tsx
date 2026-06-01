@@ -1,6 +1,11 @@
 import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ReleaseDetailPage, RoadmapGrid } from '@flamingo-stack/openframe-frontend-core/components'
+import {
+  ReleaseDetailPage,
+  RoadmapGrid,
+  type VideoDisplaySectionProps,
+} from '@flamingo-stack/openframe-frontend-core/components'
+import { EntityVideoSection } from '@flamingo-stack/openframe-frontend-core/components/features'
 import type { RoadmapItem } from '@flamingo-stack/openframe-frontend-core/components/chat'
 import { EP } from '../config/endpoints'
 
@@ -42,6 +47,16 @@ function RoadmapSection({
   )
 }
 
+// Injected video section. Without this prop the lib's ReleaseDetailPage falls
+// back to rendering MULTIPLE separate <Video> players (full + highlight). The
+// lib already ships the correct tabbed component — <EntityVideoSection> renders
+// ONE player with Full Video / Highlights tabs — so we just inject it here. The
+// lib's `VideoDisplaySectionProps` is a structural subset of EntityVideoSection's
+// props, so they forward verbatim (mirrors the hub's VideoDisplaySectionWrapper).
+function VideoDisplaySection(props: VideoDisplaySectionProps) {
+  return <EntityVideoSection {...props} />
+}
+
 export function ReleaseDetailRoute() {
   const { slug = '' } = useParams()
   return (
@@ -49,6 +64,7 @@ export function ReleaseDetailRoute() {
       slug={slug}
       useRelease={useRelease}
       RoadmapSection={RoadmapSection}
+      VideoDisplaySection={VideoDisplaySection}
       roadmapApiEndpoint={EP.roadmap}
       deliveryApiEndpoint={EP.deliveryCompleted}
       backButton={{ label: 'Back to releases', href: '/releases' }}

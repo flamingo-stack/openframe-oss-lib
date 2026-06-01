@@ -8,7 +8,7 @@ import { EP, HUB_PUBLIC_ORIGIN } from '../config/endpoints'
 // The content types THIS embedder hosts on its own slugged routes (see
 // app-routes.tsx). `makeComposeContentUrl` returns a relative in-app href for
 // these (soft-navigates) and the canonical hub origin for everything else.
-const HOSTED_TYPES = new Set(['onboarding_guide', 'product_release'])
+const HOSTED_TYPES = new Set(['onboarding_guide', 'product_release', 'roadmap_item'])
 
 // The embedder is platform-agnostic: it does NOT set `source` (the lib types it as
 // optional). The chat wire resolves source server-side from the proxied hub's
@@ -46,6 +46,12 @@ export function buildChatRuntime(): Omit<ChatRuntime, 'source'> {
     composeContentUrl: makeComposeContentUrl({
       hostedTypes: HOSTED_TYPES,
       contentOrigin: HUB_PUBLIC_ORIGIN,
+      // Per-type override → the EXISTING /roadmap route with a hash anchor (no new
+      // route/page). This proves the override seam applies to BOTH page links AND
+      // chat cards, because both flow through this one composeContentUrl.
+      overrides: {
+        roadmap_item: (id) => ({ href: `/roadmap#${id}`, targetPlatform: null }),
+      },
     }),
   }
 }

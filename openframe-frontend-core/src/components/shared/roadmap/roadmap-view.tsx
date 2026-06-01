@@ -89,6 +89,11 @@ export function RoadmapView({
       showLeftMargin={showLeftMargin}
       buildRefreshUrl={buildRefreshUrl}
       votingOptions={votingOptions}
+      // Full-page roadmap → collapsible quarter grouping (the shared RoadmapGrid
+      // capability; flat grids stay the RoadmapGrid default). When the chrome's
+      // search / status filter is active, expand every quarter so matches aren't hidden.
+      groupByQuarter
+      hasActiveFilters={search !== '' || (status !== '' && status !== 'all')}
       // After a vote refreshes a single task, patch it into the fetched list so
       // the displayed counts stay live.
       onItemUpdate={(updated) =>
