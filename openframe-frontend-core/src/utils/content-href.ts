@@ -163,3 +163,18 @@ export function buildDefaultHref(
 ): { href: string; targetPlatform: string | null } {
   return { href: `${basePath}/${slug}`, targetPlatform: null }
 }
+
+/**
+ * Resolve a content link via the host's `composeContentUrl` when wired, else the
+ * same-origin `buildDefaultHref` fallback — the exact ternary every catalog/detail page
+ * VIEW repeated. Centralizes the `composeContentUrl` input shape + the fallback in one
+ * place so a future input-shape change lands once, not per view.
+ */
+export function resolveContentHref(
+  composeContentUrl: ComposeContentUrl | undefined,
+  args: { type: string; slug: string; basePath: string; platforms?: ComposeContentUrlInput['platforms'] },
+): { href: string; targetPlatform: string | null } {
+  return composeContentUrl
+    ? composeContentUrl({ type: args.type, identifier: args.slug, platforms: args.platforms })
+    : buildDefaultHref(args.basePath, args.slug)
+}

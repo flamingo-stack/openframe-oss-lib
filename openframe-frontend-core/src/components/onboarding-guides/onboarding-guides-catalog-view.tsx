@@ -32,7 +32,7 @@ import { OnboardingGuideCard } from '../chat/entity-cards/onboarding-guide-card'
 import { OnboardingGuidesCatalogSkeleton } from './onboarding-guides-catalog-skeleton'
 import { useChatRuntime } from '../../contexts/chat-runtime-context'
 import type { OnboardingGuide } from '../chat/types/entities/onboarding-guide'
-import { buildDefaultHref } from '../../utils/content-href'
+import { resolveContentHref } from '../../utils/content-href'
 
 type SectionSummary = { section: string; section_order: number; count: number }
 
@@ -149,13 +149,12 @@ export function OnboardingGuidesCatalogView({
 
   // Per-row card renderer — runtime-composed href, fallback to relative.
   const defaultRenderCard = (guide: OnboardingGuide) => {
-    const cta = runtime?.composeContentUrl
-      ? runtime.composeContentUrl({
-          type: 'onboarding_guide',
-          identifier: guide.slug,
-          platforms: guide.onboarding_guide_platforms,
-        })
-      : buildDefaultHref(basePath, guide.slug)
+    const cta = resolveContentHref(runtime?.composeContentUrl, {
+      type: 'onboarding_guide',
+      slug: guide.slug,
+      basePath,
+      platforms: guide.onboarding_guide_platforms,
+    })
     return (
       <OnboardingGuideCard
         guide={guide}

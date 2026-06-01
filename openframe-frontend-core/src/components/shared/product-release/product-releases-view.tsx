@@ -25,7 +25,7 @@ import { useSelfFetch } from '../../../hooks/use-self-fetch'
 import { useChatRuntime } from '../../../contexts/chat-runtime-context'
 import type { ProductRelease, ProductReleaseListResponse } from '../../../types/product-release'
 import { cn } from '../../../utils/cn'
-import { buildDefaultHref } from '../../../utils/content-href'
+import { resolveContentHref } from '../../../utils/content-href'
 import { isModifierClick } from '../../chat/utils/chat-nav-resolution'
 import { executeNavigationImperative } from '../../chat/utils/execute-navigation'
 import { useEntityCardLink } from '../../chat/entity-cards/use-entity-card-link'
@@ -97,13 +97,12 @@ function ReleaseRow({
   // flattens each platform's `name` onto it), like the blog / case-study /
   // interview grids. The composer reads `name` → resolves to the CURRENT
   // platform when the release belongs to it → relative same-tab href.
-  const cta = runtime?.composeContentUrl
-    ? runtime.composeContentUrl({
-        type: 'product_release',
-        identifier: release.slug,
-        platforms: release.product_release_platforms,
-      })
-    : buildDefaultHref(basePath, release.slug)
+  const cta = resolveContentHref(runtime?.composeContentUrl, {
+    type: 'product_release',
+    slug: release.slug,
+    basePath,
+    platforms: release.product_release_platforms,
+  })
   const { target, rel } = useEntityCardLink({ href: cta.href, targetPlatform: cta.targetPlatform })
 
   const onClick = (e: React.MouseEvent<HTMLAnchorElement>) => {

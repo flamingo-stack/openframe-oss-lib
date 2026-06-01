@@ -103,6 +103,10 @@ export function executeNavigation({
     event.preventDefault()
     return true
   }
+  // Modifier / non-primary clicks → NOT handled; let the browser do its native thing.
+  // Deliberately NOT the shared `isModifierClick` (chat-nav-resolution): that predicate
+  // treats an UNDEFINED `button` as a modifier (`button !== 0`), but a structural
+  // NavClickEvent from a chip tile may omit `button` and MUST be a primary click (navigate).
   if (event.button !== undefined && event.button !== 0) return false
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false
   event.preventDefault()

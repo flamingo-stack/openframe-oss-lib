@@ -1,7 +1,7 @@
 // ONE factory for both lib runtime contexts. Every endpoint comes from EP, so the
 // `/content` base is the single source. Mounted (memoized) in app-providers.tsx.
 import type { ChatRuntime, EndpointsRuntime } from '@flamingo-stack/openframe-frontend-core/contexts'
-import { buildListUrl, makeComposeContentUrl } from '@flamingo-stack/openframe-frontend-core/utils'
+import { buildListUrl, makeComposeContentUrl, DEV_SECTION_PARAM_KEYS } from '@flamingo-stack/openframe-frontend-core/utils'
 import { CONTENT_PREFIX } from '../../proxy/content-prefix.mjs'
 import { EP, HUB_PUBLIC_ORIGIN } from '../config/endpoints'
 
@@ -64,8 +64,8 @@ export function buildChatRuntime(): Omit<ChatRuntime, 'source'> {
       // `externalUrl` (`/bug-fixes-and-enhancements?search=<id>` — the HUB's route, which
       // 404s in this app), and roadmap_item to a `#hash` the list never reads.
       overrides: {
-        roadmap_item: (id) => ({ href: `/roadmap?search=${encodeURIComponent(id)}`, targetPlatform: null }),
-        delivery_item: (id) => ({ href: `/delivery?search=${encodeURIComponent(id)}`, targetPlatform: null }),
+        roadmap_item: (id) => ({ href: `/roadmap?${DEV_SECTION_PARAM_KEYS.search}=${encodeURIComponent(id)}`, targetPlatform: null }),
+        delivery_item: (id) => ({ href: `/delivery?${DEV_SECTION_PARAM_KEYS.search}=${encodeURIComponent(id)}`, targetPlatform: null }),
       },
     }),
     // Per-documentType doc-viewer targets. Doc chips (markdown / data_room_doc) carry no

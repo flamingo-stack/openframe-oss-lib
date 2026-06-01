@@ -13,10 +13,11 @@
  *
  * Two key contracts vs hub-side chat hooks:
  *
- *   1. `source` is READ FROM THE RUNTIME, not a parameter. Throws loudly
- *      if `runtime.source` is empty so embedders that forget to wire
- *      identity get an immediate signal rather than a silently-empty
- *      localStorage namespace.
+ *   1. `source` is READ FROM THE RUNTIME, not a parameter. It is OPTIONAL —
+ *      platform-agnostic embedders leave it unset; an empty `source` falls back
+ *      to a stable constant (`DEFAULT_CHAT_SOURCE`) for the localStorage history
+ *      namespace. It is NEVER sent on the wire (the hub resolves source
+ *      server-side via `currentPlatform()`).
  *
  *   2. Navigation is runtime-provided. The hub-side `useDocSearch` keeps
  *      its own `decideNewTab` + `useDocNavigation.navigate` plumbing for
@@ -673,7 +674,8 @@ function savePersistedChat(source: DocSource, state: PersistedChatState) {
  * decision) the lib's `<ChatContainer>` consumes.
  *
  * Source identity comes from `useRequiredChatRuntime().source` — no
- * parameter. Throws if `runtime.source` is empty.
+ * parameter. An empty `source` falls back to `DEFAULT_CHAT_SOURCE` (used only for
+ * the localStorage history namespace; never sent on the wire).
  */
 export function useSseChatAdapter(
   options?: UseSseChatAdapterOptions,

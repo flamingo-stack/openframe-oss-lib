@@ -24,6 +24,10 @@ export * from './date-formatters'
 // rich card metadata): badge-color mapping + cover-image fallback resolution.
 export * from './release-badge'
 export * from './release-cover'
+// Dev-center URL param keys — the ONE source for the `?search=` / `?status=` / … keys the
+// chrome registry writes and the list views read; re-exported so embedders (and the hub's
+// dev-section-url helper) build deep-links with the same keys instead of a bare literal.
+export { DEV_SECTION_PARAM_KEYS } from './dev-sections/dev-section-param-keys'
 // Dynamic icon registry — single source of truth lives at
 // components/chat/utils/icon-registry. Re-exported here so existing
 // `@flamingo-stack/openframe-frontend-core/utils` callers (hub admin

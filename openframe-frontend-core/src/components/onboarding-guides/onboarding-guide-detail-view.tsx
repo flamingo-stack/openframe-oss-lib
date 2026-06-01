@@ -32,7 +32,7 @@ import { OnboardingGuideCard } from '../chat/entity-cards/onboarding-guide-card'
 import { useChatRuntime } from '../../contexts/chat-runtime-context'
 import type { OnboardingGuide } from '../chat/types/entities/onboarding-guide'
 import type { VideoTeaser } from '../../types/video-processing'
-import { buildDefaultHref } from '../../utils/content-href'
+import { resolveContentHref } from '../../utils/content-href'
 import { useSelfFetch } from '../../hooks/use-self-fetch'
 
 export interface OnboardingGuideDetailViewProps {
@@ -104,13 +104,12 @@ export function OnboardingGuideDetailView({
     undefined
 
   const defaultRenderRelatedCard = (g: OnboardingGuide) => {
-    const cta = runtime?.composeContentUrl
-      ? runtime.composeContentUrl({
-          type: 'onboarding_guide',
-          identifier: g.slug,
-          platforms: g.onboarding_guide_platforms,
-        })
-      : buildDefaultHref(basePath, g.slug)
+    const cta = resolveContentHref(runtime?.composeContentUrl, {
+      type: 'onboarding_guide',
+      slug: g.slug,
+      basePath,
+      platforms: g.onboarding_guide_platforms,
+    })
     return <OnboardingGuideCard guide={g} href={cta.href} targetPlatform={cta.targetPlatform} />
   }
   const renderRelatedCardFn = renderRelatedCard ?? defaultRenderRelatedCard
