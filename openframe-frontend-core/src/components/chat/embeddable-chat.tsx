@@ -292,7 +292,7 @@ function SourceChip({
       targetPlatform: src.targetPlatform ?? null,
       path: src.path,
     },
-    { baseRoute, chipBasePlatform, currentPlatform: runtime.source, composeContentUrl: runtime.composeContentUrl },
+    { baseRoute, chipBasePlatform, currentPlatform: runtime.source, composeContentUrl: runtime.composeContentUrl, docPlatformTargets: runtime.docPlatformTargets },
   )
   const Icon = cta.icon
   const icon = <Icon className="h-3.5 w-3.5" />
@@ -316,7 +316,7 @@ function SourceChip({
           targetPlatform: item.targetPlatform ?? null,
           path: item.path,
         },
-        { baseRoute, chipBasePlatform, currentPlatform: runtime.source, composeContentUrl: runtime.composeContentUrl },
+        { baseRoute, chipBasePlatform, currentPlatform: runtime.source, composeContentUrl: runtime.composeContentUrl, docPlatformTargets: runtime.docPlatformTargets },
       )
       const ItemIcon = itemCta.icon
       return {

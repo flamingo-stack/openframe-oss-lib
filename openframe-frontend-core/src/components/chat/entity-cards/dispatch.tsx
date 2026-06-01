@@ -957,6 +957,7 @@ export function ChatCardLoader({
         chipBasePlatform,
         currentPlatform: runtime.source,
         composeContentUrl: runtime.composeContentUrl,
+        docPlatformTargets: runtime.docPlatformTargets,
       },
     )
     const finalHref = cta.href ? resolveHrefForRuntime(cta.href, runtime) : null

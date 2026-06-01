@@ -68,6 +68,16 @@ export function buildChatRuntime(): Omit<ChatRuntime, 'source'> {
         delivery_item: (id) => ({ href: `/delivery?search=${encodeURIComponent(id)}`, targetPlatform: null }),
       },
     }),
+    // Per-documentType doc-viewer targets. Doc chips (markdown / data_room_doc) carry no
+    // public externalUrl, so the lib resolves each PER ROW to its home platform's public
+    // viewer — getBaseUrl(platform)/<basePath>/<path> — in a new tab. A chat surfacing
+    // BOTH sources routes each correctly (no single static fallback): OpenFrame docs →
+    // flamingo's knowledge hub, data-room docs → company-hub. (Data room isn't an enabled
+    // source for OpenFrame today, but wiring it keeps the behavior unified + future-proof.)
+    docPlatformTargets: {
+      markdown: { platform: 'flamingo', basePath: 'knowledge-base' },
+      data_room_doc: { platform: 'company-hub', basePath: 'data-room' },
+    },
   }
 }
 

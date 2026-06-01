@@ -158,6 +158,16 @@ export interface ChatRuntime {
    *  yields the slug for in-app routing) + optional `platforms` /
    *  `externalUrl` / `targetPlatform`. */
   composeContentUrl?: ComposeContentUrl
+  /** Per-`documentType` doc-viewer targets — the UNIFIED, DYNAMIC replacement for
+   *  the single `chipBasePlatform` prop. Maps a doc-table documentType
+   *  (`'markdown'`, `'data_room_doc'`, …) → `{ platform, basePath }` for the PUBLIC
+   *  doc viewer that hosts it. Doc chips with no `externalUrl` resolve PER ROW to
+   *  `getBaseUrl(platform)/<basePath>/<path>`, so a chat mixing several doc sources
+   *  sends EACH to its own home (markdown→flamingo/knowledge-base,
+   *  data_room_doc→company-hub/data-room) instead of one static fallback. The hub
+   *  may keep using `chipBasePlatform` (one doc source per platform); embedders that
+   *  surface multiple doc sources wire this. Threaded into `resolveSourceRowCTA`. */
+  docPlatformTargets?: Record<string, { platform: string; basePath: string }>
   /** Chat source / platform identifier — OPTIONAL. The hub sets it from
    *  `currentPlatform()`; EMBEDDERS leave it unset and stay platform-agnostic.
    *

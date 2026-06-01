@@ -87,6 +87,17 @@ export interface SourceRowContext {
    * verbatim (legacy).
    */
   composeContentUrl?: ComposeContentUrl
+  /**
+   * Host-supplied per-`documentType` doc-viewer targets — the UNIFIED, DYNAMIC
+   * replacement for the single `chipBasePlatform`. Maps a doc-table documentType
+   * (`'markdown'`, `'data_room_doc'`, …) → the platform whose PUBLIC doc viewer
+   * hosts it + that viewer's base path. A doc chip with no `externalUrl` resolves
+   * to `getBaseUrl(platform)/<basePath>/<path>` PER ROW — so a chat mixing several
+   * doc sources sends EACH to its own home (markdown→flamingo/knowledge-base,
+   * data_room_doc→company-hub/data-room) instead of one static fallback for all.
+   * Wins over `chipBasePlatform` when a row's documentType has an entry.
+   */
+  docPlatformTargets?: Record<string, { platform: string; basePath: string }>
 }
 
 export interface SourceRowCTA {
@@ -153,23 +164,35 @@ export function resolveSourceRowCTA(
   let href: string | null = null
   let targetPlatform: string | null = null
   const idValue = (row.id ?? '').trim()
-  if (ctx.baseRoute && row.path && shouldFallbackToPathNav(row) && !row.externalUrl) {
-    // Doc-table (markdown / data-room PDF) with no public URL → in-app doc-viewer
-    // path nav. Chat-specific; NOT a content type the composeContentUrl seam knows.
+  if (row.path && shouldFallbackToPathNav(row) && !row.externalUrl) {
+    // Doc-table (markdown / data-room PDF) with no public URL. Resolve where its
+    // viewer lives, in priority order (NOT a content type the composeContentUrl
+    // seam knows — docs carry a tree `path`, not a slug/id):
+    //   1. docPlatformTargets[documentType] — per-doc-type cross-platform target.
+    //      The UNIFIED, DYNAMIC path: a chat mixing multiple doc sources routes
+    //      EACH row to its own home (markdown→flamingo, data_room_doc→company-hub).
+    //   2. chipBasePlatform — legacy SINGLE cross-platform fallback (one platform
+    //      for every doc; only safe when a surface sees just one doc source).
+    //   3. baseRoute — the host serves the doc viewer in-app → relative path nav.
+    //   else → null (no viewer configured → Ask-only).
     const safePath = sanitizePath(row.path)
     if (safePath) {
-      if (ctx.chipBasePlatform) {
+      const docTarget = row.documentType ? ctx.docPlatformTargets?.[row.documentType] : undefined
+      if (docTarget) {
+        const seg = docTarget.basePath.replace(/^\/+|\/+$/g, '')
+        const base = `${getBaseUrl(docTarget.platform)}${seg ? `/${seg}` : ''}/`
+        href = safeHref(new URL(safePath, base).toString()) ?? null
+        targetPlatform = docTarget.platform
+      } else if (ctx.chipBasePlatform) {
         const base = `${getBaseUrl(ctx.chipBasePlatform)}/knowledge-base/`
-        href = new URL(safePath, base).toString()
+        href = safeHref(new URL(safePath, base).toString()) ?? null
         targetPlatform = ctx.chipBasePlatform
-      } else {
+      } else if (ctx.baseRoute) {
         const synthetic = `https://_internal_.local${ctx.baseRoute.startsWith('/') ? ctx.baseRoute : '/' + ctx.baseRoute}/`
         const absolute = new URL(safePath, synthetic).toString()
-        href = absolute.replace('https://_internal_.local', '')
+        href = safeHref(absolute.replace('https://_internal_.local', '')) ?? null
         targetPlatform = ctx.currentPlatform ?? null
       }
-      // Final safeHref pass on the composed URL — defense-in-depth.
-      href = safeHref(href) ?? null
     }
   } else if (ctx.composeContentUrl && row.documentType && row.externalUrl) {
     // Entity content WITH a public viewer → the unified content-href seam. The
