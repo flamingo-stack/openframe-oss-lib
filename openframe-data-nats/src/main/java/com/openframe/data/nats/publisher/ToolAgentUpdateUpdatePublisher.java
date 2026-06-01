@@ -31,7 +31,7 @@ public class ToolAgentUpdateUpdatePublisher {
     private final IntegratedToolAgentService integratedToolAgentService;
 
     public void publish(IntegratedToolAgent toolAgent) {
-        String toolAgentId = toolAgent.getId();
+        String toolAgentId = toolAgent.getKey();
         String toolAgentVersion = toolAgent.getVersion();
 
         try {
@@ -55,7 +55,7 @@ public class ToolAgentUpdateUpdatePublisher {
     }
 
     public void send(IntegratedToolAgent toolAgent) {
-        String toolAgentId = toolAgent.getId();
+        String toolAgentId = toolAgent.getKey();
         String topicName = buildTopicName(toolAgentId);
         ToolAgentUpdateMessage message = buildMessage(toolAgent);
         natsMessagePublisher.publishPersistent(topicName, message);
@@ -66,7 +66,7 @@ public class ToolAgentUpdateUpdatePublisher {
     }
 
     private ToolAgentUpdateMessage buildMessage(IntegratedToolAgent toolAgent) {
-        String toolAgentId = toolAgent.getId();
+        String toolAgentId = toolAgent.getKey();
         String toolAgentVersion = toolAgent.getVersion();
         SessionType sessionType = toolAgent.getSessionType();
         List<DownloadConfiguration> downloadConfigurations = toolAgent.getDownloadConfigurations();
