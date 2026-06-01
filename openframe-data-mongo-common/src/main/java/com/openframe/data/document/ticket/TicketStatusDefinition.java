@@ -9,7 +9,6 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.CompoundIndexes;
-import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.Instant;
 @Data
@@ -24,7 +23,6 @@ import java.time.Instant;
 public class TicketStatusDefinition implements TenantScoped {
     @Id
     private String id;
-    @Indexed
     private String tenantId;
     private TicketStatusKind kind;
     private String name;

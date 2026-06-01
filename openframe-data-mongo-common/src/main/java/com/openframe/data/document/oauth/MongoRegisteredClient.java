@@ -6,7 +6,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
-import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.util.Set;
 @Data
@@ -18,7 +17,6 @@ import java.util.Set;
 public class MongoRegisteredClient implements TenantScoped {
     @Id
     private String id;
-    @Indexed
     private String tenantId;
     private String clientId;
     private String clientSecret;
