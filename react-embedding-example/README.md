@@ -62,7 +62,8 @@ npm run build && npm run preview:proxy
 | `CHAT_PROXY_SECRET` | server only | Shared secret — must equal the hub's. |
 | `ACT_AS_EMAIL` / `ACT_AS_FIRST_NAME` / `ACT_AS_LAST_NAME` / `ACT_AS_AVATAR_URL` | server only | The impersonated identity (defaults to Michael Assraf). |
 | `VITE_HUB_ORIGIN` | client | Public hub origin for new-tab "open full content" links. |
-| `VITE_CHAT_SOURCE` | client | Chat source; must match the hub's `currentPlatform()` (default `openframe`). |
+
+> There is intentionally **no chat-source / platform variable**. The chat `source` is resolved at runtime from the proxied hub's `/auth/identity` (its server-side `currentPlatform()`) by the lib's `<EmbedChatRuntimeProvider>` — point `HUB_ORIGIN` at any platform's hub and the embed follows automatically. The client is never platform-aware.
 
 ## How it's wired
 

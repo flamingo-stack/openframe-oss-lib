@@ -3,14 +3,17 @@
 import type { ChatRuntime, EndpointsRuntime } from '@flamingo-stack/openframe-frontend-core/contexts'
 import { buildListUrl, makeComposeContentUrl } from '@flamingo-stack/openframe-frontend-core/utils'
 import { CONTENT_PREFIX } from '../../proxy/content-prefix.mjs'
-import { EP, DEFAULT_SOURCE, HUB_PUBLIC_ORIGIN } from '../config/endpoints'
+import { EP, HUB_PUBLIC_ORIGIN } from '../config/endpoints'
 
 // The content types THIS embedder hosts on its own slugged routes (see
 // app-routes.tsx). `makeComposeContentUrl` returns a relative in-app href for
 // these (soft-navigates) and the canonical hub origin for everything else.
 const HOSTED_TYPES = new Set(['onboarding_guide', 'product_release'])
 
-export function buildChatRuntime(): ChatRuntime {
+// Returns the runtime MINUS `source`: the embedder is NOT platform-aware. The lib's
+// <EmbedChatRuntimeProvider> fills `source` from the proxied hub's /auth/identity
+// (its currentPlatform()) at mount — see app-providers.tsx.
+export function buildChatRuntime(): Omit<ChatRuntime, 'source'> {
   return {
     endpoints: {
       chatStreamUrl: EP.chatStream,
@@ -42,8 +45,6 @@ export function buildChatRuntime(): ChatRuntime {
       hostedTypes: HOSTED_TYPES,
       contentOrigin: HUB_PUBLIC_ORIGIN,
     }),
-    // localStorage namespacing + doc-search scope; must match the hub's currentPlatform().
-    source: DEFAULT_SOURCE,
   }
 }
 

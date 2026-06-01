@@ -41,8 +41,5 @@ export const EP = {
   accessConsume: `${CONTENT}/consume-access-code`,
 } as const
 
-/** Chat source — must match the target hub's currentPlatform() (doc-search scope + localStorage ns). */
-export const DEFAULT_SOURCE = import.meta.env.VITE_CHAT_SOURCE ?? 'openframe'
-
 /** Public hub origin for new-tab "open the full content" links (embed mode). */
 export const HUB_PUBLIC_ORIGIN = import.meta.env.VITE_HUB_ORIGIN ?? 'http://localhost:3000'

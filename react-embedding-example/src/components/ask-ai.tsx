@@ -1,4 +1,5 @@
 import { EmbeddableChat } from '@flamingo-stack/openframe-frontend-core/components/chat'
+import { useChatRuntime } from '@flamingo-stack/openframe-frontend-core/contexts'
 
 /**
  * Embedder-side equivalent of the hub's `global-ask-ai-client.tsx`. It reuses the
@@ -8,5 +9,17 @@ import { EmbeddableChat } from '@flamingo-stack/openframe-frontend-core/componen
  * lib's built-in `defaultTableIdForDocumentType` (no hand-written map needed).
  */
 export function AskAi() {
+  const runtime = useChatRuntime()
+  // Readiness gate, NOT platform awareness: the lib's <EmbedChatRuntimeProvider>
+  // resolves the chat `source` from the proxied hub's /auth/identity, and the chat
+  // adapter requires a non-empty source. We never name a platform here — we just wait
+  // for the server to report one.
+  if (!runtime?.source) {
+    return (
+      <div className="flex h-full items-center justify-center p-10 text-ods-text-secondary">
+        Connecting…
+      </div>
+    )
+  }
   return <EmbeddableChat modes={{ guide: {} }} defaultActiveMode="guide" />
 }
