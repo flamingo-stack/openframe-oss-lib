@@ -2,20 +2,25 @@ package com.openframe.api.service.rmm;
 
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.script.CreateScriptInput;
+import com.openframe.api.dto.script.ScriptFilterInput;
 import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.script.UpdateScriptInput;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
+import com.openframe.api.dto.shared.SortDirection;
+import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptMapper;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.rmm.Script;
 import com.openframe.data.document.rmm.ScriptStatus;
+import com.openframe.data.document.rmm.filter.ScriptQueryFilter;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -81,19 +86,31 @@ public class ScriptService {
     }
 
     /**
-     * Cursor-paginated list of scripts in the current pod's tenant.
+     * Cursor-paginated list of scripts in the current pod's tenant, with
+     * optional filter / search / sort.
      *
-     * <p>Default order is newest-first (by {@code _id} desc). Uses the standard
-     * "fetch limit + 1" trick to detect {@code hasNextPage} / {@code hasPreviousPage}
-     * without an extra count query.
+     * <p>Default order is newest-first (by {@code _id} desc); pass a
+     * {@link SortInput} to override. Sort-field validation is delegated to the
+     * repository (any field not in the allowlist falls back to the default
+     * with a warn-level log). Uses the standard "fetch limit + 1" trick to
+     * detect {@code hasNextPage} / {@code hasPreviousPage} without an extra
+     * count query.
      */
-    public GenericQueryResult<ScriptResponse> list(CursorPaginationCriteria pagination) {
+    public GenericQueryResult<ScriptResponse> list(ScriptFilterInput filter,
+                                                   String search,
+                                                   SortInput sort,
+                                                   CursorPaginationCriteria pagination) {
         String tenantId = tenantIdProvider.getTenantId();
         CursorPaginationCriteria normalized = pagination.normalize();
         int limit = normalized.getLimit();
 
+        String sortField = resolveSortField(sort);
+        Sort.Direction sortDirection = resolveSortDirection(sort);
+        ScriptQueryFilter queryFilter = toQueryFilter(filter);
+
         List<Script> page = scriptRepository.findPageForTenant(
-                tenantId, normalized.getCursor(), normalized.isBackward(), limit + 1);
+                tenantId, queryFilter, search, sortField, sortDirection,
+                normalized.getCursor(), normalized.isBackward(), limit + 1);
 
         boolean hasMore = page.size() > limit;
         List<Script> items = hasMore ? page.subList(0, limit) : page;
@@ -107,6 +124,42 @@ public class ScriptService {
         return GenericQueryResult.<ScriptResponse>builder()
                 .items(views)
                 .pageInfo(buildPageInfo(views, hasMore, normalized))
+                .build();
+    }
+
+    private String resolveSortField(SortInput sort) {
+        if (sort == null || sort.getField() == null || sort.getField().isBlank()) {
+            return scriptRepository.getDefaultSortField();
+        }
+
+        String requested = sort.getField().trim();
+        if (!scriptRepository.isSortableField(requested)) {
+            log.warn("Invalid sort field requested for scripts: '{}' — falling back to default", requested);
+            return scriptRepository.getDefaultSortField();
+        }
+
+        return requested;
+    }
+
+    private static Sort.Direction resolveSortDirection(SortInput sort) {
+        if (sort != null && sort.getDirection() == SortDirection.ASC) {
+            return Sort.Direction.ASC;
+        }
+
+        return Sort.Direction.DESC;
+    }
+
+    /** Translate the API-layer filter into the data-layer's repository filter. */
+    private static ScriptQueryFilter toQueryFilter(ScriptFilterInput input) {
+        if (input == null) {
+            return null;
+        }
+
+        return ScriptQueryFilter.builder()
+                .shells(input.getShells())
+                .statuses(input.getStatuses())
+                .supportedPlatforms(input.getSupportedPlatforms())
+                .tag(input.getTag())
                 .build();
     }
 

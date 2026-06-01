@@ -8,10 +8,12 @@ import com.openframe.api.dto.GenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.script.CreateScriptInput;
+import com.openframe.api.dto.script.ScriptFilterInput;
 import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.script.UpdateScriptInput;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLScriptMapper;
 import com.openframe.api.service.rmm.ScriptService;
 import jakarta.validation.Valid;
@@ -44,6 +46,9 @@ public class ScriptDataFetcher {
 
     @DgsQuery
     public GenericConnection<GenericEdge<ScriptResponse>> scripts(
+            @InputArgument @Valid ScriptFilterInput filter,
+            @InputArgument String search,
+            @InputArgument @Valid SortInput sort,
             @InputArgument Integer first,
             @InputArgument String after,
             @InputArgument Integer last,
@@ -53,7 +58,8 @@ public class ScriptDataFetcher {
                 .first(first).after(after).last(last).before(before)
                 .build();
         CursorPaginationCriteria pagination = scriptMapper.toCursorPaginationCriteria(args);
-        GenericQueryResult<ScriptResponse> result = scriptService.list(pagination);
+        GenericQueryResult<ScriptResponse> result =
+                scriptService.list(filter, search, sort, pagination);
         return scriptMapper.toConnection(result);
     }
 
