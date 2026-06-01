@@ -20,6 +20,7 @@ import { ArrowLeft } from 'lucide-react'
 
 import { Link } from '../../embed-shims'
 import { ArticleDetailLayout } from '../layout/article-detail-layout'
+import { DetailPageSkeleton } from '../shared/detail-page-skeleton'
 import { EntityVideoSection } from '../features/entity-video-section'
 import { VideoBitesDisplay } from '../features/video-bites-display'
 import { useVideoWarmup } from '../features/use-video-warmup'
@@ -87,11 +88,10 @@ export function OnboardingGuideDetailView({
     return <LoadError message="Guide not found." onRetry={reload} />
   }
   if (!guide) {
-    return (
-      <ArticleDetailLayout>
-        <div className="py-16 text-center text-ods-text-secondary">Loading…</div>
-      </ArticleDetailLayout>
-    )
+    // Skeleton (not a bare "Loading…") for parity with every other shared view —
+    // catalog, roadmap, releases all render a skeleton on first load, so the detail
+    // page shouldn't flash text then content.
+    return <DetailPageSkeleton showImageGallery={false} />
   }
 
   const captionsUrl = getCaptionsUrl('onboarding_guide', guide.id, guide.srt_content)
