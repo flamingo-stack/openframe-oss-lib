@@ -59,6 +59,7 @@ import { renderChatInlineEntityCard } from './entity-cards/dispatch'
 import type { ChatCardDispatchExtras } from './entity-cards/dispatch'
 
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context'
+import { useRouter } from '../../embed-shims/next-navigation'
 import { type ChatSource, type UseSseChatAdapterOptions } from './hooks/use-sse-chat-adapter'
 import {
   useUnifiedChat,
@@ -81,7 +82,7 @@ import { handleChatNavClick } from './utils/nav-click-handler'
 import { computeIsNewTab, newTabAnchorAttrs } from './utils/nav-anchor-props'
 import { resolveHrefForRuntime } from './utils/chat-nav-resolution'
 import { ChatPanelContext, type ChatPanelHandle } from './chat-panel-context'
-import { resolveSourceRowCTA } from './utils/source-row-cta'
+import { resolveSourceRowCTA, sourceRowCtxFromRuntime } from './utils/source-row-cta'
 import { chatChipClass } from './utils/chip-styles'
 import { getIconComponent } from './utils/icon-registry'
 import { resolveOnboardingIcon } from './utils/onboarding-icons'
@@ -293,6 +294,7 @@ function SourceChip({
   onDiscuss?: (ref: ChatRef) => void
 }) {
   const runtime = useRequiredChatRuntime()
+  const router = useRouter()
   // Single CTA resolver — same icon, same href chain, same ChatRef
   // synthesis the inline card and search-result paths use.
   const cta = resolveSourceRowCTA(
@@ -305,7 +307,7 @@ function SourceChip({
       targetPlatform: src.targetPlatform ?? null,
       path: src.path,
     },
-    { baseRoute, chipBasePlatform, currentPlatform: runtime.source },
+    sourceRowCtxFromRuntime(runtime, { baseRoute, chipBasePlatform }),
   )
   const Icon = cta.icon
   const icon = <Icon className="h-3.5 w-3.5" />
@@ -329,7 +331,7 @@ function SourceChip({
           targetPlatform: item.targetPlatform ?? null,
           path: item.path,
         },
-        { baseRoute, chipBasePlatform, currentPlatform: runtime.source },
+        sourceRowCtxFromRuntime(runtime, { baseRoute, chipBasePlatform }),
       )
       const ItemIcon = itemCta.icon
       return {
@@ -403,7 +405,7 @@ function SourceChip({
   // Single close model: matches `ChatCardNavWrap` for inline cards.
   const buildClickHandler = (href: string, path: string | null | undefined, targetPlatform: string | null, isNewTab: boolean) =>
     (e: React.MouseEvent<HTMLAnchorElement>) => {
-      const handled = handleChatNavClick(e, runtime, { href, path, targetPlatform })
+      const handled = handleChatNavClick(e, runtime, { href, path, targetPlatform }, router.push)
       if (handled && !isNewTab && onClose) onClose()
     }
 
@@ -585,7 +587,9 @@ function EmbeddableChatInner({
   // we don't double-up with the host's behaviour.
   const shellLess = shell === 'none'
   const runtime = useRequiredChatRuntime()
-  const source = runtime.source as DocSource
+  // Optional on embedders (platform-agnostic); '' is a harmless sentinel for the
+  // `ask-ai:open-with-ref` event filter below. (DocSource is a `string` alias.)
+  const source = (runtime.source ?? '') as DocSource
   const commandsUrl = runtime.endpoints.commandsUrl
   // Server-resolved identity — drives the greeting first-name AND the
   // attachment capability flag. Single source of truth: the chat-identity
@@ -832,7 +836,12 @@ function EmbeddableChatInner({
     useChatAttachmentImageGallery()
 
   // Resolve base route. Hub default mapping: flamingo → /knowledge-base,
-  // anything else → /data-room. Embedders can override per platform.
+  // anything else → /data-room. Embedders override per platform. An embedder that
+  // doesn't host an in-app doc viewer should NOT pass an empty baseRoute (that just
+  // falls back to the platform default here) — instead it sets a truthy baseRoute +
+  // `chipBasePlatform` so doc chips with no externalUrl resolve cross-platform to that
+  // platform's public knowledge hub (`getBaseUrl(chipBasePlatform)/knowledge-base/…`),
+  // exactly like the hub's openframe config (baseRoute:'/', chipBasePlatform:'flamingo').
   const resolvedBaseRoute =
     baseRoute || (source === 'flamingo' ? '/knowledge-base' : '/data-room')
 

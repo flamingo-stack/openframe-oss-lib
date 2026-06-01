@@ -35,6 +35,8 @@
 
 import { createContext, useContext, type ReactNode } from 'react'
 
+import type { ComposeContentUrl } from '../utils/content-href'
+
 /**
  * Runtime config consumed by the chat panel.
  */
@@ -143,25 +145,41 @@ export interface ChatRuntime {
    *  platform hrefs without knowing the hub's platform topology
    *  (openmsp.ai / openframe.app / flamingo.run / tmcg).
    *
-   *  Embedders that don't host multi-platform content can wire this to
-   *  a simple `(type, slug) => ({ href: '/' + type + '/' + slug,
-   *  targetPlatform: null })` — or omit, in which case lib views fall
-   *  back to a same-origin relative path with `targetPlatform: null`.
+   *  THE single content-href authority for every embeddable surface — page
+   *  views (onboarding catalog/detail, releases) AND chat cards / chips /
+   *  search results all resolve content links through this one seam, so a
+   *  given type lands in the SAME place regardless of where it's rendered.
+   *  Embedders wire `makeComposeContentUrl({ hostedTypes, contentOrigin })`;
+   *  omit it and lib views fall back to a same-origin relative path
+   *  (`buildDefaultHref`).
    *
-   *  `platforms` is the entity's flattened junction array (e.g.
-   *  `guide.onboarding_guide_platforms`) — the callback runs
-   *  `extractPrimaryPlatform` internally before dispatching to its
-   *  composer. */
-  composeContentUrl?: (
-    type: string,
-    slug: string,
-    platforms?: Array<{ name?: string }>,
-  ) => { href: string; targetPlatform: string | null }
-  /** Chat source identifier — REQUIRED. Used for localStorage
-   *  namespacing (`mingo-chat-<source>-v1`). Hub sets via
-   *  `currentPlatform()`; embedders set explicitly.
-   *  `useEmbeddedChat()` throws if source is empty/missing. */
-  source: string
+   *  Takes a single `ComposeContentUrlInput`: `type` + `identifier` (page
+   *  views pass the slug; chat rows pass the id + `externalUrl`, whose path
+   *  yields the slug for in-app routing) + optional `platforms` /
+   *  `externalUrl` / `targetPlatform`. */
+  composeContentUrl?: ComposeContentUrl
+  /** Per-`documentType` doc-viewer targets — the UNIFIED, DYNAMIC replacement for
+   *  the single `chipBasePlatform` prop. Maps a doc-table documentType
+   *  (`'markdown'`, `'data_room_doc'`, …) → `{ platform, basePath }` for the PUBLIC
+   *  doc viewer that hosts it. Doc chips with no `externalUrl` resolve PER ROW to
+   *  `getBaseUrl(platform)/<basePath>/<path>`, so a chat mixing several doc sources
+   *  sends EACH to its own home (markdown→flamingo/knowledge-base,
+   *  data_room_doc→company-hub/data-room) instead of one static fallback. The hub
+   *  may keep using `chipBasePlatform` (one doc source per platform); embedders that
+   *  surface multiple doc sources wire this. Threaded into `resolveSourceRowCTA`. */
+  docPlatformTargets?: Record<string, { platform: string; basePath: string }>
+  /** Chat source / platform identifier — OPTIONAL. The hub sets it from
+   *  `currentPlatform()`; EMBEDDERS leave it unset and stay platform-agnostic.
+   *
+   *  It is NOT required for chat to work. The wire resolves source server-side
+   *  (`/docs/chat|search|commands` reject any client `source`); the
+   *  same-tab-vs-new-tab link decision falls back to an origin comparison when
+   *  it's absent (`decideNewTab` → `isCrossOriginUrl`); and the localStorage
+   *  history namespace falls back to a stable constant. Set it only where the
+   *  client legitimately needs to know its platform a priori — i.e. the hub,
+   *  where several platforms share related origins so "same platform" can't be
+   *  inferred from a URL alone. */
+  source?: string
   // NOTE: No `user` field. The chat's display identity (greeting
   // first-name, etc.) comes from the SERVER-resolved auth via
   // `useChatIdentity()` — the same identity the server uses to

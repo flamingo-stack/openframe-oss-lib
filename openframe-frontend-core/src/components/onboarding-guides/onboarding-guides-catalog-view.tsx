@@ -1,55 +1,55 @@
 'use client'
 
 /**
- * Public-facing catalog view for `/onboarding-guides` on openframe.
+ * Public-facing catalog view for `/onboarding-guides`.
  *
- * Self-contained: every concern that used to require a hub-side
- * wrapper now flows through lib primitives + the ChatRuntime context.
+ * Two data modes:
+ *   - **controlled** (hub SSR): pass `initialGuides` + `initialSections`
+ *     (server-fetched; section changes re-render the host with new props).
+ *   - **self-fetching** (config-only embed): omit the data props and pass
+ *     `guidesEndpoint` + `sectionsEndpoint` (the api routes). The view fetches
+ *     the guides (refetching on `?section=` change) + the section list itself —
+ *     no host data layer. (Plain fetch + useEffect, the DeliveryLists pattern.)
  *
- *   - Chrome: `<DevSectionPage sectionKey="onboarding">` (same lib
- *     primitive every other dev-center surface uses).
- *   - Search bar: lib `<DocSearchBar>` + `useDocSearch` directly,
- *     pre-scoped to `tableIds: ['onboarding-guides']`. The chat
- *     runtime's `source` discriminates the RAG namespace.
- *   - Section filter: lib `<FilterSection>` + URL push via embed-shim
- *     `useRouter`/`useSearchParams`.
- *   - Cards: lib `<OnboardingGuideCard>` with hrefs composed via
- *     `runtime.composeContentUrl?.('onboarding_guide', slug, platforms)`.
- *     Falls back to a same-origin relative path when no composer is
- *     wired (single-platform embedders).
- *
- * No hub-side wrapper file required.
+ * The view renders ONLY its body + its OWN controls (the RAG `<DocSearchBar>` +
+ * dynamic section pills — onboarding's controls are content-driven, unlike the
+ * static search/filter the `DevSectionView` chrome ships). It does NOT render the
+ * page chrome: the CALLER wraps it in `<DevSectionPage sectionKey="onboarding">`
+ * (hero + back button), exactly like the roadmap / releases / delivery pages — so
+ * every dev-center surface composes the same way and the view stays embeddable in
+ * tabbed contexts. Card hrefs flow through `runtime.composeContentUrl`.
  */
 
 import { useMemo, useTransition, type ReactNode } from 'react'
 import { GraduationCap } from 'lucide-react'
 
 import { useRouter, useSearchParams } from '../../embed-shims'
-import { DevSectionPage } from '../shared/dev-section'
+import { useSelfFetch } from '../../hooks/use-self-fetch'
 import { DocSearchBar, useDocSearch } from '../shared/doc-search'
 import { FilterPillRow } from '../ui/filter-pill-row'
+import { LoadError } from '../ui/error-state'
 import { OnboardingGuideCard } from '../chat/entity-cards/onboarding-guide-card'
+import { OnboardingGuidesCatalogSkeleton } from './onboarding-guides-catalog-skeleton'
 import { useChatRuntime } from '../../contexts/chat-runtime-context'
 import type { OnboardingGuide } from '../chat/types/entities/onboarding-guide'
-import { buildDefaultHref } from './build-default-href'
+import { resolveContentHref } from '../../utils/content-href'
+
+type SectionSummary = { section: string; section_order: number; count: number }
 
 export interface OnboardingGuidesCatalogViewProps {
-  initialGuides: OnboardingGuide[]
-  initialSections: Array<{
-    section: string
-    section_order: number
-    count: number
-  }>
+  /** Controlled / SSR: server-fetched guides. Omit + pass `guidesEndpoint`
+   *  for the self-fetching config-only mode. */
+  initialGuides?: OnboardingGuide[]
+  initialSections?: SectionSummary[]
   initialSection?: string
-  /** Optional per-row card renderer override. When omitted, lib
-   *  renders `<OnboardingGuideCard>` with runtime-composed href.
-   *  Embedders only override to swap the card shape entirely. */
+  /** Self-fetch: GET list endpoint (the api route). Appends `?section=`. */
+  guidesEndpoint?: string
+  /** Self-fetch: GET section-summary endpoint (the api route). */
+  sectionsEndpoint?: string
+  /** Optional per-row card renderer override. */
   renderCard?: (guide: OnboardingGuide) => ReactNode
-  /** Base path the catalog is mounted under. Used as the fallback
-   *  `href` prefix for card hrefs when `runtime.composeContentUrl` is
-   *  not wired. Embedders mounting at `/docs/onboarding/` instead of
-   *  `/onboarding-guides/` should override. Also used by `setSection`
-   *  for the `?section=` URL push. Default `/onboarding-guides`. */
+  /** Base path the catalog is mounted under (fallback href prefix + `?section=`
+   *  push target). Default `/onboarding-guides`. */
   basePath?: string
 }
 
@@ -57,6 +57,8 @@ export function OnboardingGuidesCatalogView({
   initialGuides,
   initialSections,
   initialSection = '',
+  guidesEndpoint,
+  sectionsEndpoint,
   renderCard,
   basePath = '/onboarding-guides',
 }: OnboardingGuidesCatalogViewProps) {
@@ -64,56 +66,65 @@ export function OnboardingGuidesCatalogView({
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
   const runtime = useChatRuntime()
-  const activeSection = initialSection || 'all'
 
-  // Section grouping. Data arrives already filtered server-side via
-  // `?section=`; this just buckets the visible rows for the section-
-  // header layout — no client-side `.filter()`.
+  // Self-fetch only when the host supplied NO data but DID give an endpoint.
+  const selfFetch = initialGuides === undefined && guidesEndpoint !== undefined
+  // Active section: from the URL when self-fetching, from the prop (host RSC
+  // already read the URL server-side) when controlled.
+  const sectionValue = selfFetch ? searchParams.get('section') ?? '' : initialSection
+  const activeSection = sectionValue || 'all'
+
+  // Self-fetch the guides (refetched whenever `?section=` changes — it's folded
+  // into the url) + the section summaries. Controlled mode passes `null` urls so
+  // the hook never fetches. The guides fetch carries the error/retry affordance.
+  const guidesQs = sectionValue ? `?section=${encodeURIComponent(sectionValue)}` : ''
+  const guidesRes = useSelfFetch<{ data?: OnboardingGuide[] }>(
+    selfFetch && guidesEndpoint ? `${guidesEndpoint}${guidesQs}` : null,
+  )
+  const sectionsRes = useSelfFetch<SectionSummary[]>(
+    selfFetch && sectionsEndpoint ? sectionsEndpoint : null,
+  )
+
+  // Invariant: `guidesRes.data` is `null` until the first fetch resolves, then
+  // `{ data: [...] }`. The `?.data ?? []` chain collapses never-fetched (null) and
+  // legitimately-empty ([]) to the same `[]` — so the first-load skeleton gate below
+  // keys on the OUTER `guidesRes.data == null` to distinguish them (an empty section
+  // toggle keeps the chrome; only a true cold start shows the full-page skeleton).
+  const guides = initialGuides ?? guidesRes.data?.data ?? []
+  const sections = initialSections ?? (Array.isArray(sectionsRes.data) ? sectionsRes.data : [])
+  const isLoading = selfFetch ? guidesRes.isLoading : false
+
+  // Section grouping. Data arrives already filtered (server-side `?section=`
+  // for the host, or our `?section=` fetch); this just buckets visible rows.
   const grouped = useMemo(() => {
-    const map = new Map<
-      string,
-      { section_order: number; guides: OnboardingGuide[] }
-    >()
-    for (const g of initialGuides) {
+    const map = new Map<string, { section_order: number; guides: OnboardingGuide[] }>()
+    for (const g of guides) {
       const existing = map.get(g.section)
       if (existing) {
-        if (g.section_order < existing.section_order)
-          existing.section_order = g.section_order
+        if (g.section_order < existing.section_order) existing.section_order = g.section_order
         existing.guides.push(g)
       } else {
         map.set(g.section, { section_order: g.section_order, guides: [g] })
       }
     }
     for (const entry of map.values()) {
-      entry.guides.sort(
-        (a, b) =>
-          a.step_order - b.step_order || a.title.localeCompare(b.title),
-      )
+      entry.guides.sort((a, b) => a.step_order - b.step_order || a.title.localeCompare(b.title))
     }
     return Array.from(map.entries())
       .map(([section, info]) => ({ section, ...info }))
-      .sort(
-        (a, b) =>
-          a.section_order - b.section_order ||
-          a.section.localeCompare(b.section),
-      )
-  }, [initialGuides])
+      .sort((a, b) => a.section_order - b.section_order || a.section.localeCompare(b.section))
+  }, [guides])
 
-  // Section-filter options for the lib `<FilterSection>` row.
   const sectionFilterOptions = useMemo(
     () => [
-      { value: 'all', label: `All (${initialGuides.length})` },
-      ...initialSections.map((s) => ({
-        value: s.section,
-        label: `${s.section} (${s.count})`,
-      })),
+      { value: 'all', label: `All (${guides.length})` },
+      ...sections.map((s) => ({ value: s.section, label: `${s.section} (${s.count})` })),
     ],
-    [initialGuides.length, initialSections],
+    [guides.length, sections],
   )
 
-  // Section pill change → push `?section=X` so the host RSC re-
-  // fetches against the DAL. Wrapped in `useTransition` so the
-  // results grid dims while the new payload is in flight.
+  // Section pill change → push `?section=X`. Controlled mode: host RSC
+  // re-fetches. Self-fetch mode: our guides effect re-fetches on the URL change.
   const setSection = (value: string) => {
     const params = new URLSearchParams(searchParams.toString())
     if (value === 'all') {
@@ -127,10 +138,7 @@ export function OnboardingGuidesCatalogView({
     })
   }
 
-  // Search bar — scoped to onboarding-guides only via the RAG-search
-  // `tableIds` parameter. The hook calls `/api/docs/search` directly;
-  // hub or embedder must expose that endpoint (reverse-proxy on
-  // non-Next.js hosts).
+  // Search bar — scoped to onboarding-guides only via RAG-search `tableIds`.
   const source = runtime?.source ?? 'openframe'
   const docSearch = useDocSearch({
     source,
@@ -139,17 +147,14 @@ export function OnboardingGuidesCatalogView({
     tableIds: ['onboarding-guides'],
   })
 
-  // Per-row card renderer — uses runtime-composed href for cross-
-  // platform navigation. Falls back to a same-origin relative URL
-  // when no composer is wired.
+  // Per-row card renderer — runtime-composed href, fallback to relative.
   const defaultRenderCard = (guide: OnboardingGuide) => {
-    const cta = runtime?.composeContentUrl
-      ? runtime.composeContentUrl(
-          'onboarding_guide',
-          guide.slug,
-          guide.onboarding_guide_platforms,
-        )
-      : buildDefaultHref(basePath, guide.slug)
+    const cta = resolveContentHref(runtime?.composeContentUrl, {
+      type: 'onboarding_guide',
+      slug: guide.slug,
+      basePath,
+      platforms: guide.onboarding_guide_platforms,
+    })
     return (
       <OnboardingGuideCard
         guide={guide}
@@ -172,7 +177,7 @@ export function OnboardingGuidesCatalogView({
         onResultSelect={docSearch.handleResultSelect}
         showDropdown={docSearch.keepDropdownOpen}
       />
-      {initialSections.length > 0 && (
+      {sections.length > 0 && (
         <FilterPillRow
           label="Section"
           selectedValue={activeSection}
@@ -183,9 +188,22 @@ export function OnboardingGuidesCatalogView({
     </div>
   )
 
+  // A failed guides fetch → a RETRYABLE error (not the indistinguishable-from-
+  // empty "no guides found" state) — parity with the sibling self-fetch views.
+  if (selfFetch && guidesRes.error) {
+    return <LoadError message="Failed to load onboarding guides." onRetry={guidesRes.reload} />
+  }
+  // Full-page skeleton ONLY on the very first load (no data has loaded yet) — a
+  // later section toggle that legitimately returns ZERO guides keeps the page
+  // chrome (search + section pills) and dims the grid via the className below.
+  if (selfFetch && guidesRes.data == null && isLoading) {
+    return <OnboardingGuidesCatalogSkeleton />
+  }
+
   return (
-    <DevSectionPage sectionKey="onboarding" preControls={preControls}>
-      {initialGuides.length === 0 ? (
+    <div className="w-full flex flex-col gap-10">
+      {preControls}
+      {guides.length === 0 ? (
         <div className="text-center py-16">
           <GraduationCap className="h-12 w-12 text-ods-text-secondary mx-auto mb-4" />
           <h2 className="text-ods-text-primary font-['DM_Sans'] text-[20px] font-semibold mb-2">
@@ -198,13 +216,7 @@ export function OnboardingGuidesCatalogView({
           </p>
         </div>
       ) : (
-        <div
-          className={
-            isPending
-              ? 'opacity-60 transition-opacity space-y-10'
-              : 'space-y-10'
-          }
-        >
+        <div className={isPending || isLoading ? 'opacity-60 transition-opacity space-y-10' : 'space-y-10'}>
           {grouped.map((sec) => (
             <section key={sec.section} className="space-y-4">
               <h2 className="text-h3 tracking-[-0.36px] text-ods-text-primary flex items-center gap-2">
@@ -213,9 +225,8 @@ export function OnboardingGuidesCatalogView({
                   {sec.guides.length}
                 </span>
               </h2>
-              {/* HORIZONTAL catalog list — single column so consecutive
-                  steps read top-to-bottom (Step 1 above Step 2 above
-                  Step 3); a grid would visually reorder them. */}
+              {/* HORIZONTAL catalog list — single column so consecutive steps
+                  read top-to-bottom; a grid would visually reorder them. */}
               <ul className="flex flex-col gap-4">
                 {sec.guides.map((guide) => (
                   <li key={guide.id}>{renderCardFn(guide)}</li>
@@ -225,6 +236,6 @@ export function OnboardingGuidesCatalogView({
           ))}
         </div>
       )}
-    </DevSectionPage>
+    </div>
   )
 }

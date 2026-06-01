@@ -18,6 +18,7 @@
 
 import React from 'react'
 import Image from '../../../embed-shims/next-image'
+import Link from '../../../embed-shims/next-link'
 import { Clock, ExternalLink, GraduationCap, Play } from 'lucide-react'
 import { cn } from '../../../utils/cn'
 import { BlogImagePlaceholder } from './blog-image-placeholder'
@@ -178,10 +179,11 @@ export function OnboardingGuideCard({
         : ''
 
     return (
-      <a
+      <Link
         href={href}
         target={target}
         rel={rel}
+        prefetch={false}
         className={cn(
           'group block no-underline bg-ods-system-greys-black',
           'border border-ods-border rounded-lg overflow-hidden',
@@ -253,7 +255,7 @@ export function OnboardingGuideCard({
             ]}
           />
         </div>
-      </a>
+      </Link>
     )
   }
 
@@ -269,7 +271,7 @@ export function OnboardingGuideCard({
       author,
     ].filter((s): s is string => typeof s === 'string' && s.length > 0)
     return (
-      <a href={href} target={target} rel={rel} className={cn(COMPACT_CARD_OUTER, className)}>
+      <Link href={href} target={target} rel={rel} prefetch={false} className={cn(COMPACT_CARD_OUTER, className)}>
         <span className={COMPACT_CARD_IMAGE_SLOT}>
           {compactCover ? (
             <Image
@@ -311,7 +313,7 @@ export function OnboardingGuideCard({
         <span className="flex shrink-0 items-center self-start h-5 text-ods-text-secondary">
           <ExternalLink className="w-3.5 h-3.5" />
         </span>
-      </a>
+      </Link>
     )
   }
 
@@ -320,10 +322,11 @@ export function OnboardingGuideCard({
   const summary = (guide.video_summary || guide.content || '').trim()
 
   return (
-    <a
+    <Link
       href={href}
       target={target}
       rel={rel}
+      prefetch={false}
       className={cn(
         `flex items-start gap-3 rounded-md border border-ods-border bg-ods-card hover:border-ods-accent transition-colors ${t.padding}`,
         className,
@@ -347,6 +350,6 @@ export function OnboardingGuideCard({
           </span>
         )}
       </span>
-    </a>
+    </Link>
   )
 }

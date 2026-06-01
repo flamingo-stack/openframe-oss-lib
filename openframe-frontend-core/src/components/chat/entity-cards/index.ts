@@ -36,6 +36,14 @@ export {
   type ProductReleaseCardSize,
   type ProductReleaseCardAnchorProps,
 } from './product-release-card'
+// Card-prop builders: `defaultBuildProductReleaseCardProps` (sm chat default) +
+// `buildProductReleaseCardProps` (RICH lg builder — the ProductReleasesView
+// default; lifted from the hub so embedders get the full metadata grid).
+export {
+  defaultBuildProductReleaseCardProps,
+  buildProductReleaseCardProps,
+  type ProductReleaseCardDerivedProps,
+} from './product-release-card-defaults'
 
 // Refactored pure-presentation cards
 export { BlogCard, BlogCardSkeleton, type BlogCardProps } from './blog-card'

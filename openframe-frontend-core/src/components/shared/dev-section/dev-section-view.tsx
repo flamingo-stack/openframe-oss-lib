@@ -35,6 +35,10 @@ export interface DevSectionViewProps {
      *  and pass the element here — function references can't cross the
      *  server→client boundary, but React elements can. */
     icon: ReactNode;
+    /** Hero title. Falls back to `OPENFRAME_DEV_SECTIONS[sectionKey].hero.title`
+     *  when omitted, so embedders can override the (OpenFrame-specific) default
+     *  copy without forking the registry. */
+    title?: string;
     description: string;
   };
   /** Optional slot rendered BETWEEN the hero and the search/filter
@@ -94,7 +98,7 @@ export function DevSectionView({ sectionKey, hero, preControls, children }: DevS
         <div className="space-y-4">
           <h1 className="text-h1 tracking-[-1.12px] text-ods-text-primary flex items-center gap-3">
             {hero.icon}
-            {section.hero.title}
+            {hero.title ?? section.hero.title}
           </h1>
           <p className="font-['DM_Sans'] font-medium text-[18px] leading-[28px] text-ods-text-secondary max-w-3xl">
             {hero.description}

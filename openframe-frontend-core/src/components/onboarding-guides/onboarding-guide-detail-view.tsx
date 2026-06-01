@@ -1,27 +1,18 @@
 'use client'
 
 /**
- * Public-facing detail view for `/onboarding-guides/<slug>` on
- * openframe.
+ * Public-facing detail view for `/onboarding-guides/<slug>`.
  *
- * Self-contained: every concern that used to require a hub-side
- * wrapper now flows through lib primitives + the ChatRuntime context.
+ * Two modes:
+ *   - **controlled** (hub SSR): pass `initialData` (a server-fetched guide).
+ *   - **self-fetching** (config-only embed): pass `slug` + `guideEndpoint`
+ *     (the api route) and the view fetches the guide itself — no host data
+ *     layer. (Plain fetch + useEffect, the DeliveryLists pattern.)
  *
- *   - Markdown: lib `<SimpleMarkdownRenderer>` (already lib-resident).
- *   - Video warmup: lib `useVideoWarmup` (reads Supabase storage
- *     origin from `runtime.endpoints.supabaseStorageOrigin`; Mux
- *     origins are hardcoded public CDN hosts).
- *   - Captions URL: lib `getCaptionsUrl` (pure URL builder).
- *   - Video poster: inline priority chain
- *     (`main_video_thumbnail || featured_image || og_image_url`) —
- *     same fallbacks the card uses.
- *   - Related card hrefs: `runtime.composeContentUrl?.(
- *     'onboarding_guide', slug, platforms)` — falls back to same-
- *     origin relative path when no composer is wired.
- *
- * No hub-side wrapper file required. Optional `MarkdownRenderer`
- * prop lets hosts swap in a renderer with extra plugins (Reddit /
- * Twitter / X embeds) when needed.
+ * Everything else flows through lib primitives + the ChatRuntime context
+ * (markdown, video warmup, captions, related-card hrefs via
+ * `runtime.composeContentUrl`). Optional `MarkdownRenderer` lets hosts swap a
+ * renderer with extra plugins.
  */
 
 import { type ComponentType, type ReactNode } from 'react'
@@ -29,44 +20,49 @@ import { ArrowLeft } from 'lucide-react'
 
 import { Link } from '../../embed-shims'
 import { ArticleDetailLayout } from '../layout/article-detail-layout'
+import { DetailPageSkeleton } from '../shared/detail-page-skeleton'
 import { EntityVideoSection } from '../features/entity-video-section'
 import { VideoBitesDisplay } from '../features/video-bites-display'
 import { useVideoWarmup } from '../features/use-video-warmup'
 import { getCaptionsUrl } from '../features/captions-url'
 import { SimpleMarkdownRenderer } from '../ui/simple-markdown-renderer'
+import { LoadError } from '../ui/error-state'
 import { EntityAuthorCard } from '../chat/entity-cards/entity-author-card'
 import { OnboardingGuideCard } from '../chat/entity-cards/onboarding-guide-card'
 import { useChatRuntime } from '../../contexts/chat-runtime-context'
 import type { OnboardingGuide } from '../chat/types/entities/onboarding-guide'
 import type { VideoTeaser } from '../../types/video-processing'
-import { buildDefaultHref } from './build-default-href'
+import { resolveContentHref } from '../../utils/content-href'
+import { useSelfFetch } from '../../hooks/use-self-fetch'
 
 export interface OnboardingGuideDetailViewProps {
-  initialData: OnboardingGuide
+  /** Server-fetched guide (controlled / SSR mode). Omit it and pass
+   *  `slug` + `guideEndpoint` for the self-fetching config-only mode. */
+  initialData?: OnboardingGuide
+  /** Self-fetch: the guide's slug (the host reads it from its route). */
+  slug?: string
+  /** Self-fetch: builds the GET url for a single guide (the api route).
+   *  e.g. `(s) => \`/content/api/onboarding-guides/${s}\``. */
+  guideEndpoint?: (slug: string) => string
   related?: OnboardingGuide[]
   /** Optional markdown renderer override. Defaults to lib
-   *  `<SimpleMarkdownRenderer>`. Hosts override when they need extra
-   *  plugins (Reddit / Twitter / X / code-block enhancements). */
+   *  `<SimpleMarkdownRenderer>`. */
   MarkdownRenderer?: ComponentType<{ content: string }>
-  /** Optional per-row related-card renderer override. When omitted,
-   *  lib renders `<OnboardingGuideCard>` with runtime-composed href. */
+  /** Optional per-row related-card renderer override. */
   renderRelatedCard?: (guide: OnboardingGuide) => ReactNode
-  /** Back-link target. Defaults to `basePath` so the link returns to
-   *  the catalog the embedder is hosting (no drift when `basePath`
-   *  is overridden). The admin preview explicitly overrides to
-   *  `/admin/onboarding-guides`. */
+  /** Back-link target. Defaults to `basePath`. */
   backHref?: string
   /** Back-link label. Defaults to "Back to Getting Started". */
   backLabel?: string
   /** Base path the related-card hrefs default to when
-   *  `runtime.composeContentUrl` is not wired. Embedders mounting at
-   *  `/docs/onboarding/` instead of `/onboarding-guides/` should
-   *  override. Default `/onboarding-guides`. */
+   *  `runtime.composeContentUrl` is not wired. Default `/onboarding-guides`. */
   basePath?: string
 }
 
 export function OnboardingGuideDetailView({
-  initialData: guide,
+  initialData,
+  slug,
+  guideEndpoint,
   related = [],
   MarkdownRenderer = SimpleMarkdownRenderer,
   renderRelatedCard,
@@ -74,36 +70,32 @@ export function OnboardingGuideDetailView({
   backLabel = 'Back to Getting Started',
   basePath = '/onboarding-guides',
 }: OnboardingGuideDetailViewProps) {
-  // Resolve `backHref` from `basePath` when not explicitly set — so
-  // an embedder overriding `basePath="/docs/onboarding"` automatically
-  // gets the right back link without remembering to thread `backHref`
-  // too. Admin preview still wins via its explicit `backHref` override.
   const resolvedBackHref = backHref ?? basePath
   const runtime = useChatRuntime()
 
-  // Video warmup — preconnect always fires; preload only when the
-  // container scrolls within ~1 viewport AND the URL is on the
-  // configured Supabase storage origin. No origin in runtime ⇒
-  // preconnect-only path (Mux/YouTube unaffected).
+  // Controlled (hub SSR `initialData`) OR self-fetch by slug (config-only embed).
+  const url = initialData ? null : slug && guideEndpoint ? guideEndpoint(slug) : null
+  const { data: guide, isLoading, error, reload } = useSelfFetch<OnboardingGuide>(url, { initialData })
+
+  // Hooks must run unconditionally — feed them optional-chained values so they
+  // no-op while the guide is still loading.
   const { ref: videoWarmupRef } = useVideoWarmup<HTMLDivElement>({
-    videoUrl: guide.main_video_url,
+    videoUrl: guide?.main_video_url,
     supabaseStorageOrigin: runtime?.endpoints.supabaseStorageOrigin,
   })
 
-  const captionsUrl = getCaptionsUrl(
-    'onboarding_guide',
-    guide.id,
-    guide.srt_content,
-  )
+  if (error || (!guide && !isLoading)) {
+    return <LoadError message="Guide not found." onRetry={reload} />
+  }
+  if (!guide) {
+    // Skeleton (not a bare "Loading…") for parity with every other shared view —
+    // catalog, roadmap, releases all render a skeleton on first load, so the detail
+    // page shouldn't flash text then content.
+    return <DetailPageSkeleton showImageGallery={false} />
+  }
 
-  // Video poster — fallback chain:
-  //   1. Entity-owned thumbnails (main_video_thumbnail / featured_image / og_image_url)
-  //   2. Branded OG placeholder from `runtime.resolvePlaceholderUrl(title)`
-  //      — restores the hub's prior behavior where a video without a
-  //      thumbnail still showed a branded poster instead of a black
-  //      frame.
-  //   3. `undefined` (player picks its own default poster — usually
-  //      first-frame extraction).
+  const captionsUrl = getCaptionsUrl('onboarding_guide', guide.id, guide.srt_content)
+
   const videoPoster =
     guide.main_video_thumbnail ||
     guide.featured_image ||
@@ -111,22 +103,14 @@ export function OnboardingGuideDetailView({
     runtime?.resolvePlaceholderUrl?.(guide.title, { aspect: 'wide' }) ||
     undefined
 
-  // Default related-card renderer — runtime-composed cross-platform href.
   const defaultRenderRelatedCard = (g: OnboardingGuide) => {
-    const cta = runtime?.composeContentUrl
-      ? runtime.composeContentUrl(
-          'onboarding_guide',
-          g.slug,
-          g.onboarding_guide_platforms,
-        )
-      : buildDefaultHref(basePath, g.slug)
-    return (
-      <OnboardingGuideCard
-        guide={g}
-        href={cta.href}
-        targetPlatform={cta.targetPlatform}
-      />
-    )
+    const cta = resolveContentHref(runtime?.composeContentUrl, {
+      type: 'onboarding_guide',
+      slug: g.slug,
+      basePath,
+      platforms: g.onboarding_guide_platforms,
+    })
+    return <OnboardingGuideCard guide={g} href={cta.href} targetPlatform={cta.targetPlatform} />
   }
   const renderRelatedCardFn = renderRelatedCard ?? defaultRenderRelatedCard
 
@@ -142,9 +126,7 @@ export function OnboardingGuideDetailView({
           <span className="text-h5">{backLabel}</span>
         </Link>
 
-        <h1 className="text-h1 tracking-[-1.12px] text-ods-text-primary">
-          {guide.title}
-        </h1>
+        <h1 className="text-h1 tracking-[-1.12px] text-ods-text-primary">{guide.title}</h1>
 
         {/* Metadata grid — Section · Step | Published | Author. */}
         <EntityAuthorCard
@@ -159,9 +141,8 @@ export function OnboardingGuideDetailView({
           ]}
         />
 
-        {/* Video. `main_video_url` (Mux/MP4) and `youtube_url` are
-            independent columns — either one populated should render
-            the player. `EntityVideoSection` routes accordingly. */}
+        {/* Video. `main_video_url` (Mux/MP4) and `youtube_url` are independent
+            columns — either populated renders the player. */}
         {(guide.main_video_url || guide.youtube_url) && (
           <div ref={videoWarmupRef}>
             <EntityVideoSection

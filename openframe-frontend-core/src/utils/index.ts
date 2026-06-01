@@ -20,6 +20,14 @@ export * from './validation-utils'
 export * from './confidence-helpers'
 // Release date formatting utilities
 export * from './date-formatters'
+// Product-release card helpers (lifted from the hub so every embedder gets the
+// rich card metadata): badge-color mapping + cover-image fallback resolution.
+export * from './release-badge'
+export * from './release-cover'
+// Dev-center URL param keys — the ONE source for the `?search=` / `?status=` / … keys the
+// chrome registry writes and the list views read; re-exported so embedders (and the hub's
+// dev-section-url helper) build deep-links with the same keys instead of a bare literal.
+export { DEV_SECTION_PARAM_KEYS } from './dev-sections/dev-section-param-keys'
 // Dynamic icon registry — single source of truth lives at
 // components/chat/utils/icon-registry. Re-exported here so existing
 // `@flamingo-stack/openframe-frontend-core/utils` callers (hub admin
@@ -216,3 +224,21 @@ export {
   type ScrollElementIntoViewOptions,
   scrollElementIntoView,
 } from './scroll-into-view'
+
+// Shared list-API URL builder — the single source for the per-type chat
+// entity-card fetch shapes. The hub's 12 RAG mapper `listApi` closures
+// delegate here (byte-parity test guards the migration); embedders wire
+// `endpoints.buildListUrl = (t, ids) => buildListUrl(t, ids, '/content')`.
+// Pure + server-safe (the hub imports it server-side from this barrel).
+export { buildListUrl } from './list-url'
+
+// Embedder-configurable content-URL composer for the existing
+// `runtime.composeContentUrl` seam — relative href for host-served types,
+// hub origin for the rest. Pure + server-safe.
+export {
+  DEFAULT_CONTENT_SUFFIXES,
+  makeComposeContentUrl,
+  buildDefaultHref,
+  type ContentHrefOptions,
+  type ComposeContentUrl,
+} from './content-href'
