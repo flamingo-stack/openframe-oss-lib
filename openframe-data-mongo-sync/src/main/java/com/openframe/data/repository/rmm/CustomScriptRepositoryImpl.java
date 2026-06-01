@@ -90,8 +90,6 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
         return FIELD_ID;
     }
 
-    // ---------- filter assembly ----------
-
     private static void applyStatusFilter(Criteria criteria, ScriptQueryFilter filter) {
         if (filter != null && filter.getStatuses() != null && !filter.getStatuses().isEmpty()) {
             // Explicit caller request — respect it verbatim (admin audit may ask for [DELETED]).
