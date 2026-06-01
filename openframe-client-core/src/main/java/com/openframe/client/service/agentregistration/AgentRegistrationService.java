@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
 
 import static com.openframe.client.service.AgentAuthService.CLIENT_CREDENTIALS_GRANT_TYPE;
 import static java.lang.String.format;
@@ -53,6 +54,20 @@ public class AgentRegistrationService {
     // TODO: two phase commit for the nats integration or other fallback
     public AgentRegistrationResponse register(String initialKey, AgentRegistrationRequest request) {
         secretValidator.validate(initialKey);
+
+        // Clean up stale PENDING registrations for the same device (retry deduplication).
+        // If the agent retries without a stored machineId, each attempt would create a new
+        // PENDING machine. Delete previous PENDING records for the same osUuid before proceeding.
+        if (request.getOsUuid() != null && !request.getOsUuid().isBlank()) {
+            List<Machine> stalePending = machineRepository.findByOsUuidAndStatus(
+                    request.getOsUuid(), DeviceStatus.PENDING);
+            if (!stalePending.isEmpty()) {
+                log.info("Removing {} stale PENDING registration(s) for osUuid={} before re-registration",
+                        stalePending.size(), request.getOsUuid());
+                stalePending.forEach(m -> oauthClientRepository.deleteByMachineId(m.getMachineId()));
+                machineRepository.deleteAll(stalePending);
+            }
+        }
 
         String machineId = machineIdGenerator.generate();
         String clientId = buildClientId(machineId);
