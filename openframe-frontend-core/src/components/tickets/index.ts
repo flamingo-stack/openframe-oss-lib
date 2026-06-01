@@ -10,6 +10,10 @@ export {
   TicketLinkedDeliveryCard,
   type TicketLinkedDeliveryCardProps,
 } from './ticket-linked-delivery-card'
+export {
+  TicketReplyComposer,
+  type TicketReplyComposerProps,
+} from './ticket-reply-composer'
 // Help Center — full-page customer-facing surface used by
 // openframe's `/tickets` route. Composes `DevSectionPage` chrome
 // (hero + search + filter) + a creation form above the controls +

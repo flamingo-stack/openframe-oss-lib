@@ -12,6 +12,7 @@ export * from './chat-input'
 export * from './slash-command-suggestions'
 export * from './chat-message-enhanced'
 export * from './chat-message-list'
+export * from './chat-message-row'
 
 export * from './chat-quick-action'
 export * from './chat-ticket-list'

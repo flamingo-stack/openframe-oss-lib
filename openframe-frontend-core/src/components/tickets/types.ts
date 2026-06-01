@@ -212,6 +212,20 @@ export interface MappedTicketActionError {
 export const TICKET_TEXT_MAX_CHARS = 5000
 
 /**
+ * Live-refresh cadence (ms) for an OPEN ticket drawer. Drives BOTH
+ * surfaces that must stay current while the customer is looking at a
+ * ticket:
+ *   - the ticket LIST poll (`useTicketsList.refetchInterval`) → surfaces
+ *     out-of-band status / pipeline / priority / assignee changes;
+ *   - the CONVERSATION poll (`useTicketEngagements.refetchInterval`) →
+ *     surfaces new agent replies + attachments.
+ * Single source of truth so the two surfaces never drift. Both leave
+ * `refetchIntervalInBackground` at its default (false), so polling pauses
+ * on a hidden tab — no wasted requests when the user tabs away.
+ */
+export const TICKET_LIVE_POLL_MS = 8000
+
+/**
  * Centralized toast copy. Keep all wording here so QA / localization
  * can find every user-visible string in one file.
  */
