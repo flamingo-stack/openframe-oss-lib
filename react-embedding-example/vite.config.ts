@@ -46,8 +46,9 @@ export default defineConfig(({ mode }) => {
     //      lands in the lib watcher's `rm -rf dist && tsup` window can't find the file.
     //   2. "[BABEL] code generator deoptimised … exceeds 500KB" — the lib's big chunks no
     //      longer pass through @vitejs/plugin-react's Babel (esbuild bundles them once).
-    // The cache-clean launch (`rm -rf node_modules/.vite` — see .vscode/launch.json) forces
-    // a fresh re-bundle on every F5, so lib edits are still picked up.
+    // The launch config runs `vite --force` (see .vscode/launch.json) to ignore the dep
+    // cache and re-bundle on every F5 (cross-platform — no shell `rm -rf`), so lib edits
+    // are still picked up. Run `npm run dev -- --force` manually for the same effect.
     optimizeDeps: {
       include: [
         '@flamingo-stack/openframe-frontend-core/components',
