@@ -76,6 +76,16 @@ describe('makeComposeContentUrl (unified single-object seam)', () => {
     ).toEqual({ href: '/releases/fallback-slug', targetPlatform: null })
   })
 
+  it('hosted type WITH a list-style externalUrl whose last segment IS the type suffix → falls back to the identifier (no /releases/releases)', () => {
+    // A malformed / list externalUrl like `${HUB}/releases/` has last segment
+    // 'releases' === the type's own suffix. The `recovered !== seg` guard must
+    // reject it and recover via the identifier, NOT emit a nonsensical
+    // `/releases/releases`. (Covers the collision branch of the slug-recovery guard.)
+    expect(
+      compose({ type: 'product_release', identifier: 'fallback-slug', externalUrl: `${HUB}/releases/` }),
+    ).toEqual({ href: '/releases/fallback-slug', targetPlatform: null })
+  })
+
   // ── Config knobs ───────────────────────────────────────────────────────────
   it('custom suffixes override the defaults', () => {
     const c = makeComposeContentUrl({

@@ -10,8 +10,7 @@
  * surface routes through it:
  *   - chat cards / chips / markdown links → `executeNavigation` (click form),
  *     via the thin `handleChatNavClick` wrapper.
- *   - buttons / page rows / form redirects → `executeNavigationImperative`,
- *     via the thin `softNavigate` wrapper or directly.
+ *   - buttons / page rows / form redirects → `executeNavigationImperative` directly.
  *
  * Decision tree (the SAME one `handleChatNavClick` used — copied verbatim so
  * behavior is byte-identical; the hub's chat-click behavior MUST NOT change):
