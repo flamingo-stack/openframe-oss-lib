@@ -1,0 +1,36 @@
+# RMM ad-hoc command dispatch.
+#
+# Distinct from scripts: a command is just a raw shell string typed in the
+# dashboard. Nothing is persisted on the backend — the mutation only forwards
+# the command to the target agent over NATS and returns an executionId for
+# the dashboard to correlate the asynchronous agent response.
+
+extend type Mutation {
+    """Dispatch an ad-hoc shell command to the target agent. Fire-and-forget — returns immediately with an executionId the client can use to correlate the agent's response."""
+    runCommand(input: RunCommandInput!): CommandDispatchResponse!
+
+    """Request cancellation of an in-flight execution on a target agent. Best-effort and asynchronous — returns immediately; the agent's actual outcome arrives via the normal result channel and may still be a normal terminal frame if the execution finished before the cancel was delivered."""
+    cancelExecution(input: CancelExecutionInput!): CancelDispatchResponse!
+}
+
+input RunCommandInput {
+    machineId: String!
+    shell: String!
+    command: String!
+    args: [String!]
+    envVars: [String!]
+    timeoutSeconds: Int
+}
+
+type CommandDispatchResponse {
+    executionId: ID!
+}
+
+input CancelExecutionInput {
+    machineId: String!
+    executionId: ID!
+}
+
+type CancelDispatchResponse {
+    executionId: ID!
+}
