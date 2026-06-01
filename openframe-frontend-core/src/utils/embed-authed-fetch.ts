@@ -204,11 +204,32 @@ export function embedAuthedFetch(url: string, init: RequestInit = {}): Promise<R
  * server. Resets to `null` once settled so the next genuine expiry can
  * refresh again.
  */
-let inFlightRefresh: Promise<boolean> | null = null
+// Stored on `globalThis` rather than a module-local so the "single refresh"
+// guarantee survives module duplication. Bundlers can ship more than one copy
+// of this module (e.g. across chunks or a host + embedded build); a per-module
+// variable would let each copy run its own refresh cycle, re-creating the
+// thundering-herd this dedupe exists to prevent.
+const IN_FLIGHT_REFRESH_GLOBAL_KEY = '__embedAuthedFetchInFlightRefresh__'
+
+function getInFlightRefresh(): Promise<boolean> | null {
+  if (typeof globalThis === 'undefined') return null
+  return (
+    ((globalThis as Record<string, unknown>)[IN_FLIGHT_REFRESH_GLOBAL_KEY] as
+      | Promise<boolean>
+      | null
+      | undefined) ?? null
+  )
+}
+
+function setInFlightRefresh(refresh: Promise<boolean> | null): void {
+  if (typeof globalThis === 'undefined') return
+  ;(globalThis as Record<string, unknown>)[IN_FLIGHT_REFRESH_GLOBAL_KEY] = refresh
+}
 
 function dedupedRefresh(): Promise<boolean> {
   const adapter = getRegisteredAuthAdapter()
   if (!adapter?.refresh) return Promise.resolve(false)
+  let inFlightRefresh = getInFlightRefresh()
   if (!inFlightRefresh) {
     // Wrap in `Promise.resolve` so an adapter that throws synchronously
     // (rather than rejecting) still funnels through the shared slot and
@@ -217,8 +238,9 @@ function dedupedRefresh(): Promise<boolean> {
       .then(() => adapter.refresh!())
       .catch(() => false)
       .finally(() => {
-        inFlightRefresh = null
+        setInFlightRefresh(null)
       })
+    setInFlightRefresh(inFlightRefresh)
   }
   return inFlightRefresh
 }

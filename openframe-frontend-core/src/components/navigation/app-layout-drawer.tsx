@@ -359,7 +359,7 @@ function AppLayoutDrawerResizeHandle({
       <div
         aria-hidden
         className={cn(
-          "rounded-full bg-[var(--system-greys-soft-grey,#3A3A3A)]",
+          "rounded-full bg-ods-border",
           gripClass,
         )}
       />
@@ -547,7 +547,7 @@ const AppLayoutDrawerContent = React.forwardRef<
           aria-hidden
           data-state={open ? "open" : "closed"}
           className={cn(
-            "absolute inset-0 z-[40] bg-black/50 pointer-events-auto outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+            "absolute inset-0 z-[40] bg-black/50 outline-none data-[state=open]:pointer-events-auto data-[state=closed]:pointer-events-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
             overlayClassName,
           )}
         />

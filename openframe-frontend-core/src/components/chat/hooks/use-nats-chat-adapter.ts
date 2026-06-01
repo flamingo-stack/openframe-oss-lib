@@ -561,9 +561,16 @@ export function useNatsChatAdapter(
   // accumulator, and seed `messages`. Streaming chunks for the same
   // dialog then append on top.
 
+  // Monotonic guard: each history load captures a sequence number; when a
+  // response resolves, it only applies if it's still the latest request. This
+  // prevents a slow response for a previously-selected dialog from clobbering
+  // the state of the dialog the user just switched to.
+  const historyLoadSeqRef = useRef(0)
+
   const loadDialogHistory = useCallback(
     async (id: string, cursor?: string): Promise<void> => {
       if (!fetchDialogMessages) return
+      const seq = ++historyLoadSeqRef.current
       setIsMessagesLoading(true)
       try {
         const result = await fetchDialogMessages({
@@ -571,6 +578,8 @@ export function useNatsChatAdapter(
           cursor,
           limit: messagesPageSize,
         })
+        // Ignore stale responses superseded by a newer dialog selection.
+        if (seq !== historyLoadSeqRef.current) return
         const { messages: rawProcessed } = processHistoricalMessagesWithErrors(
           result.messages,
           {
@@ -598,7 +607,11 @@ export function useNatsChatAdapter(
       } catch (err) {
         console.error('[useNatsChatAdapter] fetchDialogMessages failed:', err)
       } finally {
-        setIsMessagesLoading(false)
+        // Only the latest request owns the loading flag — a superseded one
+        // must not clear it while the newer load is still in flight.
+        if (seq === historyLoadSeqRef.current) {
+          setIsMessagesLoading(false)
+        }
       }
     },
     [
