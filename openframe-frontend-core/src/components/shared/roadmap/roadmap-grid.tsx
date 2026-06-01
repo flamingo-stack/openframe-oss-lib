@@ -229,7 +229,7 @@ export function RoadmapGrid({
         : computeDefaultExpandedQuarters(sortedQuarters, quartersToKeepClosed),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasActiveFilters, sortedQuartersKey, isInitialized]);
+  }, [hasActiveFilters, sortedQuartersKey, isInitialized, quartersToKeepClosed]);
 
   if (items.length === 0) {
     return (
