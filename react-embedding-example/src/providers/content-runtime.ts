@@ -5,10 +5,16 @@ import { buildListUrl, makeComposeContentUrl } from '@flamingo-stack/openframe-f
 import { CONTENT_PREFIX } from '../../proxy/content-prefix.mjs'
 import { EP, HUB_PUBLIC_ORIGIN } from '../config/endpoints'
 
-// The content types THIS embedder hosts on its own slugged routes (see
-// app-routes.tsx). `makeComposeContentUrl` returns a relative in-app href for
-// these (soft-navigates) and the canonical hub origin for everything else.
-const HOSTED_TYPES = new Set(['onboarding_guide', 'product_release', 'roadmap_item'])
+// The content types THIS embedder hosts on its own slugged DETAIL routes (see
+// app-routes.tsx: /onboarding-guides/:slug, /releases/:slug). `makeComposeContentUrl`
+// returns a relative in-app href `/<suffix>/<slug>` for these (soft-navigates) and the
+// canonical hub origin for everything else.
+//
+// NOTE: the list-filter sections (roadmap, delivery) are deliberately NOT here — they
+// have no `/<x>/<slug>` detail page; a chat card / page link deep-links into the
+// existing LIST route via `?search=<id>` (see `overrides` below). Suffix logic would
+// wrongly produce `/<suffix>/<id>`, so they need an explicit override instead.
+const HOSTED_TYPES = new Set(['onboarding_guide', 'product_release'])
 
 // The embedder is platform-agnostic: it does NOT set `source` (the lib types it as
 // optional). The chat wire resolves source server-side from the proxied hub's
@@ -46,11 +52,20 @@ export function buildChatRuntime(): Omit<ChatRuntime, 'source'> {
     composeContentUrl: makeComposeContentUrl({
       hostedTypes: HOSTED_TYPES,
       contentOrigin: HUB_PUBLIC_ORIGIN,
-      // Per-type override → the EXISTING /roadmap route with a hash anchor (no new
-      // route/page). This proves the override seam applies to BOTH page links AND
-      // chat cards, because both flow through this one composeContentUrl.
+      // List-filter types deep-link into their EXISTING list route with `?search=<id>`
+      // — the param `DevSectionView` writes and `RoadmapView` / `DeliveryLists` read.
+      // (Verified against the live hub: /api/roadmap + /api/delivery match the task id
+      // in their `search`, returning exactly that one row.) Both page links AND chat
+      // cards flow through this one composeContentUrl, so a roadmap/delivery item lands
+      // in the SAME filtered place wherever it's rendered. `id` is the row's
+      // primary-key id (the ClickUp task id the chat ref carries).
+      //
+      // Without these, delivery_item would fall through to its server-baked relative
+      // `externalUrl` (`/bug-fixes-and-enhancements?search=<id>` — the HUB's route, which
+      // 404s in this app), and roadmap_item to a `#hash` the list never reads.
       overrides: {
-        roadmap_item: (id) => ({ href: `/roadmap#${id}`, targetPlatform: null }),
+        roadmap_item: (id) => ({ href: `/roadmap?search=${encodeURIComponent(id)}`, targetPlatform: null }),
+        delivery_item: (id) => ({ href: `/delivery?search=${encodeURIComponent(id)}`, targetPlatform: null }),
       },
     }),
   }
