@@ -82,6 +82,11 @@ export function OnboardingGuidesCatalogView({
     selfFetch && sectionsEndpoint ? sectionsEndpoint : null,
   )
 
+  // Invariant: `guidesRes.data` is `null` until the first fetch resolves, then
+  // `{ data: [...] }`. The `?.data ?? []` chain collapses never-fetched (null) and
+  // legitimately-empty ([]) to the same `[]` — so the first-load skeleton gate below
+  // keys on the OUTER `guidesRes.data == null` to distinguish them (an empty section
+  // toggle keeps the chrome; only a true cold start shows the full-page skeleton).
   const guides = initialGuides ?? guidesRes.data?.data ?? []
   const sections = initialSections ?? (Array.isArray(sectionsRes.data) ? sectionsRes.data : [])
   const isLoading = selfFetch ? guidesRes.isLoading : false
