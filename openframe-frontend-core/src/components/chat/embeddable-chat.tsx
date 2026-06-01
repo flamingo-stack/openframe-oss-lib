@@ -47,6 +47,7 @@ import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon'
 
 import { ChatFooter } from './chat-container'
 import { ChatInput } from './chat-input'
+import { ChatSidebar } from './chat-sidebar'
 import { MingoOnboardingCard } from './mingo-onboarding-card'
 import { MingoOnboardingCardSkeleton } from './mingo-onboarding-card-skeleton'
 import { ChatMessageList } from './chat-message-list'
@@ -167,6 +168,20 @@ export interface EmbeddableChatProps {
    * else `'mingo'`.
    */
   defaultActiveMode?: ChatMode
+
+  /**
+   * Wrapper shell around the chat body.
+   *   - `'drawer'` (default): wraps in a body-level Radix Drawer (slide-in
+   *     overlay from the right) — the original MPH / standalone behaviour.
+   *   - `'none'`: no shell. Renders only the chat body so the consumer can
+   *     host it inside their own container (e.g. `AppLayoutDrawerContent`).
+   *     The internal "Ask AI" trigger and iOS body scroll-lock are also
+   *     suppressed — those are Drawer-shell concerns. The consumer is
+   *     responsible for mount/unmount and for opening/closing via the
+   *     `open` / `onOpenChange` props (which the in-body close button still
+   *     drives).
+   */
+  shell?: 'drawer' | 'none'
 }
 
 // =============================================================================
@@ -562,7 +577,13 @@ function EmbeddableChatInner({
   activeMode: controlledActiveMode,
   onActiveModeChange,
   defaultActiveMode,
+  shell = 'drawer',
 }: EmbeddableChatProps) {
+  // `shell === 'none'` means the consumer hosts us inside their own panel
+  // (e.g. AppLayoutDrawer in openframe-frontend). Several drawer-shell
+  // concerns are unconditional in this codebase — gate them off here so
+  // we don't double-up with the host's behaviour.
+  const shellLess = shell === 'none'
   const runtime = useRequiredChatRuntime()
   const source = runtime.source as DocSource
   const commandsUrl = runtime.endpoints.commandsUrl
@@ -603,12 +624,15 @@ function EmbeddableChatInner({
 
   // iOS scroll-lock — react-aria's two-layer approach plus body fixed-pos.
   // See hub original for the long mechanism comment; logic copied verbatim.
-  usePreventScroll({ isDisabled: !isOpen })
+  // Skipped in shell-less mode: the host (AppLayoutDrawer) is in-layout, so
+  // there's no body-level overlay that should block page scrolling.
+  usePreventScroll({ isDisabled: !isOpen || shellLess })
 
   const navigatingAwayRef = useRef(false)
 
   useEffect(() => {
     if (!isOpen) return
+    if (shellLess) return
     if (typeof window === 'undefined') return
     if (!isIOS()) return
 
@@ -634,7 +658,7 @@ function EmbeddableChatInner({
       if (window.location.pathname !== openPathname) return
       window.scrollTo(0, scrollY)
     }
-  }, [isOpen])
+  }, [isOpen, shellLess])
 
   // Imperative handle to the chat input.
   const chatInputRef = useRef<ChatInputRef | null>(null)
@@ -755,7 +779,45 @@ function EmbeddableChatInner({
     currentCacheHitRatePct,
     currentUsageBreakdown,
     displayRef,
+    // ─── Dialog management (Mingo-mode sidebar) ───
+    dialogs,
+    activeDialogId,
+    selectDialog,
+    startNewDialog,
+    isDialogsLoading,
+    hasMoreDialogs,
+    loadMoreDialogs,
   } = useUnifiedChat({ modes: effectiveModes, activeMode })
+
+  // Whether the in-panel dialog sidebar should render. Gated on:
+  //   1. Mingo mode is active (Guide has localStorage-only history that
+  //      isn't yet structured as a sidebar list — see
+  //      [[chat-architecture-and-migration]] for the asymmetry).
+  //   2. The host wired `fetchDialogs` — managed-dialog mode, not the
+  //      bare-transport Tauri flow.
+  const showSidebar =
+    activeMode === 'mingo' && effectiveModes.mingo?.fetchDialogs !== undefined
+
+  // Pending startNewDialog promise — used to gate the "Start new chat"
+  // button while creation is in flight so a double-click doesn't spawn
+  // two backend dialogs.
+  const [isStartingNewDialog, setIsStartingNewDialog] = useState<boolean>(false)
+  const handleStartNewDialog = useCallback(async () => {
+    if (isStartingNewDialog) return
+    setIsStartingNewDialog(true)
+    try {
+      await startNewDialog()
+    } finally {
+      setIsStartingNewDialog(false)
+    }
+  }, [isStartingNewDialog, startNewDialog])
+
+  const handleSelectDialog = useCallback(
+    (id: string) => {
+      selectDialog(id)
+    },
+    [selectDialog],
+  )
 
   // Chat-attachment hooks (v2 attachment feature).
   const {
@@ -930,8 +992,9 @@ function EmbeddableChatInner({
   return (
     <>
       {/* Floating "Ask AI" button — sticky-dock pattern. See hub original
-          for the full mechanism explanation. */}
-      {showInternalTrigger && (
+          for the full mechanism explanation. Suppressed in shell-less mode:
+          the host controls open/close, so an internal trigger would race. */}
+      {showInternalTrigger && !shellLess && (
         <div
           aria-hidden={isOpen}
           className={`sticky bottom-0 h-0 z-[9990] pointer-events-none ${
@@ -953,36 +1016,17 @@ function EmbeddableChatInner({
         </div>
       )}
 
-      <Drawer open={isOpen} onOpenChange={(o: boolean) => !o && handleClose()}>
-        <ChatPanelContext.Provider value={chatPanelHandle}>
-          {/*
-            Panel-level handle for descendants (inline cards via
-            `ChatCardNavWrap`, markdown-body links via
-            `NavLinkAnchorViaRuntime`) to close the panel after same-tab
-            navigation. Same-tab clicks fire `closeChat`; new-tab clicks
-            leave the panel open while the new tab loads.
-          */}
-          <DrawerContent
-            side="right"
-            flush
-            resizable
-            minSize={480}
-            maxSize={1280}
-            defaultSize={640}
-            storageKey="mingo-chat-width"
-            resizeAriaLabel="Resize chat panel"
-            overlayClassName="mingo-chat-overlay md:bg-black/20"
-            aria-describedby={undefined}
-            className="
-              mingo-chat-content !bg-ods-bg shadow-2xl
-              focus:outline-none focus-visible:outline-none
-              w-screen md:w-auto
-            "
-          >
-            <VisuallyHidden>
-              <DialogPrimitive.Title>{sourceLabel} AI Assistant</DialogPrimitive.Title>
-            </VisuallyHidden>
-
+      {/*
+        Conditional shell — overlay (Drawer, MPH default) vs inline
+        (positioned `<aside>` anchored to the nearest positioned
+        ancestor, openframe-frontend's nav-embedded chat). Both share
+        the same `body` JSX so the chat content is defined exactly
+        once; the IIFE keeps both branches type-balanced inside JSX
+        (no opening tag in one ternary branch + closing in another).
+      */}
+      {(() => {
+        const body = (
+          <>
             <div className="flex h-full flex-col overflow-hidden">
               {/* Figma node 7363:205930 — top-navigation. Title intentionally
                   omitted; a chevron-left + "New Chat" back-style affordance
@@ -1020,6 +1064,27 @@ function EmbeddableChatInner({
                   <XmarkIcon className="text-ods-text-secondary" size={24} />
                 </button>
               </div>
+
+              {/* Sidebar + chat-panel row. When Mingo is the active mode and
+                  `fetchDialogs` is wired, the in-panel `<ChatSidebar>` lists
+                  the user's backend-driven dialog history. Guide mode keeps
+                  history in localStorage and currently renders no sidebar. */}
+              <div className="flex flex-1 min-h-0 overflow-hidden">
+                {showSidebar && (
+                  <ChatSidebar
+                    className="w-72 shrink-0"
+                    dialogs={dialogs}
+                    activeDialogId={activeDialogId ?? undefined}
+                    onDialogSelect={handleSelectDialog}
+                    onNewChat={() => { void handleStartNewDialog() }}
+                    isLoading={isDialogsLoading && dialogs.length === 0}
+                    isCreatingDialog={isStartingNewDialog}
+                    hasNextPage={hasMoreDialogs}
+                    isFetchingNextPage={isDialogsLoading && dialogs.length > 0}
+                    onLoadMore={() => { void loadMoreDialogs() }}
+                  />
+                )}
+                <div className="flex flex-1 flex-col min-h-0 min-w-0">
 
               {showModeToggle ? (
                 <div
@@ -1222,11 +1287,63 @@ function EmbeddableChatInner({
                   </div>
                 </div>
               </div>
+                </div>
+              </div>
             </div>
             {galleryModal}
-          </DrawerContent>
-        </ChatPanelContext.Provider>
-      </Drawer>
+          </>
+        )
+
+        // Shell-less branch — host (e.g. AppLayoutDrawer) provides the panel
+        // chrome, focus trap, animation, and size. We render only the chat
+        // body plus ChatPanelContext so descendants can still close after
+        // same-tab navigation via the host's `onOpenChange`.
+        if (shellLess) {
+          return (
+            <ChatPanelContext.Provider value={chatPanelHandle}>
+              {body}
+            </ChatPanelContext.Provider>
+          )
+        }
+
+        // Body-level Radix Drawer — backdrop, iOS scroll-lock, focus
+        // trap, drag-to-resize handle. Slides in from the right edge.
+        return (
+          <Drawer open={isOpen} onOpenChange={(o: boolean) => !o && handleClose()}>
+            <ChatPanelContext.Provider value={chatPanelHandle}>
+              {/*
+                Panel-level handle for descendants (inline cards via
+                `ChatCardNavWrap`, markdown-body links via
+                `NavLinkAnchorViaRuntime`) to close the panel after same-tab
+                navigation. Same-tab clicks fire `closeChat`; new-tab clicks
+                leave the panel open while the new tab loads.
+              */}
+              <DrawerContent
+                side="right"
+                flush
+                resizable
+                minSize={showSidebar ? 720 : 480}
+                maxSize={1600}
+                defaultSize={showSidebar ? 960 : 640}
+                storageKey={showSidebar ? 'mingo-chat-width-with-sidebar' : 'mingo-chat-width'}
+                resizeAriaLabel="Resize chat panel"
+                overlayClassName="mingo-chat-overlay md:bg-black/20"
+                aria-describedby={undefined}
+                className="
+                  mingo-chat-content !bg-ods-bg shadow-2xl
+                  focus:outline-none focus-visible:outline-none
+                  w-screen md:w-auto
+                "
+              >
+                <VisuallyHidden>
+                  <DialogPrimitive.Title>{sourceLabel} AI Assistant</DialogPrimitive.Title>
+                </VisuallyHidden>
+                {body}
+              </DrawerContent>
+            </ChatPanelContext.Provider>
+          </Drawer>
+        )
+      })()}
     </>
   )
 }
