@@ -774,13 +774,14 @@ function EmbeddableChatInner({
     useChatAttachmentImageGallery()
 
   // Resolve base route. Hub default mapping: flamingo → /knowledge-base,
-  // anything else → /data-room. Embedders can override per platform.
-  // `??` (not `||`): an explicit empty string means "I do NOT host an in-app doc
-  // viewer" → doc-table cards (markdown / data-room) resolve to NO href and become
-  // Ask-only, rather than navigating to a dead in-app route. `undefined` (the hub +
-  // most callers) still falls through to the platform default.
+  // anything else → /data-room. Embedders override per platform. An embedder that
+  // doesn't host an in-app doc viewer should NOT pass an empty baseRoute (that just
+  // falls back to the platform default here) — instead it sets a truthy baseRoute +
+  // `chipBasePlatform` so doc chips with no externalUrl resolve cross-platform to that
+  // platform's public knowledge hub (`getBaseUrl(chipBasePlatform)/knowledge-base/…`),
+  // exactly like the hub's openframe config (baseRoute:'/', chipBasePlatform:'flamingo').
   const resolvedBaseRoute =
-    baseRoute ?? (source === 'flamingo' ? '/knowledge-base' : '/data-room')
+    baseRoute || (source === 'flamingo' ? '/knowledge-base' : '/data-room')
 
   const handleClose = useCallback(() => setIsOpen(false), [setIsOpen])
 
