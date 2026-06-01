@@ -179,7 +179,10 @@ export function resolveSourceRowCTA(
     if (safePath) {
       const docTarget = row.documentType ? ctx.docPlatformTargets?.[row.documentType] : undefined
       if (docTarget) {
-        const seg = docTarget.basePath.replace(/^\/+|\/+$/g, '')
+        // Trim leading/trailing (and collapse empty) segments WITHOUT a regex — the
+        // slash-stripping regex `/^\/+|\/+$/g` tripped CodeQL's js/polynomial-redos (high)
+        // since `\/+$` backtracks on inputs with many '/'. split/filter/join is linear.
+        const seg = docTarget.basePath.split('/').filter(Boolean).join('/')
         const base = `${getBaseUrl(docTarget.platform)}${seg ? `/${seg}` : ''}/`
         href = safeHref(new URL(safePath, base).toString()) ?? null
         targetPlatform = docTarget.platform
