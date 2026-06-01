@@ -254,16 +254,24 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    @DisplayName("Given scripts with mixed shells, when filter.shells = [BASH], then only BASH scripts come back (and tenant isolation still applies)")
-    void findPageForTenant_filterByShells() {
-        scriptRepository.save(Script.builder().tenantId(TENANT_A).name("ps").shell(ScriptShell.POWERSHELL).scriptBody("...").build());
-        Script bashScript = scriptRepository.save(Script.builder().tenantId(TENANT_A).name("bash").shell(ScriptShell.BASH).scriptBody("...").build());
+    @DisplayName("Given scripts with mixed shells across two tenants, when filter.shells = [BASH] for tenant A, then only A's BASH script comes back — tenant B's BASH script is NOT returned (filter + tenant isolation hold together)")
+    void findPageForTenant_filterByShells_respectsTenantIsolation() {
+        // Tenant A: one PowerShell + one BASH
+        scriptRepository.save(Script.builder().tenantId(TENANT_A).name("a-ps")
+                .shell(ScriptShell.POWERSHELL).scriptBody("...").build());
+        Script aBash = scriptRepository.save(Script.builder().tenantId(TENANT_A).name("a-bash")
+                .shell(ScriptShell.BASH).scriptBody("...").build());
+        // Tenant B: a BASH script that MUST NOT leak into tenant A's result
+        Script bBash = scriptRepository.save(Script.builder().tenantId(TENANT_B).name("b-bash")
+                .shell(ScriptShell.BASH).scriptBody("...").build());
 
         ScriptQueryFilter filter = ScriptQueryFilter.builder().shells(List.of(ScriptShell.BASH)).build();
         List<Script> page = scriptRepository.findPageForTenant(
                 TENANT_A, filter, null, "_id", Sort.Direction.DESC, null, false, 10);
 
-        assertThat(page).extracting(Script::getId).containsExactly(bashScript.getId());
+        assertThat(page).extracting(Script::getId)
+                .containsExactly(aBash.getId())
+                .doesNotContain(bBash.getId());
     }
 
     @Test
