@@ -105,7 +105,11 @@ export function OnboardingGuideDetailView({
 
   const defaultRenderRelatedCard = (g: OnboardingGuide) => {
     const cta = runtime?.composeContentUrl
-      ? runtime.composeContentUrl('onboarding_guide', g.slug, g.onboarding_guide_platforms)
+      ? runtime.composeContentUrl({
+          type: 'onboarding_guide',
+          identifier: g.slug,
+          platforms: g.onboarding_guide_platforms,
+        })
       : buildDefaultHref(basePath, g.slug)
     return <OnboardingGuideCard guide={g} href={cta.href} targetPlatform={cta.targetPlatform} />
   }

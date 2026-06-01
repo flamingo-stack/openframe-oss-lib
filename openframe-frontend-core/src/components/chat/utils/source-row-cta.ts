@@ -28,6 +28,7 @@ import { getIconComponent } from './icon-registry'
 import { getBaseUrl } from '../../../utils/cn'
 import { safeHref } from './compact-card-classes'
 import type { ChatRef } from '../chat-ref.types'
+import type { ComposeContentUrl } from '../../../utils/content-href'
 
 /** Path sanitization — keep alphanumerics, slash, dash, dot, underscore;
  *  strip everything else. Defends against a hostile mapper returning a
@@ -77,6 +78,15 @@ export interface SourceRowContext {
    * keeps the FileText icon.
    */
   tableIdForDocumentType?: (documentType: string) => string | null
+  /**
+   * Host-supplied unified content-href resolver (`runtime.composeContentUrl`).
+   * When provided, entity rows WITH a public `externalUrl` resolve their href
+   * through it — so the host's `hostedTypes` / `overrides` route a chat card to
+   * the SAME destination as the equivalent page-view card (in-app for hosted
+   * types, the hub URL otherwise). When omitted, the row's `externalUrl` is used
+   * verbatim (legacy).
+   */
+  composeContentUrl?: ComposeContentUrl
 }
 
 export interface SourceRowCTA {
@@ -138,13 +148,14 @@ export function resolveSourceRowCTA(
 
   const { icon, iconLabel } = pickSourceIcon(sourceRepo, row.documentType)
 
-  // URL resolution.
+  // URL resolution. `idValue` (row primary key) is shared with the Ask
+  // drill-in check below.
   let href: string | null = null
   let targetPlatform: string | null = null
-  if (row.externalUrl) {
-    href = safeHref(row.externalUrl) ?? null
-    targetPlatform = row.targetPlatform ?? null
-  } else if (ctx.baseRoute && row.path && shouldFallbackToPathNav(row)) {
+  const idValue = (row.id ?? '').trim()
+  if (ctx.baseRoute && row.path && shouldFallbackToPathNav(row) && !row.externalUrl) {
+    // Doc-table (markdown / data-room PDF) with no public URL → in-app doc-viewer
+    // path nav. Chat-specific; NOT a content type the composeContentUrl seam knows.
     const safePath = sanitizePath(row.path)
     if (safePath) {
       if (ctx.chipBasePlatform) {
@@ -160,10 +171,26 @@ export function resolveSourceRowCTA(
       // Final safeHref pass on the composed URL — defense-in-depth.
       href = safeHref(href) ?? null
     }
+  } else if (ctx.composeContentUrl && row.documentType && row.externalUrl) {
+    // Entity content WITH a public viewer → the unified content-href seam. The
+    // host's hostedTypes/overrides route hosted types in-app (slug relativized
+    // from the externalUrl) and everything else to the externalUrl verbatim —
+    // the SAME resolver the page-view cards use, so chat + page links match.
+    const composed = ctx.composeContentUrl({
+      type: row.documentType,
+      identifier: idValue,
+      externalUrl: row.externalUrl,
+      targetPlatform: row.targetPlatform ?? null,
+    })
+    href = composed.href ? (safeHref(composed.href) ?? null) : null
+    targetPlatform = composed.targetPlatform
+  } else if (row.externalUrl) {
+    // No composer wired → legacy: the RAG externalUrl verbatim.
+    href = safeHref(row.externalUrl) ?? null
+    targetPlatform = row.targetPlatform ?? null
   }
 
-  // Ask drill-in viability.
-  const idValue = (row.id ?? '').trim()
+  // Ask drill-in viability. (`idValue` computed above.)
   const askable = !!(idValue && row.documentType)
   const chatRef: ChatRef | null = askable
     ? ({

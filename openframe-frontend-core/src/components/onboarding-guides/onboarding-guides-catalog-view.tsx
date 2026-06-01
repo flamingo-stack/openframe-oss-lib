@@ -147,7 +147,11 @@ export function OnboardingGuidesCatalogView({
   // Per-row card renderer — runtime-composed href, fallback to relative.
   const defaultRenderCard = (guide: OnboardingGuide) => {
     const cta = runtime?.composeContentUrl
-      ? runtime.composeContentUrl('onboarding_guide', guide.slug, guide.onboarding_guide_platforms)
+      ? runtime.composeContentUrl({
+          type: 'onboarding_guide',
+          identifier: guide.slug,
+          platforms: guide.onboarding_guide_platforms,
+        })
       : buildDefaultHref(basePath, guide.slug)
     return (
       <OnboardingGuideCard

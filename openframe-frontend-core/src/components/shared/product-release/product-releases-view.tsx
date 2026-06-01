@@ -93,7 +93,11 @@ function ReleaseRow({
   // interview grids. The composer reads `name` → resolves to the CURRENT
   // platform when the release belongs to it → relative same-tab href.
   const cta = runtime?.composeContentUrl
-    ? runtime.composeContentUrl('product_release', release.slug, release.product_release_platforms)
+    ? runtime.composeContentUrl({
+        type: 'product_release',
+        identifier: release.slug,
+        platforms: release.product_release_platforms,
+      })
     : buildDefaultHref(basePath, release.slug)
   const { target, rel } = useEntityCardLink({ href: cta.href, targetPlatform: cta.targetPlatform })
 

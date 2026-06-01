@@ -3,37 +3,37 @@ import { makeComposeContentUrl, DEFAULT_CONTENT_SUFFIXES } from '../content-href
 
 const HUB = 'https://openframe.app'
 
-describe('makeComposeContentUrl', () => {
+describe('makeComposeContentUrl (unified single-object seam)', () => {
   const compose = makeComposeContentUrl({
     hostedTypes: new Set(['onboarding_guide', 'product_release']),
     contentOrigin: HUB,
   })
 
-  it('hosted type → relative in-app href (default suffix)', () => {
-    expect(compose('onboarding_guide', 'getting-started')).toEqual({
+  // ── Page-view inputs (no externalUrl; identifier IS the slug) ──────────────
+  it('hosted type, no externalUrl → relative in-app href (default suffix)', () => {
+    expect(compose({ type: 'onboarding_guide', identifier: 'getting-started' })).toEqual({
       href: '/onboarding-guides/getting-started',
       targetPlatform: null,
     })
-    expect(compose('product_release', 'v1-2-0')).toEqual({
+    expect(compose({ type: 'product_release', identifier: 'v1-2-0' })).toEqual({
       href: '/releases/v1-2-0',
       targetPlatform: null,
     })
   })
 
-  it('non-hosted type → hub origin href', () => {
-    expect(compose('blog_post', 'hello')).toEqual({
+  it('non-hosted type, no externalUrl → hub origin href', () => {
+    expect(compose({ type: 'blog_post', identifier: 'hello' })).toEqual({
       href: `${HUB}/blog/hello`,
       targetPlatform: null,
     })
-    expect(compose('case_study', 'acme')).toEqual({
+    expect(compose({ type: 'case_study', identifier: 'acme' })).toEqual({
       href: `${HUB}/case-studies/acme`,
       targetPlatform: null,
     })
   })
 
   it('always returns a tuple (never null) — even for an unknown type', () => {
-    // No suffix entry → falls back to the raw type as the segment, hub origin.
-    expect(compose('totally_unknown', 'x')).toEqual({
+    expect(compose({ type: 'totally_unknown', identifier: 'x' })).toEqual({
       href: `${HUB}/totally_unknown/x`,
       targetPlatform: null,
     })
@@ -41,36 +41,69 @@ describe('makeComposeContentUrl', () => {
 
   it('ignores the platforms arg — membership in hostedTypes decides', () => {
     expect(
-      compose('onboarding_guide', 'g', [{ name: 'flamingo' }]),
+      compose({ type: 'onboarding_guide', identifier: 'g', platforms: [{ name: 'flamingo' }] }),
     ).toEqual({ href: '/onboarding-guides/g', targetPlatform: null })
   })
 
+  // ── Chat-row inputs (externalUrl present; identifier is the id) ────────────
+  it('hosted type WITH externalUrl → relativizes to in-app, recovering the slug from the URL', () => {
+    // Chat rows carry the hub URL, not the slug, and `identifier` is the numeric
+    // id — the in-app path must come from the externalUrl's last segment.
+    expect(
+      compose({
+        type: 'product_release',
+        identifier: '12345',
+        externalUrl: `${HUB}/releases/my-cool-release`,
+      }),
+    ).toEqual({ href: '/releases/my-cool-release', targetPlatform: null })
+  })
+
+  it('non-hosted type WITH externalUrl → externalUrl verbatim + targetPlatform passthrough', () => {
+    expect(
+      compose({
+        type: 'blog_post',
+        identifier: '777',
+        externalUrl: `https://www.openmsp.ai/blog/some-post`,
+        targetPlatform: 'openmsp',
+      }),
+    ).toEqual({ href: 'https://www.openmsp.ai/blog/some-post', targetPlatform: 'openmsp' })
+  })
+
+  it('hosted type WITH externalUrl that has no path segment → falls back to the identifier', () => {
+    // Origin-only URL → no last path segment → recover via the identifier.
+    expect(
+      compose({ type: 'product_release', identifier: 'fallback-slug', externalUrl: HUB }),
+    ).toEqual({ href: '/releases/fallback-slug', targetPlatform: null })
+  })
+
+  // ── Config knobs ───────────────────────────────────────────────────────────
   it('custom suffixes override the defaults', () => {
     const c = makeComposeContentUrl({
       hostedTypes: new Set(['onboarding_guide']),
       contentOrigin: HUB,
       suffixes: { onboarding_guide: 'docs/onboarding' },
     })
-    expect(c('onboarding_guide', 'g')).toEqual({
+    expect(c({ type: 'onboarding_guide', identifier: 'g' })).toEqual({
       href: '/docs/onboarding/g',
       targetPlatform: null,
     })
   })
 
-  it('per-type override wins over suffix logic', () => {
+  it('per-type override wins over suffix + externalUrl logic', () => {
     const c = makeComposeContentUrl({
       hostedTypes: new Set<string>(),
       contentOrigin: HUB,
       overrides: {
-        product_release: (slug) => ({ href: `/custom/${slug}`, targetPlatform: 'openframe' }),
+        product_release: (id) => ({ href: `/custom/${id}`, targetPlatform: 'openframe' }),
       },
     })
-    expect(c('product_release', 'v2')).toEqual({ href: '/custom/v2', targetPlatform: 'openframe' })
+    expect(
+      c({ type: 'product_release', identifier: 'v2', externalUrl: `${HUB}/releases/v2` }),
+    ).toEqual({ href: '/custom/v2', targetPlatform: 'openframe' })
   })
 
   it('prototype keys do not leak from the suffix/override maps', () => {
-    // `constructor` is not a hosted type and not an own suffix key → raw segment, hub origin.
-    expect(compose('constructor', 'x')).toEqual({
+    expect(compose({ type: 'constructor', identifier: 'x' })).toEqual({
       href: `${HUB}/constructor/x`,
       targetPlatform: null,
     })

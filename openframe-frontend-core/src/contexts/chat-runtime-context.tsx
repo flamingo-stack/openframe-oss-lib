@@ -35,6 +35,8 @@
 
 import { createContext, useContext, type ReactNode } from 'react'
 
+import type { ComposeContentUrl } from '../utils/content-href'
+
 /**
  * Runtime config consumed by the chat panel.
  */
@@ -143,20 +145,19 @@ export interface ChatRuntime {
    *  platform hrefs without knowing the hub's platform topology
    *  (openmsp.ai / openframe.app / flamingo.run / tmcg).
    *
-   *  Embedders that don't host multi-platform content can wire this to
-   *  a simple `(type, slug) => ({ href: '/' + type + '/' + slug,
-   *  targetPlatform: null })` — or omit, in which case lib views fall
-   *  back to a same-origin relative path with `targetPlatform: null`.
+   *  THE single content-href authority for every embeddable surface — page
+   *  views (onboarding catalog/detail, releases) AND chat cards / chips /
+   *  search results all resolve content links through this one seam, so a
+   *  given type lands in the SAME place regardless of where it's rendered.
+   *  Embedders wire `makeComposeContentUrl({ hostedTypes, contentOrigin })`;
+   *  omit it and lib views fall back to a same-origin relative path
+   *  (`buildDefaultHref`).
    *
-   *  `platforms` is the entity's flattened junction array (e.g.
-   *  `guide.onboarding_guide_platforms`) — the callback runs
-   *  `extractPrimaryPlatform` internally before dispatching to its
-   *  composer. */
-  composeContentUrl?: (
-    type: string,
-    slug: string,
-    platforms?: Array<{ name?: string }>,
-  ) => { href: string; targetPlatform: string | null }
+   *  Takes a single `ComposeContentUrlInput`: `type` + `identifier` (page
+   *  views pass the slug; chat rows pass the id + `externalUrl`, whose path
+   *  yields the slug for in-app routing) + optional `platforms` /
+   *  `externalUrl` / `targetPlatform`. */
+  composeContentUrl?: ComposeContentUrl
   /** Chat source / platform identifier — OPTIONAL. The hub sets it from
    *  `currentPlatform()`; EMBEDDERS leave it unset and stay platform-agnostic.
    *
