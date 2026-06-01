@@ -6,7 +6,7 @@
 import { useMemo, type ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
-  EmbedChatRuntimeProvider,
+  ChatRuntimeContext,
   EndpointsRuntimeContext,
 } from '@flamingo-stack/openframe-frontend-core/contexts'
 import { buildChatRuntime, buildEndpointsRuntime } from './content-runtime'
@@ -18,11 +18,11 @@ export function AppProviders({ children }: { children: ReactNode }) {
   const endpointsRuntime = useMemo(buildEndpointsRuntime, [])
   return (
     <QueryClientProvider client={queryClient}>
-      <EmbedChatRuntimeProvider runtime={chatRuntime}>
+      <ChatRuntimeContext.Provider value={chatRuntime}>
         <EndpointsRuntimeContext.Provider value={endpointsRuntime}>
           {children}
         </EndpointsRuntimeContext.Provider>
-      </EmbedChatRuntimeProvider>
+      </ChatRuntimeContext.Provider>
     </QueryClientProvider>
   )
 }

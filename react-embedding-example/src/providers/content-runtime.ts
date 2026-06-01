@@ -10,9 +10,11 @@ import { EP, HUB_PUBLIC_ORIGIN } from '../config/endpoints'
 // these (soft-navigates) and the canonical hub origin for everything else.
 const HOSTED_TYPES = new Set(['onboarding_guide', 'product_release'])
 
-// Returns the runtime MINUS `source`: the embedder is NOT platform-aware. The lib's
-// <EmbedChatRuntimeProvider> fills `source` from the proxied hub's /auth/identity
-// (its currentPlatform()) at mount — see app-providers.tsx.
+// The embedder is platform-agnostic: it does NOT set `source` (the lib types it as
+// optional). The chat wire resolves source server-side from the proxied hub's
+// currentPlatform(); client-side link decisions fall back to an origin comparison; and
+// the chat-history localStorage namespace falls back to a lib constant. So pointing
+// HUB_ORIGIN at any platform's hub just works — no platform knob anywhere on the client.
 export function buildChatRuntime(): Omit<ChatRuntime, 'source'> {
   return {
     endpoints: {

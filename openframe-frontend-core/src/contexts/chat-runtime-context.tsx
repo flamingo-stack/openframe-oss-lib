@@ -157,11 +157,18 @@ export interface ChatRuntime {
     slug: string,
     platforms?: Array<{ name?: string }>,
   ) => { href: string; targetPlatform: string | null }
-  /** Chat source identifier — REQUIRED. Used for localStorage
-   *  namespacing (`mingo-chat-<source>-v1`). Hub sets via
-   *  `currentPlatform()`; embedders set explicitly.
-   *  `useEmbeddedChat()` throws if source is empty/missing. */
-  source: string
+  /** Chat source / platform identifier — OPTIONAL. The hub sets it from
+   *  `currentPlatform()`; EMBEDDERS leave it unset and stay platform-agnostic.
+   *
+   *  It is NOT required for chat to work. The wire resolves source server-side
+   *  (`/docs/chat|search|commands` reject any client `source`); the
+   *  same-tab-vs-new-tab link decision falls back to an origin comparison when
+   *  it's absent (`decideNewTab` → `isCrossOriginUrl`); and the localStorage
+   *  history namespace falls back to a stable constant. Set it only where the
+   *  client legitimately needs to know its platform a priori — i.e. the hub,
+   *  where several platforms share related origins so "same platform" can't be
+   *  inferred from a URL alone. */
+  source?: string
   // NOTE: No `user` field. The chat's display identity (greeting
   // first-name, etc.) comes from the SERVER-resolved auth via
   // `useChatIdentity()` — the same identity the server uses to

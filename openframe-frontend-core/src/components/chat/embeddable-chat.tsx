@@ -566,7 +566,9 @@ function EmbeddableChatInner({
   defaultActiveMode,
 }: EmbeddableChatProps) {
   const runtime = useRequiredChatRuntime()
-  const source = runtime.source as DocSource
+  // Optional on embedders (platform-agnostic); '' is a harmless sentinel for the
+  // `ask-ai:open-with-ref` event filter below. (DocSource is a `string` alias.)
+  const source = (runtime.source ?? '') as DocSource
   const commandsUrl = runtime.endpoints.commandsUrl
   // Server-resolved identity — drives the greeting first-name AND the
   // attachment capability flag. Single source of truth: the chat-identity

@@ -35,9 +35,4 @@ export {
   type ChatRuntime,
 } from './chat-runtime-context'
 
-export {
-  EmbedChatRuntimeProvider,
-  type EmbedChatRuntimeProviderProps,
-} from './embed-chat-runtime-provider'
-
 export { useOuterOrDefault } from './use-outer-or-default'

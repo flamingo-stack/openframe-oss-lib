@@ -578,6 +578,11 @@ function mergeTurnMeta(
 
 const CHAT_STORAGE_VERSION = 1
 
+/** localStorage history namespace used when no `source` is configured on the
+ *  runtime. Embedders are platform-agnostic (see `ChatRuntime.source`), so any
+ *  stable string works here — the hub passes its real platform instead. */
+const DEFAULT_CHAT_SOURCE = 'embed'
+
 /** Storage key — includes the proxy-auth impersonation email when
  *  present so each impersonated customer keeps a SEPARATE chat history. */
 const chatStorageKey = (source: DocSource): string => {
@@ -675,15 +680,12 @@ export function useSseChatAdapter(
   // Chat-specific code REQUIRES a runtime — the lib's `<HubRuntimeProvider>`
   // (hub) / embedder's provider must wrap the tree.
   const runtime = useRequiredChatRuntime()
-  const source = runtime.source
-  if (!source) {
-    throw new Error(
-      '[useSseChatAdapter] runtime.source is required — got empty string. ' +
-        'Wire `source` on your <ChatRuntimeContext.Provider value={...}>. ' +
-        'Hub default: <HubRuntimeProvider source={currentPlatform()}>; ' +
-        'embedded apps: pass your own platform/tenant identifier.',
-    )
-  }
+  // `source` is OPTIONAL — embedders are platform-agnostic (see ChatRuntime.source).
+  // Here it's used ONLY for the localStorage history namespace + client-side meta
+  // labels; it is NEVER sent on the wire (the hub resolves source server-side via
+  // currentPlatform()). Fall back to a stable constant so the persistence key stays
+  // well-formed when the embedder leaves source unset.
+  const source = runtime.source || DEFAULT_CHAT_SOURCE
   // Fall back to the lib-baked hub-canonical map when the embedder
   // didn't supply an override. Keeps Ask + Display working in any
   // mount that doesn't have a custom documentType registry. Embedders
