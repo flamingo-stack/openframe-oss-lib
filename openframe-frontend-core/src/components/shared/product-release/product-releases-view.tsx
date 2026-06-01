@@ -19,9 +19,9 @@
  */
 
 import * as React from 'react'
-import { useEffect, useRef, useState } from 'react'
 
 import { useRouter, useSearchParams, usePathname } from '../../../embed-shims'
+import { useSelfFetch } from '../../../hooks/use-self-fetch'
 import { useChatRuntime } from '../../../contexts/chat-runtime-context'
 import type { ProductRelease, ProductReleaseListResponse } from '../../../types/product-release'
 import { cn } from '../../../utils/cn'
@@ -139,43 +139,14 @@ export function ProductReleasesView({
   const currentPage = Math.max(1, parseInt(searchParams.get(pageParamKey) || '1', 10) || 1)
   const offset = (currentPage - 1) * itemsPerPage
 
-  const [data, setData] = useState<ProductReleaseListResponse | null>(initialData ?? null)
-  const [isLoading, setIsLoading] = useState(!initialData)
-  const [error, setError] = useState(false)
-  const [reloadKey, setReloadKey] = useState(0)
-  // Skip the very first fetch when SSR `initialData` already hydrated the view.
-  const skipFirstFetch = useRef(!!initialData)
-
-  useEffect(() => {
-    if (skipFirstFetch.current) {
-      skipFirstFetch.current = false
-      return
-    }
-    let cancelled = false
-    async function load() {
-      try {
-        setIsLoading(true)
-        setError(false)
-        const params = new URLSearchParams()
-        params.set('limit', String(itemsPerPage))
-        params.set('offset', String(offset))
-        if (search) params.set(searchParamKey, search)
-        if (status && status !== 'all') params.set(statusParamKey, status)
-        const res = await fetch(`${endpoint}?${params.toString()}`)
-        if (!res.ok) throw new Error(`Request failed (${res.status})`)
-        const json = (await res.json()) as ProductReleaseListResponse
-        if (!cancelled) setData(json)
-      } catch {
-        if (!cancelled) setError(true)
-      } finally {
-        if (!cancelled) setIsLoading(false)
-      }
-    }
-    load()
-    return () => {
-      cancelled = true
-    }
-  }, [endpoint, itemsPerPage, offset, search, status, searchParamKey, statusParamKey, reloadKey])
+  // Fold every query param into the url so it IS the fetch key.
+  const listParams = new URLSearchParams({ limit: String(itemsPerPage), offset: String(offset) })
+  if (search) listParams.set(searchParamKey, search)
+  if (status && status !== 'all') listParams.set(statusParamKey, status)
+  const { data, isLoading, error, reload } = useSelfFetch<ProductReleaseListResponse>(
+    `${endpoint}?${listParams.toString()}`,
+    { initialData },
+  )
 
   const releases = data?.data ?? []
   const totalCount = data?.count ?? 0
@@ -199,7 +170,7 @@ export function ProductReleasesView({
   if (error) {
     return (
       <div className={cn('w-full', className)}>
-        <LoadError message="Failed to load releases." onRetry={() => setReloadKey((k) => k + 1)} />
+        <LoadError message="Failed to load releases." onRetry={reload} />
       </div>
     )
   }

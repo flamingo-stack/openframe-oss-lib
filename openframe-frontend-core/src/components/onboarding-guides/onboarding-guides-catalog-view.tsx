@@ -16,13 +16,15 @@
  * card hrefs via `runtime.composeContentUrl`).
  */
 
-import { useEffect, useMemo, useState, useTransition, type ReactNode } from 'react'
+import { useMemo, useTransition, type ReactNode } from 'react'
 import { GraduationCap } from 'lucide-react'
 
 import { useRouter, useSearchParams } from '../../embed-shims'
+import { useSelfFetch } from '../../hooks/use-self-fetch'
 import { DevSectionPage } from '../shared/dev-section'
 import { DocSearchBar, useDocSearch } from '../shared/doc-search'
 import { FilterPillRow } from '../ui/filter-pill-row'
+import { LoadError } from '../ui/error-state'
 import { OnboardingGuideCard } from '../chat/entity-cards/onboarding-guide-card'
 import { OnboardingGuidesCatalogSkeleton } from './onboarding-guides-catalog-skeleton'
 import { useChatRuntime } from '../../contexts/chat-runtime-context'
@@ -69,49 +71,20 @@ export function OnboardingGuidesCatalogView({
   const sectionValue = selfFetch ? searchParams.get('section') ?? '' : initialSection
   const activeSection = sectionValue || 'all'
 
-  const [fetchedGuides, setFetchedGuides] = useState<OnboardingGuide[]>([])
-  const [fetchedSections, setFetchedSections] = useState<SectionSummary[]>([])
-  const [isLoading, setIsLoading] = useState(selfFetch)
+  // Self-fetch the guides (refetched whenever `?section=` changes — it's folded
+  // into the url) + the section summaries. Controlled mode passes `null` urls so
+  // the hook never fetches. The guides fetch carries the error/retry affordance.
+  const guidesQs = sectionValue ? `?section=${encodeURIComponent(sectionValue)}` : ''
+  const guidesRes = useSelfFetch<{ data?: OnboardingGuide[] }>(
+    selfFetch && guidesEndpoint ? `${guidesEndpoint}${guidesQs}` : null,
+  )
+  const sectionsRes = useSelfFetch<SectionSummary[]>(
+    selfFetch && sectionsEndpoint ? sectionsEndpoint : null,
+  )
 
-  // Section summaries — fetched once.
-  useEffect(() => {
-    if (!selfFetch || !sectionsEndpoint) return
-    let cancelled = false
-    fetch(sectionsEndpoint)
-      .then((r) => (r.ok ? r.json() : []))
-      .then((s: SectionSummary[]) => {
-        if (!cancelled) setFetchedSections(Array.isArray(s) ? s : [])
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [selfFetch, sectionsEndpoint])
-
-  // Guides — refetched on `?section=` change.
-  useEffect(() => {
-    if (!selfFetch || !guidesEndpoint) return
-    let cancelled = false
-    setIsLoading(true)
-    const qs = sectionValue ? `?section=${encodeURIComponent(sectionValue)}` : ''
-    fetch(`${guidesEndpoint}${qs}`)
-      .then((r) => (r.ok ? r.json() : { data: [] }))
-      .then((j: { data?: OnboardingGuide[] }) => {
-        if (!cancelled) setFetchedGuides(j.data ?? [])
-      })
-      .catch(() => {
-        if (!cancelled) setFetchedGuides([])
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [selfFetch, guidesEndpoint, sectionValue])
-
-  const guides = initialGuides ?? fetchedGuides
-  const sections = initialSections ?? fetchedSections
+  const guides = initialGuides ?? guidesRes.data?.data ?? []
+  const sections = initialSections ?? (Array.isArray(sectionsRes.data) ? sectionsRes.data : [])
+  const isLoading = selfFetch ? guidesRes.isLoading : false
 
   // Section grouping. Data arrives already filtered (server-side `?section=`
   // for the host, or our `?section=` fetch); this just buckets visible rows.
@@ -204,6 +177,11 @@ export function OnboardingGuidesCatalogView({
     </div>
   )
 
+  // A failed guides fetch → a RETRYABLE error (not the indistinguishable-from-
+  // empty "no guides found" state) — parity with the sibling self-fetch views.
+  if (selfFetch && guidesRes.error) {
+    return <LoadError message="Failed to load onboarding guides." onRetry={guidesRes.reload} />
+  }
   // First self-fetch in flight (no data yet) → full catalog skeleton.
   if (selfFetch && isLoading && guides.length === 0) {
     return <OnboardingGuidesCatalogSkeleton />

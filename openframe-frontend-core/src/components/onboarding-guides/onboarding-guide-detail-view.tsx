@@ -15,7 +15,7 @@
  * renderer with extra plugins.
  */
 
-import { useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react'
+import { type ComponentType, type ReactNode } from 'react'
 import { ArrowLeft } from 'lucide-react'
 
 import { Link } from '../../embed-shims'
@@ -32,6 +32,7 @@ import { useChatRuntime } from '../../contexts/chat-runtime-context'
 import type { OnboardingGuide } from '../chat/types/entities/onboarding-guide'
 import type { VideoTeaser } from '../../types/video-processing'
 import { buildDefaultHref } from '../../utils/content-href'
+import { useSelfFetch } from '../../hooks/use-self-fetch'
 
 export interface OnboardingGuideDetailViewProps {
   /** Server-fetched guide (controlled / SSR mode). Omit it and pass
@@ -71,41 +72,9 @@ export function OnboardingGuideDetailView({
   const resolvedBackHref = backHref ?? basePath
   const runtime = useChatRuntime()
 
-  const [guide, setGuide] = useState<OnboardingGuide | null>(initialData ?? null)
-  const [isLoading, setIsLoading] = useState(!initialData)
-  const [error, setError] = useState(false)
-  const [reloadKey, setReloadKey] = useState(0)
-  // Keep the displayed guide in sync with the controlled prop (hub SSR re-render).
-  useEffect(() => {
-    if (initialData) {
-      setGuide(initialData)
-      setIsLoading(false)
-      setError(false)
-    }
-  }, [initialData])
-  // Self-fetch when no controlled data was supplied.
-  useEffect(() => {
-    if (initialData || !slug || !guideEndpoint) return
-    let cancelled = false
-    async function load() {
-      try {
-        setIsLoading(true)
-        setError(false)
-        const res = await fetch(guideEndpoint!(slug!))
-        if (!res.ok) throw new Error(`Request failed (${res.status})`)
-        const json = (await res.json()) as OnboardingGuide
-        if (!cancelled) setGuide(json)
-      } catch {
-        if (!cancelled) setError(true)
-      } finally {
-        if (!cancelled) setIsLoading(false)
-      }
-    }
-    load()
-    return () => {
-      cancelled = true
-    }
-  }, [initialData, slug, guideEndpoint, reloadKey])
+  // Controlled (hub SSR `initialData`) OR self-fetch by slug (config-only embed).
+  const url = initialData ? null : slug && guideEndpoint ? guideEndpoint(slug) : null
+  const { data: guide, isLoading, error, reload } = useSelfFetch<OnboardingGuide>(url, { initialData })
 
   // Hooks must run unconditionally — feed them optional-chained values so they
   // no-op while the guide is still loading.
@@ -115,7 +84,7 @@ export function OnboardingGuideDetailView({
   })
 
   if (error || (!guide && !isLoading)) {
-    return <LoadError message="Guide not found." onRetry={() => setReloadKey((k) => k + 1)} />
+    return <LoadError message="Guide not found." onRetry={reload} />
   }
   if (!guide) {
     return (

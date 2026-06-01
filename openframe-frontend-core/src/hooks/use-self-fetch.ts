@@ -1,0 +1,86 @@
+'use client'
+
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
+
+export interface UseSelfFetchResult<T> {
+  data: T | null
+  /** Imperatively patch the fetched data (e.g. optimistic vote updates). */
+  setData: Dispatch<SetStateAction<T | null>>
+  isLoading: boolean
+  error: boolean
+  /** Re-run the fetch (error-retry affordance). */
+  reload: () => void
+}
+
+/**
+ * The single source for the lib's self-fetching content views
+ * (`ProductReleasesView`, `RoadmapView`, the onboarding catalog/detail). GETs a
+ * configured `url` into component state with **plain `fetch` + `useEffect`** —
+ * deliberately NO react-query, so embedders don't need a QueryClient (same
+ * technology choice as the shipped `DeliveryLists`).
+ *
+ * Behaviour:
+ *   - `url = null` → fetching is DISABLED (controlled / SSR mode, or missing
+ *     config); returns `initialData ?? null` and never fetches.
+ *   - `initialData` provided → hydrates immediately and SKIPS the first fetch
+ *     (so the hub's server-rendered data isn't re-fetched on mount); later
+ *     `url` changes still re-fetch.
+ *   - a `cancelled` guard ensures an in-flight response from a STALE `url`
+ *     (e.g. a fast pagination / section toggle) can't overwrite a newer one.
+ *   - `reload()` bumps an internal key to retry after an error.
+ *
+ * Re-fetches whenever `url` changes, so callers fold all query params INTO the
+ * url string (the url IS the cache key).
+ */
+export function useSelfFetch<T>(
+  url: string | null,
+  options?: { initialData?: T },
+): UseSelfFetchResult<T> {
+  const initialData = options?.initialData
+  const [data, setData] = useState<T | null>(initialData ?? null)
+  const [isLoading, setIsLoading] = useState(initialData === undefined && url !== null)
+  const [error, setError] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
+  // Skip the first fetch when SSR `initialData` already hydrated the view.
+  const skipFirstFetch = useRef(initialData !== undefined)
+
+  // Re-sync when a CONTROLLED `initialData` changes (e.g. the host navigates
+  // between detail slugs without remounting). No-op in self-fetch mode, where
+  // `initialData` is `undefined`.
+  useEffect(() => {
+    if (initialData !== undefined) setData(initialData)
+  }, [initialData])
+
+  useEffect(() => {
+    if (url === null) {
+      setIsLoading(false)
+      return
+    }
+    if (skipFirstFetch.current) {
+      skipFirstFetch.current = false
+      return
+    }
+    let cancelled = false
+    async function load() {
+      try {
+        setIsLoading(true)
+        setError(false)
+        const res = await fetch(url as string)
+        if (!res.ok) throw new Error(`Request failed (${res.status})`)
+        const json = (await res.json()) as T
+        if (!cancelled) setData(json)
+      } catch {
+        if (!cancelled) setError(true)
+      } finally {
+        if (!cancelled) setIsLoading(false)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+    // `url` folds in every query param; `reloadKey` drives retry.
+  }, [url, reloadKey])
+
+  return { data, setData, isLoading, error, reload: () => setReloadKey((k) => k + 1) }
+}

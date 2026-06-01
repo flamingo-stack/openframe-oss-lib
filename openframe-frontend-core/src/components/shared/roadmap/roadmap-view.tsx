@@ -3,18 +3,16 @@
 /**
  * `<RoadmapView />` — the SELF-CONTAINED roadmap LIST surface.
  *
- * Fetches the roadmap list internally (the `DeliveryLists` pattern: plain
- * `fetch` + `useEffect`/`useState`, no react-query dep) and renders the pure
- * `<RoadmapGrid>` (kept controlled so related-content rails can still pass
- * `items`). The host configures only **api routes**: the list `endpoint`
- * (default `/api/roadmap`), the per-task `buildRefreshUrl`, and the vote
- * endpoint via `votingOptions`. Optional `initialItems` hydrates SSR.
+ * Fetches the roadmap list via the shared `useSelfFetch` hook and renders the
+ * pure controlled `<RoadmapGrid>` (kept controlled so related-content rails can
+ * still pass `items`). The host configures only **api routes**: the list
+ * `endpoint` (default `/api/roadmap`), the per-task `buildRefreshUrl`, and the
+ * vote endpoint via `votingOptions`. Optional `initialItems` hydrates SSR.
  */
 
-import { useEffect, useRef, useState } from 'react'
-
-import type { RoadmapItem } from '../../chat/types/entities/roadmap-item'
 import { LoadError } from '../../ui/error-state'
+import { useSelfFetch } from '../../../hooks/use-self-fetch'
+import type { RoadmapItem } from '../../chat/types/entities/roadmap-item'
 import { RoadmapGrid } from './roadmap-grid'
 import { RoadmapGridSkeleton } from './roadmap-grid-skeleton'
 import type { UseRoadmapVotingOptions } from './use-roadmap-voting'
@@ -41,42 +39,16 @@ export function RoadmapView({
   buildRefreshUrl,
   votingOptions,
 }: RoadmapViewProps = {}) {
-  const [items, setItems] = useState<RoadmapItem[] | null>(initialItems ?? null)
-  const [isLoading, setIsLoading] = useState(!initialItems)
-  const [error, setError] = useState(false)
-  const [reloadKey, setReloadKey] = useState(0)
-  const skipFirstFetch = useRef(!!initialItems)
-
-  useEffect(() => {
-    if (skipFirstFetch.current) {
-      skipFirstFetch.current = false
-      return
-    }
-    let cancelled = false
-    async function load() {
-      try {
-        setIsLoading(true)
-        setError(false)
-        const res = await fetch(endpoint)
-        if (!res.ok) throw new Error(`Request failed (${res.status})`)
-        const json = (await res.json()) as { items?: RoadmapItem[] }
-        if (!cancelled) setItems(json.items ?? [])
-      } catch {
-        if (!cancelled) setError(true)
-      } finally {
-        if (!cancelled) setIsLoading(false)
-      }
-    }
-    load()
-    return () => {
-      cancelled = true
-    }
-  }, [endpoint, reloadKey])
+  const { data, setData, isLoading, error, reload } = useSelfFetch<{ items?: RoadmapItem[] }>(
+    endpoint,
+    { initialData: initialItems ? { items: initialItems } : undefined },
+  )
+  const items = data?.items ?? null
 
   if (error) {
-    return <LoadError message="Failed to load roadmap." onRetry={() => setReloadKey((k) => k + 1)} />
+    return <LoadError message="Failed to load roadmap." onRetry={reload} />
   }
-  if (isLoading || !items) {
+  if (isLoading || items === null) {
     return <RoadmapGridSkeleton showLeftMargin={showLeftMargin} />
   }
 
@@ -86,11 +58,14 @@ export function RoadmapView({
       showLeftMargin={showLeftMargin}
       buildRefreshUrl={buildRefreshUrl}
       votingOptions={votingOptions}
-      // After a vote refreshes a single task, patch it into the local list so
-      // the displayed counts stay live (replaces the host's onItemUpdate +
-      // list-refetch dance).
+      // After a vote refreshes a single task, patch it into the fetched list so
+      // the displayed counts stay live.
       onItemUpdate={(updated) =>
-        setItems((prev) => (prev ? prev.map((it) => (it.id === updated.id ? updated : it)) : prev))
+        setData((prev) =>
+          prev
+            ? { ...prev, items: (prev.items ?? []).map((it) => (it.id === updated.id ? updated : it)) }
+            : prev,
+        )
       }
     />
   )
