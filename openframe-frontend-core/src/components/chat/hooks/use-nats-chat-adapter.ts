@@ -570,7 +570,8 @@ export function useNatsChatAdapter(
   const loadDialogHistory = useCallback(
     async (id: string, cursor?: string): Promise<void> => {
       if (!fetchDialogMessages) return
-      const seq = ++historyLoadSeqRef.current
+      historyLoadSeqRef.current += 1
+      const seq = historyLoadSeqRef.current
       setIsMessagesLoading(true)
       try {
         const result = await fetchDialogMessages({
@@ -632,12 +633,21 @@ export function useNatsChatAdapter(
     if (prevDialogIdRef.current === dialogId) return
     prevDialogIdRef.current = dialogId
 
+    // Invalidate any in-flight history load for the previous dialog. Bumping
+    // here (not only inside loadDialogHistory) covers the clear/delete path
+    // — switching to a null/empty dialog never starts a new load, so without
+    // this an in-flight response could repopulate the just-cleared state.
+    historyLoadSeqRef.current += 1
+
     // Drop accumulator + message state for the previous dialog.
     resetAccumulator()
     setMessages([])
     setMessagesNextCursor(null)
     setDialogTokenUsage(null)
     setStreamingPhase('idle')
+    // No load runs when there's no active dialog, so clear the flag here;
+    // otherwise the superseded load's guarded `finally` leaves it stuck on.
+    setIsMessagesLoading(false)
 
     if (!active || !dialogId) return
 
