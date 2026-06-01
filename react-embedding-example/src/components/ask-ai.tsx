@@ -10,7 +10,12 @@ import { EmbeddableChat } from '@flamingo-stack/openframe-frontend-core/componen
  * No platform/source wiring: the embedder is platform-agnostic — the lib defaults the
  * chat-history namespace + falls back to origin-based link decisions, and the chat wire
  * resolves source server-side. See `content-runtime.ts`.
+ *
+ * `baseRoute=""` signals this embed does NOT host an in-app doc viewer (no
+ * /knowledge-base or /data-room route), so doc-table cards (openframe docs / data-room)
+ * become Ask-only instead of navigating to a dead in-app route. Entity content
+ * (releases, podcasts, …) is unaffected — it routes through `composeContentUrl`.
  */
 export function AskAi() {
-  return <EmbeddableChat modes={{ guide: {} }} defaultActiveMode="guide" />
+  return <EmbeddableChat baseRoute="" modes={{ guide: {} }} defaultActiveMode="guide" />
 }

@@ -62,22 +62,25 @@ export function useSelfFetch<T>(
       skipFirstFetch.current = false
       return
     }
+    const ctrl = new AbortController()
     let cancelled = false
     async function load() {
       try {
         setIsLoading(true)
         setError(false)
-        const res = await fetch(url as string)
+        const res = await fetch(url as string, { signal: ctrl.signal })
         if (!res.ok) throw new Error(`Request failed (${res.status})`)
         const json = (await res.json()) as T
         if (!cancelled) setData(json)
       } catch (err) {
-        if (!cancelled) {
-          setError(true)
-          // Surface the failure for diagnosis (parity with DeliveryLists); the
-          // `error` state drives the consumer's <LoadError> retry UI.
-          console.error('useSelfFetch:', url, err)
-        }
+        // AbortError on cleanup (unmount / stale-url change / React StrictMode's dev
+        // double-invoke) is EXPECTED — the request was intentionally aborted. Aborting
+        // also means the orphaned StrictMode fetch shows as "cancelled" instead of
+        // completing as a wasted duplicate (parity with useChatIdentity). Only real
+        // failures fall through to the error state + console.
+        if (cancelled || (err as Error)?.name === 'AbortError') return
+        setError(true)
+        console.error('useSelfFetch:', url, err)
       } finally {
         if (!cancelled) setIsLoading(false)
       }
@@ -85,6 +88,7 @@ export function useSelfFetch<T>(
     load()
     return () => {
       cancelled = true
+      ctrl.abort()
     }
     // `url` folds in every query param; `reloadKey` drives retry.
   }, [url, reloadKey])

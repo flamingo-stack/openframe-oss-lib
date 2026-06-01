@@ -3,7 +3,9 @@ import { useQuery } from '@tanstack/react-query'
 import {
   ReleaseDetailPage,
   RoadmapGrid,
+  DeliveryTable,
   type VideoDisplaySectionProps,
+  type DeliveryResponse,
 } from '@flamingo-stack/openframe-frontend-core/components'
 import { EntityVideoSection } from '@flamingo-stack/openframe-frontend-core/components/features'
 import type { RoadmapItem } from '@flamingo-stack/openframe-frontend-core/components/chat'
@@ -57,6 +59,22 @@ function VideoDisplaySection(props: VideoDisplaySectionProps) {
   return <EntityVideoSection {...props} />
 }
 
+// Injected delivery (bug-fixes & enhancements) section. Without this prop the lib's
+// ReleaseDetailPage skips the section entirely (it gates on `&& DeliverySection`). The lib
+// ships <DeliveryTable>; we render the completed + in-progress tables from the data
+// ReleaseDetailPage fetches via `deliveryApiEndpoint` (the base `/delivery?task_ids=` route,
+// which returns `{ completed, inProgress }`). Mirrors the hub's DeliverySectionWrapper.
+function DeliverySection({ data, isLoading }: { data: DeliveryResponse | null; isLoading: boolean }) {
+  if (isLoading) return <DeliveryTable items={[]} isLoading />
+  if (!data) return null
+  return (
+    <>
+      {data.completed.length > 0 && <DeliveryTable items={data.completed} isLoading={false} />}
+      {data.inProgress.length > 0 && <DeliveryTable items={data.inProgress} isLoading={false} />}
+    </>
+  )
+}
+
 export function ReleaseDetailRoute() {
   const { slug = '' } = useParams()
   return (
@@ -64,9 +82,10 @@ export function ReleaseDetailRoute() {
       slug={slug}
       useRelease={useRelease}
       RoadmapSection={RoadmapSection}
+      DeliverySection={DeliverySection}
       VideoDisplaySection={VideoDisplaySection}
       roadmapApiEndpoint={EP.roadmap}
-      deliveryApiEndpoint={EP.deliveryCompleted}
+      deliveryApiEndpoint={EP.delivery}
       backButton={{ label: 'Back to releases', href: '/releases' }}
     />
   )

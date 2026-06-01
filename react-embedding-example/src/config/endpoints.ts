@@ -23,7 +23,10 @@ export const EP = {
   roadmap: `${CONTENT}/roadmap`,
   roadmapVote: `${CONTENT}/roadmap/vote`,
   roadmapById: (id: string) => `${CONTENT}/roadmap/${id}`,
-  // delivery
+  // delivery — `delivery` is the base route that takes `?task_ids=` and returns
+  // BOTH `{ completed, inProgress }` (the release-detail bug-fixes/enhancements
+  // section uses this); the two list endpoints feed the standalone /delivery page.
+  delivery: `${CONTENT}/delivery`,
   deliveryCompleted: `${CONTENT}/delivery/completed`,
   deliveryInProgress: `${CONTENT}/delivery/in-progress`,
   // onboarding guides
