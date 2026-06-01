@@ -34,7 +34,6 @@ import java.time.Instant;
 public class Ticket implements TenantScoped {
     @Id
     private String id;
-    @Indexed
     private String tenantId;
     private Integer ticketNumber;
     private String title;
