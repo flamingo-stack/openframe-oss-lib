@@ -20,6 +20,10 @@ export * from './validation-utils'
 export * from './confidence-helpers'
 // Release date formatting utilities
 export * from './date-formatters'
+// Product-release card helpers (lifted from the hub so every embedder gets the
+// rich card metadata): badge-color mapping + cover-image fallback resolution.
+export * from './release-badge'
+export * from './release-cover'
 // Dynamic icon registry — single source of truth lives at
 // components/chat/utils/icon-registry. Re-exported here so existing
 // `@flamingo-stack/openframe-frontend-core/utils` callers (hub admin

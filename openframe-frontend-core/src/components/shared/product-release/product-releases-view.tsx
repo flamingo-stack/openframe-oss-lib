@@ -14,8 +14,8 @@
  * SSR: pass `initialData` to hydrate the first page without a client round-trip
  * (the hub can server-fetch); embedders omit it and the view fetches on mount.
  *
- * Card props: `buildCardProps` defaults to the lib's sm-subset builder; the hub
- * passes its richer `buildProductReleaseCardProps` for the full lg metadata.
+ * Card props: `buildCardProps` defaults to the lib's RICH `buildProductReleaseCardProps`
+ * (full lg metadata — Type / Status / author / changelog counts); pass your own to customize.
  */
 
 import * as React from 'react'
@@ -28,7 +28,7 @@ import { cn } from '../../../utils/cn'
 import { buildDefaultHref } from '../../../utils/content-href'
 import { isModifierClick, softNavigate } from '../../chat/utils/chat-nav-resolution'
 import { useEntityCardLink } from '../../chat/entity-cards/use-entity-card-link'
-import { defaultBuildProductReleaseCardProps } from '../../chat/entity-cards/product-release-card-defaults'
+import { buildProductReleaseCardProps } from '../../chat/entity-cards/product-release-card-defaults'
 import { EmptyState } from '../../empty-state'
 import { LoadError } from '../../ui/error-state'
 import { PersistentPaginationWrapper } from '../../persistent-pagination'
@@ -59,8 +59,9 @@ export interface ProductReleasesViewProps {
   /** Fallback detail-href prefix when `runtime.composeContentUrl` is not wired
    *  (single-platform embedders). Default `/releases`. */
   basePath?: string
-  /** Derive the per-card prop bundle. Defaults to the lib's sm-subset builder;
-   *  the hub passes its full lg builder via this seam. */
+  /** Derive the per-card prop bundle. Defaults to the lib's RICH lg builder
+   *  (`buildProductReleaseCardProps` — full Type/Status/author/changelog metadata)
+   *  so embedders get the complete card with zero config; pass your own to customize. */
   buildCardProps?: (release: ProductRelease) => ProductReleaseCardExtras
   /** URL param key for the search input. MUST match the chrome that writes it.
    *  Default `'search'` (also the outbound query-param name). */
@@ -127,7 +128,7 @@ export function ProductReleasesView({
   initialData,
   itemsPerPage = 5,
   basePath = '/releases',
-  buildCardProps = defaultBuildProductReleaseCardProps,
+  buildCardProps = buildProductReleaseCardProps,
   searchParamKey = DEFAULT_SEARCH_PARAM_KEY,
   statusParamKey = DEFAULT_STATUS_PARAM_KEY,
   pageParamKey = DEFAULT_PAGE_PARAM_KEY,
