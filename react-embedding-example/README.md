@@ -104,9 +104,116 @@ lib change so these read their base from the runtime — forward a `searchEndpoi
 `OnboardingGuidesCatalogView`, and derive the tickets paths from a single `agentBaseUrl` on
 `ChatRuntime.endpoints` (sibling of `approvalToolUrl`). After that, drop the fallback rules.
 
+## Configuring URL endpoints
+
+Every hub call is `/content/api/<path>`, and every such string is derived **once** from the
+shared `/content` prefix — no endpoint literal appears twice.
+
+| To change… | Edit | Effect |
+|---|---|---|
+| **Which hub** the proxy forwards to | `.env` → `HUB_ORIGIN` (server) + `VITE_HUB_ORIGIN` (client, new-tab links) | `/content/api/*` → `${HUB_ORIGIN}/api/*` |
+| **The client-facing namespace** (`/content`) | `proxy/content-prefix.mjs` (single source, imported by client + proxy + Vite) | renames the prefix everywhere at once |
+| **An individual endpoint** | `src/config/endpoints.ts` (the `EP` map) | every page/runtime reads from `EP`, so one edit retargets all callers |
+
+`EP` is the single table; `src/providers/content-runtime.ts` feeds it into the lib's
+`ChatRuntime.endpoints` + `EndpointsRuntime`, and each page passes the relevant `EP.*` to
+its component's endpoint prop. To repoint a surface, change its `EP` entry — never hand-write
+a URL in a page.
+
+## Configuring routes & navigation
+
+Two distinct concerns, configured in two places:
+
+### 1. The app's own page routes — `src/app-routes.tsx`
+
+Plain react-router; each `<Route>` mounts a lib page. The paths are yours, but they must
+match what you tell the lib about *where content lives* (§2–3) so a chat card and a nav link
+land on the same place.
+
+```tsx
+<Route path="roadmap"        element={<RoadmapPage />} />
+<Route path="delivery"       element={<DeliveryPage />} />
+<Route path="releases/:slug" element={<ReleaseDetailRoute />} />
+```
+
+### 2. Where *content* navigates — `composeContentUrl` (in `content-runtime.ts`)
+
+When the chat renders an entity card (release, roadmap item, …) or a page lists links, the
+lib asks **one resolver** "where does this go?". Wire it once → chat cards and page links
+agree. Resolution order: `overrides[type]` → `hostedTypes` (relative) → row `externalUrl` →
+`contentOrigin`.
+
+```ts
+composeContentUrl: makeComposeContentUrl({
+  // (a) Types YOU host on a slugged detail route → relative in-app href (soft-nav).
+  hostedTypes: new Set(['onboarding_guide', 'product_release']),
+  // (b) Fallback origin for everything else → opens on the hub in a new tab.
+  contentOrigin: HUB_PUBLIC_ORIGIN,
+  // (c) Per-type override — full control. List-filter types (no detail page) deep-link
+  //     into a list route with the query param the page reads (`?search=<id>`).
+  overrides: {
+    roadmap_item:  (id) => ({ href: `/roadmap?search=${id}`,  targetPlatform: null }),
+    delivery_item: (id) => ({ href: `/delivery?search=${id}`, targetPlatform: null }),
+  },
+}),
+```
+
+| Content type | Resolution | Lands at |
+|---|---|---|
+| `onboarding_guide`, `product_release` | `hostedTypes` | in-app `/<suffix>/<slug>` |
+| `roadmap_item`, `delivery_item` | `overrides` | in-app `/<route>?search=<id>` (filtered to that item) |
+| `podcast`, `webinar`, `blog_post`, … | default | hub origin, new tab |
+
+### 3. Where *doc chips* navigate — `docPlatformTargets` (in `content-runtime.ts`)
+
+Doc chips (`markdown` = product docs, `data_room_doc` = data room) carry no public URL, so
+they're routed **per `documentType`** to the platform whose public doc viewer hosts them — a
+chat mixing several doc sources sends each to its own home, no single static fallback:
+
+```ts
+docPlatformTargets: {
+  markdown:      { platform: 'flamingo',    basePath: 'knowledge-base' },
+  data_room_doc: { platform: 'company-hub', basePath: 'data-room' },
+},
+// markdown chip → getBaseUrl('flamingo')/knowledge-base/<path>, opened in a new tab.
+```
+
+### 4. Shared-page chrome — `DevSectionPage` props
+
+The roadmap / delivery / releases pages share `DevSectionPage`. Its hero **title**,
+**subtitle**, and **back button** default to the section's (OpenFrame) copy but are
+per-page overridable — nothing is hard-shared:
+
+```tsx
+<DevSectionPage
+  sectionKey="roadmap"
+  title="Our Roadmap"                          // override the default hero title
+  subtitle="What we're shipping next."         // override the default subtitle
+  backButton={{ label: 'Back', href: '/' }}    // customize, or `false` to hide
+>
+  <RoadmapView … />
+</DevSectionPage>
+```
+
 ## Add a surface
 
 1. Add the endpoint(s) to `EP` in `src/config/endpoints.ts`.
 2. Add a page under `src/pages/` that renders the lib component (data via `content-api.ts` or
    the component's own endpoint props).
 3. Register one `<Route>` in `src/app-routes.tsx`.
+4. If the chat can reference this content, point the lib at the new page — add the type to
+   `hostedTypes` / `overrides` in `composeContentUrl` (see *Configuring routes & navigation*).
+
+## Troubleshooting
+
+- **`[vite] Failed to load url …/dist/components/<x>/index.js`** — the lib is a `file:`
+  dependency whose dev watcher (`yalc:watch`) runs `rm -rf dist && tsup` on every lib source
+  edit. Vite reads the linked `dist` on demand, so a page load that lands in that ~1s rebuild
+  window transiently can't find the file. It's harmless: **reload once the lib rebuild
+  finishes**. If it persists, the lib build failed or is stale — rebuild it:
+  `cd ../openframe-frontend-core && npm run build`.
+- **Doc / roadmap / delivery chips don't navigate** — check `composeContentUrl` /
+  `docPlatformTargets` in `content-runtime.ts` (see *Configuring routes & navigation*); an
+  unmapped type falls back to Ask-only or the hub origin.
+- **Chat 500s with `CHAT_PROXY_SECRET_NOT_CONFIGURED`** — `.env`'s `CHAT_PROXY_SECRET` must
+  equal the hub's.
