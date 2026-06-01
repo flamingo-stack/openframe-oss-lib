@@ -124,7 +124,11 @@ export {
 // surfaces from importing a chat-prefixed symbol. Old chat-prefixed
 // aliases are kept as @deprecated re-exports at
 // `components/chat/utils/chat-authed-fetch.ts` + `chat-proxy-auth-storage.ts`.
-export { embedAuthedFetch } from './embed-authed-fetch'
+export {
+  embedAuthedFetch,
+  setEmbedAuthAdapter,
+  type EmbedAuthAdapter,
+} from './embed-authed-fetch'
 export {
   type EmbedProxyAuth,
   getEmbedProxyAuth,

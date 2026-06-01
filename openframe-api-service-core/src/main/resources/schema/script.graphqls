@@ -7,8 +7,19 @@ extend type Query {
     """Get a single script by id within the current tenant."""
     script(id: ID!): Script
 
-    """Cursor-paginated list of scripts within the current tenant (Relay Connection Spec). Default order is newest-first."""
-    scripts(first: Int, after: String, last: Int, before: String): ScriptConnection!
+    """Cursor-paginated list of scripts within the current tenant (Relay Connection Spec).
+    Default order is newest-first by _id. Optional filter / search / sort.
+    Sortable fields: _id (default), name, createdAt, updatedAt. Search is a
+    case-insensitive substring match on name."""
+    scripts(
+        filter: ScriptFilterInput,
+        search: String,
+        sort: SortInput,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String
+    ): ScriptConnection!
 }
 
 extend type Mutation {
@@ -104,4 +115,24 @@ input ScriptEnvVarInput {
     name: String!
     value: String
     secret: Boolean!
+}
+
+"""
+Filter for the scripts(...) query. All fields are optional — null/empty means
+no constraint. The statuses field has special default behaviour: when null/empty,
+DELETED scripts are hidden; when supplied (e.g. [DELETED] for admin audit),
+the list is used verbatim with no implicit exclusion.
+"""
+input ScriptFilterInput {
+    shells: [ScriptShell!]
+    statuses: [ScriptStatus!]
+    supportedPlatforms: [ScriptPlatform!]
+    """Exact-match tag (case-insensitive)."""
+    tag: String
+}
+
+enum ScriptStatus {
+    ACTIVE
+    ARCHIVED
+    DELETED
 }

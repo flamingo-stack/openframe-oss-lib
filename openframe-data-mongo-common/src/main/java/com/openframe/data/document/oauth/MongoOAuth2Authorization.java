@@ -17,9 +17,7 @@ public class MongoOAuth2Authorization implements TenantScoped {
     private String id;
     @Indexed
     private String tenantId;
-    @Indexed
     private String registeredClientId;
-    @Indexed
     private String principalName;
     private String authorizationGrantType;
     // Minimal snapshot for PKCE reconstruction (avoid complex objects / dotted keys)

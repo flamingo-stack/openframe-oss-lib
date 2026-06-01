@@ -57,6 +57,7 @@ import type {
   UnifiedSendMessageOptions,
   StreamingPhase,
 } from '../types/unified-chat-state.types'
+import type { DialogItem } from '../types/component.types'
 
 // =============================================================================
 // Public types
@@ -1056,5 +1057,49 @@ export function useSseChatAdapter(
     /** Cross-call usage breakdown (Haiku rewriter/classifier/summarizer
      *  token counts). null until the trailing usage frame lands. */
     currentUsageBreakdown: latestMeta?.breakdown ?? null,
+    // ─── Dialog management — stubs for v1 ────────────────────────────────
+    // Guide mode currently keeps its history in `localStorage` opaquely
+    // under the hood (`runtime.source` namespaced key). Surfacing that
+    // history as a structured dialog list is a follow-up; for now the
+    // shape is satisfied with empty defaults so the unified contract
+    // type-checks and EmbeddableChat hides sidebar affordances when
+    // `dialogs.length === 0`.
+    dialogs: SSE_EMPTY_DIALOGS,
+    activeDialogId: null,
+    selectDialog: noopSelectDialog,
+    startNewDialog: noopStartNewDialog,
+    deleteDialog: noopDeleteDialog,
+    isDialogsLoading: false,
+    isMessagesLoading: false,
+    hasMoreDialogs: false,
+    loadMoreDialogs: noopAsync,
+    hasMoreMessages: false,
+    loadMoreMessages: noopAsync,
+    approveRequest: noopApproveRequest,
+    rejectRequest: noopRejectRequest,
+    dialogTokenUsage: null,
+    connectionState: 'connected' as const,
   }
+}
+
+// ─── Stable no-op references for the Guide-mode dialog-management stubs ──
+// Plain module-scope constants so the adapter's return identity stays
+// stable across renders — consumers that memo on these fields don't get
+// spurious re-runs.
+const SSE_EMPTY_DIALOGS: DialogItem[] = []
+const noopSelectDialog = (_id: string | null): void => {
+  /* Guide mode has no managed dialog list yet */
+}
+const noopStartNewDialog = async (): Promise<string | null> => null
+const noopDeleteDialog = async (_id: string): Promise<void> => {
+  /* no-op until Guide localStorage history is exposed */
+}
+const noopAsync = async (): Promise<void> => {
+  /* no-op pagination stub */
+}
+const noopApproveRequest = async (_id: string): Promise<void> => {
+  /* Guide mode has no tool-call approval workflow */
+}
+const noopRejectRequest = async (_id: string, _reason?: string): Promise<void> => {
+  /* Guide mode has no tool-call approval workflow */
 }

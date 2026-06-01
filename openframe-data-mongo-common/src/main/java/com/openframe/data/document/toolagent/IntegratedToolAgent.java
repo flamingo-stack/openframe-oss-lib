@@ -6,7 +6,6 @@ import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
-import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.util.List;
 @Data
@@ -15,9 +14,7 @@ import java.util.List;
 public class IntegratedToolAgent implements TenantScoped {
     @Id
     private String id;
-    @Indexed
     private String tenantId;
-    @Indexed
     private String key;
     @Version
     private Long documentVersion;
