@@ -134,8 +134,12 @@ export function makeComposeContentUrl(opts: ContentHrefOptions): ComposeContentU
 
     if (opts.hostedTypes.has(type)) {
       // In-app (soft-nav). Recover the slug from the hub URL for chat rows;
-      // page views already pass the slug as `identifier`.
-      const slug = externalUrl ? (lastPathSegment(externalUrl) ?? identifier) : identifier
+      // page views already pass the slug as `identifier`. Guard: if the recovered
+      // segment is the type's OWN suffix (e.g. a malformed/list externalUrl like
+      // `https://hub/releases/` → `'releases'`), fall back to `identifier` instead
+      // of emitting a nonsensical `/releases/releases`.
+      const recovered = externalUrl ? lastPathSegment(externalUrl) : null
+      const slug = recovered && recovered !== seg ? recovered : identifier
       return { href: `/${seg}/${slug}`, targetPlatform: null }
     }
     // Not hosted → opens out. Prefer the RAG-authoritative `externalUrl` (chat);

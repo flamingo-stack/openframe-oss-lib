@@ -118,6 +118,30 @@ export interface SourceRowCTA {
 }
 
 /**
+ * Build a `SourceRowContext` from a `ChatRuntime` + the surface's `baseRoute` /
+ * `chipBasePlatform`. The runtime-derived fields (`currentPlatform`, `composeContentUrl`,
+ * `docPlatformTargets`) are wired identically at every `resolveSourceRowCTA` call site
+ * (source chips + inline cards), so they live here once — adding a ctx field is then a
+ * one-line change instead of editing all three call sites.
+ */
+export function sourceRowCtxFromRuntime(
+  runtime: {
+    source?: string
+    composeContentUrl?: ComposeContentUrl
+    docPlatformTargets?: SourceRowContext['docPlatformTargets']
+  },
+  surface: { baseRoute?: string; chipBasePlatform?: string } = {},
+): SourceRowContext {
+  return {
+    currentPlatform: runtime.source ?? null,
+    composeContentUrl: runtime.composeContentUrl,
+    docPlatformTargets: runtime.docPlatformTargets,
+    baseRoute: surface.baseRoute,
+    chipBasePlatform: surface.chipBasePlatform,
+  }
+}
+
+/**
  * Pure icon-resolution helper — `sourceRepo` (RagTableConfig.id) →
  * icon_name via `SOURCE_ICON_NAMES`, then icon_name → React component
  * via `ICON_REGISTRY`.
@@ -130,14 +154,20 @@ function pickSourceIcon(sourceRepo: string | null, documentType: string | null |
 }
 
 /**
- * Only certain row kinds should fall back to in-app `path` navigation
- * when no `externalUrl` is set. Specifically: doc-tables (markdown,
- * data-room PDFs) that the in-app doc viewer can render. Entity-table
+ * Doc-table documentTypes — rows that carry an in-app `path` (not an entity
+ * `externalUrl`) and resolve to a doc viewer. The SAME set an embedder keys its
+ * `docPlatformTargets` map by (markdown = product docs, data_room_doc = data room),
+ * declared once so the two can't silently diverge.
+ */
+export const DOC_TABLE_TYPES = ['markdown', 'data_room_doc'] as const
+
+/**
+ * Only doc-table rows (DOC_TABLE_TYPES) fall back to doc-viewer navigation when no
+ * `externalUrl` is set; the in-app/per-platform viewer can render them. Entity-table
  * rows MUST come with an explicit `externalUrl` from the mapper.
  */
 function shouldFallbackToPathNav(row: SourceRowInput): boolean {
-  const t = row.documentType
-  return t === 'markdown' || t === 'data_room_doc'
+  return !!row.documentType && (DOC_TABLE_TYPES as readonly string[]).includes(row.documentType)
 }
 
 /**

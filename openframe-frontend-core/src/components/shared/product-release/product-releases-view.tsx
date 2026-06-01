@@ -35,10 +35,13 @@ import { LoadError } from '../../ui/error-state'
 import { PersistentPaginationWrapper } from '../../persistent-pagination'
 import { ProductReleaseCard, type ProductReleaseCardProps } from './product-release-card'
 import { ProductReleaseCardSkeleton } from './product-release-card-skeleton'
+import { DEV_SECTION_PARAM_KEYS } from '../../../utils/dev-sections/dev-section-param-keys'
 
 const DEFAULT_ENDPOINT = '/api/releases'
-const DEFAULT_SEARCH_PARAM_KEY = 'search'
-const DEFAULT_STATUS_PARAM_KEY = 'release_status'
+// Param keys sourced from the shared registry (see RoadmapView) — single source for the
+// chrome's written `?key=` and this view's read.
+const DEFAULT_SEARCH_PARAM_KEY = DEV_SECTION_PARAM_KEYS.search
+const DEFAULT_STATUS_PARAM_KEY = DEV_SECTION_PARAM_KEYS.releaseStatus
 const DEFAULT_PAGE_PARAM_KEY = 'page'
 
 /** The `<ProductReleaseCard>` props the caller derives per release — the card's

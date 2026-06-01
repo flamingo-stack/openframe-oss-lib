@@ -82,7 +82,7 @@ import { handleChatNavClick } from './utils/nav-click-handler'
 import { computeIsNewTab, newTabAnchorAttrs } from './utils/nav-anchor-props'
 import { resolveHrefForRuntime } from './utils/chat-nav-resolution'
 import { ChatPanelContext, type ChatPanelHandle } from './chat-panel-context'
-import { resolveSourceRowCTA } from './utils/source-row-cta'
+import { resolveSourceRowCTA, sourceRowCtxFromRuntime } from './utils/source-row-cta'
 import { chatChipClass } from './utils/chip-styles'
 import { getIconComponent } from './utils/icon-registry'
 import { resolveOnboardingIcon } from './utils/onboarding-icons'
@@ -307,7 +307,7 @@ function SourceChip({
       targetPlatform: src.targetPlatform ?? null,
       path: src.path,
     },
-    { baseRoute, chipBasePlatform, currentPlatform: runtime.source, composeContentUrl: runtime.composeContentUrl, docPlatformTargets: runtime.docPlatformTargets },
+    sourceRowCtxFromRuntime(runtime, { baseRoute, chipBasePlatform }),
   )
   const Icon = cta.icon
   const icon = <Icon className="h-3.5 w-3.5" />
@@ -331,7 +331,7 @@ function SourceChip({
           targetPlatform: item.targetPlatform ?? null,
           path: item.path,
         },
-        { baseRoute, chipBasePlatform, currentPlatform: runtime.source, composeContentUrl: runtime.composeContentUrl, docPlatformTargets: runtime.docPlatformTargets },
+        sourceRowCtxFromRuntime(runtime, { baseRoute, chipBasePlatform }),
       )
       const ItemIcon = itemCta.icon
       return {

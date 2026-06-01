@@ -19,10 +19,13 @@ import type { RoadmapItem } from '../../chat/types/entities/roadmap-item'
 import { RoadmapGrid } from './roadmap-grid'
 import { RoadmapGridSkeleton } from './roadmap-grid-skeleton'
 import type { UseRoadmapVotingOptions } from './use-roadmap-voting'
+import { DEV_SECTION_PARAM_KEYS } from '../../../utils/dev-sections/dev-section-param-keys'
 
 const DEFAULT_ENDPOINT = '/api/roadmap'
-const DEFAULT_SEARCH_PARAM_KEY = 'search'
-const DEFAULT_STATUS_PARAM_KEY = 'status'
+// Defaults sourced from the ONE param-key registry the chrome (OPENFRAME_DEV_SECTIONS) also
+// reads, so the chrome's written `?key=` and this view's read can't silently diverge.
+const DEFAULT_SEARCH_PARAM_KEY = DEV_SECTION_PARAM_KEYS.search
+const DEFAULT_STATUS_PARAM_KEY = DEV_SECTION_PARAM_KEYS.status
 
 export interface RoadmapViewProps {
   /** GET list endpoint (the api route). Returns `{ items }`. Default
@@ -93,7 +96,7 @@ export function RoadmapView({
       // capability; flat grids stay the RoadmapGrid default). When the chrome's
       // search / status filter is active, expand every quarter so matches aren't hidden.
       groupByQuarter
-      hasActiveFilters={search !== '' || (status !== '' && status !== 'all')}
+      hasActiveFilters={search !== '' || status !== 'all'}
       // After a vote refreshes a single task, patch it into the fetched list so
       // the displayed counts stay live.
       onItemUpdate={(updated) =>

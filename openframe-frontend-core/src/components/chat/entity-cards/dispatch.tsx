@@ -35,7 +35,7 @@ import { useRouter } from '../../../embed-shims/next-navigation'
 import type { ChatRef } from '../chat-ref.types'
 import { useChatCardItem } from '../hooks/use-chat-card-item'
 import { handleChatNavClick } from '../utils/nav-click-handler'
-import { resolveSourceRowCTA, resolveSourceIcon } from '../utils/source-row-cta'
+import { resolveSourceRowCTA, resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-cta'
 import { resolveHrefForRuntime } from '../utils/chat-nav-resolution'
 import {
   computeIsNewTab,
@@ -952,13 +952,7 @@ export function ChatCardLoader({
             ? (chatRef.metadata.path as string)
             : null,
       },
-      {
-        baseRoute,
-        chipBasePlatform,
-        currentPlatform: runtime.source,
-        composeContentUrl: runtime.composeContentUrl,
-        docPlatformTargets: runtime.docPlatformTargets,
-      },
+      sourceRowCtxFromRuntime(runtime, { baseRoute, chipBasePlatform }),
     )
     const finalHref = cta.href ? resolveHrefForRuntime(cta.href, runtime) : null
     return {

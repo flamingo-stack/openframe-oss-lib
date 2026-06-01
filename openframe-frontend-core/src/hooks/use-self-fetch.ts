@@ -43,8 +43,12 @@ export function useSelfFetch<T>(
   const [isLoading, setIsLoading] = useState(initialData === undefined && url !== null)
   const [error, setError] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
-  // Skip the first fetch when SSR `initialData` already hydrated the view.
-  const skipFirstFetch = useRef(initialData !== undefined)
+  // The url whose data we currently hold — seeded from SSR `initialData`, then set after
+  // each completed fetch. The effect skips the fetch when this equals `url` (so server-
+  // rendered data isn't re-fetched on mount). A VALUE compare (not a one-shot flag) so the
+  // SSR-hydration skip survives React 18 StrictMode's mount→unmount→remount in dev;
+  // `reload()` nulls it to force a re-fetch of the same url.
+  const dataUrlRef = useRef<string | null>(initialData !== undefined ? url : null)
 
   // Re-sync when a CONTROLLED `initialData` changes (e.g. the host navigates
   // between detail slugs without remounting). No-op in self-fetch mode, where
@@ -58,10 +62,9 @@ export function useSelfFetch<T>(
       setIsLoading(false)
       return
     }
-    if (skipFirstFetch.current) {
-      skipFirstFetch.current = false
-      return
-    }
+    // Already hold data for this exact url (SSR-hydrated, or a prior completed fetch) →
+    // skip. `reload()` clears `dataUrlRef` so a retry of the same url still fetches.
+    if (dataUrlRef.current === url) return
     const ctrl = new AbortController()
     let cancelled = false
     async function load() {
@@ -71,7 +74,10 @@ export function useSelfFetch<T>(
         const res = await fetch(url as string, { signal: ctrl.signal })
         if (!res.ok) throw new Error(`Request failed (${res.status})`)
         const json = (await res.json()) as T
-        if (!cancelled) setData(json)
+        if (!cancelled) {
+          setData(json)
+          dataUrlRef.current = url // remember the url we now hold data for
+        }
       } catch (err) {
         // AbortError on cleanup (unmount / stale-url change / React StrictMode's dev
         // double-invoke) is EXPECTED — the request was intentionally aborted. Aborting
@@ -93,5 +99,16 @@ export function useSelfFetch<T>(
     // `url` folds in every query param; `reloadKey` drives retry.
   }, [url, reloadKey])
 
-  return { data, setData, isLoading, error, reload: () => setReloadKey((k) => k + 1) }
+  return {
+    data,
+    setData,
+    isLoading,
+    error,
+    // Force a re-fetch of the current url: clear the held-url ref so the skip above
+    // doesn't short-circuit, then bump the effect key.
+    reload: () => {
+      dataUrlRef.current = null
+      setReloadKey((k) => k + 1)
+    },
+  }
 }
