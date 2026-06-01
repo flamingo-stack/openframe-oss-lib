@@ -1,16 +1,16 @@
-import { ProductReleasesView } from '@flamingo-stack/openframe-frontend-core/components'
+import { DevSectionPage, ProductReleasesView } from '@flamingo-stack/openframe-frontend-core/components'
 import { EP } from '../config/endpoints'
 
 /**
- * Releases LIST — config-only. The shared lib `<ProductReleasesView>` fetches,
- * paginates, and renders internally; this page supplies only the **api route**
- * (`EP.productReleases` → `/content/api/releases`). No data layer, no page state.
+ * Releases LIST — config-only. `<DevSectionPage sectionKey="releases">` supplies the
+ * chrome (hero + search + release-status filter, all URL-param-wired); the title comes
+ * from the section registry (no manual <h1>). `<ProductReleasesView>` reads those
+ * params, fetches, paginates, and renders. This page supplies only the **api route**.
  */
 export function ReleasesPage() {
   return (
-    <div className="p-6">
-      <h1 className="mb-4 text-xl font-semibold text-ods-text-primary">Product releases</h1>
+    <DevSectionPage sectionKey="releases">
       <ProductReleasesView endpoint={EP.productReleases} />
-    </div>
+    </DevSectionPage>
   )
 }
