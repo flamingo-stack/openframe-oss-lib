@@ -38,11 +38,16 @@ export function isModifierClick(e: {
   )
 }
 
-/** Soft same-origin navigate: prefer the host's `runtime.navigation.navigate`
- *  (hub docNav swap / router.push), else fall back to the registered embed-shims
- *  `routerPush`. Single-sources the host-navigate-else-router decision shared by
- *  the footer waitlist button + the releases rows (chat surfaces route the same
- *  decision through `handleChatNavClick`). Returns whether the HOST handled it. */
+/** Soft same-origin navigate: prefer the host's `runtime.navigation.navigate`,
+ *  else fall back to the registered embed-shims `routerPush`. Returns whether
+ *  the HOST handled it.
+ *
+ *  @deprecated Use `executeNavigationImperative` (the unified nav primitive in
+ *  `execute-navigation.ts`) instead — it adds the new-tab / embed decision this
+ *  helper lacks. Kept here (and NOT delegating) only to avoid a circular import
+ *  with `execute-navigation`, which imports this module's `stripSameOriginToPath`
+ *  + `NEW_TAB_FEATURES`. Both current callers (footer button, release rows) have
+ *  already migrated; this remains for back-compat. */
 export function softNavigate(
   runtime: ChatRuntime | null | undefined,
   routerPush: (href: string) => void,
