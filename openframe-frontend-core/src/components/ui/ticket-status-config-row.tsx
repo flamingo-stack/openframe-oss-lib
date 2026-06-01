@@ -22,8 +22,8 @@ export interface TicketStatusConfigRowProps {
    * or the row's unique id for custom rows. Forwarded to TicketStatusTag.
    */
   statusKey: string
-  label: string
-  onLabelChange?: (value: string) => void
+  name: string
+  onNameChange?: (value: string) => void
   color?: string
   presetKey?: string
   onColorChange?: (next: { color: string; preset?: string }) => void
@@ -54,8 +54,8 @@ function WithLeftTooltip({ content, children }: { content?: string; children: Re
 export function TicketStatusConfigRow({
   variant,
   statusKey,
-  label,
-  onLabelChange,
+  name,
+  onNameChange,
   color,
   presetKey,
   onColorChange,
@@ -102,8 +102,8 @@ export function TicketStatusConfigRow({
 
       <div className="flex flex-1 min-w-0 flex-col gap-[var(--spacing-system-xxs)]">
         <Input
-          value={label}
-          onChange={e => onLabelChange?.(e.target.value)}
+          value={name}
+          onChange={e => onNameChange?.(e.target.value)}
           disabled={isSystem}
           readOnly={isSystem}
           aria-label="Status name"
@@ -130,7 +130,7 @@ export function TicketStatusConfigRow({
       <div className="flex h-12 flex-1 min-w-0 items-center justify-end">
         <TicketStatusTag
           status={statusKey}
-          label={label || ' '}
+          label={name || ' '}
           color={previewColor}
           variant={previewVariant}
           showIcon={isSystem}
