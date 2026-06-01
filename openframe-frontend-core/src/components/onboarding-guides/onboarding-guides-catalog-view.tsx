@@ -11,9 +11,13 @@
  *     the guides (refetching on `?section=` change) + the section list itself —
  *     no host data layer. (Plain fetch + useEffect, the DeliveryLists pattern.)
  *
- * Everything else flows through lib primitives + the ChatRuntime context
- * (chrome via `<DevSectionPage>`, search via `<DocSearchBar>`, section filter +
- * card hrefs via `runtime.composeContentUrl`).
+ * The view renders ONLY its body + its OWN controls (the RAG `<DocSearchBar>` +
+ * dynamic section pills — onboarding's controls are content-driven, unlike the
+ * static search/filter the `DevSectionView` chrome ships). It does NOT render the
+ * page chrome: the CALLER wraps it in `<DevSectionPage sectionKey="onboarding">`
+ * (hero + back button), exactly like the roadmap / releases / delivery pages — so
+ * every dev-center surface composes the same way and the view stays embeddable in
+ * tabbed contexts. Card hrefs flow through `runtime.composeContentUrl`.
  */
 
 import { useMemo, useTransition, type ReactNode } from 'react'
@@ -21,7 +25,6 @@ import { GraduationCap } from 'lucide-react'
 
 import { useRouter, useSearchParams } from '../../embed-shims'
 import { useSelfFetch } from '../../hooks/use-self-fetch'
-import { DevSectionPage } from '../shared/dev-section'
 import { DocSearchBar, useDocSearch } from '../shared/doc-search'
 import { FilterPillRow } from '../ui/filter-pill-row'
 import { LoadError } from '../ui/error-state'
@@ -199,7 +202,8 @@ export function OnboardingGuidesCatalogView({
   }
 
   return (
-    <DevSectionPage sectionKey="onboarding" preControls={preControls}>
+    <div className="w-full flex flex-col gap-10">
+      {preControls}
       {guides.length === 0 ? (
         <div className="text-center py-16">
           <GraduationCap className="h-12 w-12 text-ods-text-secondary mx-auto mb-4" />
@@ -233,6 +237,6 @@ export function OnboardingGuidesCatalogView({
           ))}
         </div>
       )}
-    </DevSectionPage>
+    </div>
   )
 }
