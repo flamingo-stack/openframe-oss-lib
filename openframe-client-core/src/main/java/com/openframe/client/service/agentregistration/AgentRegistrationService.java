@@ -16,7 +16,6 @@ import com.openframe.data.repository.oauth.OAuthClientRepository;
 import com.openframe.data.service.OrganizationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,7 +48,6 @@ public class AgentRegistrationService {
     private final InstalledAgentService installedAgentService;
 
     @Transactional
-    // TODO: two phase commit for the nats integration or other fallback
     public AgentRegistrationResponse register(String initialKey, AgentRegistrationRequest request) {
         secretValidator.validate(initialKey);
 
