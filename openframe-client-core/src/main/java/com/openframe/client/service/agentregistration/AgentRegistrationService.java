@@ -10,10 +10,8 @@ import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.oauth.OAuthClient;
-import com.openframe.data.document.organization.Organization;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.oauth.OAuthClientRepository;
-import com.openframe.data.service.OrganizationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -36,7 +34,7 @@ public class AgentRegistrationService {
 
     private final OAuthClientRepository oauthClientRepository;
     private final MachineRepository machineRepository;
-    private final OrganizationService organizationService;
+    private final OrganizationIdResolver organizationIdResolver;
     private final AgentRegistrationSecretValidator secretValidator;
     private final ClientSecretValidator clientSecretValidator;
     private final AgentSecretGenerator agentSecretGenerator;
@@ -56,7 +54,7 @@ public class AgentRegistrationService {
         String clientSecret = agentSecretGenerator.generate();
 
         // Get or resolve organization
-        String resolvedOrganizationId = resolveOrganizationId(request.getOrganizationId());
+        String resolvedOrganizationId = organizationIdResolver.resolve(request.getOrganizationId());
 
         saveOAuthClient(machineId, clientId, clientSecret);
         Machine machine = saveMachine(machineId, request, resolvedOrganizationId);
@@ -127,33 +125,6 @@ public class AgentRegistrationService {
         registrationTagAssignmentService.assignTags(machineId, request.getTags());
         agentRegistrationToolInstallationService.process(machineId);
         agentRegistrationProcessor.postProcessAgentRegistration(machine, request);
-    }
-
-    private String resolveOrganizationId(String requestedOrganizationId) {
-        // If organizationId provided, check if it exists
-        if (requestedOrganizationId != null && !requestedOrganizationId.isBlank()) {
-            boolean exists = organizationService.getOrganizationByOrganizationId(requestedOrganizationId)
-                    .isPresent();
-            
-            if (exists) {
-                log.debug("Using provided organizationId: {}", requestedOrganizationId);
-                return requestedOrganizationId;
-            } else {
-                log.warn("Provided organizationId {} not found, falling back to default", requestedOrganizationId);
-            }
-        }
-        
-        // Fallback to default organization
-        String defaultOrgId = getDefaultOrganizationId();
-        log.debug("Using default organizationId: {}", defaultOrgId);
-        return defaultOrgId;
-    }
-
-    private String getDefaultOrganizationId() {
-        return organizationService.getDefaultOrganization()
-                .map(Organization::getOrganizationId)
-                .orElseThrow(() -> new IllegalStateException(
-                        "Default organization not found. Please ensure it was created during tenant registration."));
     }
 
     private void saveInstalledAgent(String machineId, AgentRegistrationRequest request) {

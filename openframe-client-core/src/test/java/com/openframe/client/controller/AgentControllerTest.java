@@ -57,6 +57,7 @@ class AgentControllerTest {
     private void setupTestData() {
         registrationRequest = new AgentRegistrationRequest();
         registrationRequest.setHostname("test-host");
+        registrationRequest.setOrganizationId("org-1");
         registrationRequest.setIp("192.168.1.1");
         registrationRequest.setMacAddress("00:11:22:33:44:55");
         registrationRequest.setOsUuid("test-os-uuid");

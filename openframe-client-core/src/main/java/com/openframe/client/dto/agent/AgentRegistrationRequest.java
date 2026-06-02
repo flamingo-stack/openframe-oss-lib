@@ -14,6 +14,7 @@ public class AgentRegistrationRequest {
     // Core identification
     @NotBlank
     private String hostname;
+    @NotBlank
     private String organizationId;
 
     // Network information
