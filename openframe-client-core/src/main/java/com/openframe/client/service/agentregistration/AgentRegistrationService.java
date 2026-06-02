@@ -16,7 +16,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 
@@ -54,10 +53,10 @@ public class AgentRegistrationService {
 
         String resolvedOrganizationId = organizationIdResolver.resolve(request.getOrganizationId());
 
-        saveOAuthClient(machineId, clientId, clientSecret);
-        Machine machine = saveMachine(machineId, request, resolvedOrganizationId);
+        createOAuthClient(machineId, clientId, clientSecret);
+        Machine machine = createMachine(machineId, request, resolvedOrganizationId);
 
-        setupAgent(machine, request);
+        postProcessMachine(machine, request);
 
         return new AgentRegistrationResponse(machineId, clientId, clientSecret);
     }
@@ -71,7 +70,7 @@ public class AgentRegistrationService {
         return format(CLIENT_ID_TEMPLATE, machineId);
     }
 
-    private void saveOAuthClient(String machineId, String clientId, String clientSecret) {
+    private void createOAuthClient(String machineId, String clientId, String clientSecret) {
         if (oauthClientRepository.existsByMachineId(machineId)) {
             log.error("Generated non unique machine id {}", machineId);
             throw new IllegalStateException("Failed to register client");
@@ -87,10 +86,10 @@ public class AgentRegistrationService {
         oauthClientRepository.save(client);
     }
 
-    private Machine saveMachine(String machineId, AgentRegistrationRequest request, String organizationId) {
+    private Machine createMachine(String machineId, AgentRegistrationRequest request, String organizationId) {
         Machine machine = new Machine();
         machine.setMachineId(machineId);
-        applyReportedFields(machine, request);
+        applyRegistrationRequestFields(machine, request);
         machine.setStatus(DeviceStatus.PENDING);
         machine.setOrganizationId(organizationId);
         machine.setType(DeviceType.DESKTOP);
@@ -108,14 +107,14 @@ public class AgentRegistrationService {
 
         Machine machine = loadMachine(machineId);
         updateMachine(machine, request);
-        setupAgent(machine, request);
+        postProcessMachine(machine, request);
 
         String clientId = client.getClientId();
         log.info("Reinstall for existing machine {}, machine data overwritten", machineId);
         return new AgentRegistrationResponse(machineId, clientId, clientSecret);
     }
 
-    private void setupAgent(Machine machine, AgentRegistrationRequest request) {
+    private void postProcessMachine(Machine machine, AgentRegistrationRequest request) {
         String machineId = machine.getMachineId();
 
         saveInstalledAgent(machineId, request);
@@ -130,7 +129,7 @@ public class AgentRegistrationService {
     }
 
     private void updateMachine(Machine machine, AgentRegistrationRequest request) {
-        applyReportedFields(machine, request);
+        applyRegistrationRequestFields(machine, request);
 
         String organizationId = organizationIdResolver.resolve(request.getOrganizationId());
         machine.setOrganizationId(organizationId);
@@ -141,7 +140,7 @@ public class AgentRegistrationService {
         log.info("Updated machine {} on reinstall, organizationId {}", machineId, organizationId);
     }
 
-    private void applyReportedFields(Machine machine, AgentRegistrationRequest request) {
+    private void applyRegistrationRequestFields(Machine machine, AgentRegistrationRequest request) {
         machine.setHostname(request.getHostname());
         machine.setOsType(request.getOsType());
         machine.setAgentVersion(request.getAgentVersion());
