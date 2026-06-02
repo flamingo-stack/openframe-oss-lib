@@ -5,6 +5,7 @@ import com.openframe.client.dto.agent.AgentRegistrationResponse;
 import com.openframe.client.service.agentregistration.processor.AgentRegistrationProcessor;
 import com.openframe.client.service.InstalledAgentService;
 import com.openframe.client.service.validator.AgentRegistrationSecretValidator;
+import com.openframe.client.service.validator.ClientSecretValidator;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
@@ -38,6 +39,7 @@ public class AgentRegistrationService {
     private final MachineRepository machineRepository;
     private final OrganizationService organizationService;
     private final AgentRegistrationSecretValidator secretValidator;
+    private final ClientSecretValidator clientSecretValidator;
     private final AgentSecretGenerator agentSecretGenerator;
     private final PasswordEncoder passwordEncoder;
     private final MachineIdGenerator machineIdGenerator;
@@ -64,15 +66,36 @@ public class AgentRegistrationService {
         saveOAuthClient(machineId, clientId, clientSecret);
         Machine machine = saveMachine(machineId, request, resolvedOrganizationId);
 
-        saveInstalledAgent(machineId, request);
-
-        registrationTagAssignmentService.assignTags(machineId, request.getTags());
-
-        agentRegistrationToolInstallationService.process(machineId);
-
-        agentRegistrationProcessor.postProcessAgentRegistration(machine, request);
+        setupAgent(machine, request);
 
         return new AgentRegistrationResponse(machineId, clientId, clientSecret);
+    }
+
+    @Transactional
+    public AgentRegistrationResponse reinstall(String machineId, String clientSecret, AgentRegistrationRequest request) {
+        OAuthClient client = clientSecretValidator.validate(machineId, clientSecret);
+
+        Machine machine = loadMachine(machineId);
+        updateMachine(machine, request);
+        setupAgent(machine, request);
+
+        String clientId = client.getClientId();
+        log.info("Reinstall for existing machine {}, machine data overwritten", machineId);
+        return new AgentRegistrationResponse(machineId, clientId, clientSecret);
+    }
+
+    private Machine loadMachine(String machineId) {
+        return machineRepository.findByMachineId(machineId)
+                .orElseThrow(() -> new IllegalStateException("Machine not found for registered client: " + machineId));
+    }
+
+    private void setupAgent(Machine machine, AgentRegistrationRequest request) {
+        String machineId = machine.getMachineId();
+
+        saveInstalledAgent(machineId, request);
+        registrationTagAssignmentService.assignTags(machineId, request.getTags());
+        agentRegistrationToolInstallationService.process(machineId);
+        agentRegistrationProcessor.postProcessAgentRegistration(machine, request);
     }
 
     private void saveOAuthClient(String machineId, String clientId, String clientSecret) {
@@ -133,6 +156,27 @@ public class AgentRegistrationService {
     private Machine saveMachine(String machineId, AgentRegistrationRequest request, String organizationId) {
         Machine machine = new Machine();
         machine.setMachineId(machineId);
+        applyReportedFields(machine, request);
+        machine.setStatus(DeviceStatus.PENDING);
+        machine.setOrganizationId(organizationId);
+        machine.setType(DeviceType.DESKTOP);
+
+        Machine savedMachine = machineRepository.save(machine);
+
+        log.info("Saved machine {} with organizationId: {}", machineId, organizationId);
+
+        return savedMachine;
+    }
+
+    private void updateMachine(Machine machine, AgentRegistrationRequest request) {
+        applyReportedFields(machine, request);
+        machineRepository.save(machine);
+
+        String machineId = machine.getMachineId();
+        log.info("Updated machine {} on reinstall", machineId);
+    }
+
+    private void applyReportedFields(Machine machine, AgentRegistrationRequest request) {
         machine.setHostname(request.getHostname());
         machine.setIp(request.getIp());
         machine.setMacAddress(request.getMacAddress());
@@ -140,15 +184,6 @@ public class AgentRegistrationService {
         machine.setOsUuid(request.getOsUuid());
         machine.setAgentVersion(request.getAgentVersion());
         machine.setLastSeen(Instant.now());
-        machine.setStatus(DeviceStatus.PENDING);
-        machine.setOrganizationId(organizationId);
-        machine.setType(DeviceType.DESKTOP);
-
-        Machine savedMachine = machineRepository.save(machine);
-        
-        log.info("Saved machine {} with organizationId: {}", machineId, organizationId);
-        
-        return savedMachine;
     }
 
 }
