@@ -32,7 +32,7 @@ class CommandNatsPublisherTest {
     }
 
     @Test
-    @DisplayName("publishCommand: routes to machine.<machineId>.script-execution and forwards the CommandMessage verbatim")
+    @DisplayName("publishCommand: routes to machine.<machineId>.command-execution and forwards the CommandMessage verbatim")
     void publishCommand_routesToMachineSubjectWithUnchangedPayload() {
         CommandMessage message = CommandMessage.builder()
                 .executionId("exec-1")
@@ -45,7 +45,7 @@ class CommandNatsPublisherTest {
         ArgumentCaptor<String> subject = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<CommandMessage> body = ArgumentCaptor.forClass(CommandMessage.class);
         verify(messagePublisher).publish(subject.capture(), body.capture());
-        assertThat(subject.getValue()).isEqualTo("machine.machine-42.script-execution");
+        assertThat(subject.getValue()).isEqualTo("machine.machine-42.command-execution");
         // The publisher does not massage the payload — same instance reaches the transport.
         assertThat(body.getValue()).isSameAs(message);
     }
@@ -68,7 +68,7 @@ class CommandNatsPublisherTest {
     }
 
     @Test
-    @DisplayName("publishCommand: blank machineId is rejected before any broker call — would otherwise produce malformed subject `machine..script-execution`")
+    @DisplayName("publishCommand: blank machineId is rejected before any broker call — would otherwise produce malformed subject `machine..command-execution`")
     void publishCommand_rejectsBlankMachineId() {
         CommandMessage message = CommandMessage.builder()
                 .executionId("exec-1")
@@ -122,7 +122,7 @@ class CommandNatsPublisherTest {
     }
 
     @Test
-    @DisplayName("publishCancel: routes to machine.<machineId>.script-cancel — distinct subject from script-execution so the agent can prioritise it")
+    @DisplayName("publishCancel: routes to machine.<machineId>.command-cancel — distinct subject from command-execution so the agent can prioritise it")
     void publishCancel_routesToCancelSubject() {
         CancelMessage message = CancelMessage.builder()
                 .executionId("exec-abc")
@@ -130,7 +130,7 @@ class CommandNatsPublisherTest {
 
         publisher.publishCancel("machine-42", message);
 
-        verify(messagePublisher).publish(eq("machine.machine-42.script-cancel"), any(CancelMessage.class));
+        verify(messagePublisher).publish(eq("machine.machine-42.command-cancel"), any(CancelMessage.class));
     }
 
     @Test

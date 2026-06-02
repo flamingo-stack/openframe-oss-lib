@@ -21,8 +21,8 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 @Slf4j
 public class CommandNatsPublisher {
 
-    private static final String MACHINE_SUBJECT_TEMPLATE = "machine.%s.script-execution";
-    private static final String CANCEL_SUBJECT_TEMPLATE = "machine.%s.script-cancel";
+    private static final String MACHINE_SUBJECT_TEMPLATE = "machine.%s.command-execution";
+    private static final String CANCEL_SUBJECT_TEMPLATE = "machine.%s.command-cancel";
 
     private final NatsMessagePublisher natsMessagePublisher;
 

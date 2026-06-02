@@ -14,8 +14,8 @@ import java.util.List;
  *
  *
  * <pre>
- *   Stream:  SCRIPT_EXECUTION
- *   Subject: machine.{machineId}.script-execution
+ *   Stream:  COMMAND_EXECUTION
+ *   Subject: machine.{machineId}.command-execution
  * </pre>
  *
  * <p>Example payload the agent expects:
