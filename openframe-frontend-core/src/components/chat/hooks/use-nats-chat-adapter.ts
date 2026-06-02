@@ -192,6 +192,19 @@ export interface UseNatsChatAdapterConfig {
   fetchChunks?: FetchChunksFunction
 
   /**
+   * NATS topics to live-tail for the active dialog. Each maps to the
+   * subject suffix `chat.{dialogId}.{topic}` (see
+   * `useNatsDialogSubscription`). Defaults to `['message']` — the
+   * client-chat subject the Tauri Fae Chat consumer relies on. Admin /
+   * Mingo chat publishes its agent replies on `'admin-message'`, so the
+   * openframe EmbeddableChat host MUST set `topics: ['admin-message']`
+   * here — otherwise the subscription tails the wrong subject, no reply
+   * chunks ever arrive, and the assistant placeholder hangs forever in
+   * the `thinking` phase.
+   */
+  topics?: NatsMessageType[]
+
+  /**
    * Whether THINKING chunks are surfaced as segments. Default `false`
    * (parity with the existing `useRealtimeChunkProcessor` default).
    */
@@ -240,6 +253,25 @@ export interface UseNatsChatAdapterConfig {
   /** Delete a dialog from history. When omitted, the sidebar item's
    *  delete affordance is hidden. */
   deleteDialog?: (dialogId: string) => Promise<void>
+
+  /** Rename a dialog on the backend. When omitted, the "Rename" affordance
+   *  in the chat-history row menu is hidden. */
+  renameDialog?: (dialogId: string, title: string) => Promise<void>
+
+  /** Archive a dialog on the backend (removes it from the active list).
+   *  When omitted, the "Archive" affordance in the row menu is hidden. */
+  archiveDialog?: (dialogId: string) => Promise<void>
+
+  /** Fetch a paginated page of ARCHIVED dialogs for the Chat Archive page.
+   *  When omitted, the archive (clock-history) button in the header is
+   *  hidden. Same page/cursor contract as `fetchDialogs`. */
+  fetchArchivedDialogs?: (
+    params: FetchDialogsParams,
+  ) => Promise<FetchDialogsResult>
+
+  /** Restore an archived dialog back to the active list. When omitted, the
+   *  restore (refresh) button in an archived chat's header is hidden. */
+  unarchiveDialog?: (dialogId: string) => Promise<void>
 
   /**
    * Approve a pending tool-call request. Wired into the segment
@@ -383,12 +415,15 @@ export function useNatsChatAdapter(
     clientConfig,
     publishUserMessage,
     fetchChunks,
+    topics,
     enableThinking,
     batchApprovalsEnabled,
     fetchDialogs,
     fetchDialogMessages,
     createDialog: createDialogCallback,
     deleteDialog: deleteDialogCallback,
+    renameDialog: renameDialogCallback,
+    archiveDialog: archiveDialogCallback,
     approveRequest: approveRequestCallback,
     rejectRequest: rejectRequestCallback,
     stopGeneration: stopGenerationCallback,
@@ -676,6 +711,10 @@ export function useNatsChatAdapter(
   useNatsDialogSubscription({
     enabled: active && dialogId != null,
     dialogId,
+    // Subject suffix to tail. Omitted → the hook defaults to `['message']`
+    // (client chat). Admin/Mingo hosts pass `['admin-message']` so the
+    // live tail lands on the subject the agent actually publishes to.
+    ...(topics ? { topics } : {}),
     getNatsWsUrl,
     clientConfig,
     onEvent: (payload: unknown, messageType: NatsMessageType) => {
@@ -844,6 +883,48 @@ export function useNatsChatAdapter(
     [deleteDialogCallback, internalDialogId, isManagedMode],
   )
 
+  const renameDialog = useCallback(
+    async (id: string, title: string): Promise<void> => {
+      if (!renameDialogCallback) return
+      // Optimistic — update the local title immediately, roll back on error.
+      let previous: string | undefined
+      setDialogs((prev) =>
+        prev.map((d) => {
+          if (d.id !== id) return d
+          previous = d.title
+          return { ...d, title }
+        }),
+      )
+      try {
+        await renameDialogCallback(id, title)
+      } catch (err) {
+        console.error('[useNatsChatAdapter] renameDialog failed:', err)
+        if (previous !== undefined) {
+          setDialogs((prev) =>
+            prev.map((d) => (d.id === id ? { ...d, title: previous! } : d)),
+          )
+        }
+      }
+    },
+    [renameDialogCallback],
+  )
+
+  const archiveDialog = useCallback(
+    async (id: string): Promise<void> => {
+      if (!archiveDialogCallback) return
+      try {
+        await archiveDialogCallback(id)
+        setDialogs((prev) => prev.filter((d) => d.id !== id))
+        if (isManagedMode && internalDialogId === id) {
+          setInternalDialogId(null)
+        }
+      } catch (err) {
+        console.error('[useNatsChatAdapter] archiveDialog failed:', err)
+      }
+    },
+    [archiveDialogCallback, internalDialogId, isManagedMode],
+  )
+
   const loadMoreDialogs = useCallback(async (): Promise<void> => {
     if (!dialogsNextCursor) return
     await loadDialogsPage(dialogsNextCursor)
@@ -906,6 +987,8 @@ export function useNatsChatAdapter(
       selectDialog,
       startNewDialog,
       deleteDialog,
+      renameDialog,
+      archiveDialog,
       isDialogsLoading: isDialogsLoading || isCreatingDialog,
       isMessagesLoading,
       hasMoreDialogs,
@@ -934,6 +1017,8 @@ export function useNatsChatAdapter(
       selectDialog,
       startNewDialog,
       deleteDialog,
+      renameDialog,
+      archiveDialog,
       isDialogsLoading,
       isCreatingDialog,
       isMessagesLoading,

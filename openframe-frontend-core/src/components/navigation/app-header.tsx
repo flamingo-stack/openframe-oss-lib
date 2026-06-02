@@ -129,18 +129,6 @@ export const AppHeader = React.memo(function AppHeader({
         />
       )}
 
-      {/* Mingo AI launcher — placed to the LEFT of notifications so the user
-          menu cluster (notifications → avatar) stays anchored to the right. */}
-      {showMingoAI && (
-        <HeaderMingoButton
-          onClick={onMingoAI}
-          isActive={isMingoAIActive}
-          iconOnly={!isMdUp}
-          disabled={disabled || !onMingoAI}
-          className={dimmedClass}
-        />
-      )}
-
       {/* Notifications button */}
       {showNotifications && (
         <NotificationsHeaderButton
@@ -215,6 +203,18 @@ export const AppHeader = React.memo(function AppHeader({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+      )}
+
+      {/* Mingo AI launcher — anchored at the very end of the header. On mobile
+          it collapses to an icon-only affordance (no "Mingo AI" wordmark). */}
+      {showMingoAI && (
+        <HeaderMingoButton
+          onClick={onMingoAI}
+          isActive={isMingoAIActive}
+          iconOnly={!isMdUp}
+          disabled={disabled || !onMingoAI}
+          className={dimmedClass}
+        />
       )}
     </header>
   )
