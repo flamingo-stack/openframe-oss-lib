@@ -1362,6 +1362,13 @@ function EmbeddableChatInner({
   // (backdrop, iOS scroll-lock, drag-to-resize). Both render the same `body`.
   const panel = shellLess ? (
     <ChatPanelContext.Provider value={chatPanelHandle}>
+      {/* Shell-less hosts (AppLayoutDrawer) own the Radix Dialog but not its
+          accessible name — Radix warns when a Dialog.Content has no Title. The
+          panel supplies its own visually-hidden title here, mirroring the
+          drawer-shell branch below, so it's accessible regardless of host. */}
+      <VisuallyHidden>
+        <DialogPrimitive.Title>{sourceLabel} AI Assistant</DialogPrimitive.Title>
+      </VisuallyHidden>
       {body}
     </ChatPanelContext.Provider>
   ) : (
