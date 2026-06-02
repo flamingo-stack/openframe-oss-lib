@@ -2,14 +2,15 @@ import type { ReactNode } from 'react'
 
 /**
  * THE page-title style — the ODS `text-h1` token (`--font-size-h1-title` =
- * 40 / 48 / 56px, Azeret Mono semibold) plus the standard heading tracking.
- * Mirrors the global `h1 { @apply text-h1 }` base, so every page heading is
- * the SAME size across the lib and every consuming app.
+ * 40 / 48 / 56px, Azeret Mono semibold), which already owns the responsive
+ * letter-spacing (-0.02em). Mirrors the global `h1 { @apply text-h1 }` base, so
+ * every page heading is the SAME size across the lib and every consuming app.
  *
- * Single source of truth — do NOT hardcode a px size for a page title; render
- * `<PageHeading>` (or, for the rare non-h1 caller, apply `PAGE_HEADING_CLASS`).
+ * Single source of truth — do NOT hardcode a px size or re-assert the token's
+ * tracking; render `<PageHeading>` (or, for the rare non-h1 caller, apply
+ * `PAGE_HEADING_CLASS`).
  */
-export const PAGE_HEADING_CLASS = 'text-h1 text-ods-text-primary tracking-[-1.12px]'
+export const PAGE_HEADING_CLASS = 'text-h1 text-ods-text-primary'
 
 const DESCRIPTION_CLASS =
   "mt-6 max-w-[640px] font-['DM_Sans'] text-[16px] md:text-[18px] leading-[24px] md:leading-[28px] text-ods-text-secondary"
@@ -45,10 +46,15 @@ export function PageHeading({
 }: PageHeadingProps) {
   const headingClass = className ? `${PAGE_HEADING_CLASS} ${className}` : PAGE_HEADING_CLASS
   const descClass = descriptionClassName ? `${DESCRIPTION_CLASS} ${descriptionClassName}` : DESCRIPTION_CLASS
+  // `description` is a ReactNode, so `description={cond && '...'}` can pass a
+  // boolean `false` — exclude it (and empty string) so we never render an empty
+  // <p> that adds phantom vertical gap beneath the heading.
+  const hasDescription =
+    description != null && description !== '' && typeof description !== 'boolean'
   return (
     <>
       <Tag className={headingClass}>{children}</Tag>
-      {description != null && description !== '' && <p className={descClass}>{description}</p>}
+      {hasDescription && <p className={descClass}>{description}</p>}
     </>
   )
 }
