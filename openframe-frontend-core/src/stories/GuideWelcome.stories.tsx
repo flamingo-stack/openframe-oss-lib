@@ -14,6 +14,18 @@ const ACTIONS = [
   { id: 'find', label: 'Find', onClick: () => console.log('find') },
 ]
 
+// Quick actions are caller-provided (GuideWelcome ships no defaults); these
+// demonstrate the inline chips + the "⋯" overflow menu.
+const SAMPLE_QUICK_ACTIONS = [
+  { id: 'how-to-start', label: 'How to start' },
+  { id: 'connect-device', label: 'Connect device' },
+  { id: 'find-device', label: 'Find device' },
+  { id: 'remote-connection', label: 'Remote connection' },
+  { id: 'run-scripts', label: 'Run scripts' },
+  { id: 'device-software', label: 'Device software' },
+  { id: 'bulk-update', label: 'Bulk update' },
+]
+
 const SAMPLE_LIST = (
   <div className="shrink-0 overflow-hidden rounded-md border border-ods-border">
     <MingoOnboardingCard
@@ -79,6 +91,7 @@ type Story = StoryObj<typeof GuideWelcome>
 /** Full guide-mode empty state with the slash-command list and quick actions. */
 export const Default: Story = {
   args: {
+    quickActions: SAMPLE_QUICK_ACTIONS,
     onQuickAction: (a) => console.log('quick action', a.id),
     children: SAMPLE_LIST,
   },
@@ -87,7 +100,15 @@ export const Default: Story = {
 /** No slash commands available yet — greeting + quick actions only. */
 export const NoCommands: Story = {
   args: {
+    quickActions: SAMPLE_QUICK_ACTIONS,
     onQuickAction: (a) => console.log('quick action', a.id),
+  },
+}
+
+/** No quick actions supplied (the default) — the chip row is omitted entirely. */
+export const NoQuickActions: Story = {
+  args: {
+    children: SAMPLE_LIST,
   },
 }
 
@@ -96,6 +117,7 @@ export const CustomCopy: Story = {
   args: {
     title: 'Ask the Guide',
     subtitle: 'A temporary session for exploring docs and tickets.',
+    quickActions: SAMPLE_QUICK_ACTIONS,
     onQuickAction: (a) => console.log('quick action', a.id),
     children: SAMPLE_LIST,
   },

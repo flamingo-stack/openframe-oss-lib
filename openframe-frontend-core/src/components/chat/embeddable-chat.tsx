@@ -1140,9 +1140,11 @@ function EmbeddableChatInner({
               />
 
               {/* Guide-mode indicator banner (Figma node 7532:328222) —
-                  full-bleed accent strip below the header whenever Guide mode
-                  is active. Fades in to match the panel's view transitions. */}
-              {activeMode === 'guide' && (
+                  full-bleed accent strip below the header. Shown only when
+                  Guide mode is active AND the default (Mingo) mode also exists:
+                  the banner contrasts the temporary Guide session against the
+                  default chat, so it's meaningless in a guide-only setup. */}
+              {activeMode === 'guide' && !!effectiveModes.mingo && (
                 <GuideModeBanner className="animate-in fade-in-0 duration-200" />
               )}
 

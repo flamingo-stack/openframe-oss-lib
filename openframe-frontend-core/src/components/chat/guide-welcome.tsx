@@ -26,8 +26,10 @@ export interface GuideWelcomeProps {
   title?: React.ReactNode
   /** Greeting sub-line. Defaults to the OpenFrame temporary-session copy. */
   subtitle?: React.ReactNode
-  /** Quick-action chips. The first `maxVisibleQuickActions` render inline; the
-   *  rest collapse under a trailing "⋯" overflow menu. */
+  /** Quick-action chips — caller-provided; there are no built-in defaults, so
+   *  the chip row is omitted entirely unless the host supplies actions. The
+   *  first `maxVisibleQuickActions` render inline; the rest collapse under a
+   *  trailing "⋯" overflow menu. */
   quickActions?: ReadonlyArray<GuideQuickAction>
   /** How many chips to show inline before overflowing to the menu (default 3). */
   maxVisibleQuickActions?: number
@@ -49,16 +51,6 @@ const DEFAULT_SUBTITLE =
   'This chat is temporary and will not be saved. Ask about OpenFrame docs, ' +
   'known issues, or manage your support tickets right here.'
 
-const DEFAULT_QUICK_ACTIONS: ReadonlyArray<GuideQuickAction> = [
-  { id: 'how-to-start', label: 'How to start' },
-  { id: 'connect-device', label: 'Connect device' },
-  { id: 'find-device', label: 'Find device' },
-  { id: 'remote-connection', label: 'Remote connection' },
-  { id: 'run-scripts', label: 'Run scripts' },
-  { id: 'device-software', label: 'Device software' },
-  { id: 'bulk-update', label: 'Bulk update' },
-]
-
 // =============================================================================
 // Component
 // =============================================================================
@@ -77,7 +69,7 @@ const DEFAULT_QUICK_ACTIONS: ReadonlyArray<GuideQuickAction> = [
 export function GuideWelcome({
   title = DEFAULT_TITLE,
   subtitle = DEFAULT_SUBTITLE,
-  quickActions = DEFAULT_QUICK_ACTIONS,
+  quickActions = [],
   maxVisibleQuickActions = 3,
   onQuickAction,
   children,
