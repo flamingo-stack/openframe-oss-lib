@@ -1072,7 +1072,7 @@ export function useSseChatAdapter(
     startNewDialog: noopStartNewDialog,
     deleteDialog: noopDeleteDialog,
     renameDialog: noopRenameDialog,
-    archiveDialog: noopDeleteDialog,
+    archiveDialog: noopArchiveDialog,
     isDialogsLoading: false,
     isMessagesLoading: false,
     hasMoreDialogs: false,
@@ -1099,6 +1099,9 @@ const noopDeleteDialog = async (_id: string): Promise<void> => {
   /* no-op until Guide localStorage history is exposed */
 }
 const noopRenameDialog = async (_id: string, _title: string): Promise<void> => {
+  /* no-op until Guide localStorage history is exposed */
+}
+const noopArchiveDialog = async (_id: string): Promise<void> => {
   /* no-op until Guide localStorage history is exposed */
 }
 const noopAsync = async (): Promise<void> => {

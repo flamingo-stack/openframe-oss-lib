@@ -19,8 +19,10 @@ export interface HeaderMingoButtonProps
 /**
  * "Mingo AI" launcher button for `AppHeader`. Mirrors the `HeaderButton`
  * visual contract (sticky header height, `ods-card` rest / `ods-bg-hover`
- * hover / `ods-bg-active` active, divider via `AppHeader`'s `divide-x`), but
- * carries both the Mingo logo and the bold "Mingo AI" wordmark.
+ * hover, divider via `AppHeader`'s `divide-x`), but carries both the Mingo
+ * logo and the bold "Mingo AI" wordmark. The open/active state is exposed via
+ * `aria-pressed` (and, in `iconOnly` mode, by swapping the logo for a close
+ * "X"); there is no distinct active background.
  *
  * Figma: 7532:222103 — `button-full`.
  */

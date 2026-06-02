@@ -451,7 +451,7 @@ export const BothModes: Story = {
  * history, so `dialogs.length > 0` and the empty state switches to its
  * returning-user form: the "New to OpenFrame?" notification is hidden and the
  * "Start Guide Chat" chip drops from the accent yellow to the muted outline
- * style. The dialog list itself renders in the in-panel sidebar.
+ * style. The dialog list itself renders inline via MingoChatHistory.
  */
 export const ReturningUser: Story = {
   render: (args) => (

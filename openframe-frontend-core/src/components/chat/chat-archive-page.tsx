@@ -67,10 +67,23 @@ export function ChatArchivePage({
             isLoadingMore={isLoading && dialogs.length > 0}
             onLoadMore={onLoadMore}
           />
+        ) : isLoading ? (
+          // First-load skeleton — `h-12` rows matching the dialog-list layout
+          // so results land without a shift (auth → data → empty → content).
+          <div className="flex flex-col" aria-hidden>
+            {[...Array(6)].map((_, i) => (
+              <div
+                key={i}
+                className="flex h-12 items-center gap-[var(--spacing-system-xsf)] border-b border-ods-border px-[var(--spacing-system-s)] last:border-b-0"
+              >
+                <div className="h-4 w-full max-w-[60%] animate-pulse rounded bg-ods-bg-secondary" />
+              </div>
+            ))}
+          </div>
         ) : (
           <div className="flex flex-1 items-center justify-center text-center">
             <p className="text-h4 text-ods-text-secondary">
-              {isLoading ? 'Loading…' : 'No archived chats yet.'}
+              No archived chats yet.
             </p>
           </div>
         )}

@@ -59,9 +59,16 @@ export function useChatDialogManager({
     },
     [renameTarget, renameDialog],
   )
-  const handleConfirmArchive = useCallback(() => {
+  const handleConfirmArchive = useCallback(async () => {
     if (archiveTarget) {
-      void archiveDialog(archiveTarget.id)
+      try {
+        await archiveDialog(archiveTarget.id)
+      } catch (err) {
+        // Keep the modal open (don't clear the target) so the user can retry;
+        // don't tear down the open conversation for an archive that failed.
+        console.error('[useChatDialogManager] archive failed:', err)
+        return
+      }
       // Archiving the open conversation drops back to the chat list.
       if (archiveTarget.id === activeDialogId) {
         setOpeningDialogId(null)
@@ -138,9 +145,17 @@ export function useChatDialogManager({
     [selectDialog],
   )
   const [restoreTarget, setRestoreTarget] = useState<DialogItem | null>(null)
-  const handleConfirmRestore = useCallback(() => {
+  const handleConfirmRestore = useCallback(async () => {
     if (restoreTarget) {
-      void unarchiveDialog?.(restoreTarget.id)
+      try {
+        await unarchiveDialog?.(restoreTarget.id)
+      } catch (err) {
+        // Backend restore failed — leave the local archived cache untouched so
+        // the dialog doesn't vanish from the archive only to resurface on the
+        // next fetch. Keep the modal open for a retry.
+        console.error('[useChatDialogManager] unarchive failed:', err)
+        return
+      }
       // Drop it from the locally-cached archived list and exit read-only mode
       // so the composer returns and the user can keep chatting.
       setArchivedDialogs((prev) => prev.filter((d) => d.id !== restoreTarget.id))
