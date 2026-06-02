@@ -285,6 +285,14 @@ export interface UnifiedChatState {
    *  Mingo gates on the host-provided callback). */
   deleteDialog: (id: string) => Promise<void>
 
+  /** Rename a dialog. Optimistically updates the title in the local list.
+   *  No-op when the adapter doesn't expose a rename callback. */
+  renameDialog: (id: string, title: string) => Promise<void>
+
+  /** Archive a dialog (removes it from the active list). No-op when the
+   *  adapter doesn't expose an archive callback. */
+  archiveDialog: (id: string) => Promise<void>
+
   /** True while the dialog list is being fetched for the first time. */
   isDialogsLoading: boolean
 

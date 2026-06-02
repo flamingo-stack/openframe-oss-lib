@@ -5,7 +5,7 @@ import { Button } from "../ui/button"
 import { PlusCircleIcon } from "../plus-circle-icon"
 import { XmarkIcon } from "../icons-v2-generated/signs-and-symbols/xmark-icon"
 import { Chevron02LeftIcon } from "../icons-v2-generated"
-import { TicketStatusTag } from "../ui/ticket-status-tag"
+import { TicketStatusTag, resolveStatusTagProps } from "../ui/ticket-status-tag"
 import type { ConnectionIndicatorProps, ChatContainerProps, ChatHeaderProps } from "./types"
 
 const ConnectionIndicator: React.FC<ConnectionIndicatorProps> = ({ status }) => {
@@ -156,7 +156,16 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
                     <div className="text-h6 text-ods-text-secondary truncate" title={typeof ticketInfo.meta === 'string' ? ticketInfo.meta : undefined}>{ticketInfo.meta}</div>
                   )}
                 </div>
-                {ticketInfo.status && <TicketStatusTag status={ticketInfo.status} />}
+                {(ticketInfo.status || ticketInfo.statusName) && (
+                  <TicketStatusTag
+                    {...resolveStatusTagProps({
+                      status: ticketInfo.status,
+                      statusKind: ticketInfo.statusKind,
+                      statusName: ticketInfo.statusName,
+                      statusColor: ticketInfo.statusColor,
+                    })}
+                  />
+                )}
               </div>
             </>
           )}
