@@ -109,6 +109,8 @@ public class AgentRegistrationService {
         OAuthClient client = loadOAuthClient(machineId);
         clientSecretValidator.validate(client, clientSecret);
 
+        log.info("Reinstall for existing machine {}", machineId);
+
         Machine machine = loadMachine(machineId);
         updateMachine(machine, request);
         postProcessMachine(machine, request);
