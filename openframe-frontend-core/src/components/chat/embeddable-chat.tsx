@@ -42,30 +42,39 @@ import { Button } from '../ui/button'
 import { Drawer, DrawerContent } from '../ui/drawer'
 import { HoverDropdown, type HoverDropdownItem } from '../ui/hover-dropdown'
 import { MingoIcon } from '../icons'
-import { Chevron01LeftIcon } from '../icons-v2-generated/arrows/chevron-01-left-icon'
-import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon'
 
-import { ChatFooter } from './chat-container'
-import { ChatInput } from './chat-input'
-import { ChatSidebar } from './chat-sidebar'
 import { MingoOnboardingCard } from './mingo-onboarding-card'
 import { MingoOnboardingCardSkeleton } from './mingo-onboarding-card-skeleton'
+import { MingoWelcome, type MingoWelcomeProps } from './mingo-welcome'
+import { MingoChatHistory } from './mingo-chat-history'
+import { GuideWelcome, type GuideWelcomeProps } from './guide-welcome'
+import { GuideModeBanner } from './guide-mode-banner'
+import { PortalContainerContext } from '../ui/portal-container'
+import { ChatPanelHeader } from './chat-panel-header'
+import { ChatArchivePage } from './chat-archive-page'
+import { ChatComposer } from './chat-composer'
+import { useChatDialogManager } from './hooks/use-chat-dialog-manager'
+import { ChatDialogModals } from './mingo-chat-modals'
 import { ChatMessageList } from './chat-message-list'
-import { ModelDisplay } from './model-display'
 import { SourceActionButton } from './source-action-button'
 import { NavLinkAnchorViaRuntime } from './nav-link-anchor-via-runtime'
-import { ChatAttachmentAddButton, ChatAttachmentChipStrip } from './chat-attachment-bar'
+import { ChatAttachmentChipStrip } from './chat-attachment-bar'
 import { renderChatInlineEntityCard } from './entity-cards/dispatch'
 import type { ChatCardDispatchExtras } from './entity-cards/dispatch'
 
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context'
+import { useRouter } from '../../embed-shims/next-navigation'
 import { type ChatSource, type UseSseChatAdapterOptions } from './hooks/use-sse-chat-adapter'
 import {
   useUnifiedChat,
   type ChatMode,
   type UseUnifiedChatModes,
 } from './hooks/use-unified-chat'
-import type { UseNatsChatAdapterConfig } from './hooks/use-nats-chat-adapter'
+import type {
+  UseNatsChatAdapterConfig,
+  FetchDialogsParams,
+  FetchDialogsResult,
+} from './hooks/use-nats-chat-adapter'
 import { useChatAttachments } from './hooks/use-chat-attachments'
 import { useChatAttachmentImageGallery } from './hooks/use-chat-attachment-image-gallery'
 import { useChatIdentity } from './hooks/use-chat-identity'
@@ -81,7 +90,7 @@ import { handleChatNavClick } from './utils/nav-click-handler'
 import { computeIsNewTab, newTabAnchorAttrs } from './utils/nav-anchor-props'
 import { resolveHrefForRuntime } from './utils/chat-nav-resolution'
 import { ChatPanelContext, type ChatPanelHandle } from './chat-panel-context'
-import { resolveSourceRowCTA } from './utils/source-row-cta'
+import { resolveSourceRowCTA, sourceRowCtxFromRuntime } from './utils/source-row-cta'
 import { chatChipClass } from './utils/chip-styles'
 import { getIconComponent } from './utils/icon-registry'
 import { resolveOnboardingIcon } from './utils/onboarding-icons'
@@ -182,6 +191,27 @@ export interface EmbeddableChatProps {
    *     drives).
    */
   shell?: 'drawer' | 'none'
+
+  /**
+   * Content overrides for the default (Mingo-mode) empty state
+   * (`<MingoWelcome>`): greeting `title`/`subtitle`, the capability
+   * `featureCards` grid, the `promo` card, and extra `quickActions` chips.
+   * Each field falls back to the built-in OpenFrame defaults, so the kit
+   * stays platform-agnostic. `userName`, `onStartGuideChat` and
+   * `hasExistingChats` are wired internally and are NOT overridable here.
+   */
+  mingoWelcome?: Omit<
+    MingoWelcomeProps,
+    'userName' | 'onStartGuideChat' | 'hasExistingChats'
+  >
+
+  /**
+   * Content overrides for the Guide-mode empty state (`<GuideWelcome>`):
+   * greeting `title`/`subtitle` and the `quickActions` chips. Each field falls
+   * back to the built-in OpenFrame defaults. `onQuickAction` and the
+   * slash-command list `children` are wired internally and not overridable.
+   */
+  guideWelcome?: Omit<GuideWelcomeProps, 'onQuickAction' | 'children'>
 }
 
 // =============================================================================
@@ -293,6 +323,7 @@ function SourceChip({
   onDiscuss?: (ref: ChatRef) => void
 }) {
   const runtime = useRequiredChatRuntime()
+  const router = useRouter()
   // Single CTA resolver — same icon, same href chain, same ChatRef
   // synthesis the inline card and search-result paths use.
   const cta = resolveSourceRowCTA(
@@ -305,7 +336,7 @@ function SourceChip({
       targetPlatform: src.targetPlatform ?? null,
       path: src.path,
     },
-    { baseRoute, chipBasePlatform, currentPlatform: runtime.source },
+    sourceRowCtxFromRuntime(runtime, { baseRoute, chipBasePlatform }),
   )
   const Icon = cta.icon
   const icon = <Icon className="h-3.5 w-3.5" />
@@ -329,7 +360,7 @@ function SourceChip({
           targetPlatform: item.targetPlatform ?? null,
           path: item.path,
         },
-        { baseRoute, chipBasePlatform, currentPlatform: runtime.source },
+        sourceRowCtxFromRuntime(runtime, { baseRoute, chipBasePlatform }),
       )
       const ItemIcon = itemCta.icon
       return {
@@ -403,7 +434,7 @@ function SourceChip({
   // Single close model: matches `ChatCardNavWrap` for inline cards.
   const buildClickHandler = (href: string, path: string | null | undefined, targetPlatform: string | null, isNewTab: boolean) =>
     (e: React.MouseEvent<HTMLAnchorElement>) => {
-      const handled = handleChatNavClick(e, runtime, { href, path, targetPlatform })
+      const handled = handleChatNavClick(e, runtime, { href, path, targetPlatform }, router.push)
       if (handled && !isNewTab && onClose) onClose()
     }
 
@@ -578,6 +609,8 @@ function EmbeddableChatInner({
   onActiveModeChange,
   defaultActiveMode,
   shell = 'drawer',
+  mingoWelcome,
+  guideWelcome,
 }: EmbeddableChatProps) {
   // `shell === 'none'` means the consumer hosts us inside their own panel
   // (e.g. AppLayoutDrawer in openframe-frontend). Several drawer-shell
@@ -585,7 +618,9 @@ function EmbeddableChatInner({
   // we don't double-up with the host's behaviour.
   const shellLess = shell === 'none'
   const runtime = useRequiredChatRuntime()
-  const source = runtime.source as DocSource
+  // Optional on embedders (platform-agnostic); '' is a harmless sentinel for the
+  // `ask-ai:open-with-ref` event filter below. (DocSource is a `string` alias.)
+  const source = (runtime.source ?? '') as DocSource
   const commandsUrl = runtime.endpoints.commandsUrl
   // Server-resolved identity — drives the greeting first-name AND the
   // attachment capability flag. Single source of truth: the chat-identity
@@ -760,10 +795,6 @@ function EmbeddableChatInner({
     [controlledActiveMode, onActiveModeChange],
   )
 
-  // Mode toggle visible only when both slots are populated.
-  const showModeToggle =
-    effectiveModes.guide !== undefined && effectiveModes.mingo !== undefined
-
   const {
     messages: rawMessages,
     isLoading: chatLoading,
@@ -779,45 +810,16 @@ function EmbeddableChatInner({
     currentCacheHitRatePct,
     currentUsageBreakdown,
     displayRef,
-    // ─── Dialog management (Mingo-mode sidebar) ───
+    // ─── Dialog management (Mingo-mode inline history) ───
     dialogs,
     activeDialogId,
     selectDialog,
-    startNewDialog,
+    renameDialog,
+    archiveDialog,
     isDialogsLoading,
     hasMoreDialogs,
     loadMoreDialogs,
   } = useUnifiedChat({ modes: effectiveModes, activeMode })
-
-  // Whether the in-panel dialog sidebar should render. Gated on:
-  //   1. Mingo mode is active (Guide has localStorage-only history that
-  //      isn't yet structured as a sidebar list — see
-  //      [[chat-architecture-and-migration]] for the asymmetry).
-  //   2. The host wired `fetchDialogs` — managed-dialog mode, not the
-  //      bare-transport Tauri flow.
-  const showSidebar =
-    activeMode === 'mingo' && effectiveModes.mingo?.fetchDialogs !== undefined
-
-  // Pending startNewDialog promise — used to gate the "Start new chat"
-  // button while creation is in flight so a double-click doesn't spawn
-  // two backend dialogs.
-  const [isStartingNewDialog, setIsStartingNewDialog] = useState<boolean>(false)
-  const handleStartNewDialog = useCallback(async () => {
-    if (isStartingNewDialog) return
-    setIsStartingNewDialog(true)
-    try {
-      await startNewDialog()
-    } finally {
-      setIsStartingNewDialog(false)
-    }
-  }, [isStartingNewDialog, startNewDialog])
-
-  const handleSelectDialog = useCallback(
-    (id: string) => {
-      selectDialog(id)
-    },
-    [selectDialog],
-  )
 
   // Chat-attachment hooks (v2 attachment feature).
   const {
@@ -832,7 +834,12 @@ function EmbeddableChatInner({
     useChatAttachmentImageGallery()
 
   // Resolve base route. Hub default mapping: flamingo → /knowledge-base,
-  // anything else → /data-room. Embedders can override per platform.
+  // anything else → /data-room. Embedders override per platform. An embedder that
+  // doesn't host an in-app doc viewer should NOT pass an empty baseRoute (that just
+  // falls back to the platform default here) — instead it sets a truthy baseRoute +
+  // `chipBasePlatform` so doc chips with no externalUrl resolve cross-platform to that
+  // platform's public knowledge hub (`getBaseUrl(chipBasePlatform)/knowledge-base/…`),
+  // exactly like the hub's openframe config (baseRoute:'/', chipBasePlatform:'flamingo').
   const resolvedBaseRoute =
     baseRoute || (source === 'flamingo' ? '/knowledge-base' : '/data-room')
 
@@ -909,9 +916,44 @@ function EmbeddableChatInner({
     [sendMessage, readyAttachments, viewUrlPrefix, clearAttachments],
   )
 
-  const handleNewChat = useCallback(() => {
-    clearMessages()
-  }, [clearMessages])
+  // Dialog-history concerns (archive page, read-only archived conversation,
+  // rename/archive/unarchive modals) live in one hook so this component stays
+  // a thin orchestrator. Destructured with the names the JSX below uses.
+  const {
+    fetchArchivedDialogs,
+    unarchiveDialog,
+    archiveOpen,
+    archivedDialogs,
+    archivedCursor,
+    archivedLoading,
+    openArchive,
+    closeArchive,
+    loadArchivedPage,
+    handleArchivedSelect,
+    handleSelectDialog,
+    isOpeningDialog,
+    isViewingArchived,
+    handleBack,
+    activeDialog,
+    renameTarget,
+    setRenameTarget,
+    archiveTarget,
+    setArchiveTarget,
+    restoreTarget,
+    setRestoreTarget,
+    handleConfirmRename,
+    handleConfirmArchive,
+    handleConfirmRestore,
+  } = useChatDialogManager({
+    dialogs,
+    activeDialogId,
+    selectDialog,
+    clearMessages,
+    renameDialog,
+    archiveDialog,
+    fetchArchivedDialogs: effectiveModes.mingo?.fetchArchivedDialogs,
+    unarchiveDialog: effectiveModes.mingo?.unarchiveDialog,
+  })
 
   const handleOpen = useCallback(() => setIsOpen(true), [setIsOpen])
 
@@ -941,9 +983,24 @@ function EmbeddableChatInner({
   }, [source, discussRef, setIsOpen])
 
   const hasMessages = messages.length > 0
+  // A conversation is "open" the instant a chat is selected (`isOpeningDialog` /
+  // `isViewingArchived` are set synchronously on click) — not only once its
+  // history has loaded (`hasMessages`). Driving the surface + content branch
+  // off this makes the normal-chat open animate identically to the archived
+  // one instead of lagging behind the message fetch.
+  const hasConversation = hasMessages || isOpeningDialog || isViewingArchived
+  // Keys the content region so each distinct view (open conversation, Mingo
+  // welcome, Guide onboarding) remounts on switch → fades in for 200ms, the
+  // same feel as the surface flip. Switching dialogs stays "conversation" so
+  // streaming messages don't re-trigger the fade.
+  const contentViewKey = hasConversation ? 'conversation' : activeMode
+  // Guide-mode empty state (no open conversation) — drives the "Mingo Guide"
+  // header, the guide banner, and the GuideWelcome content branch.
+  const isGuideEmpty = !hasConversation && activeMode === 'guide'
+  // The guide-empty back-chevron returns to Mingo — only offer it when Mingo
+  // mode actually exists to return to (guide is normally entered from Mingo).
+  const guideCanReturnToMingo = isGuideEmpty && !!effectiveModes.mingo
   const sourceLabel = source === 'flamingo' ? 'Knowledge Base' : 'Data Room'
-  const greetingText =
-    emptyStateGreeting || `Ask me anything about ${sourceLabel.toLowerCase()}.`
 
   // Empty-state chip grid — derived directly from the fetched slash commands.
   const enabledSet = useMemo(
@@ -989,138 +1046,123 @@ function EmbeddableChatInner({
   }, [lastAssistantMsg, chatLoading])
 
 
-  return (
-    <>
-      {/* Floating "Ask AI" button — sticky-dock pattern. See hub original
-          for the full mechanism explanation. Suppressed in shell-less mode:
-          the host controls open/close, so an internal trigger would race. */}
-      {showInternalTrigger && !shellLess && (
-        <div
-          aria-hidden={isOpen}
-          className={`sticky bottom-0 h-0 z-[9990] pointer-events-none ${
-            isOpen ? 'opacity-0' : 'opacity-100'
-          }`}
-        >
-          <div className="absolute bottom-4 md:bottom-6 right-4 md:right-6">
-            <Button
-              onClick={handleOpen}
-              leftIcon={<MingoIcon className="h-5 w-5" color="currentColor" />}
-              tabIndex={isOpen ? -1 : 0}
-              className={`shadow-lg !w-auto pointer-events-auto ${
-                isOpen ? '!pointer-events-none' : ''
+  // Host node for in-panel Radix portals (see the body wrapper below).
+  const [portalHost, setPortalHost] = useState<HTMLDivElement | null>(null)
+
+  // Chat body — defined once, then rendered inside whichever shell applies.
+  // Radix overlays (⋯ menus, tooltips) portal into `portalHost` — a node inside
+  // this panel — so they inherit the drawer's stacking context and need only a
+  // small, local z-index instead of escalating to beat the drawer at the
+  // document root. See `PortalContainerContext`.
+  const body = (
+        <PortalContainerContext.Provider value={portalHost}>
+            {/* Panel surface depends on state (Figma):
+                  • Mingo empty / returning-user + archive page → grey
+                    `ods-card` (#212121),
+                  • Guide empty (node 7532:328223) + active conversation → dark
+                    `ods-bg` (#161616).
+                The header keeps its own grey `bg-ods-card`; the content and
+                footer have no bg and inherit this root, so they flip together. */}
+            <div
+              className={`flex h-full flex-col overflow-hidden transition-colors duration-200 ${
+                archiveOpen || (!hasConversation && activeMode === 'mingo')
+                  ? 'bg-ods-card'
+                  : 'bg-ods-bg'
               }`}
             >
-              Ask AI
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/*
-        Conditional shell — overlay (Drawer, MPH default) vs inline
-        (positioned `<aside>` anchored to the nearest positioned
-        ancestor, openframe-frontend's nav-embedded chat). Both share
-        the same `body` JSX so the chat content is defined exactly
-        once; the IIFE keeps both branches type-balanced inside JSX
-        (no opening tag in one ternary branch + closing in another).
-      */}
-      {(() => {
-        const body = (
-          <>
-            <div className="flex h-full flex-col overflow-hidden">
-              {/* Figma node 7363:205930 — top-navigation. Title intentionally
-                  omitted; a chevron-left + "New Chat" back-style affordance
-                  appears on the left when a conversation is active
-                  (hasMessages) and resets the chat. Close on the right.
-                  Left-borders act as 1px cell dividers. */}
-              <div className="flex-shrink-0 flex h-14 w-full overflow-hidden border-b border-ods-border bg-ods-card">
-                <div className="flex flex-1 min-w-0 items-center gap-2 px-4 py-3">
-                  {hasMessages ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={handleNewChat}
-                        aria-label="Start a new chat"
-                        className="inline-flex shrink-0 items-center justify-center size-8 -ml-1 rounded-md text-ods-text-secondary transition-colors hover:bg-ods-bg-hover hover:text-ods-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent"
-                      >
-                        <Chevron01LeftIcon size={20} />
-                      </button>
-                      <span className="truncate text-h3 text-ods-text-primary">
-                        New Chat
-                      </span>
-                    </>
-                  ) : (
-                    <p className="truncate text-h4 text-ods-text-secondary">
-                      Start a conversation
-                    </p>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={handleClose}
-                  className="flex size-14 shrink-0 items-center justify-center border-l border-ods-border text-ods-text-primary transition-colors hover:bg-ods-bg-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent"
-                  aria-label="Close"
-                >
-                  <XmarkIcon className="text-ods-text-secondary" size={24} />
-                </button>
-              </div>
-
-              {/* Sidebar + chat-panel row. When Mingo is the active mode and
-                  `fetchDialogs` is wired, the in-panel `<ChatSidebar>` lists
-                  the user's backend-driven dialog history. Guide mode keeps
-                  history in localStorage and currently renders no sidebar. */}
-              <div className="flex flex-1 min-h-0 overflow-hidden">
-                {showSidebar && (
-                  <ChatSidebar
-                    className="w-72 shrink-0"
-                    dialogs={dialogs}
-                    activeDialogId={activeDialogId ?? undefined}
-                    onDialogSelect={handleSelectDialog}
-                    onNewChat={() => { void handleStartNewDialog() }}
-                    isLoading={isDialogsLoading && dialogs.length === 0}
-                    isCreatingDialog={isStartingNewDialog}
-                    hasNextPage={hasMoreDialogs}
-                    isFetchingNextPage={isDialogsLoading && dialogs.length > 0}
-                    onLoadMore={() => { void loadMoreDialogs() }}
-                  />
-                )}
-                <div className="flex flex-1 flex-col min-h-0 min-w-0">
-
-              {showModeToggle ? (
+              {/* Archive-page ↔ chat-panel swap fades in (200ms) to match the
+                  surface flip — both branches share the same view-change feel. */}
+              {archiveOpen ? (
                 <div
-                  role="radiogroup"
-                  aria-label="Chat mode"
-                  className="flex-shrink-0 mx-5 mt-3 inline-flex rounded-lg border border-ods-border bg-ods-bg-secondary p-0.5 self-start"
+                  key="archive-view"
+                  className="flex flex-1 min-h-0 flex-col animate-in fade-in-0 duration-200"
                 >
-                  {(['mingo', 'guide'] as ChatMode[]).map((m) => {
-                    const isActive = activeMode === m
-                    const label = m === 'mingo' ? 'Mingo' : 'Guide'
-                    return (
-                      <button
-                        key={m}
-                        type="button"
-                        role="radio"
-                        aria-checked={isActive}
-                        onClick={() => handleActiveModeChange(m)}
-                        className={
-                          'px-3 py-1 text-sm rounded-md transition-colors ' +
-                          (isActive
-                            ? 'bg-ods-accent text-ods-text-on-accent'
-                            : 'text-ods-text-secondary hover:text-ods-text-primary')
-                        }
-                      >
-                        {label}
-                      </button>
-                    )
-                  })}
+                  <ChatArchivePage
+                    dialogs={archivedDialogs}
+                    onSelectDialog={handleArchivedSelect}
+                    onBack={closeArchive}
+                    onClose={handleClose}
+                    isLoading={archivedLoading}
+                    hasMore={archivedCursor != null}
+                    onLoadMore={() => {
+                      void loadArchivedPage(archivedCursor ?? undefined)
+                    }}
+                  />
                 </div>
-              ) : null}
+              ) : (
+              <div
+                key="chat-view"
+                className="flex flex-1 min-h-0 flex-col animate-in fade-in-0 duration-200"
+              >
+              <ChatPanelHeader
+                // Guide-mode empty state shows a back-chevron + "Mingo Guide"
+                // (back returns to the default Mingo welcome); an open
+                // conversation shows back + the dialog title; the Mingo list
+                // keeps the static "Current Chats" title.
+                showBack={hasConversation || guideCanReturnToMingo}
+                title={
+                  hasConversation
+                    ? activeDialog?.title || 'New Chat'
+                    : isGuideEmpty
+                      ? 'Mingo Guide'
+                      : 'Current Chats'
+                }
+                backAriaLabel={
+                  hasConversation
+                    ? isViewingArchived
+                      ? 'Back to archive'
+                      : 'Back'
+                    : 'Back to Mingo'
+                }
+                isArchivedView={isViewingArchived}
+                onBack={
+                  hasConversation
+                    ? handleBack
+                    : () => handleActiveModeChange('mingo')
+                }
+                onClose={handleClose}
+                onRestore={
+                  isViewingArchived && unarchiveDialog && activeDialog
+                    ? () => setRestoreTarget(activeDialog)
+                    : undefined
+                }
+                onRename={
+                  activeDialogId && activeDialog && effectiveModes.mingo?.renameDialog
+                    ? () => setRenameTarget(activeDialog)
+                    : undefined
+                }
+                onArchive={
+                  activeDialogId && activeDialog && effectiveModes.mingo?.archiveDialog
+                    ? () => setArchiveTarget(activeDialog)
+                    : undefined
+                }
+                onOpenArchive={fetchArchivedDialogs ? openArchive : undefined}
+              />
+
+              {/* Guide-mode indicator banner (Figma node 7532:328222) —
+                  full-bleed accent strip below the header. Shown only when
+                  Guide mode is active AND the default (Mingo) mode also exists:
+                  the banner contrasts the temporary Guide session against the
+                  default chat, so it's meaningless in a guide-only setup. */}
+              {activeMode === 'guide' && !!effectiveModes.mingo && (
+                <GuideModeBanner className="animate-in fade-in-0 duration-200" />
+              )}
+
+              {/* Chat-panel row. The dialog history is rendered inline in the
+                  Mingo empty state (`<MingoChatHistory>`), so there's no
+                  separate left sidebar. */}
+              <div className="flex flex-1 min-h-0 overflow-hidden">
+                <div className="flex flex-1 flex-col min-h-0 min-w-0">
 
               <div
                 ref={galleryPanelRef}
-                className="flex-1 flex flex-col min-h-0 px-5 py-4"
+                className="flex-1 flex flex-col min-h-0 p-[var(--spacing-system-m)]"
               >
-                {hasMessages ? (
+                <div
+                  key={contentViewKey}
+                  className="flex-1 flex flex-col min-h-0 animate-in fade-in-0 duration-200"
+                >
+                {hasConversation ? (
                   <div className="flex-1 flex flex-col min-h-0">
                     <ChatMessageList
                       messages={messages}
@@ -1149,38 +1191,67 @@ function EmbeddableChatInner({
                         </div>
                       )}
                   </div>
+                ) : activeMode === 'mingo' ? (
+                  /* Figma node 7532:222444 — default (Mingo-mode) empty state:
+                     centred greeting + capability grid + Guide-chat promo +
+                     quick-action chips. Guide mode keeps the slash-command
+                     onboarding list below. */
+                  <MingoWelcome
+                    userName={userName}
+                    onStartGuideChat={
+                      effectiveModes.guide
+                        ? () => handleActiveModeChange('guide')
+                        : undefined
+                    }
+                    {...mingoWelcome}
+                    // Derived internally (returning-user variation) — placed
+                    // after the spread so it can't be overridden by the prop.
+                    hasExistingChats={dialogs.length > 0}
+                    dialogHistory={
+                      dialogs.length > 0 ? (
+                        <MingoChatHistory
+                          dialogs={dialogs}
+                          onSelectDialog={handleSelectDialog}
+                          onRequestRename={
+                            effectiveModes.mingo?.renameDialog
+                              ? setRenameTarget
+                              : undefined
+                          }
+                          onRequestArchive={
+                            effectiveModes.mingo?.archiveDialog
+                              ? setArchiveTarget
+                              : undefined
+                          }
+                          hasMore={hasMoreDialogs}
+                          isLoadingMore={isDialogsLoading && dialogs.length > 0}
+                          onLoadMore={() => {
+                            void loadMoreDialogs()
+                          }}
+                        />
+                      ) : undefined
+                    }
+                  />
                 ) : (
-                  <div className="flex-1 flex flex-col min-h-0">
-                    {/* Figma node 7363:206278 — data-placeholder: logo + greeting.
-                        Pinned at the top (flex-shrink-0); the card list below
-                        owns its own scroll so the greeting stays visible while
-                        users browse the commands. */}
-                    <div className="flex-shrink-0 flex flex-col items-center justify-center gap-6 p-6 w-full text-center">
-                      <MingoIcon
-                        className="h-12 w-12"
-                        color="white"
-                        eyesColor="var(--ods-flamingo-cyan-base)"
-                        cornerColor="var(--ods-flamingo-cyan-base)"
-                      />
-                      <div className="flex flex-col gap-1 w-full">
-                        <p className="text-h4 text-ods-text-primary">
-                          {userName ? `Hey ${userName}, I'm Mingo` : "Hey, I'm Mingo"}
-                        </p>
-                        <p className="text-h6 text-ods-text-secondary whitespace-pre-line">
-                          {greetingText}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Figma node 7363:205938 — single-column slash-command list.
-                        The list container has no own bg (inherits the darker
-                        `ods-bg` from the drawer panel); each card has the
-                        lighter `ods-card` to pop on the dark surface.
-                        `flex-1 min-h-0 overflow-y-auto` makes the LIST the
-                        scroll target — the rounded-md frame stays visible
-                        while inner cards scroll past it. */}
+                  /* Figma node 7532:328214 — Guide-mode empty state: greeting
+                     + slash-command onboarding list share one scroll region,
+                     with a pinned quick-action chip row above the composer. */
+                  <GuideWelcome
+                    // Legacy `emptyStateGreeting` still customises the guide
+                    // subtitle; an explicit `guideWelcome.subtitle` wins.
+                    subtitle={emptyStateGreeting ?? undefined}
+                    {...guideWelcome}
+                    onQuickAction={(action) => {
+                      chatInputRef.current?.setValue(
+                        action.prompt ?? action.label,
+                      )
+                      chatInputRef.current?.focus()
+                    }}
+                  >
+                    {/* Figma node 7363:205938 — single-column slash-command
+                        list. No own scroll (GuideWelcome's region scrolls); the
+                        rounded-md frame holds the cards on the dark surface. */}
                     {(chipCommands.length > 0 || !commandsLoaded) && (
-                      <div className="mx-4 mb-4 flex-1 min-h-0 overflow-y-auto rounded-md border border-ods-border">
+                      <div className="shrink-0 overflow-hidden rounded-md border border-ods-border">
                         {!commandsLoaded &&
                           chipCommands.length === 0 &&
                           SKELETON_ROW_VARIANTS.map((variant, i) => (
@@ -1218,8 +1289,9 @@ function EmbeddableChatInner({
                         })}
                       </div>
                     )}
-                  </div>
+                  </GuideWelcome>
                 )}
+                </div>
               </div>
 
               <ChatAttachmentChipStrip
@@ -1228,122 +1300,136 @@ function EmbeddableChatInner({
                 disabled={chatLoading}
               />
 
-              {/* Figma node 7363:205952 — footer area on the lighter
-                  `ods-card` surface to contrast with the darker body
-                  (`ods-bg`) above. */}
-              <div
-                className="flex-shrink-0 px-5 pt-3 pb-4 flex flex-col gap-2 bg-ods-card border-t border-ods-border"
-                style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
-              >
-                <ChatFooter className="!p-0" fullWidth>
-                  <ChatInput
-                    ref={chatInputRef}
-                    onSend={handleSend}
-                    onStop={stopMessage}
-                    sending={chatLoading || hasInflightUploads}
-                    placeholder={
-                      hasInflightUploads
-                        ? 'Waiting for uploads to finish…'
-                        : 'Ask a question...'
-                    }
-                    fullWidth
-                    className="px-0"
-                    reserveAvatarOffset={false}
-                    autoFocus={autoFocusInput}
-                    slashCommands={slashCommandsProp}
-                  />
-                </ChatFooter>
-
-                <div className="flex items-center gap-2 w-full">
-                  {attachmentsEnabled && activeMode === 'guide' && (
-                    // Attachments are Guide-only: the NATS agent backend
-                    // doesn't accept them, so the add-button is hidden in
-                    // Mingo mode regardless of the identity endpoint's
-                    // capability flag. Skipping the render entirely (not
-                    // just the icon) collapses the otherwise-invisible 28px
-                    // placeholder slot the component leaves for layout.
-                    <ChatAttachmentAddButton
-                      attachmentsEnabled
-                      attachmentsCount={stagedAttachments.length}
-                      onAddFiles={addAttachmentFiles}
-                      disabled={chatLoading}
-                    />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <ModelDisplay
-                      provider={currentProvider ?? 'anthropic'}
-                      modelName={currentModelLabel ?? 'Claude'}
-                      usedTokens={
-                        currentInputTokens != null
-                          ? (currentInputTokens ?? 0) + (currentOutputTokens ?? 0)
-                          : undefined
-                      }
-                      contextWindow={currentContextWindowMaxTokens ?? undefined}
-                      inputTokens={currentInputTokens ?? undefined}
-                      outputTokens={currentOutputTokens ?? undefined}
-                      hitRatePct={currentCacheHitRatePct ?? undefined}
-                      breakdown={currentUsageBreakdown ?? undefined}
-                    />
-                  </div>
+              <ChatComposer
+                archived={isViewingArchived}
+                inputRef={chatInputRef}
+                onSend={handleSend}
+                onStop={stopMessage}
+                sending={chatLoading || hasInflightUploads}
+                placeholder={
+                  hasInflightUploads
+                    ? 'Waiting for uploads to finish…'
+                    : 'Ask a question...'
+                }
+                autoFocus={autoFocusInput}
+                slashCommands={slashCommandsProp}
+                showAttachmentButton={attachmentsEnabled && activeMode === 'guide'}
+                attachmentsCount={stagedAttachments.length}
+                onAddFiles={addAttachmentFiles}
+                attachmentsDisabled={chatLoading}
+                model={{
+                  provider: currentProvider ?? 'anthropic',
+                  modelName: currentModelLabel ?? 'Claude',
+                  usedTokens:
+                    currentInputTokens != null
+                      ? (currentInputTokens ?? 0) + (currentOutputTokens ?? 0)
+                      : undefined,
+                  contextWindow: currentContextWindowMaxTokens ?? undefined,
+                  inputTokens: currentInputTokens ?? undefined,
+                  outputTokens: currentOutputTokens ?? undefined,
+                  hitRatePct: currentCacheHitRatePct ?? undefined,
+                  breakdown: currentUsageBreakdown ?? undefined,
+                }}
+              />
                 </div>
               </div>
-                </div>
               </div>
+              )}
             </div>
             {galleryModal}
-          </>
-        )
 
-        // Shell-less branch — host (e.g. AppLayoutDrawer) provides the panel
-        // chrome, focus trap, animation, and size. We render only the chat
-        // body plus ChatPanelContext so descendants can still close after
-        // same-tab navigation via the host's `onOpenChange`.
-        if (shellLess) {
-          return (
-            <ChatPanelContext.Provider value={chatPanelHandle}>
-              {body}
-            </ChatPanelContext.Provider>
-          )
-        }
+            {/* Rename / Archive / Unarchive chat modals (Figma 7592:225962,
+                7592:226181). Triggered from the header ⋯ and the dialog-history
+                rows; rendered inside the panel so they overlay the chat. */}
+            <ChatDialogModals
+              renameTarget={renameTarget}
+              setRenameTarget={setRenameTarget}
+              onConfirmRename={handleConfirmRename}
+              archiveTarget={archiveTarget}
+              setArchiveTarget={setArchiveTarget}
+              onConfirmArchive={handleConfirmArchive}
+              restoreTarget={restoreTarget}
+              setRestoreTarget={setRestoreTarget}
+              onConfirmRestore={handleConfirmRestore}
+            />
 
-        // Body-level Radix Drawer — backdrop, iOS scroll-lock, focus
-        // trap, drag-to-resize handle. Slides in from the right edge.
-        return (
-          <Drawer open={isOpen} onOpenChange={(o: boolean) => !o && handleClose()}>
-            <ChatPanelContext.Provider value={chatPanelHandle}>
-              {/*
-                Panel-level handle for descendants (inline cards via
-                `ChatCardNavWrap`, markdown-body links via
-                `NavLinkAnchorViaRuntime`) to close the panel after same-tab
-                navigation. Same-tab clicks fire `closeChat`; new-tab clicks
-                leave the panel open while the new tab loads.
-              */}
-              <DrawerContent
-                side="right"
-                flush
-                resizable
-                minSize={showSidebar ? 720 : 480}
-                maxSize={1600}
-                defaultSize={showSidebar ? 960 : 640}
-                storageKey={showSidebar ? 'mingo-chat-width-with-sidebar' : 'mingo-chat-width'}
-                resizeAriaLabel="Resize chat panel"
-                overlayClassName="mingo-chat-overlay md:bg-black/20"
-                aria-describedby={undefined}
-                className="
-                  mingo-chat-content !bg-ods-bg shadow-2xl
-                  focus:outline-none focus-visible:outline-none
-                  w-screen md:w-auto
-                "
-              >
-                <VisuallyHidden>
-                  <DialogPrimitive.Title>{sourceLabel} AI Assistant</DialogPrimitive.Title>
-                </VisuallyHidden>
-                {body}
-              </DrawerContent>
-            </ChatPanelContext.Provider>
-          </Drawer>
-        )
-      })()}
+            {/* Portal target for in-panel Radix overlays — `display: contents`
+                so it adds no box; content is positioned `fixed` by Radix. */}
+            <div ref={setPortalHost} style={{ display: 'contents' }} />
+          </PortalContainerContext.Provider>
+  )
+
+  // Conditional shell: inline (shell-less host, e.g. AppLayoutDrawer, which
+  // provides its own chrome/focus-trap/size) vs the body-level Radix Drawer
+  // (backdrop, iOS scroll-lock, drag-to-resize). Both render the same `body`.
+  const panel = shellLess ? (
+    <ChatPanelContext.Provider value={chatPanelHandle}>
+      {/* Shell-less hosts (AppLayoutDrawer) own the Radix Dialog but not its
+          accessible name — Radix warns when a Dialog.Content has no Title. The
+          panel supplies its own visually-hidden title here, mirroring the
+          drawer-shell branch below, so it's accessible regardless of host. */}
+      <VisuallyHidden>
+        <DialogPrimitive.Title>{sourceLabel} AI Assistant</DialogPrimitive.Title>
+      </VisuallyHidden>
+      {body}
+    </ChatPanelContext.Provider>
+  ) : (
+    <Drawer open={isOpen} onOpenChange={(o: boolean) => !o && handleClose()}>
+      <ChatPanelContext.Provider value={chatPanelHandle}>
+        {/* Panel-level handle for descendants (inline cards, markdown-body
+            links) to close the panel after same-tab navigation. */}
+        <DrawerContent
+          side="right"
+          flush
+          resizable
+          minSize={480}
+          maxSize={1600}
+          defaultSize={750}
+          storageKey="mingo-chat-width"
+          resizeAriaLabel="Resize chat panel"
+          overlayClassName="mingo-chat-overlay md:bg-black/20"
+          aria-describedby={undefined}
+          className="
+            mingo-chat-content !bg-ods-bg shadow-2xl
+            focus:outline-none focus-visible:outline-none
+            w-screen md:w-auto
+          "
+        >
+          <VisuallyHidden>
+            <DialogPrimitive.Title>{sourceLabel} AI Assistant</DialogPrimitive.Title>
+          </VisuallyHidden>
+          {body}
+        </DrawerContent>
+      </ChatPanelContext.Provider>
+    </Drawer>
+  )
+
+  return (
+    <>
+      {/* Floating "Ask AI" button — sticky-dock pattern. Suppressed in
+          shell-less mode: the host controls open/close. */}
+      {showInternalTrigger && !shellLess && (
+        <div
+          aria-hidden={isOpen}
+          className={`sticky bottom-0 h-0 z-[9990] pointer-events-none ${
+            isOpen ? 'opacity-0' : 'opacity-100'
+          }`}
+        >
+          <div className="absolute bottom-4 md:bottom-6 right-4 md:right-6">
+            <Button
+              onClick={handleOpen}
+              leftIcon={<MingoIcon className="h-5 w-5" color="currentColor" />}
+              tabIndex={isOpen ? -1 : 0}
+              className={`shadow-lg !w-auto pointer-events-auto ${
+                isOpen ? '!pointer-events-none' : ''
+              }`}
+            >
+              Ask AI
+            </Button>
+          </div>
+        </div>
+      )}
+      {panel}
     </>
   )
 }

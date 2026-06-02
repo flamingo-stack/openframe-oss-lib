@@ -1,8 +1,4 @@
-// Shared loading/error states for the route pages (ODS-token styled, no hardcoded colors).
-export function PageLoading({ label = 'Loading…' }: { label?: string }) {
-  return <div className="p-10 text-ods-text-secondary">{label}</div>
-}
-
+// Shared error state for the route pages (ODS-token styled, no hardcoded colors).
 export function PageError({ title, detail }: { title: string; detail?: string }) {
   return (
     <div className="p-10">
