@@ -217,7 +217,7 @@ class AgentRegistrationServiceTest {
         existingMachine.setHostname("old-host");
         existingMachine.setAgentVersion("0.9.0");
         existingMachine.setOrganizationId("old-org");
-        when(clientSecretValidator.validate(MACHINE_ID, CLIENT_SECRET)).thenReturn(existingClient);
+        when(oauthClientRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(existingClient));
         when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(existingMachine));
         when(organizationIdResolver.resolve("org-1")).thenReturn("new-org");
 
@@ -232,7 +232,7 @@ class AgentRegistrationServiceTest {
         // initial key is validated before the client secret
         InOrder inOrder = inOrder(agentRegistrationSecretValidator, clientSecretValidator);
         inOrder.verify(agentRegistrationSecretValidator).validate(INITIAL_KEY);
-        inOrder.verify(clientSecretValidator).validate(MACHINE_ID, CLIENT_SECRET);
+        inOrder.verify(clientSecretValidator).validate(existingClient, CLIENT_SECRET);
 
         // existing machine row is overwritten with request data (same id), not recreated
         verify(machineRepository).save(machineCaptor.capture());
@@ -268,6 +268,7 @@ class AgentRegistrationServiceTest {
                 () -> agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request)
         );
 
+        verify(oauthClientRepository, never()).findByMachineId(any());
         verify(clientSecretValidator, never()).validate(any(), any());
         verify(machineRepository, never()).findByMachineId(any());
         verify(machineRepository, never()).save(any());
@@ -275,9 +276,26 @@ class AgentRegistrationServiceTest {
     }
 
     @Test
+    void reinstall_WithUnknownMachine_Throws() {
+        when(oauthClientRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.empty());
+
+        assertThrows(
+                InvalidClientSecretException.class,
+                () -> agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request)
+        );
+
+        verify(clientSecretValidator, never()).validate(any(), any());
+        verify(machineRepository, never()).findByMachineId(any());
+        verify(machineRepository, never()).save(any());
+    }
+
+    @Test
     void reinstall_WithInvalidClientSecret_ThrowsAndDoesNotTouchMachine() {
-        when(clientSecretValidator.validate(MACHINE_ID, CLIENT_SECRET))
-                .thenThrow(new InvalidClientSecretException(ErrorCode.CLIENT_SECRET_INVALID, "Invalid client secret"));
+        OAuthClient existingClient = new OAuthClient();
+        existingClient.setMachineId(MACHINE_ID);
+        when(oauthClientRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(existingClient));
+        doThrow(new InvalidClientSecretException(ErrorCode.CLIENT_SECRET_INVALID, "Invalid client secret"))
+                .when(clientSecretValidator).validate(existingClient, CLIENT_SECRET);
 
         assertThrows(
                 InvalidClientSecretException.class,

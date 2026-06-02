@@ -2,6 +2,7 @@ package com.openframe.client.service.agentregistration;
 
 import com.openframe.client.dto.agent.AgentRegistrationRequest;
 import com.openframe.client.dto.agent.AgentRegistrationResponse;
+import com.openframe.client.exception.InvalidClientSecretException;
 import com.openframe.client.service.agentregistration.processor.AgentRegistrationProcessor;
 import com.openframe.client.service.InstalledAgentService;
 import com.openframe.client.service.validator.AgentRegistrationSecretValidator;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 
 import static com.openframe.client.service.AgentAuthService.CLIENT_CREDENTIALS_GRANT_TYPE;
+import static com.openframe.core.exception.ErrorCode.CLIENT_SECRET_INVALID;
 import static java.lang.String.format;
 
 @Service
@@ -103,7 +105,9 @@ public class AgentRegistrationService {
 
     public AgentRegistrationResponse reinstall(String initialKey, String machineId, String clientSecret, AgentRegistrationRequest request) {
         secretValidator.validate(initialKey);
-        OAuthClient client = clientSecretValidator.validate(machineId, clientSecret);
+
+        OAuthClient client = loadOAuthClient(machineId);
+        clientSecretValidator.validate(client, clientSecret);
 
         Machine machine = loadMachine(machineId);
         updateMachine(machine, request);
@@ -112,6 +116,11 @@ public class AgentRegistrationService {
         String clientId = client.getClientId();
         log.info("Reinstall for existing machine {}, machine data overwritten", machineId);
         return new AgentRegistrationResponse(machineId, clientId, clientSecret);
+    }
+
+    private OAuthClient loadOAuthClient(String machineId) {
+        return oauthClientRepository.findByMachineId(machineId)
+                .orElseThrow(() -> new InvalidClientSecretException(CLIENT_SECRET_INVALID, "Unknown machine: " + machineId));
     }
 
     private void postProcessMachine(Machine machine, AgentRegistrationRequest request) {
