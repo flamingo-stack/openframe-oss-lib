@@ -13,10 +13,8 @@ import com.openframe.core.exception.ErrorCode;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.oauth.OAuthClient;
-import com.openframe.data.document.organization.Organization;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.oauth.OAuthClientRepository;
-import com.openframe.data.service.OrganizationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -52,7 +50,7 @@ class AgentRegistrationServiceTest {
     private InstalledAgentService installedAgentService;
 
     @Mock
-    private OrganizationService organizationService;
+    private OrganizationIdResolver organizationIdResolver;
 
     @Mock
     private AgentRegistrationSecretValidator agentRegistrationSecretValidator;
@@ -86,13 +84,14 @@ class AgentRegistrationServiceTest {
     private static final String INITIAL_KEY = "test-initial-key";
     private static final String MACHINE_ID = "test-machine-id";
     private static final String CLIENT_SECRET = "01234567890123456789012345678912";
+    private static final String ORGANIZATION_ID = "custom-uuid";
 
     @BeforeEach
     void setUp() {
         agentRegistrationService = new AgentRegistrationService(
                 oauthClientRepository,
                 machineRepository,
-                organizationService,
+                organizationIdResolver,
                 agentRegistrationSecretValidator,
                 clientSecretValidator,
                 agentSecretGenerator,
@@ -111,8 +110,7 @@ class AgentRegistrationServiceTest {
         when(machineIdGenerator.generate()).thenReturn(MACHINE_ID);
         when(oauthClientRepository.existsByMachineId(MACHINE_ID)).thenReturn(false);
         when(agentSecretGenerator.generate()).thenReturn(CLIENT_SECRET);
-        when(organizationService.getDefaultOrganization())
-                .thenReturn(Optional.of(new Organization("id", null, OrganizationService.DEFAULT_ORGANIZATION_NAME, "custom-uuid", true, null, null, null, null, null, null, null, null, null, null, null, null)));
+        when(organizationIdResolver.resolve(any())).thenReturn(ORGANIZATION_ID);
         when(passwordEncoder.encode(CLIENT_SECRET)).thenReturn("encoded-secret");
         when(oauthClientRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
         when(machineRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
@@ -142,10 +140,9 @@ class AgentRegistrationServiceTest {
         Machine savedMachine = machineCaptor.getValue();
         assertEquals(MACHINE_ID, savedMachine.getMachineId());
         assertEquals("test-hostname", savedMachine.getHostname());
-        assertEquals("192.168.1.1", savedMachine.getIp());
-        assertEquals("00:11:22:33:44:55", savedMachine.getMacAddress());
-        assertEquals("test-os-uuid", savedMachine.getOsUuid());
+        assertEquals("linux", savedMachine.getOsType());
         assertEquals("1.0.0", savedMachine.getAgentVersion());
+        assertEquals(ORGANIZATION_ID, savedMachine.getOrganizationId());
         assertEquals(DeviceStatus.PENDING, savedMachine.getStatus());
         assertNotNull(savedMachine.getLastSeen());
 
@@ -156,8 +153,6 @@ class AgentRegistrationServiceTest {
     void registerAgent_WithExistingMachine_ThrowsException() {
         when(machineIdGenerator.generate()).thenReturn(MACHINE_ID);
         when(oauthClientRepository.existsByMachineId(MACHINE_ID)).thenReturn(true);
-        when(organizationService.getDefaultOrganization())
-                .thenReturn(Optional.of(new Organization("id", null, OrganizationService.DEFAULT_ORGANIZATION_NAME, "custom-uuid", true, null, null, null, null, null, null, null, null, null, null, null, null)));
 
         IllegalStateException exception = assertThrows(
                 IllegalStateException.class,
@@ -177,8 +172,7 @@ class AgentRegistrationServiceTest {
         when(machineIdGenerator.generate()).thenReturn(MACHINE_ID);
         when(oauthClientRepository.existsByMachineId(MACHINE_ID)).thenReturn(false);
         when(agentSecretGenerator.generate()).thenReturn(CLIENT_SECRET);
-        when(organizationService.getDefaultOrganization())
-                .thenReturn(Optional.of(new Organization("id", null, OrganizationService.DEFAULT_ORGANIZATION_NAME, "custom-uuid", true, null, null, null, null, null, null, null, null, null, null, null, null)));
+        when(organizationIdResolver.resolve(any())).thenReturn(ORGANIZATION_ID);
         when(passwordEncoder.encode(CLIENT_SECRET)).thenReturn("encoded-secret");
         when(oauthClientRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
         when(machineRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
@@ -202,8 +196,7 @@ class AgentRegistrationServiceTest {
         when(machineIdGenerator.generate()).thenReturn(MACHINE_ID);
         when(oauthClientRepository.existsByMachineId(MACHINE_ID)).thenReturn(false);
         when(agentSecretGenerator.generate()).thenReturn(CLIENT_SECRET);
-        when(organizationService.getDefaultOrganization())
-                .thenReturn(Optional.of(new Organization("id", null, OrganizationService.DEFAULT_ORGANIZATION_NAME, "custom-uuid", true, null, null, null, null, null, null, null, null, null, null, null, null)));
+        when(organizationIdResolver.resolve(any())).thenReturn(ORGANIZATION_ID);
         when(passwordEncoder.encode(CLIENT_SECRET)).thenReturn("encoded-secret");
         when(oauthClientRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
         when(machineRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
@@ -244,7 +237,7 @@ class AgentRegistrationServiceTest {
         Machine savedMachine = machineCaptor.getValue();
         assertEquals(MACHINE_ID, savedMachine.getMachineId());
         assertEquals("test-hostname", savedMachine.getHostname());
-        assertEquals("192.168.1.1", savedMachine.getIp());
+        assertEquals("linux", savedMachine.getOsType());
         assertEquals("1.0.0", savedMachine.getAgentVersion());
         assertNotNull(savedMachine.getLastSeen());
 
@@ -295,9 +288,11 @@ class AgentRegistrationServiceTest {
     private AgentRegistrationRequest createTestRequest() {
         AgentRegistrationRequest request = new AgentRegistrationRequest();
         request.setHostname("test-hostname");
+        request.setOrganizationId("org-1");
         request.setIp("192.168.1.1");
         request.setMacAddress("00:11:22:33:44:55");
         request.setOsUuid("test-os-uuid");
+        request.setOsType("linux");
         request.setAgentVersion("1.0.0");
         return request;
     }
