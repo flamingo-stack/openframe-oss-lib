@@ -3,7 +3,9 @@ package com.openframe.client.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.exception.AgentRegistrationSecretValidationErrorException;
 import com.openframe.client.exception.DuplicateConnectionException;
+import com.openframe.client.exception.InvalidClientSecretException;
 import com.openframe.core.exception.BaseGlobalExceptionHandler;
+import com.openframe.core.exception.ErrorCode;
 import com.openframe.client.service.agentregistration.AgentRegistrationService;
 import com.openframe.client.util.TestAuthenticationManager;
 import com.openframe.client.dto.agent.*;
@@ -159,5 +161,82 @@ class AgentControllerTest {
                                 request.getAgentVersion().equals("1.0.0")
                 )
         );
+    }
+
+    @Test
+    void reinstall_WithValidHeaders_ReturnsOk() throws Exception {
+        when(agentRegistrationService.reinstall(eq("test-key"), eq("m-1"), eq("secret-1"), any()))
+                .thenReturn(registrationResponse);
+
+        mockMvc.perform(post("/api/agents/reinstall")
+                        .header("X-Initial-Key", "test-key")
+                        .header("X-Machine-Id", "m-1")
+                        .header("X-Client-Secret", "secret-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(registrationRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.machineId").value("test-machine-id"))
+                .andExpect(jsonPath("$.clientId").value("client-id"))
+                .andExpect(jsonPath("$.clientSecret").value("client-secret"));
+
+        verify(agentRegistrationService).reinstall(
+                eq("test-key"),
+                eq("m-1"),
+                eq("secret-1"),
+                argThat(request -> request.getHostname().equals("test-host")
+                        && request.getAgentVersion().equals("1.0.0"))
+        );
+    }
+
+    @Test
+    void reinstall_MissingInitialKey_ReturnsBadRequest() throws Exception {
+        mockMvc.perform(post("/api/agents/reinstall")
+                        .header("X-Machine-Id", "m-1")
+                        .header("X-Client-Secret", "secret-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(registrationRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value("Required header 'X-Initial-Key' is missing"));
+    }
+
+    @Test
+    void reinstall_MissingMachineId_ReturnsBadRequest() throws Exception {
+        mockMvc.perform(post("/api/agents/reinstall")
+                        .header("X-Initial-Key", "test-key")
+                        .header("X-Client-Secret", "secret-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(registrationRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value("Required header 'X-Machine-Id' is missing"));
+    }
+
+    @Test
+    void reinstall_MissingClientSecret_ReturnsBadRequest() throws Exception {
+        mockMvc.perform(post("/api/agents/reinstall")
+                        .header("X-Initial-Key", "test-key")
+                        .header("X-Machine-Id", "m-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(registrationRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value("Required header 'X-Client-Secret' is missing"));
+    }
+
+    @Test
+    void reinstall_WithInvalidClientSecret_ReturnsUnauthorized() throws Exception {
+        when(agentRegistrationService.reinstall(eq("test-key"), eq("m-1"), eq("bad-secret"), any()))
+                .thenThrow(new InvalidClientSecretException(ErrorCode.CLIENT_SECRET_INVALID, "Invalid client secret"));
+
+        mockMvc.perform(post("/api/agents/reinstall")
+                        .header("X-Initial-Key", "test-key")
+                        .header("X-Machine-Id", "m-1")
+                        .header("X-Client-Secret", "bad-secret")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(registrationRequest)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("CLIENT_SECRET_INVALID"))
+                .andExpect(jsonPath("$.message").value("Invalid client secret"));
     }
 }

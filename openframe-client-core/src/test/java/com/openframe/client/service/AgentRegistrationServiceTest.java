@@ -3,9 +3,13 @@ package com.openframe.client.service;
 import com.openframe.client.dto.agent.AgentRegistrationRequest;
 import com.openframe.client.dto.agent.AgentRegistrationResponse;
 import com.openframe.client.dto.agent.AgentRegistrationTagInput;
+import com.openframe.client.exception.AgentRegistrationSecretValidationException;
+import com.openframe.client.exception.InvalidClientSecretException;
 import com.openframe.client.service.agentregistration.*;
 import com.openframe.client.service.agentregistration.processor.AgentRegistrationProcessor;
 import com.openframe.client.service.validator.AgentRegistrationSecretValidator;
+import com.openframe.client.service.validator.ClientSecretValidator;
+import com.openframe.core.exception.ErrorCode;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.oauth.OAuthClient;
@@ -18,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -53,6 +58,9 @@ class AgentRegistrationServiceTest {
     private AgentRegistrationSecretValidator agentRegistrationSecretValidator;
 
     @Mock
+    private ClientSecretValidator clientSecretValidator;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     @Mock
@@ -86,6 +94,7 @@ class AgentRegistrationServiceTest {
                 machineRepository,
                 organizationService,
                 agentRegistrationSecretValidator,
+                clientSecretValidator,
                 agentSecretGenerator,
                 passwordEncoder,
                 machineIdGenerator,
@@ -103,11 +112,10 @@ class AgentRegistrationServiceTest {
         when(oauthClientRepository.existsByMachineId(MACHINE_ID)).thenReturn(false);
         when(agentSecretGenerator.generate()).thenReturn(CLIENT_SECRET);
         when(organizationService.getDefaultOrganization())
-                .thenReturn(Optional.of(new Organization("id", null, OrganizationService.DEFAULT_ORGANIZATION_NAME, "custom-uuid", true, null, null, null, null, null, null, null, null, null,null, null, null)));
+                .thenReturn(Optional.of(new Organization("id", null, OrganizationService.DEFAULT_ORGANIZATION_NAME, "custom-uuid", true, null, null, null, null, null, null, null, null, null, null, null, null)));
         when(passwordEncoder.encode(CLIENT_SECRET)).thenReturn("encoded-secret");
         when(oauthClientRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
         when(machineRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
-
 
         AgentRegistrationResponse response = agentRegistrationService.register(INITIAL_KEY, request);
 
@@ -140,6 +148,8 @@ class AgentRegistrationServiceTest {
         assertEquals("1.0.0", savedMachine.getAgentVersion());
         assertEquals(DeviceStatus.PENDING, savedMachine.getStatus());
         assertNotNull(savedMachine.getLastSeen());
+
+        verify(installedAgentService).addInstalledAgent(MACHINE_ID, "openframe-client", "1.0.0", false);
     }
 
     @Test
@@ -147,8 +157,7 @@ class AgentRegistrationServiceTest {
         when(machineIdGenerator.generate()).thenReturn(MACHINE_ID);
         when(oauthClientRepository.existsByMachineId(MACHINE_ID)).thenReturn(true);
         when(organizationService.getDefaultOrganization())
-                .thenReturn(Optional.of(new Organization("id", null, OrganizationService.DEFAULT_ORGANIZATION_NAME, "custom-uuid", true, null, null, null, null, null, null, null, null, null,null, null, null)));
-
+                .thenReturn(Optional.of(new Organization("id", null, OrganizationService.DEFAULT_ORGANIZATION_NAME, "custom-uuid", true, null, null, null, null, null, null, null, null, null, null, null, null)));
 
         IllegalStateException exception = assertThrows(
                 IllegalStateException.class,
@@ -203,6 +212,84 @@ class AgentRegistrationServiceTest {
 
         assertNotNull(response);
         verify(registrationTagAssignmentService).assignTags(eq(MACHINE_ID), isNull());
+    }
+
+    @Test
+    void reinstall_WithValidKeyAndSecret_OverwritesMachineAndReturnsExistingCreds() {
+        OAuthClient existingClient = new OAuthClient();
+        existingClient.setMachineId(MACHINE_ID);
+        existingClient.setClientId("agent_" + MACHINE_ID);
+        Machine existingMachine = new Machine();
+        existingMachine.setMachineId(MACHINE_ID);
+        existingMachine.setHostname("old-host");
+        existingMachine.setAgentVersion("0.9.0");
+        when(clientSecretValidator.validate(MACHINE_ID, CLIENT_SECRET)).thenReturn(existingClient);
+        when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(existingMachine));
+
+        AgentRegistrationResponse response =
+                agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request);
+
+        assertNotNull(response);
+        assertEquals(MACHINE_ID, response.getMachineId());
+        assertEquals("agent_" + MACHINE_ID, response.getClientId());
+        assertEquals(CLIENT_SECRET, response.getClientSecret());
+
+        // initial key is validated before the client secret
+        InOrder inOrder = inOrder(agentRegistrationSecretValidator, clientSecretValidator);
+        inOrder.verify(agentRegistrationSecretValidator).validate(INITIAL_KEY);
+        inOrder.verify(clientSecretValidator).validate(MACHINE_ID, CLIENT_SECRET);
+
+        // existing machine row is overwritten with request data (same id), not recreated
+        verify(machineRepository).save(machineCaptor.capture());
+        Machine savedMachine = machineCaptor.getValue();
+        assertEquals(MACHINE_ID, savedMachine.getMachineId());
+        assertEquals("test-hostname", savedMachine.getHostname());
+        assertEquals("192.168.1.1", savedMachine.getIp());
+        assertEquals("1.0.0", savedMachine.getAgentVersion());
+        assertNotNull(savedMachine.getLastSeen());
+
+        // setup is re-run
+        verify(registrationTagAssignmentService).assignTags(eq(MACHINE_ID), any());
+        verify(agentRegistrationToolInstallationService).process(MACHINE_ID);
+        verify(agentRegistrationProcessor).postProcessAgentRegistration(existingMachine, request);
+        verify(installedAgentService).addInstalledAgent(MACHINE_ID, "openframe-client", "1.0.0", false);
+
+        // nothing is re-created
+        verify(machineIdGenerator, never()).generate();
+        verify(agentSecretGenerator, never()).generate();
+        verify(oauthClientRepository, never()).save(any());
+    }
+
+    @Test
+    void reinstall_WithInvalidInitialKey_FailsBeforeClientSecretCheck() {
+        doThrow(new AgentRegistrationSecretValidationException(ErrorCode.INITIAL_KEY_INVALID, "Invalid initial key"))
+                .when(agentRegistrationSecretValidator).validate(INITIAL_KEY);
+
+        assertThrows(
+                AgentRegistrationSecretValidationException.class,
+                () -> agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request)
+        );
+
+        verify(clientSecretValidator, never()).validate(any(), any());
+        verify(machineRepository, never()).findByMachineId(any());
+        verify(machineRepository, never()).save(any());
+        verify(oauthClientRepository, never()).save(any());
+    }
+
+    @Test
+    void reinstall_WithInvalidClientSecret_ThrowsAndDoesNotTouchMachine() {
+        when(clientSecretValidator.validate(MACHINE_ID, CLIENT_SECRET))
+                .thenThrow(new InvalidClientSecretException(ErrorCode.CLIENT_SECRET_INVALID, "Invalid client secret"));
+
+        assertThrows(
+                InvalidClientSecretException.class,
+                () -> agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request)
+        );
+
+        verify(agentRegistrationSecretValidator).validate(INITIAL_KEY);
+        verify(machineRepository, never()).findByMachineId(any());
+        verify(machineRepository, never()).save(any());
+        verify(oauthClientRepository, never()).save(any());
     }
 
     private AgentRegistrationRequest createTestRequest() {
