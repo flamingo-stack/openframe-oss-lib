@@ -20,23 +20,21 @@ public class AgentController {
     private final AgentRegistrationService agentRegistrationService;
 
     @PostMapping("/register")
-    public ResponseEntity<AgentRegistrationResponse> register(
+    public AgentRegistrationResponse register(
             @RequestHeader(INITIAL_KEY_HEADER) String initialKey,
-            @Valid @RequestBody AgentRegistrationRequest request) {
-
-        AgentRegistrationResponse response = agentRegistrationService.register(initialKey, request);
-        return ResponseEntity.ok(response);
+            @Valid @RequestBody AgentRegistrationRequest request
+    ) {
+        return agentRegistrationService.register(initialKey, request);
     }
 
     @PostMapping("/reinstall")
-    public ResponseEntity<AgentRegistrationResponse> reinstall(
+    public AgentRegistrationResponse reinstall(
             @RequestHeader(INITIAL_KEY_HEADER) String initialKey,
             @RequestHeader(MACHINE_ID_HEADER) String machineId,
             @RequestHeader(CLIENT_SECRET_HEADER) String clientSecret,
-            @Valid @RequestBody AgentRegistrationRequest request) {
-
-        AgentRegistrationResponse response = agentRegistrationService.reinstall(initialKey, machineId, clientSecret, request);
-        return ResponseEntity.ok(response);
+            @Valid @RequestBody AgentRegistrationRequest request
+    ) {
+        return agentRegistrationService.reinstall(initialKey, machineId, clientSecret, request);
     }
 
 }
