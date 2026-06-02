@@ -13,4 +13,6 @@ public interface OAuthClientRepository extends MongoRepository<OAuthClient, Stri
     Optional<OAuthClient> findByMachineId(String machineId);
 
     boolean existsByMachineId(String machineId);
+
+    void deleteByMachineId(String machineId);
 } 
