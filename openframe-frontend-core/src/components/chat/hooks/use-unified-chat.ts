@@ -157,6 +157,14 @@ export function useUnifiedChat(
     (id: string) => activeState.deleteDialog(id),
     [activeState],
   )
+  const renameDialog = useCallback(
+    (id: string, title: string) => activeState.renameDialog(id, title),
+    [activeState],
+  )
+  const archiveDialog = useCallback(
+    (id: string) => activeState.archiveDialog(id),
+    [activeState],
+  )
   const loadMoreDialogs = useCallback(
     () => activeState.loadMoreDialogs(),
     [activeState],
@@ -198,6 +206,8 @@ export function useUnifiedChat(
       selectDialog,
       startNewDialog,
       deleteDialog,
+      renameDialog,
+      archiveDialog,
       isDialogsLoading: activeState.isDialogsLoading,
       isMessagesLoading: activeState.isMessagesLoading,
       hasMoreDialogs: activeState.hasMoreDialogs,
@@ -221,6 +231,8 @@ export function useUnifiedChat(
       selectDialog,
       startNewDialog,
       deleteDialog,
+      renameDialog,
+      archiveDialog,
       loadMoreDialogs,
       loadMoreMessages,
       approveRequest,
