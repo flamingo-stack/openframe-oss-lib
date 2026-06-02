@@ -16,14 +16,20 @@ export interface ColorPreset {
   color: string
 }
 
-// Hex (not tokens): values round-trip through inline `style` on the tag preview.
+// Ticket-status palette.
 export const TICKET_STATUS_COLOR_PRESETS: readonly ColorPreset[] = [
-  { key: 'red', label: 'Red', color: '#f36666' },
   { key: 'green', label: 'Green', color: '#5ea62e' },
-  { key: 'yellow', label: 'Yellow', color: '#e1b32f' },
+  { key: 'lime', label: 'Lime', color: '#8bc34a' },
+  { key: 'teal', label: 'Teal', color: '#4db6ac' },
   { key: 'sky', label: 'Sky', color: '#4fc3f7' },
-  { key: 'purple', label: 'Purple', color: '#a78bfa' },
-  { key: 'pink', label: 'Pink', color: '#f48fb1' },
+  { key: 'periwinkle', label: 'Periwinkle', color: '#7e9cd8' },
+  { key: 'lavender', label: 'Lavender', color: '#b39ddb' },
+  { key: 'yellow', label: 'Yellow', color: '#e1b32f' },
+  { key: 'sand', label: 'Sand', color: '#f0c674' },
+  { key: 'peach', label: 'Peach', color: '#f39c7a' },
+  { key: 'red', label: 'Red', color: '#f36666' },
+  { key: 'pink', label: 'Pink', color: '#e988a8' },
+  { key: 'neutral', label: 'Neutral', color: '#b0b0b0' },
 ]
 
 export const CUSTOM_PRESET_KEY = 'custom'

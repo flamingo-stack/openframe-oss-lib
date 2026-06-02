@@ -5,7 +5,7 @@ import { ActionsMenuDropdown } from './actions-menu'
 import { Tag, type TagProps, tagVariants } from './tag'
 import { CheckCircleIcon, Chevron02DownIcon } from '../icons-v2-generated'
 import { cn } from '../../utils/cn'
-import { getReadableTextColor } from '../../utils/ods-color-utils'
+import { deriveActiveColor, deriveHoverColor, getReadableTextColor } from '../../utils/ods-color-utils'
 
 /**
  * Canonical ticket status values.
@@ -221,8 +221,18 @@ export function TicketStatusTag({
   isPending = false,
 }: TicketStatusTagProps) {
   const config = getTicketStatusConfig(status)
+  // Custom color: drive bg via CSS vars so the derived hover/active fills can win
+  // on :hover/:active (an inline backgroundColor would block class-based hover).
   const customStyle = color
-    ? { backgroundColor: color, color: getReadableTextColor(color) }
+    ? ({
+        '--tag-bg': color,
+        '--tag-bg-hover': deriveHoverColor(color),
+        '--tag-bg-active': deriveActiveColor(color),
+        color: getReadableTextColor(color),
+      } as React.CSSProperties)
+    : undefined
+  const customColorClasses = color
+    ? 'bg-[var(--tag-bg)] hover:bg-[var(--tag-bg-hover)] active:bg-[var(--tag-bg-active)]'
     : undefined
 
   const tag = (
@@ -230,7 +240,7 @@ export function TicketStatusTag({
       label={label ?? config.label}
       variant={variant ?? config.variant}
       icon={showIcon ? config.icon : undefined}
-      className={cn('shrink-0 w-fit', className)}
+      className={cn('shrink-0 w-fit', customColorClasses, className)}
       style={customStyle}
     />
   )
@@ -271,6 +281,8 @@ export function TicketStatusTag({
             tagVariants({ variant: variant ?? config.variant }),
             'w-fit shrink-0 items-stretch justify-start gap-0 overflow-hidden p-0',
             'disabled:opacity-60 disabled:cursor-not-allowed',
+            // Custom color: bg/hover/active from the CSS vars set above.
+            customColorClasses,
             className,
           )}
         >

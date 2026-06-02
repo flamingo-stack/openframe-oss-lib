@@ -322,6 +322,28 @@ export function rgbToHex(r: number, g: number, b: number): string {
   return `#${to(r)}${to(g)}${to(b)}`;
 }
 
+// Ticket-status interaction states. The design-system presets derive their
+// hover/active fills by darkening each RGB channel a fixed step (10 → hover,
+// 20 → active). Applying the same rule to user-picked custom colors keeps their
+// interaction states consistent with the presets without hardcoding a variant
+// per color. Channels floor at 0 via rgbToHex's clamp.
+const HOVER_DARKEN_STEP = 10;
+const ACTIVE_DARKEN_STEP = 20;
+
+function darkenByStep(hex: string, step: number): string {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return hex;
+  return rgbToHex(rgb.r - step, rgb.g - step, rgb.b - step);
+}
+
+export function deriveHoverColor(hex: string): string {
+  return darkenByStep(hex, HOVER_DARKEN_STEP);
+}
+
+export function deriveActiveColor(hex: string): string {
+  return darkenByStep(hex, ACTIVE_DARKEN_STEP);
+}
+
 export function rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: number } {
   const rn = r / 255;
   const gn = g / 255;
