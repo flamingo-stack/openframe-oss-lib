@@ -1,8 +1,9 @@
 'use client'
 
 import React from 'react'
-import { Tag, type TagProps } from './tag'
-import { CheckCircleIcon } from '../icons-v2-generated'
+import { ActionsMenuDropdown } from './actions-menu'
+import { Tag, type TagProps, tagVariants } from './tag'
+import { CheckCircleIcon, Chevron02DownIcon } from '../icons-v2-generated'
 import { cn } from '../../utils/cn'
 import { getReadableTextColor } from '../../utils/ods-color-utils'
 
@@ -10,7 +11,7 @@ import { getReadableTextColor } from '../../utils/ods-color-utils'
  * Canonical ticket status values.
  * This is the single source of truth for ticket statuses across all frontends.
  */
-export type TicketStatus = 'ACTIVE' | 'TECH_REQUIRED' | 'ON_HOLD' | 'RESOLVED' | 'ARCHIVED'
+export type TicketStatus = 'ACTIVE' | 'AI_ASSISTANCE' | 'TECH_REQUIRED' | 'ON_HOLD' | 'RESOLVED' | 'ARCHIVED'
 
 type TagVariant = NonNullable<TagProps['variant']>
 
@@ -24,6 +25,10 @@ const STATUS_CONFIG: Record<TicketStatus, TicketStatusConfig> = {
   ACTIVE: {
     label: 'Active',
     variant: 'success',
+  },
+  AI_ASSISTANCE: {
+    label: 'AI Assistance',
+    variant: 'outline',
   },
   TECH_REQUIRED: {
     label: 'Tech Required',
@@ -51,6 +56,8 @@ const STATUS_CONFIG: Record<TicketStatus, TicketStatusConfig> = {
 const STATUS_ALIASES: Record<string, TicketStatus> = {
   // Canonical (backend enum)
   ACTIVE: 'ACTIVE',
+  AI_ASSISTANCE: 'AI_ASSISTANCE',
+  ai_assistance: 'AI_ASSISTANCE',
   TECH_REQUIRED: 'TECH_REQUIRED',
   ON_HOLD: 'ON_HOLD',
   RESOLVED: 'RESOLVED',
@@ -105,8 +112,70 @@ export function getTicketStatusTag(status: string): { label: string; variant: Ta
 }
 
 // ---------------------------------------------------------------------------
+// Lifecycle (custom-status) helpers
+// ---------------------------------------------------------------------------
+
+/** Backend status-definition kinds. */
+export type TicketStatusKind = 'AI_ASSISTANCE' | 'TECH_REQUIRED' | 'RESOLVED' | 'ARCHIVED' | 'CUSTOM'
+
+const KIND_TO_CANONICAL: Record<Exclude<TicketStatusKind, 'CUSTOM'>, TicketStatus> = {
+  AI_ASSISTANCE: 'AI_ASSISTANCE',
+  TECH_REQUIRED: 'TECH_REQUIRED',
+  RESOLVED: 'RESOLVED',
+  ARCHIVED: 'ARCHIVED',
+}
+
+/** Canonical TicketStatus for a backend kind, or undefined for CUSTOM/unknown. */
+export function kindToCanonicalStatus(kind: string | null | undefined): TicketStatus | undefined {
+  if (kind == null || kind === 'CUSTOM') return undefined
+  return (KIND_TO_CANONICAL as Record<string, TicketStatus | undefined>)[kind]
+}
+
+/**
+ * Whether a status of this kind renders with its canonical (system) styling
+ * rather than the backend-provided color: AI_ASSISTANCE/RESOLVED/ARCHIVED do;
+ * TECH_REQUIRED and custom statuses use their color.
+ */
+export function usesCanonicalStatusStyle(kind: string | null | undefined): boolean {
+  return kind != null && kind !== 'CUSTOM' && kind !== 'TECH_REQUIRED'
+}
+
+export interface TicketStatusInput {
+  /** Legacy enum status (may be empty/null under the lifecycle feature). */
+  status?: string | null
+  /** Backend status kind (AI_ASSISTANCE, TECH_REQUIRED, RESOLVED, ARCHIVED, CUSTOM). */
+  statusKind?: string | null
+  /** Custom status display name. */
+  statusName?: string | null
+  /** Custom status hex color. */
+  statusColor?: string | null
+}
+
+/**
+ * Maps a ticket's status fields to TicketStatusTag props, the unified design
+ * shared across OpenFrame surfaces: AI_ASSISTANCE/RESOLVED/ARCHIVED render with
+ * their canonical variant/icon; TECH_REQUIRED and custom statuses render from the
+ * backend color, labelled by the custom status name.
+ */
+export function resolveStatusTagProps(input: TicketStatusInput): { status: string; label?: string; color?: string } {
+  const canonical = usesCanonicalStatusStyle(input.statusKind) ? kindToCanonicalStatus(input.statusKind) : undefined
+  return {
+    status: canonical ?? input.status ?? '',
+    label: input.statusName ?? undefined,
+    color: canonical ? undefined : (input.statusColor ?? undefined),
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
+
+/** A selectable status option for the inline status-change dropdown. */
+export interface TicketStatusTagOption {
+  id: string
+  name: string
+  color: string
+}
 
 export interface TicketStatusTagProps {
   /** Ticket status in any known format (ACTIVE, active, ACTION_REQUIRED, etc.) */
@@ -124,6 +193,15 @@ export interface TicketStatusTagProps {
   className?: string
   /** Show the status-specific icon (e.g. checkmark for resolved) */
   showIcon?: boolean
+  /**
+   * Make the tag an inline status changer. When provided (with `onSelect`), the
+   * tag renders with a chevron and opens a dropdown of these options on click.
+   */
+  options?: TicketStatusTagOption[]
+  /** Called with the chosen option id. Required for the inline dropdown. */
+  onSelect?: (id: string) => void
+  /** Disables the dropdown while a change is in flight. */
+  isPending?: boolean
 }
 
 /**
@@ -138,19 +216,75 @@ export function TicketStatusTag({
   variant,
   className,
   showIcon = true,
+  options,
+  onSelect,
+  isPending = false,
 }: TicketStatusTagProps) {
   const config = getTicketStatusConfig(status)
   const customStyle = color
     ? { backgroundColor: color, color: getReadableTextColor(color) }
     : undefined
 
-  return (
+  const tag = (
     <Tag
       label={label ?? config.label}
       variant={variant ?? config.variant}
       icon={showIcon ? config.icon : undefined}
       className={cn('shrink-0 w-fit', className)}
       style={customStyle}
+    />
+  )
+
+  if (!options || options.length === 0 || !onSelect) {
+    return tag
+  }
+
+  return (
+    <ActionsMenuDropdown
+      align="start"
+      groups={[
+        {
+          items: options.map(option => ({
+            id: option.id,
+            label: option.name,
+            icon: (
+              <span
+                className="size-2 shrink-0 rounded-full"
+                style={{ backgroundColor: option.color }}
+                aria-hidden
+              />
+            ),
+            onClick: () => onSelect(option.id),
+            disabled: isPending,
+          })),
+        },
+      ]}
+      customTrigger={
+        <button
+          type="button"
+          disabled={isPending}
+          aria-label="Change status"
+          style={customStyle}
+          className={cn(
+            // Reuse the tag's variant styling, but split into a label section and a
+            // separated chevron section (the common dropdown-button seam).
+            tagVariants({ variant: variant ?? config.variant }),
+            'w-fit shrink-0 items-stretch justify-start gap-0 overflow-hidden p-0',
+            'disabled:opacity-60 disabled:cursor-not-allowed',
+            className,
+          )}
+        >
+          <span className="flex items-center gap-[var(--spacing-system-xxs)] px-[var(--spacing-system-xsf)]">
+            {showIcon && config.icon && (
+              <span className="flex items-center justify-center size-5 shrink-0">{config.icon}</span>
+            )}
+            <span className="truncate">{label ?? config.label}</span>
+          </span>
+          <span className="flex items-center justify-center self-stretch border-l border-ods-border px-[var(--spacing-system-xsf)]">
+            <Chevron02DownIcon className="size-4 shrink-0" />
+          </span>
+        </button>
+      }
     />
   )
 }

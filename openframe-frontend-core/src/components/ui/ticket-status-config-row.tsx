@@ -161,7 +161,7 @@ export function TicketStatusConfigRow({
                 onClick={deleteDisabled ? undefined : onDelete}
                 className="size-12"
               >
-                <TrashIcon />
+                <TrashIcon className="text-ods-error"/>
               </Button>
             </span>
           </WithLeftTooltip>
