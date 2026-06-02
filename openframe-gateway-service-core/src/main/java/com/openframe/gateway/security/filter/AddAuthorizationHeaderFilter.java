@@ -73,6 +73,7 @@ public class AddAuthorizationHeaderFilter implements WebFilter {
                 || path.startsWith(NATS_WS_ENDPOINT_PATH)
                 || path.startsWith(NATS_API_WS_ENDPOINT_PATH)
                 || path.startsWith(CHAT_ENDPOINT_PATH + "/")
+                || path.startsWith(CONTENT_PREFIX + "/")
                 || path.startsWith(INTERNAL_AUTH_PROBE)
                 || clientPrivate;
     }
