@@ -6,7 +6,7 @@ export { cn, getAllPlatformBaseDomains } from './cn'
 export { formatDate, formatNumber, formatPrice, formatBytes } from './format'
 // SVG path constants — re-exported here (server-safe) because icons-v2 has "use client"
 export { PLAY_ICON_PATH } from '../components/icons-v2-generated/media-playback/play-icon'
-export { getPlatformAccentColor, getCurrentPlatform, type ColorCategory } from './ods-color-utils'
+export { getPlatformAccentColor, getCurrentPlatform, type ColorCategory, HEX_PATTERN } from './ods-color-utils'
 export { delay, generateRandomString, truncateString, deepClone, getSlackCommunityJoinUrl } from './common'
 export { getBaseUrl, getPlatformProductionUrl } from '../utils/cn'
 
