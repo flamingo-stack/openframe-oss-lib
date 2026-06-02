@@ -15,12 +15,6 @@ import org.springframework.validation.annotation.Validated;
 
 /**
  * GraphQL resolver for RMM ad-hoc command dispatch.
- *
- * <p>Pure passthrough to {@link CommandDispatchService} — input validation
- * is handled by {@code @Valid} on the mutation argument, tenant scoping is
- * resolved inside the service / publisher, and the actual agent-targeted
- * publish happens over NATS. The mutation does NOT block on the agent's
- * response.
  */
 @DgsComponent
 @RequiredArgsConstructor

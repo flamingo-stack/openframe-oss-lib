@@ -19,13 +19,8 @@ import java.util.UUID;
  *
  * <p>This service is intentionally pure transport — it does NOT persist
  * anything on the backend. The agent's response will arrive on a separate
- * result subject and is the execution-service's responsibility. The dashboard
- * correlates the response via {@code executionId}, which is generated here
- * and returned immediately.
+ * result subject and is the execution-service's responsibility.
  *
- * <p>Asynchronicity: the GraphQL caller is unblocked the moment the NATS
- * publish ack returns — the agent may not have started (or even received)
- * the work yet.
  */
 @Slf4j
 @Service
@@ -57,11 +52,6 @@ public class CommandDispatchService {
 
     /**
      * Dispatch a cancel request for an in-flight execution.
-     *
-     * <p>Best-effort and asynchronous (same fire-and-forget semantics as
-     * {@link #runCommand(RunCommandInput)}). The dashboard receives an echo
-     * of {@code executionId} immediately and learns the actual cancel outcome
-     * from the agent's normal terminal response on the result channel.
      */
     public CancelDispatchResponse cancelExecution(CancelExecutionInput input) {
         CancelMessage message = CancelMessage.builder()
