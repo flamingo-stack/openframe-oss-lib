@@ -19,23 +19,8 @@ import java.util.UUID;
  *
  * <p>This service is intentionally pure transport — it does NOT persist
  * anything on the backend. The agent's response will arrive on a separate
- * result subject and is the execution-service's responsibility. The dashboard
- * correlates the response via {@code executionId}, which is generated here
- * and returned immediately.
+ * result subject and is the execution-service's responsibility.
  *
- * <p><b>Why core NATS and not JetStream:</b> ad-hoc command dispatch is a
- * live operation — the admin is watching the dashboard right now. Durable
- * delivery would let a command be replayed long after the admin walked
- * away (broker restart, agent reconnect after extended downtime), which
- * is exactly the "ghost execution" failure mode we must avoid for shell
- * commands. The result path back from the agent is a separate concern and
- * legitimately uses JetStream — see execution-service.
- *
- * <p>Asynchronicity: the GraphQL caller is unblocked the moment the NATS
- * publish returns — the agent may not have received the work yet (and if
- * it is offline, will never receive it). The dashboard discovers the real
- * outcome via the agent's terminal frame on the result channel, or via a
- * client-side timeout if no frame ever arrives.
  */
 @Slf4j
 @Service
@@ -67,11 +52,6 @@ public class CommandDispatchService {
 
     /**
      * Dispatch a cancel request for an in-flight execution.
-     *
-     * <p>Best-effort and asynchronous (same fire-and-forget semantics as
-     * {@link #runCommand(RunCommandInput)}). The dashboard receives an echo
-     * of {@code executionId} immediately and learns the actual cancel outcome
-     * from the agent's normal terminal response on the result channel.
      */
     public CancelDispatchResponse cancelExecution(CancelExecutionInput input) {
         CancelMessage message = CancelMessage.builder()

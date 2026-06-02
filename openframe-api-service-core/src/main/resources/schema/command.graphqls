@@ -6,10 +6,7 @@
 # the dashboard to correlate the asynchronous agent response.
 
 extend type Mutation {
-    """Dispatch an ad-hoc shell command to the target agent. Fire-and-forget — returns immediately with an executionId the client can use to correlate the agent's response."""
     runCommand(input: RunCommandInput!): CommandDispatchResponse!
-
-    """Request cancellation of an in-flight execution on a target agent. Best-effort and asynchronous — returns immediately; the agent's actual outcome arrives via the normal result channel and may still be a normal terminal frame if the execution finished before the cancel was delivered."""
     cancelExecution(input: CancelExecutionInput!): CancelDispatchResponse!
 }
 

@@ -9,10 +9,6 @@ import lombok.NoArgsConstructor;
 /**
  * Wire payload sent to the OpenFrame agent over NATS to abort an in-flight
  * execution.
- *
- * <p>Subject: {@code machine.{machineId}.script-cancel} (parallel to
- * {@code script-execution}).
- *
  */
 @Data
 @Builder
@@ -21,6 +17,5 @@ import lombok.NoArgsConstructor;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class CancelMessage {
 
-    /** Correlation id of the execution to cancel. */
     private String executionId;
 }
