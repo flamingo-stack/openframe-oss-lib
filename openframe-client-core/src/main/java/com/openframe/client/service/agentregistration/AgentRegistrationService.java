@@ -45,7 +45,6 @@ public class AgentRegistrationService {
     private final RegistrationTagAssignmentService registrationTagAssignmentService;
     private final InstalledAgentService installedAgentService;
 
-    @Transactional
     public AgentRegistrationResponse register(String initialKey, AgentRegistrationRequest request) {
         secretValidator.validate(initialKey);
 
@@ -103,7 +102,6 @@ public class AgentRegistrationService {
         return savedMachine;
     }
 
-    @Transactional
     public AgentRegistrationResponse reinstall(String initialKey, String machineId, String clientSecret, AgentRegistrationRequest request) {
         secretValidator.validate(initialKey);
         OAuthClient client = clientSecretValidator.validate(machineId, clientSecret);
