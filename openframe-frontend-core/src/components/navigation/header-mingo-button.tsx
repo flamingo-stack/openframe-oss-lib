@@ -3,6 +3,7 @@
 import React from 'react'
 import { cn } from '../../utils/cn'
 import { MingoIcon } from '../icons'
+import { XmarkIcon } from '../icons-v2-generated'
 
 export interface HeaderMingoButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -32,20 +33,32 @@ export function HeaderMingoButton({
   return (
     <button
       type="button"
-      aria-label="Mingo AI"
+      aria-label={iconOnly && isActive ? 'Close Mingo AI' : 'Mingo AI'}
       aria-pressed={isActive}
       className={cn(
         'flex items-center shrink-0 h-full gap-2 px-4',
         'transition-colors duration-200',
         'focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
-        isActive
-          ? 'text-ods-text-primary bg-ods-bg-active'
-          : 'text-ods-text-primary bg-ods-card hover:bg-ods-bg-hover',
+        'text-ods-text-primary bg-ods-card hover:bg-ods-bg-hover',
         className,
       )}
       {...props}
     >
-      <MingoIcon className="w-6 h-6 shrink-0" />
+      {iconOnly && isActive ? (
+        // Mobile, drawer open: the icon-only button doubles as the close
+        // affordance, so swap the Mingo logo for an X. Match the other header
+        // icons (e.g. notifications): secondary color, w-4 h-4 → md:w-6 h-6.
+        <XmarkIcon className="w-4 h-4 md:w-6 md:h-6 shrink-0 text-ods-text-secondary" />
+      ) : (
+        // Outer frame follows the button's text color (currentColor); the eyes
+        // and corner block are ODS cyan.
+        <MingoIcon
+          color="currentColor"
+          eyesColor="var(--ods-flamingo-cyan-base)"
+          cornerColor="var(--ods-flamingo-cyan-base)"
+          className="w-4 h-4 md:w-6 md:h-6 shrink-0"
+        />
+      )}
       {!iconOnly && (
         <span className="text-h3 font-bold tracking-[-0.36px] whitespace-nowrap">
           Mingo AI

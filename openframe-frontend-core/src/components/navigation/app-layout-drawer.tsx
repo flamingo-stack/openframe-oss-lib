@@ -105,16 +105,14 @@ const appLayoutDrawerVariants = cva(
       },
     },
     compoundVariants: [
-      { side: "right", flush: false, class: "pr-4 py-4" },
-      { side: "left", flush: false, class: "pl-4 py-4" },
-      { side: "top", flush: false, class: "pt-4 px-4" },
-      { side: "bottom", flush: false, class: "pb-4 px-4" },
-      // flush=true: keep wrapper padding on desktop (uniform 16px gap so the
-      // panel floats), drop on mobile for full-bleed — matches base Drawer.
-      { side: "right", flush: true, class: "md:pr-4 md:py-4" },
-      { side: "left", flush: true, class: "md:pl-4 md:py-4" },
-      { side: "top", flush: true, class: "md:pt-4 md:px-4" },
-      { side: "bottom", flush: true, class: "md:pb-4 md:px-4" },
+      { side: "right", flush: false, class: "pr-[var(--spacing-system-m)] py-[var(--spacing-system-m)]" },
+      { side: "left", flush: false, class: "pl-[var(--spacing-system-m)] py-[var(--spacing-system-m)]" },
+      { side: "top", flush: false, class: "pt-[var(--spacing-system-m)] px-[var(--spacing-system-m)]" },
+      { side: "bottom", flush: false, class: "pb-[var(--spacing-system-m)] px-[var(--spacing-system-m)]" },
+      { side: "right", flush: true, class: "md:pr-[var(--spacing-system-m)] md:py-[var(--spacing-system-m)]" },
+      { side: "left", flush: true, class: "md:pl-[var(--spacing-system-m)] md:py-[var(--spacing-system-m)]" },
+      { side: "top", flush: true, class: "md:pt-[var(--spacing-system-m)] md:px-[var(--spacing-system-m)]" },
+      { side: "bottom", flush: true, class: "md:pb-[var(--spacing-system-m)] md:px-[var(--spacing-system-m)]" },
     ],
     defaultVariants: {
       side: "right",
@@ -192,11 +190,11 @@ function useContainedResizableSize({
 
   const clampToContainer = React.useCallback(
     (value: number) => {
-      // Reserve 32px (16px outside-edge padding from the wrapper + 16px
-      // matching gap on the inside edge) so the panel sits symmetrically
+      // Reserve 40px (the `system-m` outside-edge padding from the wrapper
+      // plus a matching gap on the inside edge) so the panel sits symmetrically
       // inside the container. This also keeps the resize grip on-screen at
       // maximum extent.
-      const effectiveMax = available > 0 ? Math.min(maxSize, available - 32) : maxSize
+      const effectiveMax = available > 0 ? Math.min(maxSize, available - 40) : maxSize
       return clamp(value, minSize, Math.max(minSize, effectiveMax))
     },
     [available, minSize, maxSize],
@@ -547,13 +545,19 @@ const AppLayoutDrawerContent = React.forwardRef<
           aria-hidden
           data-state={open ? "open" : "closed"}
           className={cn(
-            "absolute inset-0 z-[40] bg-black/50 outline-none data-[state=open]:pointer-events-auto data-[state=closed]:pointer-events-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+            "absolute inset-0 z-[40] bg-[color-mix(in_srgb,var(--ods-system-greys-background)_50%,transparent)] outline-none data-[state=open]:pointer-events-auto data-[state=closed]:pointer-events-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
             overlayClassName,
           )}
         />
         <DialogPrimitive.Content
           ref={ref}
-          className={cn(appLayoutDrawerVariants({ side, flush }))}
+          className={cn(
+            appLayoutDrawerVariants({ side, flush }),
+            // Mobile: span the whole container and drop the outer gap so the
+            // panel renders edge-to-edge full-screen. (`p-0` overrides the
+            // variant's wrapper padding via tailwind-merge.)
+            isMobile && "inset-0 p-0",
+          )}
           style={style}
           onInteractOutside={(event) => {
             onInteractOutside?.(event)
@@ -585,6 +589,12 @@ const AppLayoutDrawerContent = React.forwardRef<
           <div
             className={cn(
               appLayoutDrawerPanelVariants({ side, flush }),
+              // Mobile: fill the container (the side already pins one axis) and
+              // drop the card chrome so the panel is edge-to-edge full-screen.
+              // Inner padding/gap is preserved so content isn't glued to the
+              // edges. tailwind-merge lets these override the variant classes.
+              isMobile && (isHorizontal ? "w-full" : "h-full"),
+              isMobile && "rounded-none border-0",
               className,
               panelClassName,
             )}
