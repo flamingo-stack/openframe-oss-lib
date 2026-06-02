@@ -133,10 +133,14 @@ public class AgentRegistrationService {
 
     private void updateMachine(Machine machine, AgentRegistrationRequest request) {
         applyReportedFields(machine, request);
+
+        String organizationId = organizationIdResolver.resolve(request.getOrganizationId());
+        machine.setOrganizationId(organizationId);
+
         machineRepository.save(machine);
 
         String machineId = machine.getMachineId();
-        log.info("Updated machine {} on reinstall", machineId);
+        log.info("Updated machine {} on reinstall, organizationId {}", machineId, organizationId);
     }
 
     private void applyReportedFields(Machine machine, AgentRegistrationRequest request) {

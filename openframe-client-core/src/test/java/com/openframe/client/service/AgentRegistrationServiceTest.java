@@ -216,8 +216,10 @@ class AgentRegistrationServiceTest {
         existingMachine.setMachineId(MACHINE_ID);
         existingMachine.setHostname("old-host");
         existingMachine.setAgentVersion("0.9.0");
+        existingMachine.setOrganizationId("old-org");
         when(clientSecretValidator.validate(MACHINE_ID, CLIENT_SECRET)).thenReturn(existingClient);
         when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(existingMachine));
+        when(organizationIdResolver.resolve("org-1")).thenReturn("new-org");
 
         AgentRegistrationResponse response =
                 agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request);
@@ -239,7 +241,10 @@ class AgentRegistrationServiceTest {
         assertEquals("test-hostname", savedMachine.getHostname());
         assertEquals("linux", savedMachine.getOsType());
         assertEquals("1.0.0", savedMachine.getAgentVersion());
+        assertEquals("new-org", savedMachine.getOrganizationId()); // organization can change on reinstall
         assertNotNull(savedMachine.getLastSeen());
+
+        verify(organizationIdResolver).resolve("org-1");
 
         // setup is re-run
         verify(registrationTagAssignmentService).assignTags(eq(MACHINE_ID), any());
