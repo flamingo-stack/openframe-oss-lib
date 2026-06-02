@@ -60,6 +60,7 @@ class AgentControllerTest {
         registrationRequest.setIp("192.168.1.1");
         registrationRequest.setMacAddress("00:11:22:33:44:55");
         registrationRequest.setOsUuid("test-os-uuid");
+        registrationRequest.setOsType("linux");
         registrationRequest.setAgentVersion("1.0.0");
         registrationResponse = new AgentRegistrationResponse("test-machine-id", "client-id", "client-secret");
     }
@@ -161,6 +162,21 @@ class AgentControllerTest {
                                 request.getAgentVersion().equals("1.0.0")
                 )
         );
+    }
+
+    @Test
+    void register_MissingMandatoryHostname_ReturnsValidationError() throws Exception {
+        AgentRegistrationRequest invalid = new AgentRegistrationRequest();
+        invalid.setOsType("linux");
+        invalid.setAgentVersion("1.0.0");
+        // hostname omitted -> @NotBlank must reject
+
+        mockMvc.perform(post("/api/agents/register")
+                        .header("X-Initial-Key", "test-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalid)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
 
     @Test

@@ -12,6 +12,7 @@ import java.util.List;
 @Data
 public class AgentRegistrationRequest {
     // Core identification
+    @NotBlank
     private String hostname;
     private String organizationId;
 
@@ -31,6 +32,7 @@ public class AgentRegistrationRequest {
 
     // OS information
     private DeviceType type;
+    @NotBlank
     private String osType;
     private String osVersion;
     private String osBuild;
