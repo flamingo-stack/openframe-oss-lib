@@ -53,7 +53,6 @@ public class AgentRegistrationService {
         String clientId = buildClientId(machineId);
         String clientSecret = agentSecretGenerator.generate();
 
-        // Get or resolve organization
         String resolvedOrganizationId = organizationIdResolver.resolve(request.getOrganizationId());
 
         saveOAuthClient(machineId, clientId, clientSecret);
