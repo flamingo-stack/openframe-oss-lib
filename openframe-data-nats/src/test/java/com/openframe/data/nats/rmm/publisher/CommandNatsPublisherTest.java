@@ -37,7 +37,6 @@ class CommandNatsPublisherTest {
         CommandMessage message = CommandMessage.builder()
                 .executionId("exec-1")
                 .code("df -h")
-                .shell("/bin/bash")
                 .build();
 
         publisher.publishCommand("machine-42", message);
@@ -56,7 +55,6 @@ class CommandNatsPublisherTest {
         CommandMessage message = CommandMessage.builder()
                 .executionId("exec-1")
                 .code("ls")
-                .shell("/bin/bash")
                 .build();
 
         publisher.publishCommand("machine-42", message);
@@ -73,7 +71,6 @@ class CommandNatsPublisherTest {
         CommandMessage message = CommandMessage.builder()
                 .executionId("exec-1")
                 .code("ls")
-                .shell("/bin/bash")
                 .build();
 
         assertThatThrownBy(() -> publisher.publishCommand("   ", message))
@@ -97,7 +94,6 @@ class CommandNatsPublisherTest {
         CommandMessage missingId = CommandMessage.builder()
                 .executionId("   ")
                 .code("ls")
-                .shell("/bin/bash")
                 .build();
 
         assertThatThrownBy(() -> publisher.publishCommand("machine-42", missingId))
@@ -112,7 +108,6 @@ class CommandNatsPublisherTest {
         CommandMessage message = CommandMessage.builder()
                 .executionId("exec-1")
                 .code("ls")
-                .shell("/bin/bash")
                 .build();
         doThrow(new NatsException("broker offline"))
                 .when(messagePublisher).publish(anyString(), any(CommandMessage.class));

@@ -36,9 +36,7 @@ public class CommandDispatchService {
                 .executionId(executionId)
                 .code(input.getCommand())
                 .shell(input.getShell())
-                .args(input.getArgs())
                 .timeout(input.getTimeoutSeconds())
-                .envVars(input.getEnvVars())
                 .build();
 
         commandNatsPublisher.publishCommand(input.getMachineId(), message);

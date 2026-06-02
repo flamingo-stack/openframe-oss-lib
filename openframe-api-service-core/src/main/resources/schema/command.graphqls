@@ -12,10 +12,8 @@ extend type Mutation {
 
 input RunCommandInput {
     machineId: String!
-    shell: String!
+    shell: ScriptShell!
     command: String!
-    args: [String!]
-    envVars: [String!]
     timeoutSeconds: Int
 }
 

@@ -4,6 +4,7 @@ import com.openframe.api.dto.command.CancelDispatchResponse;
 import com.openframe.api.dto.command.CancelExecutionInput;
 import com.openframe.api.dto.command.CommandDispatchResponse;
 import com.openframe.api.dto.command.RunCommandInput;
+import com.openframe.data.document.rmm.ScriptShell;
 import com.openframe.data.nats.rmm.model.CancelMessage;
 import com.openframe.data.nats.rmm.model.CommandMessage;
 import com.openframe.data.nats.rmm.publisher.CommandNatsPublisher;
@@ -41,7 +42,7 @@ class CommandDispatchServiceTest {
     void setUp() {
         input = new RunCommandInput();
         input.setMachineId(MACHINE_ID);
-        input.setShell("/bin/bash");
+        input.setShell(ScriptShell.BASH);
         input.setCommand("df -h");
     }
 
@@ -57,17 +58,13 @@ class CommandDispatchServiceTest {
         CommandMessage sent = captor.getValue();
         assertThat(sent.getExecutionId()).isEqualTo(response.getExecutionId());
         assertThat(sent.getCode()).isEqualTo("df -h");
-        assertThat(sent.getShell()).isEqualTo("/bin/bash");
-        assertThat(sent.getArgs()).isNull();      // not provided → not sent
-        assertThat(sent.getEnvVars()).isNull();   // not provided → not sent
+        assertThat(sent.getShell()).isEqualTo(ScriptShell.BASH);
         assertThat(sent.getTimeout()).isNull();   // not provided → agent default
     }
 
     @Test
-    @DisplayName("runCommand: forwards optional args / envVars / timeout verbatim — they are NOT massaged by the backend")
+    @DisplayName("runCommand: forwards optional timeout verbatim — it is NOT massaged by the backend")
     void runCommand_forwardsOptionalFieldsVerbatim() {
-        input.setArgs(List.of("--verbose", "/var/log"));
-        input.setEnvVars(List.of("LOG_LEVEL=DEBUG", "TZ=UTC"));
         input.setTimeoutSeconds(90);
 
         commandDispatchService.runCommand(input);
@@ -75,8 +72,6 @@ class CommandDispatchServiceTest {
         ArgumentCaptor<CommandMessage> captor = ArgumentCaptor.forClass(CommandMessage.class);
         verify(commandNatsPublisher).publishCommand(eq(MACHINE_ID), captor.capture());
         CommandMessage sent = captor.getValue();
-        assertThat(sent.getArgs()).containsExactly("--verbose", "/var/log");
-        assertThat(sent.getEnvVars()).containsExactly("LOG_LEVEL=DEBUG", "TZ=UTC");
         assertThat(sent.getTimeout()).isEqualTo(90);
     }
 
