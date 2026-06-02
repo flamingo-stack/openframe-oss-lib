@@ -120,7 +120,10 @@ public class AgentRegistrationService {
 
     private OAuthClient loadOAuthClient(String machineId) {
         return oauthClientRepository.findByMachineId(machineId)
-                .orElseThrow(() -> new InvalidClientSecretException(CLIENT_SECRET_INVALID, "Unknown machine: " + machineId));
+                .orElseThrow(() -> {
+                    log.warn("Reinstall requested for unknown machine {}", machineId);
+                    return new InvalidClientSecretException(CLIENT_SECRET_INVALID, "Invalid client secret");
+                });
     }
 
     private void postProcessMachine(Machine machine, AgentRegistrationRequest request) {

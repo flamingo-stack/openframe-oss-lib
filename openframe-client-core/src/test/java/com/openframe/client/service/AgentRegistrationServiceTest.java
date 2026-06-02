@@ -276,13 +276,16 @@ class AgentRegistrationServiceTest {
     }
 
     @Test
-    void reinstall_WithUnknownMachine_Throws() {
+    void reinstall_WithUnknownMachine_ThrowsGenericInvalidSecret() {
         when(oauthClientRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.empty());
 
-        assertThrows(
+        InvalidClientSecretException ex = assertThrows(
                 InvalidClientSecretException.class,
                 () -> agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request)
         );
+        // indistinguishable from a bad secret: no machine-id existence oracle
+        assertEquals(ErrorCode.CLIENT_SECRET_INVALID, ex.getErrorCode());
+        assertEquals("Invalid client secret", ex.getMessage());
 
         verify(clientSecretValidator, never()).validate(any(), any());
         verify(machineRepository, never()).findByMachineId(any());
