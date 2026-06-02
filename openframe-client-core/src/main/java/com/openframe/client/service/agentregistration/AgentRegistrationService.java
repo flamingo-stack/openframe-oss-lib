@@ -144,6 +144,7 @@ public class AgentRegistrationService {
 
     private void updateMachine(Machine machine, AgentRegistrationRequest request) {
         applyRegistrationRequestFields(machine, request);
+        machine.setStatus(DeviceStatus.PENDING);
 
         String organizationId = organizationIdResolver.resolve(request.getOrganizationId());
         machine.setOrganizationId(organizationId);

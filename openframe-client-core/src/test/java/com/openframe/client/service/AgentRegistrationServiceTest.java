@@ -242,6 +242,7 @@ class AgentRegistrationServiceTest {
         assertEquals("linux", savedMachine.getOsType());
         assertEquals("1.0.0", savedMachine.getAgentVersion());
         assertEquals("new-org", savedMachine.getOrganizationId()); // organization can change on reinstall
+        assertEquals(DeviceStatus.PENDING, savedMachine.getStatus()); // reset to PENDING on reinstall
         assertNotNull(savedMachine.getLastSeen());
 
         verify(organizationIdResolver).resolve("org-1");
