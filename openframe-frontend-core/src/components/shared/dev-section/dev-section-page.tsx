@@ -37,12 +37,27 @@ export interface DevSectionPageProps {
    *  controls instead of below them. */
   preControls?: ReactNode;
   /** Back-button config — same shape as `LegalDocumentPage` /
-   *  `ReleaseDetailPage`. Pass `false` to hide. Default
-   *  `{ label: 'Back to home', href: '/' }`. */
+   *  `ReleaseDetailPage`. Pass `false` to hide entirely. Default
+   *  `{ label: 'Back to home', href: '/' }` — embedders whose "home" isn't `/`
+   *  should override `href`, or pass `false` if the embed has no home page. */
   backButton?: { label?: string; href?: string } | false;
+  /** Override the hero title. Defaults to the (OpenFrame-specific) copy in
+   *  `OPENFRAME_DEV_SECTIONS[sectionKey].hero.title`. Set this to brand the
+   *  section for a non-OpenFrame embed. */
+  title?: string;
+  /** Override the hero subtitle/description. Defaults to
+   *  `OPENFRAME_DEV_SECTIONS[sectionKey].hero.description`. */
+  subtitle?: string;
 }
 
-export function DevSectionPage({ sectionKey, children, preControls, backButton }: DevSectionPageProps) {
+export function DevSectionPage({
+  sectionKey,
+  children,
+  preControls,
+  backButton,
+  title,
+  subtitle,
+}: DevSectionPageProps) {
   const router = useRouter();
   const section = OPENFRAME_DEV_SECTIONS[sectionKey];
   const Icon = section.icon;
@@ -66,7 +81,8 @@ export function DevSectionPage({ sectionKey, children, preControls, backButton }
           sectionKey={sectionKey}
           hero={{
             icon: <Icon className={SECTION_HERO_ICON_CLASS} />,
-            description: section.hero.description,
+            title,
+            description: subtitle ?? section.hero.description,
           }}
           preControls={preControls}
         >

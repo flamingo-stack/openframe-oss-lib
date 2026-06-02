@@ -23,16 +23,19 @@ export const EP = {
   roadmap: `${CONTENT}/roadmap`,
   roadmapVote: `${CONTENT}/roadmap/vote`,
   roadmapById: (id: string) => `${CONTENT}/roadmap/${id}`,
-  // delivery
+  // delivery — `delivery` is the base route that takes `?task_ids=` and returns
+  // BOTH `{ completed, inProgress }` (the release-detail bug-fixes/enhancements
+  // section uses this); the two list endpoints feed the standalone /delivery page.
+  delivery: `${CONTENT}/delivery`,
   deliveryCompleted: `${CONTENT}/delivery/completed`,
   deliveryInProgress: `${CONTENT}/delivery/in-progress`,
   // onboarding guides
   onboarding: `${CONTENT}/onboarding-guides`,
   onboardingBySlug: (slug: string) => `${CONTENT}/onboarding-guides/${slug}`,
   onboardingSections: `${CONTENT}/onboarding-guides/sections`,
-  // product releases
-  productReleases: `${CONTENT}/product-releases`,
-  productReleaseBySlug: (slug: string) => `${CONTENT}/product-releases/${slug}`,
+  // product releases (the hub's public routes are /api/releases + /api/releases/[slug])
+  productReleases: `${CONTENT}/releases`,
+  productReleaseBySlug: (slug: string) => `${CONTENT}/releases/${slug}`,
   // misc surfaces
   legal: (docType: string) => `${CONTENT}/legal/${docType}`,
   contact: `${CONTENT}/contact`,
@@ -40,9 +43,6 @@ export const EP = {
   accessValidate: `${CONTENT}/validate-access-code`,
   accessConsume: `${CONTENT}/consume-access-code`,
 } as const
-
-/** Chat source — must match the target hub's currentPlatform() (doc-search scope + localStorage ns). */
-export const DEFAULT_SOURCE = import.meta.env.VITE_CHAT_SOURCE ?? 'openframe'
 
 /** Public hub origin for new-tab "open the full content" links (embed mode). */
 export const HUB_PUBLIC_ORIGIN = import.meta.env.VITE_HUB_ORIGIN ?? 'http://localhost:3000'

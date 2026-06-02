@@ -34,11 +34,14 @@ import type { DeliveryResponse } from '../../../types/delivery';
 import { DeliveryTable } from './delivery-table';
 import { EmptyState } from '../../empty-state';
 import { LoadError } from '../../ui/error-state';
+import { DEV_SECTION_PARAM_KEYS } from '../../../utils/dev-sections/dev-section-param-keys';
 
 const DEFAULT_COMPLETED_ENDPOINT = '/api/delivery/completed';
 const DEFAULT_IN_PROGRESS_ENDPOINT = '/api/delivery/in-progress';
-const DEFAULT_SEARCH_PARAM_KEY = 'search';
-const DEFAULT_TASK_TYPE_PARAM_KEY = 'task_type';
+// Param keys sourced from the shared registry (see RoadmapView) — single source for the
+// chrome's written `?key=` and this view's read.
+const DEFAULT_SEARCH_PARAM_KEY = DEV_SECTION_PARAM_KEYS.search;
+const DEFAULT_TASK_TYPE_PARAM_KEY = DEV_SECTION_PARAM_KEYS.deliveryTaskType;
 
 export interface DeliveryListsProps {
   /** GET endpoint for the "Recently Completed" bucket. Default

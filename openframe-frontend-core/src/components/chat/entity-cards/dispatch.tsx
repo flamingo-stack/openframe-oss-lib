@@ -31,10 +31,11 @@
 
 import React, { type ReactNode } from 'react'
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context'
+import { useRouter } from '../../../embed-shims/next-navigation'
 import type { ChatRef } from '../chat-ref.types'
 import { useChatCardItem } from '../hooks/use-chat-card-item'
 import { handleChatNavClick } from '../utils/nav-click-handler'
-import { resolveSourceRowCTA, resolveSourceIcon } from '../utils/source-row-cta'
+import { resolveSourceRowCTA, resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-cta'
 import { resolveHrefForRuntime } from '../utils/chat-nav-resolution'
 import {
   computeIsNewTab,
@@ -866,6 +867,7 @@ function ChatCardNavWrap({
   children: ReactNode
 }) {
   const runtime = useRequiredChatRuntime()
+  const router = useRouter()
   const panel = useChatPanel()
   const onClickCapture = (e: React.MouseEvent<HTMLElement>) => {
     if (!href) return
@@ -879,7 +881,7 @@ function ChatCardNavWrap({
     if (targetEl?.closest?.('button')) return
     if (!targetEl?.closest?.('a')) return
 
-    const handled = handleChatNavClick(e, runtime, { href, path, targetPlatform })
+    const handled = handleChatNavClick(e, runtime, { href, path, targetPlatform }, router.push)
     if (!handled) return
     // Modifier-clicks fall through (handled=false) without stopPropagation
     // so ancestor telemetry handlers still see the bubble.
@@ -950,11 +952,7 @@ export function ChatCardLoader({
             ? (chatRef.metadata.path as string)
             : null,
       },
-      {
-        baseRoute,
-        chipBasePlatform,
-        currentPlatform: runtime.source,
-      },
+      sourceRowCtxFromRuntime(runtime, { baseRoute, chipBasePlatform }),
     )
     const finalHref = cta.href ? resolveHrefForRuntime(cta.href, runtime) : null
     return {

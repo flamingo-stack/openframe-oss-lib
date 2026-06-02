@@ -1,18 +1,19 @@
-import { DeliveryLists } from '@flamingo-stack/openframe-frontend-core/components'
+import { DevSectionPage, DeliveryLists } from '@flamingo-stack/openframe-frontend-core/components'
 import { EP } from '../config/endpoints'
 
 /**
- * DeliveryLists fetches its own data and reads `search` / `task_type` URL params
- * (written by its internal chrome via the embed-shim → react-router bridge). We
- * only retarget its two endpoints to /content.
+ * Delivery — config-only. `<DevSectionPage sectionKey="delivery">` supplies the chrome
+ * (hero + search + task-type filter, all URL-param-wired); `<DeliveryLists>` reads
+ * `search` / `task_type` and renders the completed + active tables. This page supplies
+ * only the two **api routes**.
  */
 export function DeliveryPage() {
   return (
-    <div className="p-6">
+    <DevSectionPage sectionKey="delivery">
       <DeliveryLists
         completedApiEndpoint={EP.deliveryCompleted}
         inProgressApiEndpoint={EP.deliveryInProgress}
       />
-    </div>
+    </DevSectionPage>
   )
 }

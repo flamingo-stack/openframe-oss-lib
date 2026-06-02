@@ -4,7 +4,7 @@ const SURFACES = [
   { to: '/onboarding-guides', title: 'Onboarding guides', desc: 'Catalog + detail, props-driven from /content/api/onboarding-guides.' },
   { to: '/roadmap', title: 'Roadmap', desc: 'Voting grid; votes + refresh hit /content/api/roadmap.' },
   { to: '/delivery', title: 'Delivery', desc: 'Bug-fix + enhancement tables; /content/api/delivery/*.' },
-  { to: '/releases', title: 'Product releases', desc: 'ReleaseDetailPage with an injected roadmap section.' },
+  { to: '/releases', title: 'Product releases', desc: 'List via the shared ProductReleasesView; detail injects a roadmap section.' },
   { to: '/legal/privacy', title: 'Legal', desc: 'Privacy / terms via /content/api/legal/*.' },
   { to: '/contact', title: 'Contact', desc: 'ContactForm → /content/api/contact (EndpointsRuntime).' },
   { to: '/tickets', title: 'Help center / tickets', desc: 'HelpCenterList (tickets hooks).' },

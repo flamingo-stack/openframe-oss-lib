@@ -21,6 +21,44 @@ import type { ScrollAnchor } from './message.types'
 import type { ChatRef } from '../chat-ref.types'
 import type { ChatSource } from '../hooks/use-sse-chat-adapter'
 import type { ChatAttachment } from '../utils/chat-attachment-markdown'
+import type { DialogItem } from './component.types'
+
+// ─── Per-dialog token usage (Mingo backend telemetry) ────────────────────────
+
+/**
+ * Token usage snapshot for the active Mingo dialog, hydrated from the
+ * backend's `dialog.tokenUsage` GraphQL field. Mirrors the shape returned
+ * by the openframe `dialogs` GraphQL endpoint so hosts can pass it through
+ * `fetchDialogMessages` without re-mapping.
+ *
+ * Null when no Mingo dialog is active, when the backend hasn't reported
+ * usage yet, or when the active mode is Guide (SSE telemetry surfaces via
+ * `currentInputTokens`/`currentOutputTokens` instead).
+ */
+export interface DialogTokenUsage {
+  /** Backend chat-type discriminator, e.g. `ADMIN_AI_CHAT`. Free-form. */
+  chatType?: string
+  /** Total input tokens consumed so far in this dialog. */
+  inputTokensSize: number
+  /** Total output tokens emitted so far in this dialog. */
+  outputTokensSize: number
+  /** Sum of input + output. May be > input + output when the backend
+   *  counts cache reads in a separate bucket — trust the backend value. */
+  totalTokensSize: number
+  /** Current LLM context-window occupancy in tokens — what the model
+   *  has loaded right now, not the cumulative dialog sum. */
+  contextSize?: number
+}
+
+// ─── Connection state (transport-level) ──────────────────────────────────────
+
+/**
+ * High-level transport connection status. Drives any UI affordance that
+ * needs to communicate "live tail is/isn't healthy" to the user. SSE/Guide
+ * adapter currently reports `'connected'` whenever a turn isn't streaming
+ * — the SSE side is request-response and has no long-lived socket.
+ */
+export type ChatConnectionState = 'connected' | 'connecting' | 'disconnected'
 
 // ─── Streaming phase (unified across transports) ─────────────────────────────
 
@@ -212,4 +250,82 @@ export interface UnifiedChatState {
    * arrives. Always null in Mingo mode.
    */
   currentUsageBreakdown: UnifiedUsageBreakdown | null
+
+  // ─── Dialog management (Mingo: backend; Guide: localStorage) ──────────────
+  //
+  // All fields below are optional in practice: a transport adapter that
+  // doesn't manage multi-dialog history (older `useNatsChatAdapter`
+  // configs, the Guide adapter with localStorage disabled) returns the
+  // empty/null defaults so existing consumers keep working unchanged.
+  // Callers gate UI on `dialogs.length > 0` or `activeDialogId != null`.
+
+  /**
+   * History of dialogs available for the active mode. Mingo: paginated
+   * from the openframe backend. Guide: list of recent threads from
+   * localStorage. Empty when the active adapter doesn't expose dialog
+   * management.
+   */
+  dialogs: DialogItem[]
+
+  /** Currently-selected dialog id, or `null` when no dialog is active
+   *  (draft state — "start a new conversation"). */
+  activeDialogId: string | null
+
+  /** Switch the panel to an existing dialog. Idempotent — selecting the
+   *  active id is a no-op. Pass `null` to drop back to draft state. */
+  selectDialog: (id: string | null) => void
+
+  /** Allocate a fresh dialog on the backend (Mingo) or in localStorage
+   *  (Guide) and switch to it. Returns the new dialog id. When the
+   *  adapter doesn't support creation, resolves to `null`. */
+  startNewDialog: () => Promise<string | null>
+
+  /** Delete a dialog from history. No-op when the adapter doesn't
+   *  expose `deleteDialog` (Guide localStorage always supports it;
+   *  Mingo gates on the host-provided callback). */
+  deleteDialog: (id: string) => Promise<void>
+
+  /** True while the dialog list is being fetched for the first time. */
+  isDialogsLoading: boolean
+
+  /** True while message history for the active dialog is being fetched. */
+  isMessagesLoading: boolean
+
+  /** Whether more dialogs remain on the server (Mingo cursor pagination). */
+  hasMoreDialogs: boolean
+
+  /** Fetch the next page of dialogs. No-op when `hasMoreDialogs` is false. */
+  loadMoreDialogs: () => Promise<void>
+
+  /** Whether more historical messages remain in the active dialog. */
+  hasMoreMessages: boolean
+
+  /** Fetch the next page of historical messages for the active dialog. */
+  loadMoreMessages: () => Promise<void>
+
+  // ─── Approval mutations (Mingo agent tool-call workflow) ──────────────────
+
+  /** Approve an in-flight tool-call request. Errors surface via the
+   *  host-supplied toast in the callback config (lib does not own UI). */
+  approveRequest: (requestId: string) => Promise<void>
+
+  /** Reject an in-flight tool-call request. Optional `reason` is
+   *  forwarded to the backend when supported. */
+  rejectRequest: (requestId: string, reason?: string) => Promise<void>
+
+  // ─── Per-dialog token usage (Mingo only) ──────────────────────────────────
+
+  /** Cumulative token usage for the active Mingo dialog. Null in Guide
+   *  mode or when the backend hasn't reported usage yet. Per-turn
+   *  metadata (`currentInputTokens` etc.) is orthogonal — that fires on
+   *  every SSE `message_start`, while this hydrates from the dialog
+   *  fetch + live `TOKEN_USAGE` events. */
+  dialogTokenUsage: DialogTokenUsage | null
+
+  // ─── Connection state ─────────────────────────────────────────────────────
+
+  /** High-level transport connection state. Drives reconnect UI in
+   *  Mingo mode; always `'connected'` in Guide mode (SSE is request-
+   *  response and has no persistent socket to monitor). */
+  connectionState: ChatConnectionState
 }

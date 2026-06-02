@@ -154,6 +154,13 @@ export interface ProductRelease {
     platform_id: string
     is_featured: boolean
     featured_order: number | null
+    // The release DAL flattens the joined `platforms` row onto each junction
+    // entry (`...platform.platforms`), so `name`/`display_name` are present at
+    // runtime — `composeContentUrlFromPlatforms` reads `name` to resolve the
+    // target platform. Declared here so callers can pass this array to the
+    // `composeContentUrl` seam without a cast.
+    name?: string
+    display_name?: string
   }>
   product_release_tags?: Array<{
     tag_id: number
