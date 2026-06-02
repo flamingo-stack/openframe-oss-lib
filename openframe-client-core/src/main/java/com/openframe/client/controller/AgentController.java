@@ -30,11 +30,12 @@ public class AgentController {
 
     @PostMapping("/reinstall")
     public ResponseEntity<AgentRegistrationResponse> reinstall(
+            @RequestHeader(INITIAL_KEY_HEADER) String initialKey,
             @RequestHeader(MACHINE_ID_HEADER) String machineId,
             @RequestHeader(CLIENT_SECRET_HEADER) String clientSecret,
             @Valid @RequestBody AgentRegistrationRequest request) {
 
-        AgentRegistrationResponse response = agentRegistrationService.reinstall(machineId, clientSecret, request);
+        AgentRegistrationResponse response = agentRegistrationService.reinstall(initialKey, machineId, clientSecret, request);
         return ResponseEntity.ok(response);
     }
 

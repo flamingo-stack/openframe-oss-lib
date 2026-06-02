@@ -48,9 +48,6 @@ public class AgentRegistrationService {
     private final RegistrationTagAssignmentService registrationTagAssignmentService;
     private final InstalledAgentService installedAgentService;
 
-    @Value("${openframe.feature.save-installed-agent-on-registration:false}")
-    private boolean saveInstalledAgentOnRegistrationEnabled;
-
     @Transactional
     // TODO: two phase commit for the nats integration or other fallback
     public AgentRegistrationResponse register(String initialKey, AgentRegistrationRequest request) {
@@ -72,7 +69,8 @@ public class AgentRegistrationService {
     }
 
     @Transactional
-    public AgentRegistrationResponse reinstall(String machineId, String clientSecret, AgentRegistrationRequest request) {
+    public AgentRegistrationResponse reinstall(String initialKey, String machineId, String clientSecret, AgentRegistrationRequest request) {
+        secretValidator.validate(initialKey);
         OAuthClient client = clientSecretValidator.validate(machineId, clientSecret);
 
         Machine machine = loadMachine(machineId);
@@ -146,9 +144,6 @@ public class AgentRegistrationService {
     }
 
     private void saveInstalledAgent(String machineId, AgentRegistrationRequest request) {
-        if (!saveInstalledAgentOnRegistrationEnabled) {
-            return;
-        }
         String agentVersion = request.getAgentVersion();
         installedAgentService.addInstalledAgent(machineId, OPENFRAME_CLIENT_AGENT_TYPE, agentVersion, false);
     }
