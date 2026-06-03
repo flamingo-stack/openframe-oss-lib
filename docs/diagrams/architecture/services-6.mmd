@@ -1,0 +1,11 @@
+sequenceDiagram
+    participant Controller
+    participant Service
+    participant Repository
+    participant Processor
+
+    Controller->>Service: Update Request
+    Service->>Repository: Save Entity
+    Repository-->>Service: Saved Entity
+    Service->>Processor: postProcess(...)
+    Service-->>Controller: Response DTO

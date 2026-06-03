@@ -1,0 +1,6 @@
+flowchart LR
+    GraphQL["GraphQL DataFetchers"] --> Services
+    Services --> Domain["Domain Models"]
+    Services --> Repositories
+    Services --> Messaging["NATS / Kafka"]
+    Services --> Cache["Redis"]

@@ -1,0 +1,6 @@
+flowchart TD
+    UpdateRequest["UpdateOrganizationRequest"] --> CheckField["Field != null?"]
+    CheckField -->|"Yes"| ApplyUpdate["Set Field on Entity"]
+    CheckField -->|"No"| Skip["Keep Existing Value"]
+    ApplyUpdate --> OrgEntity["Updated Organization"]
+    Skip --> OrgEntity

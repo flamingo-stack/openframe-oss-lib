@@ -86,7 +86,11 @@ export function useLegalDocs(
       setData(result);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-      console.error(`Error fetching ${docType} document:`, err);
+      // `docType` is externally controlled (URL path segment in embedders), so it must NOT sit in
+      // console.error's FIRST (format-string) argument — Node interprets %s/%j/%o there
+      // (CodeQL js/tainted-format-string). Keep the format string constant; pass docType + err as
+      // plain trailing args.
+      console.error('Error fetching legal document:', docType, err);
       setError(errorMessage);
     } finally {
       setIsLoading(false);

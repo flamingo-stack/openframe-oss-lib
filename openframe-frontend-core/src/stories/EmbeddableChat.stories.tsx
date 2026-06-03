@@ -8,6 +8,7 @@ import {
 import { EmbeddableChat } from '../components/chat/embeddable-chat'
 import type { UseNatsChatAdapterConfig } from '../components/chat/hooks/use-nats-chat-adapter'
 import type { SlashCommandSummary } from '../components/chat/hooks/use-slash-commands'
+import type { DialogItem } from '../components/chat/types/component.types'
 
 // =============================================================================
 // Stub commands endpoint — module-level constant referenced both by the
@@ -58,6 +59,92 @@ function createMockMingoConfig(): UseNatsChatAdapterConfig {
     publishUserMessage: (text, options) => {
       // eslint-disable-next-line no-console
       console.log('[story] mingo publish', { text, options })
+    },
+    // Selecting a dialog loads its history via this callback — without it
+    // `hasMessages` stays false and the panel never switches to the
+    // conversation view. Return a tiny canned thread so clicks "open" a chat.
+    fetchDialogMessages: ({ dialogId }) =>
+      Promise.resolve({
+        messages: [
+          {
+            id: `${dialogId}-u1`,
+            createdAt: new Date().toISOString(),
+            owner: { type: 'CLIENT' },
+            messageData: {
+              type: 'TEXT',
+              text: 'Which devices have not sent any logs in the last 24 hours?',
+            },
+          },
+          {
+            id: `${dialogId}-a1`,
+            createdAt: new Date().toISOString(),
+            owner: { type: 'ASSISTANT' },
+            messageData: {
+              type: 'TEXT',
+              text: 'Found 3 devices that have not reported in over 24 hours. Want me to run a full diagnostic?',
+            },
+          },
+        ],
+        nextCursor: null,
+      }),
+  }
+}
+
+// Sample dialog history (Figma node 7532:223950) — supplied via `fetchDialogs`
+// so EmbeddableChat reports `dialogs.length > 0` and renders MingoWelcome's
+// returning-user variation (outline "Start Guide Chat" chip, no promo).
+const SAMPLE_DIALOGS: ReadonlyArray<DialogItem> = [
+  { id: 'd1', title: 'PowerShell script for bulk user creation', unreadMessagesCount: 1 },
+  { id: 'd2', title: 'Setting up automated backup verification', unreadMessagesCount: 1 },
+  { id: 'd3', title: 'Network segmentation best practices for client' },
+  { id: 'd4', title: 'Creating GPO for software deployment' },
+  { id: 'd5', title: 'WSUS patching strategy optimization' },
+  { id: 'd6', title: 'Office 365 license assignment automation' },
+  { id: 'd7', title: 'Firewall rule configuration for new application' },
+  { id: 'd8', title: 'SQL Server maintenance plan troubleshooting' },
+]
+
+/** Mingo config whose `fetchDialogs` resolves a single page of history (with
+ *  timestamps so the list splits into Today / Yesterday) plus working
+ *  rename/archive callbacks — used by the returning-user story. */
+function createMockMingoConfigWithDialogs(): UseNatsChatAdapterConfig {
+  return {
+    ...createMockMingoConfig(),
+    fetchDialogs: () => {
+      const now = Date.now()
+      const day = 24 * 60 * 60 * 1000
+      // First six → Today, the rest → Yesterday.
+      const dialogs = SAMPLE_DIALOGS.map((d, i) => ({
+        ...d,
+        timestamp: new Date(now - (i < 6 ? 0 : day)),
+      }))
+      return Promise.resolve({ dialogs, nextCursor: null })
+    },
+    renameDialog: (id, title) => {
+      // eslint-disable-next-line no-console
+      console.log('[story] mingo rename', { id, title })
+      return Promise.resolve()
+    },
+    archiveDialog: (id) => {
+      // eslint-disable-next-line no-console
+      console.log('[story] mingo archive', { id })
+      return Promise.resolve()
+    },
+    fetchArchivedDialogs: () => {
+      const now = Date.now()
+      const day = 24 * 60 * 60 * 1000
+      const dialogs: DialogItem[] = [
+        { id: 'a1', title: 'Exchange hybrid migration planning', timestamp: new Date(now) },
+        { id: 'a2', title: 'VPN split-tunnel configuration review', timestamp: new Date(now) },
+        { id: 'a3', title: 'Decommissioning legacy file server', timestamp: new Date(now - day) },
+        { id: 'a4', title: 'Intune compliance policy rollout', timestamp: new Date(now - day) },
+      ]
+      return Promise.resolve({ dialogs, nextCursor: null })
+    },
+    unarchiveDialog: (id) => {
+      // eslint-disable-next-line no-console
+      console.log('[story] mingo unarchive', { id })
+      return Promise.resolve()
     },
   }
 }
@@ -350,6 +437,33 @@ export const BothModes: Story = {
         'How do I onboard a new device?',
         'Show me the audit log',
       ]}
+    />
+  ),
+  args: {},
+}
+
+// =============================================================================
+// 4. Returning user — Mingo with existing chats (Figma node 7532:223950)
+// =============================================================================
+
+/**
+ * Returning-user variation. The mock `fetchDialogs` resolves a page of dialog
+ * history, so `dialogs.length > 0` and the empty state switches to its
+ * returning-user form: the "New to OpenFrame?" notification is hidden and the
+ * "Start Guide Chat" chip drops from the accent yellow to the muted outline
+ * style. The dialog list itself renders inline via MingoChatHistory.
+ */
+export const ReturningUser: Story = {
+  render: (args) => (
+    <EmbeddableChat
+      {...args}
+      modes={{
+        guide: {},
+        mingo: createMockMingoConfigWithDialogs(),
+      }}
+      defaultActiveMode="mingo"
+      defaultOpen
+      showInternalTrigger={false}
     />
   ),
   args: {},

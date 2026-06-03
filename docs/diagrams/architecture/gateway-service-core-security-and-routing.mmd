@@ -1,0 +1,20 @@
+flowchart TD
+    Client["Client / Agent / UI"] --> Gateway["Gateway Service Core Security And Routing"]
+
+    subgraph security_layer["Security Layer"]
+        AuthHeader["AddAuthorizationHeaderFilter"]
+        JwtConfig["JwtAuthConfig"]
+        SecurityConfig["GatewaySecurityConfig"]
+        ApiKeyFilter["ApiKeyAuthenticationFilter"]
+        OriginFilter["OriginSanitizerFilter"]
+    end
+
+    subgraph routing_layer["Routing & Proxy Layer"]
+        IntegrationCtrl["IntegrationController"]
+        WsConfig["WebSocketGatewayConfig"]
+        UpstreamResolvers["ToolUpstreamResolvers"]
+    end
+
+    Gateway --> security_layer
+    security_layer --> routing_layer
+    routing_layer --> Upstream["Integrated Tools / NATS / Services"]

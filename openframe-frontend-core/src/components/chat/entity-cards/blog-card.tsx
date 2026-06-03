@@ -24,6 +24,8 @@ import Image from '../../../embed-shims/next-image'
 import { StatusBadge } from '../../ui/status-badge'
 import { cn } from '../../../utils/cn'
 import type { BlogPostSummary } from '../../../types/blog'
+import { useEntityCardLink } from './use-entity-card-link'
+import { useEntityCardPlaceholder } from './use-entity-card-placeholder'
 import {
   COMPACT_CARD_IMAGE_SLOT,
   COMPACT_CARD_META_ROW_BOX,
@@ -102,16 +104,26 @@ export function BlogCardSkeleton({ size = 'default' }: { size?: 'default' | 'sm'
 export function BlogCard({
   post,
   href,
-
-  target,
-
-  rel,
-  placeholderUrl,
+  target: targetProp,
+  rel: relProp,
+  targetPlatform,
+  placeholderUrl: placeholderUrlProp,
   size = 'default',
   className,
   hasEmbeddedVideo = false,
   priority = false,
 }: BlogCardProps) {
+  const { target, rel } = useEntityCardLink({
+    href,
+    targetPlatform,
+    target: targetProp,
+    rel: relProp,
+  })
+  const placeholderUrl = useEntityCardPlaceholder({
+    title: post.title,
+    placeholderUrl: placeholderUrlProp,
+    aspect: size === 'sm' ? 'square' : 'wide',
+  })
   const [imageError, setImageError] = useState(false)
   const displayImage = (post.featured_image && !imageError) ? post.featured_image : placeholderUrl
 

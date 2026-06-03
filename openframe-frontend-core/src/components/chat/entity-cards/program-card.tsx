@@ -40,6 +40,8 @@ import type {
   ProgramMedia,
   ProgramHost,
 } from '../types/entities/program-types'
+import { useEntityCardLink } from './use-entity-card-link'
+import { useEntityCardPlaceholder } from './use-entity-card-placeholder'
 
 type CardSize = 'default' | 'sm'
 
@@ -198,12 +200,24 @@ export function ProgramCard<T extends BaseProgramItem>({
   renderMeta,
   size = 'default',
   href,
-  target,
-  rel,
-  placeholderUrl,
+  target: targetProp,
+  rel: relProp,
+  targetPlatform,
+  placeholderUrl: placeholderUrlProp,
   wholeCardClickable = false,
   className,
 }: ProgramCardProps<T>) {
+  const { target, rel } = useEntityCardLink({
+    href,
+    targetPlatform,
+    target: targetProp,
+    rel: relProp,
+  })
+  const placeholderUrl = useEntityCardPlaceholder({
+    title: item.title,
+    placeholderUrl: placeholderUrlProp,
+    aspect: size === 'sm' ? 'square' : 'wide',
+  })
   const coverImage = item.cover_url
   const images = media.filter((m) => m.media_type === 'image')
   const hosts = getHosts(item.hosts)

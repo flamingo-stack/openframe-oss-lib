@@ -1,0 +1,5 @@
+flowchart TD
+    ServiceLayer["Service Layer"] --> QueryFilter["Query Filter"]
+    QueryFilter --> CustomRepository["Custom Repository Impl"]
+    CustomRepository --> CriteriaBuilder["Mongo Criteria Builder"]
+    CriteriaBuilder --> Mongo[("MongoDB Collection")]

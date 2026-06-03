@@ -1,5 +1,5 @@
 package com.openframe.data.document.ticket;
-
+import com.openframe.data.document.TenantScoped;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -10,34 +10,26 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.mapping.Document;
-
 import java.time.Instant;
-
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "ticket_statuses")
 @CompoundIndexes({
-        @CompoundIndex(name = "kind_unique", def = "{'kind': 1}", unique = true,
+        @CompoundIndex(name = "tenant_kind_unique", def = "{'tenantId': 1, 'kind': 1}", unique = true,
                 partialFilter = "{'kind': {$in: ['AI_ASSISTANCE', 'TECH_REQUIRED', 'RESOLVED', 'ARCHIVED']}}")
 })
-public class TicketStatusDefinition {
-
+public class TicketStatusDefinition implements TenantScoped {
     @Id
     private String id;
-
+    private String tenantId;
     private TicketStatusKind kind;
-
     private String name;
-
     private String color;
-
     private String position;
-
     @CreatedDate
     private Instant createdAt;
-
     @LastModifiedDate
     private Instant updatedAt;
 }

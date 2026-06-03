@@ -372,7 +372,7 @@ class NotificationLoadTestIT extends BaseMongoIntegrationTest {
         final int[] groups = {0};
         MeasurementStats stats = MeasurementStats.measure(WARMUP, SAMPLES, () ->
                 MeasurementStats.timeMillis(() -> {
-                    var counts = readStateRepository.unreadCountsByCategory(userId, RecipientType.USER);
+                    var counts = readStateRepository.unreadCountsByCategory(userId, RecipientType.USER, "test-tenant");
                     groups[0] = counts.size();
                     assertThat(counts).isNotEmpty();
                 }));

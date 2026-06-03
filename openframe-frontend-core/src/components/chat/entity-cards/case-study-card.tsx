@@ -17,6 +17,8 @@ import Image from '../../../embed-shims/next-image'
 import { Card } from '../../ui/card'
 import { cn } from '../../../utils/cn'
 import type { CaseStudy } from '../../../types/case-study'
+import { useEntityCardLink } from './use-entity-card-link'
+import { useEntityCardPlaceholder } from './use-entity-card-placeholder'
 import {
   COMPACT_CARD_IMAGE_SLOT,
   COMPACT_CARD_META_ROW_BOX,
@@ -88,7 +90,27 @@ export function CaseStudyCardSkeleton({ size = 'default' }: { size?: 'default' |
   )
 }
 
-export function CaseStudyCard({ study, href, target, rel, placeholderUrl, size = 'default', className }: CaseStudyCardProps) {
+export function CaseStudyCard({
+  study,
+  href,
+  target: targetProp,
+  rel: relProp,
+  targetPlatform,
+  placeholderUrl: placeholderUrlProp,
+  size = 'default',
+  className,
+}: CaseStudyCardProps) {
+  const { target, rel } = useEntityCardLink({
+    href,
+    targetPlatform,
+    target: targetProp,
+    rel: relProp,
+  })
+  const placeholderUrl = useEntityCardPlaceholder({
+    title: study.title,
+    placeholderUrl: placeholderUrlProp,
+    aspect: size === 'sm' ? 'square' : 'wide',
+  })
   const coverImage = study.featured_image || placeholderUrl || null
 
   if (size === 'sm') {

@@ -222,7 +222,30 @@ const SAFE_HTML_TAGS = new Set([
  *   3 — everything between the name and the closing `>` (attrs etc.)
  *   4 — optional `/` for void-element self-close
  */
-const TAG_LIKE_REGEX = /<(\/?)([a-zA-Z][a-zA-Z0-9-]*)([^>]*?)(\/?)>/g
+// ReDoS-safe shape (CodeQL polynomial-regex hardening):
+//
+// Every quantifier is hard-bounded so the engine has no possible
+// polynomial path. The original `[a-zA-Z0-9-]*` + `[^>]*?` admitted
+// O(n²) backtracking on `<A-----…` because both classes include `-`;
+// CodeQL flagged that as a polynomial regex. Bounding the tag-name
+// at 63 chars (covers every real HTML tag — `animateTransform` at 16
+// is the longest in practice) and the rest at 4096 chars (sane upper
+// bound for `<a href="…">` attribute strings) means matching is
+// constant-time per tag, NOT proportional to input length.
+//
+// Lazy `{0,4096}?` is deliberately lazy (not greedy) so the trailing
+// `(\/?)>` still captures the self-close `/` — greedy would swallow
+// the slash into the rest. Bounded lazy backtracking is constant-time
+// per match (capped at 4096 expansions), so the laziness is safe.
+//
+// Anything longer than 4159 chars per tag simply doesn't match —
+// falls through as plain text, the safe-degrade behavior for
+// HTML-in-markdown.
+//
+// Tag shapes still covered: `<a>`, `<a/>`, `<a class="x">`,
+// `<a class="x" />`, `</a>`, `<input type="text" />`,
+// `<custom-element data-foo="bar">`, `<animateTransform>`, etc.
+const TAG_LIKE_REGEX = /<(\/?)([a-zA-Z][a-zA-Z0-9-]{0,63})((?:\s[^>]{0,4096}?)?)(\/?)>/g
 
 function escapeUnknownHtmlTags(text: string): string {
   if (!text || text.indexOf('<') === -1) return text

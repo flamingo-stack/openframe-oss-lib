@@ -1,0 +1,5 @@
+flowchart TD
+    RetryStart["Retry Attempt"] --> OnError["onError()"]
+    OnError --> LogWarn["Log Warning"]
+    RetryEnd["Retry Complete"] --> Close
+    Close --> SuccessOrFail["Log Success Or Error"]

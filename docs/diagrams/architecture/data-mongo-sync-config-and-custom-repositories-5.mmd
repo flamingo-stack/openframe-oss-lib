@@ -1,0 +1,4 @@
+flowchart LR
+    Match["Match itemId"] --> Group["Group By targetType"]
+    Group --> Count["Count"]
+    Count --> MapResult["Map To EnumMap"]

@@ -1,0 +1,4 @@
+flowchart TD
+    NotificationContext --> Resolver
+    Resolver -->|"type discriminator"| TypeMap
+    TypeMap --> GraphQLType

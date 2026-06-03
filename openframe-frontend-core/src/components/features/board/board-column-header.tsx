@@ -1,7 +1,7 @@
 'use client'
 
 import { Button } from '../../ui/button/button'
-import { TicketStatusTag, getTicketStatusConfig } from '../../ui/ticket-status-tag'
+import { TicketStatusTag, resolveTicketStatus } from '../../ui/ticket-status-tag'
 import { Arrow02LeftIcon, Arrow02RightIcon, PlusIcon } from '../../icons-v2-generated'
 import type { BoardColumnDef } from './types'
 
@@ -19,7 +19,10 @@ export function BoardColumnHeader({
   onAddTicket,
 }: BoardColumnHeaderProps) {
   const count = column.total ?? column.tickets.length
-  const useStatusVariant = !!getTicketStatusConfig(column.id).icon
+  const tagStatus = column.statusKey ?? column.id
+  // Known statuses (ACTIVE, RESOLVED, …) render with their canonical Tag
+  // variant/icon; only unrecognized ids (custom-status UUIDs) fall back to `color`.
+  const useStatusVariant = resolveTicketStatus(tagStatus) !== null
 
   if (collapsed) {
     return (
@@ -34,7 +37,7 @@ export function BoardColumnHeader({
           <Arrow02RightIcon className="h-6 w-6 text-ods-text-secondary" />
         </Button>
         <TicketStatusTag
-          status={column.id}
+          status={tagStatus}
           label={column.label}
           color={useStatusVariant ? undefined : column.color}
           className="h-auto [writing-mode:vertical-rl]"
@@ -50,7 +53,7 @@ export function BoardColumnHeader({
     <div className="flex items-center gap-[var(--spacing-system-xsf)]">
       <div className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-xsf)]">
         <TicketStatusTag
-          status={column.id}
+          status={tagStatus}
           label={column.label}
           color={useStatusVariant ? undefined : column.color}
         />

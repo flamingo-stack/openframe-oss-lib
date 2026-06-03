@@ -1,0 +1,7 @@
+flowchart TD
+    ClientRequest["Client Request With Cursor"] --> ParseCursor["Parse ObjectId"]
+    ParseCursor --> LoadCursorDoc["Load Cursor Document"]
+    LoadCursorDoc --> CompareSortField["Compare Sort Field"]
+    CompareSortField --> AddCriteria["Add $or Criteria"]
+    AddCriteria --> ApplySort["Sort By Field And _id"]
+    ApplySort --> Limit["Apply Limit"]

@@ -1,0 +1,6 @@
+flowchart TD
+    AppConfig["Spring Context"] --> PinotConfig["PinotConfig"]
+    PinotConfig --> BrokerConn["pinotBrokerConnection()"]
+    PinotConfig --> ControllerConn["pinotControllerConnection()"]
+    BrokerConn --> PinotCluster["Pinot Broker"]
+    ControllerConn --> PinotController["Pinot Controller"]

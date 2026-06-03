@@ -1,6 +1,0 @@
-flowchart TD
-    Client --> Gateway
-    Gateway --> ExternalApi["External Api Service Core"]
-    ExternalApi --> CoreServices["Core Service Layer"]
-    CoreServices --> DataLayer["Mongo, Cassandra, Pinot"]
-    CoreServices --> Kafka["Kafka Messaging"]

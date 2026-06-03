@@ -2,6 +2,7 @@
 
 import { useRouter } from '../embed-shims/next-navigation';
 import { useChatRuntime } from '../contexts/chat-runtime-context';
+import { executeNavigationImperative } from './chat/utils/execute-navigation';
 import { useCallback } from 'react';
 import { OpenFrameLogo } from './icons';
 import { Button } from './ui/button';
@@ -39,15 +40,9 @@ export function FooterWaitlistButton({ className }: FooterWaitlistButtonProps) {
   const runtime = useChatRuntime();
 
   const handleClick = useCallback(() => {
-    const href = '/waitlist#top';
-    // Prefer the host's unified-nav callback (hub-wired
-    // `useUnifiedNav`). Falls back to the embed-shim's router when
-    // the host hasn't provided one.
-    if (runtime?.navigation?.navigate) {
-      const handled = runtime.navigation.navigate({ href });
-      if (handled) return;
-    }
-    router.push(href);
+    // The unified nav primitive: host `navigation.navigate` if wired, else the
+    // embed-shim router; new-tab/embed decision handled internally.
+    executeNavigationImperative({ runtime, href: '/waitlist#top', fallbackNavigate: router.push });
   }, [router, runtime]);
 
   return (

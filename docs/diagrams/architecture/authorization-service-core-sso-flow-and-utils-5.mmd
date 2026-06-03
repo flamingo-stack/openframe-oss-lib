@@ -1,0 +1,6 @@
+flowchart LR
+    SSOConfigService["SSO Config Service"] --> GoogleStrategy["Google Client Registration Strategy"]
+    SSOConfigService --> MicrosoftStrategy["Microsoft Client Registration Strategy"]
+
+    GoogleStrategy --> GoogleProps["Google SSO Properties"]
+    MicrosoftStrategy --> MicrosoftProps["Microsoft SSO Properties"]

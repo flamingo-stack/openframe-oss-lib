@@ -1,0 +1,4 @@
+flowchart TD
+    Request["GET /me"] --> AuthCheck["AuthPrincipal Present?"]
+    AuthCheck -->|"Yes"| Response["Return User Info"]
+    AuthCheck -->|"No"| Unauthorized["401 Unauthorized"]

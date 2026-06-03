@@ -40,8 +40,8 @@ import { useTicketsList } from './hooks/use-tickets-list'
 import { useTicketActions } from './hooks/use-ticket-actions'
 import { HelpCenterCard } from './help-center-card'
 import { HelpCenterCreateForm, HelpCenterCreateFormSkeleton } from './help-center-create-form'
-import type { AnyTicket, OptimisticTicket, TicketData } from './types'
-import { isOptimistic } from './types'
+import type { AnyTicket, OptimisticTicket, TicketsCacheSlot } from './types'
+import { isOptimistic, TICKET_LIVE_POLL_MS } from './types'
 
 export interface HelpCenterListProps {
   /** Toast override (test-friendly). Defaults to the lib's shared
@@ -57,6 +57,10 @@ export function HelpCenterList({ toast = defaultToast }: HelpCenterListProps = {
 
   const search = searchParams.get('search') || ''
   const status = searchParams.get('status') || 'all'
+  // Deep-link: `?ticket=<external_id>` auto-opens that ticket's drawer on load.
+  // Same GET-param plumbing as `?search=` — read here, drilled to the authed
+  // child which expands the matching row once it's in the fetched list.
+  const ticketParam = searchParams.get('ticket') || ''
   // 1-based page from the URL. `<UnifiedPagination>` writes `?page=N`
   // on navigation; we read it here and re-fetch on change. Invalid
   // values fall back to page 1.
@@ -108,6 +112,7 @@ export function HelpCenterList({ toast = defaultToast }: HelpCenterListProps = {
       search={search}
       status={status}
       page={page}
+      ticketParam={ticketParam}
       searchParams={searchParams}
       router={router}
       pathname={pathname}
@@ -122,6 +127,8 @@ interface AuthedProps {
   search: string
   status: string
   page: number
+  /** `?ticket=<external_id>` deep-link target — auto-opens that drawer. */
+  ticketParam: string
   searchParams: ReturnType<typeof useSearchParams>
   router: ReturnType<typeof useRouter>
   pathname: string
@@ -134,6 +141,7 @@ function HelpCenterListAuthed({
   search,
   status,
   page,
+  ticketParam,
   searchParams,
   router,
   pathname,
@@ -142,6 +150,26 @@ function HelpCenterListAuthed({
   sessionEmail,
 }: AuthedProps) {
   const queryClient = useQueryClient()
+  const [optimisticTickets, setOptimisticTickets] = useState<OptimisticTicket[]>([])
+  const [supportSystemDown, setSupportSystemDown] = useState(false)
+
+  // SINGLE source of truth for "which ticket is open" = the `?ticket=<external_id>`
+  // URL param (same model as `?search=` / `?status=`). Click-to-open and the
+  // deep-link path are now ONE code path: a click writes the param, the drawer's
+  // open state is DERIVED from the param. No separate `expandedTicketId` state,
+  // no auto-open effect, no re-open guard — opening, closing, deep-linking, and
+  // sharing a URL all flow through the same param.
+  const setOpenTicket = useCallback(
+    (externalId: string | null) => {
+      const params = new URLSearchParams(searchParams.toString())
+      if (externalId) params.set('ticket', externalId)
+      else params.delete('ticket')
+      const qs = params.toString()
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+    },
+    [searchParams, router, pathname],
+  )
+
   const { tickets, isLoading, isFetching, error, refetch, totalPages } = useTicketsList({
     // `sessionEmail` is drilled in from the parent — see the same
     // pattern + race-cause rationale documented in
@@ -153,11 +181,19 @@ function HelpCenterListAuthed({
     search,
     status,
     page,
+    // Live status: while a drawer is open, poll so an out-of-band HubSpot
+    // status change (e.g. agent closes the ticket) flips the badge +
+    // open/reopen affordance within one interval. Idle (no drawer) → no poll.
+    // `ticketParam` (the open ticket's external_id) is the open signal.
+    refetchInterval: ticketParam ? TICKET_LIVE_POLL_MS : false,
   })
 
-  const [optimisticTickets, setOptimisticTickets] = useState<OptimisticTicket[]>([])
-  const [expandedTicketId, setExpandedTicketId] = useState<string | null>(null)
-  const [supportSystemDown, setSupportSystemDown] = useState(false)
+  // Open state DERIVED from the URL param. `?ticket=` carries the user-facing
+  // `external_id`; map it to the internal row id the card matches on. Resolves
+  // to null until the ticket lands in the fetched list (deep-link cold load) and
+  // auto-collapses if the open ticket disappears (e.g. TICKET_NOT_FOUND removal).
+  const expandedTicketId =
+    (ticketParam && tickets.find((t) => t.external_id === ticketParam)?.id) || null
 
   // Optimistic cache management. Kept LOCAL (not in the query cache) so
   // a refetch (e.g. URL-filter change) doesn't blow away pending
@@ -168,18 +204,32 @@ function HelpCenterListAuthed({
   }, [])
   const removeOptimistic = useCallback((placeholderId: string) => {
     setOptimisticTickets((prev) => prev.filter((t) => t.id !== placeholderId))
-    setExpandedTicketId((prev) => (prev === placeholderId ? null : prev))
+    // No drawer-collapse needed: optimistic placeholders have no `external_id`,
+    // so they can never be the URL-derived open ticket.
   }, [])
   const removeTicketFromCache = useCallback(
     (ticketId: string) => {
       // Every cache slot under the ['tickets'] prefix — the queryKey
       // includes search + status + page + pageSize segments so a bare
       // write would miss most slots.
-      queryClient.setQueriesData<TicketData[] | undefined>(
+      //
+      // Cache slot is `TicketsCacheSlot` (`{ tickets, count, … }`), NOT
+      // a bare `TicketData[]`. The previous version called `.filter()`
+      // directly on the object — silently crashing only on the rare
+      // TICKET_NOT_FOUND path; the prod regression that landed
+      // 2026-05-29 surfaced the same shape mismatch in the
+      // close/reopen optimistic-update path. Project, filter, reassemble.
+      queryClient.setQueriesData<TicketsCacheSlot | undefined>(
         { queryKey: ['tickets'] },
-        (prev) => (prev ?? []).filter((t) => t.id !== ticketId),
+        (prev) => {
+          if (!prev || !Array.isArray(prev.tickets)) return prev
+          const nextTickets = prev.tickets.filter((t) => t.id !== ticketId)
+          if (nextTickets.length === prev.tickets.length) return prev
+          return { ...prev, tickets: nextTickets }
+        },
       )
-      setExpandedTicketId((prev) => (prev === ticketId ? null : prev))
+      // The drawer auto-collapses on its own: once the ticket leaves the list,
+      // the URL-derived `expandedTicketId` finds no match → null. No state to clear.
     },
     [queryClient],
   )
@@ -192,9 +242,18 @@ function HelpCenterListAuthed({
     onSupportSystemDown: () => setSupportSystemDown(true),
   })
 
-  const toggleRow = useCallback((id: string) => {
-    setExpandedTicketId((prev) => (prev === id ? null : id))
-  }, [])
+  // Toggle = write the URL param (open) or clear it (close). The clicked card's
+  // internal id maps to its `external_id` for the param; optimistic rows (no
+  // external_id) aren't expandable so they short-circuit. This is the ONE open
+  // path — a click, a deep link, and a shared URL are indistinguishable.
+  const toggleRow = useCallback(
+    (id: string) => {
+      const t = tickets.find((x) => x.id === id)
+      if (!t?.external_id) return
+      setOpenTicket(t.external_id === ticketParam ? null : t.external_id)
+    },
+    [tickets, ticketParam, setOpenTicket],
+  )
 
   const merged: AnyTicket[] = [...optimisticTickets, ...tickets]
   const hasActiveFilters = search !== '' || (status !== '' && status !== 'all')
@@ -284,7 +343,9 @@ function HelpCenterListAuthed({
                   onSendMessage={actions.sendMessage}
                   onClose={actions.closeTicket}
                   onReopen={actions.reopenTicket}
-                  onActionCollapsed={() => setExpandedTicketId(null)}
+                  onActionCollapsed={() => setOpenTicket(null)}
+                  replyError={actions.replyErrorFor(ticket.external_id)}
+                  onClearReplyError={() => actions.clearReplyError(ticket.external_id)}
                 />
               ))}
             </div>

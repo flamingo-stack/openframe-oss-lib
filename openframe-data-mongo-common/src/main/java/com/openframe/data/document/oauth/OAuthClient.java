@@ -1,14 +1,16 @@
 package com.openframe.data.document.oauth;
-
+import com.openframe.data.document.TenantScoped;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
-
 @Data
 @Document(collection = "oauth_clients")
-public class OAuthClient {
+public class OAuthClient implements TenantScoped {
     @Id
     private String id;
+    @Indexed
+    private String tenantId;
     private String clientId;
     private String clientSecret;
     private String machineId;
@@ -17,4 +19,4 @@ public class OAuthClient {
     private String[] scopes;
     private String[] roles = new String[]{};
     private boolean enabled = true;
-} 
+}

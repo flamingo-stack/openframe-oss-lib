@@ -8,6 +8,8 @@ export { NotificationDrawer } from './notification-drawer'
 export type { NotificationDrawerProps } from './notification-drawer'
 export { NotificationTile } from './notification-tile'
 export type { NotificationTileProps } from './notification-tile'
+export { NotificationPopups } from './notification-popups'
+export type { NotificationPopupsProps, NotificationPopupsPosition } from './notification-popups'
 export type {
   Notification,
   NotificationVariant,

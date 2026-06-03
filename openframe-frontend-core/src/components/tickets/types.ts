@@ -51,7 +51,28 @@ export interface TicketData {
    *  Channels, so this is the only reliable source for "what's the
    *  customer's name." */
   customer_name: string | null
+  /** HubSpot owner id of the agent assigned to this ticket. Carried as
+   *  raw id for debugging; rendering goes through `assignedOwner`. Null
+   *  when unassigned. */
+  assigned_to: string | null
+  /** Resolved assigned-owner profile — name + email + avatar. Populated
+   *  server-side via `attachOwnerProfiles` which joins through the
+   *  `hubspot_owners` mirror to `profiles` by email. Drives the
+   *  "Assigned to" attribution in the drawer header. Null when
+   *  unassigned OR the owner couldn't be resolved (rare — only when
+   *  the agent was deleted from HubSpot between the ticket update and
+   *  the next owners reconcile). */
+  assignedOwner: TicketAssignedOwner | null
   hubspot_updated_at: string
+}
+
+/** Resolved profile of a ticket's assigned agent — surfaced in the
+ *  drawer header. Subset of the server's `MirroredOwnerProfile`
+ *  trimmed to just the rendering fields. */
+export interface TicketAssignedOwner {
+  name: string | null
+  email: string | null
+  avatarUrl: string | null
 }
 
 /** Compact projection of a linked ClickUp task — matches the server's
@@ -119,9 +140,39 @@ export function isOptimistic(t: AnyTicket): t is OptimisticTicket {
 }
 
 /**
+ * Shape of a single `['tickets', …]` TanStack-Query cache slot.
+ * Mirrors `FindTicketResponse` in `hooks/use-tickets-list.ts` — kept
+ * here because the cache-mutation call sites in `useTicketActions` and
+ * `<HelpCenterList>` would otherwise have to redeclare the shape inline.
+ *
+ * A 2026-05-29 prod regression (`t.map is not a function` on
+ * close/reopen) was caused by assuming the cache held a bare
+ * `TicketData[]` instead of this wrapper — every helper that calls
+ * `queryClient.setQueriesData` / `getQueriesData` on `['tickets']`
+ * MUST type the value through this shape and project / reassemble
+ * `tickets` explicitly.
+ */
+export interface TicketsCacheSlot {
+  tickets?: TicketData[]
+  count?: number
+  totalCount?: number
+  page?: number
+  pageSize?: number
+  totalPages?: number
+  scope?: 'self' | 'all'
+}
+
+/**
  * Stable server-side error codes the ticket-action helpers route
  * through `mapTicketActionError`. Anything else is treated as a generic
  * server error.
+ *
+ * Reply-specific codes (`HUBSPOT_5XX` / `HUBSPOT_400_VALIDATION` /
+ * `HUBSPOT_404_THREAD` / `HUBSPOT_REPLY_UNKNOWN`) drive the drawer
+ * banner that appears above the composer when a customer reply fails.
+ * Distinct from `HUBSPOT_DISCONNECTED` (whole-system) and
+ * `TICKET_NOT_FOUND` (terminal-row) — the reply codes are per-attempt
+ * + retryable except for `HUBSPOT_404_THREAD`.
  */
 export type TicketActionErrorCode =
   | 'PROPOSAL_NOT_CLAIMABLE'
@@ -130,6 +181,10 @@ export type TicketActionErrorCode =
   | 'HUBSPOT_DISCONNECTED'
   | 'RATE_LIMITED'
   | 'INVALID_TOOL_ARGS'
+  | 'HUBSPOT_5XX'
+  | 'HUBSPOT_400_VALIDATION'
+  | 'HUBSPOT_404_THREAD'
+  | 'HUBSPOT_REPLY_UNKNOWN'
   | 'UNKNOWN'
 
 export interface MappedTicketActionError {
@@ -155,6 +210,20 @@ export interface MappedTicketActionError {
  * this so a future server-side hardening only touches one place.
  */
 export const TICKET_TEXT_MAX_CHARS = 5000
+
+/**
+ * Live-refresh cadence (ms) for an OPEN ticket drawer. Drives BOTH
+ * surfaces that must stay current while the customer is looking at a
+ * ticket:
+ *   - the ticket LIST poll (`useTicketsList.refetchInterval`) → surfaces
+ *     out-of-band status / pipeline / priority / assignee changes;
+ *   - the CONVERSATION poll (`useTicketEngagements.refetchInterval`) →
+ *     surfaces new agent replies + attachments.
+ * Single source of truth so the two surfaces never drift. Both leave
+ * `refetchIntervalInBackground` at its default (false), so polling pauses
+ * on a hidden tab — no wasted requests when the user tabs away.
+ */
+export const TICKET_LIVE_POLL_MS = 8000
 
 /**
  * Centralized toast copy. Keep all wording here so QA / localization

@@ -1,0 +1,5 @@
+flowchart LR
+    JWTRequest["JWKS or Token Signing"] --> TenantId["TenantContext.getTenantId()"]
+    TenantId --> KeyService["TenantKeyService.getOrCreateActiveKey"]
+    KeyService --> RSAKey["Tenant RSAKey"]
+    RSAKey --> JWKSet["JWKSet Returned"]

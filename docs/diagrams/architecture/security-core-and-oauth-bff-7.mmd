@@ -1,0 +1,8 @@
+sequenceDiagram
+    participant Browser
+    participant BFF
+    participant Auth as Authorization Server
+
+    Browser->>BFF: GET /oauth/logout
+    BFF->>Auth: Revoke refresh token
+    BFF->>Browser: Clear auth cookies

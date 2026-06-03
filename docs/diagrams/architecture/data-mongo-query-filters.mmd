@@ -1,0 +1,7 @@
+flowchart LR
+    ApiLayer["API Layer\nREST + GraphQL"] --> FilterDTOs["Filter Input DTOs"]
+    FilterDTOs --> QueryFilters["Data Mongo Query Filters"]
+    QueryFilters --> CustomRepos["Custom Mongo Repositories"]
+    CustomRepos --> MongoDB[("MongoDB")]
+
+    DomainModel["Domain Documents"] --> CustomRepos

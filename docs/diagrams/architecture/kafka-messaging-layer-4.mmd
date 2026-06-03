@@ -1,5 +1,0 @@
-flowchart TD
-    Broker["Kafka Cluster"] --> ConsumerFactory["ConsumerFactory"]
-    ConsumerFactory --> ContainerFactory["ListenerContainerFactory"]
-    ContainerFactory --> Listener["@KafkaListener"]
-    Listener --> Processor["Business Processor"]

@@ -1,0 +1,6 @@
+flowchart TD
+    Startup["Application Startup"] --> LoadTool["Load Tactical RMM Tool"]
+    LoadTool --> FetchScripts["Fetch Existing Scripts"]
+    FetchScripts --> Compare["Compare by Name"]
+    Compare -->|"Missing"| Create["Create Script"]
+    Compare -->|"Exists"| Update["Update Script"]

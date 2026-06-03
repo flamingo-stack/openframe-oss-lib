@@ -1,0 +1,6 @@
+flowchart TD
+    Client["API Client"] --> Controller["IntegratedToolController"]
+    Controller --> Save["IntegratedToolService.saveTool()"]
+    Save --> TenantCheck["TenantIdProvider"]
+    TenantCheck -->|"Registered"| Debezium["DebeziumService"]
+    Save --> Hooks["IntegratedToolPostSaveHook"]

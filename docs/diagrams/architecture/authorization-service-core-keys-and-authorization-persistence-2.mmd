@@ -1,0 +1,7 @@
+flowchart TD
+    Start["Generate Key Pair"] --> InitRandom["Initialize SecureRandom"]
+    InitRandom --> InitGenerator["Initialize KeyPairGenerator"]
+    InitGenerator --> Generate["Generate RSA KeyPair"]
+    Generate --> ConvertPem["Convert to PEM"]
+    ConvertPem --> CreateKid["Create kid UUID"]
+    CreateKid --> Result["Return AuthenticationKeyPair"]

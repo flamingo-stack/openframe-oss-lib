@@ -31,10 +31,11 @@
 
 import React, { type ReactNode } from 'react'
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context'
+import { useRouter } from '../../../embed-shims/next-navigation'
 import type { ChatRef } from '../chat-ref.types'
 import { useChatCardItem } from '../hooks/use-chat-card-item'
 import { handleChatNavClick } from '../utils/nav-click-handler'
-import { resolveSourceRowCTA, resolveSourceIcon } from '../utils/source-row-cta'
+import { resolveSourceRowCTA, resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-cta'
 import { resolveHrefForRuntime } from '../utils/chat-nav-resolution'
 import {
   computeIsNewTab,
@@ -866,6 +867,7 @@ function ChatCardNavWrap({
   children: ReactNode
 }) {
   const runtime = useRequiredChatRuntime()
+  const router = useRouter()
   const panel = useChatPanel()
   const onClickCapture = (e: React.MouseEvent<HTMLElement>) => {
     if (!href) return
@@ -879,7 +881,7 @@ function ChatCardNavWrap({
     if (targetEl?.closest?.('button')) return
     if (!targetEl?.closest?.('a')) return
 
-    const handled = handleChatNavClick(e, runtime, { href, path, targetPlatform })
+    const handled = handleChatNavClick(e, runtime, { href, path, targetPlatform }, router.push)
     if (!handled) return
     // Modifier-clicks fall through (handled=false) without stopPropagation
     // so ancestor telemetry handlers still see the bubble.
@@ -950,11 +952,7 @@ export function ChatCardLoader({
             ? (chatRef.metadata.path as string)
             : null,
       },
-      {
-        baseRoute,
-        chipBasePlatform,
-        currentPlatform: runtime.source,
-      },
+      sourceRowCtxFromRuntime(runtime, { baseRoute, chipBasePlatform }),
     )
     const finalHref = cta.href ? resolveHrefForRuntime(cta.href, runtime) : null
     return {
@@ -1016,6 +1014,27 @@ export function ChatCardLoader({
     </ChatCardNavWrap>
   )
   if (entry.mode === 'no-fetch') {
+    // Synthetic-ref gate. `chat-message-enhanced.tsx` builds a minimal
+    // `{ type, id, title: cardId, url: null }` ChatRef when the LLM
+    // emits `[card://<type>:<id>]` for an id the server did NOT
+    // surface (refs map miss) — typically an LLM hallucination of a
+    // composite/invented UUID. EVERY real ref carries `sourceRepo`
+    // (set by `buildChatRefFromRow` via `config.id` AND by
+    // `synthesizeVideoRefs` via `EMBEDDED_VIDEO_SOURCE_REPO`), so a
+    // missing `sourceRepo` is a reliable synthetic-ref signal.
+    //
+    // Returning null here triggers the bare-cardId fallback span in
+    // chat-message-enhanced's `<a card://...>` override — the
+    // documented "VISIBLE breakage" behavior. Without this gate, a
+    // hallucinated marker like `[card://markdown:f18945f8-<real-uuid>]`
+    // renders a `DataRoomDocChatCard` with the generic "Document"
+    // badge AND the fake id as the title — which the user can't tell
+    // apart from a real card (the entire point of the fallback
+    // comment block in chat-message-enhanced.tsx).
+    //
+    // Fetch-mode types already handle this gracefully: a synthetic
+    // id leads to a fetch miss → `!item` → null at line ~1034.
+    if (!finalChatRef.sourceRepo) return null
     if (entry.bareInline) {
       return navWrap(entry.render(finalChatRef, renderOpts))
     }

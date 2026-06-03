@@ -1,0 +1,4 @@
+flowchart LR
+    Scheduler["Scheduled Job"] --> LockProvider["RedisLockProvider"]
+    LockProvider --> Redis[("Redis")]
+    Redis --> LockKey["Tenant Scoped Lock Key"]

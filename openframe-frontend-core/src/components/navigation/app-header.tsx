@@ -10,6 +10,7 @@ import { Menu01Icon, SearchIcon, XmarkIcon } from '../icons-v2-generated'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, SquareAvatar } from '../ui'
 import { HeaderButton } from './header-button'
 import { HeaderGlobalSearch } from './header-global-search'
+import { HeaderMingoButton } from './header-mingo-button'
 import { HeaderOrganizationFilter } from './header-organization-filter'
 
 export interface AppHeaderProps {
@@ -21,6 +22,13 @@ export interface AppHeaderProps {
   onOrgChange?: (id: string) => void
   showNotifications?: boolean
   unreadCount?: number
+  /** Render the "Mingo AI" launcher button (drawer-style trigger for an
+   *  in-layout `AppLayoutDrawer` hosting the chat panel). Defaults to off. */
+  showMingoAI?: boolean
+  /** Click handler for the Mingo AI button — typically toggles the drawer. */
+  onMingoAI?: () => void
+  /** Whether the Mingo drawer is currently open (visually pressed state). */
+  isMingoAIActive?: boolean
   // User block
   showUser?: boolean
   userName?: string
@@ -49,6 +57,9 @@ export const AppHeader = React.memo(function AppHeader({
   onOrgChange,
   showNotifications,
   unreadCount = 0,
+  showMingoAI = false,
+  onMingoAI,
+  isMingoAIActive = false,
   showUser,
   userName,
   userEmail,
@@ -192,6 +203,18 @@ export const AppHeader = React.memo(function AppHeader({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+      )}
+
+      {/* Mingo AI launcher — anchored at the very end of the header. On mobile
+          it collapses to an icon-only affordance (no "Mingo AI" wordmark). */}
+      {showMingoAI && (
+        <HeaderMingoButton
+          onClick={onMingoAI}
+          isActive={isMingoAIActive}
+          iconOnly={!isMdUp}
+          disabled={disabled || !onMingoAI}
+          className={dimmedClass}
+        />
       )}
     </header>
   )

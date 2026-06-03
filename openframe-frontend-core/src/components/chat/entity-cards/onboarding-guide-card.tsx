@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * OnboardingGuideCard (pure presentation).
+ * OnboardingGuideCard (pure presentation + runtime-derived link attrs).
  *
  * Three variants:
  *   - `catalog`: rich detail card (hero + author grid) for the public catalog
@@ -9,18 +9,24 @@
  *   - `default`: horizontal step-numbered card for "More in {section}" rail.
  *   - `sm`: compact horizontal card for chat-inline rendering.
  *
- * The card writes NO click logic — callers wrap with their own anchor and
- * pass the resolved detail URL via `href`.
+ * Link semantics: the card derives `target`/`rel` from `ChatRuntime.navigation
+ * .decideNewTab` (hub-wired via `HubRuntimeProvider`) and the placeholder
+ * image from `ChatRuntime.resolvePlaceholderUrl`. Explicit `target` / `rel`
+ * / `placeholderUrl` props always WIN — chat dispatch and tests can
+ * pre-resolve. No runtime mounted → same-tab + no placeholder.
  */
 
 import React from 'react'
 import Image from '../../../embed-shims/next-image'
+import Link from '../../../embed-shims/next-link'
 import { Clock, ExternalLink, GraduationCap, Play } from 'lucide-react'
 import { cn } from '../../../utils/cn'
 import { BlogImagePlaceholder } from './blog-image-placeholder'
 import { EntityAuthorCard } from './entity-author-card'
 import { formatDurationMMSS } from '../../../utils/format'
 import type { OnboardingGuide } from '../types/entities/onboarding-guide'
+import { useEntityCardLink } from './use-entity-card-link'
+import { useEntityCardPlaceholder } from './use-entity-card-placeholder'
 import {
   COMPACT_CARD_OUTER,
   COMPACT_CARD_IMAGE_SLOT,
@@ -134,7 +140,28 @@ export function OnboardingGuideCardSkeleton({ size = 'default' }: { size?: 'cata
   )
 }
 
-export function OnboardingGuideCard({ guide, href, target, rel, placeholderUrl, size = 'default', className }: OnboardingGuideCardProps) {
+export function OnboardingGuideCard({
+  guide,
+  href,
+  target: targetProp,
+  rel: relProp,
+  targetPlatform,
+  placeholderUrl: placeholderUrlProp,
+  size = 'default',
+  className,
+}: OnboardingGuideCardProps) {
+  const { target, rel } = useEntityCardLink({
+    href,
+    targetPlatform,
+    target: targetProp,
+    rel: relProp,
+  })
+  const placeholderUrl = useEntityCardPlaceholder({
+    title: guide.title,
+    placeholderUrl: placeholderUrlProp,
+    aspect: size === 'sm' ? 'square' : 'wide',
+  })
+
   if (size === 'catalog') {
     const coverImage =
       guide.featured_image ||
@@ -152,10 +179,11 @@ export function OnboardingGuideCard({ guide, href, target, rel, placeholderUrl, 
         : ''
 
     return (
-      <a
+      <Link
         href={href}
         target={target}
         rel={rel}
+        prefetch={false}
         className={cn(
           'group block no-underline bg-ods-system-greys-black',
           'border border-ods-border rounded-lg overflow-hidden',
@@ -227,7 +255,7 @@ export function OnboardingGuideCard({ guide, href, target, rel, placeholderUrl, 
             ]}
           />
         </div>
-      </a>
+      </Link>
     )
   }
 
@@ -243,7 +271,7 @@ export function OnboardingGuideCard({ guide, href, target, rel, placeholderUrl, 
       author,
     ].filter((s): s is string => typeof s === 'string' && s.length > 0)
     return (
-      <a href={href} target={target} rel={rel} className={cn(COMPACT_CARD_OUTER, className)}>
+      <Link href={href} target={target} rel={rel} prefetch={false} className={cn(COMPACT_CARD_OUTER, className)}>
         <span className={COMPACT_CARD_IMAGE_SLOT}>
           {compactCover ? (
             <Image
@@ -285,7 +313,7 @@ export function OnboardingGuideCard({ guide, href, target, rel, placeholderUrl, 
         <span className="flex shrink-0 items-center self-start h-5 text-ods-text-secondary">
           <ExternalLink className="w-3.5 h-3.5" />
         </span>
-      </a>
+      </Link>
     )
   }
 
@@ -294,10 +322,11 @@ export function OnboardingGuideCard({ guide, href, target, rel, placeholderUrl, 
   const summary = (guide.video_summary || guide.content || '').trim()
 
   return (
-    <a
+    <Link
       href={href}
       target={target}
       rel={rel}
+      prefetch={false}
       className={cn(
         `flex items-start gap-3 rounded-md border border-ods-border bg-ods-card hover:border-ods-accent transition-colors ${t.padding}`,
         className,
@@ -321,6 +350,6 @@ export function OnboardingGuideCard({ guide, href, target, rel, placeholderUrl, 
           </span>
         )}
       </span>
-    </a>
+    </Link>
   )
 }
