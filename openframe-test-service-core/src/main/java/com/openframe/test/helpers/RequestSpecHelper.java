@@ -11,20 +11,28 @@ import io.restassured.filter.log.RequestLoggingFilter;
 import io.restassured.http.ContentType;
 import io.restassured.specification.RequestSpecification;
 import io.restassured.specification.ResponseSpecification;
-import static org.hamcrest.Matchers.nullValue;
+import org.apache.http.client.HttpClient;
+import org.apache.http.conn.ConnectTimeoutException;
+import org.apache.http.impl.client.SystemDefaultHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.net.ConnectException;
 import java.time.Duration;
 import java.util.Map;
 
 import static com.openframe.test.config.EnvironmentConfig.getAuthUrl;
+import static org.hamcrest.Matchers.nullValue;
 
 public class RequestSpecHelper {
 
-    private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(32);
+    // Connect fails fast so a dropped SYN (hairpin blip) is retried promptly instead of hanging;
+    // socket timeout stays generous because the server itself can be slow to respond.
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration SOCKET_TIMEOUT = Duration.ofSeconds(32);
+    private static final int CONNECT_RETRIES = 2;
     private static final Logger log = LoggerFactory.getLogger(RequestSpecHelper.class);
     private static final PrintStream SLF4J_STREAM = new PrintStream(new Slf4jOutputStream(log), true);
 
@@ -83,9 +91,7 @@ public class RequestSpecHelper {
                                 .defaultStream(SLF4J_STREAM)
                                 .enableLoggingOfRequestAndResponseIfValidationFails())
                         .sslConfig(SSLConfig.sslConfig().relaxedHTTPSValidation())
-                        .httpClient(HttpClientConfig.httpClientConfig()
-                                .setParam("http.connection.timeout", (int) DEFAULT_TIMEOUT.toMillis())
-                                .setParam("http.socket.timeout", (int) DEFAULT_TIMEOUT.toMillis())))
+                        .httpClient(retryingHttpClientConfig()))
                 .setBaseUri(getBaseUrl())
                 .setContentType(ContentType.JSON);
         if (enableLogging) {
@@ -102,14 +108,42 @@ public class RequestSpecHelper {
                                 .defaultStream(SLF4J_STREAM)
                                 .enableLoggingOfRequestAndResponseIfValidationFails())
                         .sslConfig(SSLConfig.sslConfig().relaxedHTTPSValidation())
-                        .httpClient(HttpClientConfig.httpClientConfig()
-                                .setParam("http.connection.timeout", (int) DEFAULT_TIMEOUT.toMillis())
-                                .setParam("http.socket.timeout", (int) DEFAULT_TIMEOUT.toMillis())))
+                        .httpClient(retryingHttpClientConfig()))
                 .setBaseUri(getAuthUrl());
         if (enableLogging) {
             builder.addFilter(new RequestLoggingFilter(SLF4J_STREAM));
         }
         return builder.build();
+    }
+
+    private static HttpClientConfig retryingHttpClientConfig() {
+        return HttpClientConfig.httpClientConfig()
+                .httpClientFactory(RequestSpecHelper::createRetryingHttpClient)
+                .setParam("http.connection.timeout", (int) CONNECT_TIMEOUT.toMillis())
+                .setParam("http.socket.timeout", (int) SOCKET_TIMEOUT.toMillis());
+    }
+
+    /**
+     * Apache HttpClient (RestAssured 5.x still drives the 4.x client) with a retry handler that retries
+     * only connection-establishment failures. A connect failure means the request never reached the
+     * server, so re-sending is side-effect-free even for non-idempotent mutations — unlike a read
+     * timeout after the request was sent, which we deliberately do not retry.
+     */
+    @SuppressWarnings("deprecation") // SystemDefaultHttpClient is the client RestAssured itself defaults to
+    private static HttpClient createRetryingHttpClient() {
+        SystemDefaultHttpClient client = new SystemDefaultHttpClient();
+        client.setHttpRequestRetryHandler((exception, executionCount, context) -> {
+            // ConnectException also covers HttpHostConnectException (connection refused).
+            boolean connectFailure = exception instanceof ConnectTimeoutException
+                    || exception instanceof ConnectException;
+            if (connectFailure && executionCount <= CONNECT_RETRIES) {
+                log.warn("Connect attempt {} failed ({}); retrying", executionCount,
+                        exception.getClass().getSimpleName());
+                return true;
+            }
+            return false;
+        });
+        return client;
     }
 
     private static class Slf4jOutputStream extends OutputStream {
