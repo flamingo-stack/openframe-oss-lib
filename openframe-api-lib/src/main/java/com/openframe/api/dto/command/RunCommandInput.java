@@ -1,6 +1,6 @@
 package com.openframe.api.dto.command;
 
-import com.openframe.data.document.rmm.CommandInitiator;
+import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.document.rmm.ScriptShell;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -23,7 +23,7 @@ public class RunCommandInput {
     private ScriptShell shell;
 
     @NotNull
-    private CommandInitiator initiator;
+    private PrivilegeLevel privilegeLevel;
 
     @Positive
     private Integer timeoutSeconds;

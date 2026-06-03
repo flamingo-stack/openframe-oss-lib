@@ -1,6 +1,6 @@
 package com.openframe.data.document.rmm;
 
-public enum CommandInitiator {
+public enum PrivilegeLevel {
     USER,
     ADMIN
 }

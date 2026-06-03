@@ -14,11 +14,11 @@ input RunCommandInput {
     machineId: String!
     shell: ScriptShell!
     command: String!
-    initiator: CommandInitiator!
+    privilegeLevel: PrivilegeLevel!
     timeoutSeconds: Int
 }
 
-enum CommandInitiator {
+enum PrivilegeLevel {
     USER
     ADMIN
 }

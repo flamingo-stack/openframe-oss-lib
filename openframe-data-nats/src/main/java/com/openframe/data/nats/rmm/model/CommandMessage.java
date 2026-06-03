@@ -1,7 +1,7 @@
 package com.openframe.data.nats.rmm.model;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.openframe.data.document.rmm.CommandInitiator;
+import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.document.rmm.ScriptShell;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -23,7 +23,7 @@ import lombok.NoArgsConstructor;
  *   "executionId": "01HXYZ...",
  *   "code": "echo hello",
  *   "shell": "BASH",
- *   "initiator": "ADMIN",
+ *   "privilegeLevel": "ADMIN",
  *   "timeout": 30
  * }
  * }</pre>
@@ -41,7 +41,7 @@ public class CommandMessage {
 
     private ScriptShell shell;
 
-    private CommandInitiator initiator;
+    private PrivilegeLevel privilegeLevel;
 
     private Integer timeout;
 }
