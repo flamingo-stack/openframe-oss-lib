@@ -11,7 +11,6 @@ import io.restassured.filter.log.RequestLoggingFilter;
 import io.restassured.http.ContentType;
 import io.restassured.specification.RequestSpecification;
 import io.restassured.specification.ResponseSpecification;
-import static org.hamcrest.Matchers.nullValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,10 +20,15 @@ import java.time.Duration;
 import java.util.Map;
 
 import static com.openframe.test.config.EnvironmentConfig.getAuthUrl;
+import static org.hamcrest.Matchers.nullValue;
 
 public class RequestSpecHelper {
 
-    private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(32);
+    // Connect fails fast so a dropped SYN (hairpin blip) is retried promptly instead of hanging;
+    // socket timeout stays generous because the server itself can be slow to respond.
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration SOCKET_TIMEOUT = Duration.ofSeconds(32);
+    private static final int CONNECT_RETRIES = 2;
     private static final Logger log = LoggerFactory.getLogger(RequestSpecHelper.class);
     private static final PrintStream SLF4J_STREAM = new PrintStream(new Slf4jOutputStream(log), true);
 
@@ -84,10 +88,11 @@ public class RequestSpecHelper {
                                 .enableLoggingOfRequestAndResponseIfValidationFails())
                         .sslConfig(SSLConfig.sslConfig().relaxedHTTPSValidation())
                         .httpClient(HttpClientConfig.httpClientConfig()
-                                .setParam("http.connection.timeout", (int) DEFAULT_TIMEOUT.toMillis())
-                                .setParam("http.socket.timeout", (int) DEFAULT_TIMEOUT.toMillis())))
+                                .setParam("http.connection.timeout", (int) CONNECT_TIMEOUT.toMillis())
+                                .setParam("http.socket.timeout", (int) SOCKET_TIMEOUT.toMillis())))
                 .setBaseUri(getBaseUrl())
-                .setContentType(ContentType.JSON);
+                .setContentType(ContentType.JSON)
+                .addFilter(new RetryFilter(CONNECT_RETRIES));
         if (enableLogging) {
             builder.addFilter(new RequestLoggingFilter(SLF4J_STREAM));
 
@@ -103,9 +108,10 @@ public class RequestSpecHelper {
                                 .enableLoggingOfRequestAndResponseIfValidationFails())
                         .sslConfig(SSLConfig.sslConfig().relaxedHTTPSValidation())
                         .httpClient(HttpClientConfig.httpClientConfig()
-                                .setParam("http.connection.timeout", (int) DEFAULT_TIMEOUT.toMillis())
-                                .setParam("http.socket.timeout", (int) DEFAULT_TIMEOUT.toMillis())))
-                .setBaseUri(getAuthUrl());
+                                .setParam("http.connection.timeout", (int) CONNECT_TIMEOUT.toMillis())
+                                .setParam("http.socket.timeout", (int) SOCKET_TIMEOUT.toMillis())))
+                .setBaseUri(getAuthUrl())
+                .addFilter(new RetryFilter(CONNECT_RETRIES));
         if (enableLogging) {
             builder.addFilter(new RequestLoggingFilter(SLF4J_STREAM));
         }
