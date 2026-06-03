@@ -42,9 +42,9 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
     @Override
     public void processMachineSave(Machine machine) {
         try {
-            log.info("Processing machine save event: {}", machine);
+            log.debug("Processing machine save event: {}", machine);
             sendMachineEventToKafka(machine);
-            log.info("Machine event processed successfully");
+            log.debug("Machine event processed successfully: machineId={}", machine.getMachineId());
         } catch (Exception e) {
             log.error("Error processing machine save event: {}", e.getMessage(), e);
         }
@@ -53,7 +53,7 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
     @Override
     public void processMachineSaveAll(Iterable<Machine> machines) {
         try {
-            log.info("Processing machine saveAll event: {} machines", machines);
+            log.debug("Processing machine saveAll event: {} machines", machines);
             for (Machine machine : machines) {
                 sendMachineEventToKafka(machine);
             }
@@ -65,7 +65,7 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
     @Override
     public void processTagAssignmentSave(TagAssignment assignment) {
         try {
-            log.info("Processing tag assignment save event: {}", assignment);
+            log.debug("Processing tag assignment save event: {}", assignment);
             if (assignment.getEntityType() != TagEntityType.DEVICE) {
                 log.debug("Skipping non-DEVICE tag assignment: {}", assignment.getEntityType());
                 return;
@@ -80,7 +80,7 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
     @Override
     public void processTagAssignmentSaveAll(Iterable<TagAssignment> assignments) {
         try {
-            log.info("Processing tag assignment saveAll event: {} assignments", assignments);
+            log.debug("Processing tag assignment saveAll event: {} assignments", assignments);
 
             // Group by entityId to avoid duplicate processing
             Set<String> processedEntityIds = new HashSet<>();
@@ -102,9 +102,9 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
     @Override
     public void processTagSave(Tag tag) {
         try {
-            log.info("Processing tag save event: {}", tag);
+            log.debug("Processing tag save event: {}", tag);
             sendTagEventToKafka(tag);
-            log.info("Tag event processed successfully");
+            log.debug("Tag event processed successfully: tagId={}", tag.getId());
         } catch (Exception e) {
             log.error("Error processing tag save event: {}", e.getMessage(), e);
         }
@@ -113,7 +113,7 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
     @Override
     public void processTagSaveAll(Iterable<Tag> tags) {
         try {
-            log.info("Processing tag saveAll event: {} tags", tags);
+            log.debug("Processing tag saveAll event: {} tags", tags);
 
             // Process each tag
             for (Tag tag : tags) {
@@ -216,7 +216,7 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
             // Build MachinePinotMessage with complete data
             MachinePinotMessage message = buildMachinePinotMessage(machineEntity, machineTags);
 
-            ossTenantKafkaProducer.publish(machineEventsTopic,  machineEntity.getMachineId(), message);
+            ossTenantKafkaProducer.publish(machineEventsTopic, machineEntity.getMachineId(), message);
         } catch (Exception e) {
             log.error("Error sending machine event to Kafka for machine {}: {}",
                     machineEntity.getMachineId(), e.getMessage(), e);
@@ -324,7 +324,7 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
      * Used by delete handlers where the TagAssignment list must exclude the tag being removed.
      */
     private MachinePinotMessage buildMachinePinotMessageFromParts(Machine machine, List<Tag> tags,
-                                                                   List<TagAssignment> assignments) {
+                                                                  List<TagAssignment> assignments) {
         Map<String, TagAssignment> assignmentByTagId = assignments.stream()
                 .collect(Collectors.toMap(TagAssignment::getTagId, a -> a, (a, b) -> a));
 
