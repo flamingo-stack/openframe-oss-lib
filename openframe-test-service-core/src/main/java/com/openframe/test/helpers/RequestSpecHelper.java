@@ -11,11 +11,15 @@ import io.restassured.filter.log.RequestLoggingFilter;
 import io.restassured.http.ContentType;
 import io.restassured.specification.RequestSpecification;
 import io.restassured.specification.ResponseSpecification;
+import org.apache.http.client.HttpClient;
+import org.apache.http.conn.ConnectTimeoutException;
+import org.apache.http.impl.client.SystemDefaultHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.net.ConnectException;
 import java.time.Duration;
 import java.util.Map;
 
@@ -87,12 +91,9 @@ public class RequestSpecHelper {
                                 .defaultStream(SLF4J_STREAM)
                                 .enableLoggingOfRequestAndResponseIfValidationFails())
                         .sslConfig(SSLConfig.sslConfig().relaxedHTTPSValidation())
-                        .httpClient(HttpClientConfig.httpClientConfig()
-                                .setParam("http.connection.timeout", (int) CONNECT_TIMEOUT.toMillis())
-                                .setParam("http.socket.timeout", (int) SOCKET_TIMEOUT.toMillis())))
+                        .httpClient(retryingHttpClientConfig()))
                 .setBaseUri(getBaseUrl())
-                .setContentType(ContentType.JSON)
-                .addFilter(new RetryFilter(CONNECT_RETRIES));
+                .setContentType(ContentType.JSON);
         if (enableLogging) {
             builder.addFilter(new RequestLoggingFilter(SLF4J_STREAM));
 
@@ -107,15 +108,42 @@ public class RequestSpecHelper {
                                 .defaultStream(SLF4J_STREAM)
                                 .enableLoggingOfRequestAndResponseIfValidationFails())
                         .sslConfig(SSLConfig.sslConfig().relaxedHTTPSValidation())
-                        .httpClient(HttpClientConfig.httpClientConfig()
-                                .setParam("http.connection.timeout", (int) CONNECT_TIMEOUT.toMillis())
-                                .setParam("http.socket.timeout", (int) SOCKET_TIMEOUT.toMillis())))
-                .setBaseUri(getAuthUrl())
-                .addFilter(new RetryFilter(CONNECT_RETRIES));
+                        .httpClient(retryingHttpClientConfig()))
+                .setBaseUri(getAuthUrl());
         if (enableLogging) {
             builder.addFilter(new RequestLoggingFilter(SLF4J_STREAM));
         }
         return builder.build();
+    }
+
+    private static HttpClientConfig retryingHttpClientConfig() {
+        return HttpClientConfig.httpClientConfig()
+                .httpClientFactory(RequestSpecHelper::createRetryingHttpClient)
+                .setParam("http.connection.timeout", (int) CONNECT_TIMEOUT.toMillis())
+                .setParam("http.socket.timeout", (int) SOCKET_TIMEOUT.toMillis());
+    }
+
+    /**
+     * Apache HttpClient (RestAssured 5.x still drives the 4.x client) with a retry handler that retries
+     * only connection-establishment failures. A connect failure means the request never reached the
+     * server, so re-sending is side-effect-free even for non-idempotent mutations — unlike a read
+     * timeout after the request was sent, which we deliberately do not retry.
+     */
+    @SuppressWarnings("deprecation") // SystemDefaultHttpClient is the client RestAssured itself defaults to
+    private static HttpClient createRetryingHttpClient() {
+        SystemDefaultHttpClient client = new SystemDefaultHttpClient();
+        client.setHttpRequestRetryHandler((exception, executionCount, context) -> {
+            // ConnectException also covers HttpHostConnectException (connection refused).
+            boolean connectFailure = exception instanceof ConnectTimeoutException
+                    || exception instanceof ConnectException;
+            if (connectFailure && executionCount <= CONNECT_RETRIES) {
+                log.warn("Connect attempt {} failed ({}); retrying", executionCount,
+                        exception.getClass().getSimpleName());
+                return true;
+            }
+            return false;
+        });
+        return client;
     }
 
     private static class Slf4jOutputStream extends OutputStream {
