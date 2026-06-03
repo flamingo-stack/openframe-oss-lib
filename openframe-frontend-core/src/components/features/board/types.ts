@@ -44,6 +44,7 @@ export interface BoardColumnDef {
   dropDisabled?: boolean
   dragDisabled?: boolean
   allowedFromColumns?: string[]
+  archivable?: boolean
 }
 
 export interface BoardChange {
@@ -82,6 +83,7 @@ export function columnFromTicketStatus(
     dropDisabled: overrides.dropDisabled,
     dragDisabled: overrides.dragDisabled,
     allowedFromColumns: overrides.allowedFromColumns,
+    archivable: overrides.archivable,
   }
 }
 
