@@ -14,7 +14,13 @@ input RunCommandInput {
     machineId: String!
     shell: ScriptShell!
     command: String!
+    initiator: CommandInitiator!
     timeoutSeconds: Int
+}
+
+enum CommandInitiator {
+    USER
+    ADMIN
 }
 
 type CommandDispatchResponse {
