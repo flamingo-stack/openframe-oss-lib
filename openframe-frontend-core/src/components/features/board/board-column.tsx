@@ -16,6 +16,7 @@ export interface BoardColumnProps {
   collapsed?: boolean
   onToggleCollapse: () => void
   onAddTicket?: (columnId: string) => void
+  onArchive?: (columnId: string) => void
   getTicketHref?: (ticketId: string) => string
   renderAssignSlot?: (ticket: BoardTicket) => React.ReactNode
   onLoadMore?: (columnId: string) => void
@@ -29,6 +30,7 @@ export function BoardColumn({
   collapsed = false,
   onToggleCollapse,
   onAddTicket,
+  onArchive,
   getTicketHref,
   renderAssignSlot,
   onLoadMore,
@@ -53,6 +55,7 @@ export function BoardColumn({
         collapsed={collapsed}
         onToggleCollapse={onToggleCollapse}
         onAddTicket={!collapsed && onAddTicket ? () => onAddTicket(column.id) : undefined}
+        onArchive={!collapsed && column.archivable && onArchive ? () => onArchive(column.id) : undefined}
       />
       {!collapsed && (
         <>

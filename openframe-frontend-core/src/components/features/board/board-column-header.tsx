@@ -2,7 +2,7 @@
 
 import { Button } from '../../ui/button/button'
 import { TicketStatusTag, resolveTicketStatus } from '../../ui/ticket-status-tag'
-import { Arrow02LeftIcon, Arrow02RightIcon, PlusIcon } from '../../icons-v2-generated'
+import { Arrow02LeftIcon, Arrow02RightIcon, BoxArchiveIcon, PlusIcon } from '../../icons-v2-generated'
 import type { BoardColumnDef } from './types'
 
 export interface BoardColumnHeaderProps {
@@ -10,6 +10,7 @@ export interface BoardColumnHeaderProps {
   collapsed?: boolean
   onToggleCollapse: () => void
   onAddTicket?: () => void
+  onArchive?: () => void
 }
 
 export function BoardColumnHeader({
@@ -17,6 +18,7 @@ export function BoardColumnHeader({
   collapsed = false,
   onToggleCollapse,
   onAddTicket,
+  onArchive,
 }: BoardColumnHeaderProps) {
   const count = column.total ?? column.tickets.length
   const tagStatus = column.statusKey ?? column.id
@@ -74,6 +76,17 @@ export function BoardColumnHeader({
         >
           <Arrow02LeftIcon className="h-6 w-6 text-ods-text-secondary" />
         </Button>
+        {onArchive && (
+          <Button
+            variant="transparent"
+            size="icon"
+            className="h-8 w-8 md:h-8 md:w-8 p-0"
+            onClick={onArchive}
+            aria-label="Archive resolved tickets"
+          >
+            <BoxArchiveIcon className="h-6 w-6 text-ods-text-secondary" />
+          </Button>
+        )}
         {onAddTicket && (
           <Button
             variant="transparent"
