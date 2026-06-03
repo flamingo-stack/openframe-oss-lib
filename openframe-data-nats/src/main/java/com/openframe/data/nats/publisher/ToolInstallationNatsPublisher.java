@@ -50,7 +50,7 @@ public class ToolInstallationNatsPublisher {
 
     private ToolInstallationMessage buildMessage(IntegratedToolAgent toolAgent, IntegratedTool tool, boolean reinstall) {
         ToolInstallationMessage message = new ToolInstallationMessage();
-        message.setToolAgentId(toolAgent.getKey());
+        message.setToolAgentId(toolAgent.getId());
         // TODO: need refactoring
         message.setToolId(toolAgent.getToolId() == null ? "" : toolAgent.getToolId());
         message.setToolType(tool.getToolType() == null ? "" : tool.getToolType());

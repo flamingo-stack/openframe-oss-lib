@@ -17,7 +17,7 @@ public class ReleaseVersionQueryService {
 
     public Optional<ReleaseVersion> getReleaseVersion() {
         log.debug("Retrieving current release version");
-        return releaseVersionRepository.findFirstBy();
+        return releaseVersionRepository.findById(ReleaseVersion.DEFAULT_ID);
     }
 }
 

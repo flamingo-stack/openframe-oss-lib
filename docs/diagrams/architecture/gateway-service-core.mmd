@@ -1,0 +1,12 @@
+flowchart LR
+    Client["Client / Browser"] --> Gateway["Gateway Service Core"]
+    Agent["Tool Agent"] --> Gateway
+
+    Gateway --> ApiService["API Service Core"]
+    Gateway --> ExternalApi["External API Service Core"]
+    Gateway --> AuthService["Authorization Service Core"]
+    Gateway --> Tools["Integrated Tools"]
+    Gateway --> Nats["NATS WebSocket Endpoint"]
+
+    Gateway --> Mongo["Mongo Persistence Layer"]
+    Gateway --> Redis["Redis Caching Layer"]

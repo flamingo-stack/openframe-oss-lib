@@ -21,9 +21,6 @@ interface NotificationsContextValue {
   toggle: () => void
   setShowPopups: (value: boolean) => void
   onHistoryClick?: () => void
-  hasMore: boolean
-  isLoadingMore: boolean
-  loadMore?: () => void
 }
 
 const NotificationsContext = React.createContext<NotificationsContextValue | null>(null)
@@ -47,10 +44,6 @@ export interface NotificationsProviderProps {
   onShowPopupsChange?: (value: boolean) => void
   onHistoryClick?: () => void
   actions?: NotificationsActions
-  /** Pagination — when omitted, the drawer hides its load-more sentinel. */
-  hasMore?: boolean
-  isLoadingMore?: boolean
-  onLoadMore?: () => void
 }
 
 type Action =
@@ -137,9 +130,6 @@ export function NotificationsProvider({
   onShowPopupsChange,
   onHistoryClick,
   actions,
-  hasMore = false,
-  isLoadingMore = false,
-  onLoadMore,
 }: NotificationsProviderProps) {
   const [notifications, dispatch] = React.useReducer(reducer, initialNotifications)
   const [isOpen, setIsOpen] = React.useState(false)
@@ -241,9 +231,6 @@ export function NotificationsProvider({
       toggle,
       setShowPopups,
       onHistoryClick,
-      hasMore,
-      isLoadingMore,
-      loadMore: onLoadMore,
     }),
     [
       notifications,
@@ -263,9 +250,6 @@ export function NotificationsProvider({
       toggle,
       setShowPopups,
       onHistoryClick,
-      hasMore,
-      isLoadingMore,
-      onLoadMore,
     ],
   )
 

@@ -39,24 +39,11 @@ img {
 
 html {
   background-color: var(--color-bg);
-  /* Defense-in-depth for programmatic smooth scrolls (see
-     `utils/scroll-into-view.ts`). Browser SCROLL ANCHORING issues a synchronous
-     scrollTop correction when content is inserted/removed (e.g. a ticket drawer
-     expanding) to keep the anchored element stable — and per CSSOM-View that
-     correction ABORTS any in-flight scroll. That cancelled our smooth
-     scroll-to-card on every open after the first (anchoring is suppressed only
-     at scrollY=0, so the first open looked smooth and every repeat jumped).
-     Disabling anchoring on the document scroller removes the correction
-     entirely. Put on html/body (the page scroller), NOT a descendant — a child
-     can't re-enable it for an ancestor scroll container. The self-driven rAF
-     tween in scroll-into-view.ts is the primary fix; this is belt-and-braces. */
-  overflow-anchor: none;
 }
 
 body {
   background-color: var(--color-bg);
   color: var(--color-text-primary);
-  overflow-anchor: none;
 }
 
 /* Light mode specific styles (used in alternatives-list.tsx) */

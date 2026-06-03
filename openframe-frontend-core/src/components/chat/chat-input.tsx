@@ -34,11 +34,6 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
       disabled = false,
       autoFocus = false,
       fullWidth = false,
-      // Composer extension — pulled out so it never falls through to the
-      // underlying <textarea> as an unknown DOM attribute. `allowEmptySend`
-      // lets surfaces that attach files (e.g. the ticket reply composer) send
-      // with empty text once an attachment is ready.
-      allowEmptySend = false,
       ...inputProps
     } = rest
 
@@ -52,17 +47,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
       if (disabled) return
       const el = textareaRef.current
       if (!el || el.disabled) return
-      // ALWAYS `preventScroll`. Focusing a chat composer must never yank the
-      // viewport: in the global Ask-AI chat the input is a sticky, always-
-      // visible composer (preventScroll is a no-op there), and in the ticket
-      // reply composer the input sits BELOW a tall fixed-height feed — a
-      // scroll-on-focus there fights the card's smooth scroll-to-top when the
-      // drawer opens. This bit a specific flow: deep-link a ticket → close →
-      // reopen, then the post-state-transition refocus effect below fired a
-      // bare `focus()` AFTER the card's `window.scrollTo({behavior:'smooth'})`,
-      // scrolling the textarea into view and cancelling the smooth animation.
-      // `preventScroll` on every focus path removes the whole class of bug.
-      el.focus({ preventScroll: true })
+      el.focus()
     }, [disabled])
 
     useEffect(() => {
@@ -77,34 +62,6 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
     // rebuilding the handle object N times per turn.
     const valueRef = useRef(value)
     valueRef.current = value
-
-    // Shared send path for the Send button, Enter key, and imperative submit().
-    // Replaces the old eager `setValue('')`: the draft clears ONLY when the send
-    // is not rejected (`onSend` returns / resolves !== false), so a failed ticket
-    // reply keeps the user's text. `allowEmptySend` lets attachment surfaces send
-    // with empty text. Memoized on its gate inputs ONLY (not `value`) so it stays
-    // stable across keystrokes — the imperative handle below depends on it without
-    // rebuilding per keystroke (preserves the `valueRef` optimization above).
-    const fire = useCallback(
-      (message: string) => {
-        const can = (message.length > 0 || allowEmptySend) && !sending && !disabled
-        if (!can || !onSend) return
-        const result = onSend(message)
-        const done = () => {
-          setValue('')
-          shouldRefocusRef.current = true
-          focusTextarea()
-        }
-        if (result instanceof Promise) {
-          void result.then((ok) => {
-            if (ok !== false) done()
-          })
-        } else if (result !== false) {
-          done()
-        }
-      },
-      [allowEmptySend, sending, disabled, onSend, focusTextarea],
-    )
 
     // Expose the `ChatInputRef` shape so parents can imperatively pre-fill
     // the input (used by the empty-state quick-action chips that translate
@@ -129,7 +86,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
           requestAnimationFrame(() => {
             const el = textareaRef.current
             if (!el || disabled || el.disabled) return
-            el.focus({ preventScroll: true })
+            el.focus()
             el.setSelectionRange(next.length, next.length)
           })
         },
@@ -143,34 +100,41 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
           requestAnimationFrame(() => {
             const el = textareaRef.current
             if (!el) return
-            el.focus({ preventScroll: true })
+            el.focus()
             el.setSelectionRange(clamped, clamped)
           })
         },
         submit: (next: string) => {
-          // Mirror the user-typed Send-button path via the shared `fire` helper
-          // (success-gated clear). Reads `next` (its argument), NOT the textarea
-          // `value` — the "Recent" quick-action injects a `/cmd` string while
-          // `value` is empty, so reading `value` here would submit nothing.
-          fire(next.trim())
+          // Mirror the user-typed Send-button path: skip when sending or
+          // disabled, fire onSend with the trimmed value, clear local state.
+          // The caller is responsible for any pre-fill UX (none here — this
+          // is the one-click "Recent" path).
+          if (sending || disabled || !onSend) return
+          const trimmed = next.trim()
+          if (!trimmed) return
+          onSend(trimmed)
+          setValue('')
+          shouldRefocusRef.current = true
+          focusTextarea()
         },
         getValue: () => valueRef.current,
       }),
-      // `valueRef` and `shouldRefocusRef` are stable refs. `disabled` (read by
-      // `setValue`'s rAF guard) and `focusTextarea` change session-rarely; `fire`
-      // is memoized on its gate inputs (`sending`/`onSend`/`allowEmptySend` all
-      // live inside it), so the handle rebuilds only when those change — still
-      // far fewer than per-keystroke.
-      [focusTextarea, disabled, fire],
+      // `valueRef` and `shouldRefocusRef` are stable refs. `sending` /
+      // `disabled` / `onSend` change session-rarely; including them here
+      // is correct for closure freshness and rebuilds < 5 times per chat
+      // session — an order of magnitude fewer than per-keystroke.
+      [focusTextarea, sending, disabled, onSend],
     )
 
-    // The Enter key calls handleSubmit directly (bypassing the Send button's
-    // per-render `sendDisabled`), so it must read a fresh gate — `fire` is
-    // memoized on every gate input, so depending on `fire` + `value` is both
-    // fresh and exhaustive-deps-clean.
     const handleSubmit = useCallback(() => {
-      fire(value.trim())
-    }, [fire, value])
+      const message = value.trim()
+      if (message && !sending && !disabled && onSend) {
+        onSend(message)
+        setValue('')
+        shouldRefocusRef.current = true
+        focusTextarea()
+      }
+    }, [value, sending, disabled, onSend, focusTextarea])
 
     // Slash-command autocomplete state. Detection runs in render so the
     // keyboard handler can branch on it without re-parsing.
@@ -230,7 +194,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
         requestAnimationFrame(() => {
           const el = textareaRef.current
           if (!el || el.disabled) return
-          el.focus({ preventScroll: true })
+          el.focus()
           el.setSelectionRange(next.length, next.length)
         })
       },
@@ -323,10 +287,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
     }, [onStop, isStopping])
 
     const isStopMode = sending && !!onStop
-    // Send gate: `allowEmptySend` lets empty text send (attachments-only).
-    // Default (false) collapses to the original `!value.trim()` gate.
-    const hasContent = value.trim().length > 0 || allowEmptySend
-    const sendDisabled = sending || disabled || !hasContent
+    const sendDisabled = sending || disabled || !value.trim()
 
     return (
       <div

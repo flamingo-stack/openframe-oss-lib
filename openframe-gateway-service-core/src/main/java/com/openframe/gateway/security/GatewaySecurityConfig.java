@@ -86,7 +86,6 @@ public class GatewaySecurityConfig {
                         .pathMatchers(
                                 CLIENTS_PREFIX + "/metrics/**",
                                 CLIENTS_PREFIX + "/api/agents/register",
-                                CLIENTS_PREFIX + "/api/agents/reinstall",
                                 CLIENTS_PREFIX + "/api/release-version",
                                 CLIENTS_PREFIX + "/oauth/token",
                                 // TODO: removxxe after migration artifacts to GitHub
@@ -98,7 +97,7 @@ public class GatewaySecurityConfig {
                         .pathMatchers(NATS_WS_ENDPOINT_PATH).hasAnyRole(AGENT, ADMIN)
                         .pathMatchers(NATS_API_WS_ENDPOINT_PATH).hasAnyRole(AGENT, ADMIN)
                         .pathMatchers(CHAT_PREFIX + "/**").hasAnyRole(AGENT, ADMIN)
-                        .pathMatchers(CONTENT_PREFIX + "/**").hasRole(ADMIN)
+                        .pathMatchers(GUIDE_PREFIX + "/**").hasRole(ADMIN)
                         .pathMatchers(CLIENTS_PREFIX + "/**").hasRole(AGENT)
                         .pathMatchers(TOOLS_PREFIX + "/**").hasRole(ADMIN)
                         .pathMatchers(WS_TOOLS_PREFIX + "/**").hasRole(ADMIN)

@@ -1,0 +1,11 @@
+sequenceDiagram
+    participant Browser
+    participant Authz as Authorization Service Core
+    participant IdP as OIDC Provider
+
+    Browser->>Authz: GET /oauth/register/sso
+    Authz->>Browser: Set of_sso_reg cookie + redirect
+    Browser->>IdP: OAuth2 Authorization
+    IdP->>Authz: Callback
+    Authz->>Authz: TenantRegSsoHandler
+    Authz->>Browser: Redirect to new tenant

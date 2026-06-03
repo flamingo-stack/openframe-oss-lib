@@ -1,0 +1,5 @@
+flowchart LR
+    CacheName["Cache Name"] --> KeyBuilder["OpenframeRedisKeyBuilder"]
+    TenantContext["Tenant Context"] --> KeyBuilder
+    KeyBuilder --> Prefix["Computed Prefix"]
+    Prefix --> Redis[("Redis Keyspace")]

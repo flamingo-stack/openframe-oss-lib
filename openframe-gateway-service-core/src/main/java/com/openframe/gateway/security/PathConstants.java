@@ -17,5 +17,5 @@ public final class PathConstants {
     public static final String TOOLS_PREFIX = "/tools";
     public static final String WS_TOOLS_PREFIX = "/ws/tools";
     public static final String CHAT_PREFIX = "/chat";
-    public static final String CONTENT_PREFIX = "/content";
+    public static final String GUIDE_PREFIX = "/guide";
 }

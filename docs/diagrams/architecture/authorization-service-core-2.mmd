@@ -1,0 +1,6 @@
+flowchart TD
+    Request["Incoming HTTP Request"] --> Filter["TenantContextFilter"]
+    Filter --> Resolve["Resolve tenant from path/query/session"]
+    Resolve --> SetCtx["TenantContext.setTenantId()"]
+    SetCtx --> Continue["Continue Security Chain"]
+    Continue --> Clear["TenantContext.clear()"]

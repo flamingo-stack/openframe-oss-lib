@@ -16,15 +16,15 @@ export const dotColorByVariant: Record<ToastVariant, string> = {
   success: 'bg-ods-success',
   warning: 'bg-ods-warning',
   error: 'bg-ods-error',
-  info: 'bg-ods-text-secondary',
+  info: 'bg-ods-info',
 }
 
 export const progressColorByVariant: Record<ToastVariant, string> = {
   default: 'bg-ods-text-secondary',
   success: 'bg-ods-success',
-  warning: 'bg-ods-warning',
+  warning: 'bg-ods-accent',
   error: 'bg-ods-error',
-  info: 'bg-ods-text-secondary',
+  info: 'bg-ods-info',
 }
 
 interface ToastHeaderProps {

@@ -7,7 +7,6 @@ import com.openframe.data.document.tool.ToolCredentials;
 import com.openframe.data.document.tool.ToolUrl;
 import com.openframe.data.document.tool.ToolUrlType;
 import com.openframe.data.repository.tool.IntegratedToolRepository;
-import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.ToolUrlService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -56,7 +55,7 @@ public class RestProxyService {
     public ResponseEntity<String> proxyApiRequest(String toolId, HttpServletRequest request, String body) {
         log.info("Received proxy request for tool: {}, method: {}, path: {}", toolId, request.getMethod(), request.getRequestURI());
         
-        Optional<IntegratedTool> toolOpt = toolRepository.findByKey(toolId);
+        Optional<IntegratedTool> toolOpt = toolRepository.findById(toolId);
         
         if (toolOpt.isEmpty()) {
             log.warn("Tool not found: {}", toolId);

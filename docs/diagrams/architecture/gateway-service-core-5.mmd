@@ -1,0 +1,5 @@
+flowchart LR
+    WSClient["WebSocket Client"] --> Gateway["Gateway"]
+    Gateway --> Filter["Tool WebSocket Filter"]
+    Filter --> ToolUrl["Tool URL Resolver"]
+    ToolUrl --> ToolInstance["Tool Service"]

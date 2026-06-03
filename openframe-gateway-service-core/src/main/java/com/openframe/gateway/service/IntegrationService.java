@@ -3,7 +3,6 @@ package com.openframe.gateway.service;
 import com.openframe.data.document.tool.ToolUrl;
 import com.openframe.data.document.tool.ToolUrlType;
 import com.openframe.data.reactive.repository.tool.ReactiveIntegratedToolRepository;
-import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.ToolUrlService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -59,7 +58,7 @@ public class IntegrationService {
     }
 
     public Mono<String> testIntegrationConnection(String toolId) {
-        return integratedToolRepository.findByKey(toolId)
+        return integratedToolRepository.findById(toolId)
             .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Tool not found: " + toolId)))
             .flatMap(tool -> {
                 if (!tool.isEnabled()) {

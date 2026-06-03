@@ -2,7 +2,6 @@ package com.openframe.gateway.service;
 
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.reactive.repository.tool.ReactiveIntegratedToolRepository;
-import com.openframe.data.service.TenantIdProvider;
 import com.openframe.gateway.config.CurlLoggingHandler;
 import com.openframe.gateway.upstream.ToolUpstreamResolverRegistry;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
@@ -41,7 +40,7 @@ public class RestProxyService {
     private final ToolApiKeyHeadersResolver apiKeyHeadersResolver;
 
     public Mono<ResponseEntity<String>> proxyApiRequest(String toolId, ServerHttpRequest request, String body) {
-        return toolRepository.findByKey(toolId)
+        return toolRepository.findById(toolId)
                 .flatMap(tool -> {
                     if (!tool.isEnabled()) {
                         return Mono
@@ -85,7 +84,7 @@ public class RestProxyService {
      * }
      */
     public Mono<ResponseEntity<String>> proxyAgentRequest(String toolId, ServerHttpRequest request, String body) {
-        return toolRepository.findByKey(toolId)
+        return toolRepository.findById(toolId)
                 .flatMap(tool -> {
                     if (!tool.isEnabled()) {
                         ResponseEntity<String> response = ResponseEntity.badRequest()

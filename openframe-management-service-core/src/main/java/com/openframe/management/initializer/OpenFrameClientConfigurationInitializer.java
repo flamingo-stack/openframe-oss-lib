@@ -13,6 +13,8 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 
+import static com.openframe.data.service.OpenFrameClientConfigurationService.DEFAULT_ID;
+
 @Component
 @Order(30)
 @RequiredArgsConstructor
@@ -29,6 +31,7 @@ public class OpenFrameClientConfigurationInitializer implements ApplicationRunne
         log.info("Initializing OpenFrame client configuration");
         ClassPathResource resource = new ClassPathResource(CONFIG_FILE);
         OpenFrameClientConfiguration fromConfig = objectMapper.readValue(resource.getInputStream(), OpenFrameClientConfiguration.class);
+        fromConfig.setId(DEFAULT_ID);
 
         clientConfigurationService.updateConfigurationFields(fromConfig);
 

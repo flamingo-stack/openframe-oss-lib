@@ -1,3 +1,0 @@
-com.openframe.data.config.MongoInfraConfig
-com.openframe.data.config.MongoSyncConfig
-com.openframe.data.config.TenantAwareSyncConfig

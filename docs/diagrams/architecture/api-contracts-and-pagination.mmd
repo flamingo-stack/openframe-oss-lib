@@ -1,6 +1,0 @@
-flowchart TD
-    Client["Client Application"] --> API["REST Controllers / GraphQL DataFetchers"]
-    API --> Contracts["Api Contracts And Pagination"]
-    Contracts --> Services["Domain Query Services"]
-    Services --> Repositories["Mongo Repositories"]
-    Repositories --> Database[("MongoDB")]

@@ -1,0 +1,4 @@
+flowchart TD
+    Save["Machine/Tag Saved"] --> Fetch["Fetch Related Entities"]
+    Fetch --> Build["Build MachinePinotMessage"]
+    Build --> Publish["Publish to Kafka Topic"]

@@ -10,7 +10,5 @@ import java.util.Optional;
 public interface OAuthClientRepository extends MongoRepository<OAuthClient, String> {
     Optional<OAuthClient> findByClientId(String clientId);
 
-    Optional<OAuthClient> findByMachineId(String machineId);
-
     boolean existsByMachineId(String machineId);
 } 

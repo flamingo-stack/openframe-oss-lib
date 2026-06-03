@@ -18,11 +18,12 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class OpenFrameClientConfigurationService {
 
+    public static final String DEFAULT_ID = "default";
+
     private final OpenFrameClientConfigurationRepository repository;
-    private final TenantIdProvider tenantIdProvider;
 
     public OpenFrameClientConfiguration get() {
-        return repository.findByTenantId(tenantIdProvider.getTenantId())
+        return repository.findById(DEFAULT_ID)
                 .orElseThrow(() -> new IllegalStateException("No openframe client configuration found"));
     }
 
@@ -62,7 +63,8 @@ public class OpenFrameClientConfigurationService {
 
     @RetryOnOptimisticLockingFailure
     public void updateConfigurationFields(OpenFrameClientConfiguration fromConfig) {
-        repository.findByTenantId(tenantIdProvider.getTenantId())
+        String fromConfigId = fromConfig.getId();
+        repository.findById(fromConfigId)
                 .ifPresentOrElse(
                         existing -> mergeAndSave(existing, fromConfig),
                         () -> save(fromConfig)

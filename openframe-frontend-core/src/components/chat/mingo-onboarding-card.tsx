@@ -2,7 +2,6 @@
 
 import * as React from 'react'
 import { cn } from '../../utils/cn'
-import { Button } from '../ui/button'
 
 export interface MingoOnboardingCardAction {
   /** Stable React key. */
@@ -92,18 +91,22 @@ export function MingoOnboardingCard({
       {hasActions ? (
         <div className="flex flex-wrap items-center gap-[var(--spacing-system-xxs)] mt-[var(--spacing-system-xs)]">
           {actions!.map((action) => (
-            <Button
+            <button
               key={action.id}
               type="button"
-              variant="outline"
-              size="small"
               onClick={(e) => {
                 e.stopPropagation()
                 action.onClick(e)
               }}
+              className={cn(
+                'inline-flex h-7 items-center justify-center px-[var(--spacing-system-xs)] rounded-md',
+                'border border-ods-border bg-transparent text-h6 text-ods-text-primary',
+                'transition-colors hover:bg-ods-bg-hover hover:border-ods-text-secondary',
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
+              )}
             >
               {action.label}
-            </Button>
+            </button>
           ))}
         </div>
       ) : null}

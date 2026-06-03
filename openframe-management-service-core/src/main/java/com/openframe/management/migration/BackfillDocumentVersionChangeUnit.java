@@ -1,7 +1,6 @@
 package com.openframe.management.migration;
 
 import com.mongodb.client.result.UpdateResult;
-import com.openframe.data.service.TenantIdProvider;
 import io.mongock.api.annotations.ChangeUnit;
 import io.mongock.api.annotations.Execution;
 import io.mongock.api.annotations.RollbackExecution;
@@ -21,20 +20,18 @@ public class BackfillDocumentVersionChangeUnit {
     private static final String RELEASE_VERSIONS_COLLECTION = "release_versions";
 
     @Execution
-    public void execution(MongoTemplate mongoTemplate, TenantIdProvider tenantIdProvider) {
-        String tenantId = tenantIdProvider.getTenantId();
-        backfill(mongoTemplate, INTEGRATED_TOOL_AGENTS_COLLECTION, tenantId);
-        backfill(mongoTemplate, OPENFRAME_CLIENT_CONFIGURATION_COLLECTION, tenantId);
-        backfill(mongoTemplate, RELEASE_VERSIONS_COLLECTION, tenantId);
+    public void execution(MongoTemplate mongoTemplate) {
+        backfill(mongoTemplate, INTEGRATED_TOOL_AGENTS_COLLECTION);
+        backfill(mongoTemplate, OPENFRAME_CLIENT_CONFIGURATION_COLLECTION);
+        backfill(mongoTemplate, RELEASE_VERSIONS_COLLECTION);
     }
 
     @RollbackExecution
     public void rollback() {
     }
 
-    private void backfill(MongoTemplate mongoTemplate, String collection, String tenantId) {
-        Query query = new Query(Criteria.where("tenantId").is(tenantId)
-                .and(DOCUMENT_VERSION_FIELD).exists(false));
+    private void backfill(MongoTemplate mongoTemplate, String collection) {
+        Query query = new Query(Criteria.where(DOCUMENT_VERSION_FIELD).exists(false));
         Update update = new Update().set(DOCUMENT_VERSION_FIELD, 0L);
         UpdateResult result = mongoTemplate.updateMulti(query, update, collection);
         long modifiedCount = result.getModifiedCount();

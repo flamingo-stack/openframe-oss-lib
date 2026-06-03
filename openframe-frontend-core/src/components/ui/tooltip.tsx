@@ -3,7 +3,6 @@
 import * as React from "react"
 import * as TooltipPrimitive from "@radix-ui/react-tooltip"
 import { cn } from "../../utils/cn"
-import { usePortalContainer } from "./portal-container"
 
 const TooltipProvider = TooltipPrimitive.Provider
 
@@ -14,12 +13,8 @@ const TooltipTrigger = TooltipPrimitive.Trigger
 const TooltipContent = React.forwardRef<
   React.ElementRef<typeof TooltipPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content>
->(({ className, sideOffset = 4, ...props }, ref) => {
-  // Portal into the active container (e.g. a drawer) so the tooltip inherits
-  // its stacking context; falls back to `document.body` when none is provided.
-  const container = usePortalContainer()
-  return (
-  <TooltipPrimitive.Portal container={container ?? undefined}>
+>(({ className, sideOffset = 4, ...props }, ref) => (
+  <TooltipPrimitive.Portal>
     <TooltipPrimitive.Content
       ref={ref}
       sideOffset={sideOffset}
@@ -30,8 +25,7 @@ const TooltipContent = React.forwardRef<
       {...props}
     />
   </TooltipPrimitive.Portal>
-  )
-})
+))
 TooltipContent.displayName = TooltipPrimitive.Content.displayName
 
 export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }

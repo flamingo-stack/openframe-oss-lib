@@ -32,55 +32,55 @@ public interface TicketRepository extends MongoRepository<Ticket, String>, Custo
     Optional<Ticket> findByIdAndOwnerMachineId(String id, String machineId);
 
     @Aggregation(pipeline = {
-            "{ $match: { 'tenantId': ?1, 'status': ?0, 'order': { $ne: null } } }",
+            "{ $match: { 'status': ?0, 'order': { $ne: null } } }",
             "{ $sort: { 'order': 1 } }",
             "{ $limit: 1 }"
     })
-    Optional<Ticket> findFirstInColumn(TicketStatus status, String tenantId);
+    Optional<Ticket> findFirstInColumn(TicketStatus status);
 
     @Aggregation(pipeline = {
-            "{ $match: { 'tenantId': ?1, 'status': ?0, 'order': { $ne: null } } }",
+            "{ $match: { 'status': ?0, 'order': { $ne: null } } }",
             "{ $sort: { 'order': -1 } }",
             "{ $limit: 1 }"
     })
-    Optional<Ticket> findLastInColumn(TicketStatus status, String tenantId);
+    Optional<Ticket> findLastInColumn(TicketStatus status);
 
     @Aggregation(pipeline = {
-            "{ $match: { 'tenantId': ?2, 'status': ?0, 'order': { $gt: ?1 } } }",
+            "{ $match: { 'status': ?0, 'order': { $gt: ?1 } } }",
             "{ $sort: { 'order': 1 } }",
             "{ $limit: 1 }"
     })
-    Optional<Ticket> findFirstAfter(TicketStatus status, String order, String tenantId);
+    Optional<Ticket> findFirstAfter(TicketStatus status, String order);
 
     @Aggregation(pipeline = {
-            "{ $match: { 'tenantId': ?2, 'status': ?0, 'order': { $lt: ?1 } } }",
+            "{ $match: { 'status': ?0, 'order': { $lt: ?1 } } }",
             "{ $sort: { 'order': -1 } }",
             "{ $limit: 1 }"
     })
-    Optional<Ticket> findFirstBefore(TicketStatus status, String order, String tenantId);
+    Optional<Ticket> findFirstBefore(TicketStatus status, String order);
 
     // ===== Lifecycle feature (used when lifecycle feature flag is ON) =====
 
     long countByStatusId(String statusId);
 
     @Aggregation(pipeline = {
-            "{ $match: { 'tenantId': ?1, 'statusId': ?0, 'order': { $ne: null } } }",
+            "{ $match: { 'statusId': ?0, 'order': { $ne: null } } }",
             "{ $sort: { 'order': 1 } }",
             "{ $limit: 1 }"
     })
-    Optional<Ticket> findFirstInColumnByStatusId(String statusId, String tenantId);
+    Optional<Ticket> findFirstInColumnByStatusId(String statusId);
 
     @Aggregation(pipeline = {
-            "{ $match: { 'tenantId': ?2, 'statusId': ?0, 'order': { $gt: ?1 } } }",
+            "{ $match: { 'statusId': ?0, 'order': { $gt: ?1 } } }",
             "{ $sort: { 'order': 1 } }",
             "{ $limit: 1 }"
     })
-    Optional<Ticket> findFirstAfterByStatusId(String statusId, String order, String tenantId);
+    Optional<Ticket> findFirstAfterByStatusId(String statusId, String order);
 
     @Aggregation(pipeline = {
-            "{ $match: { 'tenantId': ?2, 'statusId': ?0, 'order': { $lt: ?1 } } }",
+            "{ $match: { 'statusId': ?0, 'order': { $lt: ?1 } } }",
             "{ $sort: { 'order': -1 } }",
             "{ $limit: 1 }"
     })
-    Optional<Ticket> findFirstBeforeByStatusId(String statusId, String order, String tenantId);
+    Optional<Ticket> findFirstBeforeByStatusId(String statusId, String order);
 }

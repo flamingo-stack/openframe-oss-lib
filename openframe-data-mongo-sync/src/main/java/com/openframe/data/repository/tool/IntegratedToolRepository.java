@@ -10,7 +10,4 @@ import java.util.Optional;
 public interface IntegratedToolRepository extends MongoRepository<IntegratedTool, String>, BaseIntegratedToolRepository<Optional<IntegratedTool>, Boolean, String>, CustomIntegratedToolRepository {
     @Override
     Optional<IntegratedTool> findByType(String type);
-
-    @Override
-    Optional<IntegratedTool> findByKey(String key);
 } 
