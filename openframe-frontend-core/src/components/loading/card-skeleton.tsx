@@ -72,7 +72,7 @@ function VendorCardContent({ showActions, showMetadata }: { showActions: boolean
       {/* Header Section - Row layout matching actual VendorCard */}
       <div className="flex items-start gap-3 w-full">
         {/* Logo Frame - 60px width fixed, matching actual structure */}
-        <div className="w-[60px] h-[60px] bg-[#161616] border border-ods-border rounded-lg p-2 flex items-center justify-center flex-shrink-0">
+        <div className="w-[60px] h-[60px] bg-ods-bg border border-ods-border rounded-lg p-2 flex items-center justify-center flex-shrink-0">
           <MediaSkeleton.Avatar size="sm" className="w-11 h-11" />
         </div>
         
@@ -112,7 +112,7 @@ function VendorCardContent({ showActions, showMetadata }: { showActions: boolean
 
         {/* Tag Section - Contained within card boundaries */}
         <div className="flex-shrink-0">
-          <div className="flex items-center gap-1.5 bg-[#161616] border border-ods-border rounded px-2.5 py-1.5">
+          <div className="flex items-center gap-1.5 bg-ods-bg border border-ods-border rounded px-2.5 py-1.5">
             <div className="w-4 h-4 bg-ods-border rounded-sm flex items-center justify-center flex-shrink-0">
               <MediaSkeleton.Icon size="sm" className="w-2.5 h-2.5" />
             </div>
@@ -131,7 +131,7 @@ function BlogCardContent({ showActions, showMetadata }: { showActions: boolean; 
   return (
     <>
       {/* Image Section — OG 1200×630 aspect (matches blog-card.tsx loaded state) */}
-      <div className="blog-card-image-container relative w-full aspect-[1200/630] overflow-hidden bg-[#161616]">
+      <div className="blog-card-image-container relative w-full aspect-[1200/630] overflow-hidden bg-ods-bg">
         <MediaSkeleton.CardImage />
       </div>
       

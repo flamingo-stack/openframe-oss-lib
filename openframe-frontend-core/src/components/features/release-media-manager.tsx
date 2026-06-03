@@ -241,7 +241,7 @@ export function ReleaseMediaManager({
                       onValueChange={(value: any) => updateMedia(index, 'media_type', value)}
                       disabled={item._uploading}
                     >
-                      <SelectTrigger className="bg-[#161616] h-8 text-xs">
+                      <SelectTrigger className="bg-ods-bg h-8 text-xs">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-ods-card">
@@ -258,7 +258,7 @@ export function ReleaseMediaManager({
                     value={item.title}
                     onChange={(e) => updateMedia(index, 'title', e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
-                    className="bg-[#161616] h-8 text-xs"
+                    className="bg-ods-bg h-8 text-xs"
                     disabled={item._uploading}
                   />
                 </div>

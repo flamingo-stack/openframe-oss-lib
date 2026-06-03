@@ -65,7 +65,7 @@ export function OGEditorPreview({
             onChange={(e) => onSeoTitleChange(e.target.value)}
             disabled={disabled}
             placeholder="Enter SEO meta title..."
-            className="bg-[#161616] border-ods-border text-ods-text-primary"
+            className="bg-ods-bg border-ods-border text-ods-text-primary"
           />
         </div>
 
@@ -78,7 +78,7 @@ export function OGEditorPreview({
             onChange={(e) => onSeoKeywordsChange(e.target.value)}
             disabled={disabled}
             placeholder="Enter SEO keywords..."
-            className="bg-[#161616] border-ods-border text-ods-text-primary"
+            className="bg-ods-bg border-ods-border text-ods-text-primary"
           />
         </div>
       </div>
@@ -94,7 +94,7 @@ export function OGEditorPreview({
             onChange={(e) => onSeoDescriptionChange(e.target.value)}
             disabled={disabled}
             placeholder="Enter SEO meta description..."
-            className="bg-[#161616] border-ods-border text-ods-text-primary flex-1 resize-none"
+            className="bg-ods-bg border-ods-border text-ods-text-primary flex-1 resize-none"
             rows={6}
           />
         </div>
