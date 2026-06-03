@@ -14,7 +14,6 @@
  */
 
 import { useEffect, useState } from "react";
-import { embedAuthedFetch } from "../../../utils/embed-authed-fetch";
 import type {
   SlashCommandActionId,
   SlashCommandSummaryAction,
@@ -45,12 +44,6 @@ export type {
  * (e.g. `https://hub.openframe.ai/api/commands` → the base arg is
  * ignored).
  *
- * Auth: rides on `embedAuthedFetch` (same bearer-act-as + 401 self-heal
- * as the chat stream / identity / attachment calls) so a host that runs
- * proxy-impersonation or a refresh-capable auth adapter gets its creds
- * attached here too — no host-side `window.fetch` patch required. Hosts
- * with no adapter fall through to cookie auth unchanged.
- *
  * Returns the parsed `commands` array; on any non-2xx (auth,
  * rate-limit, chat-disabled) returns an empty array — the autocomplete
  * UI silently shows no suggestions rather than surfacing 401/403/429
@@ -63,9 +56,7 @@ export async function fetchSlashCommands(
 ): Promise<SlashCommandSummary[]> {
   const url = new URL(commandsUrl, window.location.origin);
   if (prefix) url.searchParams.set("q", prefix);
-  // `headers: {}` opts out of the default `Content-Type: application/json`
-  // — this is a bare GET with no body, so no content-type is needed.
-  const res = await embedAuthedFetch(url.toString(), { signal, headers: {} });
+  const res = await fetch(url.toString(), { signal });
   if (!res.ok) return [];
   const data = (await res.json()) as { commands?: SlashCommandSummary[] };
   return data.commands ?? [];

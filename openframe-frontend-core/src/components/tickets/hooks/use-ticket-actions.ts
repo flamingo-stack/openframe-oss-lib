@@ -39,22 +39,10 @@ import {
   type OptimisticTicket,
   type TicketActionErrorCode,
   type TicketData,
-  type TicketsCacheSlot,
   TOAST_COPY,
 } from '../types'
 
 const TICKET_ACTION_ENDPOINT = '/api/chat/agent/ticket-action'
-
-/** Codes that populate the inline reply-failure banner above the drawer
- *  composer. Other codes (system-down, ticket-gone, rate-limit) are
- *  full-row / full-system signals covered by the toast + supportSystemDown
- *  handling — surfacing them in the inline banner too would be redundant. */
-const REPLY_BANNER_CODES: ReadonlySet<TicketActionErrorCode> = new Set<TicketActionErrorCode>([
-  'HUBSPOT_5XX',
-  'HUBSPOT_400_VALIDATION',
-  'HUBSPOT_404_THREAD',
-  'HUBSPOT_REPLY_UNKNOWN',
-])
 
 /** 3 attempts × backoff (cumulative ~21s wall-clock). After this we
  *  drop the optimistic row and ask the user to reload. */
@@ -137,14 +125,6 @@ export interface UseTicketActionsReturn {
   isSubmittingForm: boolean
   /** Per-row in-flight set (read-only). UI uses `isRowBusy(localId)`. */
   isRowBusy: (localId: string) => boolean
-  /** Most recent reply failure for a given ticket id (`external_id`).
-   *  Drives the inline "couldn't send" banner above the composer in
-   *  `<TicketDetailDrawer>`. Cleared on the next successful send OR
-   *  via `clearReplyError(ticketId)`. */
-  replyErrorFor: (ticketExternalId: string) => MappedTicketActionError | null
-  /** Clear the persisted reply-failure banner for a ticket (e.g. when
-   *  the user dismisses it or starts a new draft). */
-  clearReplyError: (ticketExternalId: string) => void
 }
 
 export function useTicketActions(options: UseTicketActionsOptions): UseTicketActionsReturn {
@@ -170,37 +150,6 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
     setBusyRows(new Set(busyRowsRef.current))
   }, [])
   const isRowBusy = useCallback((id: string) => busyRows.has(id), [busyRows])
-
-  // Persisted reply-failure banner state — keyed by the ticket's
-  // HubSpot `external_id`. The drawer reads `replyErrorFor(externalId)`
-  // and renders an inline "couldn't send — retry" banner above the
-  // composer. Cleared automatically on the next successful send and
-  // explicitly by the dismiss-X / "Retry" actions in the banner UI.
-  // Distinct from the transient toast — the banner persists so the
-  // user can locate their failed draft after dismissing the toast.
-  const [replyErrorByTicket, setReplyErrorByTicket] = useState<
-    Map<string, MappedTicketActionError>
-  >(() => new Map())
-  const setReplyError = useCallback(
-    (externalId: string, mapped: MappedTicketActionError | null) => {
-      setReplyErrorByTicket((prev) => {
-        const next = new Map(prev)
-        if (mapped) next.set(externalId, mapped)
-        else next.delete(externalId)
-        return next
-      })
-    },
-    [],
-  )
-  const replyErrorFor = useCallback(
-    (externalId: string): MappedTicketActionError | null =>
-      replyErrorByTicket.get(externalId) ?? null,
-    [replyErrorByTicket],
-  )
-  const clearReplyError = useCallback(
-    (externalId: string) => setReplyError(externalId, null),
-    [setReplyError],
-  )
 
   // Mirror-sync watcher controllers tracked by placeholder id so we can
   // abort prior watchers when a new submit lands AND so unmount cleans
@@ -313,15 +262,9 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
     [queryClient, removeOptimistic, toast],
   )
 
-  // Last `surfaceError` mapping — sendMessage reads this immediately
-  // after the catch returns so it can decide whether to populate the
-  // inline reply banner. Cleared on every read by the consumer to
-  // prevent a stale failure from leaking into the next attempt.
-  const lastUpdateErrorRef = useRef<MappedTicketActionError | null>(null)
   const surfaceError = useCallback(
     (err: unknown, action: string): MappedTicketActionError => {
       const mapped = mapTicketActionError(err)
-      lastUpdateErrorRef.current = mapped
       if (mapped.supportSystemDown) onSupportSystemDown()
       toast({
         title: `Could not ${action}`,
@@ -359,10 +302,6 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
         // seconds via the mirror refetch. Drawer uses live chat
         // identity for own-replies during this window anyway.
         customer_name: null,
-        // No assignee until the real ticket lands. Drawer renders
-        // "Unassigned" for this brief window.
-        assigned_to: null,
-        assignedOwner: null,
         hubspot_updated_at: new Date().toISOString(),
         _optimistic: true,
       }
@@ -427,63 +366,13 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
             ticket_id: ticket.external_id,
           } as unknown as Record<string, unknown>)
           toast(successCopy)
-
-          // OPTIMISTIC in-place row update on the tickets cache.
-          //
-          // Previously this code called
-          // `queryClient.invalidateQueries({ queryKey: ['tickets'] })`
-          // which forced a full refetch. When the user is on a
-          // filtered view (e.g. ?status=open) and CLOSES a ticket from
-          // its drawer, the refetched list excludes the now-closed
-          // row, the parent `<HelpCenterCard>` for that row unmounts,
-          // and the inline drawer dies with it — user-facing bug
-          // "close button refreshes the whole page and dismisses the
-          // ticket I was working on" (reported 2026-05-29).
-          //
-          // The mutation already knows what changed (status, content
-          // addendum, attachments) — apply those fields in place
-          // across every `['tickets']` cache slot. The row stays in
-          // the list with the new badge; React doesn't reconcile away
-          // the card; the drawer stays mounted and the user can
-          // continue working.
-          //
-          // Filter-mismatch trade-off: a row that no longer matches a
-          // slot's filter (e.g. CLOSED row in ?status=open cache)
-          // stays visually until next manual refetch (filter change,
-          // page nav, manual reload). Acceptable — the user opted into
-          // the action; carrying their drawer through it is more
-          // important than instantly hiding the row.
-          const statusUpdate =
-            (serverArgs as { status?: 'OPEN' | 'CLOSED' }).status ?? null
-          if (statusUpdate) {
-            // The `useTicketsList` query (in `use-tickets-list.ts`)
-            // returns `FindTicketResponse` — an OBJECT shape
-            // `{ tickets: TicketData[], count, page, totalPages, ... }` —
-            // NOT a bare `TicketData[]`. The previous version of this
-            // callback assumed an array and crashed at runtime with
-            // `t.map is not a function` on every close/reopen
-            // (reported 2026-05-29 in prod). Project the nested
-            // tickets array, map, and reassemble the wrapper.
-            queryClient.setQueriesData<TicketsCacheSlot | undefined>(
-              { queryKey: ['tickets'] },
-              (prev) => {
-                if (!prev || !Array.isArray(prev.tickets)) return prev
-                let mutated = false
-                const nextTickets = prev.tickets.map((t) => {
-                  if (t.id !== ticket.id || t.status === statusUpdate) return t
-                  mutated = true
-                  return { ...t, status: statusUpdate }
-                })
-                return mutated ? { ...prev, tickets: nextTickets } : prev
-              },
-            )
-          }
-
-          // Engagements ALWAYS need to refetch — the addendum / new
-          // attachment / status-change-note must land in the timeline.
-          // Scoped to the engagements query only; doesn't touch the
-          // list cache.
-          await queryClient.invalidateQueries({ queryKey: ['ticket-engagements'] })
+          // Invalidate BOTH ticket list (status / pipeline may have
+          // changed) AND engagements (comments + attachments produce a
+          // new Note that the timeline must pick up).
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['tickets'] }),
+            queryClient.invalidateQueries({ queryKey: ['ticket-engagements'] }),
+          ])
           return true
         })
       } catch (err) {
@@ -504,18 +393,12 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
   )
 
   const sendMessage = useCallback(
-    async (ticket: TicketRef, text: string, attachments: ChatAttachment[]) => {
+    (ticket: TicketRef, text: string, attachments: ChatAttachment[]) => {
       const trimmed = text.trim()
       const hasText = trimmed.length > 0
       const hasFiles = attachments.length > 0
-      if (!hasText && !hasFiles) return false
-      // Clear any stale mapped error from a prior non-sendMessage action
-      // (closeTicket / reopenTicket) so the post-call read only picks up
-      // an error THIS sendMessage produced. Without this clear, a prior
-      // close-failure's mapped error could leak into the banner via the
-      // post-call `lastUpdateErrorRef.current` read.
-      lastUpdateErrorRef.current = null
-      const ok = await updateTicket(
+      if (!hasText && !hasFiles) return Promise.resolve(false)
+      return updateTicket(
         ticket,
         {
           ...(hasText ? { content_addendum: trimmed } : {}),
@@ -524,33 +407,8 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
         TOAST_COPY.comment_success,
         'send message',
       )
-      // Banner-state coupling: SUCCESS clears any stale failure banner
-      // for this ticket; FAILURE populates the banner ONLY for the
-      // reply-specific code subset (HUBSPOT_5XX / 400 / 404 / UNKNOWN).
-      // Other codes (TICKET_NOT_FOUND, HUBSPOT_DISCONNECTED, RATE_LIMITED)
-      // are full-row / full-system signals already covered by the
-      // existing toast + supportSystemDown handling — surfacing them in
-      // the inline banner too would be redundant.
-      if (ok) {
-        clearReplyError(ticket.external_id)
-      } else {
-        // Line 466's `.current = null` narrows the property to literal
-        // `null`. `tsc -p tsconfig.declarations.json` (declarations
-        // build, distinct from the `tsc --noEmit` pre-step) doesn't
-        // widen that narrowing across the `await updateTicket(...)`,
-        // so the read here is typed `never`. The runtime type IS
-        // `MappedTicketActionError | null` per the useRef declaration;
-        // the assertion just tells TS to honor it instead of the stale
-        // narrowing.
-        const mapped = lastUpdateErrorRef.current as MappedTicketActionError | null
-        if (mapped && REPLY_BANNER_CODES.has(mapped.code)) {
-          setReplyError(ticket.external_id, mapped)
-        }
-        lastUpdateErrorRef.current = null
-      }
-      return ok
     },
-    [updateTicket, clearReplyError, setReplyError],
+    [updateTicket],
   )
 
   const closeTicket = useCallback(
@@ -581,19 +439,8 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
       reopenTicket,
       isSubmittingForm,
       isRowBusy,
-      replyErrorFor,
-      clearReplyError,
     }),
-    [
-      submitTicket,
-      sendMessage,
-      closeTicket,
-      reopenTicket,
-      isSubmittingForm,
-      isRowBusy,
-      replyErrorFor,
-      clearReplyError,
-    ],
+    [submitTicket, sendMessage, closeTicket, reopenTicket, isSubmittingForm, isRowBusy],
   )
 }
 
@@ -665,38 +512,6 @@ export function mapTicketActionError(err: unknown): MappedTicketActionError {
           supportSystemDown: false,
           removeRowFromCache: false,
         }
-      case 'HUBSPOT_5XX':
-        return {
-          code: err.code,
-          message:
-            "We couldn't reach the support system. Your reply wasn't sent — please retry in a moment.",
-          supportSystemDown: false,
-          removeRowFromCache: false,
-        }
-      case 'HUBSPOT_400_VALIDATION':
-        return {
-          code: err.code,
-          message:
-            'Your reply was rejected. Please rephrase or remove unsupported content and try again.',
-          supportSystemDown: false,
-          removeRowFromCache: false,
-        }
-      case 'HUBSPOT_404_THREAD':
-        return {
-          code: err.code,
-          message:
-            'This conversation is no longer accepting replies. Open a new ticket to continue.',
-          supportSystemDown: false,
-          removeRowFromCache: false,
-        }
-      case 'HUBSPOT_REPLY_UNKNOWN':
-        return {
-          code: err.code,
-          message:
-            "Your reply didn't go through. Please retry.",
-          supportSystemDown: false,
-          removeRowFromCache: false,
-        }
       default:
         return {
           code: 'UNKNOWN',
@@ -731,20 +546,9 @@ function cacheContainsTicket(
   queryClient: ReturnType<typeof useQueryClient>,
   expectedTicketId: string,
 ): boolean {
-  // Cache slot is `TicketsCacheSlot` (`{ tickets, count, … }`), NOT a
-  // bare `TicketData[]`. The previous code's `Array.isArray(data)` guard
-  // silently fell through to `return false` on real responses — the
-  // post-create watcher therefore NEVER detected the real row arriving
-  // early and always waited the full timeout. Project the nested array.
-  const entries = queryClient.getQueriesData<TicketsCacheSlot | undefined>({
-    queryKey: ['tickets'],
-  })
+  const entries = queryClient.getQueriesData<TicketData[] | undefined>({ queryKey: ['tickets'] })
   for (const [, data] of entries) {
-    if (
-      data &&
-      Array.isArray(data.tickets) &&
-      data.tickets.some((t) => t.external_id === expectedTicketId)
-    ) {
+    if (Array.isArray(data) && data.some((t) => t.external_id === expectedTicketId)) {
       return true
     }
   }

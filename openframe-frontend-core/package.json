@@ -48,12 +48,6 @@
       "require": "./dist/components/tickets/index.cjs",
       "default": "./dist/components/tickets/index.js"
     },
-    "./components/onboarding-guides": {
-      "types": "./dist/components/onboarding-guides/index.d.ts",
-      "import": "./dist/components/onboarding-guides/index.js",
-      "require": "./dist/components/onboarding-guides/index.cjs",
-      "default": "./dist/components/onboarding-guides/index.js"
-    },
     "./components/contact": {
       "types": "./dist/components/contact/index.d.ts",
       "import": "./dist/components/contact/index.js",
@@ -77,12 +71,6 @@
       "import": "./dist/components/features/index.js",
       "require": "./dist/components/features/index.cjs",
       "default": "./dist/components/features/index.js"
-    },
-    "./components/features/mux-origins": {
-      "types": "./dist/components/features/mux-origins.d.ts",
-      "import": "./dist/components/features/mux-origins.js",
-      "require": "./dist/components/features/mux-origins.cjs",
-      "default": "./dist/components/features/mux-origins.js"
     },
     "./components/toast": {
       "types": "./dist/components/toast/index.d.ts",
@@ -191,7 +179,7 @@
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "yalc:watch": "NODE_OPTIONS='--max-old-space-size=4096' nodemon --watch src --watch tsconfig.json --watch tsup.config.ts --watch tailwind.config.ts --watch package.json -e ts,tsx,json,css --ignore dist --ignore node_modules --ignore '*.lock' --ignore .yalc --ignore yalc.lock --exec 'rm -rf dist && tsup && tsc -p tsconfig.declarations.json && yalc push --changed'",
+    "yalc:watch": "NODE_OPTIONS='--max-old-space-size=4096' nodemon --watch src --watch tsconfig.json --watch tsup.config.ts --watch tailwind.config.ts --watch package.json -e ts,tsx,json,css --ignore dist --ignore node_modules --ignore '*.lock' --ignore .yalc --ignore yalc.lock --exec 'rm -rf dist && tsup && yalc push --changed'",
     "yalc:push": "yalc push",
     "yalc:publish": "yalc publish",
     "generate:icons": "node scripts/generate-icons.mjs",
@@ -267,7 +255,6 @@
     "nats.ws": "^1.30.3",
     "next-themes": "^0.2.1",
     "react-aria-components": "^1.11.0",
-    "react-colorful": "^5.7.0",
     "react-datepicker": "^8.7.0",
     "react-day-picker": "^9.8.1",
     "react-device-detect": "^2.2.3",

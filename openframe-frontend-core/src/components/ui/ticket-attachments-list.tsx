@@ -16,15 +16,10 @@ export interface TicketAttachment {
 export interface TicketAttachmentsListProps {
   attachments: TicketAttachment[]
   className?: string
-  /** `compact` shrinks padding / icon / text / download-button for
-   *  in-message rendering (the ticket conversation feed). Default keeps the
-   *  roomier full-row layout for any other surface. */
-  size?: 'default' | 'compact'
 }
 
-export function TicketAttachmentsList({ attachments, className, size = 'default' }: TicketAttachmentsListProps) {
+export function TicketAttachmentsList({ attachments, className }: TicketAttachmentsListProps) {
   if (attachments.length === 0) return null
-  const compact = size === 'compact'
 
   return (
     <div className={cn("rounded-[6px] border border-ods-border overflow-hidden", className)}>
@@ -32,8 +27,7 @@ export function TicketAttachmentsList({ attachments, className, size = 'default'
         <div
           key={attachment.id}
           className={cn(
-            "flex items-center bg-ods-card",
-            compact ? "gap-2 px-2 py-1.5" : "gap-4 px-4 py-3",
+            "flex items-center gap-4 px-4 py-3 bg-ods-card",
             index < attachments.length - 1 && "border-b border-ods-border",
           )}
         >
@@ -41,29 +35,17 @@ export function TicketAttachmentsList({ attachments, className, size = 'default'
             <SquareAvatar
               src={attachment.thumbnailSrc}
               alt={attachment.fileName}
-              size={compact ? "sm" : "md"}
+              size="md"
               className="shrink-0"
             />
           ) : (
-            <div
-              className={cn(
-                "shrink-0 flex items-center justify-center rounded-[6px] bg-ods-card border border-ods-border",
-                compact ? "size-8" : "size-10",
-              )}
-            >
-              <FileIcon className={cn("text-ods-text-secondary", compact ? "size-4" : "size-6")} />
+            <div className="shrink-0 size-10 flex items-center justify-center rounded-[6px] bg-ods-card border border-ods-border">
+              <FileIcon className="size-6 text-ods-text-secondary" />
             </div>
           )}
           <div className="flex-1 min-w-0 overflow-hidden">
-            <p
-              className={cn("text-ods-text-primary truncate", compact ? "text-h5" : "text-h4")}
-              title={attachment.fileName}
-            >
-              {attachment.fileName}
-            </p>
-            {attachment.fileSize && (
-              <p className="text-h6 text-ods-text-secondary">{attachment.fileSize}</p>
-            )}
+            <p className="text-h4 text-ods-text-primary truncate" title={attachment.fileName}>{attachment.fileName}</p>
+            <p className="text-h6 text-ods-text-secondary">{attachment.fileSize}</p>
           </div>
           {attachment.onDownload && (
             <button
@@ -72,7 +54,7 @@ export function TicketAttachmentsList({ attachments, className, size = 'default'
               className="shrink-0 text-ods-text-secondary hover:text-ods-text-primary transition-colors"
               aria-label={`Download ${attachment.fileName}`}
             >
-              <Download className={compact ? "size-4" : "size-6"} />
+              <Download className="size-6" />
             </button>
           )}
         </div>

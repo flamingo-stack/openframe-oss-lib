@@ -2,7 +2,6 @@ package com.openframe.gateway.config.ws;
 
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.reactive.repository.tool.ReactiveIntegratedToolRepository;
-import com.openframe.data.service.TenantIdProvider;
 import com.openframe.gateway.upstream.ToolUpstreamResolverRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -65,7 +64,7 @@ public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Orde
     }
 
     private Mono<IntegratedTool> getTool(String toolId) {
-        return toolRepository.findByKey(toolId)
+        return toolRepository.findById(toolId)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("Tool not found: " + toolId)))
                 .flatMap(tool -> {
                     if (!tool.isEnabled()) {

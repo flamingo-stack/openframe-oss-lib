@@ -1,4 +1,0 @@
-flowchart LR
-    Request["Incoming HTTP Request"] --> Filter["TenantContextFilter"]
-    Filter --> ThreadLocal["TenantContext ThreadLocal"]
-    ThreadLocal --> Services["UserService and Key Services"]

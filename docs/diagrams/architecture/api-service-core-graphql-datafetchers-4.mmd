@@ -1,5 +1,0 @@
-flowchart TD
-    Mutation["createArticle"] --> GetUser["Extract JWT User"]
-    GetUser --> Mapper
-    Mapper --> Service["KnowledgeBaseService"]
-    Service --> DB["Mongo Repository"]

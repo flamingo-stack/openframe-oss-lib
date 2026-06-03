@@ -53,11 +53,7 @@ public class IntegratedToolController {
             @RequestBody SaveToolRequest request) {
         try {
             IntegratedTool tool = request.getTool();
-            String tenantId = tenantIdProvider.getTenantId();
-            // Preserve the UUID _id if this tool already exists (find by tenantId+key)
-            toolService.getToolById(id).ifPresent(existing -> tool.setId(existing.getId()));
-            tool.setKey(id);
-            tool.setTenantId(tenantId);
+            tool.setId(id);
             tool.setEnabled(true);
 
             IntegratedTool savedTool = toolService.saveTool(tool);

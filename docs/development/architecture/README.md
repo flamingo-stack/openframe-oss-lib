@@ -1,199 +1,627 @@
 # Architecture Overview
 
-**openframe-oss-lib** implements a layered, multi-tenant service-oriented architecture. This document provides a high-level overview of the system design, component relationships, and key data flows.
+OpenFrame OSS Libraries implements a sophisticated, multi-layered architecture designed for scalability, maintainability, and multi-tenancy. This guide provides a comprehensive understanding of the system design, core patterns, and architectural decisions.
 
----
-
-## High-Level Architecture
+## High-Level System Architecture
 
 ```mermaid
 flowchart TD
-    Client["Client / Browser / Agent"] --> Gateway["Gateway Service Core\n(Spring Cloud Gateway + WebFlux)"]
-    Gateway --> ExternalAPI["External API Service Core\n(REST + API Keys)"]
-    Gateway --> ApiCore["API Service Core\n(REST + GraphQL)"]
+    subgraph "Client Layer"
+        Web[Web Browser]
+        Mobile[Mobile Apps]
+        CLI[CLI Tools]
+        Agents[Client Agents]
+    end
+    
+    subgraph "Edge Layer"
+        Gateway[Gateway Service Core]
+        LoadBalancer[Load Balancer]
+    end
+    
+    subgraph "Authentication & Security"
+        OAuth[Authorization Service Core]
+        JWT[JWT Security Core]
+        Security[Security Core]
+    end
+    
+    subgraph "Application Layer"
+        API[API Service Core]
+        GraphQL[GraphQL Endpoints]
+        External[External API Service Core]
+        Client[Client Agent Service Core]
+    end
+    
+    subgraph "Business Logic Layer"
+        Contracts[API Lib Contracts]
+        Services[Domain Services]
+        Processors[Event Processors]
+    end
+    
+    subgraph "Data Layer"
+        Mongo[MongoDB]
+        Redis[Redis Cache]
+        Cassandra[Cassandra]
+        Pinot[Apache Pinot]
+    end
+    
+    subgraph "Event & Messaging Layer"
+        Kafka[Apache Kafka]
+        NATS[NATS Streaming]
+        Stream[Stream Processing Core]
+    end
+    
+    subgraph "Management & Operations"
+        Management[Management Service Core]
+        Monitoring[Monitoring & Metrics]
+        Config[Configuration Service]
+    end
 
-    ApiCore --> Authz["Authorization Service Core\n(OAuth2 / JWT)"]
-    ApiCore --> Stream["Stream Service Core\n(Kafka / Debezium)"]
-    ApiCore --> Management["Management Service Core\n(Schedulers / Initializers)"]
-    ApiCore --> ClientSvc["Client Core\n(Agent Registration)"]
-
-    Authz --> Mongo["MongoDB"]
-    ApiCore --> Mongo
-    ApiCore --> Redis["Redis"]
-    Stream --> Kafka["Apache Kafka"]
-    Stream --> Pinot["Apache Pinot"]
-    Stream --> Cassandra["Apache Cassandra"]
-    Management --> NATS["NATS JetStream"]
+    %% Connections
+    Web --> LoadBalancer
+    Mobile --> LoadBalancer
+    CLI --> LoadBalancer
+    Agents --> LoadBalancer
+    
+    LoadBalancer --> Gateway
+    Gateway --> OAuth
+    Gateway --> API
+    Gateway --> External
+    
+    API --> Services
+    GraphQL --> Services
+    External --> Services
+    Client --> Services
+    
+    Services --> Contracts
+    Services --> Mongo
+    Services --> Redis
+    
+    Stream --> Cassandra
+    Stream --> Pinot
+    Stream --> Kafka
+    
     Management --> Mongo
+    Management --> NATS
+    Management --> Config
 ```
 
----
+## Core Architectural Principles
 
-## Core Modules
+### 1. Multi-Tenancy by Design
 
-| Module | Responsibility | Key Technologies |
-|--------|---------------|-----------------|
-| `openframe-gateway-service-core` | Edge layer: JWT auth, API key rate limiting, WebSocket proxying, tool routing | Spring Cloud Gateway, WebFlux, Netty |
-| `openframe-authorization-service-core` | Multi-tenant OAuth2 auth server: JWT issuance, SSO, per-tenant keys | Spring Authorization Server, Spring Security |
-| `openframe-security-core` | JWT encoding/decoding, PKCE, cookie management | Nimbus JOSE, Spring Security |
-| `openframe-security-oauth` | OAuth2 BFF: browser-facing login/callback/refresh/logout endpoints | Spring Security OAuth2 |
-| `openframe-api-service-core` | Internal API: GraphQL (Relay) + REST controllers | Netflix DGS, Spring MVC |
-| `openframe-api-lib` | API contracts: filter DTOs, cursor pagination, mutation types | Spring, Jackson |
-| `openframe-external-api-service-core` | External API: API key–authenticated REST endpoints for integrations | Spring MVC, OpenAPI |
-| `openframe-client-core` | Agent/device registration, tool agent endpoints | Spring MVC, NATS |
-| `openframe-stream-service-core` | Kafka/Debezium CDC: event ingestion, normalization, enrichment | Kafka Streams, Spring Kafka |
-| `openframe-management-service-core` | Startup initializers, distributed schedulers, tool orchestration | ShedLock, Spring Retry |
-| `openframe-data-mongo-common` | MongoDB domain documents: canonical persistence model | Spring Data MongoDB |
-| `openframe-data-mongo-sync` | Synchronous MongoDB repositories + index configuration | Spring Data MongoDB |
-| `openframe-data-mongo-reactive` | Reactive MongoDB repositories | Spring Data MongoDB Reactive |
-| `openframe-data-redis` | Tenant-aware Redis cache, reactive repositories | Spring Data Redis |
-| `openframe-data-kafka` | Multi-tenant Kafka configuration, topic provisioning, retry | Spring Kafka |
-| `openframe-data-nats` | NATS JetStream publishers, notification broadcasting | NATS Spring Cloud Stream |
-| `openframe-data-cassandra` | Tenant-scoped Cassandra log storage | Spring Data Cassandra |
-| `openframe-data-pinot` | Apache Pinot analytics queries | Pinot Java Client |
-| `sdk/fleetmdm` | Fleet MDM Java client | Spring WebClient |
-| `sdk/tacticalrmm` | Tactical RMM Java client | Spring WebClient |
+Every component is built with tenant isolation as a first-class concern:
 
----
+- **Data Isolation**: MongoDB collections include `tenantId` fields
+- **Security Context**: JWT tokens carry tenant information
+- **Cache Separation**: Redis keys include tenant prefixes
+- **Event Streaming**: Kafka topics are tenant-aware
 
-## Data Flow: Request Processing
+```java
+// Example of tenant-aware service
+@Service
+@RequiredArgsConstructor
+public class OrganizationService {
+    
+    public List<Organization> findByTenant(String tenantId) {
+        return repository.findByTenantId(tenantId);
+    }
+    
+    @EventListener
+    public void handleOrganizationEvent(OrganizationEvent event) {
+        // Event processing is tenant-scoped
+        processForTenant(event.getTenantId(), event);
+    }
+}
+```
+
+### 2. Event-Driven Architecture
+
+The system embraces eventual consistency and asynchronous processing:
 
 ```mermaid
 sequenceDiagram
-    participant C as Client
-    participant GW as Gateway
-    participant Auth as Auth Service
     participant API as API Service
-    participant DB as MongoDB
-
-    C->>GW: HTTP Request (with Bearer token or API key)
-    GW->>GW: Validate JWT (multi-issuer) / API key
-    GW->>API: Forwarded request + X-User-Id header
-    API->>DB: Query data (via Spring Data repositories)
-    DB-->>API: Domain documents
-    API-->>GW: Response
-    GW-->>C: HTTP Response
+    participant Kafka as Kafka
+    participant Stream as Stream Processor
+    participant DB as Database
+    participant Cache as Redis Cache
+    
+    API->>Kafka: Publish Event
+    Kafka->>Stream: Consume Event
+    Stream->>DB: Store Enriched Data
+    Stream->>Cache: Update Cache
+    Stream->>Kafka: Publish Derived Events
 ```
 
----
+### 3. Domain-Driven Design (DDD)
 
-## Data Flow: Authentication (OAuth2)
+The architecture follows DDD principles with clear bounded contexts:
+
+| Bounded Context | Responsibility | Key Entities |
+|-----------------|----------------|--------------|
+| **Identity & Access** | Authentication, authorization | User, Tenant, Role |
+| **Organization Management** | MSP organization data | Organization, Contact |
+| **Device Management** | Endpoint devices | Machine, Device, Agent |
+| **Tool Integration** | External tool connections | Tool, Connection, Credential |
+| **Event Processing** | Audit logs, analytics | Event, Log, Metric |
+| **Agent Management** | Client agent lifecycle | Agent, Registration, Heartbeat |
+
+### 4. Layered Architecture
+
+Each service follows a consistent layered approach:
 
 ```mermaid
-sequenceDiagram
-    participant B as Browser
-    participant BFF as OAuth BFF
-    participant AuthSrv as Authorization Server
-    participant KS as TenantKeyService
-    participant DB as MongoDB
-
-    B->>BFF: GET /oauth/login
-    BFF->>AuthSrv: Redirect (PKCE + state)
-    AuthSrv->>B: Login UI
-    B->>AuthSrv: Credentials
-    AuthSrv->>KS: Get tenant RSA key pair
-    KS->>DB: Load/create TenantKey
-    AuthSrv->>BFF: callback?code=...
-    BFF->>AuthSrv: Exchange code → tokens
-    AuthSrv-->>BFF: JWT (access + refresh)
-    BFF->>B: Set HttpOnly cookies
+flowchart TD
+    Controller[Controllers/GraphQL] --> Service[Service Layer]
+    Service --> Repository[Repository Layer]
+    Repository --> Data[(Database)]
+    
+    Service --> Event[Event Publishers]
+    Event --> Messaging[(Message Broker)]
+    
+    Service --> Cache[Cache Layer]
+    Cache --> Redis[(Redis)]
 ```
 
----
+## Core Components Deep Dive
 
-## Data Flow: Event Streaming (Kafka / Debezium)
+### API Service Core
+
+**Purpose**: Main application orchestration layer
+
+**Key Responsibilities**:
+- REST controller endpoints
+- GraphQL schema implementation
+- Request validation and mapping
+- Security context management
+
+**Technology Stack**:
+- Spring Boot 3.3.0
+- Spring Security OAuth2 Resource Server
+- Netflix DGS for GraphQL
+- Spring Data MongoDB
+
+**Example Controller Pattern**:
+```java
+@RestController
+@RequestMapping("/api/organizations")
+@RequiredArgsConstructor
+@Validated
+public class OrganizationController {
+    
+    private final OrganizationService service;
+    
+    @GetMapping
+    public ResponseEntity<Page<Organization>> list(
+        @AuthenticationPrincipal AuthPrincipal principal,
+        @RequestParam(defaultValue = "0") int page
+    ) {
+        String tenantId = principal.getTenantId();
+        Page<Organization> organizations = service.findByTenant(tenantId, page);
+        return ResponseEntity.ok(organizations);
+    }
+}
+```
+
+### Authorization Service Core
+
+**Purpose**: Multi-tenant OAuth2/OIDC authorization server
+
+**Key Features**:
+- Per-tenant RSA key pairs
+- Dynamic client registration
+- SSO provider integration (Google, Microsoft)
+- Custom user flows and invitation handling
+
+**Architecture Pattern**:
+```mermaid
+flowchart LR
+    subgraph "Authorization Flow"
+        Client[Client Application] --> AuthZ[Authorization Endpoint]
+        AuthZ --> Login[Login Handler]
+        Login --> UserAuth[User Authentication]
+        UserAuth --> Consent[Consent Screen]
+        Consent --> Token[Token Endpoint]
+        Token --> JWT[JWT Token]
+    end
+    
+    subgraph "Multi-Tenant Support"
+        JWT --> KeyService[Tenant Key Service]
+        KeyService --> TenantKeys[(Per-Tenant Keys)]
+    end
+```
+
+### Gateway Service Core
+
+**Purpose**: Reactive edge gateway with authentication and routing
+
+**Key Features**:
+- JWT validation with multi-issuer support
+- API key authentication
+- Rate limiting per tenant
+- WebSocket proxy support
+- CORS handling
+
+**Request Flow**:
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Gateway
+    participant Auth as Auth Service
+    participant Backend as Backend Service
+    
+    Client->>Gateway: Request with JWT
+    Gateway->>Auth: Validate JWT
+    Auth-->>Gateway: Valid + Claims
+    Gateway->>Backend: Forward Request
+    Backend-->>Gateway: Response
+    Gateway-->>Client: Response
+```
+
+### Stream Processing Service Core
+
+**Purpose**: Real-time event processing and data enrichment
+
+**Processing Pipeline**:
+```mermaid
+flowchart LR
+    subgraph "Ingestion"
+        External[External Tool] --> CDC[CDC Connector]
+        CDC --> RawEvents[Raw Events Topic]
+    end
+    
+    subgraph "Processing"
+        RawEvents --> Deserializer[Event Deserializer]
+        Deserializer --> Enricher[Data Enricher]
+        Enricher --> Normalizer[Event Normalizer]
+    end
+    
+    subgraph "Storage"
+        Normalizer --> Analytics[Analytics Store]
+        Normalizer --> Operational[Operational Store]
+        Normalizer --> Cache[Cache Update]
+    end
+```
+
+### Data Platform Core
+
+**Purpose**: Multi-database coordination and analytics
+
+**Data Architecture**:
+
+| Database | Purpose | Data Types |
+|----------|---------|------------|
+| **MongoDB** | Operational data | Users, organizations, configurations |
+| **Cassandra** | Time-series data | Audit logs, metrics, events |
+| **Apache Pinot** | Real-time analytics | Aggregated metrics, dashboards |
+| **Redis** | Caching & sessions | Cache entries, rate limits, locks |
+
+### Client Agent Service Core
+
+**Purpose**: Endpoint agent lifecycle and communication
+
+**Agent Communication Flow**:
+```mermaid
+sequenceDiagram
+    participant Agent as Client Agent
+    participant HTTP as HTTP API
+    participant NATS as NATS Streams
+    participant Service as Agent Service
+    participant DB as Database
+    
+    Agent->>HTTP: Register Agent
+    HTTP->>Service: Process Registration
+    Service->>DB: Store Agent Info
+    
+    loop Heartbeat & Events
+        Agent->>NATS: Publish Heartbeat
+        NATS->>Service: Process Heartbeat
+        Service->>DB: Update Status
+    end
+```
+
+## Data Flow Patterns
+
+### 1. Read Path (Query Operations)
 
 ```mermaid
 flowchart LR
-    subgraph Tools["Integrated Tools"]
-        T1["Tactical RMM"]
-        T2["Fleet MDM"]
-        T3["MeshCentral"]
-    end
-    subgraph Processing["Stream Service Core"]
-        L["Kafka Listener"]
-        D["Tool Deserializer"]
-        E["Enrichment Service"]
-        M["EventTypeMapper"]
-        H["Message Handler"]
-    end
-    subgraph Storage["Storage"]
-        C["Cassandra\n(UnifiedLogEvent)"]
-        K["Kafka\n(Enriched Topics)"]
-    end
-
-    T1 --> L
-    T2 --> L
-    T3 --> L
-    L --> D
-    D --> E
-    E --> M
-    M --> H
-    H --> C
-    H --> K
+    Client[Client Request] --> Gateway[Gateway]
+    Gateway --> API[API Service]
+    API --> Cache{Redis Cache Hit?}
+    Cache -->|Hit| Return[Return Cached Data]
+    Cache -->|Miss| DB[MongoDB Query]
+    DB --> Enrich[Enrich Data]
+    Enrich --> UpdateCache[Update Cache]
+    UpdateCache --> Return
 ```
 
----
+### 2. Write Path (Command Operations)
 
-## Multi-Tenancy Design
+```mermaid
+flowchart LR
+    Client[Client Request] --> Gateway[Gateway]
+    Gateway --> API[API Service]
+    API --> Validate[Validate & Transform]
+    Validate --> DB[MongoDB Write]
+    DB --> Event[Publish Event]
+    Event --> Kafka[Kafka Topic]
+    Kafka --> Stream[Stream Processor]
+    Stream --> Analytics[Update Analytics]
+    Stream --> Cache[Invalidate Cache]
+```
 
-Every module implements strict tenant isolation:
+### 3. Event Processing Path
 
 ```mermaid
 flowchart TD
-    Request["HTTP Request"] --> TenantFilter["TenantContextFilter\n(Extracts tenant ID)"]
-    TenantFilter --> ThreadLocal["TenantContext\n(ThreadLocal)"]
-    ThreadLocal --> KeyService["TenantKeyService\n(Per-tenant RSA keys)"]
-    ThreadLocal --> Repo["Tenant-Scoped Repositories"]
-    ThreadLocal --> LockKey["ShedLock Key\nof:{tenantId}:job-lock:..."]
-    ThreadLocal --> CacheKey["Redis Key\nof:{tenantId}:..."]
+    Source[Event Source] --> Kafka[Kafka Topic]
+    Kafka --> Consumer[Event Consumer]
+    Consumer --> Deserialize[Deserialize Event]
+    Deserialize --> Enrich[Enrich with Context]
+    Enrich --> Transform[Transform Data]
+    Transform --> Multiple{Multiple Destinations}
+    
+    Multiple --> Cassandra[Audit Storage]
+    Multiple --> Pinot[Analytics Storage]
+    Multiple --> MongoDB[Operational Update]
+    Multiple --> Redis[Cache Update]
+    Multiple --> Derived[Derived Events]
 ```
 
-Key multi-tenancy patterns:
+## Security Architecture
 
-| Pattern | Implementation |
-|---------|---------------|
-| Tenant context propagation | `TenantContext` ThreadLocal, set by `TenantContextFilter` |
-| Per-tenant JWT signing keys | `TenantKeyService` with RSA key pairs stored in MongoDB |
-| Tenant-scoped cache keys | `OpenframeRedisKeyBuilder` prefixes every key with tenant ID |
-| Tenant-scoped scheduler locks | ShedLock keys include `tenantId` and `environment` |
-| JWT claim injection | `tenant_id`, `userId`, `roles` are embedded in every access token |
+### Authentication & Authorization Flow
+
+```mermaid
+sequenceDiagram
+    participant User as End User
+    participant App as Client App
+    participant Gateway as Gateway
+    participant Auth as Auth Service
+    participant Resource as Resource Service
+    
+    User->>App: Login Request
+    App->>Auth: OAuth2 Authorization
+    Auth->>User: Login Form
+    User->>Auth: Credentials
+    Auth->>App: Authorization Code
+    App->>Auth: Exchange for Token
+    Auth-->>App: JWT Token
+    
+    App->>Gateway: API Request + JWT
+    Gateway->>Auth: Validate JWT
+    Auth-->>Gateway: Valid + Claims
+    Gateway->>Resource: Forward Request
+    Resource-->>Gateway: Response
+    Gateway-->>App: Response
+```
+
+### Multi-Tenant Security Model
+
+```mermaid
+flowchart TD
+    subgraph "Tenant A"
+        UserA[Users A] --> DataA[Data A]
+        KeysA[RSA Keys A] --> JWTA[JWT Tokens A]
+    end
+    
+    subgraph "Tenant B"
+        UserB[Users B] --> DataB[Data B]
+        KeysB[RSA Keys B] --> JWTB[JWT Tokens B]
+    end
+    
+    subgraph "Shared Infrastructure"
+        Gateway[Gateway Service]
+        Auth[Auth Service]
+        DB[(Multi-Tenant Database)]
+    end
+    
+    JWTA --> Gateway
+    JWTB --> Gateway
+    Gateway --> Auth
+    Auth --> DB
+```
+
+## Performance & Scalability Patterns
+
+### 1. Caching Strategy
+
+```mermaid
+flowchart LR
+    Request[API Request] --> L1[Application Cache]
+    L1 -->|Miss| L2[Redis Cache]
+    L2 -->|Miss| DB[Database]
+    
+    DB --> Populate[Populate Caches]
+    Populate --> L2
+    Populate --> L1
+```
+
+**Cache Levels**:
+- **L1 (Application)**: In-memory cache for hot data
+- **L2 (Redis)**: Distributed cache for shared data
+- **CDN**: Static assets and public content
+
+### 2. Database Sharding
+
+```mermaid
+flowchart TD
+    App[Application] --> Router[Tenant Router]
+    Router -->|Tenant A-M| Shard1[MongoDB Shard 1]
+    Router -->|Tenant N-Z| Shard2[MongoDB Shard 2]
+    Router -->|Analytics| Pinot[Apache Pinot]
+    Router -->|Audit Logs| Cassandra[Cassandra]
+```
+
+### 3. Event Stream Partitioning
+
+```mermaid
+flowchart LR
+    Producer[Event Producer] --> Kafka[Kafka Topic]
+    Kafka -->|Partition 0| Consumer1[Consumer Group 1]
+    Kafka -->|Partition 1| Consumer2[Consumer Group 2]
+    Kafka -->|Partition 2| Consumer3[Consumer Group 3]
+    
+    subgraph "Partitioning Strategy"
+        TenantID[Tenant ID Hash]
+        EventType[Event Type]
+        Timestamp[Time-based]
+    end
+```
+
+## Monitoring & Observability
+
+### Metrics Collection
+
+```mermaid
+flowchart TD
+    App[Application] --> Micrometer[Micrometer Metrics]
+    Micrometer --> Prometheus[Prometheus]
+    Prometheus --> Grafana[Grafana Dashboards]
+    
+    App --> Logging[Structured Logging]
+    Logging --> ELK[ELK Stack]
+    
+    App --> Tracing[Distributed Tracing]
+    Tracing --> Jaeger[Jaeger]
+```
+
+### Key Metrics
+
+| Metric Type | Examples | Purpose |
+|-------------|----------|---------|
+| **Business** | Organizations created, Devices connected | Feature usage |
+| **Application** | Request latency, Error rates | Performance |
+| **Infrastructure** | CPU, Memory, Database connections | Resource utilization |
+| **Security** | Failed logins, JWT validations | Security monitoring |
+
+## Deployment Architecture
+
+### Container Strategy
+
+```mermaid
+flowchart TD
+    subgraph "Service Layer"
+        Gateway[Gateway Container]
+        API[API Service Container]
+        Auth[Auth Service Container]
+        Stream[Stream Processor Container]
+    end
+    
+    subgraph "Data Layer"
+        MongoDB[MongoDB Cluster]
+        Redis[Redis Cluster]
+        Kafka[Kafka Cluster]
+        Cassandra[Cassandra Cluster]
+    end
+    
+    subgraph "Infrastructure"
+        LB[Load Balancer]
+        DNS[Service Discovery]
+        Config[Config Server]
+    end
+```
+
+### Scaling Patterns
+
+```mermaid
+flowchart LR
+    subgraph "Horizontal Scaling"
+        LB[Load Balancer] --> Instance1[Instance 1]
+        LB --> Instance2[Instance 2]
+        LB --> Instance3[Instance 3]
+    end
+    
+    subgraph "Data Scaling"
+        App[Application] --> ReadReplicas[Read Replicas]
+        App --> WriteLeader[Write Leader]
+        App --> Cache[Distributed Cache]
+    end
+```
+
+## Design Patterns & Best Practices
+
+### 1. Command Query Responsibility Segregation (CQRS)
+
+```java
+// Command side - writes
+@Component
+public class OrganizationCommandService {
+    public void createOrganization(CreateOrganizationCommand command) {
+        // Validation and business logic
+        Organization org = new Organization(command);
+        repository.save(org);
+        publisher.publishEvent(new OrganizationCreatedEvent(org));
+    }
+}
+
+// Query side - reads
+@Component 
+public class OrganizationQueryService {
+    public List<Organization> findByTenant(String tenantId) {
+        return queryRepository.findByTenantId(tenantId);
+    }
+}
+```
+
+### 2. Event Sourcing Pattern
+
+```java
+@EventHandler
+public class OrganizationEventHandler {
+    
+    @EventListener
+    public void on(OrganizationCreatedEvent event) {
+        // Update read models
+        updateOrganizationView(event);
+        updateTenantStatistics(event);
+        sendWelcomeNotification(event);
+    }
+}
+```
+
+### 3. Saga Pattern for Distributed Transactions
+
+```java
+@Component
+public class UserRegistrationSaga {
+    
+    @SagaOrchestrationStart
+    public void startRegistration(UserRegistrationCommand command) {
+        // Step 1: Create user
+        send(new CreateUserCommand(command));
+    }
+    
+    @SagaOrchestrationStep
+    public void onUserCreated(UserCreatedEvent event) {
+        // Step 2: Send invitation email
+        send(new SendInvitationEmailCommand(event));
+    }
+    
+    // Compensation logic for failures
+    @SagaOrchestrationRollback
+    public void rollbackUserCreation(UserCreationFailedEvent event) {
+        send(new DeleteUserCommand(event.getUserId()));
+    }
+}
+```
+
+## Next Steps
+
+Now that you understand the architecture:
+
+1. **[Security Guidelines](../security/README.md)** - Implement secure, tenant-aware features
+2. **[Testing Overview](../testing/README.md)** - Test architectural components effectively
+3. **[Contributing Guidelines](../contributing/guidelines.md)** - Follow architectural patterns when contributing
+
+## Additional Resources
+
+- **[API Reference](../../reference/architecture/)** - Detailed module documentation
+- **[Spring Boot Architecture Guide](https://spring.io/guides/gs/spring-boot/)**
+- **[Microservices Patterns](https://microservices.io/patterns/)**
+- **[Domain-Driven Design Reference](https://domainlanguage.com/ddd/reference/)**
 
 ---
 
-## Key Design Decisions
-
-### 1. Reactive Gateway, Blocking Services
-
-The gateway (`openframe-gateway-service-core`) is fully reactive (WebFlux + Netty). Internal services use Spring MVC (blocking), keeping service-level logic simple while the gateway handles high concurrency.
-
-### 2. GraphQL + REST Coexistence
-
-- **Internal API:** Relay-compliant GraphQL (Netflix DGS) with DataLoaders for N+1 prevention
-- **External API:** REST with OpenAPI documentation and API key authentication
-- Both APIs share the same domain services and repositories
-
-### 3. Event-Driven Normalization
-
-Integrated tools (Tactical RMM, Fleet MDM, MeshCentral) emit raw Debezium CDC events into Kafka. The Stream Service normalizes these into a unified `UnifiedEventType` before persisting to Cassandra or re-publishing.
-
-### 4. Startup Orchestration
-
-All bootstrapping logic is centralized in `openframe-management-service-core` using Spring `ApplicationRunner`. This ensures consistent initialization order across deployments.
-
----
-
-## Reference Documentation
-
-Detailed architecture documentation is available for each module:
-
-- [Gateway Service Core](./reference/architecture/gateway-service-core-security-and-routing/gateway-service-core-security-and-routing.md)
-- [Authorization Service Core](./reference/architecture/authorization-service-core-server-and-tenant/authorization-service-core-server-and-tenant.md)
-- [Stream Service Core](./reference/architecture/stream-service-core-kafka-and-handlers/stream-service-core-kafka-and-handlers.md)
-- [Management Service Core](./reference/architecture/management-service-core-initializers-and-schedulers/management-service-core-initializers-and-schedulers.md)
-- [External API Service Core](./reference/architecture/external-api-service-core/external-api-service-core.md)
-- [Data Mongo Domain Model](./reference/architecture/data-mongo-domain-model/data-mongo-domain-model.md)
-- [Data Kafka Configuration](./reference/architecture/data-kafka-configuration-and-retry/data-kafka-configuration-and-retry.md)
-- [Security Core and OAuth BFF](./reference/architecture/security-core-and-oauth-bff/security-core-and-oauth-bff.md)
-
-[![Watch What's New in OpenFrame 0.7.8](https://img.youtube.com/vi/BQAjDB4ED2Y/maxresdefault.jpg)](https://www.youtube.com/watch?v=BQAjDB4ED2Y)
+*This architecture enables OpenFrame OSS Libraries to scale from single-tenant deployments to massive multi-tenant SaaS platforms while maintaining security, performance, and maintainability.*

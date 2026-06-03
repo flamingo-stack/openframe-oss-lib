@@ -1,7 +1,6 @@
 package com.openframe.management.scheduler;
 
 import com.openframe.data.repository.tool.IntegratedToolRepository;
-import com.openframe.data.service.TenantIdProvider;
 import com.openframe.management.service.FleetMdmSetupService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,7 +22,7 @@ public class FleetMdmSetupScheduler {
     @Scheduled(fixedDelayString = "${openframe.fleet-mdm.setup.scheduler-interval-ms:30000}")
     public void runSetupIfNeeded() {
         try {
-            toolRepository.findByKey(FLEETMDM_SERVER)
+            toolRepository.findById(FLEETMDM_SERVER)
                     .ifPresent(fleetMdmSetupService::setupAndSaveApiToken);
         } catch (Exception e) {
             log.error("Fleet MDM setup failed, will retry on next tick: {}", e.getMessage(), e);

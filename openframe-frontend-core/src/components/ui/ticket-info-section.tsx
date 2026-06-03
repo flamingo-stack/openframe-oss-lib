@@ -7,7 +7,7 @@ import { cn } from "../../utils/cn"
 import { AssigneeDropdown, type TicketAssigneeOption } from "./assignee-dropdown"
 import { SquareAvatar } from "./square-avatar"
 import { Tag } from "./tag"
-import { TicketStatusTag, type TicketStatusTagOption } from "./ticket-status-tag"
+import { TicketStatusTag } from "./ticket-status-tag"
 import { TicketDetailSection } from "./ticket-detail-section"
 import { type TicketAttachment, TicketAttachmentsList } from "./ticket-attachments-list"
 import type { TicketNote } from "./ticket-note-card"
@@ -32,16 +32,6 @@ export interface TicketInfoSectionProps {
   }
   /** Status tag */
   status?: string
-  /** Display label for the status tag (e.g. a custom status name). */
-  statusLabel?: string
-  /** Hex color for the status tag (e.g. a custom status color). */
-  statusColor?: string
-  /** When provided, the status tag becomes an inline changer with these options. */
-  statusOptions?: TicketStatusTagOption[]
-  /** Called with the chosen status id from the inline status dropdown. */
-  onStatusSelect?: (id: string) => void
-  /** Disables the inline status dropdown while a change is in flight. */
-  isStatusPending?: boolean
   /** Expand button click handler */
   onExpand?: () => void
   /** Whether the section is expanded */
@@ -116,11 +106,6 @@ export function TicketInfoSection({
   organization,
   device,
   status,
-  statusLabel,
-  statusColor,
-  statusOptions,
-  onStatusSelect,
-  isStatusPending,
   onExpand,
   expanded = false,
   className,
@@ -187,16 +172,9 @@ export function TicketInfoSection({
 
         {/* Status tag + expand button */}
         <div className="flex items-center gap-4 min-w-0">
-          {(status || statusLabel) && (
+          {status && (
             <div className="min-w-0">
-              <TicketStatusTag
-                status={status ?? ""}
-                label={statusLabel}
-                color={statusColor}
-                options={statusOptions}
-                onSelect={onStatusSelect}
-                isPending={isStatusPending}
-              />
+              <TicketStatusTag status={status} />
             </div>
           )}
           {onExpand && (

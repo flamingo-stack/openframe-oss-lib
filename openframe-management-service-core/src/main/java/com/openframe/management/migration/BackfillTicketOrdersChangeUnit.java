@@ -3,7 +3,6 @@ package com.openframe.management.migration;
 import com.github.pravin.raha.lexorank4j.LexoRank;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketStatus;
-import com.openframe.data.service.TenantIdProvider;
 import io.mongock.api.annotations.ChangeUnit;
 import io.mongock.api.annotations.Execution;
 import io.mongock.api.annotations.RollbackExecution;
@@ -26,10 +25,9 @@ public class BackfillTicketOrdersChangeUnit {
     private static final String ID_FIELD = "_id";
 
     @Execution
-    public void execution(MongoTemplate mongoTemplate, TenantIdProvider tenantIdProvider) {
-        String tenantId = tenantIdProvider.getTenantId();
+    public void execution(MongoTemplate mongoTemplate) {
         for (TicketStatus status : TicketStatus.values()) {
-            backfillColumn(mongoTemplate, status, tenantId);
+            backfillColumn(mongoTemplate, status);
         }
     }
 
@@ -37,9 +35,8 @@ public class BackfillTicketOrdersChangeUnit {
     public void rollback() {
     }
 
-    private void backfillColumn(MongoTemplate mongoTemplate, TicketStatus status, String tenantId) {
-        Query query = new Query(Criteria.where("tenantId").is(tenantId)
-                .and(STATUS_FIELD).is(status)
+    private void backfillColumn(MongoTemplate mongoTemplate, TicketStatus status) {
+        Query query = new Query(Criteria.where(STATUS_FIELD).is(status)
                 .and(ORDER_FIELD).is(null));
         query.with(Sort.by(Sort.Direction.DESC, CREATED_AT_FIELD));
         List<Ticket> tickets = mongoTemplate.find(query, Ticket.class);

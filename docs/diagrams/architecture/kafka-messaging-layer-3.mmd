@@ -1,0 +1,5 @@
+flowchart LR
+    Service["Business Service"] --> Producer["OssTenantKafkaProducer"]
+    Producer --> Template["KafkaTemplate"]
+    Template --> Serializer["JsonSerializer"]
+    Serializer --> Broker["Kafka Cluster"]

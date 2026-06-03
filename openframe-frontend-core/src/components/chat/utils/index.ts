@@ -48,16 +48,6 @@ export {
   handleChatNavClick,
   type ChatNavClickInput,
 } from './nav-click-handler'
-// The unified navigation-execution primitive — single source of truth for
-// new-tab/same-tab + internal/external + embed/host + the runtime→router→window
-// fallback. Every surface routes through it (handleChatNavClick is now a wrapper).
-export {
-  executeNavigation,
-  executeNavigationImperative,
-  type ExecuteNavigationClickArgs,
-  type ExecuteNavigationImperativeArgs,
-  type NavClickEvent,
-} from './execute-navigation'
 export {
   computeIsNewTab,
   newTabAnchorAttrs,

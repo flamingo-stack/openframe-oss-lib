@@ -1,5 +1,7 @@
 flowchart TD
-    EventRequest["GET /api/v1/events"] --> Filter["EventFilterCriteria"]
-    Filter --> Service["EventService.queryEvents()"]
-    Service --> Mapper["EventMapper"]
-    Mapper --> EventsResponse["EventsResponse"]
+    LogReq["GET /logs"] --> LogCriteria["LogFilterCriteria"]
+    LogCriteria --> LogMapper
+    LogMapper --> LogOptions["LogFilterOptions"]
+    LogOptions --> LogService
+    LogService --> Page["Paginated Result"]
+    Page --> LogsResponse

@@ -104,7 +104,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             // File input adjustments
             "file:border-0 file:bg-transparent",
             // Disabled
-            "disabled:cursor-not-allowed disabled:text-ods-text-disabled disabled:placeholder:text-ods-border",
+            "disabled:cursor-not-allowed disabled:placeholder:text-ods-border",
             // Touch
             "touch-manipulation",
             // Autofill override

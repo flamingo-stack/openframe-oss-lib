@@ -1,6 +1,0 @@
-flowchart TD
-    Boot["Application Boot"] --> Initializers
-    Initializers --> Messaging["NATS Streams Ready"]
-    Messaging --> Schedulers
-    Schedulers --> External["External Systems"]
-    Controllers --> External

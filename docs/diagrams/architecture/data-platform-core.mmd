@@ -1,0 +1,21 @@
+flowchart TD
+    App["Application Layer"] --> DataCore["Data Platform Core"]
+
+    subgraph storage_layer["Storage & Analytics"]
+        Cassandra["Cassandra"]
+        Pinot["Apache Pinot"]
+        Mongo["MongoDB (External Module)"]
+        Redis["Redis (External Module)"]
+    end
+
+    subgraph streaming_layer["Streaming"]
+        Kafka["Kafka"]
+        NATS["NATS Messages (Models)"]
+    end
+
+    DataCore --> Cassandra
+    DataCore --> Pinot
+    DataCore --> Kafka
+    DataCore --> Mongo
+    DataCore --> Redis
+    DataCore --> NATS

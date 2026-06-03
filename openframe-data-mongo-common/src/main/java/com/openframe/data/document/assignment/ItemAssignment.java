@@ -1,5 +1,5 @@
 package com.openframe.data.document.assignment;
-import com.openframe.data.document.TenantScoped;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -10,7 +10,9 @@ import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
+
 import java.time.Instant;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -20,17 +22,21 @@ import java.time.Instant;
     @CompoundIndex(name = "item_target_unique", def = "{'itemId': 1, 'targetType': 1, 'targetId': 1}", unique = true),
     @CompoundIndex(name = "target_lookup", def = "{'targetType': 1, 'targetId': 1}")
 })
-public class ItemAssignment implements TenantScoped {
+public class ItemAssignment {
     @Id
     private String id;
-    @Indexed
-    private String tenantId;
+
     private String itemId;
+
     private AssignmentItemType itemType;
+
     private AssignmentTargetType targetType;
+
     @Indexed
     private String targetId;
+
     private String displayName;
+
     @CreatedDate
     private Instant createdAt;
 }

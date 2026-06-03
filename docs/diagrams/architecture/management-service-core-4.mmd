@@ -1,0 +1,4 @@
+flowchart TD
+    Trigger["Scheduled Trigger"] --> Check["Check Connector Status"]
+    Check --> Restart["Restart Failed Tasks"]
+    Restart --> Done["Complete"]

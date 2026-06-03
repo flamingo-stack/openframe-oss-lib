@@ -13,9 +13,10 @@ import java.util.Optional;
 @Repository
 public interface ReleaseVersionRepository extends MongoRepository<ReleaseVersion, String> {
 
+    /**
+     * Find the first (and should be only) release version document
+     * @return Optional containing the release version if found
+     */
     Optional<ReleaseVersion> findFirstByOrderByCreatedAtAsc();
-
-    /** Returns the single release version for this tenant. TenantAwareMongoTemplate auto-scopes by tenantId. */
-    Optional<ReleaseVersion> findFirstBy();
 }
 

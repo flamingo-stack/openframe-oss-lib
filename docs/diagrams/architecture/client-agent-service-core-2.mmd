@@ -1,0 +1,11 @@
+sequenceDiagram
+    participant Agent
+    participant Controller as "Agent Controller"
+    participant Service as "Agent Registration Service"
+    participant Processor as "Registration Processor"
+
+    Agent->>Controller: Register with X-Initial-Key
+    Controller->>Service: register(initialKey, request)
+    Service->>Processor: postProcessAgentRegistration()
+    Service-->>Controller: AgentRegistrationResponse
+    Controller-->>Agent: 200 OK

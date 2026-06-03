@@ -31,10 +31,6 @@ export interface MoreActionsMenuProps {
   side?: 'top' | 'right' | 'bottom' | 'left'
   sideOffset?: number
   className?: string
-  /** Appended to the dropdown content. To render the menu above a high-z
-   *  surface (drawer, modal), prefer wrapping that surface in a
-   *  `PortalContainerContext` provider rather than escalating z-index here. */
-  contentClassName?: string
   ariaLabel?: string
   /** Custom trigger element. When provided, replaces the default ellipsis icon button. */
   trigger?: React.ReactNode
@@ -42,9 +38,6 @@ export interface MoreActionsMenuProps {
   open?: boolean
   /** Called when the open state changes — use together with `open`. */
   onOpenChange?: (open: boolean) => void
-  /** Forwarded to the dropdown content. Call `e.preventDefault()` to stop
-   *  Radix returning focus (and its focus ring) to the trigger on close. */
-  onCloseAutoFocus?: (event: Event) => void
 }
 
 /**
@@ -57,12 +50,10 @@ export function MoreActionsMenu({
   side = 'bottom',
   sideOffset = 6,
   className,
-  contentClassName,
   ariaLabel = 'More actions',
   trigger,
   open,
-  onOpenChange,
-  onCloseAutoFocus
+  onOpenChange
 }: MoreActionsMenuProps) {
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange}>
@@ -82,11 +73,7 @@ export function MoreActionsMenu({
         align={align}
         side={side}
         sideOffset={sideOffset}
-        onCloseAutoFocus={onCloseAutoFocus}
-        className={cn(
-          'bg-ods-card border border-ods-border p-0 rounded-[4px] min-w-[200px]',
-          contentClassName,
-        )}
+        className="bg-ods-card border border-ods-border p-0 rounded-[4px] min-w-[200px]"
       >
         {items.map((item, idx) => {
           const itemClassName =

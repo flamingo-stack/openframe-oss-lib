@@ -1,9 +1,7 @@
-sequenceDiagram
-    participant Browser
-    participant BFF
-    participant Auth as Authorization Server
-
-    Browser->>BFF: POST /oauth/refresh
-    BFF->>Auth: Refresh token request
-    Auth->>BFF: New tokens
-    BFF->>Browser: Set new cookies
+flowchart TD
+    Browser["Browser"] -->|"Auth Request"| BFF["Security Core And Oauth Bff"]
+    BFF -->|"Code Exchange"| AuthServer["Authorization Service"]
+    AuthServer -->|"JWT Issued"| BFF
+    BFF -->|"HTTP Only Cookies"| Browser
+    Browser -->|"Requests with Cookies"| Gateway["Gateway Service"]
+    Gateway -->|"Validate JWT"| Resource["API Services"]

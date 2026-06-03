@@ -1,6 +1,11 @@
-flowchart TD
-    Verifier["Code Verifier (random 32 bytes)"] --> Hash["SHA-256"]
-    Hash --> Challenge["Base64URL Encode"]
+sequenceDiagram
+    participant Browser
+    participant BFF as "OAuthBffController"
+    participant Auth as "Authorization Server"
 
-    Challenge -->|"Sent to Authorization Server"| AuthServer["Authorization Server"]
-    Verifier -->|"Stored by BFF"| BffStore["State JWT / Cookie"]
+    Browser->>BFF: GET /oauth/login
+    BFF->>Auth: Redirect with state + PKCE challenge
+    Auth->>Browser: Redirect with code
+    Browser->>BFF: GET /oauth/callback
+    BFF->>Auth: Exchange code for tokens
+    BFF->>Browser: Set cookies + redirect

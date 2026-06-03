@@ -1,0 +1,6 @@
+flowchart LR
+    Init["Application Startup"] --> IndexInit["MongoIndexConfig.initIndexes()"]
+    IndexInit --> Index1["Index on userId + timestamp"]
+    IndexInit --> Index2["Index on type + metadata.tags"]
+    Index1 --> EventsCollection[("application_events")]
+    Index2 --> EventsCollection

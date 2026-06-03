@@ -53,13 +53,4 @@ public interface RegistrationProcessor {
     default void postProcessAutoProvision(AuthUser user, String pictureUrl) {
         // Default no-op implementation
     }
-
-    /**
-     * Returns the tenantId the new Tenant document must adopt.
-     * SaaS impl atomically claims a READY cluster and returns its pre-generated tenantId.
-     * OSS default generates a fresh UUID.
-     */
-    default String reserveTenantIdForRegistration(TenantRegistrationRequest request) {
-        return Tenant.generateTenantId();
-    }
 }

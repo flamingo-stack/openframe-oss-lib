@@ -7,6 +7,7 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.mongodb.core.index.Indexed;
 
 import java.time.LocalDateTime;
 
@@ -19,6 +20,11 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class SSOPerTenantConfig extends SSOConfig {
+    /**
+     * Tenant ID this SSO configuration belongs to
+     */
+    @Indexed(unique = true, sparse = true)
+    private String tenantId;
 
     @CreatedDate
     private LocalDateTime createdAt;

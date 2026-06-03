@@ -1,0 +1,5 @@
+flowchart LR
+    Service["Service Method"] --> Annotation["@Cacheable"]
+    Annotation --> CacheManager["RedisCacheManager"]
+    CacheManager --> Prefix["Tenant Aware Prefix"]
+    Prefix --> Redis[("Redis Store")]

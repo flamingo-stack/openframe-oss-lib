@@ -1,0 +1,5 @@
+flowchart TD
+    MessageHandler --> GenericHandler["GenericMessageHandler"]
+    GenericHandler --> DebeziumHandler["DebeziumMessageHandler"]
+    DebeziumHandler --> CassandraHandler
+    DebeziumHandler --> KafkaHandler

@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { cn } from '../../../utils/cn'
 import { ChevronRight } from 'lucide-react'
-import { TicketStatusTag, resolveStatusTagProps, resolveTicketStatus } from '../../ui/ticket-status-tag'
+import { TicketStatusTag, resolveTicketStatus } from '../../ui/ticket-status-tag'
 import { Tag } from '../../ui/tag'
 import { WrenchIcon } from '../../icons-v2-generated/household/wrench-icon'
 
@@ -20,10 +20,6 @@ export interface ChatTicketItemData {
    *  When omitted, the canonical status's default label is used
    *  ("Resolved" for closed, "Active" for open, etc.). */
   statusLabel?: string
-  /** Lifecycle (custom-status) kind — drives canonical-vs-color styling. */
-  statusKind?: string
-  /** Lifecycle (custom-status) hex color, used when the kind isn't canonical. */
-  statusColor?: string
   category?: string
   timeAgo?: string
   /** When set, renders a "Linked work" chip with a wrench icon next to
@@ -42,13 +38,7 @@ export interface ChatTicketItemProps extends Omit<React.ButtonHTMLAttributes<HTM
 
 const ChatTicketItem = React.forwardRef<HTMLButtonElement, ChatTicketItemProps>(
   ({ className, ticket, onClick, ...props }, ref) => {
-    const statusTagProps = resolveStatusTagProps({
-      status: ticket.status,
-      statusKind: ticket.statusKind,
-      statusName: ticket.statusLabel,
-      statusColor: ticket.statusColor,
-    })
-    const isResolved = ticket.statusKind === 'RESOLVED' || resolveTicketStatus(ticket.status) === 'RESOLVED'
+    const isResolved = resolveTicketStatus(ticket.status) === 'RESOLVED'
 
     const subtitle = [ticket.ticketNumber, ticket.category, ticket.timeAgo]
       .filter(Boolean)
@@ -103,7 +93,7 @@ const ChatTicketItem = React.forwardRef<HTMLButtonElement, ChatTicketItemProps>(
             className="shrink-0 hidden sm:inline-flex"
           />
         )}
-        {(statusTagProps.status || statusTagProps.label) && <TicketStatusTag {...statusTagProps} />}
+        <TicketStatusTag status={ticket.status} label={ticket.statusLabel} />
 
         <div className="flex items-center justify-center shrink-0 size-12 rounded-md bg-ods-card border border-ods-border">
           <ChevronRight className="size-6 text-ods-text-secondary" />

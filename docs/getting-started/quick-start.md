@@ -1,200 +1,366 @@
-# Quick Start
+# Quick Start Guide
 
-Get up and running with **openframe-oss-lib** in 5 minutes.
+Get OpenFrame OSS Libraries up and running in just 5 minutes! This guide walks you through cloning, building, and running the core services with minimal configuration.
 
----
-
-## TL;DR
+## TL;DR - 5-Minute Setup
 
 ```bash
 # 1. Clone the repository
 git clone https://github.com/flamingo-stack/openframe-oss-lib.git
 cd openframe-oss-lib
 
-# 2. Build the full library (skip tests for speed)
-mvn install -DskipTests
+# 2. Start dependencies with Docker
+docker-compose up -d
 
-# 3. Verify the build
-mvn verify -pl openframe-core -DskipTests
+# 3. Build the project
+mvn clean install -DskipTests
+
+# 4. Run a sample service
+cd openframe-api-service-core
+mvn spring-boot:run
 ```
 
----
+## Step-by-Step Setup
 
-## Step 1 — Clone the Repository
+### Step 1: Clone the Repository
 
 ```bash
 git clone https://github.com/flamingo-stack/openframe-oss-lib.git
 cd openframe-oss-lib
 ```
 
-The repository contains 30+ Maven modules under a single parent POM at the root.
+**What you get:**
+- Complete OpenFrame OSS Libraries source code
+- Multi-module Maven project structure
+- Sample configurations and documentation
 
----
+### Step 2: Start Infrastructure Dependencies
 
-## Step 2 — Configure GitHub Packages (Required for Dependency Resolution)
+Create a `docker-compose.yml` file for quick dependency setup:
 
-Add your GitHub credentials to `~/.m2/settings.xml`:
+```yaml
+version: '3.8'
+services:
+  mongodb:
+    image: mongo:7-jammy
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=openframe
+    volumes:
+      - mongo_data:/data/db
 
-```xml
-<settings>
-  <servers>
-    <server>
-      <id>github</id>
-      <username>YOUR_GITHUB_USERNAME</username>
-      <password>YOUR_GITHUB_PAT</password>
-    </server>
-  </servers>
-</settings>
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+volumes:
+  mongo_data:
+  redis_data:
 ```
 
-> A GitHub Personal Access Token (PAT) with `read:packages` scope is required. See the [Prerequisites Guide](prerequisites.md) for details.
-
----
-
-## Step 3 — Build the Library
-
-Build all modules without running tests for the fastest initial setup:
+Start the services:
 
 ```bash
-mvn install -DskipTests
+docker-compose up -d
 ```
 
-Expected output:
+**Verification:**
+```bash
+# Check all services are running
+docker-compose ps
 
+# Test connections
+mongosh --eval "db.adminCommand('ping')"
+redis-cli ping
+```
+
+### Step 3: Build the Project
+
+Build all modules with Maven:
+
+```bash
+mvn clean install -DskipTests
+```
+
+**Expected output:**
 ```text
-[INFO] Reactor Summary for OpenFrame OSS Libraries 5.79.3:
-[INFO]
-[INFO] openframe-exception ....................  SUCCESS [  3.5 s]
-[INFO] openframe-core ........................  SUCCESS [  2.1 s]
-[INFO] openframe-core-crypto .................  SUCCESS [  1.8 s]
-[INFO] openframe-data-mongo-common ...........  SUCCESS [  4.2 s]
-...
+[INFO] Reactor Summary for OpenFrame OSS Libraries:
+[INFO] 
+[INFO] openframe-core ..................................... SUCCESS
+[INFO] openframe-data-mongo ............................... SUCCESS
+[INFO] openframe-api-lib .................................. SUCCESS
+[INFO] openframe-security-core ............................ SUCCESS
+[INFO] openframe-api-service-core ......................... SUCCESS
+[INFO] ... (other modules)
 [INFO] BUILD SUCCESS
 ```
 
----
+> **Note**: We skip tests initially to speed up the first build. Run tests later with `mvn test`.
 
-## Step 4 — Add a Module as a Dependency
+### Step 4: Configure Environment
 
-To use a specific module in your own Spring Boot service, add the parent BOM and the desired dependency to your `pom.xml`:
+Create an `application.yml` file in your working directory:
 
-```xml
-<dependencyManagement>
-  <dependencies>
-    <!-- Import the OpenFrame OSS BOM -->
-    <dependency>
-      <groupId>com.openframe.oss</groupId>
-      <artifactId>openframe-oss-lib</artifactId>
-      <version>5.79.3</version>
-      <type>pom</type>
-      <scope>import</scope>
-    </dependency>
-  </dependencies>
-</dependencyManagement>
+```yaml
+# Basic configuration for quick start
+spring:
+  profiles:
+    active: development
+  
+  # MongoDB Configuration
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/openframe
+  
+  # Redis Configuration
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  
+  # Kafka Configuration
+  kafka:
+    bootstrap-servers: localhost:9092
+    
+# Security Configuration
+openframe:
+  security:
+    jwt:
+      secret: development-secret-key-change-in-production
+  oauth:
+    encryption-key: dev-key-32-chars-long-minimum!!
 
-<dependencies>
-  <!-- Example: Add core module -->
-  <dependency>
-    <groupId>com.openframe.oss</groupId>
-    <artifactId>openframe-core</artifactId>
-  </dependency>
+# Server Configuration
+server:
+  port: 8080
 
-  <!-- Example: Add MongoDB sync support -->
-  <dependency>
-    <groupId>com.openframe.oss</groupId>
-    <artifactId>openframe-data-mongo-sync</artifactId>
-  </dependency>
-
-  <!-- Example: Add API service core -->
-  <dependency>
-    <groupId>com.openframe.oss</groupId>
-    <artifactId>openframe-api-service-core</artifactId>
-  </dependency>
-</dependencies>
+# Logging
+logging:
+  level:
+    com.openframe: DEBUG
+    org.springframework.security: DEBUG
 ```
 
----
+### Step 5: Run the API Service
 
-## Step 5 — Run Tests for a Specific Module
-
-To run tests for a single module:
+Start the main API service:
 
 ```bash
-# Run unit tests only for a specific module
-mvn test -pl openframe-core
-
-# Run integration tests (requires Docker)
-mvn verify -pl openframe-data-mongo-sync
+cd openframe-api-service-core
+mvn spring-boot:run
 ```
 
-> Integration tests use Testcontainers and require a running Docker daemon.
-
----
-
-## Available Modules — Quick Reference
-
-| Module | GroupId | Description |
-|--------|---------|-------------|
-| `openframe-core` | `com.openframe.oss` | Core utilities, pagination, validation |
-| `openframe-exception` | `com.openframe.oss` | Standard exception hierarchy |
-| `openframe-core-crypto` | `com.openframe.oss` | Encryption utilities |
-| `openframe-security-core` | `com.openframe.oss` | JWT, PKCE, cookie service |
-| `openframe-security-oauth` | `com.openframe.oss` | OAuth2 BFF layer |
-| `openframe-authorization-service-core` | `com.openframe.oss` | Multi-tenant OAuth2 auth server |
-| `openframe-api-lib` | `com.openframe.oss` | API contracts, filter DTOs |
-| `openframe-api-service-core` | `com.openframe.oss` | REST + GraphQL API service layer |
-| `openframe-gateway-service-core` | `com.openframe.oss` | Reactive gateway, routing, security |
-| `openframe-data-mongo-common` | `com.openframe.oss` | MongoDB domain documents |
-| `openframe-data-mongo-sync` | `com.openframe.oss` | Synchronous MongoDB repositories |
-| `openframe-data-mongo-reactive` | `com.openframe.oss` | Reactive MongoDB repositories |
-| `openframe-data-redis` | `com.openframe.oss` | Redis cache configuration |
-| `openframe-data-kafka` | `com.openframe.oss` | Kafka multi-tenant configuration |
-| `openframe-data-nats` | `com.openframe.oss` | NATS real-time messaging |
-| `openframe-data-cassandra` | `com.openframe.oss` | Cassandra log storage |
-| `openframe-data-pinot` | `com.openframe.oss` | Apache Pinot analytics |
-| `openframe-management-service-core` | `com.openframe.oss` | Schedulers, initializers |
-| `openframe-stream-service-core` | `com.openframe.oss` | Kafka streams, event enrichment |
-| `openframe-external-api-service-core` | `com.openframe.oss` | External REST API |
-| `sdk/fleetmdm` | `com.openframe.oss` | Fleet MDM Java SDK |
-| `sdk/tacticalrmm` | `com.openframe.oss` | Tactical RMM Java SDK |
-
----
-
-## Expected Results
-
-After a successful `mvn install -DskipTests` you should see:
-
+**Expected startup logs:**
 ```text
-[INFO] BUILD SUCCESS
-[INFO] Total time: 2-4 minutes (depending on hardware)
-[INFO] Finished at: ...
+  ____                   _____                          
+ / __ \                 |  __ \                         
+| |  | |_ __   ___ _ __ | |__) |_ __ __ _ _ __ ___   ___ 
+| |  | | '_ \ / _ \ '_ \|  _  /| '__/ _` | '_ ` _ \ / _ \
+| |__| | |_) |  __/ | | | | \ \| | | (_| | | | | | |  __/
+ \____/| .__/ \___|_| |_|_|  \_\_|  \__,_|_| |_| |_|\___|
+       | |                                               
+       |_|                                               
+
+OpenFrame API Service Core v5.32.0
+Started ApiServiceApplication in 12.34 seconds
 ```
 
-All modules are installed into your local Maven repository (`~/.m2/repository/com/openframe/oss/`).
+The service will be available at `http://localhost:8080`.
 
----
+## Verify Your Installation
 
-## Video Walkthrough
+### Test the Health Endpoint
 
-[![Getting Started with OpenFrame - Organization Setup Basics](https://img.youtube.com/vi/-_56_qYvMWk/maxresdefault.jpg)](https://www.youtube.com/watch?v=-_56_qYvMWk)
+```bash
+curl http://localhost:8080/health
+```
 
----
+**Expected response:**
+```json
+{
+  "status": "OK"
+}
+```
+
+### Explore the GraphQL Schema
+
+Visit the GraphQL Playground:
+```
+http://localhost:8080/graphiql
+```
+
+Try a sample query:
+```graphql
+query {
+  __schema {
+    types {
+      name
+      description
+    }
+  }
+}
+```
+
+### Test Authentication Setup
+
+Check the OAuth2 configuration endpoint:
+```bash
+curl http://localhost:8080/.well-known/openid-configuration
+```
+
+You should see a JSON response with OAuth2/OIDC discovery information.
+
+## Available Endpoints
+
+With the API service running, you have access to:
+
+| Endpoint | Type | Description |
+|----------|------|-------------|
+| `/health` | REST | Service health check |
+| `/graphql` | GraphQL | Main data API |
+| `/graphiql` | Web UI | GraphQL playground |
+| `/api/users` | REST | User management |
+| `/api/organizations` | REST | Organization management |
+| `/oauth/token` | OAuth2 | Token endpoint |
+| `/.well-known/openid-configuration` | OIDC | Discovery document |
+
+## What's Running?
+
+After completing the quick start, you have:
+
+### **Infrastructure Services**
+- ✅ MongoDB (port 27017) - Primary database
+- ✅ Redis (port 6379) - Caching and sessions  
+- ✅ Kafka (port 9092) - Event streaming
+- ✅ Zookeeper (port 2181) - Kafka coordination
+
+### **OpenFrame Services**
+- ✅ API Service Core (port 8080) - Main application API
+- ✅ OAuth2 Authorization Server - Multi-tenant authentication
+- ✅ GraphQL API - Efficient data queries
+- ✅ REST APIs - Administrative operations
+
+## Sample Data Operations
+
+### Create an Organization
+
+```bash
+curl -X POST http://localhost:8080/api/organizations \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Sample MSP",
+    "contactInformation": {
+      "email": "admin@samplemsp.com",
+      "phone": "+1-555-0123"
+    }
+  }'
+```
+
+### Query via GraphQL
+
+```bash
+curl -X POST http://localhost:8080/graphql \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "query { organizations { edges { node { id name } } } }"
+  }'
+```
+
+## Performance Tips
+
+For better development performance:
+
+```bash
+# Use parallel builds
+mvn clean install -T 4
+
+# Skip non-essential plugins
+mvn clean install -DskipTests -Dcheckstyle.skip
+
+# Increase Maven memory
+export MAVEN_OPTS="-Xmx4g -XX:MaxMetaspaceSize=512m"
+```
 
 ## Troubleshooting
 
-| Problem | Solution |
-|---------|---------|
-| `Could not resolve dependencies` | Check `~/.m2/settings.xml` for GitHub credentials |
-| `OutOfMemoryError` during build | Set `export MAVEN_OPTS="-Xmx4g"` |
-| Integration tests fail | Ensure Docker daemon is running |
-| `flatten-maven-plugin` errors | Upgrade Maven to 3.9+ |
+### Build Issues
 
----
+**"Java version not supported"**
+```bash
+java -version  # Ensure Java 21+
+echo $JAVA_HOME  # Verify JAVA_HOME
+```
+
+**"Tests failing"**
+```bash
+# Skip tests initially
+mvn clean install -DskipTests
+```
+
+### Connection Issues
+
+**MongoDB connection refused**
+```bash
+# Check Docker container
+docker-compose ps
+docker-compose logs mongodb
+```
+
+**Port conflicts**
+```bash
+# Check what's using the ports
+lsof -i :8080
+lsof -i :27017
+```
+
+### Memory Issues
+
+**OutOfMemoryError during build**
+```bash
+export MAVEN_OPTS="-Xmx4g -XX:MaxMetaspaceSize=1g"
+```
 
 ## Next Steps
 
-After building successfully, explore:
+Congratulations! You now have OpenFrame OSS Libraries running locally. 
 
-- [First Steps Guide](first-steps.md) for key module walkthroughs
-- [Development Environment Setup](../development/setup/environment.md) for IDE configuration
-- [Architecture Overview](../development/architecture/README.md) for system design patterns
+Continue your journey:
+
+1. **[First Steps Guide](first-steps.md)** - Explore key features and capabilities
+2. **[Development Setup](../development/setup/local-development.md)** - Configure your development environment
+3. **[Architecture Overview](../development/architecture/README.md)** - Understand the system design
+
+## Getting Help
+
+If you encounter issues:
+
+- Check our [OpenMSP Slack Community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
+- Review the [Prerequisites](prerequisites.md) guide
+- Browse the [GitHub Issues](https://github.com/flamingo-stack/openframe-oss-lib/issues)
+
+---
+
+*Happy coding! You're now ready to explore the full power of OpenFrame OSS Libraries.*

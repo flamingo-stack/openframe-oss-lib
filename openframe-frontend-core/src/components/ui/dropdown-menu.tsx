@@ -5,7 +5,6 @@ import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu"
 import { Check, ChevronRight, Circle } from "lucide-react"
 
 import { cn } from "../../utils/cn"
-import { usePortalContainer } from "./portal-container"
 
 const DropdownMenu = DropdownMenuPrimitive.Root
 
@@ -60,12 +59,8 @@ DropdownMenuSubContent.displayName =
 const DropdownMenuContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>
->(({ className, sideOffset = 4, ...props }, ref) => {
-  // Portal into the active container (e.g. a drawer) so the menu inherits its
-  // stacking context; falls back to `document.body` when none is provided.
-  const container = usePortalContainer()
-  return (
-  <DropdownMenuPrimitive.Portal container={container ?? undefined}>
+>(({ className, sideOffset = 4, ...props }, ref) => (
+  <DropdownMenuPrimitive.Portal>
     <DropdownMenuPrimitive.Content
       ref={ref}
       sideOffset={sideOffset}
@@ -76,8 +71,7 @@ const DropdownMenuContent = React.forwardRef<
       {...props}
     />
   </DropdownMenuPrimitive.Portal>
-  )
-})
+))
 DropdownMenuContent.displayName = DropdownMenuPrimitive.Content.displayName
 
 const DropdownMenuItem = React.forwardRef<

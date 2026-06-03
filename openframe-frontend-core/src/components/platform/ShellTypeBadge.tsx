@@ -6,7 +6,7 @@
  */
 
 import React from 'react'
-import { PowershellLogoGreyIcon } from '../icons-v2-generated/brand-logos/powershell-logo-grey-icon'
+import { PowershellLogoIcon } from '../icons-v2-generated/brand-logos/powershell-logo-icon'
 import { PythonLogoIcon } from '../icons-v2-generated/brand-logos/python-logo-icon'
 
 import { ShellType, ShellTypeValues } from '../../types/shell.types'
@@ -34,7 +34,7 @@ interface ShellIconConfig {
  */
 const shellIconMap: Record<ShellType, ShellIconConfig> = {
   [ShellTypeValues.POWERSHELL]: {
-    icon: PowershellLogoGreyIcon,
+    icon: PowershellLogoIcon,
     props: { size: 16, className: 'text-ods-text-secondary' }
   },
   [ShellTypeValues.CMD]: {

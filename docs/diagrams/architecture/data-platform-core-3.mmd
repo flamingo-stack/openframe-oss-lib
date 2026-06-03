@@ -1,0 +1,6 @@
+flowchart LR
+    Filters["Filter Inputs"] --> Builder["Build WHERE Clause"]
+    Builder --> Query["Construct SQL Query"]
+    Query --> Pinot["Pinot Broker"]
+    Pinot --> Result["ResultSet"]
+    Result --> Map["Map to Filter Options / Count"]

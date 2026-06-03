@@ -34,12 +34,6 @@ export interface ChatHeaderTicketInfo {
   title: React.ReactNode
   meta?: React.ReactNode
   status?: string
-  /** Lifecycle (custom-status) display name. */
-  statusName?: string
-  /** Lifecycle (custom-status) hex color, used when the kind isn't canonical. */
-  statusColor?: string
-  /** Lifecycle (custom-status) kind — drives canonical-vs-color styling. */
-  statusKind?: string
 }
 
 export interface ChatHeaderProps extends HTMLAttributes<HTMLDivElement> {
@@ -290,10 +284,7 @@ export interface SlashCommandsProp {
 }
 
 export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'onSubmit'> {
-  /** Source-compatible widening: returning `false` (or a Promise resolving to
-   *  `false`) tells the input to KEEP the draft (e.g. a failed send). `void` /
-   *  `true` clears as before — preserves every existing caller's behavior. */
-  onSend?: (message: string) => void | boolean | Promise<boolean | void>
+  onSend?: (message: string) => void
   onStop?: () => void | Promise<void>
   sending?: boolean
   awaitingResponse?: boolean
@@ -315,10 +306,6 @@ export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextArea
    *  primitives (no raw HTML elements) and ODS tokens for theming.
    *  Backward compat: omit to disable autocomplete entirely. */
   slashCommands?: SlashCommandsProp
-  /** When true, send is allowed with EMPTY text (e.g. an attachments-only
-   *  reply); `onSend('')` fires. Default false → today's text-required gate.
-   *  Used by the ticket reply composer so a file-only reply can send. */
-  allowEmptySend?: boolean
 }
 
 export interface ChatInputRef {

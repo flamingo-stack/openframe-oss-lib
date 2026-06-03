@@ -24,13 +24,6 @@ export interface BoardTicket {
 
 export interface BoardColumnDef {
   id: string
-  /**
-   * Canonical status key for header styling (e.g. 'ACTIVE', 'RESOLVED'), when the
-   * column `id` is not itself a known status (e.g. a custom-status UUID). The
-   * header resolves its TicketStatusTag variant/icon from this, falling back to
-   * `id`. Leave undefined for custom statuses so they render from `color`.
-   */
-  statusKey?: string
   label: string
   color: string
   tickets: BoardTicket[]
@@ -56,7 +49,6 @@ export interface BoardChange {
 
 const STATUS_DEFAULTS: Record<TicketStatus, { label: string; color: string }> = {
   ACTIVE: { label: 'Active', color: '#5ea62e' },
-  AI_ASSISTANCE: { label: 'AI Assistance', color: '#888888' },
   TECH_REQUIRED: { label: 'Tech Required', color: '#e1b32f' },
   ON_HOLD: { label: 'On Hold', color: '#f36666' },
   RESOLVED: { label: 'Resolved', color: '#888888' },
@@ -91,7 +83,6 @@ export function groupTicketsByStatus(
 ): BoardColumnDef[] {
   const buckets: Record<TicketStatus, BoardTicket[]> = {
     ACTIVE: [],
-    AI_ASSISTANCE: [],
     TECH_REQUIRED: [],
     ON_HOLD: [],
     RESOLVED: [],
@@ -109,7 +100,6 @@ function canonicalize(status: string): TicketStatus | null {
   if (upper === 'ACTION_REQUIRED') return 'TECH_REQUIRED'
   if (
     upper === 'ACTIVE' ||
-    upper === 'AI_ASSISTANCE' ||
     upper === 'TECH_REQUIRED' ||
     upper === 'ON_HOLD' ||
     upper === 'RESOLVED' ||

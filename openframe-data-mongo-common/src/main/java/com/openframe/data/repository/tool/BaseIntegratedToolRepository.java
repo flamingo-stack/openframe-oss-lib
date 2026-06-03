@@ -1,4 +1,5 @@
 package com.openframe.data.repository.tool;
+
 /**
  * Base interface defining common integrated tool repository operations.
  * This interface is technology-agnostic and can be implemented by both reactive and non-reactive repositories.
@@ -15,9 +16,4 @@ public interface BaseIntegratedToolRepository<T, B, ID> {
      * @return The tool wrapped in T (Optional<IntegratedTool> for blocking, Mono<IntegratedTool> for reactive)
      */
     T findByType(String type);
-    /**
-     * Find an integrated tool by its human-readable key (e.g. "fleetmdm-server").
-     * TenantAwareMongoTemplate auto-injects tenantId for tenant-side services.
-     */
-    T findByKey(String key);
 } 

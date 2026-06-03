@@ -18,7 +18,7 @@
  */
 
 import type { ComponentType } from 'react';
-import { PageShell, PageLayout, PageHeading } from '../../ui';
+import { PageShell, PageLayout } from '../../ui';
 import { SimpleMarkdownRenderer } from '../../ui/simple-markdown-renderer';
 import { useRouter } from '../../../embed-shims/next-navigation';
 import { useLegalDocs, type LegalDocument } from './use-legal-docs';
@@ -100,10 +100,10 @@ export function LegalDocumentPage({
   // Title with accent-colon trailing dot — matches knowledge-hub typography
   const customTitle = (
     <div className="flex flex-col gap-4">
-      <PageHeading>
+      <h1 className="font-['Azeret_Mono'] text-[32px] md:text-[40px] lg:text-[48px] font-semibold leading-[1em] tracking-[-0.02em] text-ods-text-primary">
         <span>{title}</span>
         <span className="text-ods-accent">.</span>
-      </PageHeading>
+      </h1>
       <p className="font-['DM_Sans'] text-base md:text-lg text-ods-text-secondary max-w-2xl">
         {effectiveLastUpdatedLabel ? `Last Updated: ${effectiveLastUpdatedLabel}` : fallbackDescription}
         {data?.sourceFile && (

@@ -39,7 +39,6 @@ export function TitleBlock({
   className,
 }: TitleBlockProps) {
   const hasActions = actions && actions.length > 0
-  const hasMenuActions = !!menuActions && menuActions.some(g => g.items.length > 0)
 
   return (
     <div
@@ -90,7 +89,7 @@ export function TitleBlock({
         )}
       </div>
 
-      {(hasActions || hasMenuActions || selector) && (
+      {(hasActions || selector) && (
         <div className="flex gap-2 items-center shrink-0">
           <PageActions
             variant={actionsVariant}

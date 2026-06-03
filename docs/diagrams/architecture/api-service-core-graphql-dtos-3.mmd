@@ -1,6 +1,0 @@
-flowchart TD
-    GraphQLInput["GraphQL Filter Input"] --> DataFetcher["Data Fetcher"]
-    DataFetcher --> Criteria["Domain Filter Criteria"]
-    Criteria --> Repository["Custom Repository"]
-    Repository --> Results["Domain Documents"]
-    Results --> Connection["Connection DTO"]

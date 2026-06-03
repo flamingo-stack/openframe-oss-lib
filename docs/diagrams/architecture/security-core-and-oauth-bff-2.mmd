@@ -1,11 +1,6 @@
 flowchart TD
-    JwtConfig["JwtConfig"] -->|"loadPublicKey()"| PublicKey["RSAPublicKey"]
+    JwtSecurityConfig -->|"loads"| JwtConfig
+    JwtConfig -->|"loadPublicKey()"| PublicKey["RSAPublicKey"]
     JwtConfig -->|"loadPrivateKey()"| PrivateKey["RSAPrivateKey"]
-
-    PublicKey --> RsaKey["RSAKey Builder"]
-    PrivateKey --> RsaKey
-
-    RsaKey --> JwkSet["JWKSet"]
-    JwkSet --> JwtEncoder["NimbusJwtEncoder"]
-
-    PublicKey --> JwtDecoder["NimbusJwtDecoder"]
+    JwtSecurityConfig --> Encoder["NimbusJwtEncoder"]
+    JwtSecurityConfig --> Decoder["NimbusJwtDecoder"]

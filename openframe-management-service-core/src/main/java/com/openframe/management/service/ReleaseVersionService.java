@@ -26,7 +26,7 @@ public class ReleaseVersionService {
     public void process(String releaseVersion) {
         log.info("Processing release version: {}", releaseVersion);
 
-        releaseVersionRepository.findFirstBy()
+        releaseVersionRepository.findById(ReleaseVersion.DEFAULT_ID)
                 .ifPresentOrElse(
                         existing -> updateExistingReleaseVersion(existing, releaseVersion),
                         () -> createNewReleaseVersion(releaseVersion)
@@ -57,6 +57,7 @@ public class ReleaseVersionService {
     private void createNewReleaseVersion(String releaseVersion) {
         log.info("Creating initial release version record for: {}", releaseVersion);
         ReleaseVersion newReleaseVersion = new ReleaseVersion();
+        newReleaseVersion.setId(ReleaseVersion.DEFAULT_ID);
         newReleaseVersion.setVersion(releaseVersion);
 
         ReleaseVersion saved = releaseVersionRepository.save(newReleaseVersion);

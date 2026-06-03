@@ -1,0 +1,5 @@
+flowchart TD
+    MachineIds2["List&lt;machineId&gt;"] --> ToolService["ToolConnectionService"]
+    ToolService --> ToolRepo["ToolConnectionRepository"]
+    ToolRepo --> ToolService
+    ToolService --> Grouped2["Grouped By MachineId"]

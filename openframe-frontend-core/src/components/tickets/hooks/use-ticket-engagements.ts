@@ -73,32 +73,16 @@ export interface UseTicketEngagementsReturn {
   refetch: () => void
 }
 
-export function useTicketEngagements(
-  externalTicketId: string | null | undefined,
-  enabled = true,
-  /** Poll cadence (ms) for live conversation refresh while the drawer is
-   *  open. The drawer only mounts this hook when expanded, so a constant
-   *  here is already gated to "drawer open" — closing the drawer unmounts
-   *  the panel and the polling stops. `false`/undefined disables it (the
-   *  default, preserving prior fetch-once-per-open behavior for any other
-   *  caller). Mirrors `useTicketsList.refetchInterval`; see
-   *  `TICKET_LIVE_POLL_MS`. */
-  refetchInterval: number | false = false,
-): UseTicketEngagementsReturn {
+export function useTicketEngagements(externalTicketId: string | null | undefined, enabled = true): UseTicketEngagementsReturn {
   const identity = useChatIdentity()
   const identityKey = identity.user?.email ?? 'anon'
 
-  // "Will this ticket fetch its timeline once identity is ready?" — i.e. it's a
-  // real, non-optimistic ticket the caller enabled. INDEPENDENT of whether
-  // identity has resolved yet, so the loading state is correct from the very
-  // first render (before `useChatIdentity` settles).
-  const fetchable =
+  const queryEnabled =
     enabled &&
+    identity.authTier !== 'anon' &&
+    !!identity.user?.email &&
     !!externalTicketId &&
     !externalTicketId.startsWith('temp-') // optimistic placeholders have no real id yet
-
-  const queryEnabled =
-    fetchable && identity.authTier !== 'anon' && !!identity.user?.email
 
   const query = useQuery({
     queryKey: ['ticket-engagements', externalTicketId, identityKey],
@@ -110,11 +94,6 @@ export function useTicketEngagements(
     gcTime: 0,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
-    // Live conversation: poll while the caller opts in (drawer open). New
-    // agent replies + attachments appear within one interval without a
-    // manual refresh. `refetchIntervalInBackground` stays false (default)
-    // so polling pauses on a hidden tab.
-    refetchInterval,
     queryFn: async (): Promise<TicketEngagement[]> => {
       const response = await embedAuthedFetch(LIST_ENGAGEMENTS_ENDPOINT, {
         method: 'POST',
@@ -131,22 +110,7 @@ export function useTicketEngagements(
 
   return {
     engagements: query.data ?? [],
-    // Loading-state truth that prevents the "body → blink → skeleton → data"
-    // double-flash. The bug: `useChatIdentity` starts at anon defaults and
-    // resolves async, so on the first render `queryEnabled` is false and the
-    // OLD `queryEnabled && query.isLoading` returned FALSE — the panel rendered
-    // the ticket body, THEN identity resolved, the query enabled, isLoading
-    // flipped true → skeleton appeared (the blink), then data landed.
-    //
-    // Fix: for a fetchable ticket we are "loading" whenever we don't yet have
-    // the timeline to show — that includes the window while identity is still
-    // resolving (so we skeleton from the FIRST render, never the body) AND the
-    // cold query fetch (`data === undefined`). A background poll keeps
-    // `query.data` defined, so it never re-flashes the skeleton. Non-fetchable
-    // (optimistic/disabled) or a resolved-anon viewer → not loading.
-    isLoading:
-      fetchable &&
-      (identity.isLoading || (queryEnabled && query.data === undefined)),
+    isLoading: queryEnabled && query.isLoading,
     isFetching: query.isFetching,
     error: (query.error as Error | null) ?? null,
     refetch: () => {

@@ -43,13 +43,6 @@ export function getPlatformProductionUrl(platform: string): string {
       return process.env.NEXT_PUBLIC_FLAMINGO_URL || 'https://www.flamingo.run';
     case 'openframe':
       return process.env.NEXT_PUBLIC_OPENFRAME_URL || 'https://openframe.ai';
-    // OpenFrame product / dashboard — the "Start Free Trial" CTA target. DISTINCT from
-    // the `openframe` content hub above: production overrides that one to
-    // hub.openframe.ai via NEXT_PUBLIC_OPENFRAME_URL (the knowledge/docs deployment),
-    // so a product CTA must NOT reuse it. Defaults to the product apex so the CTA is
-    // correct even when the (optional) dashboard override is unset.
-    case 'openframe-dashboard':
-      return process.env.NEXT_PUBLIC_OPENFRAME_DASHBOARD_URL || 'https://openframe.ai';
     case 'universal':
       return process.env.NEXT_PUBLIC_FLAMINGO_URL || 'https://www.flamingo.run';
     default:
@@ -149,8 +142,6 @@ export function getAllPlatformBaseDomains(): string[] {
  * - NEXT_PUBLIC_TMCG_URL             -> www.tmcg.miami
  * - NEXT_PUBLIC_FLAMINGO_TEASER_URL  -> www.flamingo.cx
  * - NEXT_PUBLIC_OPENFRAME_URL        -> openframe.ai
- * - NEXT_PUBLIC_OPENFRAME_DASHBOARD_URL -> openframe.ai (product/dashboard CTA target;
- *     distinct from the openframe content hub, which prod points at hub.openframe.ai)
  *
  * @example
  * getBaseUrl() // Current app URL

@@ -1,6 +1,0 @@
-flowchart LR
-    Client["Browser / Client App"] --> Controllers["Auth Controllers"]
-    Controllers --> Services["Domain Services"]
-    Services --> Persistence["Authorization & Tenant Persistence"]
-    Services --> Security["Spring Security / OAuth2"]
-    Security --> Client

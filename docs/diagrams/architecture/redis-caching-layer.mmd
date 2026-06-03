@@ -1,0 +1,9 @@
+flowchart TD
+    Client["Client Request"] --> ApiService["API Service Layer"]
+    ApiService --> CacheCheck["Spring Cache Abstraction"]
+    CacheCheck -->|"Cache Hit"| Redis[("Redis")]
+    CacheCheck -->|"Cache Miss"| Database[("Primary Database")]
+    Database --> CacheStore["Store in Cache"]
+    CacheStore --> Redis
+    Redis --> ApiService
+    ApiService --> Client

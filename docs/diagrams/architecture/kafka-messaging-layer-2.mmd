@@ -1,0 +1,5 @@
+flowchart TD
+    Config["KafkaTopicProperties"] --> AutoConfig["OssTenantKafkaAutoConfiguration"]
+    AutoConfig --> Admin["KafkaAdmin"]
+    Admin --> Topics["NewTopic Definitions"]
+    Topics --> Broker["Kafka Cluster"]
