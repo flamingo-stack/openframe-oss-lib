@@ -1,7 +1,9 @@
 package com.openframe.authz.service.user;
 
 import com.openframe.authz.dto.InvitationRegistrationRequest;
+import com.openframe.authz.exception.OwnerCannotSwitchTenantException;
 import com.openframe.authz.exception.UserActiveInAnotherTenantException;
+import com.openframe.data.document.user.UserRole;
 import com.openframe.authz.service.processor.RegistrationProcessor;
 import com.openframe.authz.service.processor.UserDeactivationProcessor;
 import com.openframe.authz.service.validation.InvitationValidator;
@@ -64,16 +66,19 @@ public class InvitationRegistrationService {
      *   - when switchTenant=true: deactivate and continue (return null to proceed with creation)
      *   - otherwise: throw
      */
-    private AuthUser handleExistingActiveUser(AuthUser current,
+    private AuthUser handleExistingActiveUser(AuthUser user,
                                               String targetTenantId,
                                               AuthInvitation invitation,
                                               InvitationRegistrationRequest request) {
-        if (targetTenantId.equals(current.getTenantId())) {
-            return current;
+        if (targetTenantId.equals(user.getTenantId())) {
+            return user;
         }
         if (TRUE.equals(request.getSwitchTenant())) {
-            userService.deactivateUser(current);
-            userDeactivationProcessor.postProcessDeactivation(current);
+            if (user.getRoles().contains(UserRole.OWNER)) {
+                throw new OwnerCannotSwitchTenantException(invitation.getEmail());
+            }
+            userService.deactivateUser(user);
+            userDeactivationProcessor.postProcessDeactivation(user);
             return null;
         }
         throw new UserActiveInAnotherTenantException(invitation.getEmail());

@@ -51,6 +51,7 @@ public enum ErrorCode {
 
     // Authorization specific
     USER_ACTIVE_IN_ANOTHER_TENANT("USER_IS_ACTIVE_IN_ANOTHER_TENANT", 409),
+    OWNER_CANNOT_SWITCH_TENANT("OWNER_CANNOT_SWITCH_TENANT", 409),
 
     // Infrastructure error codes
     TYPE_MISMATCH("TYPE_MISMATCH", 400),
