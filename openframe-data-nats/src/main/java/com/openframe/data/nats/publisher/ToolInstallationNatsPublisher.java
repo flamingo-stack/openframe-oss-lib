@@ -37,7 +37,7 @@ public class ToolInstallationNatsPublisher {
     public void publish(String machineId, IntegratedToolAgent toolAgent, IntegratedTool tool, boolean reinstall) {
         String topicName = buildTopicName(machineId);
         ToolInstallationMessage message = buildMessage(toolAgent, tool, reinstall);
-        natsMessagePublisher.publish(topicName, message);
+        natsMessagePublisher.publishPersistent(topicName, message);
     }
 
     private String buildTopicName(String machineId) {
