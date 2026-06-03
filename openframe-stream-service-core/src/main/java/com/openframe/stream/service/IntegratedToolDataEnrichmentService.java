@@ -71,6 +71,7 @@ public class IntegratedToolDataEnrichmentService implements DataEnrichmentServic
     private void enrichFromTenant(DeserializedDebeziumMessage message, IntegratedToolEnrichedData enriched) {
         if (clusterTenantIdResolver == null) {
             enriched.setTenantId(tenantIdProvider.getTenantId());
+            message.setTenantId(enriched.getTenantId());
             return;
         }
         String tenantId = clusterTenantIdResolver.resolveTenantId(message.getTenantId());
