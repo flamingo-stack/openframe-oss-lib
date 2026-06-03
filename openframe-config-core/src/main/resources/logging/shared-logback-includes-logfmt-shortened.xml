@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<included debug="true" scan="false">
+
+    <!--
+      DEV-ONLY variant of shared-logback-includes-logfmt.xml that shortens stack traces with
+      net.logstash.logback.stacktrace.ShortenedThrowableConverter (depth 30, maxLength 2048,
+      rootCauseFirst, inlineHash, framework-frame exclusions).
+
+      TEXT appenders use the `exShort` conversion word (registered in the parent
+      shared-logback-spring-logfmt-shortened.xml). Option order:
+      maxDepthPerThrowable, shortenedClassNameLength(full=no shortening), maxLength,
+      then keyword options (rootFirst, inlineHash), then frame-exclusion regexes.
+      %replace(...) flattens newlines so the whole trace stays on one logfmt line.
+
+      IMPORTANT: the conversion-word options are processed by logback's ${} variable-substitution
+      parser, which mis-handles a literal '$'. So the text exclusion regexes are written WITHOUT
+      '$' (CGLIB frames matched as substrings; no trailing-anchor on Thread.run). The JSON
+      <exclude> elements below are plain element text and keep the canonical '$' anchors.
+      Both lists target the same frames. Verified against logback 1.5.6 + logstash-encoder 8.0.
+    -->
+
+    <!-- Console Appender in logfmt -->
+    <appender name="ConsoleAppender" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <pattern>ts=%d{yyyy-MM-dd'T'HH:mm:ss.SSSX} level=%-5level service=${SPRING_APP_NAME} logger=%logger{36} thread=%thread msg="%replace(%msg){'\r?\n',' '}" stack="%replace(%exShort{30,full,2048,rootFirst,inlineHash,FastClassByCGLIB,EnhancerBySpringCGLIB,^sun\.reflect\..*\.invoke,^com\.sun\.,^sun\.net\.,^net\.sf\.cglib\.proxy\.MethodProxy\.invoke,^org\.springframework\.cglib\.,^org\.springframework\.transaction\.,^org\.springframework\.validation\.,^org\.springframework\.app\.,^org\.springframework\.aop\.,^java\.lang\.reflect\.Method\.invoke,^org\.springframework\.ws\..*\.invoke,^org\.springframework\.ws\.transport\.,^org\.springframework\.ws\.soap\.saaj\.SaajSoapMessage\.,^org\.springframework\.ws\.client\.core\.WebServiceTemplate\.,^org\.springframework\.web\.filter\.,^org\.apache\.tomcat\.,^org\.apache\.catalina\.,^org\.apache\.coyote\.,^java\.util\.concurrent\.ThreadPoolExecutor\.runWorker,^java\.lang\.Thread\.run}){'\r?\n',' | '}"%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Rolling File Appender (Text Format - logfmt) -->
+    <appender name="RollingFileAppender" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/${SPRING_APP_NAME}.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/${SPRING_APP_NAME}.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <totalSizeCap>50MB</totalSizeCap>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <pattern>ts=%d{yyyy-MM-dd'T'HH:mm:ss.SSSX} level=%-5level service=${SPRING_APP_NAME} logger=%logger{36} thread=%thread msg="%replace(%msg){'\r?\n',' '}" stack="%replace(%exShort{30,full,2048,rootFirst,inlineHash,FastClassByCGLIB,EnhancerBySpringCGLIB,^sun\.reflect\..*\.invoke,^com\.sun\.,^sun\.net\.,^net\.sf\.cglib\.proxy\.MethodProxy\.invoke,^org\.springframework\.cglib\.,^org\.springframework\.transaction\.,^org\.springframework\.validation\.,^org\.springframework\.app\.,^org\.springframework\.aop\.,^java\.lang\.reflect\.Method\.invoke,^org\.springframework\.ws\..*\.invoke,^org\.springframework\.ws\.transport\.,^org\.springframework\.ws\.soap\.saaj\.SaajSoapMessage\.,^org\.springframework\.ws\.client\.core\.WebServiceTemplate\.,^org\.springframework\.web\.filter\.,^org\.apache\.tomcat\.,^org\.apache\.catalina\.,^org\.apache\.coyote\.,^java\.util\.concurrent\.ThreadPoolExecutor\.runWorker,^java\.lang\.Thread\.run}){'\r?\n',' | '}"%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- JSON rolling appender with shortened stack trace -->
+    <appender name="JsonRollingFileAppender" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/${SPRING_APP_NAME}.json</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/${SPRING_APP_NAME}.%d{yyyy-MM-dd}.%i.json</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <totalSizeCap>50MB</totalSizeCap>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp />
+                <logLevel />
+                <threadName />
+                <loggerName />
+                <message />
+                <stackTrace>
+                    <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+                        <maxDepthPerThrowable>30</maxDepthPerThrowable>
+                        <maxLength>2048</maxLength>
+                        <rootCauseFirst>true</rootCauseFirst>
+                        <inlineHash>true</inlineHash>
+
+                        <!-- https://github.com/logfellow/logstash-logback-encoder/blob/main/stack-hash.md#recommended-exclusion-patterns -->
+                        <!-- generated class names -->
+                        <exclude>\$\$FastClassByCGLIB\$\$</exclude>
+                        <exclude>\$\$EnhancerBySpringCGLIB\$\$</exclude>
+                        <exclude>^sun\.reflect\..*\.invoke</exclude>
+                        <!-- JDK internals -->
+                        <exclude>^com\.sun\.</exclude>
+                        <exclude>^sun\.net\.</exclude>
+                        <!-- dynamic invocation -->
+                        <exclude>^net\.sf\.cglib\.proxy\.MethodProxy\.invoke</exclude>
+                        <exclude>^org\.springframework\.cglib\.</exclude>
+                        <exclude>^org\.springframework\.transaction\.</exclude>
+                        <exclude>^org\.springframework\.validation\.</exclude>
+                        <exclude>^org\.springframework\.app\.</exclude>
+                        <exclude>^org\.springframework\.aop\.</exclude>
+                        <exclude>^java\.lang\.reflect\.Method\.invoke</exclude>
+                        <!-- Spring plumbing -->
+                        <exclude>^org\.springframework\.ws\..*\.invoke</exclude>
+                        <exclude>^org\.springframework\.ws\.transport\.</exclude>
+                        <exclude>^org\.springframework\.ws\.soap\.saaj\.SaajSoapMessage\.</exclude>
+                        <exclude>^org\.springframework\.ws\.client\.core\.WebServiceTemplate\.</exclude>
+                        <exclude>^org\.springframework\.web\.filter\.</exclude>
+                        <!-- Tomcat internals -->
+                        <exclude>^org\.apache\.tomcat\.</exclude>
+                        <exclude>^org\.apache\.catalina\.</exclude>
+                        <exclude>^org\.apache\.coyote\.</exclude>
+                        <exclude>^java\.util\.concurrent\.ThreadPoolExecutor\.runWorker</exclude>
+                        <exclude>^java\.lang\.Thread\.run$</exclude>
+                    </throwableConverter>
+                </stackTrace>
+            </providers>
+        </encoder>
+    </appender>
+
+    <!-- Add all appenders to root -->
+    <root level="info">
+        <appender-ref ref="ConsoleAppender" />
+        <appender-ref ref="RollingFileAppender" />
+        <appender-ref ref="JsonRollingFileAppender" />
+    </root>
+</included>
